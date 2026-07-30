@@ -37,6 +37,7 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path("server/services/factory/postOffloadImpactPreview.ts")
           text = path.read_text()
@@ -49,62 +50,50 @@ jobs:
               "const fetched = await getFxRateToUsdReadOnly(",
           )
 
-          old_fingerprint = '''export async function computePostOffloadImpactStateFingerprint(
-            companyId: number,
-            containerId: number,
-          ): Promise<string> {
-            const state = await loadPreviewState(companyId, containerId);
-            return stableHash({
-              container: state.container,
-              activeCharges: [...state.activeCharges].sort((left, right) => left.id - right.id),
-              commission: state.commission,
-              otherCharges: [...state.otherCharges].sort((left, right) => left.id - right.id),
-              rawStockRows: [...state.rawStockRows].sort((left, right) => left.id - right.id),
-              supplier: state.supplier,
-              supplierRemainingKg: formatFactoryQuantity(state.supplierRemainingKg),
-            });
-          }
-          '''
-          new_fingerprint = '''function fingerprintPostOffloadImpactState(
+          if "function fingerprintPostOffloadImpactState(" not in text:
+              pattern = re.compile(
+                  r'export async function computePostOffloadImpactStateFingerprint\(\s*'
+                  r'companyId: number,\s*containerId: number,\s*\): Promise<string> \{\s*'
+                  r'const state = await loadPreviewState\(companyId, containerId\);\s*'
+                  r'return stableHash\(\{(?P<body>.*?)\}\);\s*\}',
+                  re.S,
+              )
+              match = pattern.search(text)
+              if not match:
+                  raise SystemExit("fingerprint function not found")
+              body = match.group("body")
+              replacement = f'''function fingerprintPostOffloadImpactState(
             state: Awaited<ReturnType<typeof loadPreviewState>>,
-          ): string {
-            return stableHash({
-              container: state.container,
-              activeCharges: [...state.activeCharges].sort((left, right) => left.id - right.id),
-              commission: state.commission,
-              otherCharges: [...state.otherCharges].sort((left, right) => left.id - right.id),
-              rawStockRows: [...state.rawStockRows].sort((left, right) => left.id - right.id),
-              supplier: state.supplier,
-              supplierRemainingKg: formatFactoryQuantity(state.supplierRemainingKg),
-            });
-          }
+          ): string {{
+            return stableHash({{{body}}});
+          }}
 
           export async function computePostOffloadImpactStateFingerprint(
             companyId: number,
             containerId: number,
-          ): Promise<string> {
+          ): Promise<string> {{
             return fingerprintPostOffloadImpactState(await loadPreviewState(companyId, containerId));
-          }
-          '''
-          if old_fingerprint not in text:
-              raise SystemExit("fingerprint block not found")
-          text = text.replace(old_fingerprint, new_fingerprint)
+          }}'''
+              text = text[:match.start()] + replacement + text[match.end():]
 
-          old_parallel = '''  const [scope, replaySafety, stateFingerprint] = await Promise.all([
+          parallel_pattern = re.compile(
+              r'\s*const \[scope, replaySafety, stateFingerprint\] = await Promise\.all\(\[\s*'
+              r'loadImpactScope\(input\.companyId, state\.container\.supplierId\),\s*'
+              r'loadReplaySafety\(input\.companyId, state\.container\.supplierId\),\s*'
+              r'computePostOffloadImpactStateFingerprint\(input\.companyId, input\.containerId\),\s*'
+              r'\]\);',
+              re.S,
+          )
+          replacement = '''
+          const [scope, replaySafety] = await Promise.all([
             loadImpactScope(input.companyId, state.container.supplierId),
             loadReplaySafety(input.companyId, state.container.supplierId),
-            computePostOffloadImpactStateFingerprint(input.companyId, input.containerId),
           ]);
-          '''
-          new_parallel = '''  const [scope, replaySafety] = await Promise.all([
-            loadImpactScope(input.companyId, state.container.supplierId),
-            loadReplaySafety(input.companyId, state.container.supplierId),
-          ]);
-          const stateFingerprint = fingerprintPostOffloadImpactState(state);
-          '''
-          if old_parallel not in text:
+          const stateFingerprint = fingerprintPostOffloadImpactState(state);'''
+          text, count = parallel_pattern.subn(replacement, text, count=1)
+          if count != 1 and "const stateFingerprint = fingerprintPostOffloadImpactState(state);" not in text:
               raise SystemExit("parallel fingerprint block not found")
-          text = text.replace(old_parallel, new_parallel)
+
           path.write_text(text)
           PY
 
