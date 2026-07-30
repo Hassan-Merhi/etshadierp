@@ -60,6 +60,18 @@ describe("Phase 13 release identity", () => {
     });
   });
 
+  it("requires an approved commit for every production startup", () => {
+    expect(() =>
+      resolveReleaseIdentity(
+        {
+          NODE_ENV: "production",
+          RENDER_GIT_COMMIT: COMMIT,
+        },
+        true,
+      ),
+    ).toThrow("RELEASE_EXPECTED_COMMIT is required in production");
+  });
+
   it("fails closed when the deployed commit differs from approval", () => {
     expect(() =>
       resolveReleaseIdentity(
@@ -75,7 +87,13 @@ describe("Phase 13 release identity", () => {
 
   it("rejects abbreviated commit identities and unsafe release IDs", () => {
     expect(() =>
-      resolveReleaseIdentity({ RENDER_GIT_COMMIT: "12345678" }, true),
+      resolveReleaseIdentity(
+        {
+          RENDER_GIT_COMMIT: "12345678",
+          RELEASE_EXPECTED_COMMIT: COMMIT,
+        },
+        true,
+      ),
     ).toThrow("full 40-character Git SHA");
     expect(() =>
       resolveReleaseIdentity({ RELEASE_ID: "release id with spaces" }, false),
