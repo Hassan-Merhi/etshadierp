@@ -112,12 +112,10 @@ beforeAll(async () => {
   try {
     await sweepAll();
   } finally {
-    // Drop this suite's company here rather than in afterAll. Several endpoints
-    // are only well-defined when exactly one ERP company exists - supplier
-    // opening balances refuse to resolve a parent company otherwise - so
-    // leaving a second ERP company alive for even part of another suite's run
-    // makes unrelated tests fail. Nothing below needs the fixture: the results
-    // are already captured in `failures`.
+    // Drop this suite's company as soon as the walk finishes rather than in
+    // afterAll. Nothing below needs the fixture - the results are already
+    // captured in `failures` - and releasing it early keeps the window in which
+    // a second ERP company exists as short as possible.
     await cleanupTestData(TEST_PREFIX);
   }
 

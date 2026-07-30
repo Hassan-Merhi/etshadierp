@@ -5,14 +5,10 @@ import path from "path";
  * The API smoke sweep runs as its own Vitest invocation, not as part of the
  * backend suite.
  *
- * The sweep needs a seeded ERP company for the ~3 seconds it takes to call
- * every read endpoint. Several endpoints are only well-defined when exactly one
- * ERP company exists — `resolveParentCompanyId()` refuses to guess which
- * company owns legacy supplier opening balances otherwise — so while the sweep
- * holds its fixture, any other suite that also holds an ERP company sees two
- * and fails. Backend test files are not guaranteed to be serialised against
- * each other, so isolating the sweep at the process level is the only reliable
- * separation.
+ * It is kept separate for signal, not isolation: the sweep calls several hundred
+ * endpoints in one hook, so a failure here means "an endpoint stopped
+ * responding", which is worth its own red/green in CI rather than being buried
+ * in a two-thousand-test run. It also keeps the unit suite's runtime honest.
  *
  *     npm run test:smoke-sweep
  */

@@ -289,7 +289,6 @@
       "server/services/factoryContainerTrackingService.ts": 1275,
       "server/services/schedulerService.ts": 1225,
       "server/services/spSalesFormExport.ts": 925,
-      "server/startupSchema.ts": 4325,
       "server/storage/accounting.ts": 1750,
       "server/storage/containers.ts": 1300,
       "server/storage/stockOps.ts": 1275,

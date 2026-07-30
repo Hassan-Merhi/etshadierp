@@ -5,7 +5,7 @@ the TypeScript source. This document describes the program for splitting them
 and — more importantly — the safety harness that makes those splits verifiable
 rather than hopeful.
 
-Phase 0 (the harness) is complete. Phases 1–6 are not started.
+Phase 0 (the harness) and Phase 1 are complete. Phases 2–6 are not started.
 
 ## Why a harness came first
 
@@ -73,12 +73,8 @@ Each request has a 15s deadline, because a handler that throws without
 responding would otherwise hang CI rather than fail it.
 
 The sweep runs as its own Vitest invocation (`npm run test:smoke-sweep`, wired
-into CI as a separate step) rather than inside the backend suite. It holds a
-seeded ERP company for the few seconds it takes to walk the read surface, and
-several endpoints are only well-defined when exactly one ERP company exists —
-`resolveParentCompanyId()` refuses to guess which company owns legacy supplier
-opening balances otherwise. Backend test files are not serialised against each
-other, so process-level isolation is the only reliable separation.
+into CI as a separate step) so that "an endpoint stopped responding" stays a
+distinct signal rather than one red line inside a two-thousand-test run.
 
 ### 0.3 Source-text assertion triage (`config/source-text-assertion-baseline.json`)
 
@@ -142,12 +138,15 @@ npm run audit:god-files
 
 | Phase | Scope | Notes |
 |---|---|---|
-| 1 | `server/startupSchema.ts` | 4,312 lines, a single array of 1,212 SQL strings, one import, one export. Order is load-bearing — assert the joined array is unchanged. |
+| 1 | ~~`server/startupSchema.ts`~~ | **Done.** Split into ten parts under `server/startup-schema/`, largest 772 lines. Order preserved and proven by a sha256 pin of the assembled array in `tests/startup-schema-integrity.test.ts`. |
 | 2 | Delete before splitting | ~10,300 lines across 7 `*Legacy` / dead-version files. The manifest identifies which server ones are unreachable. |
 | 3 | Route monoliths (~71 files) | Split by URL prefix into a directory with an `index.ts` barrel. Start somewhere self-contained, not factory. |
 | 4 | Page components (~63 files) | Extract types, then pure helpers, then sub-components, then hooks — strictly safest first. |
 | 5 | `shared/schema/*.ts` | Highest blast radius, lowest urgency. Barrel must preserve every export name. |
 | 6 | Tighten the ratchet | Lower `softMaxLines` as the backlog empties. |
+
+Phase 1 removed 4,312 lines from the backlog, which now stands at 161 files and
+98,924 excess lines.
 
 Phases 3 and 4 touch disjoint trees and can run in parallel.
 
@@ -172,11 +171,13 @@ These were surfaced by the harness and are not yet acted on:
   foreign key after a read-only sweep.
 - **A `GET` endpoint persists `equity_adjustment_<companyId>` rows** into the
   global `system_settings` table, so a read-only pass leaves state behind.
-- **The backend suite is flaky on `/api/accounts/all`.** Two runs of identical
-  code produced 8 and then 14 failures. The cause is `resolveParentCompanyId()`,
-  which throws when `parentCompanyId` is unset and more than one ERP company
-  exists; test files are not serialised, so any two suites holding an ERP
-  fixture company at the same time break each other. Affected assertions live in
-  `accounting`, `api-smoke`, `permissions`, and
-  `rental-payment-accounting-reconciliation`. Worth fixing before the split
-  phases begin — a suite that fails randomly cannot certify a refactor.
+- **The backend suite was non-deterministic — now fixed.** Two runs of identical
+  code produced 8 and then 14 failures. `resolveParentCompanyId()` throws when
+  the `parentCompanyId` setting is unset and more than one ERP company exists,
+  and companies default to `companyType: "erp"`, so any suite that created a
+  second company broke every endpoint reading supplier balances. Test files were
+  also running in parallel against one shared database, so suites observed each
+  other's fixtures. Both are fixed: `seedTestData` pins the setting, and
+  `fileParallelism: false` serialises the files. The suite now produces
+  byte-identical results across runs, at 378s instead of 165s — a cost worth
+  paying, since a suite that fails randomly cannot certify a refactor.

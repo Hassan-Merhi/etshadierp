@@ -230,9 +230,8 @@ jobs:
 
       - name: API smoke sweep
         id: smoke_sweep
-        # Runs as its own invocation: the sweep holds an ERP fixture company
-        # while it walks the whole read surface, which collides with any other
-        # suite holding one.
+        # Its own step so that "an endpoint stopped responding" is a distinct
+        # signal from a unit-test failure.
         if: always() && steps.runtime_migrations.outcome == 'success'
         run: |
           set -o pipefail

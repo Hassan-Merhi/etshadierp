@@ -5,7 +5,7 @@
 - **Existing and production deployments are unaffected.** Their databases already
   contain the core tables, so every startup migration runs (or no-ops) cleanly.
 - A **brand-new, empty database** cannot fully bootstrap from the app alone today:
-  the startup migration array in `server/startupSchema.ts` **adds columns to and
+  the startup migration array in `server/startup-schema/` **adds columns to and
   indexes** core tables such as `companies` and `vouchers`, but it **does not
   create those core tables**. On a truly empty DB those statements fail with
   `relation "companies" does not exist`, surfacing as "N migration(s) failed at
@@ -22,7 +22,7 @@ Two facts combine:
 
 1. **`drizzle-kit push` is intentionally disabled.** Per `docs/deployment.md`,
    runtime schema is driven solely by the idempotent SQL array in
-   `server/startupSchema.ts` (extracted from `server/index.ts`); `drizzle-kit
+   `server/startup-schema/` (extracted from `server/index.ts`); `drizzle-kit
    push` is documented as "blocked by schema drift" and must not be run.
 2. **The runtime array is not self-sufficient for a cold start.** It contains
    ~176 `CREATE TABLE IF NOT EXISTS` statements for tables added *over time*, plus
@@ -35,7 +35,7 @@ Two facts combine:
 
 ## Verification notes
 
-- `server/startupSchema.ts` has **0** `CREATE TABLE … companies` / `… vouchers`
+- `server/startup-schema/` has **0** `CREATE TABLE … companies` / `… vouchers`
   statements, but multiple `ALTER TABLE companies …` / `ALTER TABLE vouchers …`.
 - Booting the built server against a truly empty Postgres reproduces the failures;
   booting against a database that already has the core schema does not. The

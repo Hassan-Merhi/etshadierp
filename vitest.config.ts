@@ -9,12 +9,17 @@ export default defineConfig({
     hookTimeout: 30000,
     setupFiles: ["./server/supplierCompanyScopeBridge.mjs"],
     include: ["tests/**/*.test.ts"],
-    // The smoke sweep holds an ERP fixture company while it walks the whole
-    // read surface, which collides with any other suite holding one. It runs as
-    // its own invocation instead: npm run test:smoke-sweep
+    // The smoke sweep runs as its own invocation so that "an endpoint stopped
+    // responding" is a separate CI signal: npm run test:smoke-sweep
     exclude: ["tests/ui/**", "tests/api-smoke-sweep.test.ts"],
     pool: "forks",
-    singleFork: true,
+    // Backend suites share one database and several process-global settings
+    // (notably system_settings.parentCompanyId). Running files in parallel lets
+    // one suite's fixture company be observed by another, which made results
+    // vary run to run. `singleFork` alone does not serialise files - it is not a
+    // recognised top-level option - so file parallelism is disabled explicitly.
+    fileParallelism: false,
+    poolOptions: { forks: { singleFork: true } },
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary"],

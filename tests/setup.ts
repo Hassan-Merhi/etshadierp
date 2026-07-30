@@ -6,7 +6,6 @@ import { pool } from "../server/db";
 import { eq, and, sql } from "drizzle-orm";
 import * as schema from "../shared/schema";
 import { KNOWN_SECURITY_PERMISSIONS } from "../server/services/security/namedPermissionService";
-import { setParentCompanyId } from "../server/storage/accounting";
 
 let testApp: express.Express;
 let testServer: any;
@@ -147,8 +146,10 @@ export async function cleanupTestData(prefix: string): Promise<void> {
   }
 
   // Drop the parent-company pin with the fixture that owned it, so a later run
-  // cannot resolve a parent company that no longer exists.
-  await setParentCompanyId(null);
+  // cannot resolve a parent company that no longer exists. A delete is used
+  // rather than setParentCompanyId(null) because it is idempotent and cannot
+  // race another suite into a duplicate-key insert.
+  await pool.query("DELETE FROM system_settings WHERE key = 'parentCompanyId'");
 }
 
 export async function seedTestData(prefix: string): Promise<TestContext> {
@@ -186,10 +187,18 @@ export async function seedTestData(prefix: string): Promise<TestContext> {
   // creates a second company - which several do, to exercise isolation - every
   // endpoint that reads supplier balances starts returning 500, including
   // /api/accounts/all. Configuring the setting is what a real deployment is
-  // required to do, and it makes resolution deterministic no matter how many
+  // required to do, and it makes resolution succeed no matter how many
   // companies a test creates. In the single-company case it resolves to exactly
   // the same company the fallback would have chosen.
-  await setParentCompanyId(company.id);
+  //
+  // Written as an upsert rather than through setParentCompanyId(): test files
+  // are not serialised, and system_settings.key is unique, so a read-then-
+  // insert loses the race when two suites seed at the same moment.
+  await pool.query(
+    `INSERT INTO system_settings (key, value) VALUES ('parentCompanyId', $1)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+    [String(company.id)],
+  );
 
   await db.insert(schema.userCompanyRoles).values({
     userId: user.id,
