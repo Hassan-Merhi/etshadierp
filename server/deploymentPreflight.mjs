@@ -1,3 +1,5 @@
+import { resolveReleaseIdentity } from "./releaseIdentityPolicy.mjs";
+
 const isProduction = process.env.NODE_ENV === "production";
 
 function parseBoundedInteger(name, fallback, min, max) {
@@ -43,9 +45,10 @@ const port = parseBoundedInteger("PORT", 5000, 1, 65535);
 const sessionPoolMax = parseBoundedInteger("PG_SESSION_POOL_MAX", 3, 1, 20);
 const shutdownGraceMs = parseBoundedInteger("SHUTDOWN_GRACE_MS", 25000, 1000, 120000);
 const databaseSource = resolveDatabaseSource();
+const releaseIdentity = resolveReleaseIdentity(process.env, isProduction);
 const buildVersion =
   process.env.BUILD_VERSION?.trim() ||
-  process.env.RENDER_GIT_COMMIT?.trim()?.slice(0, 8) ||
+  releaseIdentity.commitSha?.slice(0, 12) ||
   process.env.REPL_SLUG?.trim() ||
   "dev";
 
@@ -56,6 +59,7 @@ export const deploymentRuntimeConfig = Object.freeze({
   shutdownGraceMs,
   databaseSource,
   buildVersion,
+  ...releaseIdentity,
 });
 
 console.log("[DeploymentPreflight] configuration accepted", {
@@ -63,6 +67,10 @@ console.log("[DeploymentPreflight] configuration accepted", {
   port,
   databaseSource,
   buildVersion,
+  commitSha: releaseIdentity.commitSha,
+  expectedCommitSha: releaseIdentity.expectedCommitSha,
+  commitVerified: releaseIdentity.commitVerified,
+  releaseId: releaseIdentity.releaseId,
   sessionPoolMax,
   shutdownGraceMs,
 });
