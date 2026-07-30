@@ -1,0 +1,172 @@
+name: Phase 4 Correctness Fix
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase4-correctness-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  harden:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v7
+        with:
+          ref: fix/phase-4-post-offload-impact-preview
+          fetch-depth: 0
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Normalize registry and install
+        run: |
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+          npm ci --no-audit --bin-links=true
+
+      - name: Apply preview correctness hardening
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          service_path = Path("server/services/factory/postOffloadImpactPreview.ts")
+          text = service_path.read_text()
+
+          text = text.replace(
+              'import { getAuthoritativeSupplierRemainingKg } from "./rawStockLockedRate";',
+              '''import {
+            getAuthoritativeSupplierRemainingKg,
+            getLockedSupplierRateReadOnly,
+          } from "./rawStockLockedRate";''',
+          )
+
+          supplier_quantity = '''  const supplierRemainingKg = container.supplierId
+            ? await getAuthoritativeSupplierRemainingKg(db, companyId, container.supplierId)
+            : 0;
+          '''
+          supplier_with_rate = '''  const supplierRemainingKg = container.supplierId
+            ? await getAuthoritativeSupplierRemainingKg(db, companyId, container.supplierId)
+            : 0;
+          const supplierLockedRate = container.supplierId
+            ? (await getLockedSupplierRateReadOnly(db, companyId, container.supplierId)).rate
+            : null;
+          '''
+          if "const supplierLockedRate = container.supplierId" not in text:
+              if supplier_quantity not in text:
+                  raise SystemExit("supplier quantity block not found")
+              text = text.replace(supplier_quantity, supplier_with_rate)
+
+          return_marker = '''    supplier,
+            supplierRemainingKg,
+            receivedKg,
+          '''
+          return_replacement = '''    supplier,
+            supplierRemainingKg,
+            supplierLockedRate,
+            receivedKg,
+          '''
+          if "supplierLockedRate," not in text.split("return {", 2)[-1]:
+              if return_marker not in text:
+                  raise SystemExit("preview state return block not found")
+              text = text.replace(return_marker, return_replacement, 1)
+
+          fingerprint_marker = '''    supplier: state.supplier,
+            supplierRemainingKg: formatFactoryQuantity(state.supplierRemainingKg),
+          '''
+          fingerprint_replacement = '''    supplier: state.supplier,
+            supplierRemainingKg: formatFactoryQuantity(state.supplierRemainingKg),
+            supplierLockedRate:
+              state.supplierLockedRate === null
+                ? null
+                : formatFactoryLockedRate(state.supplierLockedRate),
+          '''
+          if "state.supplierLockedRate === null" not in text:
+              if fingerprint_marker not in text:
+                  raise SystemExit("fingerprint supplier block not found")
+              text = text.replace(fingerprint_marker, fingerprint_replacement, 1)
+
+          text = text.replace(
+              "const currentSupplierRate = state.supplier?.rate ?? null;",
+              "const currentSupplierRate = state.supplierLockedRate;",
+          )
+
+          verification_marker = '''  const stateFingerprint = await computePostOffloadImpactStateFingerprint(input.companyId, input.containerId);
+            if (stateFingerprint !== payload.stateFingerprint) {
+              throw new StalePostOffloadImpactPreviewError();
+            }
+
+            return payload.preview;
+          '''
+          verification_replacement = '''  const stateFingerprint = await computePostOffloadImpactStateFingerprint(input.companyId, input.containerId);
+            if (stateFingerprint !== payload.stateFingerprint) {
+              throw new StalePostOffloadImpactPreviewError();
+            }
+
+            const recomputed = await preparePostOffloadImpactPreview({
+              companyId: input.companyId,
+              userId: input.userId,
+              containerId: input.containerId,
+              transactionDate,
+              charges: input.charges,
+            });
+            if (stableHash(recomputed.preview) !== stableHash(payload.preview)) {
+              throw new StalePostOffloadImpactPreviewError(
+                "Post-offload cost impact changed after preview. Review the updated impact before saving.",
+              );
+            }
+
+            return payload.preview;
+          '''
+          if "const recomputed = await preparePostOffloadImpactPreview" not in text:
+              if verification_marker not in text:
+                  raise SystemExit("verification tail not found")
+              text = text.replace(verification_marker, verification_replacement)
+
+          service_path.write_text(text)
+
+          test_path = Path("tests/factory-post-offload-impact-preview.test.ts")
+          tests = test_path.read_text()
+          tests = tests.replace(
+              'expect(service).toContain("calculateRateAfterInventoryValueDelta");',
+              'expect(service).toContain("calculateRateAfterInventoryValueDelta");\n    expect(service).toContain("getLockedSupplierRateReadOnly");',
+          )
+          tests = tests.replace(
+              'expect(service).toContain("StalePostOffloadImpactPreviewError");',
+              'expect(service).toContain("StalePostOffloadImpactPreviewError");\n    expect(service).toContain("const recomputed = await preparePostOffloadImpactPreview");\n    expect(service).toContain("stableHash(recomputed.preview)");',
+          )
+          test_path.write_text(tests)
+          PY
+
+      - name: Format changed files
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            server/services/factory/postOffloadImpactPreview.ts \
+            tests/factory-post-offload-impact-preview.test.ts
+
+      - name: Verify focused implementation
+        run: |
+          npm run check
+          node node_modules/vitest/vitest.mjs run tests/factory-post-offload-impact-preview.test.ts --maxWorkers=1 --no-file-parallelism
+
+      - name: Commit hardening
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/services/factory/postOffloadImpactPreview.ts tests/factory-post-offload-impact-preview.test.ts
+          if git diff --cached --quiet; then
+            echo "No correctness changes required"
+            exit 0
+          fi
+          git commit -m "fix: bind preview to derived rate and recomputed impact"
+          git pull --rebase origin fix/phase-4-post-offload-impact-preview
+          git push origin HEAD:fix/phase-4-post-offload-impact-preview
