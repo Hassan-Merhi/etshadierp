@@ -74,15 +74,10 @@ export function computeContainerLandedCost(
     };
   }
 
-  // Per-kg denominator: use actualReceivedKg when provided so the stored cost/kg
-  // reflects what was actually received — matching the dialog's live estimate.
-  // The material payable total (basePayable) still uses the full declared weight
-  // (originalCostBasisKg) because that is what was contractually agreed with the supplier.
-  const receivedKgRaw = parseFloat((container as any).actualReceivedKg || "0");
-  const allocationKg =
-    receivedKgRaw > 0
-      ? factoryCostDecimal(String(receivedKgRaw), "container.actualReceivedKg")
-      : originalCostBasisKg;
+  // Allocate the full material value and fixed landed charges over the original
+// agreed container quantity. Partial receipts must keep the same fixed cost/kg
+// as later receipts and the final offload.
+const allocationKg = originalCostBasisKg;
   const dFxRate = factoryCostDecimal(fxRate, "container.fxRateToUsd", { allowZero: false });
   const baseRate = factoryCostDecimal(container.ratePerKg || "0", "container.ratePerKg");
   const basePayable = calculateCostLine(originalCostBasisKg, baseRate).totalCost;
