@@ -127,9 +127,9 @@ if (debtResult.status !== 0) {
 
 const documentation = "docs/engineering/phase12-business-regression-suite.md";
 for (const marker of [
-  "coverage gates",
-  "route-policy matrix",
-  "critical test-debt budget",
+  "Coverage gates",
+  "Route-policy matrix",
+  "Critical test-debt budget",
   "cost memory",
   "rollback-safe",
   "not executed",
