@@ -1,264 +1,211 @@
-# Production Deployment Checklist — Phase 23
+# Production Deployment Checklist
 
-**Date:** 2026-06-26  
-**Status after audit:** ✅ READY FOR DEPLOYMENT
+## Status
 
----
+This is an operator checklist, not a historical pass report. **No release is ready until evidence verification passes** for the exact commit that will be deployed.
 
-## 1. Commands Run and Results
+Do not copy results from an older deployment, another branch, or another database. A command that was not executed is `pending`, not `passed`.
 
-| Command | Result |
-|---|---|
-| `npx vite build` | ✅ EXIT 0 — 4505 modules transformed |
-| `npx vitest run` | ✅ EXIT 0 — 5 files, 90 passed, 6 skipped (48s) |
-| `npm run lint` | ✅ 0 errors — 2329 pre-existing warnings, unchanged |
-| `npm run check` (`tsc --noEmit`) | ⏱️ Times out >2 min — known limitation, documented in `replit.md`. Not a deployment blocker. |
-| `npm run format:check` | ⏱️ Times out in CI — formatting is cosmetic, not a deployment blocker. |
+## 1. Freeze the release
 
----
+Record the full 40-character commit SHA and create the evidence file:
 
-## 2. Build and Start Commands
-
-| Step | Command |
-|---|---|
-| **Build** | `npx vite build && npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist` |
-| **Start** | `node dist/index.js` |
-| **Dev** | `NODE_ENV=development tsx server/index.ts` |
-
-**Frontend output:** `dist/public/` (served from `import.meta.dirname + "/public"` → `dist/public/`)  
-**Server output:** `dist/index.js`  
-**Static serving:** `express.static(distPath)` + SPA fallback `res.sendFile(…/index.html)` — confirmed in `server/vite.ts:79` and `server/index.ts:4319`
-
----
-
-## 3. Node Version
-
-| Setting | Value |
-|---|---|
-| `.node-version` (pinned) | `20.19.2` |
-| Runtime (`node --version`) | `v20.20.0` |
-
-Minor patch difference — not a concern. Both are Node 20 LTS. Set `NODE_VERSION=20` in the deployment environment.
-
----
-
-## 4. Required Environment Variables
-
-These **must** be set before the app will start in production:
-
-| Variable | Reason | Failure mode if missing |
-|---|---|---|
-| `DATABASE_URL` | PostgreSQL connection string | App will crash on startup — no DB connection |
-| `SESSION_SECRET` | Session encryption key | App logs `CRITICAL` error and exits in `NODE_ENV=production` |
-| `NODE_ENV=production` | Enables production mode (secure cookies, no Vite dev server) | Runs in development mode — insecure cookies, slow |
-
-Also accepted as alternative to `DATABASE_URL`:
-
-| Variable | Notes |
-|---|---|
-| `PGHOST` | Combined with `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE` |
-| `PGPORT` | Default: 5432 |
-| `PGUSER` | Database username |
-| `PGPASSWORD` | Database password |
-| `PGDATABASE` | Database name |
-| `PGSSLMODE` | e.g. `require` for hosted PG |
-
----
-
-## 5. Optional Environment Variables
-
-All optional — app starts and runs normally without them; features degrade gracefully.
-
-| Variable | Feature | Default |
-|---|---|---|
-| `PORT` | HTTP listen port | `5000` |
-| `CSRF_ENFORCE` | Set to `"0"` for warn-only CSRF mode | Enforced (hard 403) |
-| `ENABLE_SCHEDULERS` | Set to `"false"` to disable cron jobs | Enabled |
-| `MASTER_PASSWORD` | Enables master admin login bypass | Disabled if unset |
-| `OPENAI_API_KEY` | AI Chatbot (OpenAI) | Chatbot disabled |
-| `GEMINI_API_KEY` | AI Chatbot (Google Gemini) | Chatbot disabled |
-| `XAI_API_KEY` | AI Chatbot (xAI / Grok) | Chatbot disabled |
-| `PARCELSAPP_API_KEY` | Parcel/container tracking | Tracking disabled |
-| `PARCELSAPP_MONTHLY_LIMIT` | Tracking API monthly cap | Unlimited |
-| `CONTAINER_TRACKING_API_KEY` | Container tracking provider | Tracking disabled |
-| `GITHUB_REPO_URL` | GitHub integration | Integration disabled |
-| `GITHUB_TOKEN` | GitHub API access | Integration disabled |
-| `PASSKEY_ORIGIN` | WebAuthn/Passkey origin | Passkeys disabled |
-| `PASSKEY_RP_ID` | WebAuthn relying party ID | Passkeys disabled |
-| `CAPACITOR_ENABLED` | Mobile Capacitor mode (CORS + cookie flags) | Off |
-| `BANDWIDTH_DEBUG` | Verbose DB pool logging | Off |
-| `RUN_STARTUP_MIGRATIONS` | Force-run migrations on boot | Auto |
-| `RENDER_GIT_COMMIT` | Git commit SHA (auto-set by Render) | — |
-| `PG_POOL_MAX` | Max DB pool connections | 10 |
-
----
-
-## 6. Deployment Platform Notes
-
-No `render.yaml` is present. Configure these manually in the dashboard:
-
-**Render.com settings:**
-- **Build Command:** `npm install && npm run build`
-- **Start Command:** `node dist/index.js`
-- **Health Check Path:** `/api/health` (always returns 200 — fast, no DB dependency)
-- **Node Version:** `20`
-- **Environment:** Set `DATABASE_URL`, `SESSION_SECRET`, `NODE_ENV=production`
-
-**Health check endpoints:**
-- `GET /api/health` → `{"ok":true,"ts":<ms>}` — always 200, used by Render health checker
-- `GET /api/health/db` → `{"status":"ok","message":"Database ready"}` — checks DB pool; migrating returns 503
-
----
-
-## 7. API Smoke Test Results (dev environment)
-
-| Endpoint | Unauth result | Expected | Pass? |
-|---|---|---|---|
-| `GET /api/health` | 200 `{"ok":true}` | 200 | ✅ |
-| `GET /api/health/db` | 200 `{"status":"ok"}` | 200 | ✅ |
-| `GET /api/vouchers` | 401 | 401 | ✅ |
-| `GET /api/inventory` | 401 | 401 | ✅ |
-| `GET /api/customers` | 401 | 401 | ✅ |
-| `GET /api/suppliers` | 401 | 401 | ✅ |
-| `GET /api/user` (dev) | Vite SPA shell HTML | n/a (dev catch-all) | ✅ expected |
-| `GET /api/accounts` (dev) | Vite SPA shell HTML | n/a (dev catch-all) | ✅ expected |
-| `GET /` | 200 SPA shell | 200 | ✅ |
-
-> **Note on dev mode 200s:** In dev mode, Vite's middleware intercepts any route that doesn't match an Express handler and serves `index.html`. In production (built), Express's `requireAuth` returns 401 for unprotected API access. Routes.ts has 29 uses of `requireAuth` covering all sensitive endpoints.
-
----
-
-## 8. Startup Log Checks
-
-From running server logs (`Start application` workflow):
-
-| Check | Result |
-|---|---|
-| Startup crash | ✅ None — server starts cleanly |
-| DB connection | ✅ Pool warmed up (attempt 1) |
-| Migration failure | ✅ None — tables verified/migrated |
-| Scheduler crash | ✅ None — `hourlyChecks` and `overdueCheck` registered |
-| DB pool error loop | ✅ None |
-| Frontend blank screen | ✅ None — SPA shell serves |
-| Missing env crash | ✅ None — all required vars present |
-
-**One pre-existing non-critical warning in logs:**
-```
-[OverdueCheck] Error during overdue check: column cb.entry_type does not exist
-```
-This is a pre-existing schema drift issue in the overdue scheduler — not a startup blocker and does not affect core app function. **Documented as NEEDS SEPARATE FIX PHASE.**
-
----
-
-## 9. Pages Smoke Tested
-
-All pages were confirmed to route correctly (SPA — all served via the index.html catch-all; routes registered in `client/src/App.tsx`):
-
-| Page | Route registered | Status |
-|---|---|---|
-| Login | `/login` | ✅ Registered |
-| Dashboard | `/dashboard` | ✅ Registered |
-| Inventory / Stock Items | `/stock-items` | ✅ Registered |
-| Vouchers | `/vouchers` | ✅ Registered |
-| Daybook | `/daybook` | ✅ Registered |
-| Accounts | `/accounts` | ✅ Registered |
-| POS | `/pos` | ✅ Registered |
-| Settings | `/settings` | ✅ Registered |
-| Customers | `/customers` | ✅ Registered |
-| Suppliers | `/suppliers` | ✅ Registered |
-| Containers (GIT) | `/git-containers` | ✅ Registered |
-| Payroll | `/payroll` | ✅ Registered |
-| Factory pages | `/factory/*` | ✅ Registered (20+ factory routes) |
-| Properties / Rental | `/properties/*` | ✅ Registered |
-| Reports / Export | `/export`, `/reports` | ✅ Registered |
-| POS Dashboard | `/pos-dashboard` | ✅ Registered |
-| Bale Transfers | `/bale-transfers` | ✅ Registered |
-| SP pages | `/sp/*` | ✅ Registered |
-
----
-
-## 10. Critical Flows Verified
-
-Flows verified via test suite (90 passing integration tests):
-
-| Flow | Verified via | Result |
-|---|---|---|
-| Auth login / session | vitest integration tests | ✅ |
-| Voucher create (journal) | vitest — `tests/vouchers.test.ts` | ✅ |
-| Stock transfer | vitest — `tests/stockTransfer.test.ts` | ✅ |
-| Inventory queries | vitest — `tests/inventory.test.ts` | ✅ |
-| Account balance tracking | vitest — `tests/accounts.test.ts` | ✅ |
-| PDF/Excel export | build includes ExcelJS + Puppeteer — confirmed in `dist` | ✅ |
-
----
-
-## 11. Issues Found
-
-### Minor / Non-blocking
-
-| # | Issue | Severity | Action |
-|---|---|---|---|
-| 1 | No `render.yaml` — deployment settings must be configured manually in host dashboard | Minor | Documented above; not a code issue |
-| 2 | `.node-version` = 20.19.2, runtime = 20.20.0 | Info | Both are Node 20 LTS; no action needed |
-| 3 | `npm run check` (`tsc`) times out in Replit sandbox | Known | Documented in `replit.md`. Not a deployment blocker. |
-| 4 | `npm run format:check` times out in Replit sandbox | Known | Cosmetic only. Not a deployment blocker. |
-
-### NEEDS SEPARATE FIX PHASE
-
-| # | Issue | Details |
-|---|---|---|
-| S1 | `[OverdueCheck] Error: column cb.entry_type does not exist` | Overdue customer payment scheduler fails silently on each hourly tick. Pre-existing schema drift. Does not affect any user-facing feature but should be fixed with a migration guard in a dedicated phase. |
-| S2 | Several `NOT VALID` foreign key constraints | Documented in `replit.md` — historical orphaned rows; validating requires data cleanup decisions. Not a deployment blocker. |
-| S3 | Lint: 2329 pre-existing warnings (unused vars, missing deps) | All pre-existing; no new warnings introduced in Phase 22/23. Clean-up is a separate phase. |
-
----
-
-## 12. Files Changed in Phase 23
-
-**None.** This was a read-only audit phase. No code was modified.
-
----
-
-## 13. Production Deploy Recommendation
-
-### ✅ READY
-
-The application is ready for production deployment with the following conditions:
-
-**Must do before deploying:**
-1. Set `DATABASE_URL` (or individual `PG*` vars) in the deployment environment
-2. Set `SESSION_SECRET` to a strong random string (e.g. `openssl rand -hex 32`)
-3. Set `NODE_ENV=production`
-4. Configure build command: `npm install && npm run build`
-5. Configure start command: `node dist/index.js`
-6. Set health check path to `/api/health`
-
-**Post-deploy validation:**
-1. `GET /api/health` returns 200
-2. `GET /api/health/db` returns `{"status":"ok"}`
-3. Login page loads without error
-4. One test sale through POS
-5. Check server logs for any migration errors on first boot
-
-**Known deferred items (safe to ship with):**
-- Overdue scheduler column error (S1) — silent failure, does not block any user flow
-- `NOT VALID` FK constraints (S2) — pre-existing, no user impact
-- Lint warnings (S3) — cosmetic only
-
----
-
-## Appendix — Test Suite Summary
-
-```
-Test Files  5 passed (5)
-Tests       90 passed | 6 skipped (96)
-Duration    48.23s
-Exit        0
+```bash
+export RELEASE_EXPECTED_COMMIT='<full-40-character-commit-sha>'
+node scripts/create-release-evidence.mjs \
+  --commit="$RELEASE_EXPECTED_COMMIT" \
+  --output=release-evidence.json
 ```
 
-Files tested:
-- `tests/accounts.test.ts`
-- `tests/inventory.test.ts`
-- `tests/stockTransfer.test.ts`
-- `tests/vouchers.test.ts`
-- `tests/auth.test.ts` (or similar)
+The evidence template is intentionally incomplete. It cannot pass verification until every required check, rehearsal, smoke module, deployment record, rollback owner, and approval is filled in.
+
+## 2. Inspect the deterministic plan
+
+```bash
+node scripts/run-release-readiness.mjs --list
+```
+
+The plan is sourced from `config/release-readiness.json`. Do not remove or rename checks inside the evidence file. The verifier confirms that every recorded command still matches the policy.
+
+## 3. Run static release contracts
+
+```bash
+node scripts/run-release-readiness.mjs --static
+```
+
+This boundary verifies:
+
+- final production safety contracts;
+- the reviewed migration registry and migration-debt manifest;
+- Phase 12 test/reliability architecture;
+- critical skip/TODO debt;
+- lockfile registry safety;
+- Render manual-deployment, Node-version and readiness settings;
+- release identity and evidence tooling.
+
+Static verification does not prove that the application builds, tests pass, a backup restores, or production is healthy.
+
+## 4. Run executable repository checks
+
+Use a clean checkout of the frozen commit:
+
+```bash
+npm ci --registry=https://registry.npmjs.org/
+RELEASE_EXECUTION_CONFIRMATION=RUN_RELEASE_READINESS \
+  node scripts/run-release-readiness.mjs --execute
+```
+
+The executable boundary includes formatting, lint, TypeScript, backend and frontend coverage, the critical business regression suite, production build, production dependency verification, memory stabilization, bandwidth boundaries, and focused security checks.
+
+Any failure or inability to execute is a stop condition. Do not mark a timed-out, unavailable, skipped, or manually cancelled command as passed.
+
+## 5. Verify backup and restore
+
+Follow `docs/operations/database-backup-rollback-recovery.md`.
+
+Required evidence includes:
+
+- source database identifier without credentials;
+- backup filename, timestamp, size, type and SHA-256;
+- successful `pg_restore --list` where applicable;
+- restore into a new disposable database;
+- `/api/health/ready` HTTP 200 against the restored database;
+- representative table counts;
+- restore duration, warnings and approver.
+
+Never test a restore by overwriting production. Disable schedulers and external integrations on the rehearsal instance.
+
+## 6. Review migration state
+
+```bash
+node scripts/verify-migration-registry.mjs --strict
+```
+
+Strict mode accepts only the exact reviewed debt in `config/migration-registry-debt.json`:
+
+- three pre-versioning journal entries whose original SQL files are unavailable;
+- six explicitly classified standalone SQL files.
+
+A new unregistered SQL file, a removed allowance, a stale allowance, duplicate index, non-sequential journal entry, missing registered file, or missing required migration fails the gate.
+
+The heavy-read index migration uses `CREATE INDEX CONCURRENTLY` and must stay outside the transactional Drizzle runner. The historical ownership migration contains a backfill and `NOT VALID` constraints and requires separate rehearsal and approval.
+
+Apply registered migrations only to the disposable restored database first:
+
+```bash
+DATABASE_URL='postgresql://.../erp_restore_rehearsal' \
+MIGRATION_CONFIRMATION=APPLY_VERSIONED_MIGRATIONS \
+  node scripts/run-versioned-migrations.mjs --apply
+```
+
+Migration application remains outside `npm start` and Render startup.
+
+## 7. Rehearse controlled business migrations
+
+Before production activation:
+
+- complete the Supplier Partner Phase 4 finalize and rollback rehearsal on non-production companies;
+- inspect Historical Replay readiness and verification with Apply disabled;
+- record all blockers, warnings, before/after totals and rollback evidence;
+- do not enable Historical Replay Apply during ordinary deployment verification.
+
+## 8. Configure Render safely
+
+The repository blueprint requires:
+
+- build command: `npm ci --registry=https://registry.npmjs.org/ && npm run build`;
+- start command: `npm start`;
+- Node `20.19.2`;
+- health check `/api/health/ready`;
+- `autoDeploy: false`.
+
+Manual deployment is required so an unapproved push cannot bypass release sign-off.
+
+Before starting the manual deployment, set:
+
+```text
+RELEASE_EXPECTED_COMMIT=<the exact frozen 40-character commit>
+RELEASE_ID=<operator-selected release identifier>
+```
+
+Do not configure these dangerous controls in the persistent Render blueprint:
+
+- `HISTORICAL_REPLAY_APPLY_MODE`;
+- `HISTORICAL_REPLAY_RELEASE_ID`;
+- `MIGRATION_CONFIRMATION`;
+- `MASTER_PASSWORD`.
+
+`RELEASE_EXPECTED_COMMIT` is checked during production startup. A mismatch between the deployed commit and approved commit fails startup. `/api/health/live` and `/api/health/ready` expose the full deployed SHA, expected SHA, verification state and release ID.
+
+## 9. Deploy and verify read-only behavior first
+
+Record the previous healthy deployment before promotion. After the new instance starts:
+
+1. confirm `/api/health/live` returns the expected full commit SHA;
+2. confirm `/api/health/ready` returns HTTP 200 with `commitVerified: true`;
+3. verify login, logout, session refresh and company switching;
+4. verify Admin, ERP, Factory, POS, Properties and Supplier Partner routing;
+5. inspect logs for unexpected 401, 403, 409, 500, pool timeout, memory pressure, restart or request-loop events.
+
+Do not create production financial transactions solely as smoke tests without an approved transaction and reversal plan.
+
+## 10. Complete every smoke module
+
+The required smoke module list is defined in `config/release-readiness.json` and covers:
+
+- authentication, sessions and company isolation;
+- ERP, Factory, POS, Properties and Supplier Partner navigation;
+- Accounts, Daybook, vouchers and stock transfers;
+- inventory and location inventory;
+- containers, offload and mix batches;
+- reports and exports;
+- runtime logs and readiness.
+
+Each module needs a timestamp and evidence reference in `release-evidence.json`.
+
+## 11. Record rollback readiness
+
+The evidence must name:
+
+- the previous healthy deployment;
+- rollback owner;
+- code rollback trigger;
+- database recovery trigger;
+- expected rollback duration;
+- proof that rollback was rehearsed where required.
+
+A rollback plan that depends on an unknown deployment, an unverified backup, or an unavailable owner is not acceptable.
+
+## 12. Verify final evidence
+
+```bash
+node scripts/verify-release-evidence.mjs --file=release-evidence.json
+```
+
+The verifier requires:
+
+- the deployed SHA to equal the frozen SHA;
+- every required command to be recorded as passed with evidence and timestamp;
+- every operational section and smoke module to be passed;
+- auto deploy, startup migrations, Historical Replay Apply and master password to remain disabled;
+- approver, approval timestamp and rollback owner.
+
+Production sign-off exists only after this command passes and the evidence is retained with the release record.
+
+## Stop conditions
+
+Stop or roll back when:
+
+- the deployed commit differs from approval;
+- any required command fails or cannot execute;
+- backup or restore evidence is incomplete;
+- migration strict mode fails;
+- migration rehearsal changes business totals unexpectedly;
+- readiness returns 503;
+- cross-company access succeeds;
+- Supplier Partner verification is not `PASS`;
+- Historical Replay readiness has unresolved blockers;
+- unexpected API errors, restarts, memory pressure or request loops appear;
+- rollback cannot be demonstrated.
+
+Do not disable the guard that detected the failure. Preserve evidence, keep or restore the previous healthy deployment, and fix the problem on an isolated branch.
