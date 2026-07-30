@@ -14,8 +14,10 @@ describe("Phase 6 post-offload safety and repair", () => {
     expect(routes).toContain("inspectPostOffloadPhase6Readiness");
     expect(routes).toContain("preparePostOffloadPhase6Repair");
     expect(routes).toContain("applyPostOffloadPhase6Repair");
-    expect(routes).toContain("repairCommitted: false");
-    expect(routes).toContain("noPartialChanges: true");
+    expect(routes).toContain("repairWasCommitted");
+    expect(routes).toContain("transactionRolledBack: !repairWasCommitted");
+    expect(routes).toContain("partialChanges: false");
+    expect(routes).toContain("undoLogId");
   });
 
   it("binds a short-lived approval to company, user, release, algorithm, state, scope, and row count", () => {
