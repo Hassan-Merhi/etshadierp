@@ -10,6 +10,7 @@ const POST_OFFLOAD_PATH = /\/api\/factory\/containers\/(\d+)\/post-offload-charg
 const INTERCEPTED = Symbol.for("etshadierp.postOffloadHistoricalReplayIntercepted");
 
 function resolveMutationAction(req: Request): "CREATE" | "EDIT" | "UNDO" | "LEGACY_REBUILD" | null {
+  if (req.originalUrl.includes("/post-offload-charges/preview")) return null;
   if (req.method === "POST") return "CREATE";
   if (req.method === "DELETE") return "UNDO";
   if (req.method === "PATCH" && req.originalUrl.includes("/legacy-rebuild")) {
@@ -108,8 +109,10 @@ export function postOffloadHistoricalReplayMiddleware(req: Request, res: Respons
       }
 
       const repairRequired = historicalReplay.status === "blocked" || historicalReplay.status === "failed";
+      const approvedImpactPreview = (req as any).postOffloadImpactPreview ?? null;
       const responseBody = {
         ...body,
+        impactPreview: approvedImpactPreview,
         historicalReplay,
         historicalCostsRecalculated: !repairRequired,
         historicalRepairRequired: repairRequired,

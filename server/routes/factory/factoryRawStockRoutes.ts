@@ -10,6 +10,8 @@ import { registerRawStockBalanceRoutes } from "./raw-stock/rawStockBalanceRoutes
 import { registerRawStockRecalcRoutes } from "./raw-stock/registerRawStockRecalcRoutes";
 import { registerRawStockDiagnosticRoutes } from "./raw-stock/rawStockDiagnosticRoutes";
 import { postOffloadHistoricalReplayMiddleware } from "./raw-stock/postOffloadHistoricalReplayMiddleware";
+import { requirePostOffloadImpactPreview } from "./raw-stock/postOffloadImpactPreviewMiddleware";
+import { registerPostOffloadImpactPreviewRoutes } from "./raw-stock/postOffloadImpactPreviewRoutes";
 
 const RAW_STOCK_REPAIR_PERMISSION = "factory.raw-stock.repair";
 
@@ -30,6 +32,10 @@ export function registerFactoryRawStockRoutes(app: Express) {
   // they are registered by the raw-stock module. Reject foreign, inactive, or
   // deleted ledger targets before the route can derive a voucher company from them.
   app.use("/api/factory/containers", requirePostOffloadLedgerOwnership);
+
+  // Refreshed clients bind CREATE requests to a signed, short-lived read-only
+  // impact preview. Legacy callers remain compatible until they opt into v1.
+  app.use("/api/factory/containers", requirePostOffloadImpactPreview);
 
   // After a successful post-offload CREATE/EDIT/UNDO/LEGACY_REBUILD transaction,
   // replay the affected supplier's exact historical cost timeline before sending
@@ -89,6 +95,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
 
   registerRawStockCrudRoutes(app);
   registerRawStockOffloadRoutes(app);
+  registerPostOffloadImpactPreviewRoutes(app);
   registerRawStockContainerRoutes(app);
   registerRawStockBalanceRoutes(app);
   registerRawStockRecalcRoutes(app);
