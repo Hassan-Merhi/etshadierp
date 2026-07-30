@@ -43,13 +43,12 @@ async function sendProformaSummaries(req: Request, res: Response) {
             COALESCE(lines.line_count, 0)::text AS line_count,
             COALESCE(lines.total_quantity, 0)::text AS total_quantity
        FROM customer_proformas p
-       LEFT JOIN (
-         SELECT proforma_id,
-                COUNT(*)::int AS line_count,
+       LEFT JOIN LATERAL (
+         SELECT COUNT(*)::int AS line_count,
                 COALESCE(SUM(quantity::numeric), 0) AS total_quantity
            FROM customer_proforma_lines
-          GROUP BY proforma_id
-       ) lines ON lines.proforma_id = p.id
+          WHERE proforma_id = p.id
+       ) lines ON true
       WHERE p.company_id = $1
         AND p.customer_id = $2
         AND p.deleted_at IS NULL
