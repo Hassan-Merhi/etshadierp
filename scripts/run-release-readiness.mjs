@@ -29,19 +29,36 @@ function printPlan() {
   }, null, 2));
 }
 
-function runCheck(check) {
-  console.log(`\n[release:${check.id}] ${check.command}`);
-  const result = spawnSync(check.command, {
-    cwd: root,
-    env: { ...process.env, NODE_ENV: process.env.NODE_ENV || "test" },
-    stdio: "inherit",
-    shell: true,
-  });
+function finishResult(result) {
   if (result.error) {
     console.error(result.error.message);
     process.exit(1);
   }
   if (result.status !== 0) process.exit(result.status ?? 1);
+}
+
+function runCheck(check) {
+  console.log(`\n[release:${check.id}] ${check.command}`);
+  finishResult(spawnSync(check.command, {
+    cwd: root,
+    env: { ...process.env, NODE_ENV: process.env.NODE_ENV || "test" },
+    stdio: "inherit",
+    shell: true,
+  }));
+}
+
+function runEvidence(evidencePath) {
+  console.log(`\n[release:release-evidence] ${evidencePath}`);
+  finishResult(spawnSync(
+    process.execPath,
+    ["scripts/verify-release-evidence.mjs", `--file=${evidencePath}`],
+    {
+      cwd: root,
+      env: { ...process.env, NODE_ENV: process.env.NODE_ENV || "test" },
+      stdio: "inherit",
+      shell: false,
+    },
+  ));
 }
 
 if (listMode) {
@@ -65,9 +82,5 @@ if (executeMode) {
 }
 
 if (evidenceArg) {
-  const evidencePath = evidenceArg.slice("--evidence=".length);
-  runCheck({
-    id: "release-evidence",
-    command: `node scripts/verify-release-evidence.mjs --file=${JSON.stringify(evidencePath)}`,
-  });
+  runEvidence(evidenceArg.slice("--evidence=".length));
 }
