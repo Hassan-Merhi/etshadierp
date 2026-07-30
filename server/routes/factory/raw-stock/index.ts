@@ -3,10 +3,12 @@ import { registerRawStockCrudRoutes } from "./rawStockCrudRoutes";
 import { registerRawStockOffloadRoutes } from "./rawStockOffloadRoutes";
 import { registerRawStockContainerRoutes } from "./rawStockContainerRoutes";
 import { registerRawStockBalanceRoutes } from "./rawStockBalanceRoutes";
+import { postOffloadHistoricalReplayMiddleware } from "./postOffloadHistoricalReplayMiddleware";
 
 // Legacy compatibility aggregator. The active production aggregator is
 // ../factoryRawStockRoutes.ts, where explicit company-context middleware is mounted.
 export function registerFactoryRawStockRoutes(app: Express) {
+  app.use("/api/factory/containers", postOffloadHistoricalReplayMiddleware);
   registerRawStockCrudRoutes(app);
   registerRawStockOffloadRoutes(app);
   registerRawStockContainerRoutes(app);

@@ -9,6 +9,7 @@ import { registerRawStockContainerRoutes } from "./raw-stock/rawStockContainerRo
 import { registerRawStockBalanceRoutes } from "./raw-stock/rawStockBalanceRoutes";
 import { registerRawStockRecalcRoutes } from "./raw-stock/registerRawStockRecalcRoutes";
 import { registerRawStockDiagnosticRoutes } from "./raw-stock/rawStockDiagnosticRoutes";
+import { postOffloadHistoricalReplayMiddleware } from "./raw-stock/postOffloadHistoricalReplayMiddleware";
 
 const RAW_STOCK_REPAIR_PERMISSION = "factory.raw-stock.repair";
 
@@ -29,6 +30,12 @@ export function registerFactoryRawStockRoutes(app: Express) {
   // they are registered by the raw-stock module. Reject foreign, inactive, or
   // deleted ledger targets before the route can derive a voucher company from them.
   app.use("/api/factory/containers", requirePostOffloadLedgerOwnership);
+
+  // After a successful post-offload CREATE/EDIT/UNDO/LEGACY_REBUILD transaction,
+  // replay the affected supplier's exact historical cost timeline before sending
+  // the response. This catches supplier-priced historical mix sources that the
+  // direct container cascade cannot correctly reprice by itself.
+  app.use("/api/factory/containers", postOffloadHistoricalReplayMiddleware);
 
   const confirmedRepair = (action: string, sourceType: string) =>
     requireLegacyPrivilegedWrite({
