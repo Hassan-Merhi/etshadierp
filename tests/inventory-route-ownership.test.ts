@@ -19,12 +19,10 @@ describe("Phase 6 inventory route ownership", () => {
     expect(inventoryRoutes).toContain("registerInventoryMovementRoutes(app);");
   });
 
-  it("prevents inventory HTTP ownership from returning to routesLegacy", () => {
-    const legacyRoutes = read("server/routesLegacy.ts");
-    const boundaries = read("config/legacy-route-boundaries.json");
+  it("keeps inventory HTTP ownership out of any retired legacy registry", () => {
+    expect(fs.existsSync(path.join(root, "server/routesLegacy.ts"))).toBe(false);
 
-    expect(legacyRoutes).not.toMatch(/\bapp\.(get|post|put|patch|delete|use)\s*\(/);
-    expect(legacyRoutes).not.toMatch(/registerInventoryRoutes/);
-    expect(boundaries).toContain("no inventory HTTP ownership");
+    const boundaries = JSON.parse(read("config/legacy-route-boundaries.json")) as { files: unknown[] };
+    expect(boundaries.files).toEqual([]);
   });
 });

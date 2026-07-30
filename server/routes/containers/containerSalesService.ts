@@ -1,9 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import {
-  containers,
-  containerSales,
-  insertContainerSaleSchema,
-} from "@shared/schema";
+import { containers, containerSales, insertContainerSaleSchema } from "@shared/schema";
 
 import { db } from "../../db";
 import {
@@ -19,7 +15,7 @@ const postingDependencies = createDatabasePostingDependencies();
 export class ContainerSaleRouteError extends Error {
   constructor(
     public readonly statusCode: number,
-    message: string,
+    message: string
   ) {
     super(message);
     this.name = "ContainerSaleRouteError";
@@ -85,18 +81,14 @@ export const containerSalesService = {
     if (!customer.ledgerAccountId) {
       throw new ContainerSaleRouteError(400, "Customer does not have a ledger account");
     }
+    const customerLedgerAccountId = customer.ledgerAccountId;
 
     const commissionAccountId = await resolveCommissionAccountId(companyId, parsed.commissionAccountId);
     return db.transaction(async (tx) => {
       const [currentSale] = await tx
         .select()
         .from(containerSales)
-        .where(
-          and(
-            eq(containerSales.companyId, companyId),
-            eq(containerSales.containerId, parsed.containerId),
-          ),
-        )
+        .where(and(eq(containerSales.companyId, companyId), eq(containerSales.containerId, parsed.containerId)))
         .limit(1);
       if (currentSale) return currentSale;
 
@@ -111,7 +103,7 @@ export const containerSalesService = {
         debitNarration: `Container sale - ${voucherNumber}`,
         creditNarration: `Container sale commission - ${voucherNumber}`,
         totalAmount: parsed.totalAmount,
-        customerLedgerAccountId: customer.ledgerAccountId,
+        customerLedgerAccountId,
         commissionAccountId,
         actor: actor ?? { reason: "Container sale posting" },
       });
@@ -121,10 +113,7 @@ export const containerSalesService = {
         .select()
         .from(containerSales)
         .where(
-          and(
-            eq(containerSales.companyId, companyId),
-            eq(containerSales.voucherId, Number((posted.voucher as any).id)),
-          ),
+          and(eq(containerSales.companyId, companyId), eq(containerSales.voucherId, Number((posted.voucher as any).id)))
         )
         .limit(1);
       if (replayedSale) return replayedSale;

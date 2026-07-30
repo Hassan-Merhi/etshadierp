@@ -11,7 +11,7 @@ describe("Phase 8 duplicate route ownership", () => {
     const applicationRoutes = read("server/routes/applicationRoutes.ts");
     const names = Array.from(
       applicationRoutes.matchAll(/(register[A-Z][A-Za-z0-9]+Routes?)\(app/g),
-      (match) => match[1],
+      (match) => match[1]
     );
     const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
 
@@ -19,7 +19,7 @@ describe("Phase 8 duplicate route ownership", () => {
     expect([...new Set(duplicates)]).toEqual([]);
   });
 
-  it("keeps compatibility files free of active HTTP registrations", () => {
+  it("keeps retired compatibility files deleted", () => {
     const files = [
       "server/routesLegacy.ts",
       "server/routes/reportsRoutesLegacy.ts",
@@ -28,20 +28,19 @@ describe("Phase 8 duplicate route ownership", () => {
     ];
 
     for (const file of files) {
-      const source = read(file);
-      expect(source).not.toMatch(/app\.(get|post|put|patch|delete|use)\(/);
+      expect(fs.existsSync(path.join(root, file))).toBe(false);
     }
   });
 
-  it("records duplicate cleanup as the current boundary", () => {
+  it("records the retired compatibility registry as the current boundary", () => {
     const boundaries = JSON.parse(read("config/legacy-route-boundaries.json")) as {
       version: number;
       description: string;
-      files: Array<{ owner: string }>;
+      files: unknown[];
     };
 
-    expect(boundaries.version).toBe(8);
-    expect(boundaries.description).toContain("uniquely composed");
-    expect(boundaries.files.every((entry) => entry.owner.includes("no active HTTP ownership"))).toBe(true);
+    expect(boundaries.version).toBe(9);
+    expect(boundaries.description).toContain("removed in Phase 9");
+    expect(boundaries.files).toEqual([]);
   });
 });

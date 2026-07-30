@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type { PoolClient } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { pool } from "../../db";
 import { normalizeOpeningBalanceCurrency } from "./openingBalanceCurrency";
 import { normalizeVoucherEntryAmounts } from "./currencyAmounts";
@@ -160,7 +160,7 @@ function versionTag(row: Record<string, unknown>): string {
 async function getBaseCurrency(companyId: number, client = pool): Promise<string> {
   const result = await client.query<{ base_currency: string | null }>(
     "SELECT base_currency FROM companies WHERE id = $1",
-    [companyId],
+    [companyId]
   );
   return String(result.rows[0]?.base_currency || "USD").toUpperCase();
 }
@@ -178,7 +178,7 @@ function supplierScope(alias: string): string {
 async function loadVoucherEntryCase(
   companyId: number,
   id: number,
-  client = pool,
+  client: Pool | PoolClient = pool
 ): Promise<HistoricalRepairCase | null> {
   const result = await client.query(
     `SELECT ve.id, ve.voucher_id, v.voucher_date, v.currency AS voucher_currency,
@@ -189,7 +189,7 @@ async function loadVoucherEntryCase(
        JOIN vouchers v ON v.id = ve.voucher_id
       WHERE ve.id = $1 AND v.company_id = $2 AND v.deleted_at IS NULL AND v.optional = false
       LIMIT 1`,
-    [id, companyId],
+    [id, companyId]
   );
   const row = result.rows[0];
   if (!row) return null;
@@ -228,7 +228,7 @@ async function loadOpeningCase(
   companyId: number,
   kind: Exclude<HistoricalRepairKind, "voucherEntry">,
   id: number,
-  client = pool,
+  client: Pool | PoolClient = pool
 ): Promise<HistoricalRepairCase | null> {
   const config = OPENING_CONFIG[kind];
   const clauses = ["target.id = $1"];
@@ -246,7 +246,7 @@ async function loadOpeningCase(
        FROM ${config.table} target
       WHERE ${clauses.join(" AND ")}
       LIMIT 1`,
-    [id, companyId],
+    [id, companyId]
   );
   const row = result.rows[0];
   if (!row) return null;
@@ -276,7 +276,7 @@ export async function loadHistoricalRepairCase(
   companyId: number,
   kind: HistoricalRepairKind,
   id: number,
-  client = pool,
+  client: Pool | PoolClient = pool
 ): Promise<HistoricalRepairCase | null> {
   return kind === "voucherEntry"
     ? loadVoucherEntryCase(companyId, id, client)
@@ -293,7 +293,7 @@ export async function listHistoricalRepairCases(companyId: number): Promise<Hist
         AND (ve.base_debit_amount IS NULL OR ve.base_credit_amount IS NULL)
       ORDER BY v.voucher_date, v.id, ve.id
       LIMIT 500`,
-    [companyId],
+    [companyId]
   );
   const openingResult = await pool.query<{ kind: HistoricalRepairKind; id: number }>(
     `SELECT * FROM (
@@ -304,7 +304,7 @@ export async function listHistoricalRepairCases(companyId: number): Promise<Hist
        UNION ALL SELECT 'employee', id FROM employees WHERE company_id = $1 AND deleted_at IS NULL AND COALESCE(opening_balance, 0)::numeric <> 0 AND opening_balance_base_amount IS NULL
        UNION ALL SELECT 'fixedAsset', id FROM fixed_assets WHERE company_id = $1 AND COALESCE(purchase_amount, 0)::numeric <> 0 AND purchase_base_amount IS NULL
      ) unresolved ORDER BY kind, id LIMIT 500`,
-    [companyId, companyId],
+    [companyId, companyId]
   );
   const cases: HistoricalRepairCase[] = [];
   for (const row of entryResult.rows) {
@@ -321,16 +321,20 @@ export async function listHistoricalRepairCases(companyId: number): Promise<Hist
 function normalizePlanAfter(
   input: HistoricalRepairInput,
   before: HistoricalRepairCase,
-  baseCurrency: string,
+  baseCurrency: string
 ): Record<string, string | null> {
-  const currency = String(input.currency || before.currency || "").trim().toUpperCase();
+  const currency = String(input.currency || before.currency || "")
+    .trim()
+    .toUpperCase();
   if (!currency) throw new Error(`${input.kind} #${input.id}: currency is required`);
   if (input.kind === "voucherEntry") {
     const normalized = normalizeVoucherEntryAmounts({
       transactionCurrency: currency,
       baseCurrency,
-      transactionDebitAmount: input.transactionDebitAmount ?? before.transactionDebitAmount ?? before.debitAmount ?? "0",
-      transactionCreditAmount: input.transactionCreditAmount ?? before.transactionCreditAmount ?? before.creditAmount ?? "0",
+      transactionDebitAmount:
+        input.transactionDebitAmount ?? before.transactionDebitAmount ?? before.debitAmount ?? "0",
+      transactionCreditAmount:
+        input.transactionCreditAmount ?? before.transactionCreditAmount ?? before.creditAmount ?? "0",
       historicalRate: input.historicalRate,
     });
     return {
@@ -357,13 +361,13 @@ function normalizePlanAfter(
     currency: normalized.openingBalanceCurrency,
     historicalRate: normalized.openingBalanceHistoricalRate,
     baseAmount: normalized.openingBalanceBaseAmount,
-    side: input.kind === "supplier" || input.kind === "employee" ? "Cr" : input.side ?? before.side ?? "Dr",
+    side: input.kind === "supplier" || input.kind === "employee" ? "Cr" : (input.side ?? before.side ?? "Dr"),
   };
 }
 
 export async function planHistoricalCurrencyRepairs(
   companyId: number,
-  repairs: HistoricalRepairInput[],
+  repairs: HistoricalRepairInput[]
 ): Promise<HistoricalRepairPlan> {
   if (!Array.isArray(repairs) || repairs.length === 0) throw new Error("At least one approved repair is required");
   if (repairs.length > 200) throw new Error("A repair batch cannot exceed 200 rows");
@@ -379,7 +383,9 @@ export async function planHistoricalCurrencyRepairs(
     if (!before) throw new Error(`${input.kind} #${input.id} was not found in the selected company`);
     items.push({ input, before, after: normalizePlanAfter(input, before, baseCurrency) });
   }
-  const fingerprint = stableFingerprint(items.map(({ input, before, after }) => ({ input, versionTag: before.versionTag, after })));
+  const fingerprint = stableFingerprint(
+    items.map(({ input, before, after }) => ({ input, versionTag: before.versionTag, after }))
+  );
   return { companyId, createdAt: new Date().toISOString(), itemCount: items.length, fingerprint, items };
 }
 
@@ -387,7 +393,7 @@ async function insertAudit(
   client: PoolClient,
   actor: { userId: string; username: string },
   companyId: number,
-  item: HistoricalRepairPlanItem,
+  item: HistoricalRepairPlanItem
 ): Promise<void> {
   await client.query(
     `INSERT INTO audit_log (user_id, username, company_id, action, table_name, record_id, record_identifier, changes)
@@ -400,7 +406,7 @@ async function insertAudit(
       item.input.id,
       `historical-currency:${item.input.kind}:${item.input.id}`,
       JSON.stringify({ before: item.before, after: item.after, note: item.input.note || null }),
-    ],
+    ]
   );
 }
 
@@ -417,19 +423,35 @@ async function applyPlanItem(client: PoolClient, companyId: number, item: Histor
               base_debit_amount = $4, base_credit_amount = $5, historical_exchange_rate = $6,
               rate_convention = $7, debit_amount = $8, credit_amount = $9
         WHERE id = $10`,
-      [after.transactionCurrency, after.transactionDebitAmount, after.transactionCreditAmount,
-       after.baseDebitAmount, after.baseCreditAmount, after.historicalExchangeRate,
-       after.rateConvention, after.debitAmount, after.creditAmount, item.input.id],
+      [
+        after.transactionCurrency,
+        after.transactionDebitAmount,
+        after.transactionCreditAmount,
+        after.baseDebitAmount,
+        after.baseCreditAmount,
+        after.historicalExchangeRate,
+        after.rateConvention,
+        after.debitAmount,
+        after.creditAmount,
+        item.input.id,
+      ]
     );
     return;
   }
   const config = OPENING_CONFIG[item.input.kind];
   const assignments = [
-    `${config.amountColumn} = $1`, `${config.nativeColumn} = $2`, `${config.currencyColumn} = $3`,
-    `${config.rateColumn} = $4`, `${config.baseColumn} = $5`,
+    `${config.amountColumn} = $1`,
+    `${config.nativeColumn} = $2`,
+    `${config.currencyColumn} = $3`,
+    `${config.rateColumn} = $4`,
+    `${config.baseColumn} = $5`,
   ];
   const values: Array<string | number | null> = [
-    item.after.baseAmount, item.after.nativeAmount, item.after.currency, item.after.historicalRate, item.after.baseAmount,
+    item.after.baseAmount,
+    item.after.nativeAmount,
+    item.after.currency,
+    item.after.historicalRate,
+    item.after.baseAmount,
   ];
   if (config.sideColumn) {
     assignments.push(`${config.sideColumn} = $6`);
@@ -441,7 +463,7 @@ async function applyPlanItem(client: PoolClient, companyId: number, item: Histor
 
 export async function applyHistoricalCurrencyRepairPlan(
   plan: HistoricalRepairPlan,
-  actor: { userId: string; username: string },
+  actor: { userId: string; username: string }
 ): Promise<{ appliedCount: number; fingerprint: string }> {
   const client = await pool.connect();
   try {

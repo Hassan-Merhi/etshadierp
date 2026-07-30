@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 function source(path: string): string {
-  return readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
+  return readFileSync(resolve(process.cwd(), path), "utf8");
 }
 
 describe("Phase 10 UI consistency contracts", () => {
@@ -22,7 +23,7 @@ describe("Phase 10 UI consistency contracts", () => {
     }
 
     expect(layout).toContain('role="region"');
-    expect(layout).toContain('tabIndex={0}');
+    expect(layout).toContain("tabIndex={0}");
     expect(layout).toContain("overflow-x-auto");
     expect(layout).toContain("flex-col-reverse");
   });
@@ -35,7 +36,9 @@ describe("Phase 10 UI consistency contracts", () => {
     expect(header).toContain('aria-label="Previous record"');
     expect(header).toContain('aria-label="Next record"');
     expect(header).toContain("WorkspaceActions");
-    expect(header).not.toContain("text-page-subtitle\">\n              {subtitle}\n            </p>");
+    // The subtitle must render as a semantic paragraph with muted styling.
+    expect(header).toContain('data-testid="text-page-subtitle"');
+    expect(header).toMatch(/<p [^>]*text-muted-foreground[^>]*data-testid="text-page-subtitle"/);
   });
 
   it("supports consistent pending and secondary page-state actions", () => {
@@ -43,7 +46,7 @@ describe("Phase 10 UI consistency contracts", () => {
 
     expect(states).toContain("actionPending?: boolean");
     expect(states).toContain("secondaryActionLabel?: string");
-    expect(states).toContain('aria-busy={actionPending}');
+    expect(states).toContain("aria-busy={actionPending}");
     expect(states).toContain("motion-reduce:animate-none");
     expect(states).toContain("WorkspaceActions");
   });

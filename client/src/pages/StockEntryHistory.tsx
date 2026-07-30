@@ -274,7 +274,21 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         String(includeUnassigned),
         String(useLite),
       ].join("|"),
-    [fromActive, fromDate, toActive, toDate, workerIdFilter, productIdFilter, locationIdFilter, categoryFilter, productCategoryFilter, statusFilter, debouncedSearch, includeUnassigned, useLite]
+    [
+      fromActive,
+      fromDate,
+      toActive,
+      toDate,
+      workerIdFilter,
+      productIdFilter,
+      locationIdFilter,
+      categoryFilter,
+      productCategoryFilter,
+      statusFilter,
+      debouncedSearch,
+      includeUnassigned,
+      useLite,
+    ]
   );
   // (page/pageSize reset removed — no pagination)
 
@@ -310,7 +324,11 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
 
   // (page validity effect removed — no pagination)
 
-  const { data: workers = [] } = useQuery<any[]>({ queryKey: ["/api/factory/workers"], staleTime: 60_000, refetchOnWindowFocus: false });
+  const { data: workers = [] } = useQuery<any[]>({
+    queryKey: ["/api/factory/workers"],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
   const { data: products = [] } = useQuery<any[]>({ queryKey: ["/api/factory/bale-products"] });
   const { data: locations = [] } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
   const { data: categories = [] } = useQuery<any[]>({
@@ -344,8 +362,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     queries: expandedGroupBaleKeys.map((key) => {
       const baseKey = key.replace(/-bales$/, "");
       const group = groups.find((g) => groupKey(g) === baseKey);
-      if (!group)
-        return { queryKey: ["noop", key], queryFn: () => [] as BaleDetail[], enabled: false };
+      if (!group) return { queryKey: ["noop", key], queryFn: () => [] as BaleDetail[], enabled: false };
       const gp = new URLSearchParams();
       gp.set("startDate", group.stockEntryDate);
       gp.set("endDate", group.stockEntryDate);
@@ -476,7 +493,8 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   function toggleExpand(key: string) {
     setExpandedKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }
@@ -543,7 +561,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     setFromDate(today);
     setToDate(today);
     setCategoryFilter("all");
-    setProductCategoryFilter("all");
+    setProductCategoryFilter([]);
     setWorkerIdFilter("all");
     setProductIdFilter("all");
     setLocationIdFilter("all");
@@ -1058,7 +1076,8 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                     {productCategoryFilter.length === 0
                       ? "All Categories"
                       : productCategoryFilter.length === 1
-                        ? (productCategories.find((c: any) => String(c.id) === productCategoryFilter[0])?.name ?? "1 selected")
+                        ? (productCategories.find((c: any) => String(c.id) === productCategoryFilter[0])?.name ??
+                          "1 selected")
                         : `${productCategoryFilter.length} selected`}
                   </span>
                   <ChevronDown className="ml-1 h-3 w-3 shrink-0 text-muted-foreground" />
@@ -1071,7 +1090,9 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                     className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-accent"
                     onClick={() => setProductCategoryFilter([])}
                   >
-                    <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-sm border ${productCategoryFilter.length === 0 ? "bg-primary border-primary" : "border-muted-foreground"}`}>
+                    <span
+                      className={`flex h-3.5 w-3.5 items-center justify-center rounded-sm border ${productCategoryFilter.length === 0 ? "bg-primary border-primary" : "border-muted-foreground"}`}
+                    >
                       {productCategoryFilter.length === 0 && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
                     </span>
                     All Categories
@@ -1084,12 +1105,12 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                         key={c.id}
                         className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-accent"
                         onClick={() =>
-                          setProductCategoryFilter((prev) =>
-                            checked ? prev.filter((x) => x !== id) : [...prev, id]
-                          )
+                          setProductCategoryFilter((prev) => (checked ? prev.filter((x) => x !== id) : [...prev, id]))
                         }
                       >
-                        <span className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border ${checked ? "bg-primary border-primary" : "border-muted-foreground"}`}>
+                        <span
+                          className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border ${checked ? "bg-primary border-primary" : "border-muted-foreground"}`}
+                        >
                           {checked && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
                         </span>
                         {c.name}
@@ -1296,7 +1317,6 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         </div>
       </div>
 
-
       {/* ── CONDENSED VIEW: grouped by worker ── */}
       {viewMode === "condensed" && (
         <div className="rounded-xl border overflow-hidden">
@@ -1480,34 +1500,40 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                                         </thead>
                                         <tbody>
                                           {isGroupBalesLoading(g) ? (
-                                             <tr><td colSpan={4} className="py-2 text-xs text-muted-foreground">Loading bale details…</td></tr>
-                                           ) : getGroupBales(g).map((b) => (
-                                            <tr
-                                              key={b.id}
-                                              className="border-t border-border/30"
-                                              data-testid={`row-bale-${b.id}`}
-                                            >
-                                              <td className="py-1 pr-4 font-mono">{b.referenceNumber}</td>
-                                              <td className="py-1 pr-4 text-right">
-                                                {parseFloat(b.weightKg || "0").toFixed(2)}
-                                              </td>
-                                              <td className="py-1 pr-4">
-                                                <span
-                                                  className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${STATUS_COLORS[b.status] || "bg-muted text-muted-foreground"}`}
-                                                >
-                                                  {b.status}
-                                                </span>
-                                              </td>
-                                              <td className="py-1">
-                                                {b.finalizedAt
-                                                  ? new Date(b.finalizedAt).toLocaleTimeString([], {
-                                                      hour: "2-digit",
-                                                      minute: "2-digit",
-                                                    })
-                                                  : "—"}
+                                            <tr>
+                                              <td colSpan={4} className="py-2 text-xs text-muted-foreground">
+                                                Loading bale details…
                                               </td>
                                             </tr>
-                                          ))}
+                                          ) : (
+                                            getGroupBales(g).map((b) => (
+                                              <tr
+                                                key={b.id}
+                                                className="border-t border-border/30"
+                                                data-testid={`row-bale-${b.id}`}
+                                              >
+                                                <td className="py-1 pr-4 font-mono">{b.referenceNumber}</td>
+                                                <td className="py-1 pr-4 text-right">
+                                                  {parseFloat(b.weightKg || "0").toFixed(2)}
+                                                </td>
+                                                <td className="py-1 pr-4">
+                                                  <span
+                                                    className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${STATUS_COLORS[b.status] || "bg-muted text-muted-foreground"}`}
+                                                  >
+                                                    {b.status}
+                                                  </span>
+                                                </td>
+                                                <td className="py-1">
+                                                  {b.finalizedAt
+                                                    ? new Date(b.finalizedAt).toLocaleTimeString([], {
+                                                        hour: "2-digit",
+                                                        minute: "2-digit",
+                                                      })
+                                                    : "—"}
+                                                </td>
+                                              </tr>
+                                            ))
+                                          )}
                                         </tbody>
                                       </table>
                                     </td>

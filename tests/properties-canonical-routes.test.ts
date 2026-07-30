@@ -14,12 +14,12 @@ describe("Properties canonical route contract", () => {
   });
 
   it("normalizes historical global aliases with replacement history", () => {
-    const app = read("client/src/app/AuthenticatedApp.tsx");
+    const guard = read("client/src/app/authenticatedAppRouteGuard.ts");
 
-    expect(app).toContain('currentLocation === "/my-settings"');
-    expect(app).toContain('<Redirect replace to="/properties/my-settings" />');
-    expect(app).toContain('currentLocation === "/balance-repair"');
-    expect(app).toContain('<Redirect replace to="/properties/balance-repair" />');
+    expect(guard).toContain('currentLocation === "/my-settings"');
+    expect(guard).toContain('decision = { kind: "redirect", to: "/properties/my-settings" }');
+    expect(guard).toContain('currentLocation === "/balance-repair"');
+    expect(guard).toContain('decision = { kind: "redirect", to: "/properties/balance-repair" }');
   });
 
   it("uses replacement navigation for unknown Properties routes", () => {
