@@ -5,7 +5,7 @@ the TypeScript source. This document describes the program for splitting them
 and — more importantly — the safety harness that makes those splits verifiable
 rather than hopeful.
 
-Phase 0 (the harness) and Phase 1 are complete. Phases 2–6 are not started.
+Phases 0, 1 and 2 are complete. Phases 3–6 are not started.
 
 ## Why a harness came first
 
@@ -139,16 +139,52 @@ npm run audit:god-files
 | Phase | Scope | Notes |
 |---|---|---|
 | 1 | ~~`server/startupSchema.ts`~~ | **Done.** Split into ten parts under `server/startup-schema/`, largest 772 lines. Order preserved and proven by a sha256 pin of the assembled array in `tests/startup-schema-integrity.test.ts`. |
-| 2 | Delete before splitting | ~10,300 lines across 7 `*Legacy` / dead-version files. The manifest identifies which server ones are unreachable. |
+| 2 | ~~Delete before splitting~~ | **Done, and the premise was wrong** — see below. No file was deletable; three dead *handlers* (349 lines) were removed instead. |
 | 3 | Route monoliths (~71 files) | Split by URL prefix into a directory with an `index.ts` barrel. Start somewhere self-contained, not factory. |
 | 4 | Page components (~63 files) | Extract types, then pure helpers, then sub-components, then hooks — strictly safest first. |
 | 5 | `shared/schema/*.ts` | Highest blast radius, lowest urgency. Barrel must preserve every export name. |
 | 6 | Tighten the ratchet | Lower `softMaxLines` as the backlog empties. |
 
-Phase 1 removed 4,312 lines from the backlog, which now stands at 161 files and
-98,924 excess lines.
+Phase 1 removed 4,312 lines from the backlog and Phase 2 a further 349; it now
+stands at 161 files and 98,565 excess lines.
 
 Phases 3 and 4 touch disjoint trees and can run in parallel.
+
+## Phase 2 — what the evidence actually showed
+
+The plan assumed ~10,300 lines across seven `*Legacy` / dead-version files could
+simply be deleted. Checking each one against the router and the route manifest
+showed that **none of them were dead**:
+
+- `AnalyticsLegacy.tsx`, `AccountsLegacy.tsx`, `SalesReportLegacy.tsx` are each
+  rendered unconditionally by a same-named wrapper that exists only to inject a
+  compatibility shim. They are the live implementation; the name misleads.
+- `FactoryStockAllocationV3.tsx` still has a live route,
+  `/factory/stock-allocation-v3`.
+- The three server `*Legacy` route modules are all registered, and each supplies
+  the majority of the live handlers for its area. They run *last* in their
+  composition group, so only paths that an earlier sibling also registers are
+  shadowed.
+
+Measured per module, that was 1 shadowed route of 8, 3 of 19, and 0 of 10. Of
+those four, one — `POST /api/factory/raw-stock/recalc/undo` — turned out to be
+live after all: the V4 handler registered before it calls `next()` on purpose to
+fall through, and says so in a comment.
+
+So the real dead code was three handlers, not seven files: the legacy
+`assign-to-bales`, `recalc/historical-replay`, and
+`recalc/historical-replay/apply`. Removing them and their orphaned imports took
+out 349 lines. All three endpoints still resolve, served by the newer modules
+registered ahead of them — the manifest reported exactly three removed
+registrations, no additions and no reordering.
+
+The durable outcome is the ratchet: `MAX_SHADOWED_REGISTRATIONS` in
+`tests/route-manifest.test.ts` pins the number of registrations shadowed by an
+earlier identical method+path at 142, down from 145. It can fall but not rise.
+
+The lesson generalises to the remaining phases: a file named `*Legacy` in this
+repository usually means "the original implementation, still in use", not "dead
+code". Those lines have to be split, not deleted.
 
 ## A note on scope
 

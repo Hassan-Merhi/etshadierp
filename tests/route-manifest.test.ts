@@ -33,6 +33,12 @@ import {
 const MANIFEST_PATH = path.join(process.cwd(), "config/route-manifest.json");
 const shouldUpdate = process.env.UPDATE_ROUTE_MANIFEST === "1";
 
+/**
+ * Registrations that are shadowed by an earlier identical method+path. A
+ * one-way ceiling: lower it whenever dead duplicates are removed.
+ */
+const MAX_SHADOWED_REGISTRATIONS = 142;
+
 let actual: SerializedRouteManifest;
 
 /**
@@ -127,6 +133,30 @@ describe("route manifest", () => {
 
     expect(actual.routeCount).toBe(expected.routeCount);
     expect(actual.middlewareMountCount).toBe(expected.middlewareMountCount);
+  });
+
+  it("does not add shadowed route registrations", () => {
+    // Express resolves first-match, so a second registration of the same
+    // method and path only runs if the earlier handler calls next(). Some of
+    // these are deliberate interceptor chains; others are dead handlers left
+    // behind by earlier refactors. Either way the number should fall, never
+    // rise - a new duplicate is either dead on arrival or a silent override of
+    // an existing endpoint.
+    const counts = new Map<string, number>();
+    for (const entry of actual.routes) {
+      const methodAndPath = entry.slice(0, entry.lastIndexOf("[")).trim();
+      counts.set(methodAndPath, (counts.get(methodAndPath) ?? 0) + 1);
+    }
+
+    let shadowed = 0;
+    for (const count of counts.values()) shadowed += count - 1;
+
+    expect(
+      shadowed,
+      `Shadowed registrations rose to ${shadowed} from a baseline of ${MAX_SHADOWED_REGISTRATIONS}. ` +
+        "Register the new handler on a distinct path, or replace the existing one rather than " +
+        "stacking on top of it."
+    ).toBeLessThanOrEqual(MAX_SHADOWED_REGISTRATIONS);
   });
 
   it("keeps every /api route behind an explicit guard", () => {
