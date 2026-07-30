@@ -18,9 +18,15 @@ interface UseAuthenticatedAppDataOptions {
   selectedCompanyId?: number;
   userPresent: boolean;
   isPOS: boolean;
+  needsFactorySettings: boolean;
 }
 
-export function useAuthenticatedAppData({ selectedCompanyId, userPresent, isPOS }: UseAuthenticatedAppDataOptions) {
+export function useAuthenticatedAppData({
+  selectedCompanyId,
+  userPresent,
+  isPOS,
+  needsFactorySettings,
+}: UseAuthenticatedAppDataOptions) {
   const { toast } = useToast();
   const prevUnreadRef = useRef<number>(-1);
 
@@ -52,6 +58,8 @@ export function useAuthenticatedAppData({ selectedCompanyId, userPresent, isPOS 
     setAppTimezone(companySettings?.timezone);
   }, [companySettings?.timezone]);
 
+  // Access is still resolved for every non-POS user because the route guard uses
+  // it to distinguish ERP-only, factory-only, and dual-access accounts.
   const {
     data: myAccess,
     isLoading: myAccessLoading,
@@ -59,18 +67,19 @@ export function useAuthenticatedAppData({ selectedCompanyId, userPresent, isPOS 
   } = useQuery<FactoryAccess>({
     queryKey: companyQueryKey("/api/factory/my-access", selectedCompanyId),
     enabled: userPresent && !isPOS && !!selectedCompanyId,
-    staleTime: 30000,
-    retry: 2,
+    staleTime: 5 * 60 * 1000,
   });
 
+  // Factory settings are only used by the factory route guard. Regular ERP and
+  // Properties sessions no longer download this payload on every app bootstrap.
   const { data: factorySettings } = useQuery<Record<string, any>>({
     queryKey: companyQueryKey("/api/factory/settings", selectedCompanyId),
     queryFn: async () => {
       const response = await fetch("/api/factory/settings");
       return response.ok ? response.json() : {};
     },
-    enabled: userPresent && !isPOS && !!selectedCompanyId,
-    staleTime: 60000,
+    enabled: userPresent && !isPOS && !!selectedCompanyId && needsFactorySettings,
+    staleTime: 5 * 60 * 1000,
   });
 
   return {
