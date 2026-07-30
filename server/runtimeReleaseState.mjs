@@ -4,6 +4,10 @@ const startedAt = new Date();
 
 export const runtimeReleaseState = Object.freeze({
   buildVersion: deploymentRuntimeConfig.buildVersion,
+  commitSha: deploymentRuntimeConfig.commitSha,
+  expectedCommitSha: deploymentRuntimeConfig.expectedCommitSha,
+  commitVerified: deploymentRuntimeConfig.commitVerified,
+  releaseId: deploymentRuntimeConfig.releaseId,
   environment: deploymentRuntimeConfig.isProduction ? "production" : process.env.NODE_ENV || "development",
   databaseSource: deploymentRuntimeConfig.databaseSource,
   startedAt: startedAt.toISOString(),
