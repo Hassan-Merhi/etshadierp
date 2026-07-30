@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useDeferredValue, useMemo } from "react";
 
 interface UseCombinedStockRowsParams {
   allInventoryData: any[];
@@ -15,8 +15,13 @@ export function useCombinedStockRows({
   allStockLocationFilter,
   allStockSearchTerm,
 }: UseCombinedStockRowsParams) {
-  const matrixProfile = allInventoryData.some(
-    (item: any) => item && typeof item.qtyByLocationName === "object" && Array.isArray(item.locations),
+  const deferredSearchTerm = useDeferredValue(allStockSearchTerm);
+  const matrixProfile = useMemo(
+    () =>
+      allInventoryData.some(
+        (item: any) => item && typeof item.qtyByLocationName === "object" && Array.isArray(item.locations),
+      ),
+    [allInventoryData],
   );
 
   const allInventoryLocations = useMemo(() => {
@@ -63,6 +68,7 @@ export function useCombinedStockRows({
         totalQty: Number(item.totalQty || 0),
         avgCost: Number(item.avgCost || 0),
         totalValue: Number(item.totalValue || 0),
+        searchText: `${item.stockItemName || ""} ${item.stockItemCode || ""}`.toLowerCase(),
       }));
     }
 
@@ -96,10 +102,12 @@ export function useCombinedStockRows({
     return [...itemMap.values()].map((row) => ({
       ...row,
       avgCost: row.totalQty > 0 ? row.weightedCostSum / row.totalQty : 0,
+      searchText: `${row.stockItemName} ${row.stockItemCode}`.toLowerCase(),
     }));
   }, [allInventoryData, matrixProfile]);
 
   const filteredCombinedRows = useMemo(() => {
+    const search = deferredSearchTerm.trim().toLowerCase();
     return combinedStockRows
       .filter((row) => {
         if (allStockGroupFilter) {
@@ -116,10 +124,7 @@ export function useCombinedStockRows({
         if (allStockLocationFilter && !((row.qtyByLocationName[allStockLocationFilter] || 0) > 0)) {
           return false;
         }
-        if (allStockSearchTerm) {
-          const search = allStockSearchTerm.toLowerCase();
-          return row.stockItemName.toLowerCase().includes(search) || row.stockItemCode.toLowerCase().includes(search);
-        }
+        if (search && !row.searchText.includes(search)) return false;
         return true;
       })
       .sort(
@@ -130,7 +135,7 @@ export function useCombinedStockRows({
     allStockGroupFilter,
     allStockCategoryFilter,
     allStockLocationFilter,
-    allStockSearchTerm,
+    deferredSearchTerm,
   ]);
 
   return { allInventoryLocations, allInventoryGroups, filteredCombinedRows };
