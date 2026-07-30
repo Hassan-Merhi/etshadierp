@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 /**
- * verify-lockfile-registry.mjs
+ * Production prebuild safety boundary.
  *
- * Ensures package-lock.json contains no Replit-internal registry URLs.
- * Exits with status 1 if any are found so the build fails before any
- * esbuild/vite step runs.
+ * 1. Rejects Replit-internal or insecure npm registry URLs.
+ * 2. Rejects unresolved relative source imports and imports of retired route modules.
+ *
+ * This runs from package.json prebuild before Vite or esbuild starts.
  */
 import { readFileSync } from "fs";
 import { resolve } from "path";
+import { auditRelativeImports } from "./audit-relative-imports.mjs";
 
 const lockPath = resolve(process.cwd(), "package-lock.json");
 let content;
@@ -21,24 +23,21 @@ try {
 const BLOCKED_PATTERNS = [
   "package-firewall.replit.local",
   "replit.local/npm",
-  // Add other Replit-only registry hostnames here if they ever appear
+  // Add other environment-only registry hostnames here if they ever appear.
 ];
 
 let failed = false;
 for (const pattern of BLOCKED_PATTERNS) {
   if (content.includes(pattern)) {
     console.error(`\n❌  LOCKFILE SAFETY CHECK FAILED`);
-    console.error(`   package-lock.json contains a Replit-internal registry URL:`);
+    console.error(`   package-lock.json contains an environment-internal registry URL:`);
     console.error(`   "${pattern}"`);
-    console.error(`\n   Production deployments (e.g. Render) cannot reach this host.`);
-    console.error(`   Fix: run the following and commit the updated lockfile:`);
-    console.error(`     sed -i 's|http://package-firewall.replit.local/npm/|https://registry.npmjs.org/|g' package-lock.json`);
-    console.error(`   Then confirm with: grep -c 'package-firewall.replit.local' package-lock.json`);
+    console.error(`\n   Production deployments cannot reach this host.`);
+    console.error(`   Replace it with https://registry.npmjs.org/ and commit the updated lockfile.`);
     failed = true;
   }
 }
 
-// Also warn if any http:// (not https://) npm registry URLs sneak in
 if (content.includes('"http://registry.npmjs.org')) {
   console.error(`\n❌  LOCKFILE SAFETY CHECK FAILED`);
   console.error(`   package-lock.json contains insecure http://registry.npmjs.org URLs.`);
@@ -46,8 +45,16 @@ if (content.includes('"http://registry.npmjs.org')) {
   failed = true;
 }
 
-if (failed) {
+if (failed) process.exit(1);
+console.log("✅  Lockfile registry check passed — no internal or insecure registry URLs found.");
+
+const importReport = auditRelativeImports();
+if (importReport.failures.length > 0) {
+  console.error("\n❌  PRODUCTION IMPORT BOUNDARY FAILED");
+  for (const failure of importReport.failures) console.error(`   - ${failure}`);
   process.exit(1);
 }
 
-console.log("✅  Lockfile registry check passed — no Replit-internal URLs found.");
+console.log(
+  `✅  Relative imports verified across ${importReport.scannedFiles} source files (${importReport.checkedImports} relative imports).`,
+);
