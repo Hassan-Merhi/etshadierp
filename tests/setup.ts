@@ -6,6 +6,7 @@ import { pool } from "../server/db";
 import { eq, and, sql } from "drizzle-orm";
 import * as schema from "../shared/schema";
 import { KNOWN_SECURITY_PERMISSIONS } from "../server/services/security/namedPermissionService";
+import { setParentCompanyId } from "../server/storage/accounting";
 
 let testApp: express.Express;
 let testServer: any;
@@ -144,6 +145,10 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     await pool.query("DELETE FROM login_history WHERE user_id = $1", [u.id]);
     await db.delete(schema.users).where(eq(schema.users.id, u.id));
   }
+
+  // Drop the parent-company pin with the fixture that owned it, so a later run
+  // cannot resolve a parent company that no longer exists.
+  await setParentCompanyId(null);
 }
 
 export async function seedTestData(prefix: string): Promise<TestContext> {
@@ -172,6 +177,19 @@ export async function seedTestData(prefix: string): Promise<TestContext> {
       baseCurrency: "USD",
     })
     .returning();
+
+  // Pin the legacy parent company to this fixture.
+  //
+  // resolveParentCompanyId() falls back to "the only ERP company" when the
+  // parentCompanyId setting is unset, and throws outright when more than one
+  // exists. Companies default to companyType "erp", so the moment a test
+  // creates a second company - which several do, to exercise isolation - every
+  // endpoint that reads supplier balances starts returning 500, including
+  // /api/accounts/all. Configuring the setting is what a real deployment is
+  // required to do, and it makes resolution deterministic no matter how many
+  // companies a test creates. In the single-company case it resolves to exactly
+  // the same company the fallback would have chosen.
+  await setParentCompanyId(company.id);
 
   await db.insert(schema.userCompanyRoles).values({
     userId: user.id,
