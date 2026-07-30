@@ -54,6 +54,8 @@ export function resolveAuthenticatedAppRoute({
     decision = { kind: "redirect", to: "/properties/balance-repair" };
   } else if (isPropertiesCompany && !isPropertiesRoute) {
     decision = { kind: "redirect", to: "/properties/daybook" };
+  } else if (isPropertiesRoute && !isPropertiesCompany) {
+    decision = { kind: "redirect", to: "/" };
   } else if (isSupplierPartnerRoute && !isSupplierPartnerCompany) {
     decision = { kind: "redirect", to: "/tracking" };
   } else if (
