@@ -1,6 +1,6 @@
 {
-  "version": 13,
-  "description": "God-file architecture boundaries for ERP route composition, storage aggregation, and authenticated frontend orchestration.",
+  "version": 14,
+  "description": "Repository-wide god-file architecture boundaries for ERP route composition, storage aggregation, authenticated frontend orchestration, and source growth.",
   "retiredFiles": [
     "server/routesLegacy.ts",
     "server/routes/reportsRoutesLegacy.ts",
@@ -38,5 +38,15 @@
       "maxLines": 150,
       "forbidPatterns": ["useQuery<", "fetch(\"/api/", "SUPPLIER_PARTNER_PATHS", "computeFactoryGuardRedirect("]
     }
-  ]
+  ],
+  "repositoryScan": {
+    "roots": ["server", "client/src", "shared", "scripts", "tests"],
+    "extensions": [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"],
+    "softMaxLines": 900,
+    "hardMaxLines": 3000,
+    "excludeDirectories": ["node_modules", "dist", "build", "coverage", ".git", "migrations"],
+    "excludeFiles": [
+      "client/src/components/ui/sidebar.tsx"
+    ]
+  }
 }
