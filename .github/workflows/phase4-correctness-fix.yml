@@ -71,7 +71,11 @@ jobs:
               return_pattern = re.compile(
                   r'(\n\s+supplier,\n\s+supplierRemainingKg,)(\n\s+receivedKg,)',
               )
-              text, count = return_pattern.subn(r'\1\n    supplierLockedRate,\2', text, count=1)
+              text, count = return_pattern.subn(
+                  lambda match: match.group(1) + "\n    supplierLockedRate," + match.group(2),
+                  text,
+                  count=1,
+              )
               if count != 1:
                   raise SystemExit("preview state return block not found")
 
@@ -79,12 +83,16 @@ jobs:
               fingerprint_pattern = re.compile(
                   r'(\s+supplier: state\.supplier,\n\s+supplierRemainingKg: formatFactoryQuantity\(state\.supplierRemainingKg\),)',
               )
-              fingerprint_replacement = '''\1
+              text, count = fingerprint_pattern.subn(
+                  lambda match: match.group(1)
+                  + '''
             supplierLockedRate:
               state.supplierLockedRate === null
                 ? null
-                : formatFactoryLockedRate(state.supplierLockedRate),'''
-              text, count = fingerprint_pattern.subn(fingerprint_replacement, text, count=1)
+                : formatFactoryLockedRate(state.supplierLockedRate),''',
+                  text,
+                  count=1,
+              )
               if count != 1:
                   raise SystemExit("fingerprint supplier block not found")
 
@@ -102,7 +110,9 @@ jobs:
                   r'  \}\n)\n'
                   r'  return payload\.preview;',
               )
-              verification_replacement = '''\1
+              text, count = verification_pattern.subn(
+                  lambda match: match.group(1)
+                  + '''
           const recomputed = await preparePostOffloadImpactPreview({
             companyId: input.companyId,
             userId: input.userId,
@@ -116,8 +126,10 @@ jobs:
             );
           }
 
-          return payload.preview;'''
-              text, count = verification_pattern.subn(verification_replacement, text, count=1)
+          return payload.preview;''',
+                  text,
+                  count=1,
+              )
               if count != 1:
                   raise SystemExit("verification tail not found")
 
