@@ -148,9 +148,7 @@ export function registerPostOffloadPhase6SafetyRoutes(app: Express): void {
         });
         await persistPostOffloadPhase6Audit({
           action:
-            prepared.status === "blocked"
-              ? "post_offload_phase6_blocked"
-              : "post_offload_phase6_preview_generated",
+            prepared.status === "blocked" ? "post_offload_phase6_blocked" : "post_offload_phase6_preview_generated",
           companyId: context.companyId,
           userId: context.userId,
           username: context.username,
