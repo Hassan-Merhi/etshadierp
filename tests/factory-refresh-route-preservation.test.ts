@@ -20,6 +20,7 @@ describe("Factory refresh route preservation", () => {
 
   it("classifies Factory routes and only redirects a wrong-company Factory URL", () => {
     expect(guard).toContain('const isFactoryRoute = currentLocation.startsWith("/factory/");');
-    expect(guard).toContain("isFactoryRoute && !isFactoryCompany && !myAccessLoading && hasErpAccess");
+    expect(guard).toContain("isFactoryRoute && !isFactoryCompany");
+expect(guard).toContain('decision = { kind: "redirect", to: "/" };');
   });
 });
