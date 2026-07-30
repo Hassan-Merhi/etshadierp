@@ -70,9 +70,12 @@ export default function ProductionRawStock() {
     refetchOnWindowFocus: false,
   });
 
-  const { data: availableContainers = [] } = useQuery<any[]>({
+  const { data: availableContainersRaw = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/raw-stock/available-containers"],
   });
+  const availableContainers = availableContainersRaw.filter(
+    (c) => c.status !== "PARTIALLY_RECEIVED"
+  );
 
   const { data: mixBatchesByDate = [], isLoading: mixBatchesByDateLoading } = useQuery<any[]>({
     queryKey: [`/api/factory/mix-batches-by-date?date=${encodeURIComponent(mixBatchDate)}`],
