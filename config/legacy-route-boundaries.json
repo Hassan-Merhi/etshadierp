@@ -1,31 +1,31 @@
 {
-  "version": 7,
-  "description": "Frozen legacy route boundaries. Budgets may only decrease as routes move into focused modules. Phase 7 confirms operations ownership is fully outside routesLegacy.ts.",
+  "version": 8,
+  "description": "Frozen legacy route boundaries. Budgets may only decrease as routes move into focused modules. Phase 8 confirms active application route registrars are uniquely composed with no duplicate HTTP ownership in compatibility files.",
   "files": [
     {
       "path": "server/routes/reportsRoutesLegacy.ts",
-      "owner": "Reporting",
+      "owner": "Reporting compatibility boundary; no active HTTP ownership",
       "maxLines": 12,
       "targetLines": 0,
       "migrationPhase": 2
     },
     {
       "path": "server/routes/authRoutesLegacy.ts",
-      "owner": "Authentication and access control",
+      "owner": "Authentication compatibility boundary; no active HTTP ownership",
       "maxLines": 12,
       "targetLines": 0,
       "migrationPhase": 3
     },
     {
       "path": "server/routesLegacy.ts",
-      "owner": "Application route compatibility export; no operations HTTP ownership",
+      "owner": "Application route compatibility export; no active HTTP ownership",
       "maxLines": 14,
       "targetLines": 0,
       "migrationPhase": 5
     },
     {
       "path": "server/routes/customerRoutesLegacy.ts",
-      "owner": "Customer accounting and operations",
+      "owner": "Customer compatibility boundary; no active HTTP ownership",
       "maxLines": 12,
       "targetLines": 0,
       "migrationPhase": 4
