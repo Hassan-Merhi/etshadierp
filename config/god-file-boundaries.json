@@ -1,6 +1,6 @@
 {
-  "version": 14,
-  "description": "Repository-wide god-file architecture boundaries for ERP route composition, storage aggregation, authenticated frontend orchestration, and source growth.",
+  "version": 15,
+  "description": "Repository-wide god-file architecture boundaries for ERP route composition, storage aggregation, authenticated frontend orchestration, diagnostic routes, and source growth.",
   "retiredFiles": [
     "server/routesLegacy.ts",
     "server/routes/reportsRoutesLegacy.ts",
@@ -37,6 +37,24 @@
       "owner": "Authenticated shell orchestration",
       "maxLines": 150,
       "forbidPatterns": ["useQuery<", "fetch(\"/api/", "SUPPLIER_PARTNER_PATHS", "computeFactoryGuardRedirect("]
+    },
+    {
+      "path": "server/routes/debugRoutes.ts",
+      "owner": "Debug route composition",
+      "maxLines": 20,
+      "forbidPatterns": ["app.get(", "app.post(", "app.put(", "app.patch(", "app.delete(", "drizzle-orm", "@shared/schema", "../db"]
+    },
+    {
+      "path": "server/routes/debug/importCycleDiagnosticFoundation.ts",
+      "owner": "Import-cycle diagnostic data collection",
+      "maxLines": 650,
+      "forbidPatterns": ["app.get(", "app.post(", "res.json("]
+    },
+    {
+      "path": "server/routes/debug/importCycleDiagnosticAnalysis.ts",
+      "owner": "Import-cycle reconciliation and response assembly",
+      "maxLines": 700,
+      "forbidPatterns": ["app.get(", "app.post(", "requireAuth", "requireRole"]
     }
   ],
   "repositoryScan": {
