@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "legacyMissingRegisteredTags": [
+    {
+      "tag": "0000_conscious_william_stryker",
+      "classification": "pre-versioning-journal-gap",
+      "reason": "The Drizzle journal predates the retained SQL migration history. The missing file is approved debt and must not be recreated from memory."
+    },
+    {
+      "tag": "0001_parallel_guardian",
+      "classification": "pre-versioning-journal-gap",
+      "reason": "The Drizzle journal predates the retained SQL migration history. The missing file is approved debt and must not be recreated from memory."
+    },
+    {
+      "tag": "0002_married_loa",
+      "classification": "pre-versioning-journal-gap",
+      "reason": "The Drizzle journal predates the retained SQL migration history. The missing file is approved debt and must not be recreated from memory."
+    }
+  ],
+  "approvedUnregisteredSqlFiles": [
+    {
+      "file": "20260717_factory_recalc_undo_log.sql",
+      "classification": "standalone-idempotent-schema",
+      "executionMode": "reviewed-manual-or-future-registration",
+      "reason": "Creates the raw-stock recalculation history and undo storage. It is idempotent but has not been deliberately added to the transactional versioned runner."
+    },
+    {
+      "file": "20260717_phase3_heavy_read_indexes.sql",
+      "classification": "standalone-nontransactional-indexes",
+      "executionMode": "manual-psql-outside-transaction",
+      "reason": "Uses CREATE INDEX CONCURRENTLY and therefore must not be executed by the transactional Drizzle migration runner."
+    },
+    {
+      "file": "20260718_post_offload_charge_edit_undo.sql",
+      "classification": "standalone-idempotent-schema",
+      "executionMode": "manual-psql",
+      "reason": "The migration explicitly requires direct psql execution and is intentionally not owned by drizzle-kit push."
+    },
+    {
+      "file": "20260720_001_financial_close_audit.sql",
+      "classification": "standalone-idempotent-schema",
+      "executionMode": "reviewed-manual-or-future-registration",
+      "reason": "Creates financial close and immutable audit objects. Registration requires a separate migration-activation review."
+    },
+    {
+      "file": "20260721_001_factory_mix_batch_sources_inventory_supplier.sql",
+      "classification": "standalone-reviewed-backfill",
+      "executionMode": "controlled-manual-or-future-registration",
+      "reason": "Contains a company-scoped historical ownership backfill and NOT VALID constraints. It requires rehearsal and explicit approval before activation."
+    },
+    {
+      "file": "20260721_fix_pos_location_pool_crash.sql",
+      "classification": "standalone-idempotent-schema",
+      "executionMode": "reviewed-manual-or-future-registration",
+      "reason": "Adds dual-currency compatibility columns and the POS location index. It remains outside the versioned journal until deliberately activated."
+    }
+  ]
+}
