@@ -1,0 +1,91 @@
+name: Phase 5 Debug
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify-phase5:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Normalize Replit registry URLs for CI
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Add strict query-client typing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("server/services/factory/postOffloadReconciliation.ts")
+          text = path.read_text()
+          marker = "interface DaybookRow {\n"
+          insert_after = "  meta_json: unknown;\n}\n"
+          interface = """
+
+          interface ReconciliationQueryClient {
+            query<T = Record<string, unknown>>(
+              text: string,
+              params?: unknown[]
+            ): Promise<{ rows: T[]; rowCount: number | null }>;
+          }
+          """
+          start = text.index(marker)
+          end = text.index(insert_after, start) + len(insert_after)
+          text = text[:end] + interface + text[end:]
+          text = text.replace("loadDaybook(client: any,", "loadDaybook(client: ReconciliationQueryClient,")
+          text = text.replace("  client: any;", "  client: ReconciliationQueryClient;")
+          text = text.replace(
+              "  const client = await pool.connect();",
+              "  const client = (await pool.connect()) as unknown as ReconciliationQueryClient & { release(): void };",
+          )
+          path.write_text(text)
+          PY
+
+      - name: Format Phase 5 files
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            server/services/factory/factoryVoucherEntryAmounts.ts \
+            server/services/factory/postOffloadReconciliation.ts \
+            server/routes/factory/raw-stock/postOffloadReconciliationMiddleware.ts \
+            server/routes/factory/factoryRawStockRoutes.ts \
+            server/routes/factory/raw-stock/index.ts \
+            tests/factory-post-offload-phase5-reconciliation.test.ts
+
+      - name: Type-check
+        continue-on-error: true
+        run: npm run check > phase5-typecheck.log 2>&1
+
+      - name: Run focused test
+        continue-on-error: true
+        run: |
+          node node_modules/vitest/vitest.mjs run \
+            tests/factory-post-offload-phase5-reconciliation.test.ts \
+            --maxWorkers=1 --no-file-parallelism > phase5-test.log 2>&1
+
+      - name: Upload formatted files and logs
+        uses: actions/upload-artifact@v7
+        with:
+          name: phase5-debug-bundle
+          path: |
+            server/services/factory/factoryVoucherEntryAmounts.ts
+            server/services/factory/postOffloadReconciliation.ts
+            server/routes/factory/raw-stock/postOffloadReconciliationMiddleware.ts
+            server/routes/factory/factoryRawStockRoutes.ts
+            server/routes/factory/raw-stock/index.ts
+            tests/factory-post-offload-phase5-reconciliation.test.ts
+            phase5-typecheck.log
+            phase5-test.log
+          if-no-files-found: error
+          retention-days: 1
