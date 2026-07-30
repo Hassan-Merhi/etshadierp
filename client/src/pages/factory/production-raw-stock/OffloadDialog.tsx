@@ -159,13 +159,31 @@ export function OffloadDialog({
     return kg * rate;
   }, [isSubsequentReceipt, selectedContainer, actualReceivedKg]);
 
-  /** Estimated landed avg cost/kg (USD) — live preview summing all charges entered so far. */
+  /** Estimated landed avg cost/kg (USD) — live preview summing all charges entered so far.
+   *
+   * IMPORTANT: fixed charges (freight, OC, commission, duty, additional) are agreed for
+   * the whole container and the server spreads them over `totalKg` (the full declared
+   * weight) — not over just the kg being received in this receipt.  We mirror that here
+   * so the preview always matches what `computeContainerLandedCost` will store.
+   * Changing `actualReceivedKg` must NOT change the cost-per-kg estimate.
+   */
   const estimatedAvgCostKg = useMemo(() => {
     const kg = parseFloat(actualReceivedKg || "0");
-    if (!kg || !selectedContainerId) return null;
+    if (!kg || !selectedContainerId || !selectedContainer) return null;
 
+    // Use the container's full declared weight as the valuation basis — identical to
+    // how the server computes costPerKg.  Fall back to the received kg only when the
+    // container has no declared weight recorded yet (edge case).
+    const valuationKg =
+      parseFloat((selectedContainer as any).totalKg || "0") > 0
+        ? parseFloat((selectedContainer as any).totalKg)
+        : kg;
+
+    // Material cost scales with valuationKg (total declared kg), not the partial receipt.
     const materialUsd =
-      parseFloat(costPerKg || "0") * parseFloat(fxRateToUsd || "1") * kg;
+      parseFloat(costPerKg || "0") * parseFloat(fxRateToUsd || "1") * valuationKg;
+
+    // Fixed charges: full container amounts, already independent of received kg.
     const freightUsd =
       parseFloat(freight || "0") * parseFloat(freightFxRate || "1");
     const otherUsd =
@@ -175,7 +193,8 @@ export function OffloadDialog({
     if (commissionPersonName.trim() && parseFloat(commissionRate || "0") > 0) {
       const commBase =
         parseFloat(commissionRate || "0") * parseFloat(commissionFxRate || "1");
-      commissionUsd = commissionType === "PER_KG" ? commBase * kg : commBase;
+      // PER_KG commission is agreed on the full declared weight (server mirrors this).
+      commissionUsd = commissionType === "PER_KG" ? commBase * valuationKg : commBase;
     }
 
     const extraUsd = additionalCharges
@@ -190,9 +209,9 @@ export function OffloadDialog({
     const dutyUsd = dutyPending ? 0 : parseFloat(dutyAmount || "0");
 
     const totalUsd = materialUsd + freightUsd + otherUsd + commissionUsd + extraUsd + dutyUsd;
-    return totalUsd / kg;
+    return totalUsd / valuationKg;
   }, [
-    actualReceivedKg, selectedContainerId, costPerKg, fxRateToUsd,
+    actualReceivedKg, selectedContainer, selectedContainerId, costPerKg, fxRateToUsd,
     freight, freightFxRate, otherCharges, otherChargesFxRate,
     commissionPersonName, commissionRate, commissionFxRate, commissionType,
     additionalCharges, dutyAmount, dutyPending,
