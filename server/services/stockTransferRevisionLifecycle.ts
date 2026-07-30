@@ -134,7 +134,7 @@ async function lockTransferScope(tx: any, transferId: number) {
 function assertLockedTransfer(locked: any, companyId: number): asserts locked {
   if (!locked) throw new Error("Stock transfer not found");
   if (Number(locked.company_id) !== companyId) throw new Error("Stock transfer belongs to a different company");
-  if (locked.voucher_type !== "Stock Transfer" && locked.voucher_type !== "StockTransfer") {
+  if (locked.voucher_type !== "Stock Transfer" && locked.voucher_type !== "StockTransfer" && locked.voucher_type !== "Transfer") {
     throw new Error("Voucher is not a stock transfer");
   }
   if (locked.deleted_at) throw new Error("Deleted stock transfers cannot be revised");
@@ -359,7 +359,7 @@ export async function approvePendingStockTransferRevision(
     const requested = firstRow(requestedResult);
     if (!requested) throw new Error("Revision not found");
     if (Number(requested.company_id) !== companyId) throw new Error("Revision belongs to a different company");
-    if (requested.voucher_type !== "Stock Transfer" && requested.voucher_type !== "StockTransfer") {
+    if (requested.voucher_type !== "Stock Transfer" && requested.voucher_type !== "StockTransfer" && requested.voucher_type !== "Transfer") {
       throw new Error("Voucher is not a stock transfer");
     }
     if (requested.deleted_at) throw new Error("Deleted stock transfers cannot be revised");

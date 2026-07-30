@@ -485,7 +485,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
         const destLoc = locations.find((l) => l.id === data.destinationLocationId);
         const voucherRes = await modeApiRequest("POST", "/api/vouchers", {
           companyId: selectedCompany?.id,
-          voucherType: "Transfer",
+          voucherType: "Stock Transfer",
           voucherNumber: `TRANSFER-${Date.now()}`,
           voucherDate: format(data.voucherDate, "yyyy-MM-dd"),
           description: `Stock transfer to ${destLoc?.name || ""}`,
