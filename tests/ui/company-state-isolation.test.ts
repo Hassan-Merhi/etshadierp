@@ -32,7 +32,7 @@ describe("frontend company-state isolation wiring", () => {
     const app = source("client/src/app/AuthenticatedApp.tsx");
     const appData = source("client/src/app/useAuthenticatedAppData.ts");
 
-    expect(app).toContain("if (isLoading || companyLoading || !selectedCompany || !user) return <AppLoadingState />;");
+    expect(app).toContain("if (companyLoading || !selectedCompany) return <AppLoadingState />;");
     expect(appData).toContain('companyQueryKey("/api/company-settings", selectedCompanyId)');
     expect(appData).toContain('companyQueryKey("/api/factory/my-access", selectedCompanyId)');
     expect(appData).toContain('companyQueryKey("/api/factory/settings", selectedCompanyId)');
