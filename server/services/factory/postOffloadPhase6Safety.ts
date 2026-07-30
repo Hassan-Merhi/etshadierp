@@ -8,6 +8,7 @@ import {
   buildHistoricalReplayScopeInternal,
   computeReplayFingerprint,
   normalizeReplayWriteScope,
+  previewHistoricalCostReplayWithExecutor,
   replayBaleIdsForScope,
   replayWriteScopesEqual,
   type ExactReplaySnapshot,
@@ -297,6 +298,7 @@ function parseReplayScope(value: unknown): ReplayWriteScope | null {
     if (!raw || typeof raw !== "object") return null;
     const row = raw as Record<string, unknown>;
     if (
+      typeof row.batchId !== "number" ||
       !Number.isInteger(row.batchId) ||
       typeof row.batchCode !== "string" ||
       !Array.isArray(row.reasons) ||
@@ -431,7 +433,10 @@ async function loadPostOffloadSupplierIds(executor: ReplayQueryExecutor, company
   return uniqueSortedNumbers(result.rows.map((row) => Number(row.supplier_id)));
 }
 
-async function loadLatestUndo(executor: ReplayQueryExecutor, companyId: number): Promise<PostOffloadPhase6Readiness["latestUndo"]> {
+async function loadLatestUndo(
+  executor: ReplayQueryExecutor,
+  companyId: number
+): Promise<PostOffloadPhase6Readiness["latestUndo"]> {
   const result = await executor.query<LatestUndoRow>(
     `SELECT id, algorithm_version, scope_fingerprint, applied_at, undone_at
      FROM factory_recalc_undo_log
@@ -458,34 +463,38 @@ function buildBlockers(params: {
   safety: ReturnType<typeof evaluateHistoricalReplaySafetyReadiness>;
   scope: ReplayWriteScope;
   selectedSupplierIds: number[];
+  hasPostOffloadSuppliers: boolean;
+  hasHistoricalRepairWork: boolean;
 }): string[] {
   const blockers = [
-    ...params.control.configurationErrors.map((value) => `production-control:${value}`),
     ...params.schema.missingObjects.map((value) => `schema:${value}`),
-    ...params.safety.blockers.map((value) => `safety:${value.gate}=${value.count}`),
+    ...(params.hasHistoricalRepairWork
+      ? params.control.configurationErrors.map((value) => `production-control:${value}`)
+      : []),
+    ...(params.hasPostOffloadSuppliers
+      ? params.safety.blockers.map((value) => `safety:${value.gate}=${value.count}`)
+      : []),
     ...params.scope.blockedBatches.flatMap((batch) =>
       batch.reasons.map((reason) => `batch:${batch.batchId}:${reason}`)
     ),
   ];
-  if (params.selectedSupplierIds.length === 0) blockers.push("scope:no-safe-post-offload-suppliers");
+  if (params.hasHistoricalRepairWork && params.selectedSupplierIds.length === 0) {
+    blockers.push("scope:no-safe-post-offload-suppliers");
+  }
   return [...new Set(blockers)].sort();
 }
 
 function classifyStatus(params: {
-  automaticRepairEligible: boolean;
   integrityIssueCount: number;
   totalWritableRows: number;
   blockers: string[];
 }): PostOffloadPhase6Status {
   if (params.blockers.length > 0) return "blocked";
   if (params.integrityIssueCount > 0 || params.totalWritableRows > 0) return "repair_required";
-  return params.automaticRepairEligible ? "repair_required" : "ready";
+  return "ready";
 }
 
-async function buildSnapshot(params: {
-  companyId: number;
-  requestedSupplierIds?: unknown;
-}): Promise<Phase6Snapshot> {
+async function buildSnapshot(params: { companyId: number; requestedSupplierIds?: unknown }): Promise<Phase6Snapshot> {
   const requestedIds = requestedSupplierIds(params.requestedSupplierIds);
   const control = readHistoricalReplayProductionControl();
   const client = await pool.connect();
@@ -509,15 +518,13 @@ async function buildSnapshot(params: {
     };
 
     if (schema.ready) {
-      const { previewHistoricalCostReplayWithExecutor } = await import("./historicalCostReplay");
       preview = await previewHistoricalCostReplayWithExecutor(executor, params.companyId);
       safety = evaluateHistoricalReplaySafetyReadiness(preview);
       const safePostOffloadIds = preview.supplierRows
         .filter((supplier) => supplier.safeToRepair && postOffloadSupplierIds.includes(supplier.supplierId))
         .map((supplier) => supplier.supplierId);
-      const selectedSupplierIds = requestedIds.length > 0
-        ? requestedIds.filter((id) => safePostOffloadIds.includes(id))
-        : safePostOffloadIds;
+      const selectedSupplierIds =
+        requestedIds.length > 0 ? requestedIds.filter((id) => safePostOffloadIds.includes(id)) : safePostOffloadIds;
 
       if (selectedSupplierIds.length > 0) {
         const internalScope = await buildHistoricalReplayScopeInternal({
@@ -535,20 +542,29 @@ async function buildSnapshot(params: {
 
     const selectedSupplierIds = scope.supplierIds;
     const counts = scopeCounts(scope);
-    const fingerprint = preview && selectedSupplierIds.length > 0
-      ? computeReplayFingerprint(
-          params.companyId,
-          selectedSupplierIds,
-          preview,
-          {
-            includeCompletedBatches: INCLUDE_COMPLETED_BATCHES,
-            includeFinalizedBales: INCLUDE_FINALIZED_BALES,
-          },
-          scope
-        )
-      : null;
+    const fingerprint =
+      preview && selectedSupplierIds.length > 0
+        ? computeReplayFingerprint(
+            params.companyId,
+            selectedSupplierIds,
+            preview,
+            {
+              includeCompletedBatches: INCLUDE_COMPLETED_BATCHES,
+              includeFinalizedBales: INCLUDE_FINALIZED_BALES,
+            },
+            scope
+          )
+        : null;
     const latestUndo = schema.ready ? await loadLatestUndo(executor, params.companyId) : null;
-    const blockers = buildBlockers({ control, schema, safety, scope, selectedSupplierIds });
+    const blockers = buildBlockers({
+      control,
+      schema,
+      safety,
+      scope,
+      selectedSupplierIds,
+      hasPostOffloadSuppliers: postOffloadSupplierIds.length > 0,
+      hasHistoricalRepairWork: counts.totalWritableRows > 0,
+    });
     const automaticRepairEligible =
       historicalReplayAuthorizationReady({ control, schema, safety }) &&
       selectedSupplierIds.length > 0 &&
@@ -564,7 +580,6 @@ async function buildSnapshot(params: {
       fingerprint,
     });
     const status = classifyStatus({
-      automaticRepairEligible,
       integrityIssueCount: integrity.issueCount,
       totalWritableRows: counts.totalWritableRows,
       blockers,
@@ -612,10 +627,12 @@ export async function inspectPostOffloadPhase6Readiness(params: {
   companyId: number;
   supplierIds?: unknown;
 }): Promise<PostOffloadPhase6Readiness> {
-  return (await buildSnapshot({
-    companyId: params.companyId,
-    requestedSupplierIds: params.supplierIds,
-  })).readiness;
+  return (
+    await buildSnapshot({
+      companyId: params.companyId,
+      requestedSupplierIds: params.supplierIds,
+    })
+  ).readiness;
 }
 
 export async function preparePostOffloadPhase6Repair(params: {
@@ -644,7 +661,9 @@ export async function preparePostOffloadPhase6Repair(params: {
       instructions:
         readiness.status === "ready"
           ? "No post-offload historical cost repair is required."
-          : "Apply is blocked. Resolve every production-control, schema, safety, accounting, FX, or scope blocker and run the dry-run again.",
+          : readiness.status === "blocked"
+            ? "Apply is blocked. Resolve every production-control, schema, safety, FX, or scope blocker and run the dry-run again."
+            : "Repair is still required, but no automatic historical cost scope is eligible. Repair the reported charge, accounting, reversal, or raw-stock integrity issues and run readiness again.",
     };
   }
 
@@ -691,9 +710,7 @@ function parseToken(value: unknown): PostOffloadPhase6TokenPayload {
     payload = verifyRepairToken<PostOffloadPhase6TokenPayload>(String(value ?? ""));
   } catch (error) {
     if (error instanceof ExpiredRepairTokenError) {
-      throw new StalePostOffloadPhase6TokenError(
-        "Post-offload repair approval expired. Re-run the dry-run plan."
-      );
+      throw new StalePostOffloadPhase6TokenError("Post-offload repair approval expired. Re-run the dry-run plan.");
     }
     if (error instanceof InvalidRepairTokenError) {
       throw new InvalidPostOffloadPhase6TokenError(error.message);

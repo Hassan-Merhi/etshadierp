@@ -94,10 +94,7 @@ describe("Phase 6 post-offload safety and repair", () => {
   });
 
   it("registers the Phase 6 routes in both active and compatibility aggregators", () => {
-    for (const path of [
-      "server/routes/factory/factoryRawStockRoutes.ts",
-      "server/routes/factory/raw-stock/index.ts",
-    ]) {
+    for (const path of ["server/routes/factory/factoryRawStockRoutes.ts", "server/routes/factory/raw-stock/index.ts"]) {
       const routes = read(path);
       expect(routes).toContain("registerPostOffloadPhase6SafetyRoutes");
       expect(routes).toContain("registerPostOffloadPhase6SafetyRoutes(app)");
