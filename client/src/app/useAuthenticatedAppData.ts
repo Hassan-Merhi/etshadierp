@@ -67,7 +67,8 @@ export function useAuthenticatedAppData({
   } = useQuery<FactoryAccess>({
     queryKey: companyQueryKey("/api/factory/my-access", selectedCompanyId),
     enabled: userPresent && !isPOS && !!selectedCompanyId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30000,
+    retry: 2,
   });
 
   // Factory settings are only used by the factory route guard. Regular ERP and
@@ -79,7 +80,7 @@ export function useAuthenticatedAppData({
       return response.ok ? response.json() : {};
     },
     enabled: userPresent && !isPOS && !!selectedCompanyId && needsFactorySettings,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60000,
   });
 
   return {
