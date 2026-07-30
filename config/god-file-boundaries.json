@@ -1,6 +1,6 @@
 {
-  "version": 12,
-  "description": "God-file architecture boundaries for ERP route composition and storage aggregation layers.",
+  "version": 13,
+  "description": "God-file architecture boundaries for ERP route composition, storage aggregation, and authenticated frontend orchestration.",
   "retiredFiles": [
     "server/routesLegacy.ts",
     "server/routes/reportsRoutesLegacy.ts",
@@ -31,6 +31,12 @@
       "owner": "POS storage compatibility barrel",
       "maxLines": 10,
       "forbidPatterns": ["drizzle-orm", "../db", "db.select(", "db.insert(", "db.update(", "db.delete("]
+    },
+    {
+      "path": "client/src/app/AuthenticatedApp.tsx",
+      "owner": "Authenticated shell orchestration",
+      "maxLines": 150,
+      "forbidPatterns": ["useQuery<", "fetch(\"/api/", "SUPPLIER_PARTNER_PATHS", "computeFactoryGuardRedirect("]
     }
   ]
 }
