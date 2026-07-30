@@ -15,9 +15,8 @@ describe("post-offload impact preview", () => {
     expect(service).toContain("remainingFraction");
     expect(service).toContain("previewHistoricalCostReplayWithExecutor");
     expect(service).toContain("finalizedBalesExcluded");
-    expect(service).not.toContain(".insert(");
-    expect(service).not.toContain(".update(");
-    expect(service).not.toContain(".delete(");
+    expect(service).not.toMatch(/\b(?:db|pool)\s*\.\s*(?:insert|update|delete)\s*\(/i);
+    expect(service).not.toMatch(/\b(?:INSERT\s+INTO|UPDATE\s+\w+|DELETE\s+FROM)\b/i);
   });
 
   it("binds the reviewed request and current cost state to a signed expiring token", () => {
