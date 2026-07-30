@@ -1,0 +1,47 @@
+name: Phase 3 Format Debug
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  format-debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Normalize Replit registry URLs for CI
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Generate exact Prettier output
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            server/routes/factory/raw-stock/postOffloadHistoricalReplayMiddleware.ts \
+            server/services/factory/postOffloadHistoricalReplay.ts
+          git diff -- \
+            server/routes/factory/raw-stock/postOffloadHistoricalReplayMiddleware.ts \
+            server/services/factory/postOffloadHistoricalReplay.ts > phase3-format.diff
+          cp server/routes/factory/raw-stock/postOffloadHistoricalReplayMiddleware.ts formatted-middleware.ts
+          cp server/services/factory/postOffloadHistoricalReplay.ts formatted-service.ts
+
+      - name: Upload exact formatted files
+        uses: actions/upload-artifact@v7
+        with:
+          name: phase3-formatted-files
+          path: |
+            phase3-format.diff
+            formatted-middleware.ts
+            formatted-service.ts
+          if-no-files-found: error
+          retention-days: 1
