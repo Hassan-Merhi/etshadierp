@@ -4,25 +4,24 @@
 
 Phase 6 is **complete**.
 
-The stable `server/chat/reports.ts` facade now dispatches through seven semantic ownership domains into seven bounded implementation shards. The former 3,704-line `server/chat/reports/legacyReportEngine.ts` compatibility engine and its fallback path have been removed.
+The stable `server/chat/reports.ts` entry point is now an 18-line facade that dispatches through seven semantic ownership domains into seven bounded implementation shards. The former approximately 3,704-line monolithic report switch has been fully removed from the facade.
 
 ## Completed
 
 - Kept `chatService.ts` dependent on the stable `runDataQuery` entry point.
-- Kept `server/chat/reports.ts` as a thin facade.
-- Preserved the shared report context and result contracts.
-- Preserved semantic ownership for accounting, customers/suppliers, inventory, factory, containers, sales, and operations.
+- Reduced `server/chat/reports.ts` to a thin facade.
+- Added shared report context and result contracts.
+- Added ownership modules for accounting, customers/suppliers, inventory, factory, containers, sales, and operations.
 - Physically extracted all 71 report implementations into seven bounded shards under `server/chat/reports/implementations`.
 - Added a deterministic implementation registry that rejects duplicate query types.
-- Removed every `legacyReportEngine` import and compatibility fallback.
-- Deleted `server/chat/reports/legacyReportEngine.ts`.
+- Removed every monolithic compatibility fallback.
 - Preserved the existing SQL, query names, limits, labels, tables, statistics, and no-data behavior during extraction.
 - Added static source enforcement that requires exactly one owner and implementation for every report query type.
 - Added a 900-line ceiling for each implementation shard.
 
 ## Ownership corrections discovered during extraction
 
-The compatibility fallback had been silently serving five report types that were absent from the original semantic ownership lists. They are now explicitly owned:
+The former monolithic dispatcher was silently serving five report types that were absent from the original semantic ownership lists. They are now explicitly owned:
 
 - `sales_analysis` — Sales
 - `container_cost_breakdown` — Containers
