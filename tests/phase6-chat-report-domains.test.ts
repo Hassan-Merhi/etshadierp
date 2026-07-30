@@ -3,7 +3,28 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
-const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
+const resolve = (file: string) => path.join(root, file);
+const read = (file: string) => fs.readFileSync(resolve(file), "utf8");
+const quotedValues = (source: string) => [...source.matchAll(/"([a-z0-9_]+)"/g)].map((match) => match[1]);
+
+function ownedQueryTypes(): string[] {
+  return fs
+    .readdirSync(resolve("server/chat/reports/domains"))
+    .filter((name) => name.endsWith("ReportDomain.ts") && name !== "createReportDomainHandler.ts")
+    .flatMap((name) => {
+      const source = read(path.join("server/chat/reports/domains", name));
+      const owned = source.match(/createReportDomainHandler\("[^"]+",\s*\[([\s\S]*?)\]\);/);
+      return owned ? quotedValues(owned[1]) : [];
+    });
+}
+
+function implementedQueryTypes(): string[] {
+  return fs
+    .readdirSync(resolve("server/chat/reports/implementations"))
+    .filter((name) => /^phase\d+ReportShard\.ts$/.test(name))
+    .flatMap((name) => [...read(path.join("server/chat/reports/implementations", name)).matchAll(/case\s+"([a-z0-9_]+)"\s*:/g)])
+    .map((match) => match[1]);
+}
 
 describe("Phase 6 chat reporting architecture", () => {
   it("keeps chatService behind the stable report gateway", () => {
@@ -18,7 +39,7 @@ describe("Phase 6 chat reporting architecture", () => {
     expect(source.split(/\r?\n/).length).toBeLessThanOrEqual(30);
   });
 
-  it("registers focused report domains and a compatibility fallback", () => {
+  it("registers seven focused domains without a compatibility fallback", () => {
     const source = read("server/chat/reports/domains/reportDomainDispatcher.ts");
     expect(source).toContain("accountingReportDomain");
     expect(source).toContain("customerSupplierReportDomain");
@@ -27,6 +48,27 @@ describe("Phase 6 chat reporting architecture", () => {
     expect(source).toContain("containerReportDomain");
     expect(source).toContain("salesReportDomain");
     expect(source).toContain("operationsReportDomain");
-    expect(source).toContain("runLegacyDataQuery");
+    expect(source).not.toMatch(/runLegacyDataQuery|legacyReportEngine/);
+    expect(fs.existsSync(resolve("server/chat/reports/legacyReportEngine.ts"))).toBe(false);
+  });
+
+  it("gives all 71 report types exactly one owner and implementation", () => {
+    const owned = ownedQueryTypes();
+    const implemented = implementedQueryTypes();
+    expect(owned).toHaveLength(71);
+    expect(new Set(owned).size).toBe(71);
+    expect(implemented).toHaveLength(71);
+    expect(new Set(implemented).size).toBe(71);
+    expect([...owned].sort()).toEqual([...implemented].sort());
+  });
+
+  it("keeps each implementation shard below the architecture threshold", () => {
+    const shardFiles = fs
+      .readdirSync(resolve("server/chat/reports/implementations"))
+      .filter((name) => /^phase\d+ReportShard\.ts$/.test(name));
+    expect(shardFiles).toHaveLength(7);
+    for (const file of shardFiles) {
+      expect(read(path.join("server/chat/reports/implementations", file)).split(/\r?\n/).length).toBeLessThanOrEqual(900);
+    }
   });
 });
