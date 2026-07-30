@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 function source(path: string): string {
-  return readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
+  return readFileSync(resolve(process.cwd(), path), "utf8");
 }
 
 describe("frontend company-state isolation wiring", () => {
@@ -29,11 +30,12 @@ describe("frontend company-state isolation wiring", () => {
 
   it("blocks every authenticated workspace while the company session changes", () => {
     const app = source("client/src/app/AuthenticatedApp.tsx");
+    const appData = source("client/src/app/useAuthenticatedAppData.ts");
 
-    expect(app).toContain("if (isLoading || companyLoading || !selectedCompany) return <AppLoadingState />;");
-    expect(app).toContain('companyQueryKey("/api/company-settings", selectedCompany?.id)');
-    expect(app).toContain('companyQueryKey("/api/factory/my-access", selectedCompany?.id)');
-    expect(app).toContain('companyQueryKey("/api/factory/settings", selectedCompany?.id)');
+    expect(app).toContain("if (isLoading || companyLoading || !selectedCompany || !user) return <AppLoadingState />;");
+    expect(appData).toContain('companyQueryKey("/api/company-settings", selectedCompanyId)');
+    expect(appData).toContain('companyQueryKey("/api/factory/my-access", selectedCompanyId)');
+    expect(appData).toContain('companyQueryKey("/api/factory/settings", selectedCompanyId)');
   });
 
   it("scopes company-transfer history, account options, and rules", () => {

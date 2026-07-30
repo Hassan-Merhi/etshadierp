@@ -1,15 +1,14 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+const exists = (path: string) => existsSync(new URL(`../${path}`, import.meta.url));
 
 describe("Phase 5 routesLegacy extraction", () => {
-  it("keeps routesLegacy compatibility-only", () => {
-    const legacy = read("server/routesLegacy.ts");
-    expect(legacy).toContain("registerApplicationRoutes(app)");
-    expect(legacy).not.toContain("app.get(");
-    expect(legacy).not.toContain("app.post(");
-    expect(legacy).not.toContain("app.use(");
-    expect(legacy.split("\n").length).toBeLessThanOrEqual(14);
+  it("keeps routesLegacy retired with the entry point as the composition root", () => {
+    expect(exists("server/routesLegacy.ts")).toBe(false);
+    const root = read("server/routes/applicationRoutes.ts");
+    expect(root).toContain("registerApplicationRoutes");
+    expect(root).not.toContain("routesLegacy");
   });
 
   it("composes every extracted registrar", () => {

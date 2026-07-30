@@ -31,14 +31,10 @@ describe("Phase 7 operations route ownership", () => {
     }
   });
 
-  it("prevents operations HTTP ownership from returning to routesLegacy", () => {
-    const legacyRoutes = read("server/routesLegacy.ts");
-    const boundaries = read("config/legacy-route-boundaries.json");
+  it("keeps operations HTTP ownership out of any retired legacy registry", () => {
+    expect(fs.existsSync(path.join(root, "server/routesLegacy.ts"))).toBe(false);
 
-    expect(legacyRoutes).not.toMatch(/\bapp\.(get|post|put|patch|delete|use)\s*\(/);
-    expect(legacyRoutes).not.toMatch(
-      /register(Location|Employee|Stock|Container|Import|Pos|Bale|PropertiesRental|ErpRental|FactoryRental|Factory|GlobalTransaction|FiscalTransfer)Routes/,
-    );
-    expect(boundaries).toContain("no operations HTTP ownership");
+    const boundaries = JSON.parse(read("config/legacy-route-boundaries.json")) as { files: unknown[] };
+    expect(boundaries.files).toEqual([]);
   });
 });

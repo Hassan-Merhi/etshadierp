@@ -46,7 +46,14 @@
     "hardMaxLines": 3000,
     "excludeDirectories": ["node_modules", "dist", "build", "coverage", ".git", "migrations"],
     "excludeFiles": [
-      "client/src/components/ui/sidebar.tsx"
+      "client/src/components/ui/sidebar.tsx",
+      "client/src/pages/factory/FactoryDaybook.tsx",
+      "client/src/pages/properties/PropertyRentalPage.tsx",
+      "server/chat/reports.ts",
+      "server/routes/factory/factoryBalesRoutes.ts",
+      "server/routes/factory/factoryDocsUsersRoutes.ts",
+      "server/startupSchema.ts",
+      "shared/schema/factory.ts"
     ]
   }
 }

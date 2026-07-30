@@ -10,7 +10,7 @@ describe("Supplier Partner administration phase 4", () => {
   const navigation = read("client/src/lib/supplier-partner-navigation.ts");
   const overview = read("client/src/pages/sp/SpOverview.tsx");
   const panel = read("client/src/pages/sp/SpSetupPanel.tsx");
-  const authenticatedApp = read("client/src/app/AuthenticatedApp.tsx");
+  const routeGuard = read("client/src/app/authenticatedAppRouteGuard.ts");
 
   it("consolidates setup and migration under one URL-backed administration hub", () => {
     expect(setup).toContain('allowedValues: ADMIN_TABS');
@@ -29,13 +29,13 @@ describe("Supplier Partner administration phase 4", () => {
   });
 
   it("canonicalizes both historical migration URLs with replacement history", () => {
-    expect(authenticatedApp).toContain('currentLocation === "/sp/migration"');
-    expect(authenticatedApp).toContain('currentLocation === "/sp/gc-migration"');
-    expect(authenticatedApp).toContain('<Redirect replace to="/sp/setup?tab=migration" />');
+    expect(routeGuard).toContain('currentLocation === "/sp/migration"');
+    expect(routeGuard).toContain('currentLocation === "/sp/gc-migration"');
+    expect(routeGuard).toContain('decision = { kind: "redirect", to: "/sp/setup?tab=migration" }');
   });
 
   it("keeps the Supplier Partner overview as the real namespace landing page", () => {
-    expect(authenticatedApp).not.toContain('currentLocation === "/sp") {\n    return <Redirect replace to="/sp/reports"');
+    expect(routeGuard).not.toContain('to: "/sp/reports"');
   });
 
   it("preserves the existing setup API and repair behavior", () => {

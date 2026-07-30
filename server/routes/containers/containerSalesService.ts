@@ -85,6 +85,7 @@ export const containerSalesService = {
     if (!customer.ledgerAccountId) {
       throw new ContainerSaleRouteError(400, "Customer does not have a ledger account");
     }
+    const customerLedgerAccountId = customer.ledgerAccountId;
 
     const commissionAccountId = await resolveCommissionAccountId(companyId, parsed.commissionAccountId);
     return db.transaction(async (tx) => {
@@ -111,7 +112,7 @@ export const containerSalesService = {
         debitNarration: `Container sale - ${voucherNumber}`,
         creditNarration: `Container sale commission - ${voucherNumber}`,
         totalAmount: parsed.totalAmount,
-        customerLedgerAccountId: customer.ledgerAccountId,
+        customerLedgerAccountId,
         commissionAccountId,
         actor: actor ?? { reason: "Container sale posting" },
       });

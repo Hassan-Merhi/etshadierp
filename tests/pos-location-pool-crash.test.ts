@@ -41,10 +41,13 @@ describe("POS location database-pool crash protection", () => {
   it("does not prefetch general ERP reference data for POS sessions", () => {
     const context = source("client/src/contexts/CompanyContext.tsx");
 
+    // POS sessions must never prefetch heavy ERP reference data. The role is
+    // threaded through every prefetch path so the `role === "POS"` early-return
+    // guard always applies, including the initial company-restore path.
     expect(context).toContain('if (role === "POS") return;');
-    expect(context).toContain("role: uc.role");
+    expect(context).toContain("role: assignment.role");
     expect(context).toContain("prefetchReferenceData(company.id, company.role)");
-    expect(context).toContain("prefetchReferenceData(target.id, target.role)");
+    expect(context).toContain("commitCompanySelection(target, { prefetch: true, serverSynced: true })");
   });
 
   it("does not mount the hidden ERP command palette for ordinary POS users", () => {

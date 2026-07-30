@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 function source(path: string): string {
-  return readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
+  return readFileSync(resolve(process.cwd(), path), "utf8");
 }
 
 describe("Phase 10 UI consistency contracts", () => {
@@ -35,7 +36,9 @@ describe("Phase 10 UI consistency contracts", () => {
     expect(header).toContain('aria-label="Previous record"');
     expect(header).toContain('aria-label="Next record"');
     expect(header).toContain("WorkspaceActions");
-    expect(header).not.toContain("text-page-subtitle\">\n              {subtitle}\n            </p>");
+    // The subtitle must render as a semantic paragraph with muted styling.
+    expect(header).toContain('data-testid="text-page-subtitle"');
+    expect(header).toMatch(/<p [^>]*text-muted-foreground[^>]*data-testid="text-page-subtitle"/);
   });
 
   it("supports consistent pending and secondary page-state actions", () => {

@@ -44,7 +44,7 @@ export function AuthenticatedApp() {
     });
 
   if (loadingTimedOut || (!isLoading && (error || !user))) return <Redirect to="/login" />;
-  if (isLoading || companyLoading || !selectedCompany) return <AppLoadingState />;
+  if (isLoading || companyLoading || !selectedCompany || !user) return <AppLoadingState />;
 
   const isAdminOwner = user.role === "Admin" || user.role === "Owner" || user.role === "Developer";
   const routeState = resolveAuthenticatedAppRoute({

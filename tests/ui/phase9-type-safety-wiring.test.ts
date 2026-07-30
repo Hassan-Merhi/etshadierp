@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 function source(path: string): string {
-  return readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
+  return readFileSync(resolve(process.cwd(), path), "utf8");
 }
 
 describe("Phase 9 type-safety wiring", () => {

@@ -101,7 +101,7 @@ export async function recomputeBatchAndCascadeBales(
     .where(eq(factoryMixBatchSources.mixBatchId, batchId));
 
   const aggregate = calculateWeightedAverageCost(
-    allSources.map((source) => ({
+    allSources.map((source: { weightKg: string; costPerKg: string; totalCost: string }) => ({
       quantityKg: source.weightKg,
       unitCostPerKg: source.costPerKg,
       totalCost: source.totalCost,
@@ -334,7 +334,7 @@ export async function cascadeContainerCostChange(
         .from(factoryMixBatchSources)
         .where(eq(factoryMixBatchSources.mixBatchId, batchId));
       const aggregate = calculateWeightedAverageCost(
-        batchSources.map((source) => ({
+        batchSources.map((source: { weightKg: string; costPerKg: string; totalCost: string }) => ({
           quantityKg: source.weightKg,
           unitCostPerKg: source.costPerKg,
           totalCost: source.totalCost,

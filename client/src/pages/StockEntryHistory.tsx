@@ -543,7 +543,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     setFromDate(today);
     setToDate(today);
     setCategoryFilter("all");
-    setProductCategoryFilter("all");
+    setProductCategoryFilter([]);
     setWorkerIdFilter("all");
     setProductIdFilter("all");
     setLocationIdFilter("all");

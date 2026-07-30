@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type { PoolClient } from "pg";
+import type { Pool, PoolClient } from "pg";
 import { pool } from "../../db";
 import { normalizeOpeningBalanceCurrency } from "./openingBalanceCurrency";
 import { normalizeVoucherEntryAmounts } from "./currencyAmounts";
@@ -178,7 +178,7 @@ function supplierScope(alias: string): string {
 async function loadVoucherEntryCase(
   companyId: number,
   id: number,
-  client = pool,
+  client: Pool | PoolClient = pool,
 ): Promise<HistoricalRepairCase | null> {
   const result = await client.query(
     `SELECT ve.id, ve.voucher_id, v.voucher_date, v.currency AS voucher_currency,
@@ -228,7 +228,7 @@ async function loadOpeningCase(
   companyId: number,
   kind: Exclude<HistoricalRepairKind, "voucherEntry">,
   id: number,
-  client = pool,
+  client: Pool | PoolClient = pool,
 ): Promise<HistoricalRepairCase | null> {
   const config = OPENING_CONFIG[kind];
   const clauses = ["target.id = $1"];
@@ -276,7 +276,7 @@ export async function loadHistoricalRepairCase(
   companyId: number,
   kind: HistoricalRepairKind,
   id: number,
-  client = pool,
+  client: Pool | PoolClient = pool,
 ): Promise<HistoricalRepairCase | null> {
   return kind === "voucherEntry"
     ? loadVoucherEntryCase(companyId, id, client)
