@@ -74,6 +74,16 @@ describe("Phase 5 post-offload reconciliation", () => {
     expect(service).toContain("post_offload_reconciliation_completed");
   });
 
+  it("refreshes every report query key returned by reconciliation", () => {
+    const client = read("client/src/lib/factoryApi.ts");
+
+    expect(client).toContain("POST_OFFLOAD_MUTATION_PATH");
+    expect(client).toContain("postOffloadReconciliation?.reports?.queryKeys");
+    expect(client).toContain("invalidatePostOffloadReconciliationQueries");
+    expect(client).toContain('refetchType: "active"');
+    expect(client).toContain("await invalidatePostOffloadReconciliationQueries(method, url, response)");
+  });
+
   it("registers reconciliation outside historical replay in both route aggregators", () => {
     for (const path of ["server/routes/factory/factoryRawStockRoutes.ts", "server/routes/factory/raw-stock/index.ts"]) {
       const routes = read(path);
