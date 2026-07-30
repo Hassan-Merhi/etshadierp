@@ -58,15 +58,46 @@ for (const forbidden of [
   }
 }
 
+const appRoot = read("client/src/App.tsx");
+for (const invariant of [
+  "function AuthenticatedRoot()",
+  "useAuthenticatedUser()",
+  "if (isLoading || !user) return <AppLoadingState />;",
+  "<CompanyProvider>",
+  "<AuthenticatedApp user={user} handleLogout={handleLogout} />",
+]) {
+  if (!appRoot.includes(invariant)) {
+    failures.push(`client/src/App.tsx: missing ${invariant}`);
+  }
+}
+const authLoadingGuard = appRoot.indexOf("if (isLoading || !user) return <AppLoadingState />;");
+const protectedProvider = appRoot.indexOf("<CompanyProvider>", authLoadingGuard);
+if (authLoadingGuard < 0 || protectedProvider <= authLoadingGuard) {
+  failures.push("client/src/App.tsx: protected providers are not behind the verified-session guard");
+}
+
 const app = read("client/src/app/AuthenticatedApp.tsx");
 for (const invariant of [
-  "if (isLoading || companyLoading || !selectedCompany) return <AppLoadingState />;",
-  'companyQueryKey("/api/company-settings", selectedCompany?.id)',
-  'companyQueryKey("/api/factory/my-access", selectedCompany?.id)',
-  'companyQueryKey("/api/factory/settings", selectedCompany?.id)',
+  "if (companyLoading || !selectedCompany) return <AppLoadingState />;",
+  "userPresent: true",
+  "interface AuthenticatedAppProps",
 ]) {
   if (!app.includes(invariant)) {
     failures.push(`client/src/app/AuthenticatedApp.tsx: missing ${invariant}`);
+  }
+}
+if (app.includes("useAuthenticatedUser(")) {
+  failures.push("client/src/app/AuthenticatedApp.tsx: duplicated authenticated-user query remains");
+}
+
+const appData = read("client/src/app/useAuthenticatedAppData.ts");
+for (const invariant of [
+  'companyQueryKey("/api/company-settings", selectedCompanyId)',
+  'companyQueryKey("/api/factory/my-access", selectedCompanyId)',
+  'companyQueryKey("/api/factory/settings", selectedCompanyId)',
+]) {
+  if (!appData.includes(invariant)) {
+    failures.push(`client/src/app/useAuthenticatedAppData.ts: missing ${invariant}`);
   }
 }
 
@@ -112,6 +143,7 @@ for (const testPath of [
   "tests/ui/company-switch-queue.test.ts",
   "tests/ui/company-state-isolation.test.ts",
   "tests/ui/queryKeys.test.ts",
+  "tests/ui/authenticated-request-gating.test.ts",
 ]) {
   if (!fs.existsSync(path.join(root, testPath))) failures.push(`missing focused test: ${testPath}`);
 }
