@@ -40,5 +40,9 @@ ts-errors*.txt
 artifacts/responsive-smoke/
 artifacts/bandwidth-smoke/
 
+# Release sign-off evidence may contain deployment and database identifiers.
+release-evidence*.json
+artifacts/release-readiness/
+
 # User-uploaded content (runtime data, not source)
 uploads/
