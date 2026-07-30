@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "nodeVersion": "20.19.2",
+  "render": {
+    "buildCommand": "npm ci --registry=https://registry.npmjs.org/ && npm run build",
+    "startCommand": "npm start",
+    "healthCheckPath": "/api/health/ready",
+    "autoDeploy": false
+  },
+  "forbiddenRenderEnvironmentKeys": [
+    "HISTORICAL_REPLAY_APPLY_MODE",
+    "HISTORICAL_REPLAY_RELEASE_ID",
+    "MIGRATION_CONFIRMATION",
+    "MASTER_PASSWORD"
+  ],
+  "requiredStaticChecks": [
+    {
+      "id": "final-production-contracts",
+      "command": "node scripts/verify-final-production-readiness.mjs"
+    },
+    {
+      "id": "migration-registry",
+      "command": "node scripts/verify-migration-registry.mjs --strict"
+    },
+    {
+      "id": "phase12-reliability-contracts",
+      "command": "node scripts/verify-phase12-business-regression.mjs"
+    },
+    {
+      "id": "critical-test-debt",
+      "command": "node scripts/verify-critical-test-debt.mjs"
+    },
+    {
+      "id": "lockfile-registry",
+      "command": "node scripts/verify-lockfile-registry.mjs"
+    }
+  ],
+  "requiredExecutableChecks": [
+    {
+      "id": "format",
+      "command": "npm run format:check"
+    },
+    {
+      "id": "lint",
+      "command": "npm run lint"
+    },
+    {
+      "id": "typescript",
+      "command": "npm run check"
+    },
+    {
+      "id": "backend-coverage",
+      "command": "npm run test:backend:coverage"
+    },
+    {
+      "id": "frontend-coverage",
+      "command": "npm run test:frontend:coverage"
+    },
+    {
+      "id": "critical-business-regression",
+      "command": "node scripts/run-phase12-business-regression.mjs"
+    },
+    {
+      "id": "production-build",
+      "command": "npm run build"
+    },
+    {
+      "id": "production-dependencies",
+      "command": "npm run verify:production-dependencies"
+    },
+    {
+      "id": "memory-stabilization",
+      "command": "npm run verify:stabilization"
+    },
+    {
+      "id": "bandwidth-boundaries",
+      "command": "npm run verify:bandwidth"
+    },
+    {
+      "id": "security-boundaries",
+      "command": "npm run check:program-6-security"
+    }
+  ],
+  "requiredEvidenceSections": [
+    "repository",
+    "databaseBackup",
+    "restoreRehearsal",
+    "migrationRehearsal",
+    "supplierPartnerRehearsal",
+    "deployment",
+    "productionSmoke",
+    "historicalReplayReadiness",
+    "rollback",
+    "approvals"
+  ],
+  "requiredSmokeModules": [
+    "authentication-and-sessions",
+    "company-switching-and-isolation",
+    "erp-navigation",
+    "factory-navigation",
+    "pos-navigation",
+    "properties-navigation",
+    "supplier-partner-navigation",
+    "accounts-and-daybook",
+    "vouchers-and-stock-transfers",
+    "inventory-and-location-inventory",
+    "containers-offload-and-mix-batches",
+    "reports-and-exports",
+    "runtime-logs-and-readiness"
+  ]
+}
