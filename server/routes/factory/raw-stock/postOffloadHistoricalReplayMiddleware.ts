@@ -6,13 +6,20 @@ import {
   type PostOffloadHistoricalReplayResult,
 } from "../../../services/factory/postOffloadHistoricalReplay";
 
-const POST_OFFLOAD_PATH = /\/api\/factory\/containers\/(\d+)\/post-offload-charges(?:\/|$)/;
-const INTERCEPTED = Symbol.for("etshadierp.postOffloadHistoricalReplayIntercepted");
+const POST_OFFLOAD_PATH =
+  /\/api\/factory\/containers\/(\d+)\/post-offload-charges(?:\/|$)/;
+const INTERCEPTED = Symbol.for(
+  "etshadierp.postOffloadHistoricalReplayIntercepted",
+);
 
-function resolveMutationAction(req: Request): "CREATE" | "EDIT" | "UNDO" | "LEGACY_REBUILD" | null {
+function resolveMutationAction(
+  req: Request,
+): "CREATE" | "EDIT" | "UNDO" | "LEGACY_REBUILD" | null {
   if (req.method === "POST") return "CREATE";
   if (req.method === "DELETE") return "UNDO";
-  if (req.method === "PATCH" && req.originalUrl.includes("/legacy-rebuild")) return "LEGACY_REBUILD";
+  if (req.method === "PATCH" && req.originalUrl.includes("/legacy-rebuild")) {
+    return "LEGACY_REBUILD";
+  }
   if (req.method === "PATCH") return "EDIT";
   return null;
 }
@@ -21,7 +28,7 @@ function fallbackFailure(
   containerId: number,
   supplierId: number | null,
   chargeId: number | null,
-  error: unknown
+  error: unknown,
 ): PostOffloadHistoricalReplayResult {
   return {
     status: "failed",
@@ -44,7 +51,7 @@ function fallbackFailure(
 export function postOffloadHistoricalReplayMiddleware(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void {
   const action = resolveMutationAction(req);
   const pathMatch = POST_OFFLOAD_PATH.exec(req.originalUrl);
@@ -67,25 +74,35 @@ export function postOffloadHistoricalReplayMiddleware(
 
     void (async () => {
       const companyId = Number(
-        (req.session as any)?.factoryCompanyId || (req.session as any)?.currentCompanyId || 0
+        (req.session as any)?.factoryCompanyId ||
+          (req.session as any)?.currentCompanyId ||
+          0,
       );
-      const userId = String((req.session as any)?.userId || (req as any).user?.id || "system");
+      const userId = String(
+        (req.session as any)?.userId || (req as any).user?.id || "system",
+      );
       const username = (req.session as any)?.username || null;
-      const chargeId = Number.isInteger(Number(body?.chargeId)) ? Number(body.chargeId) : null;
+      const chargeId = Number.isInteger(Number(body?.chargeId))
+        ? Number(body.chargeId)
+        : null;
 
       let supplierId: number | null = null;
       let historicalReplay: PostOffloadHistoricalReplayResult;
 
       try {
         if (!companyId || !Number.isInteger(containerId) || containerId <= 0) {
-          throw new Error("Post-offload replay context is missing company or container identity.");
+          throw new Error(
+            "Post-offload replay context is missing company or container identity.",
+          );
         }
 
-        const supplierResult = await pool.query<{ supplier_id: number | null }>(
+        const supplierResult = await pool.query<{
+          supplier_id: number | null;
+        }>(
           `SELECT supplier_id
            FROM factory_containers
            WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL`,
-          [containerId, companyId]
+          [containerId, companyId],
         );
         supplierId = supplierResult.rows[0]?.supplier_id ?? null;
 
@@ -106,10 +123,17 @@ export function postOffloadHistoricalReplayMiddleware(
           chargeId,
           mutationAction: action,
         });
-        historicalReplay = fallbackFailure(containerId, supplierId, chargeId, error);
+        historicalReplay = fallbackFailure(
+          containerId,
+          supplierId,
+          chargeId,
+          error,
+        );
       }
 
-      const repairRequired = historicalReplay.status === "blocked" || historicalReplay.status === "failed";
+      const repairRequired =
+        historicalReplay.status === "blocked" ||
+        historicalReplay.status === "failed";
       const responseBody = {
         ...body,
         historicalReplay,
