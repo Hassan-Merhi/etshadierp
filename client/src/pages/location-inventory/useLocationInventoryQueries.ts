@@ -31,6 +31,9 @@ interface UseLocationInventoryQueriesParams {
   showNegativeStock: boolean;
 }
 
+const freshInventoryFetch = (url: string) =>
+  fetch(url, { credentials: "include", cache: "no-store" });
+
 export function useLocationInventoryQueries({
   waGroupDialogOpen,
   posUser,
@@ -85,7 +88,7 @@ export function useLocationInventoryQueries({
         ? [inventoryBaseKey, companyId, "compact", showZeroStock ? "include-zero" : "non-zero"]
         : [],
     queryFn: async () => {
-      const res = await fetch(compactInventoryUrl, { credentials: "include" });
+      const res = await freshInventoryFetch(compactInventoryUrl);
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
@@ -101,7 +104,7 @@ export function useLocationInventoryQueries({
         : [],
     queryFn: async () => {
       const url = `${inventoryBaseKey}?profile=compact&asOfDate=${fromDate}`;
-      const res = await fetch(url, { credentials: "include" });
+      const res = await freshInventoryFetch(url);
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
@@ -117,7 +120,7 @@ export function useLocationInventoryQueries({
         : [],
     queryFn: async () => {
       const url = `${inventoryBaseKey}?profile=compact&asOfDate=${asOfDate}`;
-      const res = await fetch(url, { credentials: "include" });
+      const res = await freshInventoryFetch(url);
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
@@ -130,7 +133,7 @@ export function useLocationInventoryQueries({
     // Canonical /api/inventory prefix preserves all existing write invalidations.
     queryKey: companyId ? ["/api/inventory", companyId, "matrix"] : [],
     queryFn: async () => {
-      const res = await fetch("/api/inventory?profile=matrix", { credentials: "include" });
+      const res = await freshInventoryFetch("/api/inventory?profile=matrix");
       if (!res.ok) throw new Error(await res.text());
       const payload = await res.json();
       return Array.isArray(payload) ? payload : [];
