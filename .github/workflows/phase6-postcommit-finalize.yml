@@ -31,6 +31,7 @@ jobs:
       - name: Harden post-commit reporting
         run: |
           python - <<'PY'
+          import re
           from pathlib import Path
 
           service_path = Path("server/services/factory/postOffloadPhase6Safety.ts")
@@ -39,13 +40,14 @@ jobs:
               "post_offload_phase6_applied_and_verified",
               "post_offload_phase6_applied",
           )
-          old_verification = '''  const readiness = await inspectPostOffloadPhase6Readiness({
-            companyId: params.companyId,
-            supplierIds: payload.supplierIds,
-          });
-
-          return {'''
-          new_verification = '''  let readiness: PostOffloadPhase6Readiness;
+          verification_pattern = re.compile(
+              r'''  const readiness = await inspectPostOffloadPhase6Readiness\(\{\n'''
+              r'''    companyId: params\.companyId,\n'''
+              r'''    supplierIds: payload\.supplierIds,\n'''
+              r'''  \}\);\n\n'''
+              r'''  return \{'''
+          )
+          verification_replacement = '''  let readiness: PostOffloadPhase6Readiness;
           try {
             readiness = await inspectPostOffloadPhase6Readiness({
               companyId: params.companyId,
@@ -69,9 +71,9 @@ jobs:
           }
 
           return {'''
-          if old_verification not in service:
-              raise SystemExit("Post-commit verification block not found")
-          service = service.replace(old_verification, new_verification)
+          service, replacements = verification_pattern.subn(verification_replacement, service, count=1)
+          if replacements != 1:
+              raise SystemExit(f"Expected one post-commit verification block, found {replacements}")
           service_path.write_text(service)
 
           route_path = Path("server/routes/factory/raw-stock/postOffloadPhase6SafetyRoutes.ts")
@@ -92,9 +94,11 @@ jobs:
                 undoLogId: params.undoLogId,
                 httpStatus: params.httpStatus,''',
           )
-          route = route.replace(
-              '''      await auditFailure({ context, error, httpStatus: status, dryRun: true });''',
-              '''      await auditFailure({
+          readiness_audit = '''      await auditFailure({ context, error, httpStatus: status, dryRun: true });'''
+          if readiness_audit in route:
+              route = route.replace(
+                  readiness_audit,
+                  '''      await auditFailure({
                 context,
                 error,
                 httpStatus: status,
@@ -102,7 +106,8 @@ jobs:
                 repairCommitted: false,
                 undoLogId: null,
               });''',
-          )
+                  1,
+              )
           route = route.replace(
               '''    const confirmationToken = req.body?.confirmationToken;
             const isDryRun = req.body?.dryRun === true || !confirmationToken;
@@ -115,14 +120,17 @@ jobs:
 
             try {''',
           )
-          route = route.replace(
-              '''      const result = await applyPostOffloadPhase6Repair({
+          apply_marker = '''      const result = await applyPostOffloadPhase6Repair({
                 companyId: context.companyId,
                 userId: context.userId,
                 username: context.username,
                 confirmationToken,
               });
-              await persistPostOffloadPhase6Audit({''',
+              await persistPostOffloadPhase6Audit({'''
+          if apply_marker not in route:
+              raise SystemExit("Apply result marker not found")
+          route = route.replace(
+              apply_marker,
               '''      const result = await applyPostOffloadPhase6Repair({
                 companyId: context.companyId,
                 userId: context.userId,
@@ -132,25 +140,17 @@ jobs:
               repairCommitted = true;
               committedUndoLogId = result.undoLogId;
               await persistPostOffloadPhase6Audit({''',
+              1,
           )
-          old_catch = '''    } catch (error: unknown) {
-              const status = phase6ErrorStatus(error);
-              await auditFailure({ context, error, httpStatus: status, dryRun: isDryRun });
-              logger.error("Post-offload Phase 6 repair rejected or failed", {
-                error,
-                companyId: context.companyId,
-                userId: context.userId,
-                status,
-                dryRun: isDryRun,
-              });
-              return res.status(status).json({
-                success: false,
-                repairCommitted: false,
-                noPartialChanges: true,
-                message: getErrorMessage(error) || "Post-offload Phase 6 repair failed.",
-                code: (error as { code?: string }).code || "POST_OFFLOAD_PHASE6_REPAIR_FAILED",
-              });
-            }'''
+
+          catch_start = route.rfind('    } catch (error: unknown) {')
+          if catch_start < 0:
+              raise SystemExit("Repair catch boundary not found")
+          catch_end_marker = '\n    }\n  });'
+          catch_end = route.find(catch_end_marker, catch_start)
+          if catch_end < 0:
+              raise SystemExit("Repair catch end not found")
+          catch_end += len('\n    }')
           new_catch = '''    } catch (error: unknown) {
               const status = phase6ErrorStatus(error);
               const errorState = error as {
@@ -189,9 +189,7 @@ jobs:
                 code: errorState.code || "POST_OFFLOAD_PHASE6_REPAIR_FAILED",
               });
             }'''
-          if old_catch not in route:
-              raise SystemExit("Route error boundary not found")
-          route = route.replace(old_catch, new_catch)
+          route = route[:catch_start] + new_catch + route[catch_end:]
           route_path.write_text(route)
 
           test_path = Path("tests/factory-post-offload-phase6-safety-repair.test.ts")
@@ -208,12 +206,15 @@ jobs:
               'expect(service).toContain("post_offload_phase6_applied_and_verified");',
               'expect(service).toContain("post_offload_phase6_applied");',
           )
-          test = test.replace(
-              '''    expect(exactApply).toContain('await client.query("ROLLBACK")');''',
-              '''    expect(exactApply).toContain('await client.query("ROLLBACK")');
+          rollback_assertion = '''    expect(exactApply).toContain('await client.query("ROLLBACK")');'''
+          if "POST_OFFLOAD_PHASE6_POST_COMMIT_VERIFICATION_FAILED" not in test:
+              test = test.replace(
+                  rollback_assertion,
+                  rollback_assertion
+                  + '''
               expect(service).toContain("POST_OFFLOAD_PHASE6_POST_COMMIT_VERIFICATION_FAILED");
               expect(service).toContain("repairCommitted: true");''',
-          )
+              )
           test_path.write_text(test)
           PY
 
