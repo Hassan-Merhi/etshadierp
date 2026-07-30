@@ -7,6 +7,10 @@
     "healthCheckPath": "/api/health/ready",
     "autoDeploy": false
   },
+  "requiredManualRenderEnvironmentKeys": [
+    "RELEASE_EXPECTED_COMMIT",
+    "RELEASE_ID"
+  ],
   "forbiddenRenderEnvironmentKeys": [
     "HISTORICAL_REPLAY_APPLY_MODE",
     "HISTORICAL_REPLAY_RELEASE_ID",
