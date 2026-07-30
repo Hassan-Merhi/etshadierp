@@ -21,6 +21,7 @@ import { registerEndProductionRoutes } from "./factory/endProductionRoutes";
 import { registerProductionPlannerRoutes } from "./factory/factoryProductionPlannerRoutes";
 import { registerFactoryContactRoutes } from "./factory/factoryContactRoutes";
 import { registerPerformanceReadMicrocache } from "./performance/readMicrocache";
+import { registerPhase10FactoryBandwidthRoutes } from "./performance/phase10FactoryBandwidthRoutes";
 import { registerFactoryDaybookPaginationRoutes } from "./factory/factoryDaybookPaginationRoutes";
 import { registerFactoryStockEntryHistoryPaginationRoutes } from "./factory/factoryStockEntryHistoryPaginationRoutes";
 import { registerFactoryStockAllocationV5PaginationRoutes } from "./factory/factoryStockAllocationV5PaginationRoutes";
@@ -64,8 +65,8 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
           and(
             eq(userCompanyRoles.userId, session.userId),
             eq(companies.active, true),
-            or(eq(companies.companyType, "factory"), eq(companies.companyType, "factory_v2"))
-          )
+            or(eq(companies.companyType, "factory"), eq(companies.companyType, "factory_v2")),
+          ),
         )
         .orderBy(companies.id);
 
@@ -137,6 +138,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   registerCentralGlobalTransactionRoutes(app, requireAuth);
 
   registerPerformanceReadMicrocache(app);
+  // Phase 10 summary/selector endpoints must register before the broad factory
+  // handlers so Express does not let dynamic :id routes swallow literal paths.
+  registerPhase10FactoryBandwidthRoutes(app);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // FACTORY ADMIN GUARD — blocks PUT / PATCH / DELETE for non-admins unless
@@ -192,7 +196,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   app.get(
     "/api/factory/uploads/:folder/:filename",
     requireAuth,
-    createContainerDocumentDownloadHandler(db)
+    createContainerDocumentDownloadHandler(db),
   );
 
   // Paged requests are intercepted here and perform count/limit/offset in SQL.
