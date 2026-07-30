@@ -445,6 +445,13 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
       return { type, accountType, accountId, accountName, amount, narration: entry.narration || "" };
     });
 
+    // Guard: if any entry has a real accountId but a blank name, the account list
+    // that should resolve it hasn't loaded yet (or loaded under the wrong company
+    // key before selectedCompany was set).  Return without resetting or marking
+    // hydrated so the effect retries when the correct data arrives.
+    const hasUnresolvedName = formEntries.some((e) => e.accountId > 0 && e.accountName === "");
+    if (hasUnresolvedName) return;
+
     journalForm.reset({
       voucherDate: parseDateLocal(voucherToEdit.voucherDate),
       entries:
