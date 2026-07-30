@@ -5,7 +5,7 @@ the TypeScript source. This document describes the program for splitting them
 and — more importantly — the safety harness that makes those splits verifiable
 rather than hopeful.
 
-Phases 0, 1 and 2 are complete. Phases 3–6 are not started.
+Phases 0, 1 and 2 are complete. Phase 3 is in progress.
 
 ## Why a harness came first
 
@@ -140,7 +140,7 @@ npm run audit:god-files
 |---|---|---|
 | 1 | ~~`server/startupSchema.ts`~~ | **Done.** Split into ten parts under `server/startup-schema/`, largest 772 lines. Order preserved and proven by a sha256 pin of the assembled array in `tests/startup-schema-integrity.test.ts`. |
 | 2 | ~~Delete before splitting~~ | **Done, and the premise was wrong** — see below. No file was deletable; three dead *handlers* (349 lines) were removed instead. |
-| 3 | Route monoliths (~71 files) | Split by URL prefix into a directory with an `index.ts` barrel. Start somewhere self-contained, not factory. |
+| 3 | Route monoliths (~71 files) | **In progress.** Split by URL prefix into a directory with an `index.ts` barrel. `gitRoutes.ts` (1,969) done as the template. |
 | 4 | Page components (~63 files) | Extract types, then pure helpers, then sub-components, then hooks — strictly safest first. |
 | 5 | `shared/schema/*.ts` | Highest blast radius, lowest urgency. Barrel must preserve every export name. |
 | 6 | Tighten the ratchet | Lower `softMaxLines` as the backlog empties. |
@@ -185,6 +185,38 @@ earlier identical method+path at 142, down from 145. It can fall but not rise.
 The lesson generalises to the remaining phases: a file named `*Legacy` in this
 repository usually means "the original implementation, still in use", not "dead
 code". Those lines have to be split, not deleted.
+
+## Phase 3 — the recipe, as applied to `gitRoutes.ts`
+
+`server/routes/gitRoutes.ts` (1,969 lines, 27 endpoints) became
+`server/routes/git/`:
+
+| File | Lines | Contents |
+|---|---|---|
+| `_helpers.ts` | 484 | Module state, multer config, types, `fifoAllocate`, `buildAgentsForCompany` |
+| `gitReportRoutes.ts` | 334 | Agent/duty balances, container lists, summaries, at-port, truck location |
+| `gitImportRoutes.ts` | 680 | Excel templates, bulk import, undo |
+| `gitWhatsappRoutes.ts` | 244 | WhatsApp group settings and sends |
+| `gitAgentRoutes.ts` | 278 | Agent notes, adjustments, prepaid |
+| `index.ts` | 19 | Composition, in the original registration order |
+
+What made it verifiable:
+
+- **The route manifest did not change at all** — not one route, guard chain, or
+  position. That is the proof the split preserved behaviour, and it is worth
+  more than any amount of reading the diff.
+- `importUndoStore` is module-level mutable state shared by the import and undo
+  endpoints, so it lives in `_helpers.ts` and is imported. A copy per module
+  would have silently broken undo.
+- Relative import depth changes by one level for every moved line, including
+  inside dynamic `await import()` calls in route bodies.
+- Cut points must be checked against the source: the first attempt sliced into
+  the middle of a JSDoc block because the registration function started two
+  lines earlier than assumed. `tsc` caught it immediately.
+- The original had zero unused-import warnings; the split initially introduced
+  several, because a symbol that is genuinely used somewhere in a 2,000-line
+  file is usually not used in every 300-line piece of it. Trim per module until
+  lint is clean again.
 
 ## A note on scope
 

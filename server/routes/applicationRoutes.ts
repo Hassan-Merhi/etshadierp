@@ -33,7 +33,7 @@ import { registerFactoryRoutes } from "./factoryRoutes";
 import { registerFactoryWorkerRoutes } from "./factoryWorkerRoutes";
 import { registerFactoryWhatsappRoutes } from "./factoryWhatsappRoutes";
 import { registerFiscalTransferRoutes } from "./fiscalTransferRoutes";
-import { registerGitRoutes } from "./gitRoutes";
+import { registerGitRoutes } from "./git";
 import { registerGlobalTransactionRoutes } from "./globalTransactionRoutes";
 import { registerImportCycleRoutes } from "./importCycleRoutes";
 import { registerImportRoutes } from "./importRoutes";

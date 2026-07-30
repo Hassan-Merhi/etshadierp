@@ -257,7 +257,6 @@
       "server/routes/factoryReportRoutes.ts": 1000,
       "server/routes/factoryWorkerRoutes.ts": 1550,
       "server/routes/fiscalTransferRoutes.ts": 1375,
-      "server/routes/gitRoutes.ts": 1975,
       "server/routes/importCycleRoutes.ts": 1025,
       "server/routes/importRoutes.ts": 1150,
       "server/routes/inventoryMovementRoutes.ts": 1000,
