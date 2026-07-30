@@ -19,6 +19,9 @@ describe("Phase 11 frontend performance boundaries", () => {
     const hook = source("client/src/app/useAuthenticatedAppData.ts");
     expect(hook).toContain("needsFactorySettings: boolean");
     expect(hook).toContain("enabled: userPresent && !isPOS && !!selectedCompanyId && needsFactorySettings");
+    expect(hook).toContain("staleTime: 30000");
+    expect(hook).toContain("retry: 2");
+    expect(hook).toContain("staleTime: 60000");
   });
 
   it("loads Daybook audit and dialog code only when used", () => {
@@ -32,6 +35,7 @@ describe("Phase 11 frontend performance boundaries", () => {
 
   it("defers Excel runtimes and linearizes combined-stock summaries", () => {
     const plugin = source("build/viteLazyHeavyImportsPlugin.ts");
+    const vite = source("vite.config.ts");
     expect(plugin).toContain('await import("@/lib/excelHelper")');
     expect(plugin).toContain("AGENTS_SUFFIX");
     expect(plugin).toContain("DAYBOOK_SUFFIX");
@@ -41,6 +45,8 @@ describe("Phase 11 frontend performance boundaries", () => {
     expect(plugin).toContain("locationTotals");
     expect(plugin).toContain("tableSummary");
     expect(plugin).not.toContain("try:\\n");
+    expect(vite.indexOf("heavyListPaginationPlugin()")).toBeLessThan(vite.indexOf("lazyHeavyImportsPlugin()"));
+    expect(vite.indexOf("lazyHeavyImportsPlugin()")).toBeLessThan(vite.indexOf("react()"));
   });
 
   it("defers combined-stock text filtering while preserving all filters", () => {
