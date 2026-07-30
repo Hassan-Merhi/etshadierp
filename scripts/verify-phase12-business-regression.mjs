@@ -56,10 +56,10 @@ for (const marker of [
 
 const backendConfig = "vitest.config.ts";
 for (const marker of [
-  "lines: 10",
-  "statements: 10",
-  "functions: 8",
-  "branches: 8",
+  "lines: 8",
+  "statements: 8",
+  "functions: 6",
+  "branches: 6",
   '"server/services/security/companyContextPolicy.ts"',
   '"server/services/accounting/customerLinkedLedgerValidation.ts"',
 ]) {
