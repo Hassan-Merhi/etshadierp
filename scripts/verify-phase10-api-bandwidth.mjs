@@ -53,6 +53,8 @@ const inventoryHook = "client/src/pages/location-inventory/useLocationInventoryQ
 for (const marker of [
   "profile=compact",
   "/api/inventory?profile=matrix",
+  'queryKey: companyId ? ["/api/inventory", companyId, "matrix"]',
+  'cache: "no-store"',
   "refetchOnWindowFocus: false",
 ]) {
   requireText(inventoryHook, marker);
@@ -72,6 +74,8 @@ for (const marker of [
   '"/api/factory/customer-proformas/:id/lines"',
   'req.query.profile !== "selector"',
   'res.setHeader("X-Result-Profile", "selector")',
+  "LEFT JOIN LATERAL",
+  "WHERE proforma_id = p.id",
   "lineCount:",
   "totalQuantity:",
 ]) {
@@ -87,6 +91,9 @@ requireOrder(factoryRoutes, "registerPhase10FactoryBandwidthRoutes(app)", "regis
 
 const locationRegistry = "server/routes/location/index.ts";
 requireOrder(locationRegistry, "registerCommonInventoryPerformanceRoutes(app)", "registerLocationInventoryRoutes(app)");
+
+const applicationRoutes = "server/routes/applicationRoutes.ts";
+requireOrder(applicationRoutes, "registerLocationRoutes(app)", "registerInventoryRoutes(app)");
 
 const migration = "migrations/20260730_001_phase10_bandwidth_indexes.sql";
 for (const indexName of [
