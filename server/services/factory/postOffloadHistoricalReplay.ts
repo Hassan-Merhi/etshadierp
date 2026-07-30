@@ -81,7 +81,7 @@ function errorCode(error: unknown): string | undefined {
  * must not claim that historical production costs were updated.
  */
 export async function replayPostOffloadHistoricalCosts(
-  params: PostOffloadHistoricalReplayParams
+  params: PostOffloadHistoricalReplayParams,
 ): Promise<PostOffloadHistoricalReplayResult> {
   const {
     companyId,
@@ -116,12 +116,15 @@ export async function replayPostOffloadHistoricalCosts(
 
     try {
       await prepareClient.query("BEGIN");
-      await prepareClient.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
+      await prepareClient.query(
+        "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY",
+      );
       const executor = prepareClient as unknown as ReplayQueryExecutor;
 
-      const selectionPreview = await previewHistoricalCostReplayWithExecutor(executor, companyId);
+      const selectionPreview =
+        await previewHistoricalCostReplayWithExecutor(executor, companyId);
       const supplierPreview = selectionPreview.supplierRows.find(
-        (row) => row.supplierId === supplierId
+        (row) => row.supplierId === supplierId,
       );
 
       if (!supplierPreview) {
@@ -161,17 +164,23 @@ export async function replayPostOffloadHistoricalCosts(
       normalizedScope = normalizeReplayWriteScope(internalScope);
 
       if (!normalizedScope.supplierIds.includes(supplierId)) {
-        blockedReasons = internalScope.blockedBatches.flatMap((batch) => batch.reasons);
+        blockedReasons = internalScope.blockedBatches.flatMap(
+          (batch) => batch.reasons,
+        );
         await prepareClient.query("COMMIT");
         return {
           status: blockedReasons.length > 0 ? "blocked" : "no_changes",
           supplierId,
           containerId,
           chargeId,
-          reason: blockedReasons.length > 0
-            ? "Historical replay closure contains blocked batches."
-            : "No historical supplier-priced costs require replay.",
-          blockedReasons: blockedReasons.length > 0 ? [...new Set(blockedReasons)] : undefined,
+          reason:
+            blockedReasons.length > 0
+              ? "Historical replay closure contains blocked batches."
+              : "No historical supplier-priced costs require replay.",
+          blockedReasons:
+            blockedReasons.length > 0
+              ? [...new Set(blockedReasons)]
+              : undefined,
         };
       }
 
@@ -180,7 +189,7 @@ export async function replayPostOffloadHistoricalCosts(
         normalizedScope.supplierIds,
         internalScope._fullPreview,
         { includeCompletedBatches, includeFinalizedBales },
-        normalizedScope
+        normalizedScope,
       );
 
       await prepareClient.query("COMMIT");
@@ -195,10 +204,14 @@ export async function replayPostOffloadHistoricalCosts(
       `SELECT name
        FROM factory_suppliers
        WHERE id = $1 AND company_id = $2`,
-      [supplierId, companyId]
+      [supplierId, companyId],
     );
-    const supplierName = supplierNameResult.rows[0]?.name || `Supplier ${supplierId}`;
-    const baleIds = replayBaleIdsForScope(normalizedScope, includeFinalizedBales);
+    const supplierName =
+      supplierNameResult.rows[0]?.name || `Supplier ${supplierId}`;
+    const baleIds = replayBaleIdsForScope(
+      normalizedScope,
+      includeFinalizedBales,
+    );
     const tokenHash = crypto
       .createHash("sha256")
       .update(
@@ -211,7 +224,7 @@ export async function replayPostOffloadHistoricalCosts(
           mutationAction,
           crypto.randomUUID(),
         ].join(":"),
-        "utf8"
+        "utf8",
       )
       .digest("hex");
 
@@ -256,7 +269,7 @@ export async function replayPostOffloadHistoricalCosts(
             JSON.stringify(undoEnvelope),
             REPLAY_ALGORITHM_VERSION,
             fingerprint,
-          ]
+          ],
         );
         undoLogCreated = true;
 
@@ -282,7 +295,7 @@ export async function replayPostOffloadHistoricalCosts(
               options: { includeCompletedBatches, includeFinalizedBales },
               fingerprint,
             }),
-          ]
+          ],
         );
       },
     });
