@@ -13,6 +13,7 @@ import { postOffloadHistoricalReplayMiddleware } from "./raw-stock/postOffloadHi
 import { requirePostOffloadImpactPreview } from "./raw-stock/postOffloadImpactPreviewMiddleware";
 import { registerPostOffloadImpactPreviewRoutes } from "./raw-stock/postOffloadImpactPreviewRoutes";
 import { postOffloadReconciliationMiddleware } from "./raw-stock/postOffloadReconciliationMiddleware";
+import { registerPostOffloadPhase6SafetyRoutes } from "./raw-stock/postOffloadPhase6SafetyRoutes";
 
 const RAW_STOCK_REPAIR_PERMISSION = "factory.raw-stock.repair";
 
@@ -102,6 +103,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
   registerRawStockCrudRoutes(app);
   registerRawStockOffloadRoutes(app);
   registerPostOffloadImpactPreviewRoutes(app);
+  registerPostOffloadPhase6SafetyRoutes(app);
   registerRawStockContainerRoutes(app);
   registerRawStockBalanceRoutes(app);
   registerRawStockRecalcRoutes(app);
