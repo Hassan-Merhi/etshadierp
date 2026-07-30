@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, Fragment } from "react";
+import { useState, useEffect, useRef, useMemo, Fragment } from "react";
 import { useEscapeBack } from "@/hooks/use-escape-back";
 import { useQuery } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +34,7 @@ import {
   ShoppingCart,
   Container as ContainerIcon,
   Landmark,
+  Check,
   type LucideIcon,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -322,7 +325,7 @@ export default function Analytics() {
   const [reportEndDate, setReportEndDate] = useState("");
   const [reportLocationId, setReportLocationId] = useState("all");
   const [reportStockGroupId, setReportStockGroupId] = useState("all");
-  const [reportSupplierId, setReportSupplierId] = useState("all");
+  const [reportSupplierNames, setReportSupplierNames] = useState<string[]>([]);
   const [reportContainerStatus, setReportContainerStatus] = useState("Offloaded");
   const [reportAllCompanies, setReportAllCompanies] = useState("all");
   const [containerPeriodFilter, setContainerPeriodFilter] = useState<PeriodFilterValue>(() =>
@@ -551,7 +554,7 @@ export default function Analytics() {
     const params = new URLSearchParams();
     if (containerPeriodFilter.fromDate) params.append("startDate", containerPeriodFilter.fromDate);
     if (containerPeriodFilter.toDate) params.append("endDate", containerPeriodFilter.toDate);
-    if (reportSupplierId && reportSupplierId !== "all") params.append("supplierId", reportSupplierId);
+    // supplier filtering is done client-side so multi-select works without extra API params
     // Status is always set (Offloaded or OTW)
     params.append("status", reportContainerStatus);
     if (reportAllCompanies === "all") {
@@ -2336,20 +2339,52 @@ export default function Analytics() {
                 />
               </div>
               <div className="flex flex-col gap-1.5 min-w-[160px]">
-                <Label htmlFor="container-supplier">Supplier</Label>
-                <Select value={reportSupplierId} onValueChange={setReportSupplierId}>
-                  <SelectTrigger id="container-supplier">
-                    <SelectValue placeholder="All Suppliers" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Suppliers</SelectItem>
-                    {suppliers.map((supplier) => (
-                      <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                        {supplier.legalName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Supplier</Label>
+                {(() => {
+                  const allSupplierNames = Array.from(
+                    new Set((containerData?.containers ?? []).map((c) => c.supplierName).filter(Boolean))
+                  ).sort();
+                  const label =
+                    reportSupplierNames.length === 0
+                      ? "All Suppliers"
+                      : reportSupplierNames.length === 1
+                        ? reportSupplierNames[0]
+                        : `${reportSupplierNames.length} suppliers`;
+                  return (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="min-w-[160px] justify-between font-normal">
+                          <span className="truncate">{label}</span>
+                          <ChevronDown className="h-4 w-4 ml-2 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64 p-2 max-h-72 overflow-y-auto" align="start">
+                        <button
+                          className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent"
+                          onClick={() => setReportSupplierNames([])}
+                        >
+                          <Check className={`h-4 w-4 ${reportSupplierNames.length === 0 ? "opacity-100" : "opacity-0"}`} />
+                          All Suppliers
+                        </button>
+                        <div className="border-t my-1" />
+                        {allSupplierNames.map((name) => (
+                          <button
+                            key={name}
+                            className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent"
+                            onClick={() =>
+                              setReportSupplierNames((prev) =>
+                                prev.includes(name) ? prev.filter((s) => s !== name) : [...prev, name]
+                              )
+                            }
+                          >
+                            <Check className={`h-4 w-4 shrink-0 ${reportSupplierNames.includes(name) ? "opacity-100" : "opacity-0"}`} />
+                            <span className="truncate">{name}</span>
+                          </button>
+                        ))}
+                      </PopoverContent>
+                    </Popover>
+                  );
+                })()}
               </div>
               <div className="flex flex-col gap-1.5 min-w-[140px]">
                 <Label htmlFor="container-status">Status</Label>
@@ -2390,34 +2425,30 @@ export default function Analytics() {
                 const getDate = (c: ReportContainer) =>
                   reportContainerStatus === "Offloaded" ? c.offloadDate || "-" : c.importDate || "-";
 
-                // Build company groups when showing all companies
-                const companyGroups: {
-                  companyId: number;
-                  companyName: string;
-                  containers: ReportContainer[];
-                  total: number;
-                }[] = [];
-                if (isAllCompanies) {
-                  const map = new Map<number, (typeof companyGroups)[0]>();
-                  for (const c of containerData.containers) {
-                    if (!map.has(c.companyId)) {
-                      map.set(c.companyId, {
-                        companyId: c.companyId,
-                        companyName: c.companyName,
-                        containers: [],
-                        total: 0,
-                      });
-                    }
-                    const g = map.get(c.companyId)!;
-                    g.containers.push(c);
-                    g.total += parseFloat(c.grandTotal || "0");
-                  }
-                  companyGroups.push(
-                    ...Array.from(map.values()).sort((a, b) => a.companyName.localeCompare(b.companyName))
-                  );
-                }
+                // Client-side supplier filter
+                const visibleContainers =
+                  reportSupplierNames.length === 0
+                    ? containerData.containers
+                    : containerData.containers.filter((c) => reportSupplierNames.includes(c.supplierName));
 
-                const colSpanTotal = isAllCompanies ? 6 : 5;
+                // Group by supplier, sorted alphabetically; within each group sort by date DESC
+                const supplierMap = new Map<string, { supplierName: string; containers: ReportContainer[]; total: number }>();
+                for (const c of visibleContainers) {
+                  if (!supplierMap.has(c.supplierName)) {
+                    supplierMap.set(c.supplierName, { supplierName: c.supplierName, containers: [], total: 0 });
+                  }
+                  const g = supplierMap.get(c.supplierName)!;
+                  g.containers.push(c);
+                  g.total += parseFloat(c.grandTotal || "0");
+                }
+                const supplierGroups = Array.from(supplierMap.values()).sort((a, b) =>
+                  a.supplierName.localeCompare(b.supplierName)
+                );
+                for (const g of supplierGroups) {
+                  g.containers.sort((a, b) => getDate(b).localeCompare(getDate(a)));
+                }
+                const visibleTotal = visibleContainers.reduce((s, c) => s + parseFloat(c.grandTotal || "0"), 0);
+                const colSpan = isAllCompanies ? 6 : 5;
 
                 return (
                   <div className="space-y-4">
@@ -2433,114 +2464,47 @@ export default function Analytics() {
                             <TableHead className="text-right">Grand Total</TableHead>
                           </TableRow>
                         </TableHeader>
-                        {isAllCompanies ? (
-                          <>
-                            {companyGroups.map((group) => (
-                              <>
-                                {group.containers.map((container) => (
-                                  <TableBody key={container.id}>
-                                    <TableRow>
-                                      <TableCell className="font-mono text-sm">{container.containerNumber}</TableCell>
-                                      <TableCell className="text-sm">{container.supplierName}</TableCell>
-                                      <TableCell className="text-sm">{container.companyName}</TableCell>
-                                      <TableCell className="text-sm">{container.status}</TableCell>
-                                      <TableCell className="text-sm">{getDate(container)}</TableCell>
-                                      <TableCell className="text-right font-mono text-sm">
-                                        {formatAmount(parseFloat(container.grandTotal))}
-                                      </TableCell>
-                                    </TableRow>
-                                  </TableBody>
-                                ))}
-                                <TableBody key={`subtotal-${group.companyId}`}>
-                                  <TableRow className="bg-muted/50 font-semibold">
-                                    <TableCell colSpan={colSpanTotal - 1} className="text-sm">
-                                      {group.companyName} — {group.containers.length} container
-                                      {group.containers.length !== 1 ? "s" : ""}
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono text-sm">
-                                      {formatAmount(group.total)}
-                                    </TableCell>
-                                  </TableRow>
-                                </TableBody>
-                              </>
-                            ))}
+                        {supplierGroups.map((sg) => (
+                          <Fragment key={sg.supplierName}>
                             <TableBody>
-                              <TableRow className="font-bold border-t-2">
-                                <TableCell colSpan={colSpanTotal - 1}>
-                                  TOTALS ({containerData.summary.totalContainers} containers)
-                                </TableCell>
-                                <TableCell className="text-right font-mono">
-                                  {formatAmount(containerData.summary.totalGrandTotal)}
-                                </TableCell>
-                              </TableRow>
-                            </TableBody>
-                          </>
-                        ) : (
-                          <>
-                            <TableBody>
-                              {containerData.containers.map((container) => (
+                              {sg.containers.map((container) => (
                                 <TableRow key={container.id}>
-                                  <TableCell className="font-mono">{container.containerNumber}</TableCell>
-                                  <TableCell>{container.supplierName}</TableCell>
-                                  <TableCell>{container.status}</TableCell>
-                                  <TableCell>{getDate(container)}</TableCell>
-                                  <TableCell className="text-right font-mono">
+                                  <TableCell className="font-mono text-sm">{container.containerNumber}</TableCell>
+                                  <TableCell className="text-sm">{container.supplierName}</TableCell>
+                                  {isAllCompanies && <TableCell className="text-sm">{container.companyName}</TableCell>}
+                                  <TableCell className="text-sm">{container.status}</TableCell>
+                                  <TableCell className="text-sm">{getDate(container)}</TableCell>
+                                  <TableCell className="text-right font-mono text-sm">
                                     {formatAmount(parseFloat(container.grandTotal))}
                                   </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
-                            <TableBody className="font-semibold border-t-2">
-                              <TableRow>
-                                <TableCell colSpan={3}>
-                                  TOTALS ({containerData.summary.totalContainers} containers)
+                            <TableBody>
+                              <TableRow className="bg-muted/40 font-semibold">
+                                <TableCell colSpan={colSpan - 1} className="text-sm">
+                                  {sg.supplierName} — {sg.containers.length} container{sg.containers.length !== 1 ? "s" : ""}
                                 </TableCell>
-                                <TableCell></TableCell>
-                                <TableCell className="text-right font-mono">
-                                  {formatAmount(containerData.summary.totalGrandTotal)}
-                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm">{formatAmount(sg.total)}</TableCell>
                               </TableRow>
                             </TableBody>
-                          </>
-                        )}
+                          </Fragment>
+                        ))}
+                        <TableBody>
+                          <TableRow className="font-bold border-t-2">
+                            <TableCell colSpan={colSpan - 1}>TOTALS ({visibleContainers.length} containers)</TableCell>
+                            <TableCell className="text-right font-mono">{formatAmount(visibleTotal)}</TableCell>
+                          </TableRow>
+                        </TableBody>
                       </Table>
                     </div>
                     <div className="md:hidden space-y-3">
-                      {isAllCompanies
-                        ? companyGroups.map((group) => (
-                            <div key={group.companyId} className="space-y-2">
-                              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
-                                {group.companyName}
-                              </div>
-                              {group.containers.map((container) => (
-                                <Card key={container.id}>
-                                  <CardContent className="p-4 space-y-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span className="font-mono font-medium">{container.containerNumber}</span>
-                                      <span className="text-sm text-muted-foreground">{container.status}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between gap-2 text-sm">
-                                      <span className="text-muted-foreground">
-                                        {container.supplierName} · {getDate(container)}
-                                      </span>
-                                      <span className="font-mono font-semibold">
-                                        {formatAmount(parseFloat(container.grandTotal))}
-                                      </span>
-                                    </div>
-                                  </CardContent>
-                                </Card>
-                              ))}
-                              <Card className="bg-muted/40">
-                                <CardContent className="p-3 flex items-center justify-between gap-2">
-                                  <span className="text-sm font-semibold">
-                                    {group.companyName} Total ({group.containers.length})
-                                  </span>
-                                  <span className="font-mono font-semibold text-sm">{formatAmount(group.total)}</span>
-                                </CardContent>
-                              </Card>
-                            </div>
-                          ))
-                        : containerData.containers.map((container) => (
+                      {supplierGroups.map((sg) => (
+                        <div key={sg.supplierName} className="space-y-2">
+                          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
+                            {sg.supplierName}
+                          </div>
+                          {sg.containers.map((container) => (
                             <Card key={container.id}>
                               <CardContent className="p-4 space-y-2">
                                 <div className="flex items-center justify-between gap-2">
@@ -2549,7 +2513,7 @@ export default function Analytics() {
                                 </div>
                                 <div className="flex items-center justify-between gap-2 text-sm">
                                   <span className="text-muted-foreground">
-                                    {container.supplierName} · {getDate(container)}
+                                    {isAllCompanies ? `${container.companyName} · ` : ""}{getDate(container)}
                                   </span>
                                   <span className="font-mono font-semibold">
                                     {formatAmount(parseFloat(container.grandTotal))}
@@ -2558,14 +2522,20 @@ export default function Analytics() {
                               </CardContent>
                             </Card>
                           ))}
+                          <Card className="bg-muted/40">
+                            <CardContent className="p-3 flex items-center justify-between gap-2">
+                              <span className="text-sm font-semibold">
+                                {sg.supplierName} ({sg.containers.length})
+                              </span>
+                              <span className="font-mono font-semibold text-sm">{formatAmount(sg.total)}</span>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      ))}
                       <Card className="bg-muted/50">
                         <CardContent className="p-4 flex items-center justify-between gap-2">
-                          <span className="font-bold text-sm">
-                            TOTALS ({containerData.summary.totalContainers} containers)
-                          </span>
-                          <span className="font-mono font-semibold">
-                            {formatAmount(containerData.summary.totalGrandTotal)}
-                          </span>
+                          <span className="font-bold text-sm">TOTALS ({visibleContainers.length} containers)</span>
+                          <span className="font-mono font-semibold">{formatAmount(visibleTotal)}</span>
                         </CardContent>
                       </Card>
                     </div>
