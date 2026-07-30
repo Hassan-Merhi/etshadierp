@@ -1,5 +1,5 @@
 {
-  "version": 11,
+  "version": 12,
   "description": "God-file architecture boundaries for ERP route composition and storage aggregation layers.",
   "retiredFiles": [
     "server/routesLegacy.ts",
@@ -23,6 +23,12 @@
     {
       "path": "server/storage/factory.ts",
       "owner": "Factory storage compatibility barrel",
+      "maxLines": 10,
+      "forbidPatterns": ["drizzle-orm", "../db", "db.select(", "db.insert(", "db.update(", "db.delete("]
+    },
+    {
+      "path": "server/storage/pos.ts",
+      "owner": "POS storage compatibility barrel",
       "maxLines": 10,
       "forbidPatterns": ["drizzle-orm", "../db", "db.select(", "db.insert(", "db.update(", "db.delete("]
     }
