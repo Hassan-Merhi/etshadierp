@@ -31,14 +31,13 @@ describe("Phase 7 operations route ownership", () => {
     }
   });
 
-  it("prevents operations HTTP ownership from returning to routesLegacy", () => {
-    const legacyRoutes = read("server/routesLegacy.ts");
-    const boundaries = read("config/legacy-route-boundaries.json");
-
-    expect(legacyRoutes).not.toMatch(/\bapp\.(get|post|put|patch|delete|use)\s*\(/);
-    expect(legacyRoutes).not.toMatch(
-      /register(Location|Employee|Stock|Container|Import|Pos|Bale|PropertiesRental|ErpRental|FactoryRental|Factory|GlobalTransaction|FiscalTransfer)Routes/,
-    );
-    expect(boundaries).toContain("no operations HTTP ownership");
+  it("keeps the retired top-level route registry absent", () => {
+    expect(fs.existsSync(path.join(root, "server/routesLegacy.ts"))).toBe(false);
+    const boundaries = JSON.parse(read("config/legacy-route-boundaries.json")) as {
+      description: string;
+      files: unknown[];
+    };
+    expect(boundaries.description).toContain("focused domain modules");
+    expect(boundaries.files).toEqual([]);
   });
 });
