@@ -19,6 +19,10 @@ export function resolveReleaseIdentity(env = process.env, isProduction = env.NOD
   const expectedCommit = optionalTrimmed(env.RELEASE_EXPECTED_COMMIT);
   const releaseId = optionalTrimmed(env.RELEASE_ID);
 
+  if (isProduction && !expectedCommit) {
+    throw new Error("RELEASE_EXPECTED_COMMIT is required in production");
+  }
+
   if (actualCommit && !FULL_COMMIT_SHA.test(actualCommit)) {
     const message = `Release commit must be a full 40-character Git SHA; received ${JSON.stringify(actualCommit)}`;
     if (isProduction) throw new Error(message);
