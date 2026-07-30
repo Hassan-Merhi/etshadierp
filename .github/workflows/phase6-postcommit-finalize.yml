@@ -41,11 +41,11 @@ jobs:
               "post_offload_phase6_applied",
           )
           verification_pattern = re.compile(
-              r'''  const readiness = await inspectPostOffloadPhase6Readiness\(\{\n'''
-              r'''    companyId: params\.companyId,\n'''
-              r'''    supplierIds: payload\.supplierIds,\n'''
-              r'''  \}\);\n\n'''
-              r'''  return \{'''
+              r"  const readiness = await inspectPostOffloadPhase6Readiness\(\{\n"
+              r"    companyId: params\.companyId,\n"
+              r"    supplierIds: payload\.supplierIds,\n"
+              r"  \}\);\n\n"
+              r"  return \{"
           )
           verification_replacement = '''  let readiness: PostOffloadPhase6Readiness;
           try {
@@ -78,69 +78,61 @@ jobs:
 
           route_path = Path("server/routes/factory/raw-stock/postOffloadPhase6SafetyRoutes.ts")
           route = route_path.read_text()
-          route = route.replace(
-              '''  dryRun: boolean;
-          }): Promise<void> {''',
-              '''  dryRun: boolean;
-            repairCommitted: boolean;
-            undoLogId: number | null;
-          }): Promise<void> {''',
-          )
-          route = route.replace(
-              '''        dryRun: params.dryRun,
-                httpStatus: params.httpStatus,''',
-              '''        dryRun: params.dryRun,
-                repairCommitted: params.repairCommitted,
-                undoLogId: params.undoLogId,
-                httpStatus: params.httpStatus,''',
-          )
-          readiness_audit = '''      await auditFailure({ context, error, httpStatus: status, dryRun: true });'''
-          if readiness_audit in route:
-              route = route.replace(
-                  readiness_audit,
-                  '''      await auditFailure({
-                context,
-                error,
-                httpStatus: status,
-                dryRun: true,
-                repairCommitted: false,
-                undoLogId: null,
-              });''',
-                  1,
-              )
-          route = route.replace(
-              '''    const confirmationToken = req.body?.confirmationToken;
-            const isDryRun = req.body?.dryRun === true || !confirmationToken;
+          signature_old = "  dryRun: boolean;\n}): Promise<void> {"
+          signature_new = "  dryRun: boolean;\n  repairCommitted: boolean;\n  undoLogId: number | null;\n}): Promise<void> {"
+          if signature_old not in route:
+              raise SystemExit("Audit failure signature not found")
+          route = route.replace(signature_old, signature_new, 1)
 
-            try {''',
-              '''    const confirmationToken = req.body?.confirmationToken;
-            const isDryRun = req.body?.dryRun === true || !confirmationToken;
-            let repairCommitted = false;
-            let committedUndoLogId: number | null = null;
-
-            try {''',
+          details_old = "        dryRun: params.dryRun,\n        httpStatus: params.httpStatus,"
+          details_new = (
+              "        dryRun: params.dryRun,\n"
+              "        repairCommitted: params.repairCommitted,\n"
+              "        undoLogId: params.undoLogId,\n"
+              "        httpStatus: params.httpStatus,"
           )
-          apply_marker = '''      const result = await applyPostOffloadPhase6Repair({
-                companyId: context.companyId,
-                userId: context.userId,
-                username: context.username,
-                confirmationToken,
-              });
-              await persistPostOffloadPhase6Audit({'''
-          if apply_marker not in route:
-              raise SystemExit("Apply result marker not found")
-          route = route.replace(
-              apply_marker,
-              '''      const result = await applyPostOffloadPhase6Repair({
-                companyId: context.companyId,
-                userId: context.userId,
-                username: context.username,
-                confirmationToken,
-              });
-              repairCommitted = true;
-              committedUndoLogId = result.undoLogId;
-              await persistPostOffloadPhase6Audit({''',
-              1,
+          if details_old not in route:
+              raise SystemExit("Failure audit details marker not found")
+          route = route.replace(details_old, details_new, 1)
+
+          readiness_old = "      await auditFailure({ context, error, httpStatus: status, dryRun: true });"
+          readiness_new = '''      await auditFailure({
+            context,
+            error,
+            httpStatus: status,
+            dryRun: true,
+            repairCommitted: false,
+            undoLogId: null,
+          });'''
+          if readiness_old not in route:
+              raise SystemExit("Readiness failure audit call not found")
+          route = route.replace(readiness_old, readiness_new, 1)
+
+          state_old = '''    const confirmationToken = req.body?.confirmationToken;
+          const isDryRun = req.body?.dryRun === true || !confirmationToken;
+
+          try {'''
+          state_new = '''    const confirmationToken = req.body?.confirmationToken;
+          const isDryRun = req.body?.dryRun === true || !confirmationToken;
+          let repairCommitted = false;
+          let committedUndoLogId: number | null = null;
+
+          try {'''
+          if state_old not in route:
+              raise SystemExit("Repair state marker not found")
+          route = route.replace(state_old, state_new, 1)
+
+          apply_start = route.find("      const result = await applyPostOffloadPhase6Repair({")
+          if apply_start < 0:
+              raise SystemExit("Apply start not found")
+          audit_start = route.find("      await persistPostOffloadPhase6Audit({", apply_start)
+          if audit_start < 0:
+              raise SystemExit("Post-apply audit start not found")
+          route = (
+              route[:audit_start]
+              + "      repairCommitted = true;\n"
+              + "      committedUndoLogId = result.undoLogId;\n"
+              + route[audit_start:]
           )
 
           catch_start = route.rfind('    } catch (error: unknown) {')
@@ -152,43 +144,43 @@ jobs:
               raise SystemExit("Repair catch end not found")
           catch_end += len('\n    }')
           new_catch = '''    } catch (error: unknown) {
-              const status = phase6ErrorStatus(error);
-              const errorState = error as {
-                code?: string;
-                repairCommitted?: boolean;
-                undoLogId?: number;
-                applied?: unknown;
-              };
-              const repairWasCommitted = repairCommitted || errorState.repairCommitted === true;
-              const undoLogId = committedUndoLogId ?? errorState.undoLogId ?? null;
-              await auditFailure({
-                context,
-                error,
-                httpStatus: status,
-                dryRun: isDryRun,
-                repairCommitted: repairWasCommitted,
-                undoLogId,
-              });
-              logger.error("Post-offload Phase 6 repair rejected or failed", {
-                error,
-                companyId: context.companyId,
-                userId: context.userId,
-                status,
-                dryRun: isDryRun,
-                repairCommitted: repairWasCommitted,
-                undoLogId,
-              });
-              return res.status(status).json({
-                success: false,
-                repairCommitted: repairWasCommitted,
-                transactionRolledBack: !repairWasCommitted,
-                partialChanges: false,
-                undoLogId,
-                applied: errorState.applied ?? null,
-                message: getErrorMessage(error) || "Post-offload Phase 6 repair failed.",
-                code: errorState.code || "POST_OFFLOAD_PHASE6_REPAIR_FAILED",
-              });
-            }'''
+            const status = phase6ErrorStatus(error);
+            const errorState = error as {
+              code?: string;
+              repairCommitted?: boolean;
+              undoLogId?: number;
+              applied?: unknown;
+            };
+            const repairWasCommitted = repairCommitted || errorState.repairCommitted === true;
+            const undoLogId = committedUndoLogId ?? errorState.undoLogId ?? null;
+            await auditFailure({
+              context,
+              error,
+              httpStatus: status,
+              dryRun: isDryRun,
+              repairCommitted: repairWasCommitted,
+              undoLogId,
+            });
+            logger.error("Post-offload Phase 6 repair rejected or failed", {
+              error,
+              companyId: context.companyId,
+              userId: context.userId,
+              status,
+              dryRun: isDryRun,
+              repairCommitted: repairWasCommitted,
+              undoLogId,
+            });
+            return res.status(status).json({
+              success: false,
+              repairCommitted: repairWasCommitted,
+              transactionRolledBack: !repairWasCommitted,
+              partialChanges: false,
+              undoLogId,
+              applied: errorState.applied ?? null,
+              message: getErrorMessage(error) || "Post-offload Phase 6 repair failed.",
+              code: errorState.code || "POST_OFFLOAD_PHASE6_REPAIR_FAILED",
+            });
+          }'''
           route = route[:catch_start] + new_catch + route[catch_end:]
           route_path.write_text(route)
 
@@ -196,11 +188,11 @@ jobs:
           test = test_path.read_text()
           test = test.replace(
               '''    expect(routes).toContain("repairCommitted: false");
-              expect(routes).toContain("noPartialChanges: true");''',
+            expect(routes).toContain("noPartialChanges: true");''',
               '''    expect(routes).toContain("repairWasCommitted");
-              expect(routes).toContain("transactionRolledBack: !repairWasCommitted");
-              expect(routes).toContain("partialChanges: false");
-              expect(routes).toContain("undoLogId");''',
+            expect(routes).toContain("transactionRolledBack: !repairWasCommitted");
+            expect(routes).toContain("partialChanges: false");
+            expect(routes).toContain("undoLogId");''',
           )
           test = test.replace(
               'expect(service).toContain("post_offload_phase6_applied_and_verified");',
@@ -208,12 +200,14 @@ jobs:
           )
           rollback_assertion = '''    expect(exactApply).toContain('await client.query("ROLLBACK")');'''
           if "POST_OFFLOAD_PHASE6_POST_COMMIT_VERIFICATION_FAILED" not in test:
+              if rollback_assertion not in test:
+                  raise SystemExit("Rollback test assertion not found")
               test = test.replace(
                   rollback_assertion,
                   rollback_assertion
                   + '''
-              expect(service).toContain("POST_OFFLOAD_PHASE6_POST_COMMIT_VERIFICATION_FAILED");
-              expect(service).toContain("repairCommitted: true");''',
+            expect(service).toContain("POST_OFFLOAD_PHASE6_POST_COMMIT_VERIFICATION_FAILED");
+            expect(service).toContain("repairCommitted: true");''',
               )
           test_path.write_text(test)
           PY
