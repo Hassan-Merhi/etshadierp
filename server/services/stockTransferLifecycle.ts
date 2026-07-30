@@ -274,7 +274,7 @@ export async function saveStockTransferLifecycle(input: SaveStockTransferLifecyc
     const locked = await lockTransfer(tx, transferId);
     if (!locked) throw new Error("Stock transfer not found");
     if (Number(locked.company_id) !== companyId) throw new Error("Stock transfer belongs to a different company");
-    if (locked.voucher_type !== "Stock Transfer" && locked.voucher_type !== "StockTransfer") {
+    if (locked.voucher_type !== "Stock Transfer" && locked.voucher_type !== "StockTransfer" && locked.voucher_type !== "Transfer") {
       throw new Error("Voucher is not a stock transfer");
     }
     if (locked.deleted_at) throw new Error("Deleted stock transfers cannot be changed");
@@ -347,7 +347,7 @@ export async function finalizeOptionalStockTransfer(
     const locked = await lockTransferByVoucher(tx, voucherId);
     if (!locked) throw new Error("Stock transfer not found");
     if (Number(locked.company_id) !== companyId) throw new Error("Stock transfer belongs to a different company");
-    if (locked.voucher_type !== "Stock Transfer" && locked.voucher_type !== "StockTransfer") {
+    if (locked.voucher_type !== "Stock Transfer" && locked.voucher_type !== "StockTransfer" && locked.voucher_type !== "Transfer") {
       throw new Error("Voucher is not a stock transfer");
     }
     if (locked.deleted_at) throw new Error("Deleted stock transfers cannot be finalized");
@@ -434,7 +434,7 @@ export async function reopenStockTransferAsDraft(
     const locked = await lockTransferByVoucher(tx, voucherId);
     if (!locked) throw new Error("Stock transfer not found");
     if (Number(locked.company_id) !== companyId) throw new Error("Stock transfer belongs to a different company");
-    if (locked.voucher_type !== "Stock Transfer" && locked.voucher_type !== "StockTransfer") {
+    if (locked.voucher_type !== "Stock Transfer" && locked.voucher_type !== "StockTransfer" && locked.voucher_type !== "Transfer") {
       throw new Error("Voucher is not a stock transfer");
     }
     if (locked.deleted_at) throw new Error("Deleted stock transfers cannot be changed");

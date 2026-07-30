@@ -89,7 +89,7 @@ export function registerStockTransferLifecycleRoutes(app: Express) {
       if (!Number.isInteger(voucherId) || voucherId <= 0) return res.status(400).json({ message: "Invalid voucher ID" });
 
       const voucher = await getVoucher(voucherId);
-      if (!voucher || (voucher.voucherType !== "Stock Transfer" && voucher.voucherType !== "StockTransfer")) return next();
+      if (!voucher || (voucher.voucherType !== "Stock Transfer" && voucher.voucherType !== "StockTransfer" && voucher.voucherType !== "Transfer")) return next();
       if (voucher.companyId !== companyId) return res.status(403).json({ message: "Voucher belongs to a different company" });
 
       const targetOptional = req.body.optional === true;
@@ -164,7 +164,7 @@ export function registerStockTransferLifecycleRoutes(app: Express) {
         if (!Number.isInteger(voucherId) || voucherId <= 0) return res.status(400).json({ message: "Invalid voucher ID" });
 
         const voucher = await getVoucher(voucherId);
-        if (!voucher || (voucher.voucherType !== "Stock Transfer" && voucher.voucherType !== "StockTransfer")) return next();
+        if (!voucher || (voucher.voucherType !== "Stock Transfer" && voucher.voucherType !== "StockTransfer" && voucher.voucherType !== "Transfer")) return next();
         if (voucher.companyId !== companyId) return res.status(403).json({ message: "Voucher belongs to a different company" });
 
         const [transfer] = await db
@@ -213,7 +213,7 @@ export function registerStockTransferLifecycleRoutes(app: Express) {
         if (!Number.isInteger(voucherId) || voucherId <= 0) return res.status(400).json({ message: "Invalid voucher ID" });
 
         const voucher = await getVoucher(voucherId);
-        if (!voucher || (voucher.voucherType !== "Stock Transfer" && voucher.voucherType !== "StockTransfer")) return next();
+        if (!voucher || (voucher.voucherType !== "Stock Transfer" && voucher.voucherType !== "StockTransfer" && voucher.voucherType !== "Transfer")) return next();
         if (voucher.companyId !== companyId) return res.status(403).json({ message: "Voucher belongs to a different company" });
 
         const result = await finalizeOptionalStockTransfer(companyId, voucherId);
