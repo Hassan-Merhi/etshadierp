@@ -340,6 +340,7 @@ export function registerStatsReportsRoutes(app: Express) {
         .select({
           id: containers.id,
           containerNumber: containers.containerNumber,
+          supplierId: containers.supplierId,
           supplierName: suppliers.legalName,
           status: containers.status,
           importDate: containers.importDate,

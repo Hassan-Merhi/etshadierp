@@ -6,6 +6,7 @@ import { registerReportsContainerTrackingRoutes } from "./reportsContainerTracki
 import { registerReportsLedgerRoutes } from "./reportsLedgerRoutes";
 import { registerReportsNetProfitStatementRoutes } from "./reportsNetProfitStatementRoutes";
 import { registerReportsVoucherDetailRoutes } from "./reportsVoucherDetailRoutes";
+import { registerReportsRoutes as registerLegacyReportsRoutes } from "./reportsRoutesLegacy";
 
 export function registerReportsRoutes(app: Express) {
   registerReportsNetProfitStatementRoutes(app);
@@ -14,4 +15,5 @@ export function registerReportsRoutes(app: Express) {
   registerReportsContainerTrackingRoutes(app);
   registerReportsLedgerRoutes(app);
   registerReportsVoucherDetailRoutes(app);
+  registerLegacyReportsRoutes(app);
 }

@@ -130,6 +130,7 @@ interface Container {
 interface ReportContainer {
   id: number;
   containerNumber: string;
+  supplierId: number;
   supplierName: string;
   status: string;
   importDate: string | null;
@@ -325,7 +326,7 @@ export default function Analytics() {
   const [reportEndDate, setReportEndDate] = useState("");
   const [reportLocationId, setReportLocationId] = useState("all");
   const [reportStockGroupId, setReportStockGroupId] = useState("all");
-  const [reportSupplierNames, setReportSupplierNames] = useState<string[]>([]);
+  const [reportSupplierIds, setReportSupplierIds] = useState<number[]>([]);
   const [reportContainerStatus, setReportContainerStatus] = useState("Offloaded");
   const [reportAllCompanies, setReportAllCompanies] = useState("all");
   const [containerPeriodFilter, setContainerPeriodFilter] = useState<PeriodFilterValue>(() =>
@@ -2341,15 +2342,20 @@ export default function Analytics() {
               <div className="flex flex-col gap-1.5 min-w-[160px]">
                 <Label>Supplier</Label>
                 {(() => {
-                  const allSupplierNames = Array.from(
-                    new Set((containerData?.containers ?? []).map((c) => c.supplierName).filter(Boolean))
-                  ).sort();
+                  const supplierOptions = Array.from(
+                    new Map(
+                      (containerData?.containers ?? []).map((c) => [
+                        c.supplierId,
+                        { id: c.supplierId, name: c.supplierName },
+                      ])
+                    ).values()
+                  ).sort((a, b) => a.name.localeCompare(b.name));
                   const label =
-                    reportSupplierNames.length === 0
+                    reportSupplierIds.length === 0
                       ? "All Suppliers"
-                      : reportSupplierNames.length === 1
-                        ? reportSupplierNames[0]
-                        : `${reportSupplierNames.length} suppliers`;
+                      : reportSupplierIds.length === 1
+                        ? (supplierOptions.find((s) => s.id === reportSupplierIds[0])?.name ?? "1 supplier")
+                        : `${reportSupplierIds.length} suppliers`;
                   return (
                     <Popover>
                       <PopoverTrigger asChild>
@@ -2360,25 +2366,31 @@ export default function Analytics() {
                       </PopoverTrigger>
                       <PopoverContent className="w-64 p-2 max-h-72 overflow-y-auto" align="start">
                         <button
+                          type="button"
+                          aria-pressed={reportSupplierIds.length === 0}
                           className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent"
-                          onClick={() => setReportSupplierNames([])}
+                          onClick={() => setReportSupplierIds([])}
                         >
-                          <Check className={`h-4 w-4 ${reportSupplierNames.length === 0 ? "opacity-100" : "opacity-0"}`} />
+                          <Check className={`h-4 w-4 ${reportSupplierIds.length === 0 ? "opacity-100" : "opacity-0"}`} />
                           All Suppliers
                         </button>
                         <div className="border-t my-1" />
-                        {allSupplierNames.map((name) => (
+                        {supplierOptions.map((supplier) => (
                           <button
-                            key={name}
+                            key={supplier.id}
+                            type="button"
+                            aria-pressed={reportSupplierIds.includes(supplier.id)}
                             className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent"
                             onClick={() =>
-                              setReportSupplierNames((prev) =>
-                                prev.includes(name) ? prev.filter((s) => s !== name) : [...prev, name]
+                              setReportSupplierIds((prev) =>
+                                prev.includes(supplier.id)
+                                  ? prev.filter((id) => id !== supplier.id)
+                                  : [...prev, supplier.id]
                               )
                             }
                           >
-                            <Check className={`h-4 w-4 shrink-0 ${reportSupplierNames.includes(name) ? "opacity-100" : "opacity-0"}`} />
-                            <span className="truncate">{name}</span>
+                            <Check className={`h-4 w-4 shrink-0 ${reportSupplierIds.includes(supplier.id) ? "opacity-100" : "opacity-0"}`} />
+                            <span className="truncate">{supplier.name}</span>
                           </button>
                         ))}
                       </PopoverContent>
@@ -2427,17 +2439,17 @@ export default function Analytics() {
 
                 // Client-side supplier filter
                 const visibleContainers =
-                  reportSupplierNames.length === 0
+                  reportSupplierIds.length === 0
                     ? containerData.containers
-                    : containerData.containers.filter((c) => reportSupplierNames.includes(c.supplierName));
+                    : containerData.containers.filter((c) => reportSupplierIds.includes(c.supplierId));
 
-                // Group by supplier, sorted alphabetically; within each group sort by date DESC
-                const supplierMap = new Map<string, { supplierName: string; containers: ReportContainer[]; total: number }>();
+                // Group by supplierId, sorted alphabetically; within each group sort by date DESC
+                const supplierMap = new Map<number, { supplierId: number; supplierName: string; containers: ReportContainer[]; total: number }>();
                 for (const c of visibleContainers) {
-                  if (!supplierMap.has(c.supplierName)) {
-                    supplierMap.set(c.supplierName, { supplierName: c.supplierName, containers: [], total: 0 });
+                  if (!supplierMap.has(c.supplierId)) {
+                    supplierMap.set(c.supplierId, { supplierId: c.supplierId, supplierName: c.supplierName, containers: [], total: 0 });
                   }
-                  const g = supplierMap.get(c.supplierName)!;
+                  const g = supplierMap.get(c.supplierId)!;
                   g.containers.push(c);
                   g.total += parseFloat(c.grandTotal || "0");
                 }
@@ -2465,7 +2477,7 @@ export default function Analytics() {
                           </TableRow>
                         </TableHeader>
                         {supplierGroups.map((sg) => (
-                          <Fragment key={sg.supplierName}>
+                          <Fragment key={sg.supplierId}>
                             <TableBody>
                               {sg.containers.map((container) => (
                                 <TableRow key={container.id}>
@@ -2500,7 +2512,7 @@ export default function Analytics() {
                     </div>
                     <div className="md:hidden space-y-3">
                       {supplierGroups.map((sg) => (
-                        <div key={sg.supplierName} className="space-y-2">
+                        <div key={sg.supplierId} className="space-y-2">
                           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide px-1">
                             {sg.supplierName}
                           </div>
