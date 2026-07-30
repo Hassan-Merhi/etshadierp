@@ -1785,6 +1785,31 @@ export function registerFactoryBalesRoutes(app: Express) {
     }
   });
 
+  // PATCH /api/factory/bales/bulk-date — update stock_entry_date for a set of bales
+  app.patch("/api/factory/bales/bulk-date", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { ids, stockEntryDate } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0)
+        return res.status(400).json({ message: "ids must be a non-empty array" });
+      if (!stockEntryDate || typeof stockEntryDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(stockEntryDate))
+        return res.status(400).json({ message: "stockEntryDate must be YYYY-MM-DD" });
+
+      const now = new Date();
+      const result = await db
+        .update(factoryBales)
+        .set({ stockEntryDate, updatedAt: now })
+        .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, ids.map(Number))))
+        .returning({ id: factoryBales.id });
+
+      res.json({ updated: result.length });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
   app.patch("/api/factory/bales/:id/status", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;

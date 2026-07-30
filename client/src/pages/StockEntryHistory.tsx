@@ -250,6 +250,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   const [includeUnassigned, setIncludeUnassigned] = useState(true);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"condensed" | "detailed">("condensed");
+  const [editingDateKey, setEditingDateKey] = useState<string | null>(null);
 
   // Condensed mode: use lite mode (no per-bale JSON_AGG) for a small initial payload (~95% smaller).
   // Detailed mode fetches the full response so the flat bale list is populated.
@@ -451,6 +452,21 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
 
   // Detailed view: flat list of all bales
   const allBales = useMemo(() => filteredGroups.flatMap((g) => g.bales), [filteredGroups]);
+
+  const updateDateMutation = useMutation({
+    mutationFn: async ({ ids, stockEntryDate }: { ids: number[]; stockEntryDate: string }) => {
+      const res = await apiRequest("PATCH", "/api/factory/bales/bulk-date", { ids, stockEntryDate });
+      return res.json();
+    },
+    onSuccess: (_, vars) => {
+      toast({ title: "Date updated", description: `Updated date for ${vars.ids.length} bale(s).` });
+      setEditingDateKey(null);
+      qc.invalidateQueries({ queryKey: ["/api/factory/bales/stock-entry-history"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Update failed", description: err.message, variant: "destructive" });
+    },
+  });
 
   const bulkAssignMutation = useMutation({
     mutationFn: async ({ baleIds, workerId }: { baleIds: number[]; workerId: number }) => {
@@ -980,6 +996,50 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     win.document.close();
   }
 
+  function EditableDateCell({
+    dateStr,
+    editKey,
+    onSave,
+  }: {
+    dateStr: string;
+    editKey: string;
+    onSave: (newDate: string) => void;
+  }) {
+    const isEditing = editingDateKey === editKey;
+    if (isEditing) {
+      return (
+        <input
+          autoFocus
+          type="date"
+          defaultValue={dateStr}
+          className="border rounded px-1 py-0.5 text-xs w-32"
+          onBlur={(e) => {
+            const val = e.target.value;
+            if (val && val !== dateStr) onSave(val);
+            else setEditingDateKey(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setEditingDateKey(null);
+            if (e.key === "Enter") {
+              const val = (e.target as HTMLInputElement).value;
+              if (val && val !== dateStr) onSave(val);
+              else setEditingDateKey(null);
+            }
+          }}
+        />
+      );
+    }
+    return (
+      <span
+        className="cursor-pointer hover:underline hover:text-primary"
+        title="Click to edit date"
+        onClick={() => setEditingDateKey(editKey)}
+      >
+        {dateStr ? formatDisplayDate(dateStr) : "—"}
+      </span>
+    );
+  }
+
   return (
     <div className="p-4 space-y-3">
       {/* ── Toolbar ── */}
@@ -1435,7 +1495,20 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                                       <ChevronRight className="w-3 h-3" />
                                     )}
                                   </td>
-                                  <td className="px-3 py-1.5">{formatDisplayDate(g.stockEntryDate)}</td>
+                                  <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
+                                    <EditableDateCell
+                                      dateStr={g.stockEntryDate}
+                                      editKey={`group-${groupKey(g)}`}
+                                      onSave={async (newDate) => {
+                                        const baleIds = await resolveGroupBaleIds(g);
+                                        if (baleIds.length === 0) {
+                                          toast({ title: "No bales found", variant: "destructive" });
+                                          return;
+                                        }
+                                        updateDateMutation.mutate({ ids: baleIds, stockEntryDate: newDate });
+                                      }}
+                                    />
+                                  </td>
                                   <td className="px-3 py-1.5">{g.locationName}</td>
                                   <td className="px-3 py-1.5">
                                     {g.productName || "—"}
@@ -1594,7 +1667,13 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                   data-testid={`row-bale-${b.id}`}
                 >
                   <td className="px-3 py-1.5 font-mono text-xs">{b.referenceNumber}</td>
-                  <td className="px-3 py-1.5">{b.stockEntryDate ? formatDisplayDate(b.stockEntryDate) : "—"}</td>
+                  <td className="px-3 py-1.5">
+                    <EditableDateCell
+                      dateStr={b.stockEntryDate || ""}
+                      editKey={`bale-${b.id}`}
+                      onSave={(newDate) => updateDateMutation.mutate({ ids: [b.id], stockEntryDate: newDate })}
+                    />
+                  </td>
                   <td className="px-3 py-1.5">{b.locationName}</td>
                   <td className="px-3 py-1.5">
                     {b.workerName || <span className="italic text-muted-foreground text-xs">Unassigned</span>}
