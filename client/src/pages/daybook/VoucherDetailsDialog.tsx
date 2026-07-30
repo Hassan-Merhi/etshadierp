@@ -326,6 +326,10 @@ export function VoucherDetailsDialog({
                         {!isPOSUser &&
                           purchaseOrderData &&
                           (() => {
+                            const totalQty = purchaseItems.reduce(
+                              (sum: number, e: any) => sum + parseFloat(e.quantity || "0"),
+                              0
+                            );
                             const charges = [
                               { label: "Items Total", value: purchaseOrderData.itemsTotal },
                               { label: "Freight", value: purchaseOrderData.freight },
@@ -335,9 +339,15 @@ export function VoucherDetailsDialog({
                               { label: "Other Charges", value: purchaseOrderData.otherCharges },
                               { label: "Discount", value: purchaseOrderData.discount },
                             ].filter((c) => c.value != null && parseFloat(String(c.value)) !== 0);
-                            if (charges.length === 0) return null;
+                            if (charges.length === 0 && totalQty === 0) return null;
                             return (
                               <div className="border-t px-4 py-3 space-y-1">
+                                {totalQty > 0 && (
+                                  <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Total Qty</span>
+                                    <span className="font-mono">{totalQty.toLocaleString()}</span>
+                                  </div>
+                                )}
                                 {charges.map((c) => (
                                   <div key={c.label} className="flex justify-between text-sm">
                                     <span className="text-muted-foreground">{c.label}</span>
