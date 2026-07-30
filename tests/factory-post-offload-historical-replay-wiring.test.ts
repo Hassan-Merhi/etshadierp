@@ -55,13 +55,17 @@ describe("post-offload historical supplier-cost replay", () => {
     const active = read("server/routes/factory/factoryRawStockRoutes.ts");
     const legacy = read("server/routes/factory/raw-stock/index.ts");
 
-    const activeReplay = active.indexOf("postOffloadHistoricalReplayMiddleware");
-    const activeRoutes = active.indexOf("registerRawStockContainerRoutes(app)");
+    const activeReplay = active.indexOf(
+      'app.use("/api/factory/containers", postOffloadHistoricalReplayMiddleware)'
+    );
+    const activeRoutes = active.indexOf("registerRawStockContainerRoutes(app);");
     expect(activeReplay).toBeGreaterThan(-1);
     expect(activeReplay).toBeLessThan(activeRoutes);
 
-    const legacyReplay = legacy.indexOf("postOffloadHistoricalReplayMiddleware");
-    const legacyRoutes = legacy.indexOf("registerRawStockContainerRoutes(app)");
+    const legacyReplay = legacy.indexOf(
+      'app.use("/api/factory/containers", postOffloadHistoricalReplayMiddleware)'
+    );
+    const legacyRoutes = legacy.indexOf("registerRawStockContainerRoutes(app);");
     expect(legacyReplay).toBeGreaterThan(-1);
     expect(legacyReplay).toBeLessThan(legacyRoutes);
   });
