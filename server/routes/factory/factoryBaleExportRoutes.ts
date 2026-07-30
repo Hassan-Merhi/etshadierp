@@ -1459,6 +1459,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
 
       const from = req.query.from as string | undefined;
       const to = req.query.to as string | undefined;
+      const workerIdParam = req.query.workerId as string | undefined;
 
       // ── Build date range conditions ──
       // Use COALESCE(stock_entry_date, DATE(created_at)) so bales without a stock_entry_date
@@ -1479,6 +1480,8 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         baleConditions.push(
           sql`COALESCE(DATE(${factoryBales.stockEntryDate}), DATE(${factoryBales.createdAt})) <= ${to}`
         );
+      if (workerIdParam && !isNaN(parseInt(workerIdParam)))
+        baleConditions.push(eq(factoryBales.finalizedBy, parseInt(workerIdParam)));
 
       // Exclude CARRY_FORWARD batches from the "Original Batches" total.
       // CARRY_FORWARD batches represent leftover material from a parent batch whose weight is

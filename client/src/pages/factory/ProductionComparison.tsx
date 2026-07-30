@@ -26,6 +26,7 @@ import {
 import { TrendingUp, TrendingDown, Minus, AlertTriangle, Check, ChevronDown, X, Package, Scale } from "lucide-react";
 import React from "react";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -374,8 +375,15 @@ export default function ProductionComparison() {
   const [filterCategories, setFilterCategories] = useState<string[]>([]);
   const [filterGrades, setFilterGrades] = useState<string[]>([]);
   const [filterProduct, setFilterProduct] = useState("");
+  // Worker filter (single select by worker ID)
+  const [filterWorker, setFilterWorker] = useState<string>("");
   // Supplier mix breakdown filter
   const [filterSuppliers, setFilterSuppliers] = useState<string[]>([]);
+
+  const { data: workers = [] } = useQuery<{ id: number; fullName: string }[]>({
+    queryKey: ["/api/factory/workers"],
+    staleTime: 60_000,
+  });
 
   const [rangeA, rangeB] = useMemo<[[string, string], [string, string]]>(() => {
     if (preset === "today-yesterday")
@@ -403,26 +411,24 @@ export default function ProductionComparison() {
           : "Period B";
 
   const qA = useQuery<ReportData>({
-    queryKey: ["/api/factory/production-value-report", rangeA[0], rangeA[1]],
+    queryKey: ["/api/factory/production-value-report", rangeA[0], rangeA[1], filterWorker],
     staleTime: 0,
     queryFn: async () => {
-      const r = await fetch(
-        `/api/factory/production-value-report?from=${rangeA[0]}&to=${rangeA[1]}`,
-        { credentials: "include" },
-      );
+      const params = new URLSearchParams({ from: rangeA[0], to: rangeA[1] });
+      if (filterWorker) params.set("workerId", filterWorker);
+      const r = await fetch(`/api/factory/production-value-report?${params}`, { credentials: "include" });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "Request failed");
       return r.json();
     },
   });
 
   const qB = useQuery<ReportData>({
-    queryKey: ["/api/factory/production-value-report", rangeB[0], rangeB[1]],
+    queryKey: ["/api/factory/production-value-report", rangeB[0], rangeB[1], filterWorker],
     staleTime: 0,
     queryFn: async () => {
-      const r = await fetch(
-        `/api/factory/production-value-report?from=${rangeB[0]}&to=${rangeB[1]}`,
-        { credentials: "include" },
-      );
+      const params = new URLSearchParams({ from: rangeB[0], to: rangeB[1] });
+      if (filterWorker) params.set("workerId", filterWorker);
+      const r = await fetch(`/api/factory/production-value-report?${params}`, { credentials: "include" });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "Request failed");
       return r.json();
     },
@@ -580,7 +586,7 @@ export default function ProductionComparison() {
   const totalSupBCost = supplierBreakdownB.reduce((s, r) => s + r.totalCost, 0);
 
   const hasActiveFilter =
-    filterCategories.length > 0 || filterGrades.length > 0 || filterProduct !== "";
+    filterCategories.length > 0 || filterGrades.length > 0 || filterProduct !== "" || filterWorker !== "";
   const hasSupplierFilter = filterSuppliers.length > 0;
 
   return (
@@ -908,6 +914,20 @@ export default function ProductionComparison() {
               className="w-36"
             />
 
+            <Select value={filterWorker || "__all__"} onValueChange={(v) => setFilterWorker(v === "__all__" ? "" : v)}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="All Workers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All Workers</SelectItem>
+                {workers.map((w) => (
+                  <SelectItem key={w.id} value={String(w.id)}>
+                    {w.fullName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Input
               placeholder="Search product…"
               className="w-52"
@@ -923,6 +943,7 @@ export default function ProductionComparison() {
                   setFilterCategories([]);
                   setFilterGrades([]);
                   setFilterProduct("");
+                  setFilterWorker("");
                 }}
               >
                 Clear filters
