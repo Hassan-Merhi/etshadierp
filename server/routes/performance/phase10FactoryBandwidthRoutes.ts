@@ -1,5 +1,5 @@
 import type { Express, NextFunction, Request, Response } from "express";
-import { and, asc, eq, ilike, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, isNull, or } from "drizzle-orm";
 import { factoryBaleProducts, factoryWorkers } from "@shared/schema";
 import { requireAuth } from "../../auth";
 import { db, pool } from "../../db";
@@ -32,7 +32,7 @@ async function sendProformaSummaries(req: Request, res: Response) {
     company_id: number;
     customer_id: number;
     name: string | null;
-    is_active: boolean | null;
+    is_active?: boolean | null;
     deleted_at: string | null;
     created_at: string;
     updated_at: string | null;
@@ -53,7 +53,7 @@ async function sendProformaSummaries(req: Request, res: Response) {
       WHERE p.company_id = $1
         AND p.customer_id = $2
         AND p.deleted_at IS NULL
-      ORDER BY COALESCE(p.is_active, false) DESC, p.name ASC
+      ORDER BY p.name ASC
       LIMIT $3`,
     [companyId, customerId, limit],
   );
