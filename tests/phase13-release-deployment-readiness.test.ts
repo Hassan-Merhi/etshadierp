@@ -132,6 +132,10 @@ describe("Phase 13 deployment contracts", () => {
     expect(render).toContain("autoDeploy: false");
     expect(render).toContain("healthCheckPath: /api/health/ready");
     expect(render).toContain("value: 20.19.2");
+    for (const key of policy.requiredManualRenderEnvironmentKeys) {
+      expect(render).toContain(`key: ${key}`);
+    }
+    expect(render.match(/sync: false/g)).toHaveLength(policy.requiredManualRenderEnvironmentKeys.length);
     for (const key of policy.forbiddenRenderEnvironmentKeys) {
       expect(render).not.toContain(`key: ${key}`);
     }
