@@ -14,7 +14,8 @@ describe("Phase 6 post-offload safety and repair", () => {
     expect(routes).toContain("inspectPostOffloadPhase6Readiness");
     expect(routes).toContain("preparePostOffloadPhase6Repair");
     expect(routes).toContain("applyPostOffloadPhase6Repair");
-    expect(routes).toContain("repairRolledBack");
+    expect(routes).toContain("repairCommitted: false");
+    expect(routes).toContain("noPartialChanges: true");
   });
 
   it("binds a short-lived approval to company, user, release, algorithm, state, scope, and row count", () => {
@@ -41,7 +42,7 @@ describe("Phase 6 post-offload safety and repair", () => {
     expect(service).toContain("POST_OFFLOAD_PHASE6_TOKEN_STALE");
   });
 
-  it("uses the existing exact replay engine with one-use token, exact undo, and atomic audit", () => {
+  it("uses the existing exact replay engine with one-use token, exact undo, and atomic apply audit", () => {
     const service = read("server/services/factory/postOffloadPhase6Safety.ts");
     const exactApply = read("server/services/factory/historical-replay/exactApplyFinal.ts");
 
@@ -54,6 +55,24 @@ describe("Phase 6 post-offload safety and repair", () => {
     expect(exactApply).toContain("pg_advisory_xact_lock(9003, $1)");
     expect(exactApply).toContain("factory_replay_consumed_tokens");
     expect(exactApply).toContain('await client.query("ROLLBACK")');
+  });
+
+  it("persists readiness, preview, blocked, failed, and post-apply verification audit outcomes", () => {
+    const routes = read("server/routes/factory/raw-stock/postOffloadPhase6SafetyRoutes.ts");
+    const audit = read("server/services/factory/postOffloadPhase6Audit.ts");
+
+    expect(routes).toContain("persistPostOffloadPhase6Audit");
+    for (const action of [
+      "post_offload_phase6_readiness_inspected",
+      "post_offload_phase6_preview_generated",
+      "post_offload_phase6_blocked",
+      "post_offload_phase6_failed",
+      "post_offload_phase6_verified",
+    ]) {
+      expect(routes + audit).toContain(action);
+    }
+    expect(audit).toContain("INSERT INTO audit_log");
+    expect(audit).toContain("factory_offload_additional_charges");
   });
 
   it("includes completed batches but always excludes finalized and sold bales from automatic repair", () => {
