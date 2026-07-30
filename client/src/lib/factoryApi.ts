@@ -13,6 +13,8 @@ export type AppMode = "erp" | "factory" | "properties";
 
 const FACTORY_PREFIX = "/api/factory/";
 const POST_OFFLOAD_CREATE_PATH = /^\/api\/factory\/containers\/\d+\/post-offload-charges(?:\?.*)?$/;
+const POST_OFFLOAD_MUTATION_PATH =
+  /^\/api\/factory\/containers\/\d+\/post-offload-charges(?:\/\d+(?:\/legacy-rebuild)?)?(?:\?.*)?$/;
 const ALLOWED_SHARED_PREFIXES = [
   "/api/locations",
   "/api/barcode",
@@ -75,6 +77,14 @@ interface PostOffloadImpactPreviewResponse {
       completedBatches: number;
       availableBales: number;
       finalizedBalesExcluded: number;
+    };
+  };
+}
+
+interface PostOffloadReconciliationResponse {
+  postOffloadReconciliation?: {
+    reports?: {
+      queryKeys?: unknown;
     };
   };
 }
@@ -181,6 +191,35 @@ async function attachPostOffloadImpactPreview(
   };
 }
 
+async function invalidatePostOffloadReconciliationQueries(
+  method: string,
+  url: string,
+  response: Response
+): Promise<void> {
+  const normalizedMethod = method.toUpperCase();
+  if (
+    !response.ok ||
+    !["POST", "PATCH", "DELETE"].includes(normalizedMethod) ||
+    !POST_OFFLOAD_MUTATION_PATH.test(url)
+  ) {
+    return;
+  }
+
+  const payload = (await response
+    .clone()
+    .json()
+    .catch(() => null)) as PostOffloadReconciliationResponse | null;
+  const rawQueryKeys = payload?.postOffloadReconciliation?.reports?.queryKeys;
+  if (!Array.isArray(rawQueryKeys)) return;
+
+  const queryKeys = [...new Set(rawQueryKeys.filter((value): value is string => typeof value === "string"))];
+  await Promise.all(
+    queryKeys.map((queryKey) =>
+      queryClient.invalidateQueries({ queryKey: [queryKey], refetchType: "active" })
+    )
+  );
+}
+
 /**
  * Shared replay guard for both ERP and Factory app modes. The UI may pass current
  * checkbox state, but a token-backed apply is rebuilt from the server-prepared
@@ -208,6 +247,7 @@ async function requestWithPreparedReplayState(
         .catch(() => null);
       rememberHistoricalReplayPreparation(payload);
     }
+    await invalidatePostOffloadReconciliationQueries(method, url, response);
     return response;
   } catch (error: any) {
     // OfflineQueued means the exact body (including clientRequestId) is persisted.
