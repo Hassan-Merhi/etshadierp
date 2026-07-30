@@ -449,7 +449,10 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
     // that should resolve it hasn't loaded yet (or loaded under the wrong company
     // key before selectedCompany was set).  Return without resetting or marking
     // hydrated so the effect retries when the correct data arrives.
-    const hasUnresolvedName = formEntries.some((e) => e.accountId > 0 && e.accountName === "");
+   const hasUnresolvedName = formEntries.some(
+  (e: JournalFormData["entries"][number]) =>
+    e.accountId > 0 && e.accountName === ""
+);
     if (hasUnresolvedName) return;
 
     journalForm.reset({
