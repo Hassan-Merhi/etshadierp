@@ -134,13 +134,14 @@ export function validateReleaseEvidence(evidence, policy) {
   }
 
   const dangerousControls = evidence.dangerousControls || {};
-  for (const key of [
-    "autoDeployEnabled",
-    "migrationsRunFromStartup",
-    "historicalReplayApplyEnabled",
-    "masterPasswordEnabled",
-  ]) {
-    if (dangerousControls[key] !== false) failures.push(`dangerousControls.${key} must be false`);
+  const dangerousControlLabels = [
+    ["autoDeployEnabled", "dangerousControls.autoDeployEnabled"],
+    ["migrationsRunFromStartup", "dangerousControls.migrationsRunFromStartup"],
+    ["historicalReplayApplyEnabled", "dangerousControls.historicalReplayApplyEnabled"],
+    ["masterPasswordEnabled", "dangerousControls.masterPasswordEnabled"],
+  ];
+  for (const [key, label] of dangerousControlLabels) {
+    if (dangerousControls[key] !== false) failures.push(`${label} must be false`);
   }
 
   const approval = evidence.approval || {};
