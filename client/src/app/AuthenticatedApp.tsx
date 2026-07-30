@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { useDialogScrollFix } from "@/hooks/use-dialog-scroll-fix";
 import { useLocation, Redirect } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -19,7 +19,7 @@ const PropertiesShell = lazy(() =>
 const FactoryShell = lazy(() => import("./FactoryShell").then((module) => ({ default: module.FactoryShell })));
 const ErpShell = lazy(() => import("./ErpShell").then((module) => ({ default: module.ErpShell })));
 
-function ShellBoundary({ children }: { children: React.ReactNode }) {
+function ShellBoundary({ children }: { children: ReactNode }) {
   return <Suspense fallback={<AppLoadingState />}>{children}</Suspense>;
 }
 
