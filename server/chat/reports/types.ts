@@ -1,6 +1,11 @@
+export interface ReportQueryParams {
+  queryType?: string;
+  [key: string]: any;
+}
+
 export interface DataQueryContext {
   companyId: number;
-  params: Record<string, unknown> & { queryType?: string };
+  params: ReportQueryParams;
   dateFrom: string;
   dateTo: string;
   todayStr: string;
@@ -15,6 +20,12 @@ export interface DataQueryContext {
 }
 
 export type DataQueryResult = Record<string, unknown> | undefined;
+
+export interface ReportImplementationShard {
+  readonly name: string;
+  readonly queryTypes: readonly string[];
+  run(ctx: DataQueryContext): Promise<DataQueryResult>;
+}
 
 export interface ReportDomainHandler {
   readonly domain: string;
