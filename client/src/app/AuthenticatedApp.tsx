@@ -24,8 +24,8 @@ interface AuthenticatedAppProps {
 export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) {
   const { selectedCompany, isLoading: companyLoading } = useCompany();
   usePresence(true);
-  useScreenFeed(true);
-  useWsInvalidation(true);
+  useScreenFeed();
+  useWsInvalidation();
   useDialogScrollFix();
 
   const [currentLocation] = useLocation();
