@@ -18,12 +18,28 @@ export default defineConfig({
         "client/src/components/ui/period-filter.tsx",
         "client/src/pages/StockHub.tsx",
         "client/src/pages/InventoryHub.tsx",
+        "client/src/app/authenticatedAppRouteGuard.ts",
+        "client/src/app/factoryAccessGuard.ts",
       ],
       thresholds: {
         lines: 65,
         statements: 60,
         functions: 60,
         branches: 55,
+
+        "client/src/app/authenticatedAppRouteGuard.ts": {
+          lines: 90,
+          statements: 90,
+          functions: 100,
+          branches: 85,
+        },
+
+        "client/src/app/factoryAccessGuard.ts": {
+          lines: 85,
+          statements: 85,
+          functions: 100,
+          branches: 80,
+        },
       },
     },
     // No pool/fork overrides — jsdom runs in the same process
