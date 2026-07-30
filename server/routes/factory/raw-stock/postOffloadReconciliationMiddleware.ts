@@ -71,11 +71,7 @@ function failedResult(params: {
  * inventory, report refresh coverage, and exact undo availability before the
  * final JSON response is sent.
  */
-export function postOffloadReconciliationMiddleware(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void {
+export function postOffloadReconciliationMiddleware(req: Request, res: Response, next: NextFunction): void {
   const action = resolveMutationAction(req);
   const pathMatch = POST_OFFLOAD_PATH.exec(req.originalUrl);
   if (!action || !pathMatch) return next();
@@ -96,9 +92,7 @@ export function postOffloadReconciliationMiddleware(
     }
 
     void (async () => {
-      const companyId = Number(
-        (req.session as any)?.factoryCompanyId || (req.session as any)?.currentCompanyId || 0
-      );
+      const companyId = Number((req.session as any)?.factoryCompanyId || (req.session as any)?.currentCompanyId || 0);
       const userId = String((req.session as any)?.userId || (req as any).user?.id || "system");
       const username = (req.session as any)?.username || null;
       const chargeId = Number.isInteger(Number(body?.chargeId)) ? Number(body.chargeId) : null;

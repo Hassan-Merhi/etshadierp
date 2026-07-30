@@ -98,6 +98,10 @@ interface DaybookRow {
   meta_json: unknown;
 }
 
+interface ReconciliationQueryClient {
+  query<T = Record<string, unknown>>(text: string, params?: unknown[]): Promise<{ rows: T[]; rowCount: number | null }>;
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -122,9 +126,7 @@ function metadata(value: unknown): Record<string, unknown> {
   if (typeof value === "string") {
     try {
       const parsed = JSON.parse(value);
-      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-        ? (parsed as Record<string, unknown>)
-        : {};
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
     } catch {
       return {};
     }
@@ -136,7 +138,7 @@ function uniqueIssues(values: string[]): string[] {
   return [...new Set(values)];
 }
 
-async function loadDaybook(client: any, id: number | null): Promise<DaybookRow | null> {
+async function loadDaybook(client: ReconciliationQueryClient, id: number | null): Promise<DaybookRow | null> {
   if (!id) return null;
   const result = await client.query<DaybookRow>(
     `SELECT id, company_id, tx_type, reference_id, amount_currency,
@@ -185,7 +187,7 @@ function verifyOriginalDaybook(params: {
 }
 
 async function reconcileActiveVoucher(params: {
-  client: any;
+  client: ReconciliationQueryClient;
   charge: ChargeRow;
   accountingIssues: string[];
 }): Promise<{ voucherChecked: boolean; entriesNormalized: number }> {
@@ -341,7 +343,7 @@ async function reconcileActiveVoucher(params: {
 }
 
 async function verifyDeletedCharge(params: {
-  client: any;
+  client: ReconciliationQueryClient;
   companyId: number;
   containerId: number;
   charge: ChargeRow;
@@ -413,7 +415,7 @@ export async function reconcilePostOffloadMutation(params: {
     username = null,
     historicalReplay = null,
   } = params;
-  const client = await pool.connect();
+  const client = (await pool.connect()) as unknown as ReconciliationQueryClient & { release(): void };
   let transactionStarted = false;
 
   const accountingIssues: string[] = [];

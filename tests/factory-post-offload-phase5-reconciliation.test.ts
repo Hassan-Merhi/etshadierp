@@ -75,17 +75,10 @@ describe("Phase 5 post-offload reconciliation", () => {
   });
 
   it("registers reconciliation outside historical replay in both route aggregators", () => {
-    for (const path of [
-      "server/routes/factory/factoryRawStockRoutes.ts",
-      "server/routes/factory/raw-stock/index.ts",
-    ]) {
+    for (const path of ["server/routes/factory/factoryRawStockRoutes.ts", "server/routes/factory/raw-stock/index.ts"]) {
       const routes = read(path);
-      const reconciliation = routes.indexOf(
-        'app.use("/api/factory/containers", postOffloadReconciliationMiddleware)'
-      );
-      const historical = routes.indexOf(
-        'app.use("/api/factory/containers", postOffloadHistoricalReplayMiddleware)'
-      );
+      const reconciliation = routes.indexOf('app.use("/api/factory/containers", postOffloadReconciliationMiddleware)');
+      const historical = routes.indexOf('app.use("/api/factory/containers", postOffloadHistoricalReplayMiddleware)');
 
       expect(reconciliation).toBeGreaterThan(-1);
       expect(historical).toBeGreaterThan(reconciliation);
@@ -93,9 +86,7 @@ describe("Phase 5 post-offload reconciliation", () => {
   });
 
   it("surfaces reconciliation state and never writes quantity or payment fields", () => {
-    const middleware = read(
-      "server/routes/factory/raw-stock/postOffloadReconciliationMiddleware.ts"
-    );
+    const middleware = read("server/routes/factory/raw-stock/postOffloadReconciliationMiddleware.ts");
     const service = read("server/services/factory/postOffloadReconciliation.ts");
 
     expect(middleware).toContain("postOffloadFullyReconciled");
