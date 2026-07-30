@@ -81,9 +81,14 @@ requireAll("scripts/verify-lockfile-registry.mjs", [
 for (const relativePath of [
   "tests/auth-route-composition.test.ts",
   "tests/reports-route-composition.test.ts",
+  "tests/customer-route-composition.test.ts",
   "tests/duplicate-route-ownership.test.ts",
+  "tests/inventory-route-ownership.test.ts",
+  "tests/operations-route-ownership.test.ts",
   "tests/phase2-backend-module-separation.test.ts",
+  "tests/phase5-routes-legacy-extraction.test.ts",
   "scripts/verify-phase2-backend-module-separation.mjs",
+  "scripts/verify-phase5-routes-legacy-extraction.mjs",
 ]) {
   forbidAll(relativePath, [
     "registerLegacyAuthRoutes(app)",
@@ -91,6 +96,17 @@ for (const relativePath of [
     "registerCustomerLegacyRoutes(app)",
     "registerLegacyRoutes(app)",
   ]);
+}
+
+for (const relativePath of [
+  "tests/customer-route-composition.test.ts",
+  "tests/duplicate-route-ownership.test.ts",
+  "tests/inventory-route-ownership.test.ts",
+  "tests/operations-route-ownership.test.ts",
+  "tests/phase5-routes-legacy-extraction.test.ts",
+  "scripts/verify-phase5-routes-legacy-extraction.mjs",
+]) {
+  requireAll(relativePath, ["existsSync"]);
 }
 
 for (const requiredFile of [
