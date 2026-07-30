@@ -19,7 +19,7 @@ import {
   formatFactoryTotal,
 } from "./factoryCostingEngine";
 import { previewHistoricalCostReplayWithExecutor, type ReplayQueryExecutor } from "./historicalCostReplay";
-import { getAuthoritativeSupplierRemainingKg } from "./rawStockLockedRate";
+import { getAuthoritativeSupplierRemainingKg, getLockedSupplierRateReadOnly } from "./rawStockLockedRate";
 import { computeCorrectContainerCost } from "./rawStockRecalc";
 import {
   ExpiredRepairTokenError,
@@ -450,6 +450,9 @@ async function loadPreviewState(companyId: number, containerId: number) {
   const supplierRemainingKg = container.supplierId
     ? await getAuthoritativeSupplierRemainingKg(db, companyId, container.supplierId)
     : 0;
+  const supplierLockedRate = container.supplierId
+    ? (await getLockedSupplierRateReadOnly(db, companyId, container.supplierId)).rate
+    : null;
 
   let receivedKg = new Decimal(0);
   let usedKg = new Decimal(0);
@@ -468,6 +471,7 @@ async function loadPreviewState(companyId: number, containerId: number) {
     rawStockRows,
     supplier,
     supplierRemainingKg,
+    supplierLockedRate,
     receivedKg,
     remainingKg,
     remainingFraction,
@@ -483,6 +487,7 @@ function fingerprintPostOffloadImpactState(state: Awaited<ReturnType<typeof load
     rawStockRows: [...state.rawStockRows].sort((left, right) => left.id - right.id),
     supplier: state.supplier,
     supplierRemainingKg: formatFactoryQuantity(state.supplierRemainingKg),
+    supplierLockedRate: state.supplierLockedRate === null ? null : formatFactoryLockedRate(state.supplierLockedRate),
   });
 }
 
@@ -572,7 +577,7 @@ export async function preparePostOffloadImpactPreview(input: {
 
   const fullDelta = new Decimal(projectedCost.totalUsd).minus(currentCost.totalUsd);
   const supplierInventoryDelta = fullDelta.times(state.remainingFraction);
-  const currentSupplierRate = state.supplier?.rate ?? null;
+  const currentSupplierRate = state.supplierLockedRate;
   const projectedSupplierRate = state.container.supplierId
     ? calculateRateAfterInventoryValueDelta({
         inventoryQuantityKg: state.supplierRemainingKg,
@@ -687,6 +692,19 @@ export async function verifyPostOffloadImpactPreview(input: {
   const stateFingerprint = await computePostOffloadImpactStateFingerprint(input.companyId, input.containerId);
   if (stateFingerprint !== payload.stateFingerprint) {
     throw new StalePostOffloadImpactPreviewError();
+  }
+
+  const recomputed = await preparePostOffloadImpactPreview({
+    companyId: input.companyId,
+    userId: input.userId,
+    containerId: input.containerId,
+    transactionDate,
+    charges: input.charges,
+  });
+  if (stableHash(recomputed.preview) !== stableHash(payload.preview)) {
+    throw new StalePostOffloadImpactPreviewError(
+      "Post-offload cost impact changed after preview. Review the updated impact before saving."
+    );
   }
 
   return payload.preview;

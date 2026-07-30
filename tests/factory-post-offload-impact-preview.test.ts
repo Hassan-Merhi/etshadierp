@@ -10,6 +10,7 @@ describe("post-offload impact preview", () => {
 
     expect(service).toContain("computeCorrectContainerCost");
     expect(service).toContain("calculateRateAfterInventoryValueDelta");
+    expect(service).toContain("getLockedSupplierRateReadOnly");
     expect(service).toContain("supplierInventoryValueDeltaUsd");
     expect(service).toContain("remainingFraction");
     expect(service).toContain("previewHistoricalCostReplayWithExecutor");
@@ -28,6 +29,8 @@ describe("post-offload impact preview", () => {
     expect(service).toContain("signRepairToken(payload)");
     expect(service).toContain("verifyRepairToken<PostOffloadImpactPreviewTokenPayload>");
     expect(service).toContain("StalePostOffloadImpactPreviewError");
+    expect(service).toContain("const recomputed = await preparePostOffloadImpactPreview");
+    expect(service).toContain("stableHash(recomputed.preview)");
     expect(service).toContain("REPAIR_TOKEN_TTL_MS");
   });
 
