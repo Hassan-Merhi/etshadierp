@@ -7,6 +7,7 @@ import { postOffloadHistoricalReplayMiddleware } from "./postOffloadHistoricalRe
 import { requirePostOffloadImpactPreview } from "./postOffloadImpactPreviewMiddleware";
 import { registerPostOffloadImpactPreviewRoutes } from "./postOffloadImpactPreviewRoutes";
 import { postOffloadReconciliationMiddleware } from "./postOffloadReconciliationMiddleware";
+import { registerPostOffloadPhase6SafetyRoutes } from "./postOffloadPhase6SafetyRoutes";
 
 // Legacy compatibility aggregator. The active production aggregator is
 // ../factoryRawStockRoutes.ts, where explicit company-context middleware is mounted.
@@ -17,6 +18,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
   registerRawStockCrudRoutes(app);
   registerRawStockOffloadRoutes(app);
   registerPostOffloadImpactPreviewRoutes(app);
+  registerPostOffloadPhase6SafetyRoutes(app);
   registerRawStockContainerRoutes(app);
   registerRawStockBalanceRoutes(app);
 }
