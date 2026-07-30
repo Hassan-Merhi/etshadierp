@@ -50,9 +50,8 @@ export function postOffloadHistoricalReplayMiddleware(
   const pathMatch = POST_OFFLOAD_PATH.exec(req.originalUrl);
   if (!action || !pathMatch) return next();
 
-  const taggedRequest = req as Request & { [INTERCEPTED]?: boolean };
-  if (taggedRequest[INTERCEPTED]) return next();
-  taggedRequest[INTERCEPTED] = true;
+  if ((req as any)[INTERCEPTED]) return next();
+  (req as any)[INTERCEPTED] = true;
 
   const containerId = Number.parseInt(pathMatch[1], 10);
   const originalJson = res.json.bind(res);
