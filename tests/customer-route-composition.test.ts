@@ -15,10 +15,10 @@ describe("customer route composition", () => {
     expect(source).not.toContain("registerCustomerLegacyRoutes");
   });
 
-  it("keeps the customer legacy boundary free of HTTP handlers", () => {
-    const source = fs.readFileSync(legacyPath, "utf8");
+  it("keeps the customer compatibility registrar fully retired", () => {
+    const source = fs.readFileSync(compositionPath, "utf8");
 
-    expect(source).not.toMatch(/app\.(get|post|put|patch|delete)\(/);
-    expect(source).toContain("registerCustomerRoutes(_app: Express)");
+    expect(fs.existsSync(legacyPath)).toBe(false);
+    expect(source).not.toContain("customerRoutesLegacy");
   });
 });

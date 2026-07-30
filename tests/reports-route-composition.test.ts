@@ -14,25 +14,20 @@ const focusedRegistrars = [
 ];
 
 describe("report route composition", () => {
-  it("registers every focused report domain before the compatibility boundary", () => {
+  it("registers every focused report domain in the composition root", () => {
     const source = fs.readFileSync(compositionPath, "utf8");
-    const legacyIndex = source.indexOf("registerLegacyReportsRoutes(app)");
 
-    expect(legacyIndex).toBeGreaterThan(-1);
     for (const registrar of focusedRegistrars) {
       const registrarIndex = source.indexOf(registrar);
       expect(registrarIndex, `${registrar} must be registered`).toBeGreaterThan(-1);
-      expect(registrarIndex, `${registrar} must precede the legacy boundary`).toBeLessThan(legacyIndex);
     }
   });
 
-  it("keeps migrated endpoints out of the legacy compatibility file", () => {
-    const legacyPath = path.resolve(process.cwd(), "server/routes/reportsRoutesLegacy.ts");
-    const legacySource = fs.readFileSync(legacyPath, "utf8");
+  it("keeps the report entry point free of retired compatibility registrars", () => {
+    const source = fs.readFileSync(compositionPath, "utf8");
 
-    for (const method of ["get", "post", "put", "patch", "delete"]) {
-      expect(legacySource).not.toContain(`app.${method}(`);
-    }
+    expect(source).not.toContain("registerLegacyReportsRoutes");
+    expect(source).not.toContain("reportsRoutesLegacy");
   });
 
   it("keeps each extracted endpoint in a focused module", () => {

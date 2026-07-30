@@ -5,9 +5,6 @@ import userEvent from "@testing-library/user-event";
 vi.mock("@/pages/StockItems", () => ({ default: () => <div>Stock items content</div> }));
 vi.mock("@/pages/StockQuery", () => ({ default: () => <div>Stock query content</div> }));
 vi.mock("@/pages/OffloadItemSearch", () => ({ default: () => <div>Offload content</div> }));
-vi.mock("@/components/GradesCategoriesManager", () => ({
-  GradesCategoriesManager: () => <div>Grades content</div>,
-}));
 vi.mock("@/pages/LocationInventory", () => ({ default: () => <div>Location inventory content</div> }));
 vi.mock("@/pages/StockOTW", () => ({ default: () => <div>On the way content</div> }));
 vi.mock("@/pages/ContainersPage", () => ({ default: () => <div>Containers content</div> }));
@@ -34,10 +31,10 @@ describe("hub tab navigation", () => {
   });
 
   it("renders the StockHub tab selected by a valid direct URL", () => {
-    window.history.replaceState({}, "", "/stock?tab=grades");
+    window.history.replaceState({}, "", "/stock?tab=offload");
     render(<StockHub />);
 
-    expect(screen.getByText("Grades content")).toBeInTheDocument();
+    expect(screen.getByText("Offload content")).toBeInTheDocument();
     expect(screen.queryByText("Stock items content")).not.toBeInTheDocument();
   });
 
