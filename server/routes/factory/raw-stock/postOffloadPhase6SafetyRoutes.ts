@@ -36,6 +36,8 @@ async function auditFailure(params: {
   error: unknown;
   httpStatus: number;
   dryRun: boolean;
+  repairCommitted: boolean;
+  undoLogId: number | null;
 }): Promise<void> {
   try {
     await persistPostOffloadPhase6Audit({
@@ -46,6 +48,8 @@ async function auditFailure(params: {
       status: "failed",
       details: {
         dryRun: params.dryRun,
+        repairCommitted: params.repairCommitted,
+        undoLogId: params.undoLogId,
         httpStatus: params.httpStatus,
         code: (params.error as { code?: string })?.code ?? null,
         message: getErrorMessage(params.error) || "Post-offload Phase 6 operation failed.",
@@ -56,6 +60,8 @@ async function auditFailure(params: {
       error: auditError,
       companyId: params.context.companyId,
       userId: params.context.userId,
+      repairCommitted: params.repairCommitted,
+      undoLogId: params.undoLogId,
     });
   }
 }
@@ -114,7 +120,14 @@ export function registerPostOffloadPhase6SafetyRoutes(app: Express): void {
       return res.json(readiness);
     } catch (error: unknown) {
       const status = phase6ErrorStatus(error);
-      await auditFailure({ context, error, httpStatus: status, dryRun: true });
+      await auditFailure({
+        context,
+        error,
+        httpStatus: status,
+        dryRun: true,
+        repairCommitted: false,
+        undoLogId: null,
+      });
       logger.error("Post-offload Phase 6 readiness failed", {
         error,
         companyId: context.companyId,
@@ -138,6 +151,8 @@ export function registerPostOffloadPhase6SafetyRoutes(app: Express): void {
 
     const confirmationToken = req.body?.confirmationToken;
     const isDryRun = req.body?.dryRun === true || !confirmationToken;
+    let repairCommitted = false;
+    let committedUndoLogId: number | null = null;
 
     try {
       if (isDryRun) {
@@ -185,6 +200,8 @@ export function registerPostOffloadPhase6SafetyRoutes(app: Express): void {
         username: context.username,
         confirmationToken,
       });
+      repairCommitted = true;
+      committedUndoLogId = result.undoLogId;
       await persistPostOffloadPhase6Audit({
         action: "post_offload_phase6_verified",
         companyId: context.companyId,
@@ -211,20 +228,40 @@ export function registerPostOffloadPhase6SafetyRoutes(app: Express): void {
       return res.json(result);
     } catch (error: unknown) {
       const status = phase6ErrorStatus(error);
-      await auditFailure({ context, error, httpStatus: status, dryRun: isDryRun });
+      const errorState = error as {
+        code?: string;
+        repairCommitted?: boolean;
+        undoLogId?: number;
+        applied?: unknown;
+      };
+      const repairWasCommitted = repairCommitted || errorState.repairCommitted === true;
+      const undoLogId = committedUndoLogId ?? errorState.undoLogId ?? null;
+      await auditFailure({
+        context,
+        error,
+        httpStatus: status,
+        dryRun: isDryRun,
+        repairCommitted: repairWasCommitted,
+        undoLogId,
+      });
       logger.error("Post-offload Phase 6 repair rejected or failed", {
         error,
         companyId: context.companyId,
         userId: context.userId,
         status,
         dryRun: isDryRun,
+        repairCommitted: repairWasCommitted,
+        undoLogId,
       });
       return res.status(status).json({
         success: false,
-        repairCommitted: false,
-        noPartialChanges: true,
+        repairCommitted: repairWasCommitted,
+        transactionRolledBack: !repairWasCommitted,
+        partialChanges: false,
+        undoLogId,
+        applied: errorState.applied ?? null,
         message: getErrorMessage(error) || "Post-offload Phase 6 repair failed.",
-        code: (error as { code?: string }).code || "POST_OFFLOAD_PHASE6_REPAIR_FAILED",
+        code: errorState.code || "POST_OFFLOAD_PHASE6_REPAIR_FAILED",
       });
     }
   });
