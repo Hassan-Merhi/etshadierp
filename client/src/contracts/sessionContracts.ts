@@ -14,7 +14,10 @@ export const authenticatedUserSchema = z.object({
   id: z.union([z.string(), z.number()]).optional(),
   username: z.string().min(1),
   role: z.string().nullable().optional(),
-  posStation: z.string().nullable().optional(),
+  posStation: z
+    .union([z.string(), z.number().transform((value) => String(value))])
+    .nullable()
+    .optional(),
 }).passthrough();
 
 export type AuthenticatedUser = z.infer<typeof authenticatedUserSchema>;
