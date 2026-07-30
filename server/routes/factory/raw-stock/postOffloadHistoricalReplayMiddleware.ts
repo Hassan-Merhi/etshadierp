@@ -24,7 +24,7 @@ function fallbackFailure(
   containerId: number,
   supplierId: number | null,
   chargeId: number | null,
-  error: unknown,
+  error: unknown
 ): PostOffloadHistoricalReplayResult {
   return {
     status: "failed",
@@ -44,11 +44,7 @@ function fallbackFailure(
  * require repair. The original financial mutation is never reported as a full
  * historical success when replay is blocked or fails.
  */
-export function postOffloadHistoricalReplayMiddleware(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): void {
+export function postOffloadHistoricalReplayMiddleware(req: Request, res: Response, next: NextFunction): void {
   const action = resolveMutationAction(req);
   const pathMatch = POST_OFFLOAD_PATH.exec(req.originalUrl);
   if (!action || !pathMatch) return next();
@@ -69,9 +65,7 @@ export function postOffloadHistoricalReplayMiddleware(
     }
 
     void (async () => {
-      const companyId = Number(
-        (req.session as any)?.factoryCompanyId || (req.session as any)?.currentCompanyId || 0,
-      );
+      const companyId = Number((req.session as any)?.factoryCompanyId || (req.session as any)?.currentCompanyId || 0);
       const userId = String((req.session as any)?.userId || (req as any).user?.id || "system");
       const username = (req.session as any)?.username || null;
       const chargeId = Number.isInteger(Number(body?.chargeId)) ? Number(body.chargeId) : null;
@@ -90,7 +84,7 @@ export function postOffloadHistoricalReplayMiddleware(
           `SELECT supplier_id
            FROM factory_containers
            WHERE id = $1 AND company_id = $2 AND deleted_at IS NULL`,
-          [containerId, companyId],
+          [containerId, companyId]
         );
         supplierId = supplierResult.rows[0]?.supplier_id ?? null;
 

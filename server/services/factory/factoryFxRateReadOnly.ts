@@ -29,7 +29,7 @@ function buildValidatedFxUrl(dateISO: string, currencyCode: string): string {
 export async function getFxRateToUsdReadOnly(
   companyId: number,
   currencyCode: string,
-  dateISO: string,
+  dateISO: string
 ): Promise<string> {
   const normalizedCurrency = currencyCode.trim().toUpperCase();
   if (normalizedCurrency === "USD") return "1";
@@ -41,8 +41,8 @@ export async function getFxRateToUsdReadOnly(
       and(
         eq(factoryFxRates.companyId, companyId),
         eq(factoryFxRates.currencyCode, normalizedCurrency),
-        eq(factoryFxRates.source, "manual"),
-      ),
+        eq(factoryFxRates.source, "manual")
+      )
     )
     .orderBy(desc(factoryFxRates.effectiveDate))
     .limit(1);
@@ -56,8 +56,8 @@ export async function getFxRateToUsdReadOnly(
         eq(factoryFxRates.companyId, companyId),
         eq(factoryFxRates.currencyCode, normalizedCurrency),
         eq(factoryFxRates.effectiveDate, dateISO),
-        eq(factoryFxRates.source, "auto"),
-      ),
+        eq(factoryFxRates.source, "auto")
+      )
     )
     .limit(1);
   if (existingExactRate) return existingExactRate.rateToUsd;
@@ -75,19 +75,14 @@ export async function getFxRateToUsdReadOnly(
     const [fallback] = await db
       .select()
       .from(factoryFxRates)
-      .where(
-        and(
-          eq(factoryFxRates.companyId, companyId),
-          eq(factoryFxRates.currencyCode, normalizedCurrency),
-        ),
-      )
+      .where(and(eq(factoryFxRates.companyId, companyId), eq(factoryFxRates.currencyCode, normalizedCurrency)))
       .orderBy(desc(factoryFxRates.effectiveDate))
       .limit(1);
 
     if (fallback) return fallback.rateToUsd;
     throw new Error(
       `No FX rate available for ${dateISO}/${normalizedCurrency}. External API error: ${getErrorMessage(error)}`,
-      { cause: error },
+      { cause: error }
     );
   }
 }

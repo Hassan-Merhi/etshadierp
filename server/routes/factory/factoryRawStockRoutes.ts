@@ -21,7 +21,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
     requireExplicitCompanyContext({
       assertionFields: ["companyId", "factoryCompanyId"],
       includeLegacyFactorySessionAssertion: true,
-    }),
+    })
   );
 
   // Validate and freeze high-impact repair payloads before permission,
@@ -70,15 +70,15 @@ export function registerFactoryRawStockRoutes(app: Express) {
   // requireAuth + requireRole(Admin/Developer) + signRepairToken/verifyRepairToken.
   app.use(
     "/api/factory/raw-stock/recalc/auto-apply-fx",
-    directRepair("factory.raw-stock.fx.auto-apply", "container-fx-repair"),
+    directRepair("factory.raw-stock.fx.auto-apply", "container-fx-repair")
   );
   app.use(
     "/api/factory/raw-stock/supplier-rate/recompute",
-    directRepair("factory.raw-stock.supplier-rate.recompute", "supplier-rate-repair"),
+    directRepair("factory.raw-stock.supplier-rate.recompute", "supplier-rate-repair")
   );
   app.use(
     "/api/factory/raw-stock/recalc/fix-source-mismatches",
-    directRepair("factory.raw-stock.source-mismatches.fix", "mix-batch-source-repair"),
+    directRepair("factory.raw-stock.source-mismatches.fix", "mix-batch-source-repair")
   );
   app.use(
     "/api/factory/raw-stock/recalc/undo",
@@ -90,7 +90,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
       sourceType: "raw-stock-recalc-undo",
       enforcement: "always",
       sourceId: (req) => String((req.body as any)?.undoLogId || "recalc-undo"),
-    }),
+    })
   );
 
   registerRawStockCrudRoutes(app);

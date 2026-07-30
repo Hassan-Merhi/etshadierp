@@ -33,12 +33,8 @@ describe("post-offload impact preview", () => {
 
   it("registers preview verification before the historical replay response interceptor", () => {
     const routes = read("server/routes/factory/factoryRawStockRoutes.ts");
-    const previewGuard = routes.indexOf(
-      'app.use("/api/factory/containers", requirePostOffloadImpactPreview)',
-    );
-    const replay = routes.indexOf(
-      'app.use("/api/factory/containers", postOffloadHistoricalReplayMiddleware)',
-    );
+    const previewGuard = routes.indexOf('app.use("/api/factory/containers", requirePostOffloadImpactPreview)');
+    const replay = routes.indexOf('app.use("/api/factory/containers", postOffloadHistoricalReplayMiddleware)');
     const previewRoute = routes.indexOf("registerPostOffloadImpactPreviewRoutes(app)");
     const mutationRoutes = routes.indexOf("registerRawStockContainerRoutes(app)");
 
@@ -49,11 +45,9 @@ describe("post-offload impact preview", () => {
   });
 
   it("keeps legacy callers compatible while strictly checking refreshed clients", () => {
-    const middleware = read(
-      "server/routes/factory/raw-stock/postOffloadImpactPreviewMiddleware.ts",
-    );
+    const middleware = read("server/routes/factory/raw-stock/postOffloadImpactPreviewMiddleware.ts");
 
-    expect(middleware).toContain('Number((req.body as any)?.impactPreviewVersion) !== 1');
+    expect(middleware).toContain("Number((req.body as any)?.impactPreviewVersion) !== 1");
     expect(middleware).toContain("verifyPostOffloadImpactPreview");
     expect(middleware).toContain("POST_OFFLOAD_IMPACT_PREVIEW_REQUIRED");
     expect(middleware).toContain("POST_OFFLOAD_IMPACT_PREVIEW_STALE");
@@ -71,9 +65,7 @@ describe("post-offload impact preview", () => {
   });
 
   it("does not run the historical replay for the read-only preview endpoint", () => {
-    const middleware = read(
-      "server/routes/factory/raw-stock/postOffloadHistoricalReplayMiddleware.ts",
-    );
+    const middleware = read("server/routes/factory/raw-stock/postOffloadHistoricalReplayMiddleware.ts");
 
     expect(middleware).toContain('req.originalUrl.includes("/post-offload-charges/preview")');
     expect(middleware).toContain("impactPreview: approvedImpactPreview");

@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import Decimal from "decimal.js";
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db, pool } from "../../db";
-import { getOrFetchFxRateToUsd } from "../../routes/factory/_helpers";
+import { getFxRateToUsdReadOnly } from "./factoryFxRateReadOnly";
 import {
   factoryContainerCommissions,
   factoryContainerOtherCharges,
@@ -18,10 +18,7 @@ import {
   formatFactoryRate,
   formatFactoryTotal,
 } from "./factoryCostingEngine";
-import {
-  previewHistoricalCostReplayWithExecutor,
-  type ReplayQueryExecutor,
-} from "./historicalCostReplay";
+import { previewHistoricalCostReplayWithExecutor, type ReplayQueryExecutor } from "./historicalCostReplay";
 import { getAuthoritativeSupplierRemainingKg } from "./rawStockLockedRate";
 import { computeCorrectContainerCost } from "./rawStockRecalc";
 import {
@@ -145,9 +142,7 @@ function normalizeDate(value: unknown): string {
   return date;
 }
 
-export function normalizePostOffloadImpactCharges(
-  value: unknown,
-): NormalizedChargeRequest[] {
+export function normalizePostOffloadImpactCharges(value: unknown): NormalizedChargeRequest[] {
   if (!Array.isArray(value) || value.length === 0) {
     throw new InvalidPostOffloadImpactPreviewError("At least one post-offload charge is required.");
   }
@@ -164,7 +159,9 @@ export function normalizePostOffloadImpactCharges(
       throw new InvalidPostOffloadImpactPreviewError(`Charge ${index + 1} amount must be greater than zero.`);
     }
 
-    const currencyCode = String(input.currencyCode ?? "USD").trim().toUpperCase();
+    const currencyCode = String(input.currencyCode ?? "USD")
+      .trim()
+      .toUpperCase();
     if (!/^[A-Z]{3,10}$/.test(currencyCode)) {
       throw new InvalidPostOffloadImpactPreviewError(`Charge ${index + 1} has an invalid currency code.`);
     }
@@ -221,7 +218,7 @@ async function resolvePreviewChargeFx(input: {
     if (charge.currencyCode === input.containerCurrency) {
       if (!input.containerFxConfirmed || input.containerFxRate <= 0) {
         throw new InvalidPostOffloadImpactPreviewError(
-          `Container FX rate for ${input.containerCurrency} is not confirmed. Confirm it before adding this charge.`,
+          `Container FX rate for ${input.containerCurrency} is not confirmed. Confirm it before adding this charge.`
         );
       }
       resolved.push({
@@ -233,15 +230,11 @@ async function resolvePreviewChargeFx(input: {
       continue;
     }
 
-    const fetched = await getOrFetchFxRateToUsd(
-      input.companyId,
-      charge.currencyCode,
-      input.transactionDate,
-    );
+    const fetched = await getFxRateToUsdReadOnly(input.companyId, charge.currencyCode, input.transactionDate);
     const rate = new Decimal(String(fetched ?? "0"));
     if (!rate.isFinite() || rate.lte(0)) {
       throw new InvalidPostOffloadImpactPreviewError(
-        `Cannot resolve FX rate for ${charge.currencyCode} on ${input.transactionDate}. Add the FX rate first.`,
+        `Cannot resolve FX rate for ${charge.currencyCode} on ${input.transactionDate}. Add the FX rate first.`
       );
     }
     resolved.push({
@@ -254,10 +247,7 @@ async function resolvePreviewChargeFx(input: {
   return resolved;
 }
 
-async function loadImpactScope(
-  companyId: number,
-  supplierId: number | null,
-): Promise<PostOffloadImpactScope> {
+async function loadImpactScope(companyId: number, supplierId: number | null): Promise<PostOffloadImpactScope> {
   if (!supplierId) {
     return {
       supplierOwnedSources: 0,
@@ -334,7 +324,7 @@ async function loadImpactScope(
           AND mb.status IN ('COMPLETED','CLOSED'))::text AS completed_batches,
        (SELECT COUNT(*) FROM bale_scope WHERE finalized = FALSE)::text AS available_bales,
        (SELECT COUNT(*) FROM bale_scope WHERE finalized = TRUE)::text AS finalized_bales_excluded`,
-    [companyId, supplierId],
+    [companyId, supplierId]
   );
 
   const row = result.rows[0];
@@ -350,7 +340,10 @@ async function loadImpactScope(
   };
 }
 
-async function loadReplaySafety(companyId: number, supplierId: number | null): Promise<{
+async function loadReplaySafety(
+  companyId: number,
+  supplierId: number | null
+): Promise<{
   safe: boolean;
   reasons: string[];
 }> {
@@ -360,10 +353,7 @@ async function loadReplaySafety(companyId: number, supplierId: number | null): P
   try {
     await client.query("BEGIN");
     await client.query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
-    const preview = await previewHistoricalCostReplayWithExecutor(
-      client as unknown as ReplayQueryExecutor,
-      companyId,
-    );
+    const preview = await previewHistoricalCostReplayWithExecutor(client as unknown as ReplayQueryExecutor, companyId);
     await client.query("COMMIT");
 
     const supplier = preview.supplierRows.find((row) => row.supplierId === supplierId);
@@ -397,15 +387,15 @@ async function loadPreviewState(companyId: number, containerId: number) {
       and(
         eq(factoryContainers.id, containerId),
         eq(factoryContainers.companyId, companyId),
-        isNull(factoryContainers.deletedAt),
-      ),
+        isNull(factoryContainers.deletedAt)
+      )
     );
   if (!container) {
     throw new InvalidPostOffloadImpactPreviewError("Container not found.");
   }
   if (!["OFFLOADED", "PARTIALLY_RECEIVED"].includes(container.status)) {
     throw new InvalidPostOffloadImpactPreviewError(
-      "Post-offload impact preview is only available for received containers.",
+      "Post-offload impact preview is only available for received containers."
     );
   }
 
@@ -417,8 +407,8 @@ async function loadPreviewState(companyId: number, containerId: number) {
         and(
           eq(factoryOffloadAdditionalCharges.companyId, companyId),
           eq(factoryOffloadAdditionalCharges.containerId, containerId),
-          isNull(factoryOffloadAdditionalCharges.deletedAt),
-        ),
+          isNull(factoryOffloadAdditionalCharges.deletedAt)
+        )
       ),
     db
       .select()
@@ -426,8 +416,8 @@ async function loadPreviewState(companyId: number, containerId: number) {
       .where(
         and(
           eq(factoryContainerCommissions.companyId, companyId),
-          eq(factoryContainerCommissions.containerId, containerId),
-        ),
+          eq(factoryContainerCommissions.containerId, containerId)
+        )
       )
       .orderBy(desc(factoryContainerCommissions.id)),
     db
@@ -436,18 +426,13 @@ async function loadPreviewState(companyId: number, containerId: number) {
       .where(
         and(
           eq(factoryContainerOtherCharges.companyId, companyId),
-          eq(factoryContainerOtherCharges.containerId, containerId),
-        ),
+          eq(factoryContainerOtherCharges.containerId, containerId)
+        )
       ),
     db
       .select()
       .from(factoryRawStock)
-      .where(
-        and(
-          eq(factoryRawStock.companyId, companyId),
-          eq(factoryRawStock.containerId, containerId),
-        ),
-      ),
+      .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId))),
     container.supplierId
       ? db
           .select({
@@ -456,12 +441,7 @@ async function loadPreviewState(companyId: number, containerId: number) {
             updatedAt: factorySuppliers.updatedAt,
           })
           .from(factorySuppliers)
-          .where(
-            and(
-              eq(factorySuppliers.companyId, companyId),
-              eq(factorySuppliers.id, container.supplierId),
-            ),
-          )
+          .where(and(eq(factorySuppliers.companyId, companyId), eq(factorySuppliers.id, container.supplierId)))
       : Promise.resolve([]),
   ]);
 
@@ -478,9 +458,7 @@ async function loadPreviewState(companyId: number, containerId: number) {
     usedKg = usedKg.plus(String(row.usedKg ?? "0"));
   }
   const remainingKg = Decimal.max(0, receivedKg.minus(usedKg));
-  const remainingFraction = receivedKg.gt(0)
-    ? Decimal.min(1, remainingKg.div(receivedKg))
-    : new Decimal(0);
+  const remainingFraction = receivedKg.gt(0) ? Decimal.min(1, remainingKg.div(receivedKg)) : new Decimal(0);
 
   return {
     container,
@@ -496,11 +474,7 @@ async function loadPreviewState(companyId: number, containerId: number) {
   };
 }
 
-export async function computePostOffloadImpactStateFingerprint(
-  companyId: number,
-  containerId: number,
-): Promise<string> {
-  const state = await loadPreviewState(companyId, containerId);
+function fingerprintPostOffloadImpactState(state: Awaited<ReturnType<typeof loadPreviewState>>): string {
   return stableHash({
     container: state.container,
     activeCharges: [...state.activeCharges].sort((left, right) => left.id - right.id),
@@ -510,6 +484,13 @@ export async function computePostOffloadImpactStateFingerprint(
     supplier: state.supplier,
     supplierRemainingKg: formatFactoryQuantity(state.supplierRemainingKg),
   });
+}
+
+export async function computePostOffloadImpactStateFingerprint(
+  companyId: number,
+  containerId: number
+): Promise<string> {
+  return fingerprintPostOffloadImpactState(await loadPreviewState(companyId, containerId));
 }
 
 export async function preparePostOffloadImpactPreview(input: {
@@ -527,12 +508,10 @@ export async function preparePostOffloadImpactPreview(input: {
   const storedFx = resolveStoredFxRate(
     containerCurrency,
     state.container.fxRateToUsdOffload || state.container.fxRateToUsd,
-    state.container.fxRateConfirmed,
+    state.container.fxRateConfirmed
   );
   if (!storedFx.looksSet) {
-    throw new InvalidPostOffloadImpactPreviewError(
-      new UnresolvedExchangeRateError(containerCurrency).message,
-    );
+    throw new InvalidPostOffloadImpactPreviewError(new UnresolvedExchangeRateError(containerCurrency).message);
   }
 
   const resolvedCharges = await resolvePreviewChargeFx({
@@ -577,17 +556,17 @@ export async function preparePostOffloadImpactPreview(input: {
     state.container,
     state.activeCharges,
     state.commission,
-    state.otherCharges,
+    state.otherCharges
   );
   const projectedCost = computeCorrectContainerCost(
     state.container,
     [...state.activeCharges, ...syntheticRows],
     state.commission,
-    state.otherCharges,
+    state.otherCharges
   );
   if (currentCost.fxUnresolved || projectedCost.fxUnresolved) {
     throw new InvalidPostOffloadImpactPreviewError(
-      `FX rate unresolved for container ${state.container.containerNumber}.`,
+      `FX rate unresolved for container ${state.container.containerNumber}.`
     );
   }
 
@@ -602,12 +581,11 @@ export async function preparePostOffloadImpactPreview(input: {
         fallbackRatePerKg: projectedCost.costPerKgUsd,
       })
     : null;
-
-  const [scope, replaySafety, stateFingerprint] = await Promise.all([
+  const [scope, replaySafety] = await Promise.all([
     loadImpactScope(input.companyId, state.container.supplierId),
     loadReplaySafety(input.companyId, state.container.supplierId),
-    computePostOffloadImpactStateFingerprint(input.companyId, input.containerId),
   ]);
+  const stateFingerprint = fingerprintPostOffloadImpactState(state);
 
   const preview: PostOffloadImpactPreviewSummary = {
     containerId: input.containerId,
@@ -624,12 +602,8 @@ export async function preparePostOffloadImpactPreview(input: {
     containerRemainingKg: formatFactoryQuantity(state.remainingKg),
     remainingFraction: state.remainingFraction.toDecimalPlaces(8).toFixed(8),
     supplierRemainingKg: formatFactoryQuantity(state.supplierRemainingKg),
-    supplierLockedRateBefore: currentSupplierRate
-      ? formatFactoryLockedRate(currentSupplierRate)
-      : null,
-    supplierLockedRateProjected: projectedSupplierRate
-      ? formatFactoryLockedRate(projectedSupplierRate)
-      : null,
+    supplierLockedRateBefore: currentSupplierRate ? formatFactoryLockedRate(currentSupplierRate) : null,
+    supplierLockedRateProjected: projectedSupplierRate ? formatFactoryLockedRate(projectedSupplierRate) : null,
     supplierInventoryValueDeltaUsd: supplierInventoryDelta.toFixed(6),
     historicalReplaySafe: replaySafety.safe,
     historicalReplayBlockedReasons: replaySafety.reasons,
@@ -675,7 +649,7 @@ export async function verifyPostOffloadImpactPreview(input: {
   } catch (error) {
     if (error instanceof ExpiredRepairTokenError) {
       throw new StalePostOffloadImpactPreviewError(
-        "Post-offload impact preview expired. Review the impact again before saving.",
+        "Post-offload impact preview expired. Review the impact again before saving."
       );
     }
     if (error instanceof InvalidRepairTokenError) {
@@ -695,7 +669,7 @@ export async function verifyPostOffloadImpactPreview(input: {
     payload.transactionDate !== transactionDate
   ) {
     throw new InvalidPostOffloadImpactPreviewError(
-      "Post-offload impact preview does not match this user, company, container, or date.",
+      "Post-offload impact preview does not match this user, company, container, or date."
     );
   }
 
@@ -706,14 +680,11 @@ export async function verifyPostOffloadImpactPreview(input: {
   });
   if (requestFingerprint !== payload.requestFingerprint) {
     throw new InvalidPostOffloadImpactPreviewError(
-      "Post-offload charges changed after preview. Review the updated impact before saving.",
+      "Post-offload charges changed after preview. Review the updated impact before saving."
     );
   }
 
-  const stateFingerprint = await computePostOffloadImpactStateFingerprint(
-    input.companyId,
-    input.containerId,
-  );
+  const stateFingerprint = await computePostOffloadImpactStateFingerprint(input.companyId, input.containerId);
   if (stateFingerprint !== payload.stateFingerprint) {
     throw new StalePostOffloadImpactPreviewError();
   }

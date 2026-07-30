@@ -24,7 +24,7 @@ export interface PostOffloadImpactPreviewRequest extends Request {
 export async function requirePostOffloadImpactPreview(
   req: PostOffloadImpactPreviewRequest,
   res: Response,
-  next: NextFunction,
+  next: NextFunction
 ): Promise<void> {
   const pathMatch = CREATE_PATH.exec(req.originalUrl);
   if (req.method !== "POST" || !pathMatch || req.originalUrl.includes("/preview")) {
@@ -37,9 +37,7 @@ export async function requirePostOffloadImpactPreview(
     return;
   }
 
-  const companyId = Number(
-    (req.session as any)?.factoryCompanyId || (req.session as any)?.currentCompanyId || 0,
-  );
+  const companyId = Number((req.session as any)?.factoryCompanyId || (req.session as any)?.currentCompanyId || 0);
   const userId = String((req.session as any)?.userId || (req as any).user?.id || "");
   const containerId = Number.parseInt(pathMatch[1], 10);
   const token = (req.body as any)?.impactPreviewToken;
@@ -87,9 +85,7 @@ export async function requirePostOffloadImpactPreview(
       message: getErrorMessage(error),
       code:
         (error as { code?: string }).code ||
-        (status === 409
-          ? "POST_OFFLOAD_IMPACT_PREVIEW_STALE"
-          : "POST_OFFLOAD_IMPACT_PREVIEW_INVALID"),
+        (status === 409 ? "POST_OFFLOAD_IMPACT_PREVIEW_STALE" : "POST_OFFLOAD_IMPACT_PREVIEW_INVALID"),
     });
   }
 }

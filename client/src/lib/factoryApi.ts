@@ -1,12 +1,6 @@
 import { queryClient, apiRequest } from "./queryClient";
-import {
-  attachAccountingRequestIdentity,
-  releaseAccountingRequestIdentity,
-} from "./accountingRequestIdentity";
-import {
-  isUnsafeFactoryLoadingScanRequest,
-  purgeUnsafeFactoryLoadingScans,
-} from "./factoryOfflineQueueSafety";
+import { attachAccountingRequestIdentity, releaseAccountingRequestIdentity } from "./accountingRequestIdentity";
+import { isUnsafeFactoryLoadingScanRequest, purgeUnsafeFactoryLoadingScans } from "./factoryOfflineQueueSafety";
 import {
   forgetHistoricalReplayPreparation,
   freezeHistoricalReplayApplyRequest,
@@ -103,9 +97,7 @@ function money(value: string | number | null | undefined): string {
     : "0.00";
 }
 
-function buildPostOffloadImpactConfirmation(
-  preview: PostOffloadImpactPreviewResponse["preview"],
-): string {
+function buildPostOffloadImpactConfirmation(preview: PostOffloadImpactPreviewResponse["preview"]): string {
   const remainingPercent = Math.max(0, Math.min(100, Number(preview.remainingFraction || 0) * 100));
   const lines = [
     "Review post-offload cost impact",
@@ -119,13 +111,13 @@ function buildPostOffloadImpactConfirmation(
 
   if (preview.supplierLockedRateBefore || preview.supplierLockedRateProjected) {
     lines.push(
-      `Supplier locked rate: $${money(preview.supplierLockedRateBefore)} → $${money(preview.supplierLockedRateProjected)}`,
+      `Supplier locked rate: $${money(preview.supplierLockedRateBefore)} → $${money(preview.supplierLockedRateProjected)}`
     );
   }
 
   lines.push(
     "",
-    `Historical scope: ${preview.scope.supplierOwnedSources} supplier source(s), ${preview.scope.affectedBatches} batch(es), ${preview.scope.availableBales} available bale(s).`,
+    `Historical scope: ${preview.scope.supplierOwnedSources} supplier source(s), ${preview.scope.affectedBatches} batch(es), ${preview.scope.availableBales} available bale(s).`
   );
 
   if (preview.scope.completedBatches > 0) {
@@ -133,13 +125,13 @@ function buildPostOffloadImpactConfirmation(
   }
   if (preview.scope.finalizedBalesExcluded > 0) {
     lines.push(
-      `WARNING: ${preview.scope.finalizedBalesExcluded} sold/finalized bale(s) are excluded from automatic replay and will still require the protected admin repair flow.`,
+      `WARNING: ${preview.scope.finalizedBalesExcluded} sold/finalized bale(s) are excluded from automatic replay and will still require the protected admin repair flow.`
     );
   }
   if (!preview.historicalReplaySafe) {
     const reasons = preview.historicalReplayBlockedReasons.join(", ") || "historical replay safety checks failed";
     lines.push(
-      `WARNING: Historical replay is currently blocked (${reasons}). The charge can be recorded, but historical production costs may require admin repair.`,
+      `WARNING: Historical replay is currently blocked (${reasons}). The charge can be recorded, but historical production costs may require admin repair.`
     );
   }
 
@@ -151,7 +143,7 @@ async function attachPostOffloadImpactPreview(
   delegate: RequestDelegate,
   method: string,
   url: string,
-  data: unknown,
+  data: unknown
 ): Promise<unknown> {
   if (method.toUpperCase() !== "POST" || !POST_OFFLOAD_CREATE_PATH.test(url)) return data;
   if (!data || typeof data !== "object" || Array.isArray(data)) return data;
@@ -174,8 +166,7 @@ async function attachPostOffloadImpactPreview(
   }
 
   const confirmed =
-    typeof window === "undefined" ||
-    window.confirm(buildPostOffloadImpactConfirmation(prepared.preview));
+    typeof window === "undefined" || window.confirm(buildPostOffloadImpactConfirmation(prepared.preview));
   if (!confirmed) {
     const cancelled: any = new Error("Post-offload charge save cancelled.");
     cancelled.name = "UserCancelled";
@@ -199,7 +190,7 @@ async function requestWithPreparedReplayState(
   delegate: RequestDelegate,
   method: string,
   url: string,
-  data?: unknown,
+  data?: unknown
 ): Promise<Response> {
   const prepareRequest = isHistoricalReplayPrepareRequest(method, url, data);
   const token = historicalReplayTokenFromRequest(method, url, data);
@@ -211,7 +202,10 @@ async function requestWithPreparedReplayState(
     const response = await delegate(method, url, outboundData);
     releaseAccountingRequestIdentity(method, url, outboundData);
     if (prepareRequest && response.ok) {
-      const payload = await response.clone().json().catch(() => null);
+      const payload = await response
+        .clone()
+        .json()
+        .catch(() => null);
       rememberHistoricalReplayPreparation(payload);
     }
     return response;
@@ -219,10 +213,7 @@ async function requestWithPreparedReplayState(
     // OfflineQueued means the exact body (including clientRequestId) is persisted.
     // A 4xx is a definite rejection. Keep the identity only for network errors,
     // timeouts, and 5xx responses where the commit outcome may be uncertain.
-    if (
-      error?.name === "OfflineQueued" ||
-      (Number(error?.status) >= 400 && Number(error?.status) < 500)
-    ) {
+    if (error?.name === "OfflineQueued" || (Number(error?.status) >= 400 && Number(error?.status) < 500)) {
       releaseAccountingRequestIdentity(method, url, outboundData);
     }
     throw error;
@@ -252,7 +243,7 @@ async function factoryApiRequestBase(method: string, url: string, data?: unknown
     if (unsafeLoadingScan && error?.name === "OfflineQueued") {
       purgeUnsafeFactoryLoadingScans();
       const onlineOnlyError: any = new Error(
-        "Loading scans require an internet connection. Reconnect and scan this bale again; it was not queued.",
+        "Loading scans require an internet connection. Reconnect and scan this bale again; it was not queued."
       );
       onlineOnlyError.name = "OnlineRequired";
       throw onlineOnlyError;
