@@ -30,6 +30,8 @@ import {
 } from "@/app/factoryAccessGuard";
 import { resolveAuthenticatedAppRoute } from "@/app/authenticatedAppRouteGuard";
 
+type RouteOptions = Parameters<typeof resolveAuthenticatedAppRoute>[0];
+
 function access(overrides: Partial<MyAccess> = {}): MyAccess {
   return {
     fullAccess: false,
@@ -40,7 +42,7 @@ function access(overrides: Partial<MyAccess> = {}): MyAccess {
   };
 }
 
-function route(overrides: Record<string, unknown> = {}) {
+function route(overrides: Partial<RouteOptions> = {}) {
   return resolveAuthenticatedAppRoute({
     currentLocation: "/",
     companyType: "erp",
@@ -159,7 +161,7 @@ describe("Factory page access policy", () => {
     expect(computeFactoryDefaultPage(access())).toBe("/factory/production-report");
   });
 
-  it.each([
+  it.each<[string, string | null]>([
     ["/factory/daybook", "factory/daybook"],
     ["/factory/daybook/2026-07-30", "factory/daybook"],
     ["/factory/containers/new", "factory/containers-hub"],
