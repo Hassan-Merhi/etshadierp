@@ -29,7 +29,7 @@ describe("post-offload historical supplier-cost replay", () => {
   it("persists exact undo and audit records in the replay commit", () => {
     const service = read("server/services/factory/postOffloadHistoricalReplay.ts");
 
-    expect(service).toContain('kind: EXACT_UNDO_KIND');
+    expect(service).toContain("kind: EXACT_UNDO_KIND");
     expect(service).toContain("factory_recalc_undo_log");
     expect(service).toContain("HISTORICAL_REPLAY_EXACT");
     expect(service).toContain("post_offload_historical_replay_applied");
@@ -38,11 +38,9 @@ describe("post-offload historical supplier-cost replay", () => {
   });
 
   it("runs only after a successful mutation response and surfaces repair-required state", () => {
-    const middleware = read(
-      "server/routes/factory/raw-stock/postOffloadHistoricalReplayMiddleware.ts"
-    );
+    const middleware = read("server/routes/factory/raw-stock/postOffloadHistoricalReplayMiddleware.ts");
 
-    expect(middleware).toContain('if (res.statusCode >= 400 || body?.alreadyUndone === true)');
+    expect(middleware).toContain("if (res.statusCode >= 400 || body?.alreadyUndone === true)");
     expect(middleware).toContain("replayPostOffloadHistoricalCosts");
     expect(middleware).toContain("historicalReplay");
     expect(middleware).toContain("historicalCostsRecalculated");
@@ -55,16 +53,12 @@ describe("post-offload historical supplier-cost replay", () => {
     const active = read("server/routes/factory/factoryRawStockRoutes.ts");
     const legacy = read("server/routes/factory/raw-stock/index.ts");
 
-    const activeReplay = active.indexOf(
-      'app.use("/api/factory/containers", postOffloadHistoricalReplayMiddleware)'
-    );
+    const activeReplay = active.indexOf('app.use("/api/factory/containers", postOffloadHistoricalReplayMiddleware)');
     const activeRoutes = active.indexOf("registerRawStockContainerRoutes(app);");
     expect(activeReplay).toBeGreaterThan(-1);
     expect(activeReplay).toBeLessThan(activeRoutes);
 
-    const legacyReplay = legacy.indexOf(
-      'app.use("/api/factory/containers", postOffloadHistoricalReplayMiddleware)'
-    );
+    const legacyReplay = legacy.indexOf('app.use("/api/factory/containers", postOffloadHistoricalReplayMiddleware)');
     const legacyRoutes = legacy.indexOf("registerRawStockContainerRoutes(app);");
     expect(legacyReplay).toBeGreaterThan(-1);
     expect(legacyReplay).toBeLessThan(legacyRoutes);
