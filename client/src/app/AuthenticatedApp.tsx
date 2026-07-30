@@ -64,11 +64,7 @@ export function AuthenticatedApp() {
   }
 
   const leaveConfirmDialog = (
-    <AppLeaveConfirmDialog
-      open={showLeaveConfirm}
-      onOpenChange={setShowLeaveConfirm}
-      onConfirm={handleConfirmLeave}
-    />
+    <AppLeaveConfirmDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm} onConfirm={handleConfirmLeave} />
   );
 
   if (isPOS) {

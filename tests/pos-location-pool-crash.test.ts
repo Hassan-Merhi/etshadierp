@@ -23,9 +23,7 @@ describe("POS location database-pool crash protection", () => {
   it("serializes cold-cache net-profit calculations", () => {
     const guard = source("server/runtimeMemoryGuard.mjs");
 
-    expect(guard).toContain(
-      '{ test: (path) => path === "/api/stats/net-profit", max: 1, name: "stats-net-profit" }'
-    );
+    expect(guard).toContain('{ test: (path) => path === "/api/stats/net-profit", max: 1, name: "stats-net-profit" }');
   });
 
   it("keeps schema and production SQL aligned", () => {
@@ -55,7 +53,7 @@ describe("POS location database-pool crash protection", () => {
 
     expect(shell).toContain("{hasAdminSearch && (");
     expect(shell).toContain(
-      '<CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} isPOS={true} user={user} />'
+      "<CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} isPOS={true} user={user} />"
     );
   });
 });

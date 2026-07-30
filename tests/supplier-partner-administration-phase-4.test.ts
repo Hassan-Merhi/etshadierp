@@ -13,12 +13,12 @@ describe("Supplier Partner administration phase 4", () => {
   const routeGuard = read("client/src/app/authenticatedAppRouteGuard.ts");
 
   it("consolidates setup and migration under one URL-backed administration hub", () => {
-    expect(setup).toContain('allowedValues: ADMIN_TABS');
+    expect(setup).toContain("allowedValues: ADMIN_TABS");
     expect(setup).toContain('defaultValue: "setup"');
-    expect(setup).toContain('<SpSetupPanel />');
-    expect(setup).toContain('<GcLshiMigration />');
-    expect(navigation).toContain('/sp/setup?tab=migration');
-    expect(overview).toContain('/sp/setup?tab=migration');
+    expect(setup).toContain("<SpSetupPanel />");
+    expect(setup).toContain("<GcLshiMigration />");
+    expect(navigation).toContain("/sp/setup?tab=migration");
+    expect(overview).toContain("/sp/setup?tab=migration");
   });
 
   it("limits setup to Admin or Developer and migration to Developer", () => {
@@ -41,6 +41,6 @@ describe("Supplier Partner administration phase 4", () => {
   it("preserves the existing setup API and repair behavior", () => {
     expect(panel).toContain('queryKey: ["/api/sp/setup/status"]');
     expect(panel).toContain('apiRequest("POST", "/api/sp/setup")');
-    expect(panel).toContain('repairedSupplierVoucherLinks');
+    expect(panel).toContain("repairedSupplierVoucherLinks");
   });
 });

@@ -30,10 +30,7 @@ import {
 } from "./factoryCostingEngine";
 
 /** Cost recalculation must never mutate inventory or batch quantities. */
-export function assertNoQuantityFields(
-  update: Record<string, unknown>,
-  context = "cost update"
-): void {
+export function assertNoQuantityFields(update: Record<string, unknown>, context = "cost update"): void {
   const forbidden = [
     "receivedKg",
     "received_kg",
@@ -199,10 +196,7 @@ export async function cascadeContainerCostChange(
       costPerKgUsd: formatFactoryRate(newCostPerKgUsd),
     };
     assertNoQuantityFields(rawStockCostUpdate, "cascadeContainerCostChange → factoryRawStock");
-    await tx
-      .update(factoryRawStock)
-      .set(rawStockCostUpdate)
-      .where(eq(factoryRawStock.id, row.id));
+    await tx.update(factoryRawStock).set(rawStockCostUpdate).where(eq(factoryRawStock.id, row.id));
   }
 
   const [container] = await tx
@@ -219,20 +213,21 @@ export async function cascadeContainerCostChange(
       await getAuthoritativeSupplierRemainingKg(tx, companyId, container.supplierId)
     );
 
-    const nextLockedRate = params.supplierInventoryValueDeltaUsdOverride !== undefined
-      ? calculateRateAfterInventoryValueDelta({
-          inventoryQuantityKg: supplierTotalRemainingKg,
-          currentRatePerKg: oldLockedRate,
-          valueDelta: params.supplierInventoryValueDeltaUsdOverride,
-          fallbackRatePerKg: newCostPerKgUsd,
-        })
-      : calculateRemainingInventoryCorrection({
-          supplierRemainingKg: supplierTotalRemainingKg,
-          currentLockedRatePerKg: oldLockedRate,
-          correctedContainerRemainingKg,
-          oldCorrectedContainerRemainingValue: oldValueOfRemaining,
-          newContainerRatePerKg: newCostPerKgUsd,
-        }).newLockedRatePerKg;
+    const nextLockedRate =
+      params.supplierInventoryValueDeltaUsdOverride !== undefined
+        ? calculateRateAfterInventoryValueDelta({
+            inventoryQuantityKg: supplierTotalRemainingKg,
+            currentRatePerKg: oldLockedRate,
+            valueDelta: params.supplierInventoryValueDeltaUsdOverride,
+            fallbackRatePerKg: newCostPerKgUsd,
+          })
+        : calculateRemainingInventoryCorrection({
+            supplierRemainingKg: supplierTotalRemainingKg,
+            currentLockedRatePerKg: oldLockedRate,
+            correctedContainerRemainingKg,
+            oldCorrectedContainerRemainingValue: oldValueOfRemaining,
+            newContainerRatePerKg: newCostPerKgUsd,
+          }).newLockedRatePerKg;
 
     await tx
       .update(factorySuppliers)
@@ -240,12 +235,7 @@ export async function cascadeContainerCostChange(
         currentRawMaterialCostPerKgUsd: formatFactoryLockedRate(nextLockedRate),
         updatedAt: new Date(),
       })
-      .where(
-        and(
-          eq(factorySuppliers.id, container.supplierId),
-          eq(factorySuppliers.companyId, companyId)
-        )
-      );
+      .where(and(eq(factorySuppliers.id, container.supplierId), eq(factorySuppliers.companyId, companyId)));
   }
 
   const cascadeStatuses = includeCompletedBatches
@@ -256,12 +246,7 @@ export async function cascadeContainerCostChange(
     .select({ src: factoryMixBatchSources, batchStatus: factoryMixBatches.status })
     .from(factoryMixBatchSources)
     .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
-    .where(
-      and(
-        eq(factoryMixBatchSources.containerId, containerId),
-        sql`${factoryMixBatches.deletedAt} IS NULL`
-      )
-    );
+    .where(and(eq(factoryMixBatchSources.containerId, containerId), sql`${factoryMixBatches.deletedAt} IS NULL`));
 
   const affectedBatches: CascadeResult["affectedBatches"] = [];
   const affectedBales: CascadeResult["affectedBales"] = [];
@@ -304,8 +289,11 @@ export async function cascadeContainerCostChange(
     ] as number[];
 
     for (const batchId of cascadeEligibleBatchIds) {
-      const { bales, totalBatchWeightKg: _totalWeight, ...batchResult } =
-        await recomputeBatchAndCascadeBales(tx, companyId, batchId);
+      const {
+        bales,
+        totalBatchWeightKg: _totalWeight,
+        ...batchResult
+      } = await recomputeBatchAndCascadeBales(tx, companyId, batchId);
       affectedBatches.push({
         batchId,
         ...batchResult,

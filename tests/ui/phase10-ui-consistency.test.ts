@@ -23,7 +23,7 @@ describe("Phase 10 UI consistency contracts", () => {
     }
 
     expect(layout).toContain('role="region"');
-    expect(layout).toContain('tabIndex={0}');
+    expect(layout).toContain("tabIndex={0}");
     expect(layout).toContain("overflow-x-auto");
     expect(layout).toContain("flex-col-reverse");
   });
@@ -46,7 +46,7 @@ describe("Phase 10 UI consistency contracts", () => {
 
     expect(states).toContain("actionPending?: boolean");
     expect(states).toContain("secondaryActionLabel?: string");
-    expect(states).toContain('aria-busy={actionPending}');
+    expect(states).toContain("aria-busy={actionPending}");
     expect(states).toContain("motion-reduce:animate-none");
     expect(states).toContain("WorkspaceActions");
   });

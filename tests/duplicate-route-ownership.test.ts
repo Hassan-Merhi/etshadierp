@@ -11,7 +11,7 @@ describe("Phase 8 duplicate route ownership", () => {
     const applicationRoutes = read("server/routes/applicationRoutes.ts");
     const names = Array.from(
       applicationRoutes.matchAll(/(register[A-Z][A-Za-z0-9]+Routes?)\(app/g),
-      (match) => match[1],
+      (match) => match[1]
     );
     const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
 

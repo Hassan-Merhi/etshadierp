@@ -31,7 +31,10 @@ describe("auth route composition", () => {
 
   it("keeps security-sensitive endpoints in focused modules", () => {
     const core = fs.readFileSync(path.resolve(process.cwd(), "server/routes/auth/coreAuthRoutes.ts"), "utf8");
-    const users = fs.readFileSync(path.resolve(process.cwd(), "server/routes/auth/userAdministrationRoutes.ts"), "utf8");
+    const users = fs.readFileSync(
+      path.resolve(process.cwd(), "server/routes/auth/userAdministrationRoutes.ts"),
+      "utf8"
+    );
     const access = fs.readFileSync(path.resolve(process.cwd(), "server/routes/auth/userAccessRoutes.ts"), "utf8");
     const companies = fs.readFileSync(path.resolve(process.cwd(), "server/routes/auth/companyAccessRoutes.ts"), "utf8");
     const audit = fs.readFileSync(path.resolve(process.cwd(), "server/routes/auth/auditLogRoutes.ts"), "utf8");
