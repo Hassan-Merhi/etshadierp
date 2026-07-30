@@ -2,7 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-const compositionPath = path.resolve(process.cwd(), "server/routes/reportsRoutes.ts");
+const root = process.cwd();
+const compositionPath = path.resolve(root, "server/routes/reportsRoutes.ts");
+const legacyPath = path.resolve(root, "server/routes/reportsRoutesLegacy.ts");
 
 const focusedRegistrars = [
   "registerReportsNetProfitStatementRoutes(app)",
@@ -14,25 +16,22 @@ const focusedRegistrars = [
 ];
 
 describe("report route composition", () => {
-  it("registers every focused report domain before the compatibility boundary", () => {
+  it("registers every focused report domain in preserved order", () => {
     const source = fs.readFileSync(compositionPath, "utf8");
-    const legacyIndex = source.indexOf("registerLegacyReportsRoutes(app)");
+    let previousIndex = -1;
 
-    expect(legacyIndex).toBeGreaterThan(-1);
     for (const registrar of focusedRegistrars) {
-      const registrarIndex = source.indexOf(registrar);
-      expect(registrarIndex, `${registrar} must be registered`).toBeGreaterThan(-1);
-      expect(registrarIndex, `${registrar} must precede the legacy boundary`).toBeLessThan(legacyIndex);
+      const index = source.indexOf(registrar);
+      expect(index, `${registrar} must be registered`).toBeGreaterThan(previousIndex);
+      previousIndex = index;
     }
+
+    expect(source).not.toContain("reportsRoutesLegacy");
+    expect(source).not.toContain("registerLegacyReportsRoutes");
   });
 
-  it("keeps migrated endpoints out of the legacy compatibility file", () => {
-    const legacyPath = path.resolve(process.cwd(), "server/routes/reportsRoutesLegacy.ts");
-    const legacySource = fs.readFileSync(legacyPath, "utf8");
-
-    for (const method of ["get", "post", "put", "patch", "delete"]) {
-      expect(legacySource).not.toContain(`app.${method}(`);
-    }
+  it("keeps the retired report compatibility path deleted", () => {
+    expect(fs.existsSync(legacyPath)).toBe(false);
   });
 
   it("keeps each extracted endpoint in a focused module", () => {
@@ -44,7 +43,7 @@ describe("report route composition", () => {
     ];
 
     for (const [fileName, route] of expectedRoutes) {
-      const source = fs.readFileSync(path.resolve(process.cwd(), "server/routes", fileName), "utf8");
+      const source = fs.readFileSync(path.resolve(root, "server/routes", fileName), "utf8");
       expect(source).toContain(route);
       expect(source).toContain("requireAuth");
     }
