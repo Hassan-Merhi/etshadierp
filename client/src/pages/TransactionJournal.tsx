@@ -643,7 +643,7 @@ export default function TransactionJournal() {
 
       {/* ── Summary cards ── */}
       {!isLoading && Object.keys(summaryByCompany).length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="flex flex-col gap-3">
           {Object.entries(summaryByCompany).map(([id, row]) => (
             <Card
               key={id}
