@@ -214,9 +214,7 @@ async function invalidatePostOffloadReconciliationQueries(
 
   const queryKeys = [...new Set(rawQueryKeys.filter((value): value is string => typeof value === "string"))];
   await Promise.all(
-    queryKeys.map((queryKey) =>
-      queryClient.invalidateQueries({ queryKey: [queryKey], refetchType: "active" })
-    )
+    queryKeys.map((queryKey) => queryClient.invalidateQueries({ queryKey: [queryKey], refetchType: "active" }))
   );
 }
 
