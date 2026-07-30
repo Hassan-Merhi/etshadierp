@@ -94,7 +94,10 @@ export function resolveAuthenticatedAppRoute({
     });
     if (factoryGuardRedirect) {
       decision = { kind: "redirect", to: factoryGuardRedirect };
-    } else if (isFactoryRoute && !isFactoryCompany && !myAccessLoading && hasErpAccess) {
+    } else if (isFactoryRoute && !isFactoryCompany) {
+      // Switch away from /factory/* immediately when the company is not a factory
+      // type — don't wait for myAccess to finish loading. The company type alone
+      // is enough to know these routes don't apply.
       decision = { kind: "redirect", to: "/" };
     }
   }
