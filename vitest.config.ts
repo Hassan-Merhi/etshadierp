@@ -24,12 +24,12 @@ export default defineConfig({
         "shared/**/*.d.ts",
       ],
       thresholds: {
-        // Raise the whole-backend floor while legacy monoliths are still being
-        // split, and add stronger gates for the critical modules below.
-        lines: 8,
-        statements: 8,
-        functions: 6,
-        branches: 6,
+        // Keep the whole-repository floor incremental while enforcing much
+        // stronger measured gates on security and accounting policy modules.
+        lines: 10,
+        statements: 10,
+        functions: 8,
+        branches: 8,
 
         "server/routes/helpers/passwordHelpers.ts": {
           lines: 95,
@@ -43,6 +43,20 @@ export default defineConfig({
           statements: 45,
           functions: 40,
           branches: 35,
+        },
+
+        "server/services/security/companyContextPolicy.ts": {
+          lines: 95,
+          statements: 95,
+          functions: 100,
+          branches: 90,
+        },
+
+        "server/services/accounting/customerLinkedLedgerValidation.ts": {
+          lines: 90,
+          statements: 90,
+          functions: 100,
+          branches: 85,
         },
       },
     },
