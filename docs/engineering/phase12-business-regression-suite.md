@@ -43,7 +43,7 @@ The full boundary includes:
 
 ## Coverage gates
 
-Backend global floors increase incrementally from 8/8/6/6 to 10/10/8/8 for lines, statements, functions, and branches. Stronger per-file thresholds now protect:
+The last measured backend-wide floor remains 8/8/6/6 for lines, statements, functions, and branches. Phase 12 does not invent a higher repository-wide number without executing coverage. Instead, strong new per-file thresholds now protect:
 
 - `server/services/security/companyContextPolicy.ts`;
 - `server/services/accounting/customerLinkedLedgerValidation.ts`;
