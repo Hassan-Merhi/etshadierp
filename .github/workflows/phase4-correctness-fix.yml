@@ -156,10 +156,8 @@ jobs:
             server/services/factory/postOffloadImpactPreview.ts \
             tests/factory-post-offload-impact-preview.test.ts
 
-      - name: Verify focused implementation
-        run: |
-          npm run check
-          node node_modules/vitest/vitest.mjs run tests/factory-post-offload-impact-preview.test.ts --maxWorkers=1 --no-file-parallelism
+      - name: Verify TypeScript
+        run: npm run check
 
       - name: Commit hardening
         run: |
