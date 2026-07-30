@@ -49,12 +49,14 @@ describe("Phase 6 post-offload safety and repair", () => {
     expect(service).toContain("applyHistoricalCostReplay({");
     expect(service).toContain("tokenHash");
     expect(service).toContain("HISTORICAL_REPLAY_EXACT");
-    expect(service).toContain("post_offload_phase6_applied_and_verified");
+    expect(service).toContain("post_offload_phase6_applied");
     expect(service).toContain("RETURNING id");
     expect(exactApply).toContain("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE");
     expect(exactApply).toContain("pg_advisory_xact_lock(9003, $1)");
     expect(exactApply).toContain("factory_replay_consumed_tokens");
     expect(exactApply).toContain('await client.query("ROLLBACK")');
+    expect(service).toContain("POST_OFFLOAD_PHASE6_POST_COMMIT_VERIFICATION_FAILED");
+    expect(service).toContain("repairCommitted: true");
   });
 
   it("persists readiness, preview, blocked, failed, and post-apply verification audit outcomes", () => {

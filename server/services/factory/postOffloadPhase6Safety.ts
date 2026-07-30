@@ -849,7 +849,7 @@ export async function applyPostOffloadPhase6Repair(params: {
         `INSERT INTO audit_log
            (user_id, username, company_id, action, table_name, record_id,
             record_identifier, changes, created_at)
-         VALUES ($1, $2, $3, 'post_offload_phase6_applied_and_verified',
+         VALUES ($1, $2, $3, 'post_offload_phase6_applied',
                  'factory_recalc_undo_log', $4, $5, $6::jsonb, NOW())`,
         [
           params.userId || null,
@@ -877,10 +877,28 @@ export async function applyPostOffloadPhase6Repair(params: {
     throw new Error("Phase 6 repair completed without an exact undo identifier.");
   }
 
-  const readiness = await inspectPostOffloadPhase6Readiness({
-    companyId: params.companyId,
-    supplierIds: payload.supplierIds,
-  });
+  let readiness: PostOffloadPhase6Readiness;
+  try {
+    readiness = await inspectPostOffloadPhase6Readiness({
+      companyId: params.companyId,
+      supplierIds: payload.supplierIds,
+    });
+  } catch (error) {
+    throw Object.assign(
+      new Error(
+        `Phase 6 repair committed with undo log ${undoLogId}, but post-commit verification failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      ),
+      {
+        code: "POST_OFFLOAD_PHASE6_POST_COMMIT_VERIFICATION_FAILED",
+        repairCommitted: true,
+        undoLogId,
+        applied,
+        cause: error,
+      }
+    );
+  }
 
   return {
     success: true,
