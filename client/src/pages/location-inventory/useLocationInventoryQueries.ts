@@ -6,8 +6,8 @@ interface InventoryItem {
   locationId: number;
   stockItemId: number;
   quantity: string;
-  averageRate: string;
-  totalValue: string;
+  averageRate: string | null;
+  totalValue: string | null;
   stockItemCode: string;
   stockItemName: string;
   stockItemUom: string;
@@ -73,27 +73,28 @@ export function useLocationInventoryQueries({
   const locations = posUser ? posAssignedLocations : allLocations;
   const locationsLoading = posUser ? posLocationsLoading : allLocationsLoading;
 
+  const compactInventoryUrl = selectedLocationLocal
+    ? `/api/locations/${selectedLocationLocal.id}/inventory?profile=compact${showZeroStock ? "&includeZero=true" : ""}`
+    : "";
   const { data: inventoryData = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
-    queryKey:
-      selectedLocationLocal && companyId
-        ? [`/api/locations/${selectedLocationLocal.id}/inventory${showZeroStock ? "?includeZero=true" : ""}`, companyId]
-        : [],
+    queryKey: selectedLocationLocal && companyId ? [compactInventoryUrl, companyId] : [],
     queryFn: async () => {
-      const url = `/api/locations/${selectedLocationLocal!.id}/inventory${showZeroStock ? "?includeZero=true" : ""}`;
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetch(compactInventoryUrl, { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
     enabled: !!selectedLocationLocal && !!companyId,
+    staleTime: 15_000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: openingInventoryData = [], isLoading: openingInventoryLoading } = useQuery<InventoryItem[]>({
     queryKey:
       selectedLocationLocal && fromDate && companyId
-        ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${fromDate}`, companyId]
+        ? [`/api/locations/${selectedLocationLocal.id}/inventory?profile=compact&asOfDate=${fromDate}`, companyId]
         : [],
     queryFn: async () => {
-      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${fromDate}`;
+      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?profile=compact&asOfDate=${fromDate}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
@@ -106,10 +107,10 @@ export function useLocationInventoryQueries({
   const { data: closingInventoryData = [], isLoading: closingInventoryLoading } = useQuery<InventoryItem[]>({
     queryKey:
       selectedLocationLocal && asOfDate && companyId
-        ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${asOfDate}`, companyId]
+        ? [`/api/locations/${selectedLocationLocal.id}/inventory?profile=compact&asOfDate=${asOfDate}`, companyId]
         : [],
     queryFn: async () => {
-      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${asOfDate}`;
+      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?profile=compact&asOfDate=${asOfDate}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
@@ -119,35 +120,15 @@ export function useLocationInventoryQueries({
     refetchOnReconnect: false,
   });
 
-  const { data: allInventoryRaw, isLoading: allInventoryLoading } = useQuery<any>({
-    queryKey: companyId ? ["/api/inventory", companyId] : [],
+  const { data: allInventoryRaw, isLoading: allInventoryLoading } = useQuery<any[]>({
+    queryKey: companyId ? ["/api/inventory?profile=matrix", companyId] : [],
     queryFn: async () => {
-      // Fetch the first page at the maximum allowed page size.
-      const PAGE_SIZE = 5000;
-      const res = await fetch(`/api/inventory?page=1&pageSize=${PAGE_SIZE}`, { credentials: "include" });
+      const res = await fetch("/api/inventory?profile=matrix", { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
-      const first = await res.json();
-
-      // Legacy non-paginated response — return as-is.
-      if (Array.isArray(first)) return first;
-
-      const { data, totalPages } = first;
-      if (!totalPages || totalPages <= 1) return data;
-
-      // Fetch any remaining pages in parallel so large inventories are not truncated.
-      const remaining = await Promise.all(
-        Array.from({ length: totalPages - 1 }, (_, i) => i + 2).map(async (page) => {
-          const r = await fetch(`/api/inventory?page=${page}&pageSize=${PAGE_SIZE}`, { credentials: "include" });
-          if (!r.ok) throw new Error(await r.text());
-          const d = await r.json();
-          return Array.isArray(d) ? d : (d.data ?? []);
-        })
-      );
-      return [...data, ...remaining.flat()];
+      const payload = await res.json();
+      return Array.isArray(payload) ? payload : [];
     },
     enabled: showAllStock && !!companyId,
-    // Extended stale time: the full inventory list is expensive; avoid re-downloading
-    // it on every mutation or focus event. Users can navigate away and back to refresh.
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -155,7 +136,6 @@ export function useLocationInventoryQueries({
     refetchOnMount: false,
     retry: false,
   });
-  // queryFn always resolves to a flat array of inventory rows.
   const allInventoryData: any[] = Array.isArray(allInventoryRaw) ? allInventoryRaw : [];
 
   const { data: allNegativeStock = [], isLoading: negativeStockLoading } = useQuery<any[]>({
