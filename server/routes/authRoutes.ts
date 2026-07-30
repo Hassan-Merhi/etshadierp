@@ -8,8 +8,6 @@ import { registerUserAccessRoutes } from "./auth/userAccessRoutes";
 import { registerUserAdministrationRoutes } from "./auth/userAdministrationRoutes";
 import { registerExchangeRateRoutes } from "./exchangeRateRoutes";
 import { registerUserPresenceRoutes } from "./userPresenceRoutes";
-import { registerAuthRoutes as registerLegacyAuthRoutes } from "./authRoutesLegacy";
-
 export function registerAuthRoutes(app: Express) {
   registerCoreAuthRoutes(app);
   registerSessionRoutes(app);
@@ -19,5 +17,4 @@ export function registerAuthRoutes(app: Express) {
   registerCompanyAccessRoutes(app);
   registerUserPresenceRoutes(app);
   registerExchangeRateRoutes(app);
-  registerLegacyAuthRoutes(app);
 }
