@@ -39,7 +39,7 @@ function accessSummary(user: any): { label: string; variant: "default" | "second
 
 function pagesSummary(user: any): string {
   const privileged = ["admin", "owner", "developer"].includes(user.role?.toLowerCase());
-  if (privileged || user.pageAccess.length === 0) return "Full access";
+  if (privileged || !user.pageAccess || user.pageAccess.length === 0) return "Full access";
   const factoryKeys = new Set(FACTORY_NAV_PAGES.map((p: any) => p.key));
   const erpKeys = new Set<string>(FEATURE_KEYS);
   const fCount = user.pageAccess.filter((k: string) => factoryKeys.has(k)).length;
