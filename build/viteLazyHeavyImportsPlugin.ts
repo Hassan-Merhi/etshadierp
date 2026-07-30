@@ -9,8 +9,8 @@ const COMBINED_STOCK_VIEW_SUFFIX = "/client/src/pages/location-inventory/Combine
 
 const EXCEL_HELPER_IMPORT = `import { ExcelJS, writeFile } from "@/lib/excelHelper";`;
 const EXCEL_UTILS_IMPORT = `import { utils, writeFile } from "@/lib/excelHelper";`;
-const EXPORT_START = `    try:\n      const workbook = new ExcelJS.Workbook();`;
-const LAZY_EXPORT_START = `    try:\n      const { ExcelJS, writeFile } = await import("@/lib/excelHelper");\n      const workbook = new ExcelJS.Workbook();`;
+const EXPORT_START = `    try {\n      const workbook = new ExcelJS.Workbook();`;
+const LAZY_EXPORT_START = `    try {\n      const { ExcelJS, writeFile } = await import("@/lib/excelHelper");\n      const workbook = new ExcelJS.Workbook();`;
 
 function replaceExactly(source: string, before: string, after: string, label: string): string {
   const first = source.indexOf(before);
