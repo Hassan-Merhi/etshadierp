@@ -36,14 +36,6 @@ function requireMarkers(relativePath, markers) {
   return source;
 }
 
-function forbidMarkers(relativePath, markers) {
-  const source = read(relativePath);
-  for (const marker of markers) {
-    if (source.includes(marker)) failures.push(`${relativePath}: forbidden marker present: ${marker}`);
-  }
-  return source;
-}
-
 requireMarkers("docs/final-production-readiness.md", [
   "Freeze one full 40-character Git commit",
   "autoDeploy: false",
@@ -128,6 +120,10 @@ if (policy) {
   if (policy.render?.healthCheckPath !== "/api/health/ready") {
     failures.push("Release policy must require /api/health/ready");
   }
+  const requiredManualKeys = policy.requiredManualRenderEnvironmentKeys ?? [];
+  if (requiredManualKeys.length !== 2 || !requiredManualKeys.includes("RELEASE_EXPECTED_COMMIT") || !requiredManualKeys.includes("RELEASE_ID")) {
+    failures.push("Release policy must require manual RELEASE_EXPECTED_COMMIT and RELEASE_ID inputs");
+  }
   if (!Array.isArray(policy.requiredStaticChecks) || policy.requiredStaticChecks.length < 5) {
     failures.push("Release policy must retain at least five static checks");
   }
@@ -153,6 +149,15 @@ const renderConfig = requireMarkers("render.yaml", [
   "value: 20.19.2",
 ]);
 if (renderConfig.includes("autoDeploy: true")) failures.push("render.yaml must not enable automatic deployment");
+for (const requiredKey of policy?.requiredManualRenderEnvironmentKeys ?? []) {
+  if (!renderConfig.includes(`key: ${requiredKey}`)) {
+    failures.push(`render.yaml is missing required manual release input: ${requiredKey}`);
+  }
+}
+const manualInputCount = (renderConfig.match(/sync: false/g) ?? []).length;
+if (policy && manualInputCount !== policy.requiredManualRenderEnvironmentKeys.length) {
+  failures.push(`render.yaml must contain exactly ${policy.requiredManualRenderEnvironmentKeys.length} manual sync:false release inputs`);
+}
 for (const forbidden of policy?.forbiddenRenderEnvironmentKeys ?? []) {
   if (renderConfig.includes(`key: ${forbidden}`)) {
     failures.push(`render.yaml must not persist dangerous release control: ${forbidden}`);
@@ -160,7 +165,7 @@ for (const forbidden of policy?.forbiddenRenderEnvironmentKeys ?? []) {
 }
 
 requireMarkers("server/releaseIdentityPolicy.mjs", [
-  "RELEASE_EXPECTED_COMMIT",
+  "RELEASE_EXPECTED_COMMIT is required in production",
   "full 40-character Git SHA",
   "does not match approved release commit",
   "commitVerified",
@@ -235,13 +240,26 @@ requireMarkers("scripts/run-release-readiness.mjs", [
   "RUN_RELEASE_READINESS",
   "requiredStaticChecks",
   "requiredExecutableChecks",
+  "shell: false",
 ]);
 requireMarkers("tests/phase13-release-deployment-readiness.test.ts", [
   "accepts and verifies the exact approved runtime commit",
+  "requires an approved commit for every production startup",
   "fails closed when the deployed commit differs from approval",
   "accepts complete evidence for the exact deployed commit",
   "requires manual Render promotion",
   "freezes the reviewed migration debt",
+]);
+requireMarkers("docs/engineering/phase13-release-deployment-readiness.md", [
+  "Manual deployment boundary",
+  "Runtime release identity",
+  "Migration registry debt",
+  "Evidence policy",
+  "No CI",
+]);
+requireMarkers(".gitignore", [
+  "release-evidence*.json",
+  "artifacts/release-readiness/",
 ]);
 
 const packageJson = readJson("package.json");
