@@ -63,6 +63,8 @@ export interface PostOffloadPhase6ScopeCounts {
   availableBales: number;
   finalizedBalesExcluded: number;
   blockedBatches: number;
+  supplierRateChanges: number;
+  actualChangeRows: number;
   totalWritableRows: number;
 }
 
@@ -241,7 +243,13 @@ function decimal(value: string | number | null | undefined): Decimal {
   }
 }
 
-function scopeCounts(scope: ReplayWriteScope): PostOffloadPhase6ScopeCounts {
+function scopeCounts(scope: ReplayWriteScope, supplierRateChanges = 0): PostOffloadPhase6ScopeCounts {
+  const nonSupplierChangeRows =
+    scope.containerIdsToUpdate.length +
+    scope.rawStockIdsToUpdate.length +
+    scope.sourceIdsToUpdate.length +
+    scope.batchIdsToUpdate.length +
+    scope.availableBaleIdsToUpdate.length;
   const totalWritableRows =
     scope.containerIdsToUpdate.length +
     scope.rawStockIdsToUpdate.length +
@@ -259,6 +267,8 @@ function scopeCounts(scope: ReplayWriteScope): PostOffloadPhase6ScopeCounts {
     availableBales: scope.availableBaleIdsToUpdate.length,
     finalizedBalesExcluded: scope.finalizedBaleIdsToUpdate.length,
     blockedBatches: scope.blockedBatches.length,
+    supplierRateChanges,
+    actualChangeRows: nonSupplierChangeRows + supplierRateChanges,
     totalWritableRows,
   };
 }
@@ -486,11 +496,11 @@ function buildBlockers(params: {
 
 function classifyStatus(params: {
   integrityIssueCount: number;
-  totalWritableRows: number;
+  actualChangeRows: number;
   blockers: string[];
 }): PostOffloadPhase6Status {
   if (params.blockers.length > 0) return "blocked";
-  if (params.integrityIssueCount > 0 || params.totalWritableRows > 0) return "repair_required";
+  if (params.integrityIssueCount > 0 || params.actualChangeRows > 0) return "repair_required";
   return "ready";
 }
 
@@ -541,7 +551,14 @@ async function buildSnapshot(params: { companyId: number; requestedSupplierIds?:
     }
 
     const selectedSupplierIds = scope.supplierIds;
-    const counts = scopeCounts(scope);
+    const supplierRateChanges = preview
+      ? preview.supplierRows.filter(
+          (supplier) =>
+            selectedSupplierIds.includes(supplier.supplierId) &&
+            Math.abs(supplier.endingExpectedRate - supplier.currentStoredRate) > 0.00000001
+        ).length
+      : 0;
+    const counts = scopeCounts(scope, supplierRateChanges);
     const fingerprint =
       preview && selectedSupplierIds.length > 0
         ? computeReplayFingerprint(
@@ -563,12 +580,12 @@ async function buildSnapshot(params: { companyId: number; requestedSupplierIds?:
       scope,
       selectedSupplierIds,
       hasPostOffloadSuppliers: postOffloadSupplierIds.length > 0,
-      hasHistoricalRepairWork: counts.totalWritableRows > 0,
+      hasHistoricalRepairWork: counts.actualChangeRows > 0,
     });
     const automaticRepairEligible =
       historicalReplayAuthorizationReady({ control, schema, safety }) &&
       selectedSupplierIds.length > 0 &&
-      counts.totalWritableRows > 0;
+      counts.actualChangeRows > 0;
     const stateFingerprint = stableHash({
       companyId: params.companyId,
       algorithmVersion: REPLAY_ALGORITHM_VERSION,
@@ -581,7 +598,7 @@ async function buildSnapshot(params: { companyId: number; requestedSupplierIds?:
     });
     const status = classifyStatus({
       integrityIssueCount: integrity.issueCount,
-      totalWritableRows: counts.totalWritableRows,
+      actualChangeRows: counts.actualChangeRows,
       blockers,
     });
 

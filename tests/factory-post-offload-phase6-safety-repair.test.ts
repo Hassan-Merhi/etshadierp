@@ -79,6 +79,8 @@ describe("Phase 6 post-offload safety and repair", () => {
     expect(service).toContain("evaluateHistoricalReplaySafetyReadiness");
     expect(service).toContain("readHistoricalReplayProductionControl");
     expect(service).toContain('"ready" | "repair_required" | "blocked"');
+    expect(service).toContain("actualChangeRows");
+    expect(service).toContain("supplierRateChanges");
   });
 
   it("does not introduce quantity, payment, customer balance, or finalized-bale writes", () => {
