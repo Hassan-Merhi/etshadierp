@@ -73,11 +73,17 @@ export function useLocationInventoryQueries({
   const locations = posUser ? posAssignedLocations : allLocations;
   const locationsLoading = posUser ? posLocationsLoading : allLocationsLoading;
 
+  const inventoryBaseKey = selectedLocationLocal ? `/api/locations/${selectedLocationLocal.id}/inventory` : "";
   const compactInventoryUrl = selectedLocationLocal
-    ? `/api/locations/${selectedLocationLocal.id}/inventory?profile=compact${showZeroStock ? "&includeZero=true" : ""}`
+    ? `${inventoryBaseKey}?profile=compact${showZeroStock ? "&includeZero=true" : ""}`
     : "";
   const { data: inventoryData = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
-    queryKey: selectedLocationLocal && companyId ? [compactInventoryUrl, companyId] : [],
+    // Keep the canonical URL as the first key element so existing stock-write
+    // invalidations continue to match every compact and historical profile.
+    queryKey:
+      selectedLocationLocal && companyId
+        ? [inventoryBaseKey, companyId, "compact", showZeroStock ? "include-zero" : "non-zero"]
+        : [],
     queryFn: async () => {
       const res = await fetch(compactInventoryUrl, { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
@@ -91,10 +97,10 @@ export function useLocationInventoryQueries({
   const { data: openingInventoryData = [], isLoading: openingInventoryLoading } = useQuery<InventoryItem[]>({
     queryKey:
       selectedLocationLocal && fromDate && companyId
-        ? [`/api/locations/${selectedLocationLocal.id}/inventory?profile=compact&asOfDate=${fromDate}`, companyId]
+        ? [inventoryBaseKey, companyId, "compact", "as-of", fromDate]
         : [],
     queryFn: async () => {
-      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?profile=compact&asOfDate=${fromDate}`;
+      const url = `${inventoryBaseKey}?profile=compact&asOfDate=${fromDate}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
@@ -107,10 +113,10 @@ export function useLocationInventoryQueries({
   const { data: closingInventoryData = [], isLoading: closingInventoryLoading } = useQuery<InventoryItem[]>({
     queryKey:
       selectedLocationLocal && asOfDate && companyId
-        ? [`/api/locations/${selectedLocationLocal.id}/inventory?profile=compact&asOfDate=${asOfDate}`, companyId]
+        ? [inventoryBaseKey, companyId, "compact", "as-of", asOfDate]
         : [],
     queryFn: async () => {
-      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?profile=compact&asOfDate=${asOfDate}`;
+      const url = `${inventoryBaseKey}?profile=compact&asOfDate=${asOfDate}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
@@ -121,7 +127,8 @@ export function useLocationInventoryQueries({
   });
 
   const { data: allInventoryRaw, isLoading: allInventoryLoading } = useQuery<any[]>({
-    queryKey: companyId ? ["/api/inventory?profile=matrix", companyId] : [],
+    // Canonical /api/inventory prefix preserves all existing write invalidations.
+    queryKey: companyId ? ["/api/inventory", companyId, "matrix"] : [],
     queryFn: async () => {
       const res = await fetch("/api/inventory?profile=matrix", { credentials: "include" });
       if (!res.ok) throw new Error(await res.text());
