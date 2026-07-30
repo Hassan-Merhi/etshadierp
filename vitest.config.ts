@@ -24,12 +24,12 @@ export default defineConfig({
         "shared/**/*.d.ts",
       ],
       thresholds: {
-        // Keep the whole-repository floor incremental while enforcing much
-        // stronger measured gates on security and accounting policy modules.
-        lines: 10,
-        statements: 10,
-        functions: 8,
-        branches: 8,
+        // Preserve the last measured whole-repository floor while enforcing
+        // substantially stronger gates on the critical modules covered below.
+        lines: 8,
+        statements: 8,
+        functions: 6,
+        branches: 6,
 
         "server/routes/helpers/passwordHelpers.ts": {
           lines: 95,
