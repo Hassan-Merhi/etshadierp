@@ -14,6 +14,15 @@ function forbidText(relativePath, text, label = text) {
   if (read(relativePath).includes(text)) failures.push(`${relativePath}: forbidden ${label}`);
 }
 
+function requireOrder(relativePath, first, second) {
+  const content = read(relativePath);
+  const firstIndex = content.indexOf(first);
+  const secondIndex = content.indexOf(second);
+  if (firstIndex < 0 || secondIndex < 0 || firstIndex >= secondIndex) {
+    failures.push(`${relativePath}: expected ${first} before ${second}`);
+  }
+}
+
 function requireLineLimit(relativePath, maximum) {
   const lines = read(relativePath).split(/\r?\n/).length;
   if (lines > maximum) failures.push(`${relativePath}: ${lines} lines exceeds ${maximum}`);
@@ -44,7 +53,9 @@ const appData = "client/src/app/useAuthenticatedAppData.ts";
 requireText(appData, "needsFactorySettings: boolean");
 requireText(appData, "needsFactorySettings,\n}: UseAuthenticatedAppDataOptions");
 requireText(appData, "enabled: userPresent && !isPOS && !!selectedCompanyId && needsFactorySettings");
-requireText(appData, "staleTime: 5 * 60 * 1000");
+requireText(appData, "staleTime: 30000");
+requireText(appData, "retry: 2");
+requireText(appData, "staleTime: 60000");
 
 const lazyAudit = "client/src/components/performance/LazyAuditLog.tsx";
 requireText(lazyAudit, 'lazy(() =>\n  import("@/pages/settings/AuditLog")');
@@ -80,6 +91,10 @@ for (const marker of [
 }
 forbidText(lazyPlugin, "try:\\n", "invalid try template");
 requireLineLimit(lazyPlugin, 260);
+
+const viteConfig = "vite.config.ts";
+requireOrder(viteConfig, "heavyListPaginationPlugin()", "lazyHeavyImportsPlugin()");
+requireOrder(viteConfig, "lazyHeavyImportsPlugin()", "react()");
 
 const combinedRows = "client/src/pages/location-inventory/useCombinedStockRows.ts";
 for (const marker of [
