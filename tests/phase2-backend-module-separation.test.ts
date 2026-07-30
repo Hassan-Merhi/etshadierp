@@ -1,19 +1,31 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8");
+const root = process.cwd();
+const read = (relativePath: string) => fs.readFileSync(path.resolve(root, relativePath), "utf8");
 
-function expectBefore(source: string, first: string, second: string) {
-  expect(source.indexOf(first)).toBeGreaterThanOrEqual(0);
-  expect(source.indexOf(second)).toBeGreaterThanOrEqual(0);
-  expect(source.indexOf(first)).toBeLessThan(source.indexOf(second));
+function expectInOrder(source: string, values: string[]) {
+  let previousIndex = -1;
+  for (const value of values) {
+    const index = source.indexOf(value);
+    expect(index, `${value} must be present`).toBeGreaterThan(previousIndex);
+    previousIndex = index;
+  }
 }
 
+const retiredFiles = [
+  "server/routesLegacy.ts",
+  "server/routes/authRoutesLegacy.ts",
+  "server/routes/customerRoutesLegacy.ts",
+  "server/routes/reportsRoutesLegacy.ts",
+];
+
 describe("Phase 2 backend module separation", () => {
-  it("keeps the public route entry point as a composition root", () => {
+  it("keeps the public route entry point as a focused composition root", () => {
     const source = read("server/routes.ts");
-    expect(source).toContain("registerLegacyRoutes(app)");
+    expectInOrder(source, ["registerOperationalMonitoringRoutes(app)", "registerApplicationRoutes(app)"]);
+    expect(source).not.toContain("registerLegacyRoutes");
     expect(source).not.toContain("app.get(");
     expect(source).not.toContain("app.post(");
     expect(source.split("\n").length).toBeLessThanOrEqual(30);
@@ -30,17 +42,22 @@ describe("Phase 2 backend module separation", () => {
 
   it("composes inventory read, adjustment, and movement modules", () => {
     const source = read("server/routes/inventoryRoutes.ts");
-    expect(source).toContain("registerInventoryListRoutes(app)");
-    expect(source).toContain("registerInventoryQuickAdjustRoutes(app)");
-    expect(source).toContain("registerInventoryMovementRoutes(app)");
+    expectInOrder(source, [
+      "registerInventoryListRoutes(app)",
+      "registerInventoryQuickAdjustRoutes(app)",
+      "registerInventoryMovementRoutes(app)",
+    ]);
     expect(source).not.toContain("db.transaction");
   });
 
-  it("registers focused customer domains before compatibility routes", () => {
+  it("composes customer domains directly without a compatibility registrar", () => {
     const source = read("server/routes/customerRoutes.ts");
-    expectBefore(source, "registerCustomerMasterRoutes(app)", "registerCustomerLegacyRoutes(app)");
-    expectBefore(source, "registerContainerSalesRoutes(app)", "registerCustomerLegacyRoutes(app)");
-    expectBefore(source, "registerCompanyTransferRoutes(app)", "registerCustomerLegacyRoutes(app)");
+    expectInOrder(source, [
+      "registerCustomerMasterRoutes(app)",
+      "registerContainerSalesRoutes(app)",
+      "registerCompanyTransferRoutes(app)",
+    ]);
+    expect(source).not.toContain("Legacy");
   });
 
   it("preserves container-sale and transfer accounting invariants", () => {
@@ -56,28 +73,35 @@ describe("Phase 2 backend module separation", () => {
     expect(simpleTransfer).toContain("deleteTransferVoucher");
   });
 
-  it("registers session and focused reporting routes before compatibility routes", () => {
+  it("composes auth and reporting domains directly", () => {
     const auth = read("server/routes/authRoutes.ts");
     const reports = read("server/routes/reportsRoutes.ts");
 
-    expectBefore(auth, "registerSessionRoutes(app)", "registerLegacyAuthRoutes(app)");
-    expectBefore(
-      reports,
+    expectInOrder(auth, [
+      "registerCoreAuthRoutes(app)",
+      "registerSessionRoutes(app)",
+      "registerAuthAuditLogRoutes(app)",
+      "registerUserAdministrationRoutes(app)",
+      "registerUserAccessRoutes(app)",
+      "registerCompanyAccessRoutes(app)",
+      "registerUserPresenceRoutes(app)",
+      "registerExchangeRateRoutes(app)",
+    ]);
+    expectInOrder(reports, [
       "registerReportsNetProfitStatementRoutes(app)",
-      "registerLegacyReportsRoutes(app)",
-    );
-    expectBefore(reports, "registerReportsClosingStockRoutes(app)", "registerLegacyReportsRoutes(app)");
-    expectBefore(reports, "registerDashboardAccountRoutes(app)", "registerLegacyReportsRoutes(app)");
+      "registerReportsClosingStockRoutes(app)",
+      "registerDashboardAccountRoutes(app)",
+      "registerReportsContainerTrackingRoutes(app)",
+      "registerReportsLedgerRoutes(app)",
+      "registerReportsVoucherDetailRoutes(app)",
+    ]);
+    expect(auth).not.toContain("LegacyAuth");
+    expect(reports).not.toContain("LegacyReports");
   });
 
-  it("keeps compatibility registries explicit and reviewable", () => {
-    for (const path of [
-      "server/routesLegacy.ts",
-      "server/routes/authRoutesLegacy.ts",
-      "server/routes/customerRoutesLegacy.ts",
-      "server/routes/reportsRoutesLegacy.ts",
-    ]) {
-      expect(read(path)).toContain("export");
+  it("keeps all retired route registry paths deleted", () => {
+    for (const relativePath of retiredFiles) {
+      expect(fs.existsSync(path.resolve(root, relativePath)), relativePath).toBe(false);
     }
   });
 });
