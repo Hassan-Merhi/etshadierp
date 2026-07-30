@@ -209,7 +209,9 @@ export function OffloadDialog({
     const dutyUsd = dutyPending ? 0 : parseFloat(dutyAmount || "0");
 
     const totalUsd = materialUsd + freightUsd + otherUsd + commissionUsd + extraUsd + dutyUsd;
-    return totalUsd / valuationKg;
+    // Divide by the received weight the user entered — cost/kg reflects the actual
+    // incoming stock, not the declared container weight.
+    return totalUsd / kg;
   }, [
     actualReceivedKg, selectedContainer, selectedContainerId, costPerKg, fxRateToUsd,
     freight, freightFxRate, otherCharges, otherChargesFxRate,
