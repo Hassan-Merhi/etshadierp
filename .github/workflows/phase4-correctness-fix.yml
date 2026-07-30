@@ -38,6 +38,7 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           service_path = Path("server/services/factory/postOffloadImpactPreview.ts")
           text = service_path.read_text()
@@ -50,100 +51,90 @@ jobs:
           } from "./rawStockLockedRate";''',
           )
 
-          supplier_quantity = '''  const supplierRemainingKg = container.supplierId
-            ? await getAuthoritativeSupplierRemainingKg(db, companyId, container.supplierId)
-            : 0;
-          '''
-          supplier_with_rate = '''  const supplierRemainingKg = container.supplierId
+          if "const supplierLockedRate = container.supplierId" not in text:
+              quantity_pattern = re.compile(
+                  r'  const supplierRemainingKg = container\.supplierId\s*'
+                  r'\? await getAuthoritativeSupplierRemainingKg\(db, companyId, container\.supplierId\)\s*'
+                  r': 0;',
+              )
+              quantity_replacement = '''  const supplierRemainingKg = container.supplierId
             ? await getAuthoritativeSupplierRemainingKg(db, companyId, container.supplierId)
             : 0;
           const supplierLockedRate = container.supplierId
             ? (await getLockedSupplierRateReadOnly(db, companyId, container.supplierId)).rate
-            : null;
-          '''
-          if "const supplierLockedRate = container.supplierId" not in text:
-              if supplier_quantity not in text:
+            : null;'''
+              text, count = quantity_pattern.subn(quantity_replacement, text, count=1)
+              if count != 1:
                   raise SystemExit("supplier quantity block not found")
-              text = text.replace(supplier_quantity, supplier_with_rate)
 
-          return_marker = '''    supplier,
-            supplierRemainingKg,
-            receivedKg,
-          '''
-          return_replacement = '''    supplier,
-            supplierRemainingKg,
-            supplierLockedRate,
-            receivedKg,
-          '''
-          if "supplierLockedRate," not in text.split("return {", 2)[-1]:
-              if return_marker not in text:
+          if re.search(r'\n\s+supplierLockedRate,\n\s+receivedKg,', text) is None:
+              return_pattern = re.compile(
+                  r'(\n\s+supplier,\n\s+supplierRemainingKg,)(\n\s+receivedKg,)',
+              )
+              text, count = return_pattern.subn(r'\1\n    supplierLockedRate,\2', text, count=1)
+              if count != 1:
                   raise SystemExit("preview state return block not found")
-              text = text.replace(return_marker, return_replacement, 1)
 
-          fingerprint_marker = '''    supplier: state.supplier,
-            supplierRemainingKg: formatFactoryQuantity(state.supplierRemainingKg),
-          '''
-          fingerprint_replacement = '''    supplier: state.supplier,
-            supplierRemainingKg: formatFactoryQuantity(state.supplierRemainingKg),
+          if "state.supplierLockedRate === null" not in text:
+              fingerprint_pattern = re.compile(
+                  r'(\s+supplier: state\.supplier,\n\s+supplierRemainingKg: formatFactoryQuantity\(state\.supplierRemainingKg\),)',
+              )
+              fingerprint_replacement = '''\1
             supplierLockedRate:
               state.supplierLockedRate === null
                 ? null
-                : formatFactoryLockedRate(state.supplierLockedRate),
-          '''
-          if "state.supplierLockedRate === null" not in text:
-              if fingerprint_marker not in text:
+                : formatFactoryLockedRate(state.supplierLockedRate),'''
+              text, count = fingerprint_pattern.subn(fingerprint_replacement, text, count=1)
+              if count != 1:
                   raise SystemExit("fingerprint supplier block not found")
-              text = text.replace(fingerprint_marker, fingerprint_replacement, 1)
 
           text = text.replace(
               "const currentSupplierRate = state.supplier?.rate ?? null;",
               "const currentSupplierRate = state.supplierLockedRate;",
           )
 
-          verification_marker = '''  const stateFingerprint = await computePostOffloadImpactStateFingerprint(input.companyId, input.containerId);
-            if (stateFingerprint !== payload.stateFingerprint) {
-              throw new StalePostOffloadImpactPreviewError();
-            }
-
-            return payload.preview;
-          '''
-          verification_replacement = '''  const stateFingerprint = await computePostOffloadImpactStateFingerprint(input.companyId, input.containerId);
-            if (stateFingerprint !== payload.stateFingerprint) {
-              throw new StalePostOffloadImpactPreviewError();
-            }
-
-            const recomputed = await preparePostOffloadImpactPreview({
-              companyId: input.companyId,
-              userId: input.userId,
-              containerId: input.containerId,
-              transactionDate,
-              charges: input.charges,
-            });
-            if (stableHash(recomputed.preview) !== stableHash(payload.preview)) {
-              throw new StalePostOffloadImpactPreviewError(
-                "Post-offload cost impact changed after preview. Review the updated impact before saving.",
-              );
-            }
-
-            return payload.preview;
-          '''
           if "const recomputed = await preparePostOffloadImpactPreview" not in text:
-              if verification_marker not in text:
+              verification_pattern = re.compile(
+                  r'(  const stateFingerprint = await computePostOffloadImpactStateFingerprint\('
+                  r'input\.companyId, input\.containerId\);\n'
+                  r'  if \(stateFingerprint !== payload\.stateFingerprint\) \{\n'
+                  r'    throw new StalePostOffloadImpactPreviewError\(\);\n'
+                  r'  \}\n)\n'
+                  r'  return payload\.preview;',
+              )
+              verification_replacement = '''\1
+          const recomputed = await preparePostOffloadImpactPreview({
+            companyId: input.companyId,
+            userId: input.userId,
+            containerId: input.containerId,
+            transactionDate,
+            charges: input.charges,
+          });
+          if (stableHash(recomputed.preview) !== stableHash(payload.preview)) {
+            throw new StalePostOffloadImpactPreviewError(
+              "Post-offload cost impact changed after preview. Review the updated impact before saving.",
+            );
+          }
+
+          return payload.preview;'''
+              text, count = verification_pattern.subn(verification_replacement, text, count=1)
+              if count != 1:
                   raise SystemExit("verification tail not found")
-              text = text.replace(verification_marker, verification_replacement)
 
           service_path.write_text(text)
 
           test_path = Path("tests/factory-post-offload-impact-preview.test.ts")
           tests = test_path.read_text()
-          tests = tests.replace(
-              'expect(service).toContain("calculateRateAfterInventoryValueDelta");',
-              'expect(service).toContain("calculateRateAfterInventoryValueDelta");\n    expect(service).toContain("getLockedSupplierRateReadOnly");',
-          )
-          tests = tests.replace(
-              'expect(service).toContain("StalePostOffloadImpactPreviewError");',
-              'expect(service).toContain("StalePostOffloadImpactPreviewError");\n    expect(service).toContain("const recomputed = await preparePostOffloadImpactPreview");\n    expect(service).toContain("stableHash(recomputed.preview)");',
-          )
+          if 'expect(service).toContain("getLockedSupplierRateReadOnly");' not in tests:
+              tests = tests.replace(
+                  'expect(service).toContain("calculateRateAfterInventoryValueDelta");',
+                  'expect(service).toContain("calculateRateAfterInventoryValueDelta");\n    expect(service).toContain("getLockedSupplierRateReadOnly");',
+              )
+          if 'expect(service).toContain("stableHash(recomputed.preview)");' not in tests:
+              tests = tests.replace(
+                  'expect(service).toContain("StalePostOffloadImpactPreviewError");',
+                  'expect(service).toContain("StalePostOffloadImpactPreviewError");\n    expect(service).toContain("const recomputed = await preparePostOffloadImpactPreview");\n    expect(service).toContain("stableHash(recomputed.preview)");',
+              )
           test_path.write_text(tests)
           PY
 
