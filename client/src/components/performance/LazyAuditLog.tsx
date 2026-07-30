@@ -1,11 +1,13 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ComponentProps } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const AuditLogPanel = lazy(() =>
   import("@/pages/settings/AuditLog").then((module) => ({ default: module.AuditLog })),
 );
 
-export function AuditLog(props: Record<string, unknown>) {
+type AuditLogProps = ComponentProps<typeof AuditLogPanel>;
+
+export function AuditLog(props: AuditLogProps) {
   return (
     <Suspense
       fallback={
