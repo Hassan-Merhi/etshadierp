@@ -9,7 +9,10 @@ export default defineConfig({
     hookTimeout: 30000,
     setupFiles: ["./server/supplierCompanyScopeBridge.mjs"],
     include: ["tests/**/*.test.ts"],
-    exclude: ["tests/ui/**"],
+    // The smoke sweep holds an ERP fixture company while it walks the whole
+    // read surface, which collides with any other suite holding one. It runs as
+    // its own invocation instead: npm run test:smoke-sweep
+    exclude: ["tests/ui/**", "tests/api-smoke-sweep.test.ts"],
     pool: "forks",
     singleFork: true,
     coverage: {

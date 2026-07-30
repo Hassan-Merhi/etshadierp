@@ -2,19 +2,6 @@
   "description": "Endpoints that return 5xx under the smoke sweep's seed data. This list is a ratchet: removing entries is progress, adding one accepts a known-broken endpoint. Regenerate with UPDATE_API_SMOKE_BASELINE=1.",
   "knownFailing": [
     "/api/accounts/multi-currency/unresolved-openings",
-    "/api/auth/passkey/list",
-    "/api/git/agent-duty-wa-settings",
-    "/api/git/containers-wa-settings",
-    "/api/git/transfer-wa-settings",
-    "/api/sessions",
-    "/api/whatsapp/chats",
-    "/api/whatsapp/chats/pos",
-    "/api/whatsapp/instance-state/main",
-    "/api/whatsapp/instance-state/pos",
-    "/api/whatsapp/np-settings",
-    "/api/whatsapp/recipients",
-    "/api/whatsapp/settings",
-    "/api/whatsapp/settings/pos",
-    "/api/whatsapp/stock-settings"
+    "/api/sessions"
   ]
 }

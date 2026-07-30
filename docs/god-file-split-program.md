@@ -63,11 +63,22 @@ helper that moved without being re-exported, or a circular import resolving to
 
 Mutating, long-running, and file-generating endpoints are excluded — the
 exclusion list is deliberately narrow. Endpoints that fail under test seed data
-are recorded in `config/api-smoke-baseline.json` (15 today, all integration-
-config dependent: WhatsApp, passkeys, sessions). That list is a ratchet.
+are recorded in `config/api-smoke-baseline.json` — 2 today, both dependent on
+state the test harness does not create (`GET /api/sessions` reads the
+`connect-pg-simple` session table). Stale entries are reported, not asserted:
+whether a baselined endpoint fails varies by environment, so failing the build
+on it would buy no safety.
 
 Each request has a 15s deadline, because a handler that throws without
 responding would otherwise hang CI rather than fail it.
+
+The sweep runs as its own Vitest invocation (`npm run test:smoke-sweep`, wired
+into CI as a separate step) rather than inside the backend suite. It holds a
+seeded ERP company for the few seconds it takes to walk the read surface, and
+several endpoints are only well-defined when exactly one ERP company exists —
+`resolveParentCompanyId()` refuses to guess which company owns legacy supplier
+opening balances otherwise. Backend test files are not serialised against each
+other, so process-level isolation is the only reliable separation.
 
 ### 0.3 Source-text assertion triage (`config/source-text-assertion-baseline.json`)
 
@@ -159,3 +170,13 @@ These were surfaced by the harness and are not yet acted on:
 - **`GET /api/production-bales/next-barcode` writes** — it allocates a
   `bale_sequences` row on read. Found because test cleanup began failing on a
   foreign key after a read-only sweep.
+- **A `GET` endpoint persists `equity_adjustment_<companyId>` rows** into the
+  global `system_settings` table, so a read-only pass leaves state behind.
+- **The backend suite is flaky on `/api/accounts/all`.** Two runs of identical
+  code produced 8 and then 14 failures. The cause is `resolveParentCompanyId()`,
+  which throws when `parentCompanyId` is unset and more than one ERP company
+  exists; test files are not serialised, so any two suites holding an ERP
+  fixture company at the same time break each other. Affected assertions live in
+  `accounting`, `api-smoke`, `permissions`, and
+  `rental-payment-accounting-reconciliation`. Worth fixing before the split
+  phases begin — a suite that fails randomly cannot certify a refactor.
