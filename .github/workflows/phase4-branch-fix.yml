@@ -1,0 +1,131 @@
+name: Phase 4 Branch Fix
+
+on:
+  push:
+    branches:
+      - fix/phase-4-post-offload-impact-preview
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v7
+        with:
+          ref: fix/phase-4-post-offload-impact-preview
+          fetch-depth: 0
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Normalize registry and install
+        run: |
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+          npm ci --no-audit --bin-links=true
+
+      - name: Make impact preview fully read-only and snapshot-consistent
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("server/services/factory/postOffloadImpactPreview.ts")
+          text = path.read_text()
+          text = text.replace(
+              'import { getOrFetchFxRateToUsd } from "../../routes/factory/_helpers";',
+              'import { getFxRateToUsdReadOnly } from "./factoryFxRateReadOnly";',
+          )
+          text = text.replace(
+              "const fetched = await getOrFetchFxRateToUsd(",
+              "const fetched = await getFxRateToUsdReadOnly(",
+          )
+
+          old_fingerprint = '''export async function computePostOffloadImpactStateFingerprint(
+            companyId: number,
+            containerId: number,
+          ): Promise<string> {
+            const state = await loadPreviewState(companyId, containerId);
+            return stableHash({
+              container: state.container,
+              activeCharges: [...state.activeCharges].sort((left, right) => left.id - right.id),
+              commission: state.commission,
+              otherCharges: [...state.otherCharges].sort((left, right) => left.id - right.id),
+              rawStockRows: [...state.rawStockRows].sort((left, right) => left.id - right.id),
+              supplier: state.supplier,
+              supplierRemainingKg: formatFactoryQuantity(state.supplierRemainingKg),
+            });
+          }
+          '''
+          new_fingerprint = '''function fingerprintPostOffloadImpactState(
+            state: Awaited<ReturnType<typeof loadPreviewState>>,
+          ): string {
+            return stableHash({
+              container: state.container,
+              activeCharges: [...state.activeCharges].sort((left, right) => left.id - right.id),
+              commission: state.commission,
+              otherCharges: [...state.otherCharges].sort((left, right) => left.id - right.id),
+              rawStockRows: [...state.rawStockRows].sort((left, right) => left.id - right.id),
+              supplier: state.supplier,
+              supplierRemainingKg: formatFactoryQuantity(state.supplierRemainingKg),
+            });
+          }
+
+          export async function computePostOffloadImpactStateFingerprint(
+            companyId: number,
+            containerId: number,
+          ): Promise<string> {
+            return fingerprintPostOffloadImpactState(await loadPreviewState(companyId, containerId));
+          }
+          '''
+          if old_fingerprint not in text:
+              raise SystemExit("fingerprint block not found")
+          text = text.replace(old_fingerprint, new_fingerprint)
+
+          old_parallel = '''  const [scope, replaySafety, stateFingerprint] = await Promise.all([
+            loadImpactScope(input.companyId, state.container.supplierId),
+            loadReplaySafety(input.companyId, state.container.supplierId),
+            computePostOffloadImpactStateFingerprint(input.companyId, input.containerId),
+          ]);
+          '''
+          new_parallel = '''  const [scope, replaySafety] = await Promise.all([
+            loadImpactScope(input.companyId, state.container.supplierId),
+            loadReplaySafety(input.companyId, state.container.supplierId),
+          ]);
+          const stateFingerprint = fingerprintPostOffloadImpactState(state);
+          '''
+          if old_parallel not in text:
+              raise SystemExit("parallel fingerprint block not found")
+          text = text.replace(old_parallel, new_parallel)
+          path.write_text(text)
+          PY
+
+      - name: Format Phase 4 files
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            client/src/lib/factoryApi.ts \
+            server/routes/factory/factoryRawStockRoutes.ts \
+            server/routes/factory/raw-stock/index.ts \
+            server/routes/factory/raw-stock/postOffloadHistoricalReplayMiddleware.ts \
+            server/routes/factory/raw-stock/postOffloadImpactPreviewMiddleware.ts \
+            server/routes/factory/raw-stock/postOffloadImpactPreviewRoutes.ts \
+            server/services/factory/factoryFxRateReadOnly.ts \
+            server/services/factory/postOffloadImpactPreview.ts \
+            tests/factory-post-offload-impact-preview.test.ts
+
+      - name: Commit generated fixes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/src/lib/factoryApi.ts server/routes/factory server/services/factory tests/factory-post-offload-impact-preview.test.ts
+          if git diff --cached --quiet; then
+            echo "No generated changes"
+            exit 0
+          fi
+          git commit -m "fix: make phase 4 preview read-only and formatted"
+          git push origin HEAD:fix/phase-4-post-offload-impact-preview
