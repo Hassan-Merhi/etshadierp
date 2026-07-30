@@ -1,43 +1,49 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = process.cwd();
-const read = (path) => readFileSync(resolve(root, path), "utf8");
+const read = (relativePath) => readFileSync(resolve(root, relativePath), "utf8");
 const failures = [];
 
-function requireText(path, needle, label = needle) {
-  const source = read(path);
-  if (!source.includes(needle)) failures.push(`${path}: missing ${label}`);
+function requireText(relativePath, needle, label = needle) {
+  const source = read(relativePath);
+  if (!source.includes(needle)) failures.push(`${relativePath}: missing ${label}`);
   return source;
 }
 
-function forbidText(path, needle, label = needle) {
-  const source = read(path);
-  if (source.includes(needle)) failures.push(`${path}: contains forbidden ${label}`);
+function forbidText(relativePath, needle, label = needle) {
+  const source = read(relativePath);
+  if (source.includes(needle)) failures.push(`${relativePath}: contains forbidden ${label}`);
   return source;
 }
 
-function requireOrder(path, first, second) {
-  const source = read(path);
-  const firstIndex = source.indexOf(first);
-  const secondIndex = source.indexOf(second);
-  if (firstIndex < 0 || secondIndex < 0 || firstIndex >= secondIndex) {
-    failures.push(`${path}: expected ${first} before ${second}`);
+function requireInOrder(relativePath, values) {
+  const source = read(relativePath);
+  let previousIndex = -1;
+  for (const value of values) {
+    const index = source.indexOf(value);
+    if (index <= previousIndex) {
+      failures.push(`${relativePath}: expected ordered registration for ${value}`);
+      return;
+    }
+    previousIndex = index;
   }
 }
 
-const rootRoutes = requireText("server/routes.ts", "registerLegacyRoutes(app)", "legacy registry delegation");
+const rootRoutes = requireText("server/routes.ts", "registerApplicationRoutes(app)", "application route composition");
+requireText("server/routes.ts", "registerOperationalMonitoringRoutes(app)", "operational monitoring registration");
 if (rootRoutes.split("\n").length > 30) failures.push("server/routes.ts: composition root exceeds 30 lines");
+forbidText("server/routes.ts", "registerLegacyRoutes", "legacy registry delegation");
 forbidText("server/routes.ts", "app.get(", "direct GET route registration");
 forbidText("server/routes.ts", "app.post(", "direct POST route registration");
 
-for (const compatibilityFile of [
+for (const retiredFile of [
   "server/routesLegacy.ts",
   "server/routes/authRoutesLegacy.ts",
   "server/routes/customerRoutesLegacy.ts",
   "server/routes/reportsRoutesLegacy.ts",
 ]) {
-  requireText(compatibilityFile, "export", "compatibility export");
+  if (existsSync(resolve(root, retiredFile))) failures.push(`${retiredFile}: retired compatibility path must remain deleted`);
 }
 
 const supplierRoutes = requireText("server/routes/supplierRoutes.ts", "supplierService");
@@ -52,17 +58,25 @@ const inventoryRoutes = requireText("server/routes/inventoryRoutes.ts", "registe
 for (const forbidden of ["../db", "../storage", "@shared/schema", "drizzle-orm"]) {
   if (inventoryRoutes.includes(forbidden)) failures.push(`server/routes/inventoryRoutes.ts: composition layer imports ${forbidden}`);
 }
+requireInOrder("server/routes/inventoryRoutes.ts", [
+  "registerInventoryListRoutes(app)",
+  "registerInventoryQuickAdjustRoutes(app)",
+  "registerInventoryMovementRoutes(app)",
+]);
 requireText("server/routes/inventory/inventoryQueryService.ts", ".limit(filters.pageSize)");
 requireText("server/routes/inventory/inventoryQuickAdjustService.ts", "Supplier Partner companies must use SP Sales");
 requireText("server/routes/inventory/inventoryQuickAdjustService.ts", "db.transaction");
 
-requireOrder("server/routes/customerRoutes.ts", "registerCustomerMasterRoutes(app)", "registerCustomerLegacyRoutes(app)");
-requireOrder("server/routes/customerRoutes.ts", "registerContainerSalesRoutes(app)", "registerCustomerLegacyRoutes(app)");
-requireOrder("server/routes/customerRoutes.ts", "registerCompanyTransferRoutes(app)", "registerCustomerLegacyRoutes(app)");
+requireInOrder("server/routes/customerRoutes.ts", [
+  "registerCustomerMasterRoutes(app)",
+  "registerContainerSalesRoutes(app)",
+  "registerCompanyTransferRoutes(app)",
+]);
+forbidText("server/routes/customerRoutes.ts", "Legacy", "legacy customer registrar");
 requireText("server/routes/customers/customerBalanceQuery.ts", "historicalBaseBalance");
 requireText("server/routes/customers/customerService.ts", "Accounts Receivable");
 requireText("server/routes/containers/containerSalesService.ts", "db.transaction");
-requireText("server/routes/containers/containerSalesService.ts", "status: \"SOLD\"");
+requireText("server/routes/containers/containerSalesService.ts", 'status: "SOLD"');
 
 requireText("server/routes/transfers/transferRepository.ts", "listSimpleTransfers");
 requireText("server/routes/transfers/interCompanyTransferService.ts", "IC-TO-");
@@ -70,28 +84,32 @@ requireText("server/routes/transfers/interCompanyTransferService.ts", "IC-FROM-"
 requireText("server/routes/transfers/simpleCompanyTransferService.ts", "TRANSFER-CLEARING");
 requireText("server/routes/transfers/simpleCompanyTransferService.ts", "deleteTransferVoucher");
 
-requireOrder("server/routes/authRoutes.ts", "registerSessionRoutes(app)", "registerLegacyAuthRoutes(app)");
+requireInOrder("server/routes/authRoutes.ts", [
+  "registerCoreAuthRoutes(app)",
+  "registerSessionRoutes(app)",
+  "registerAuthAuditLogRoutes(app)",
+  "registerUserAdministrationRoutes(app)",
+  "registerUserAccessRoutes(app)",
+  "registerCompanyAccessRoutes(app)",
+  "registerUserPresenceRoutes(app)",
+  "registerExchangeRateRoutes(app)",
+]);
+forbidText("server/routes/authRoutes.ts", "authRoutesLegacy", "retired auth import");
 requireText("server/routes/auth/sessionRepository.ts", "FROM session");
 requireText("server/routes/auth/sessionService.ts", "ADMIN_SESSION_ROLES");
 requireText("server/routes/auth/sessionRoutes.ts", '"/api/login-history"');
 
-requireOrder(
-  "server/routes/reportsRoutes.ts",
+requireInOrder("server/routes/reportsRoutes.ts", [
   "registerReportsNetProfitStatementRoutes(app)",
-  "registerLegacyReportsRoutes(app)",
-);
-requireOrder(
-  "server/routes/reportsRoutes.ts",
   "registerReportsClosingStockRoutes(app)",
-  "registerLegacyReportsRoutes(app)",
-);
-requireOrder(
-  "server/routes/reportsRoutes.ts",
   "registerDashboardAccountRoutes(app)",
-  "registerLegacyReportsRoutes(app)",
-);
+  "registerReportsContainerTrackingRoutes(app)",
+  "registerReportsLedgerRoutes(app)",
+  "registerReportsVoucherDetailRoutes(app)",
+]);
+forbidText("server/routes/reportsRoutes.ts", "reportsRoutesLegacy", "retired reports import");
 
-for (const existingComposer of [
+for (const [relativePath, marker] of [
   ["server/routes/voucherRoutes.ts", "registerVoucherQueryRoutes"],
   ["server/routes/containerRoutes.ts", "registerContainerCrudRoutes"],
   ["server/routes/ledgerRoutes.ts", "registerLegacyLedgerRoutes"],
@@ -99,7 +117,7 @@ for (const existingComposer of [
   ["server/routes/factoryRoutes.ts", "registerFactoryStockRoutes"],
   ["server/routes/rentalRouteFactory.ts", "registerRentalUnitsContractsRoutes"],
 ]) {
-  requireText(existingComposer[0], existingComposer[1]);
+  requireText(relativePath, marker);
 }
 
 if (failures.length > 0) {
