@@ -268,7 +268,6 @@
       "server/routes/payrollRoutes.ts": 2025,
       "server/routes/rental/_rentalShared.ts": 1175,
       "server/routes/rental/rentalUnitsContractsRoutes.ts": 1875,
-      "server/routes/spMigrationRoutes.ts": 2350,
       "server/routes/stats/statsNetProfitRoutes.ts": 1125,
       "server/routes/stock/stockGroupsItemsRoutes.ts": 1175,
       "server/routes/stock/stockMergeRoutes.ts": 1350,

@@ -50,7 +50,7 @@ import { registerPropertiesRentalRoutes } from "./propertiesRentalRoutes";
 import { registerReportsRoutes } from "./reportsRoutes";
 import { registerScreenFeedRoutes } from "./screenFeedRoutes";
 import { registerSpRoutes } from "./sp";
-import { registerSpMigrationRoutes } from "./spMigrationRoutes";
+import { registerSpMigrationRoutes } from "./sp-migration";
 import { registerStatsRoutes } from "./statsRoutes";
 import { registerStockRoutes } from "./stockRoutes";
 import { registerStockSummaryRoutes } from "./stockSummaryRoutes";

@@ -140,7 +140,7 @@ npm run audit:god-files
 |---|---|---|
 | 1 | ~~`server/startupSchema.ts`~~ | **Done.** Split into ten parts under `server/startup-schema/`, largest 772 lines. Order preserved and proven by a sha256 pin of the assembled array in `tests/startup-schema-integrity.test.ts`. |
 | 2 | ~~Delete before splitting~~ | **Done, and the premise was wrong** — see below. No file was deletable; three dead *handlers* (349 lines) were removed instead. |
-| 3 | Route monoliths (~71 files) | **In progress.** Split by URL prefix into a directory with an `index.ts` barrel. `gitRoutes.ts` (1,969) done as the template. |
+| 3 | Route monoliths (~71 files) | **In progress.** Split by URL prefix into a directory with an `index.ts` barrel. `gitRoutes.ts` (1,969) and `spMigrationRoutes.ts` (2,349) done. |
 | 4 | Page components (~63 files) | Extract types, then pure helpers, then sub-components, then hooks — strictly safest first. |
 | 5 | `shared/schema/*.ts` | Highest blast radius, lowest urgency. Barrel must preserve every export name. |
 | 6 | Tighten the ratchet | Lower `softMaxLines` as the backlog empties. |
@@ -217,6 +217,14 @@ What made it verifiable:
   several, because a symbol that is genuinely used somewhere in a 2,000-line
   file is usually not used in every 300-line piece of it. Trim per module until
   lint is clean again.
+
+`spMigrationRoutes.ts` (2,349 lines, 19 endpoints) followed the same recipe and
+became `server/routes/sp-migration/` in five modules plus `_helpers.ts`. One
+extra wrinkle: `ensureTargetLocation` was defined *inside* the registration
+function, so it had to be hoisted into `_helpers.ts` before the endpoints that
+use it could move. Nested declarations are worth grepping for before choosing
+cut points — `^  (const|function|async function)` inside the register body finds
+them.
 
 ## A note on scope
 
