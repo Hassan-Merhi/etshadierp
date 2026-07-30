@@ -127,6 +127,11 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     await pool.query("DELETE FROM factory_containers WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_suppliers WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_daybook_entries WHERE company_id = $1", [company.id]);
+    // Barcode sequence rows are allocated lazily on read — GET
+    // /api/production-bales/next-barcode writes one — so a test that only
+    // exercises read endpoints can still leave an FK reference behind.
+    await pool.query("DELETE FROM bale_sequences WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_bale_sequences WHERE company_id = $1", [company.id]);
     await db.delete(schema.companies).where(eq(schema.companies.id, company.id));
   }
 

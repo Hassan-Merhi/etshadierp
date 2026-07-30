@@ -83,27 +83,40 @@ export function auditGodFileBoundaries() {
       collectSourceFiles(root, config.repositoryScan, sourcePaths);
     }
 
+    // Files already over the limit when the ratchet was introduced are frozen
+    // at their recorded size rather than exempted. They may shrink freely, but
+    // any growth fails - so the backlog can only get smaller while the split
+    // program runs.
+    const grandfathered = config.repositoryScan.grandfathered ?? {};
+    const bucket = config.repositoryScan.ratchetBucketLines ?? 25;
+
     sourcePaths.sort();
     for (const relativePath of sourcePaths) {
       const lines = countLines(readText(relativePath));
-      const severity =
-        lines > config.repositoryScan.hardMaxLines
-          ? "failure"
-          : lines > config.repositoryScan.softMaxLines
-            ? "warning"
-            : "ok";
+      const isGrandfathered = Object.prototype.hasOwnProperty.call(grandfathered, relativePath);
+      const cap = isGrandfathered ? grandfathered[relativePath] : config.repositoryScan.softMaxLines;
 
-      if (severity === "failure") {
+      let severity = "ok";
+      if (lines > cap) {
+        severity = "failure";
         failures.push(
-          `${relativePath} has ${lines} lines; repository hard maximum is ${config.repositoryScan.hardMaxLines}`
+          isGrandfathered
+            ? `${relativePath} has ${lines} lines; its frozen baseline is ${cap}. Oversized files may shrink but never grow - split it instead of extending it.`
+            : `${relativePath} has ${lines} lines; the repository maximum is ${cap}. Split it, or record a baseline entry in config/god-file-boundaries.json if the size is genuinely unavoidable.`
         );
-      } else if (severity === "warning") {
-        warnings.push(
-          `${relativePath} has ${lines} lines; consider splitting before it exceeds ${config.repositoryScan.hardMaxLines}`
-        );
+      } else if (isGrandfathered) {
+        severity = "grandfathered";
+        // Baselines are rounded up to a whole bucket, so every file starts just
+        // under its cap. Only nudge once a full bucket has actually been
+        // recovered, otherwise the rounding itself would warn on every file.
+        if (lines <= cap - bucket) {
+          warnings.push(
+            `${relativePath} is now ${lines} lines, at least one bucket below its frozen baseline of ${cap}; lower the baseline to lock in the gain`
+          );
+        }
       }
 
-      scannedFiles.push({ path: relativePath, lines, severity });
+      scannedFiles.push({ path: relativePath, lines, cap, severity });
     }
   }
 
@@ -119,6 +132,16 @@ export function auditGodFileBoundaries() {
       scannedFiles: scannedFiles.length,
       warningFiles: scannedFiles.filter((file) => file.severity === "warning").length,
       failedScanFiles: scannedFiles.filter((file) => file.severity === "failure").length,
+      grandfatheredFiles: scannedFiles.filter((file) => file.severity === "grandfathered").length,
+      // Lines carried above the repository limit by grandfathered files. This is
+      // the split program's backlog expressed as a single number, and it should
+      // fall monotonically.
+      grandfatheredExcessLines: scannedFiles
+        .filter((file) => file.severity === "grandfathered")
+        .reduce(
+          (total, file) => total + Math.max(0, file.lines - config.repositoryScan.softMaxLines),
+          0
+        ),
     },
   };
 }
