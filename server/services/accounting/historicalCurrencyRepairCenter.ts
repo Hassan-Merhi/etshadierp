@@ -1,8 +1,20 @@
 import crypto from "node:crypto";
+import Decimal from "decimal.js";
 import type { PoolClient } from "pg";
 import { pool } from "../../db";
 import { normalizeOpeningBalanceCurrency } from "./openingBalanceCurrency";
-import { normalizeVoucherEntryAmounts } from "./currencyAmounts";
+import {
+  normalizeCurrencyCode,
+  normalizeVoucherEntryAmounts,
+  validateHistoricalRate,
+} from "./currencyAmounts";
+import {
+  recommendOpeningRepair,
+  recommendVoucherRepair,
+  type HistoricalRepairClassification,
+  type HistoricalRepairRecommendation,
+  type StoredAmountMode,
+} from "./historicalCurrencyRepairRecommendations";
 
 export type HistoricalRepairKind =
   | "voucherEntry"
@@ -18,6 +30,7 @@ export interface HistoricalRepairInput {
   id: number;
   currency: string;
   historicalRate: string | number;
+  storedAmountMode?: StoredAmountMode;
   transactionDebitAmount?: string | number;
   transactionCreditAmount?: string | number;
   nativeAmount?: string | number;
@@ -32,15 +45,27 @@ export interface HistoricalRepairCase {
   label: string;
   currency: string | null;
   rawAmount: string | null;
+  nativeAmount: string | null;
   currentRate: string | null;
   currentBaseAmount: string | null;
   voucherId?: number;
+  voucherNumber?: string | null;
+  voucherType?: string | null;
   voucherDate?: string;
+  sourceModule?: string | null;
+  voucherCurrency?: string | null;
+  voucherExchangeRate?: string | null;
   debitAmount?: string | null;
   creditAmount?: string | null;
   transactionDebitAmount?: string | null;
   transactionCreditAmount?: string | null;
+  baseDebitAmount?: string | null;
+  baseCreditAmount?: string | null;
   side?: string | null;
+  classification: HistoricalRepairClassification;
+  autoRepairable: boolean;
+  reason: string;
+  recommendation: HistoricalRepairRecommendation;
   versionTag: string;
 }
 
@@ -54,6 +79,7 @@ export interface HistoricalRepairPlan {
   companyId: number;
   createdAt: string;
   itemCount: number;
+  voucherCount: number;
   fingerprint: string;
   items: HistoricalRepairPlanItem[];
 }
@@ -157,6 +183,14 @@ function versionTag(row: Record<string, unknown>): string {
   return stableFingerprint(row);
 }
 
+function decimalTotal(debit: unknown, credit: unknown): string {
+  try {
+    return new Decimal(String(debit ?? 0)).plus(String(credit ?? 0)).toDecimalPlaces(6).toFixed(6);
+  } catch {
+    return "0.000000";
+  }
+}
+
 async function getBaseCurrency(companyId: number, client = pool): Promise<string> {
   const result = await client.query<{ base_currency: string | null }>(
     "SELECT base_currency FROM companies WHERE id = $1",
@@ -175,13 +209,28 @@ function supplierScope(alias: string): string {
   )`;
 }
 
+function openingIncomplete(config: OpeningConfig, alias: string): string {
+  return `(
+    ${alias}.${config.nativeColumn} IS NULL
+    OR ${alias}.${config.currencyColumn} IS NULL
+    OR ${alias}.${config.baseColumn} IS NULL
+    OR (
+      ${alias}.${config.currencyColumn} IS NOT NULL
+      AND UPPER(${alias}.${config.currencyColumn}) <> 'USD'
+      AND ${alias}.${config.rateColumn} IS NULL
+    )
+  )`;
+}
+
 async function loadVoucherEntryCase(
   companyId: number,
   id: number,
   client = pool,
+  knownBaseCurrency?: string,
 ): Promise<HistoricalRepairCase | null> {
   const result = await client.query(
     `SELECT ve.id, ve.voucher_id, v.voucher_date, v.currency AS voucher_currency,
+            v.exchange_rate AS voucher_exchange_rate, v.voucher_number, v.voucher_type, v.source_module,
             ve.transaction_currency, ve.transaction_debit_amount, ve.transaction_credit_amount,
             ve.base_debit_amount, ve.base_credit_amount, ve.historical_exchange_rate,
             ve.debit_amount, ve.credit_amount, COALESCE(ve.narration, v.description, v.voucher_number) AS label
@@ -193,11 +242,14 @@ async function loadVoucherEntryCase(
   );
   const row = result.rows[0];
   if (!row) return null;
+  const baseCurrency = knownBaseCurrency || (await getBaseCurrency(companyId, client));
   const snapshot = {
     id: row.id,
     voucherId: row.voucher_id,
     voucherDate: row.voucher_date,
-    currency: row.transaction_currency || row.voucher_currency || "USD",
+    voucherCurrency: row.voucher_currency,
+    voucherExchangeRate: row.voucher_exchange_rate,
+    transactionCurrency: row.transaction_currency,
     transactionDebitAmount: row.transaction_debit_amount,
     transactionCreditAmount: row.transaction_credit_amount,
     baseDebitAmount: row.base_debit_amount,
@@ -206,20 +258,44 @@ async function loadVoucherEntryCase(
     debitAmount: row.debit_amount,
     creditAmount: row.credit_amount,
   };
-  return {
-    kind: "voucherEntry",
-    id: row.id,
-    label: row.label || `Voucher entry #${row.id}`,
-    currency: snapshot.currency,
-    rawAmount: String(Number(row.debit_amount || 0) + Number(row.credit_amount || 0)),
-    currentRate: row.historical_exchange_rate,
-    currentBaseAmount: String(Number(row.base_debit_amount || 0) + Number(row.base_credit_amount || 0)),
-    voucherId: row.voucher_id,
-    voucherDate: String(row.voucher_date),
+  const recommendation = recommendVoucherRepair({
+    voucherCurrency: row.transaction_currency || row.voucher_currency,
+    voucherExchangeRate: row.voucher_exchange_rate,
+    historicalExchangeRate: row.historical_exchange_rate,
     debitAmount: row.debit_amount,
     creditAmount: row.credit_amount,
     transactionDebitAmount: row.transaction_debit_amount,
     transactionCreditAmount: row.transaction_credit_amount,
+    baseDebitAmount: row.base_debit_amount,
+    baseCreditAmount: row.base_credit_amount,
+    baseCurrency,
+  });
+  return {
+    kind: "voucherEntry",
+    id: row.id,
+    label: row.label || `Voucher entry #${row.id}`,
+    currency: row.transaction_currency || row.voucher_currency || null,
+    rawAmount: decimalTotal(row.debit_amount, row.credit_amount),
+    nativeAmount: decimalTotal(row.transaction_debit_amount, row.transaction_credit_amount),
+    currentRate: row.historical_exchange_rate || row.voucher_exchange_rate || null,
+    currentBaseAmount: decimalTotal(row.base_debit_amount, row.base_credit_amount),
+    voucherId: row.voucher_id,
+    voucherNumber: row.voucher_number,
+    voucherType: row.voucher_type,
+    voucherDate: String(row.voucher_date),
+    sourceModule: row.source_module,
+    voucherCurrency: row.voucher_currency,
+    voucherExchangeRate: row.voucher_exchange_rate,
+    debitAmount: row.debit_amount,
+    creditAmount: row.credit_amount,
+    transactionDebitAmount: row.transaction_debit_amount,
+    transactionCreditAmount: row.transaction_credit_amount,
+    baseDebitAmount: row.base_debit_amount,
+    baseCreditAmount: row.base_credit_amount,
+    classification: recommendation.classification,
+    autoRepairable: recommendation.autoRepairable,
+    reason: recommendation.reason,
+    recommendation,
     versionTag: versionTag(snapshot),
   };
 }
@@ -229,6 +305,7 @@ async function loadOpeningCase(
   kind: Exclude<HistoricalRepairKind, "voucherEntry">,
   id: number,
   client = pool,
+  knownBaseCurrency?: string,
 ): Promise<HistoricalRepairCase | null> {
   const config = OPENING_CONFIG[kind];
   const clauses = ["target.id = $1"];
@@ -250,6 +327,7 @@ async function loadOpeningCase(
   );
   const row = result.rows[0];
   if (!row) return null;
+  const baseCurrency = knownBaseCurrency || (await getBaseCurrency(companyId, client));
   const snapshot = {
     id: row.id,
     rawAmount: row.raw_amount,
@@ -259,15 +337,28 @@ async function loadOpeningCase(
     baseAmount: row.base_amount,
     side: row.side || null,
   };
+  const recommendation = recommendOpeningRepair({
+    currency: row.currency,
+    historicalRate: row.historical_rate,
+    rawAmount: row.raw_amount,
+    nativeAmount: row.native_amount,
+    baseAmount: row.base_amount,
+    baseCurrency,
+  });
   return {
     kind,
     id: row.id,
     label: row.label || `${kind} #${row.id}`,
     currency: row.currency,
     rawAmount: row.raw_amount,
+    nativeAmount: row.native_amount,
     currentRate: row.historical_rate,
     currentBaseAmount: row.base_amount,
     side: row.side || null,
+    classification: recommendation.classification,
+    autoRepairable: recommendation.autoRepairable,
+    reason: recommendation.reason,
+    recommendation,
     versionTag: versionTag(snapshot),
   };
 }
@@ -278,44 +369,92 @@ export async function loadHistoricalRepairCase(
   id: number,
   client = pool,
 ): Promise<HistoricalRepairCase | null> {
+  const baseCurrency = await getBaseCurrency(companyId, client);
   return kind === "voucherEntry"
-    ? loadVoucherEntryCase(companyId, id, client)
-    : loadOpeningCase(companyId, kind, id, client);
+    ? loadVoucherEntryCase(companyId, id, client, baseCurrency)
+    : loadOpeningCase(companyId, kind, id, client, baseCurrency);
 }
 
 export async function listHistoricalRepairCases(companyId: number): Promise<HistoricalRepairCase[]> {
+  const baseCurrency = await getBaseCurrency(companyId);
   const entryResult = await pool.query<{ id: number }>(
     `SELECT ve.id
        FROM voucher_entries ve
        JOIN vouchers v ON v.id = ve.voucher_id
       WHERE v.company_id = $1 AND v.optional = false AND v.deleted_at IS NULL
         AND COALESCE(UPPER(v.currency), 'USD') <> 'USD'
-        AND (ve.base_debit_amount IS NULL OR ve.base_credit_amount IS NULL)
+        AND (
+          ve.transaction_currency IS NULL OR ve.transaction_debit_amount IS NULL OR ve.transaction_credit_amount IS NULL
+          OR ve.base_debit_amount IS NULL OR ve.base_credit_amount IS NULL
+          OR ve.historical_exchange_rate IS NULL OR ve.rate_convention IS NULL
+        )
       ORDER BY v.voucher_date, v.id, ve.id
-      LIMIT 500`,
+      LIMIT 1000`,
     [companyId],
   );
   const openingResult = await pool.query<{ kind: HistoricalRepairKind; id: number }>(
     `SELECT * FROM (
-       SELECT 'ledger'::text AS kind, id FROM ledger_accounts WHERE company_id = $1 AND deleted_at IS NULL AND COALESCE(opening_balance, 0)::numeric <> 0 AND opening_balance_base_amount IS NULL
-       UNION ALL SELECT 'bank', id FROM bank_accounts WHERE company_id = $1 AND deleted_at IS NULL AND COALESCE(opening_balance, 0)::numeric <> 0 AND opening_balance_base_amount IS NULL
-       UNION ALL SELECT 'customer', id FROM customers WHERE company_id = $1 AND deleted_at IS NULL AND COALESCE(opening_balance, 0)::numeric <> 0 AND opening_balance_base_amount IS NULL
-       UNION ALL SELECT 'supplier', s.id FROM suppliers s WHERE s.deleted_at IS NULL AND COALESCE(s.opening_balance, 0)::numeric <> 0 AND s.opening_balance_base_amount IS NULL AND ${supplierScope("s")}
-       UNION ALL SELECT 'employee', id FROM employees WHERE company_id = $1 AND deleted_at IS NULL AND COALESCE(opening_balance, 0)::numeric <> 0 AND opening_balance_base_amount IS NULL
-       UNION ALL SELECT 'fixedAsset', id FROM fixed_assets WHERE company_id = $1 AND COALESCE(purchase_amount, 0)::numeric <> 0 AND purchase_base_amount IS NULL
-     ) unresolved ORDER BY kind, id LIMIT 500`,
+       SELECT 'ledger'::text AS kind, id FROM ledger_accounts target WHERE company_id = $1 AND deleted_at IS NULL AND COALESCE(opening_balance, 0)::numeric <> 0 AND ${openingIncomplete(OPENING_CONFIG.ledger, "target")}
+       UNION ALL SELECT 'bank', id FROM bank_accounts target WHERE company_id = $1 AND deleted_at IS NULL AND COALESCE(opening_balance, 0)::numeric <> 0 AND ${openingIncomplete(OPENING_CONFIG.bank, "target")}
+       UNION ALL SELECT 'customer', id FROM customers target WHERE company_id = $1 AND deleted_at IS NULL AND COALESCE(opening_balance, 0)::numeric <> 0 AND ${openingIncomplete(OPENING_CONFIG.customer, "target")}
+       UNION ALL SELECT 'supplier', target.id FROM suppliers target WHERE target.deleted_at IS NULL AND COALESCE(target.opening_balance, 0)::numeric <> 0 AND ${openingIncomplete(OPENING_CONFIG.supplier, "target")} AND ${supplierScope("target")}
+       UNION ALL SELECT 'employee', id FROM employees target WHERE company_id = $1 AND deleted_at IS NULL AND COALESCE(opening_balance, 0)::numeric <> 0 AND ${openingIncomplete(OPENING_CONFIG.employee, "target")}
+       UNION ALL SELECT 'fixedAsset', id FROM fixed_assets target WHERE company_id = $1 AND COALESCE(purchase_amount, 0)::numeric <> 0 AND ${openingIncomplete(OPENING_CONFIG.fixedAsset, "target")}
+     ) unresolved ORDER BY kind, id LIMIT 1000`,
     [companyId, companyId],
   );
   const cases: HistoricalRepairCase[] = [];
   for (const row of entryResult.rows) {
-    const found = await loadVoucherEntryCase(companyId, row.id);
+    const found = await loadVoucherEntryCase(companyId, row.id, pool, baseCurrency);
     if (found) cases.push(found);
   }
   for (const row of openingResult.rows) {
-    const found = await loadOpeningCase(companyId, row.kind as Exclude<HistoricalRepairKind, "voucherEntry">, row.id);
+    const found = await loadOpeningCase(
+      companyId,
+      row.kind as Exclude<HistoricalRepairKind, "voucherEntry">,
+      row.id,
+      pool,
+      baseCurrency,
+    );
     if (found) cases.push(found);
   }
   return cases;
+}
+
+export function automaticRepairInput(repairCase: HistoricalRepairCase): HistoricalRepairInput | null {
+  const recommendation = repairCase.recommendation;
+  if (!recommendation.autoRepairable || !recommendation.suggestedCurrency || !recommendation.suggestedHistoricalRate) {
+    return null;
+  }
+  if (repairCase.kind === "voucherEntry") {
+    if (!recommendation.suggestedTransactionDebitAmount || !recommendation.suggestedTransactionCreditAmount) return null;
+    return {
+      kind: "voucherEntry",
+      id: repairCase.id,
+      currency: recommendation.suggestedCurrency,
+      historicalRate: recommendation.suggestedHistoricalRate,
+      storedAmountMode: recommendation.suggestedStorageMode || "transaction",
+      transactionDebitAmount: recommendation.suggestedTransactionDebitAmount,
+      transactionCreditAmount: recommendation.suggestedTransactionCreditAmount,
+      note: `Safe automatic repair: ${recommendation.reason}`,
+    };
+  }
+  if (!recommendation.suggestedNativeAmount) return null;
+  return {
+    kind: repairCase.kind,
+    id: repairCase.id,
+    currency: recommendation.suggestedCurrency,
+    historicalRate: recommendation.suggestedHistoricalRate,
+    nativeAmount: recommendation.suggestedNativeAmount,
+    baseAmount: recommendation.suggestedBaseAmount || undefined,
+    side: repairCase.side === "Cr" ? "Cr" : "Dr",
+    note: `Safe automatic repair: ${recommendation.reason}`,
+  };
+}
+
+export async function listAutomaticHistoricalRepairs(companyId: number): Promise<HistoricalRepairInput[]> {
+  const cases = await listHistoricalRepairCases(companyId);
+  return cases.map(automaticRepairInput).filter((input): input is HistoricalRepairInput => input !== null);
 }
 
 function normalizePlanAfter(
@@ -323,14 +462,27 @@ function normalizePlanAfter(
   before: HistoricalRepairCase,
   baseCurrency: string,
 ): Record<string, string | null> {
-  const currency = String(input.currency || before.currency || "").trim().toUpperCase();
-  if (!currency) throw new Error(`${input.kind} #${input.id}: currency is required`);
+  const currency = normalizeCurrencyCode(String(input.currency || before.currency || ""));
   if (input.kind === "voucherEntry") {
+    let transactionDebitAmount = input.transactionDebitAmount;
+    let transactionCreditAmount = input.transactionCreditAmount;
+    if (transactionDebitAmount === undefined || transactionCreditAmount === undefined) {
+      if (input.storedAmountMode === "base") {
+        const rate = currency === normalizeCurrencyCode(baseCurrency)
+          ? new Decimal(1)
+          : validateHistoricalRate(input.historicalRate, `${input.kind} #${input.id} historical rate`);
+        transactionDebitAmount = new Decimal(before.baseDebitAmount ?? before.debitAmount ?? 0).times(rate).toFixed();
+        transactionCreditAmount = new Decimal(before.baseCreditAmount ?? before.creditAmount ?? 0).times(rate).toFixed();
+      } else {
+        transactionDebitAmount = before.transactionDebitAmount ?? before.debitAmount ?? "0";
+        transactionCreditAmount = before.transactionCreditAmount ?? before.creditAmount ?? "0";
+      }
+    }
     const normalized = normalizeVoucherEntryAmounts({
       transactionCurrency: currency,
       baseCurrency,
-      transactionDebitAmount: input.transactionDebitAmount ?? before.transactionDebitAmount ?? before.debitAmount ?? "0",
-      transactionCreditAmount: input.transactionCreditAmount ?? before.transactionCreditAmount ?? before.creditAmount ?? "0",
+      transactionDebitAmount,
+      transactionCreditAmount,
       historicalRate: input.historicalRate,
     });
     return {
@@ -346,7 +498,7 @@ function normalizePlanAfter(
     };
   }
   const normalized = normalizeOpeningBalanceCurrency({
-    openingBalance: input.nativeAmount ?? before.rawAmount ?? "0",
+    openingBalance: input.nativeAmount ?? before.nativeAmount ?? before.rawAmount ?? "0",
     openingBalanceCurrency: currency,
     openingBalanceHistoricalRate: input.historicalRate,
     openingBalanceBaseAmount: input.baseAmount,
@@ -361,12 +513,50 @@ function normalizePlanAfter(
   };
 }
 
+async function assertCompleteVoucherCoverage(
+  companyId: number,
+  items: HistoricalRepairPlanItem[],
+): Promise<void> {
+  const selectedByVoucher = new Map<number, Set<number>>();
+  for (const item of items) {
+    if (item.input.kind !== "voucherEntry" || !item.before.voucherId) continue;
+    const selected = selectedByVoucher.get(item.before.voucherId) || new Set<number>();
+    selected.add(item.input.id);
+    selectedByVoucher.set(item.before.voucherId, selected);
+  }
+  if (selectedByVoucher.size === 0) return;
+  const voucherIds = [...selectedByVoucher.keys()];
+  const result = await pool.query<{ voucher_id: number; entry_ids: number[] }>(
+    `SELECT ve.voucher_id, ARRAY_AGG(ve.id ORDER BY ve.id) AS entry_ids
+       FROM voucher_entries ve
+       JOIN vouchers v ON v.id = ve.voucher_id
+      WHERE v.company_id = $1
+        AND v.id = ANY($2::int[])
+        AND v.deleted_at IS NULL AND v.optional = false
+        AND COALESCE(UPPER(v.currency), 'USD') <> 'USD'
+        AND (
+          ve.transaction_currency IS NULL OR ve.transaction_debit_amount IS NULL OR ve.transaction_credit_amount IS NULL
+          OR ve.base_debit_amount IS NULL OR ve.base_credit_amount IS NULL
+          OR ve.historical_exchange_rate IS NULL OR ve.rate_convention IS NULL
+        )
+      GROUP BY ve.voucher_id`,
+    [companyId, voucherIds],
+  );
+  for (const row of result.rows) {
+    const selected = selectedByVoucher.get(row.voucher_id) || new Set<number>();
+    const missing = (row.entry_ids || []).filter((id) => !selected.has(id));
+    if (missing.length > 0) {
+      throw new Error(`Voucher #${row.voucher_id} must be repaired as one complete batch; missing entry ids: ${missing.join(", ")}`);
+    }
+  }
+}
+
 export async function planHistoricalCurrencyRepairs(
   companyId: number,
   repairs: HistoricalRepairInput[],
 ): Promise<HistoricalRepairPlan> {
   if (!Array.isArray(repairs) || repairs.length === 0) throw new Error("At least one approved repair is required");
-  if (repairs.length > 200) throw new Error("A repair batch cannot exceed 200 rows");
+  if (repairs.length > 500) throw new Error("A repair batch cannot exceed 500 rows");
   const baseCurrency = await getBaseCurrency(companyId);
   const items: HistoricalRepairPlanItem[] = [];
   const seen = new Set<string>();
@@ -379,8 +569,16 @@ export async function planHistoricalCurrencyRepairs(
     if (!before) throw new Error(`${input.kind} #${input.id} was not found in the selected company`);
     items.push({ input, before, after: normalizePlanAfter(input, before, baseCurrency) });
   }
+  await assertCompleteVoucherCoverage(companyId, items);
   const fingerprint = stableFingerprint(items.map(({ input, before, after }) => ({ input, versionTag: before.versionTag, after })));
-  return { companyId, createdAt: new Date().toISOString(), itemCount: items.length, fingerprint, items };
+  return {
+    companyId,
+    createdAt: new Date().toISOString(),
+    itemCount: items.length,
+    voucherCount: new Set(items.flatMap((item) => item.before.voucherId ? [item.before.voucherId] : [])).size,
+    fingerprint,
+    items,
+  };
 }
 
 async function insertAudit(
@@ -411,16 +609,19 @@ async function applyPlanItem(client: PoolClient, companyId: number, item: Histor
   }
   if (item.input.kind === "voucherEntry") {
     const after = item.after;
-    await client.query(
-      `UPDATE voucher_entries
+    const result = await client.query(
+      `UPDATE voucher_entries ve
           SET transaction_currency = $1, transaction_debit_amount = $2, transaction_credit_amount = $3,
               base_debit_amount = $4, base_credit_amount = $5, historical_exchange_rate = $6,
               rate_convention = $7, debit_amount = $8, credit_amount = $9
-        WHERE id = $10`,
+         FROM vouchers v
+        WHERE ve.id = $10 AND v.id = ve.voucher_id AND v.company_id = $11
+          AND v.deleted_at IS NULL AND v.optional = false`,
       [after.transactionCurrency, after.transactionDebitAmount, after.transactionCreditAmount,
        after.baseDebitAmount, after.baseCreditAmount, after.historicalExchangeRate,
-       after.rateConvention, after.debitAmount, after.creditAmount, item.input.id],
+       after.rateConvention, after.debitAmount, after.creditAmount, item.input.id, companyId],
     );
+    if (result.rowCount !== 1) throw new Error(`voucherEntry #${item.input.id} was not updated in the selected company`);
     return;
   }
   const config = OPENING_CONFIG[item.input.kind];
@@ -435,14 +636,57 @@ async function applyPlanItem(client: PoolClient, companyId: number, item: Histor
     assignments.push(`${config.sideColumn} = $6`);
     values.push(item.after.side);
   }
+  const idIndex = values.length + 1;
   values.push(item.input.id);
-  await client.query(`UPDATE ${config.table} SET ${assignments.join(", ")} WHERE id = $${values.length}`, values);
+  const companyIndex = values.length + 1;
+  values.push(companyId);
+  const scope = config.companyColumn
+    ? `${config.companyColumn} = $${companyIndex}`
+    : supplierScope("target").replaceAll("$2", `$${companyIndex}`);
+  const deleted = config.deletedColumn ? ` AND ${config.deletedColumn} IS NULL` : "";
+  const result = await client.query(
+    `UPDATE ${config.table} target SET ${assignments.join(", ")} WHERE target.id = $${idIndex} AND ${scope}${deleted}`,
+    values,
+  );
+  if (result.rowCount !== 1) throw new Error(`${item.input.kind} #${item.input.id} was not updated in the selected company`);
+}
+
+async function assertTouchedVouchersBalanced(client: PoolClient, companyId: number, items: HistoricalRepairPlanItem[]): Promise<void> {
+  const voucherIds = [...new Set(items.flatMap((item) => item.before.voucherId ? [item.before.voucherId] : []))];
+  if (voucherIds.length === 0) return;
+  const result = await client.query<{
+    voucher_id: number;
+    debit_total: string;
+    credit_total: string;
+    incomplete_count: string;
+  }>(
+    `SELECT v.id AS voucher_id,
+            COALESCE(SUM(ve.base_debit_amount::numeric), 0)::text AS debit_total,
+            COALESCE(SUM(ve.base_credit_amount::numeric), 0)::text AS credit_total,
+            COUNT(*) FILTER (WHERE ve.base_debit_amount IS NULL OR ve.base_credit_amount IS NULL
+              OR ve.transaction_currency IS NULL OR ve.transaction_debit_amount IS NULL OR ve.transaction_credit_amount IS NULL
+              OR ve.historical_exchange_rate IS NULL OR ve.rate_convention IS NULL)::text AS incomplete_count
+       FROM vouchers v
+       JOIN voucher_entries ve ON ve.voucher_id = v.id
+      WHERE v.company_id = $1 AND v.id = ANY($2::int[]) AND v.deleted_at IS NULL AND v.optional = false
+      GROUP BY v.id`,
+    [companyId, voucherIds],
+  );
+  for (const row of result.rows) {
+    if ((Number.parseInt(row.incomplete_count || "0", 10) || 0) > 0) {
+      throw new Error(`Voucher #${row.voucher_id} still has incomplete currency metadata after repair`);
+    }
+    const difference = new Decimal(row.debit_total || 0).minus(row.credit_total || 0).abs();
+    if (difference.gt("0.000001")) {
+      throw new Error(`Voucher #${row.voucher_id} would be unbalanced by ${difference.toFixed(6)} in historical base currency`);
+    }
+  }
 }
 
 export async function applyHistoricalCurrencyRepairPlan(
   plan: HistoricalRepairPlan,
   actor: { userId: string; username: string },
-): Promise<{ appliedCount: number; fingerprint: string }> {
+): Promise<{ appliedCount: number; voucherCount: number; fingerprint: string }> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -451,8 +695,13 @@ export async function applyHistoricalCurrencyRepairPlan(
       await applyPlanItem(client, plan.companyId, item);
       await insertAudit(client, actor, plan.companyId, item);
     }
+    await assertTouchedVouchersBalanced(client, plan.companyId, plan.items);
     await client.query("COMMIT");
-    return { appliedCount: plan.items.length, fingerprint: plan.fingerprint };
+    return {
+      appliedCount: plan.items.length,
+      voucherCount: plan.voucherCount,
+      fingerprint: plan.fingerprint,
+    };
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

@@ -250,15 +250,19 @@ describe("legacy history safety", () => {
     expect(route).toContain("/api/accounts/multi-currency/opening-balance/:entityType/:id");
     expect(route).toContain("normalizeOpeningBalanceCurrency");
     expect(ui).toContain("Resolve Historical Opening & Asset Values");
+    expect(ui).toContain("Reviewed native amount");
     expect(ui).toContain("historicalRate");
   });
 });
 
 describe("historical repair remains explicit", () => {
-  it("keeps the backfill dry-run by default and does not use the latest rate", () => {
+  it("retires the heuristic CLI write path", () => {
     const source = read("scripts/backfill-voucher-entry-currency-amounts.mjs");
-    expect(source).toMatch(/Dry-run by default/i);
-    expect(source).toMatch(/Never uses the latest company exchange rate/i);
-    expect(source).toContain("timingSafeEqual");
+    expect(source).toMatch(/Historical currency backfill CLI retired/i);
+    expect(source).toMatch(/Refusing --apply/i);
+    expect(source).toMatch(/No database connection was opened/i);
+    expect(source).not.toContain("confirmed-transaction-stored");
+    expect(source).not.toContain("storedMain.lte");
+    expect(source).not.toContain("timingSafeEqual");
   });
 });

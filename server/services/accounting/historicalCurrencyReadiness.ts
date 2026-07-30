@@ -2,6 +2,8 @@ import { pool } from "../../db";
 
 export interface HistoricalCurrencyReadiness {
   ready: boolean;
+  schemaReady: boolean;
+  legacyMode: boolean;
   unresolvedEntryCount: number;
   unresolvedVoucherCount: number;
   unresolvedLedgerOpeningCount: number;
@@ -10,21 +12,64 @@ export interface HistoricalCurrencyReadiness {
   unresolvedSupplierOpeningCount: number;
   unresolvedEmployeeOpeningCount: number;
   unresolvedFixedAssetCount: number;
+  totalUnresolvedCount: number;
   sampleVoucherIds: number[];
   asOfDate: string | null;
 }
 
-/**
- * Financial reports must never treat an unresolved non-USD legacy amount as a
- * historical base amount. This check is intentionally read-only and does not
- * apply the backfill or modify opening balances/acquisition values.
- */
-export async function getHistoricalCurrencyReadiness(
-  companyId: number,
-  asOfDate?: string | null,
-): Promise<HistoricalCurrencyReadiness> {
-  const READY_LEGACY: HistoricalCurrencyReadiness = {
-    ready: true,
+const REQUIRED_CURRENCY_COLUMNS: Record<string, readonly string[]> = {
+  voucher_entries: [
+    "transaction_currency",
+    "transaction_debit_amount",
+    "transaction_credit_amount",
+    "base_debit_amount",
+    "base_credit_amount",
+    "historical_exchange_rate",
+    "rate_convention",
+  ],
+  ledger_accounts: [
+    "opening_balance_native_amount",
+    "opening_balance_currency",
+    "opening_balance_historical_rate",
+    "opening_balance_base_amount",
+  ],
+  bank_accounts: [
+    "opening_balance_native_amount",
+    "opening_balance_currency",
+    "opening_balance_historical_rate",
+    "opening_balance_base_amount",
+  ],
+  customers: [
+    "opening_balance_native_amount",
+    "opening_balance_currency",
+    "opening_balance_historical_rate",
+    "opening_balance_base_amount",
+  ],
+  suppliers: [
+    "opening_balance_native_amount",
+    "opening_balance_currency",
+    "opening_balance_historical_rate",
+    "opening_balance_base_amount",
+  ],
+  employees: [
+    "opening_balance_native_amount",
+    "opening_balance_currency",
+    "opening_balance_historical_rate",
+    "opening_balance_base_amount",
+  ],
+  fixed_assets: [
+    "purchase_native_amount",
+    "purchase_currency",
+    "purchase_historical_rate",
+    "purchase_base_amount",
+  ],
+};
+
+function schemaUnavailableReadiness(asOfDate: string | null): HistoricalCurrencyReadiness {
+  return {
+    ready: false,
+    schemaReady: false,
+    legacyMode: true,
     unresolvedEntryCount: 0,
     unresolvedVoucherCount: 0,
     unresolvedLedgerOpeningCount: 0,
@@ -33,39 +78,52 @@ export async function getHistoricalCurrencyReadiness(
     unresolvedSupplierOpeningCount: 0,
     unresolvedEmployeeOpeningCount: 0,
     unresolvedFixedAssetCount: 0,
+    totalUnresolvedCount: 0,
     sampleVoucherIds: [],
-    asOfDate: asOfDate || null,
+    asOfDate,
   };
+}
 
-  // ── Phase-gate: only enforce multi-currency completeness once the backfill
-  // has actually been started for this company.  If the column does not exist
-  // (pre-migration production) OR no entries have been backfilled yet, the
-  // system is in pure-legacy mode — the net-profit route already handles this
-  // via COALESCE(base_debit_amount, debit_amount) fallbacks.  Blocking a
-  // zero-backfill company with 409 is incorrect behaviour.
-  try {
-    const migratedCheck = await pool.query<{ has_migrated: boolean }>(
-      `SELECT EXISTS(
-         SELECT 1 FROM voucher_entries ve
-         JOIN vouchers v ON ve.voucher_id = v.id
-         WHERE v.company_id = $1
-           AND ve.base_debit_amount IS NOT NULL
-       ) AS has_migrated`,
-      [companyId],
-    );
-    const hasMigrated = migratedCheck.rows[0]?.has_migrated === true;
-    if (!hasMigrated) {
-      // Backfill never started → legacy mode, allow all financial endpoints
-      return READY_LEGACY;
+async function hasRequiredCurrencySchema(): Promise<boolean> {
+  const expected = Object.values(REQUIRED_CURRENCY_COLUMNS).reduce((total, columns) => total + columns.length, 0);
+  const tableNames = Object.keys(REQUIRED_CURRENCY_COLUMNS);
+  const columnNames = [...new Set(Object.values(REQUIRED_CURRENCY_COLUMNS).flat())];
+  const result = await pool.query<{ table_name: string; column_name: string }>(
+    `SELECT table_name, column_name
+       FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND table_name = ANY($1::text[])
+        AND column_name = ANY($2::text[])`,
+    [tableNames, columnNames],
+  );
+  const found = new Set(result.rows.map((row) => `${row.table_name}.${row.column_name}`));
+  if (found.size < expected) return false;
+  for (const [table, columns] of Object.entries(REQUIRED_CURRENCY_COLUMNS)) {
+    for (const column of columns) {
+      if (!found.has(`${table}.${column}`)) return false;
     }
-  } catch {
-    // Column doesn't exist yet in this deployment → definitely legacy mode
-    return READY_LEGACY;
+  }
+  return true;
+}
+
+/**
+ * Returns whether historical accounting data is complete enough for financial
+ * aggregation. Once the structural currency schema exists, readiness is based
+ * on persisted row state only; it never treats an untouched or partially
+ * repaired company as implicitly safe.
+ */
+export async function getHistoricalCurrencyReadiness(
+  companyId: number,
+  asOfDate?: string | null,
+): Promise<HistoricalCurrencyReadiness> {
+  const normalizedAsOfDate = asOfDate || null;
+  if (!(await hasRequiredCurrencySchema())) {
+    return schemaUnavailableReadiness(normalizedAsOfDate);
   }
 
   const params: Array<number | string> = [companyId];
-  const dateClause = asOfDate ? "AND v.voucher_date <= $2" : "";
-  if (asOfDate) params.push(asOfDate);
+  const dateClause = normalizedAsOfDate ? "AND v.voucher_date <= $2" : "";
+  if (normalizedAsOfDate) params.push(normalizedAsOfDate);
 
   const [entryResult, openingResult] = await Promise.all([
     pool.query<{
@@ -86,8 +144,15 @@ export async function getHistoricalCurrencyReadiness(
          AND v.optional = false
          AND v.deleted_at IS NULL
          AND COALESCE(UPPER(v.currency), 'USD') <> 'USD'
-         AND ve.base_debit_amount IS NULL
-         AND ve.base_credit_amount IS NULL
+         AND (
+           ve.transaction_currency IS NULL
+           OR ve.transaction_debit_amount IS NULL
+           OR ve.transaction_credit_amount IS NULL
+           OR ve.base_debit_amount IS NULL
+           OR ve.base_credit_amount IS NULL
+           OR ve.historical_exchange_rate IS NULL
+           OR ve.rate_convention IS NULL
+         )
          ${dateClause}`,
       params,
     ),
@@ -99,72 +164,59 @@ export async function getHistoricalCurrencyReadiness(
       unresolved_employee_openings: string;
       unresolved_fixed_assets: string;
     }>(
-      // Only flag records whose currency is explicitly set to a non-USD value
-      // but whose base amount has not been filled in.  Records with NULL
-      // currency are pre-multi-currency legacy data implicitly denominated in
-      // the base currency (USD) and do not need backfilling — this mirrors the
-      // same COALESCE(UPPER(currency),'USD') <> 'USD' gate used for voucher
-      // entries above.
-      `SELECT
+      `WITH company_scope AS (
+         SELECT COALESCE(UPPER(base_currency), 'USD') AS base_currency
+           FROM companies
+          WHERE id = $1
+       )
+       SELECT
          (SELECT COUNT(*)
-            FROM ledger_accounts la
-           WHERE la.company_id = $1
-             AND la.deleted_at IS NULL
+            FROM ledger_accounts la, company_scope cs
+           WHERE la.company_id = $1 AND la.deleted_at IS NULL
              AND COALESCE(la.opening_balance, 0)::numeric <> 0
-             AND la.opening_balance_currency IS NOT NULL
-             AND COALESCE(UPPER(la.opening_balance_currency), 'USD') <> 'USD'
-             AND la.opening_balance_base_amount IS NULL
+             AND (la.opening_balance_native_amount IS NULL OR la.opening_balance_currency IS NULL OR la.opening_balance_base_amount IS NULL
+               OR (UPPER(la.opening_balance_currency) <> cs.base_currency AND la.opening_balance_historical_rate IS NULL))
          )::text AS unresolved_ledger_openings,
          (SELECT COUNT(*)
-            FROM bank_accounts ba
-           WHERE ba.company_id = $1
-             AND ba.deleted_at IS NULL
+            FROM bank_accounts ba, company_scope cs
+           WHERE ba.company_id = $1 AND ba.deleted_at IS NULL
              AND COALESCE(ba.opening_balance, 0)::numeric <> 0
-             AND ba.opening_balance_currency IS NOT NULL
-             AND COALESCE(UPPER(ba.opening_balance_currency), 'USD') <> 'USD'
-             AND ba.opening_balance_base_amount IS NULL
+             AND (ba.opening_balance_native_amount IS NULL OR ba.opening_balance_currency IS NULL OR ba.opening_balance_base_amount IS NULL
+               OR (UPPER(ba.opening_balance_currency) <> cs.base_currency AND ba.opening_balance_historical_rate IS NULL))
          )::text AS unresolved_bank_openings,
          (SELECT COUNT(*)
-            FROM customers c
-           WHERE c.company_id = $1
-             AND c.deleted_at IS NULL
+            FROM customers c, company_scope cs
+           WHERE c.company_id = $1 AND c.deleted_at IS NULL
              AND COALESCE(c.opening_balance, 0)::numeric <> 0
-             AND c.opening_balance_currency IS NOT NULL
-             AND COALESCE(UPPER(c.opening_balance_currency), 'USD') <> 'USD'
-             AND c.opening_balance_base_amount IS NULL
+             AND (c.opening_balance_native_amount IS NULL OR c.opening_balance_currency IS NULL OR c.opening_balance_base_amount IS NULL
+               OR (UPPER(c.opening_balance_currency) <> cs.base_currency AND c.opening_balance_historical_rate IS NULL))
          )::text AS unresolved_customer_openings,
          (SELECT COUNT(*)
-            FROM suppliers s
+            FROM suppliers s, company_scope cs
            WHERE s.deleted_at IS NULL
              AND COALESCE(s.opening_balance, 0)::numeric <> 0
-             AND s.opening_balance_currency IS NOT NULL
-             AND COALESCE(UPPER(s.opening_balance_currency), 'USD') <> 'USD'
-             AND s.opening_balance_base_amount IS NULL
+             AND (s.opening_balance_native_amount IS NULL OR s.opening_balance_currency IS NULL OR s.opening_balance_base_amount IS NULL
+               OR (UPPER(s.opening_balance_currency) <> cs.base_currency AND s.opening_balance_historical_rate IS NULL))
              AND EXISTS (
                SELECT 1
                  FROM voucher_entries ve
                  JOIN vouchers v ON v.id = ve.voucher_id
-                WHERE ve.supplier_id = s.id
-                  AND v.company_id = $1
-                  AND v.deleted_at IS NULL
+                WHERE ve.supplier_id = s.id AND v.company_id = $1 AND v.deleted_at IS NULL
              )
          )::text AS unresolved_supplier_openings,
          (SELECT COUNT(*)
-            FROM employees e
-           WHERE e.company_id = $1
-             AND e.deleted_at IS NULL
+            FROM employees e, company_scope cs
+           WHERE e.company_id = $1 AND e.deleted_at IS NULL
              AND COALESCE(e.opening_balance, 0)::numeric <> 0
-             AND e.opening_balance_currency IS NOT NULL
-             AND COALESCE(UPPER(e.opening_balance_currency), 'USD') <> 'USD'
-             AND e.opening_balance_base_amount IS NULL
+             AND (e.opening_balance_native_amount IS NULL OR e.opening_balance_currency IS NULL OR e.opening_balance_base_amount IS NULL
+               OR (UPPER(e.opening_balance_currency) <> cs.base_currency AND e.opening_balance_historical_rate IS NULL))
          )::text AS unresolved_employee_openings,
          (SELECT COUNT(*)
-            FROM fixed_assets fa
+            FROM fixed_assets fa, company_scope cs
            WHERE fa.company_id = $1
              AND COALESCE(fa.purchase_amount, 0)::numeric <> 0
-             AND fa.purchase_currency IS NOT NULL
-             AND COALESCE(UPPER(fa.purchase_currency), 'USD') <> 'USD'
-             AND fa.purchase_base_amount IS NULL
+             AND (fa.purchase_native_amount IS NULL OR fa.purchase_currency IS NULL OR fa.purchase_base_amount IS NULL
+               OR (UPPER(fa.purchase_currency) <> cs.base_currency AND fa.purchase_historical_rate IS NULL))
          )::text AS unresolved_fixed_assets`,
       [companyId],
     ),
@@ -172,28 +224,25 @@ export async function getHistoricalCurrencyReadiness(
 
   const unresolvedEntryCount = Number.parseInt(entryResult.rows[0]?.unresolved_entry_count || "0", 10) || 0;
   const unresolvedVoucherCount = Number.parseInt(entryResult.rows[0]?.unresolved_voucher_count || "0", 10) || 0;
-  const unresolvedLedgerOpeningCount =
-    Number.parseInt(openingResult.rows[0]?.unresolved_ledger_openings || "0", 10) || 0;
-  const unresolvedBankOpeningCount =
-    Number.parseInt(openingResult.rows[0]?.unresolved_bank_openings || "0", 10) || 0;
-  const unresolvedCustomerOpeningCount =
-    Number.parseInt(openingResult.rows[0]?.unresolved_customer_openings || "0", 10) || 0;
-  const unresolvedSupplierOpeningCount =
-    Number.parseInt(openingResult.rows[0]?.unresolved_supplier_openings || "0", 10) || 0;
-  const unresolvedEmployeeOpeningCount =
-    Number.parseInt(openingResult.rows[0]?.unresolved_employee_openings || "0", 10) || 0;
-  const unresolvedFixedAssetCount =
-    Number.parseInt(openingResult.rows[0]?.unresolved_fixed_assets || "0", 10) || 0;
+  const unresolvedLedgerOpeningCount = Number.parseInt(openingResult.rows[0]?.unresolved_ledger_openings || "0", 10) || 0;
+  const unresolvedBankOpeningCount = Number.parseInt(openingResult.rows[0]?.unresolved_bank_openings || "0", 10) || 0;
+  const unresolvedCustomerOpeningCount = Number.parseInt(openingResult.rows[0]?.unresolved_customer_openings || "0", 10) || 0;
+  const unresolvedSupplierOpeningCount = Number.parseInt(openingResult.rows[0]?.unresolved_supplier_openings || "0", 10) || 0;
+  const unresolvedEmployeeOpeningCount = Number.parseInt(openingResult.rows[0]?.unresolved_employee_openings || "0", 10) || 0;
+  const unresolvedFixedAssetCount = Number.parseInt(openingResult.rows[0]?.unresolved_fixed_assets || "0", 10) || 0;
+  const totalUnresolvedCount =
+    unresolvedEntryCount +
+    unresolvedLedgerOpeningCount +
+    unresolvedBankOpeningCount +
+    unresolvedCustomerOpeningCount +
+    unresolvedSupplierOpeningCount +
+    unresolvedEmployeeOpeningCount +
+    unresolvedFixedAssetCount;
 
   return {
-    ready:
-      unresolvedEntryCount === 0 &&
-      unresolvedLedgerOpeningCount === 0 &&
-      unresolvedBankOpeningCount === 0 &&
-      unresolvedCustomerOpeningCount === 0 &&
-      unresolvedSupplierOpeningCount === 0 &&
-      unresolvedEmployeeOpeningCount === 0 &&
-      unresolvedFixedAssetCount === 0,
+    ready: totalUnresolvedCount === 0,
+    schemaReady: true,
+    legacyMode: false,
     unresolvedEntryCount,
     unresolvedVoucherCount,
     unresolvedLedgerOpeningCount,
@@ -202,7 +251,8 @@ export async function getHistoricalCurrencyReadiness(
     unresolvedSupplierOpeningCount,
     unresolvedEmployeeOpeningCount,
     unresolvedFixedAssetCount,
+    totalUnresolvedCount,
     sampleVoucherIds: entryResult.rows[0]?.sample_voucher_ids || [],
-    asOfDate: asOfDate || null,
+    asOfDate: normalizedAsOfDate,
   };
 }

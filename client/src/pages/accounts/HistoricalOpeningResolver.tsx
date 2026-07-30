@@ -1,15 +1,17 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
+import { useCompany } from "@/contexts/CompanyContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+
+const ALLOWED_ROLES = new Set(["Admin", "Owner", "Developer"]);
 
 interface UnresolvedOpening {
   entity_type: "ledger" | "bank" | "customer" | "supplier" | "employee" | "fixedAsset";
@@ -18,18 +20,26 @@ interface UnresolvedOpening {
   code: string;
   raw_amount: string;
   side: "Dr" | "Cr";
+  native_amount: string | null;
+  currency: string | null;
+  historical_rate: string | null;
+  base_amount: string | null;
 }
 
 interface Draft {
-  currency: "USD" | "CFA";
+  currency: string;
   historicalRate: string;
+  nativeAmount: string;
 }
 
 export function HistoricalOpeningResolver() {
+  const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const authorized = Boolean(selectedCompany?.role && ALLOWED_ROLES.has(selectedCompany.role));
   const query = useQuery<UnresolvedOpening[]>({
     queryKey: ["/api/accounts/multi-currency/unresolved-openings"],
+    enabled: authorized,
     staleTime: 30_000,
   });
 
@@ -38,13 +48,14 @@ export function HistoricalOpeningResolver() {
 
   const mutation = useMutation({
     mutationFn: async ({ row, draft }: { row: UnresolvedOpening; draft: Draft }) => {
+      const currency = draft.currency.trim().toUpperCase();
       return apiRequest(
         "PUT",
         `/api/accounts/multi-currency/opening-balance/${row.entity_type}/${row.id}`,
         {
-          nativeAmount: row.raw_amount,
-          currency: draft.currency,
-          historicalRate: draft.currency === "CFA" ? draft.historicalRate : "1",
+          nativeAmount: draft.nativeAmount,
+          currency,
+          historicalRate: currency === "USD" ? "1" : draft.historicalRate,
           side: row.side,
         },
       );
@@ -52,7 +63,7 @@ export function HistoricalOpeningResolver() {
     onSuccess: (_data, variables) => {
       toast({
         title: "Historical value resolved",
-        description: `${variables.row.name} now preserves its native amount and historical base value.`,
+        description: `${variables.row.name} now preserves its reviewed native amount and historical base value.`,
       });
       const key = `${variables.row.entity_type}:${variables.row.id}`;
       setDrafts((current) => {
@@ -60,20 +71,27 @@ export function HistoricalOpeningResolver() {
         delete next[key];
         return next;
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts/multi-currency/unresolved-openings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts/multi-currency/readiness"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/accounts/multi-currency/cash-bank-revaluation"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
+      for (const queryKey of [
+        ["/api/accounts/multi-currency/unresolved-openings"],
+        ["/api/accounts/multi-currency/readiness"],
+        ["/api/accounts/multi-currency/repair-center"],
+        ["/api/accounts/multi-currency/cash-bank-revaluation"],
+        ["/api/ledger-accounts"],
+        ["/api/bank-accounts"],
+      ]) {
+        queryClient.invalidateQueries({ queryKey });
+      }
     },
     onError: (error: any) => {
       toast({
         title: "Could not resolve historical value",
-        description: error?.message || "Check the currency and historical rate.",
+        description: error?.message || "Check the original amount, currency, and historical rate.",
         variant: "destructive",
       });
     },
   });
+
+  if (!authorized) return null;
 
   if (query.isLoading) {
     return (
@@ -115,7 +133,7 @@ export function HistoricalOpeningResolver() {
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Manual review required</AlertTitle>
           <AlertDescription>
-            Choose the currency originally entered and the historical CFA-per-USD rate. This preserves the native amount and stores a separate historical USD value. It does not use today’s rate.
+            Confirm the original native amount and currency from the source document, then enter its historical transaction-per-base rate. Persisted metadata is used only as a starting point; the raw legacy amount is never assumed to be native or base currency.
           </AlertDescription>
         </Alert>
 
@@ -125,8 +143,9 @@ export function HistoricalOpeningResolver() {
               <TableRow>
                 <TableHead>Type</TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead>Original raw amount</TableHead>
-                <TableHead>Currency</TableHead>
+                <TableHead>Raw legacy amount</TableHead>
+                <TableHead>Reviewed native amount</TableHead>
+                <TableHead>Original currency</TableHead>
                 <TableHead>Historical rate</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
@@ -134,9 +153,16 @@ export function HistoricalOpeningResolver() {
             <TableBody>
               {rows.map((row) => {
                 const key = `${row.entity_type}:${row.id}`;
-                const draft = drafts[key] || { currency: "USD" as const, historicalRate: "" };
+                const draft = drafts[key] || {
+                  currency: row.currency || "",
+                  historicalRate: row.historical_rate || "",
+                  nativeAmount: row.native_amount || row.raw_amount || "",
+                };
+                const normalizedCurrency = draft.currency.trim().toUpperCase();
                 const isSaving = mutation.isPending && mutation.variables?.row.entity_type === row.entity_type && mutation.variables?.row.id === row.id;
-                const invalidRate = draft.currency === "CFA" && (!draft.historicalRate || Number(draft.historicalRate) <= 0);
+                const invalidCurrency = normalizedCurrency.length < 3;
+                const invalidNativeAmount = !draft.nativeAmount || !Number.isFinite(Number(draft.nativeAmount)) || Number(draft.nativeAmount) < 0;
+                const invalidRate = normalizedCurrency !== "USD" && (!draft.historicalRate || Number(draft.historicalRate) <= 0);
                 return (
                   <TableRow key={key}>
                     <TableCell className="capitalize">{row.entity_type === "fixedAsset" ? "Fixed asset" : row.entity_type}</TableCell>
@@ -145,24 +171,35 @@ export function HistoricalOpeningResolver() {
                       <div className="text-xs text-muted-foreground">{row.code || `#${row.id}`} · {row.side}</div>
                     </TableCell>
                     <TableCell className="font-mono">{Number(row.raw_amount || 0).toLocaleString()}</TableCell>
-                    <TableCell className="min-w-[120px]">
-                      <Select
-                        value={draft.currency}
-                        onValueChange={(currency: "USD" | "CFA") =>
-                          setDrafts((current) => ({ ...current, [key]: { ...draft, currency } }))
+                    <TableCell className="min-w-[180px]">
+                      <Label className="sr-only">Reviewed native amount</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.000001"
+                        value={draft.nativeAmount}
+                        onChange={(event) =>
+                          setDrafts((current) => ({ ...current, [key]: { ...draft, nativeAmount: event.target.value } }))
                         }
-                      >
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="USD">USD</SelectItem>
-                          <SelectItem value="CFA">CFA</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      />
                     </TableCell>
-                    <TableCell className="min-w-[170px]">
-                      {draft.currency === "CFA" ? (
+                    <TableCell className="min-w-[140px]">
+                      <Label className="sr-only">Original currency</Label>
+                      <Input
+                        value={draft.currency}
+                        placeholder="USD, CFA, EUR…"
+                        maxLength={3}
+                        onChange={(event) =>
+                          setDrafts((current) => ({ ...current, [key]: { ...draft, currency: event.target.value } }))
+                        }
+                      />
+                    </TableCell>
+                    <TableCell className="min-w-[180px]">
+                      {normalizedCurrency === "USD" ? (
+                        <span className="text-sm text-muted-foreground">1.0000000000</span>
+                      ) : (
                         <div className="space-y-1">
-                          <Label className="sr-only">Historical CFA per USD rate</Label>
+                          <Label className="sr-only">Historical transaction-per-base rate</Label>
                           <Input
                             type="number"
                             min="0.0000000001"
@@ -177,14 +214,12 @@ export function HistoricalOpeningResolver() {
                             }
                           />
                         </div>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">1.0000000000</span>
                       )}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
                         size="sm"
-                        disabled={isSaving || invalidRate || !rowKeys.has(key)}
+                        disabled={isSaving || invalidCurrency || invalidNativeAmount || invalidRate || !rowKeys.has(key)}
                         onClick={() => mutation.mutate({ row, draft })}
                       >
                         {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

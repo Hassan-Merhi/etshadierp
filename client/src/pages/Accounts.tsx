@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import AccountsLegacy from "./AccountsLegacy";
 import { CashBankRevaluationPanel } from "./accounts/CashBankRevaluationPanel";
+import { HistoricalCurrencyStabilizationPanel } from "./accounts/HistoricalCurrencyStabilizationPanel";
 import { HistoricalOpeningResolver } from "./accounts/HistoricalOpeningResolver";
 
 const PATCH_KEY = "__program6bAccountsParentGroupFetchPatch";
@@ -68,9 +69,10 @@ export default function Accounts() {
 
   return (
     <div className="space-y-4">
+      <HistoricalCurrencyStabilizationPanel />
+      <HistoricalOpeningResolver />
+      <CashBankRevaluationPanel />
       {/* AccountsLegacy owns the desktop AccountTable and responsive account views. */}
-      {/* CashBankRevaluationPanel hidden */}
-      {/* HistoricalOpeningResolver hidden */}
       <AccountsLegacy />
     </div>
   );

@@ -129,49 +129,74 @@ export function registerOpeningBalanceResolutionRoutes(app: Express) {
         if (!companyId) return res.status(400).json({ message: "No company selected" });
 
         const result = await pool.query(
-          `SELECT * FROM (
+          `WITH company_scope AS (
+             SELECT COALESCE(UPPER(base_currency), 'USD') AS base_currency
+               FROM companies
+              WHERE id = $1
+           )
+           SELECT * FROM (
              SELECT 'ledger'::text AS entity_type, la.id, la.name, la.code,
                     la.opening_balance::text AS raw_amount,
-                    COALESCE(la.opening_balance_side, 'Dr') AS side
-               FROM ledger_accounts la
+                    COALESCE(la.opening_balance_side, 'Dr') AS side,
+                    la.opening_balance_native_amount::text AS native_amount,
+                    la.opening_balance_currency AS currency,
+                    la.opening_balance_historical_rate::text AS historical_rate,
+                    la.opening_balance_base_amount::text AS base_amount
+               FROM ledger_accounts la, company_scope cs
               WHERE la.company_id = $1 AND la.deleted_at IS NULL
                 AND COALESCE(la.opening_balance, 0)::numeric <> 0
-                AND (la.opening_balance_native_amount IS NULL OR la.opening_balance_currency IS NULL OR la.opening_balance_base_amount IS NULL)
+                AND (la.opening_balance_native_amount IS NULL OR la.opening_balance_currency IS NULL OR la.opening_balance_base_amount IS NULL
+                  OR (UPPER(la.opening_balance_currency) <> cs.base_currency AND la.opening_balance_historical_rate IS NULL))
              UNION ALL
              SELECT 'bank', ba.id, ba.name, ba.code, ba.opening_balance::text,
-                    COALESCE(ba.opening_balance_side, 'Dr')
-               FROM bank_accounts ba
+                    COALESCE(ba.opening_balance_side, 'Dr'),
+                    ba.opening_balance_native_amount::text, ba.opening_balance_currency,
+                    ba.opening_balance_historical_rate::text, ba.opening_balance_base_amount::text
+               FROM bank_accounts ba, company_scope cs
               WHERE ba.company_id = $1 AND ba.deleted_at IS NULL
                 AND COALESCE(ba.opening_balance, 0)::numeric <> 0
-                AND (ba.opening_balance_native_amount IS NULL OR ba.opening_balance_currency IS NULL OR ba.opening_balance_base_amount IS NULL)
+                AND (ba.opening_balance_native_amount IS NULL OR ba.opening_balance_currency IS NULL OR ba.opening_balance_base_amount IS NULL
+                  OR (UPPER(ba.opening_balance_currency) <> cs.base_currency AND ba.opening_balance_historical_rate IS NULL))
              UNION ALL
              SELECT 'customer', c.id, c.legal_name, c.code, c.opening_balance::text,
-                    COALESCE(c.opening_balance_side, 'Dr')
-               FROM customers c
+                    COALESCE(c.opening_balance_side, 'Dr'),
+                    c.opening_balance_native_amount::text, c.opening_balance_currency,
+                    c.opening_balance_historical_rate::text, c.opening_balance_base_amount::text
+               FROM customers c, company_scope cs
               WHERE c.company_id = $1 AND c.deleted_at IS NULL
                 AND COALESCE(c.opening_balance, 0)::numeric <> 0
-                AND (c.opening_balance_native_amount IS NULL OR c.opening_balance_currency IS NULL OR c.opening_balance_base_amount IS NULL)
+                AND (c.opening_balance_native_amount IS NULL OR c.opening_balance_currency IS NULL OR c.opening_balance_base_amount IS NULL
+                  OR (UPPER(c.opening_balance_currency) <> cs.base_currency AND c.opening_balance_historical_rate IS NULL))
              UNION ALL
              SELECT 'supplier', s.id, s.legal_name, s.code, s.opening_balance::text,
-                    COALESCE(s.opening_balance_side, 'Cr')
-               FROM suppliers s
+                    COALESCE(s.opening_balance_side, 'Cr'),
+                    s.opening_balance_native_amount::text, s.opening_balance_currency,
+                    s.opening_balance_historical_rate::text, s.opening_balance_base_amount::text
+               FROM suppliers s, company_scope cs
               WHERE s.deleted_at IS NULL
                 AND COALESCE(s.opening_balance, 0)::numeric <> 0
-                AND (s.opening_balance_native_amount IS NULL OR s.opening_balance_currency IS NULL OR s.opening_balance_base_amount IS NULL)
+                AND (s.opening_balance_native_amount IS NULL OR s.opening_balance_currency IS NULL OR s.opening_balance_base_amount IS NULL
+                  OR (UPPER(s.opening_balance_currency) <> cs.base_currency AND s.opening_balance_historical_rate IS NULL))
                 AND ${supplierScopeSql("s")}
              UNION ALL
              SELECT 'employee', e.id, CONCAT_WS(' ', e.first_name, e.last_name), e.code,
-                    e.opening_balance::text, COALESCE(e.opening_balance_side, 'Cr')
-               FROM employees e
+                    e.opening_balance::text, COALESCE(e.opening_balance_side, 'Cr'),
+                    e.opening_balance_native_amount::text, e.opening_balance_currency,
+                    e.opening_balance_historical_rate::text, e.opening_balance_base_amount::text
+               FROM employees e, company_scope cs
               WHERE e.company_id = $1 AND e.deleted_at IS NULL
                 AND COALESCE(e.opening_balance, 0)::numeric <> 0
-                AND (e.opening_balance_native_amount IS NULL OR e.opening_balance_currency IS NULL OR e.opening_balance_base_amount IS NULL)
+                AND (e.opening_balance_native_amount IS NULL OR e.opening_balance_currency IS NULL OR e.opening_balance_base_amount IS NULL
+                  OR (UPPER(e.opening_balance_currency) <> cs.base_currency AND e.opening_balance_historical_rate IS NULL))
              UNION ALL
-             SELECT 'fixedAsset', fa.id, fa.name, fa.code, fa.purchase_amount::text, 'Dr'
-               FROM fixed_assets fa
+             SELECT 'fixedAsset', fa.id, fa.name, fa.code, fa.purchase_amount::text, 'Dr',
+                    fa.purchase_native_amount::text, fa.purchase_currency,
+                    fa.purchase_historical_rate::text, fa.purchase_base_amount::text
+               FROM fixed_assets fa, company_scope cs
               WHERE fa.company_id = $1
                 AND COALESCE(fa.purchase_amount, 0)::numeric <> 0
-                AND (fa.purchase_native_amount IS NULL OR fa.purchase_currency IS NULL OR fa.purchase_base_amount IS NULL)
+                AND (fa.purchase_native_amount IS NULL OR fa.purchase_currency IS NULL OR fa.purchase_base_amount IS NULL
+                  OR (UPPER(fa.purchase_currency) <> cs.base_currency AND fa.purchase_historical_rate IS NULL))
            ) unresolved
            ORDER BY entity_type, name`,
           [companyId, companyId],
@@ -216,8 +241,6 @@ export function registerOpeningBalanceResolutionRoutes(app: Express) {
           openingBalanceBaseAmount: req.body.baseAmount,
           baseCurrency,
         });
-        // Supplier and employee opening balances retain their established credit
-        // orientation; ledger/bank/customer sides may be explicitly reviewed.
         const side =
           entityType === "supplier" || entityType === "employee"
             ? "Cr"
