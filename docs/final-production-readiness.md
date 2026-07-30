@@ -2,98 +2,116 @@
 
 ## Status
 
-The repository implementation is complete for Program 3 company isolation, Historical Replay Phase 8, Supplier Partner Phase 4, Programs 6–8, and the ERP/Factory/Properties navigation audits.
+Repository implementation is not production sign-off. Production sign-off requires executable checks on one frozen commit, verified backup and restore evidence, controlled migration rehearsal, manual deployment of the approved SHA, module-level smoke evidence, and a demonstrated rollback owner.
 
-This document does **not** declare production verified. Production sign-off requires executable checks, a verified backup and restore rehearsal, controlled database activation, deployment evidence, and business smoke tests.
-
-No step in this runbook authorizes historical replay Apply, Supplier Partner cutover, a database repair, or an unreviewed production write.
+No step in this runbook authorizes Historical Replay Apply, Supplier Partner production cutover, a database repair, or an unreviewed financial transaction.
 
 ## Release invariants
 
-- Freeze one exact Git commit for the release.
+- Freeze one full 40-character Git commit for the release.
 - Do not deploy a moving branch or an unrecorded working tree.
-- Keep Historical Replay Apply disabled unless a separate release window explicitly authorizes it.
-- Do not run Supplier Partner cutover until the rehearsal company has completed finalize and rollback testing.
-- Do not apply migration `0013_tenant_control_integrity_guards` until the tenant audit, backup, restore rehearsal, and rollback plan are reviewed.
-- A readiness failure is a stop condition, not permission to disable a guard.
+- Keep Render `autoDeploy: false`; promotion must be manual.
+- Set `RELEASE_EXPECTED_COMMIT` to the frozen SHA before deployment.
+- A production startup mismatch between the actual and approved commits must fail closed.
+- Leave Historical Replay Apply, migration confirmation, and master-password impersonation disabled during ordinary deployment.
+- Do not run Supplier Partner cutover until finalize and rollback have been rehearsed on non-production companies.
+- A readiness or evidence failure is a stop condition, not permission to disable a guard.
 - Never test a restore by overwriting production.
 
-## Gate 1 — Repository contract verification
+## Gate 1 — Freeze and initialize evidence
+
+```bash
+export RELEASE_EXPECTED_COMMIT='<full-40-character-commit-sha>'
+node scripts/create-release-evidence.mjs \
+  --commit="$RELEASE_EXPECTED_COMMIT" \
+  --output=release-evidence.json
+node scripts/run-release-readiness.mjs --list
+```
+
+The generated evidence file starts in `pending` state. It cannot pass until every required repository check, database rehearsal, deployment record, smoke module and approval is complete.
+
+## Gate 2 — Static release contracts
+
+```bash
+node scripts/run-release-readiness.mjs --static
+```
+
+This executes the machine-defined static checks in `config/release-readiness.json`, including:
+
+- final production contracts;
+- migration registry strict mode;
+- Phase 12 test/reliability contracts;
+- critical test-debt limits;
+- lockfile registry safety.
+
+The static boundary also protects:
+
+- Render manual deployment, exact Node version and `/api/health/ready`;
+- the full runtime release identity;
+- the reviewed migration-debt manifest;
+- evidence creation and verification tooling;
+- the current deployment checklist.
+
+Static verification does not prove runtime correctness.
+
+## Gate 3 — Executable application checks
 
 From a clean checkout of the frozen release commit:
 
 ```bash
 npm ci --registry=https://registry.npmjs.org/
-npm run verify:final-production-readiness
+RELEASE_EXECUTION_CONFIRMATION=RUN_RELEASE_READINESS \
+  node scripts/run-release-readiness.mjs --execute
 ```
 
-This static verifier confirms that the fail-closed release contracts remain present. It does not connect to a database, deploy code, or prove runtime correctness.
+The executable boundary includes formatting, lint, TypeScript, backend and frontend coverage, the critical business regression suite, production build, production dependency verification, memory stabilization, bandwidth boundaries and focused security checks.
 
-Stop when:
+Do not continue when any command fails, times out, is unavailable, is cancelled or cannot execute. A missing CI service is not a passing result; an independent clean checkout may supply evidence only when the exact commit, command, environment and output are retained.
 
-- any required file is missing;
-- a required safety marker is missing;
-- migration journal index 13 does not map exactly to `0013_tenant_control_integrity_guards`;
-- Render readiness no longer points to `/api/health/ready`; or
-- the Historical Replay Apply mode appears in `render.yaml`.
-
-## Gate 2 — Executable application checks
-
-Run on the frozen release commit in a clean environment:
-
-```bash
-npm run format:check
-npm run lint
-npm run check
-npm test
-npm run build
-npm run verify:production-dependencies
-npm run verify:stabilization
-npm run verify:bandwidth
-npm run check:program-6-security
-```
-
-Also run the focused UI navigation configurations used by the ERP and Properties audits.
-
-Do not continue to production when any required check cannot execute or fails. A missing CI runner is not a passing result. An approved independent checkout may supply the evidence while GitHub Actions is unavailable, but the exact commands, commit, environment, and output must be recorded.
-
-## Gate 3 — Backup and restore rehearsal
+## Gate 4 — Backup and restore rehearsal
 
 Follow `docs/operations/database-backup-rollback-recovery.md`.
 
 Required evidence:
 
-- frozen release commit;
-- current production commit and deployment identifier;
-- database host and database name without credentials;
-- backup filename, timestamp, size, and SHA-256;
-- `pg_restore --list` evidence for a custom-format dump;
-- successful restore into a new disposable database;
+- frozen release commit and current production deployment;
+- database target without credentials;
+- backup filename, timestamp, size, type and SHA-256;
+- successful backup inspection;
+- restore into a new disposable database;
 - `/api/health/ready` HTTP 200 on the restored database;
-- representative table counts compared with the source snapshot;
-- restore duration and warnings;
-- explicit approver.
+- representative source and restored table counts;
+- restore duration, warnings and explicit approver.
 
-Never point the restore rehearsal at production. Disable schedulers and external integrations on the rehearsal instance.
+Disable schedulers and external integrations on the rehearsal instance.
 
-## Gate 4 — Tenant-integrity audit and migration rehearsal
+## Gate 5 — Tenant and migration rehearsal
 
-Run the read-only audit against the restored database first:
+Run the read-only tenant audit against the restored database:
 
 ```bash
 DATABASE_URL='postgresql://.../erp_restore_rehearsal' \
   node scripts/tenant-control-integrity-audit.mjs --json
 ```
 
-The audit must report zero error rows. Warnings must be reviewed and accepted or repaired through a separate approved change.
+The audit must report zero error rows. Warnings require explicit review.
 
-Review the migration registry:
+Verify the exact migration state:
 
 ```bash
 node scripts/verify-migration-registry.mjs --strict
 ```
 
-Rehearse the registered migrations only against the disposable restored database:
+Strict mode permits only the exact debt recorded in `config/migration-registry-debt.json`:
+
+- three approved pre-versioning journal gaps;
+- six approved standalone SQL files.
+
+A new unregistered SQL file, missing allowance, stale allowance, missing registered file, duplicate tag, duplicate index or non-sequential journal fails the gate.
+
+`20260717_phase3_heavy_read_indexes.sql` uses `CREATE INDEX CONCURRENTLY` and must remain outside the transactional Drizzle runner. `20260721_001_factory_mix_batch_sources_inventory_supplier.sql` includes a reviewed historical backfill and `NOT VALID` constraints and requires controlled rehearsal.
+
+Apply registered migrations only to the restored database first:
 
 ```bash
 DATABASE_URL='postgresql://.../erp_restore_rehearsal' \
@@ -101,109 +119,117 @@ MIGRATION_CONFIRMATION=APPLY_VERSIONED_MIGRATIONS \
   node scripts/run-versioned-migrations.mjs --apply
 ```
 
-After rehearsal:
+After rehearsal, readiness, login, company switching, isolation, business totals and inventory quantities must remain correct. Migration application remains outside `npm start` and Render startup.
 
-- `/api/health/ready` must remain HTTP 200;
-- login and company switching must work;
-- no cross-company role, location, cash-account, or POS mapping may be created;
-- application totals and inventory quantities must remain unchanged;
-- migration duration and warnings must be recorded.
+## Gate 6 — Supplier Partner and Historical Replay rehearsal
 
-Do not add the deferred unique `(user_id, company_id)` constraint or validate historical foreign keys during this release unless a separate reviewed migration explicitly owns that work.
+Supplier Partner Phase 4 rehearsal must prove:
 
-## Gate 5 — Supplier Partner Phase 4 rehearsal
-
-Use a non-production rehearsal source and target company.
-
-Follow `docs/sp-migration-phase-4-runbook.md` and require:
-
-1. final verification returns `PASS` or only approved synchronizable warnings;
+1. final verification returns `PASS` or explicitly approved synchronizable warnings;
 2. Prepare locks source and target writes;
-3. Finalize completes exact stock, sales, container, Goods-OTW, user, role, location, cash-account, session, and presence reconciliation;
-4. the target activates only after final verification is `PASS`;
-5. the old source rejects writes with `SP_SOURCE_READ_ONLY`;
-6. one rehearsal container and one rehearsal sale can be created and reversed;
-7. controlled rollback restores source users and inventory state before the deadline;
-8. the target remains read-only after rollback to prevent split-brain operation.
+3. Finalize reconciles stock, sales, containers, Goods OTW, users, roles, locations, cash accounts, sessions and presence;
+4. the source rejects writes with `SP_SOURCE_READ_ONLY`;
+5. controlled rollback restores the source and prevents split-brain operation.
 
-Do not start a production cutover solely because the repository code is merged.
-
-## Gate 6 — Deployment with dangerous features disabled
-
-Before deploying:
-
-- leave `HISTORICAL_REPLAY_APPLY_MODE` unset;
-- leave `HISTORICAL_REPLAY_RELEASE_ID` unset;
-- do not place migration application in `npm start` or Render startup;
-- record the previous healthy deployment for code rollback;
-- confirm the deployed commit matches the frozen release commit.
-
-Deploy the code. Apply reviewed versioned migrations only through the explicit migration runner and only after the production backup and rehearsal evidence are approved.
-
-## Gate 7 — Production smoke verification
-
-Immediately after deployment, verify read-only behavior first:
-
-- `/api/health/ready` returns HTTP 200 and names no missing critical schema objects;
-- login, logout, session refresh, and legitimate company switching;
-- Admin, normal ERP user, Factory user, POS user, and Properties user routing;
-- ERP, Factory, POS, Properties, and Supplier Partner navigation, Back, Escape, browser Back/Forward, and direct URLs;
-- Accounts, Daybook, vouchers, customers, suppliers, employees, inventory, location inventory, stock transfers, containers, offloading, mix batches, reports, and exports;
-- company isolation on admin, deleted-item, file, location-summary, and orphan-record operations;
-- no unexpected 401, 403, 409, 500, readiness, pool-timeout, memory, repeated restart, or bandwidth-loop errors in logs.
-
-Do not create production financial transactions merely as smoke tests unless the business owner explicitly approves the exact transaction and reversal procedure.
-
-## Gate 8 — Historical Replay readiness only
-
-With Apply still disabled, inspect:
+With Historical Replay Apply disabled, inspect:
 
 ```text
 GET /api/factory/raw-stock/recalc/historical-replay/readiness
 GET /api/factory/raw-stock/recalc/historical-replay/verification
 ```
 
-Resolve every schema and safety blocker. Review supplier changes, raw-material value, Balance on Table, and projected Net Position.
+Review supplier changes, raw-material value, Balance on Table and projected Net Position. Historical Replay Apply requires a separate approved window and is not part of ordinary release verification.
 
-Historical Replay Apply requires a separate explicit authorization, unique release identifier, two server-issued tokens, a fresh Prepare, a one-use Apply, exact post-apply verification, and removal of the Apply-mode environment variable after the window.
+## Gate 7 — Manual deployment of the approved commit
 
-Do not perform Apply as part of ordinary deployment verification.
+The repository `render.yaml` requires:
 
-## Gate 9 — Sign-off record
+- Node `20.19.2`;
+- build command `npm ci --registry=https://registry.npmjs.org/ && npm run build`;
+- start command `npm start`;
+- readiness path `/api/health/ready`;
+- `autoDeploy: false`.
+
+Before manual promotion, configure:
+
+```text
+RELEASE_EXPECTED_COMMIT=<exact frozen 40-character SHA>
+RELEASE_ID=<release identifier>
+```
+
+Do not persist these dangerous controls in the Render blueprint:
+
+- `HISTORICAL_REPLAY_APPLY_MODE`;
+- `HISTORICAL_REPLAY_RELEASE_ID`;
+- `MIGRATION_CONFIRMATION`;
+- `MASTER_PASSWORD`.
+
+Record the previous healthy deployment before promotion. The application startup policy compares the full runtime commit against `RELEASE_EXPECTED_COMMIT`; a mismatch fails startup.
+
+## Gate 8 — Production smoke verification
+
+Verify read-only behavior first:
+
+- `/api/health/live` returns the expected full commit SHA and release ID;
+- `/api/health/ready` returns HTTP 200 with `commitVerified: true`;
+- login, logout, session refresh and legitimate company switching work;
+- Admin, ERP, Factory, POS, Properties and Supplier Partner routing works;
+- Back, Escape, browser Back/Forward and direct URLs work;
+- Accounts, Daybook, vouchers, inventory, transfers, containers, offload, mix batches, reports and exports load correctly;
+- company isolation remains enforced on administrative, deleted-item, file and location operations;
+- logs show no unexpected 401, 403, 409, 500, pool timeout, memory pressure, restart or request loop.
+
+Do not create production financial transactions merely as smoke tests without an approved transaction and reversal procedure.
+
+Complete every smoke module listed in `config/release-readiness.json`, with timestamp and evidence reference.
+
+## Gate 9 — Rollback readiness
 
 Record:
 
-- frozen release commit;
-- production deployment identifier;
-- previous known-good deployment;
-- database target without credentials;
-- backup and restore evidence;
-- tenant audit result;
-- migration registry and rehearsal result;
-- Supplier Partner rehearsal result;
-- executable check outputs;
-- smoke-test results by module and company type;
-- Render log review result;
-- Historical Replay readiness result with Apply disabled;
-- approver and timestamp;
-- rollback owner and trigger conditions.
+- previous healthy deployment;
+- rollback owner;
+- code rollback trigger;
+- database recovery trigger;
+- expected rollback duration;
+- rehearsal evidence where required.
 
-Production is signed off only when every required gate has evidence and no unresolved stop condition remains.
+Rollback is not ready when the previous deployment is unknown, the backup is unverified, the recovery procedure has not been rehearsed, or the owner is unavailable.
+
+## Gate 10 — Machine-verified sign-off
+
+Fill the release evidence and run:
+
+```bash
+node scripts/verify-release-evidence.mjs --file=release-evidence.json
+```
+
+The verifier requires:
+
+- deployed SHA equals frozen SHA;
+- every required command is `passed` with timestamp and evidence;
+- every operational section and smoke module is `passed`;
+- auto deploy, startup migrations, Historical Replay Apply and master password remain disabled;
+- approver, approval timestamp and rollback owner are present.
+
+Production sign-off exists only when evidence verification passes and the record is retained with the release.
 
 ## Stop conditions
 
-Stop deployment or activation when any of the following occurs:
+Stop deployment or roll back when:
 
-- CI or independent checks cannot execute;
-- backup is missing, stale, empty, or not restorable in rehearsal;
+- the deployed commit differs from the approved commit;
+- a required check fails or cannot execute;
+- backup is missing, stale, empty or not restorable;
 - tenant audit reports error rows;
-- migration rehearsal fails or changes business totals;
+- migration strict mode or rehearsal fails;
+- rehearsal changes business totals unexpectedly;
 - `/api/health/ready` returns 503;
 - cross-company access succeeds where it should be denied;
 - Supplier Partner final verification is not `PASS`;
-- rollback cannot be demonstrated in rehearsal;
-- unexpected API 500s, repeated restarts, memory pressure, or request loops appear;
-- Historical Replay readiness reports blockers; or
-- the deployed commit differs from the approved release commit.
+- Historical Replay readiness reports unresolved blockers;
+- unexpected API errors, repeated restarts, memory pressure or request loops appear;
+- rollback cannot be demonstrated;
+- evidence verification fails.
 
-When stopped, keep the previous healthy deployment serving traffic, preserve evidence, and fix the problem on an isolated branch. Do not bypass the safety control that detected the failure.
+When stopped, preserve evidence, keep or restore the previous healthy deployment, and fix the issue on an isolated branch. Do not bypass the safety control that detected the failure.
