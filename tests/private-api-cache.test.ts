@@ -95,15 +95,13 @@ describe("private API cache", () => {
     const testApp = createTestApp();
 
     const responses = await Promise.all(
-      Array.from({ length: 8 }, () => request(testApp.app).get("/api/location-summary")),
+      Array.from({ length: 8 }, () => request(testApp.app).get("/api/location-summary"))
     );
 
     expect(testApp.getDelayedReportCalls()).toBe(1);
     expect(responses.every((response) => response.status === 200)).toBe(true);
     expect(responses.every((response) => response.body.calls === 1)).toBe(true);
-    expect(
-      responses.filter((response) => response.headers["x-erp-cache"] === "COALESCED").length,
-    ).toBeGreaterThan(0);
+    expect(responses.filter((response) => response.headers["x-erp-cache"] === "COALESCED").length).toBeGreaterThan(0);
     expect(getPrivateApiCacheStats().coalesced).toBeGreaterThan(0);
   });
 
