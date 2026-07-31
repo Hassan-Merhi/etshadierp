@@ -14,6 +14,7 @@ import {
   factoryContainerCommissions,
   factoryContainerOtherCharges,
 } from "@shared/schema";
+import { resolveFactoryOffloadValuationKg } from "@shared/factoryOffloadValuation";
 import { resolveStoredFxRate } from "./currencyConversion";
 import {
   FACTORY_COST_PRECISION,
@@ -59,7 +60,11 @@ export function computeContainerLandedCost(
   }
 
   const originalCostBasisKg = factoryCostDecimal(
-    (container as any).totalKg || container.declaredKg || container.actualReceivedKg || "0",
+    resolveFactoryOffloadValuationKg({
+      totalKg: (container as any).totalKg,
+      declaredKg: container.declaredKg,
+      receivedKg: container.actualReceivedKg,
+    }),
     "container.valuationKg",
   );
   if (originalCostBasisKg.lte(0)) {
@@ -75,9 +80,9 @@ export function computeContainerLandedCost(
   }
 
   // Allocate the full material value and fixed landed charges over the original
-// agreed container quantity. Partial receipts must keep the same fixed cost/kg
-// as later receipts and the final offload.
-const allocationKg = originalCostBasisKg;
+  // agreed container quantity. Partial receipts must keep the same fixed cost/kg
+  // as later receipts and the final offload.
+  const allocationKg = originalCostBasisKg;
   const dFxRate = factoryCostDecimal(fxRate, "container.fxRateToUsd", { allowZero: false });
   const baseRate = factoryCostDecimal(container.ratePerKg || "0", "container.ratePerKg");
   const basePayable = calculateCostLine(originalCostBasisKg, baseRate).totalCost;
