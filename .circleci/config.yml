@@ -86,6 +86,20 @@ commands:
           name: Verify disposable database schema
           command: node scripts/verify-ci-disposable-schema.mjs
 
+  run_backend_range:
+    parameters:
+      range:
+        type: string
+      label:
+        type: string
+    steps:
+      - install_dependencies
+      - wait_for_postgres
+      - prepare_postgres_schema
+      - run:
+          name: Backend tests << parameters.label >>
+          command: node node_modules/vitest/vitest.mjs run tests/[<< parameters.range >>]*.test.ts --maxWorkers=1 --no-file-parallelism
+
 jobs:
   static-build:
     executor: node22
@@ -146,6 +160,42 @@ jobs:
           name: Frontend tests
           command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
 
+  backend-a-f:
+    executor: node22-postgres
+    steps:
+      - run_backend_range:
+          range: "a-f"
+          label: A-F
+
+  backend-g-l:
+    executor: node22-postgres
+    steps:
+      - run_backend_range:
+          range: "g-l"
+          label: G-L
+
+  backend-m-r:
+    executor: node22-postgres
+    steps:
+      - run_backend_range:
+          range: "m-r"
+          label: M-R
+
+  backend-s-z:
+    executor: node22-postgres
+    steps:
+      - run_backend_range:
+          range: "s-z"
+          label: S-Z
+
+  full-frontend:
+    executor: node22
+    steps:
+      - install_dependencies
+      - run:
+          name: Full frontend tests
+          command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
+
   postgres-phase3-backend:
     executor: node22-postgres
     steps:
@@ -200,6 +250,11 @@ workflows:
     jobs:
       - static-build
       - postgres-regression
+      - backend-a-f
+      - backend-g-l
+      - backend-m-r
+      - backend-s-z
+      - full-frontend
       - postgres-phase3-backend
       - phase3-frontend
       - architecture-guards
