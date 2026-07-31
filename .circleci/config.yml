@@ -74,6 +74,18 @@ commands:
             echo "PostgreSQL did not become ready."
             exit 1
 
+  prepare_postgres_schema:
+    steps:
+      - run:
+          name: Verify migration registry
+          command: node scripts/verify-migration-registry.mjs --json
+      - run:
+          name: Prepare disposable database schema
+          command: node node_modules/drizzle-kit/bin.cjs push --force
+      - run:
+          name: Verify disposable database schema
+          command: node scripts/verify-ci-disposable-schema.mjs
+
 jobs:
   static-build:
     executor: node22
@@ -126,21 +138,43 @@ jobs:
     steps:
       - install_dependencies
       - wait_for_postgres
-      - run:
-          name: Verify migration registry
-          command: node scripts/verify-migration-registry.mjs --json
-      - run:
-          name: Prepare disposable database schema
-          command: node node_modules/drizzle-kit/bin.cjs push --force
-      - run:
-          name: Verify disposable database schema
-          command: node scripts/verify-ci-disposable-schema.mjs
+      - prepare_postgres_schema
       - run:
           name: Backend tests
           command: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
       - run:
           name: Frontend tests
           command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
+
+  postgres-phase2-bilingual:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - wait_for_postgres
+      - prepare_postgres_schema
+      - run:
+          name: Phase 2 bilingual schema test
+          command: node node_modules/vitest/vitest.mjs run tests/factory-bilingual-schema.test.ts --maxWorkers=1 --no-file-parallelism
+
+  postgres-diagnostic-g-i:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - wait_for_postgres
+      - prepare_postgres_schema
+      - run:
+          name: Backend diagnostic G-I
+          command: node node_modules/vitest/vitest.mjs run tests/[g-i]*.test.ts --maxWorkers=1 --no-file-parallelism
+
+  postgres-diagnostic-s-u:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - wait_for_postgres
+      - prepare_postgres_schema
+      - run:
+          name: Backend diagnostic S-U
+          command: node node_modules/vitest/vitest.mjs run tests/[s-u]*.test.ts --maxWorkers=1 --no-file-parallelism
 
   security-readiness:
     executor: node22-postgres
@@ -168,6 +202,9 @@ workflows:
     jobs:
       - static-build
       - postgres-regression
+      - postgres-phase2-bilingual
+      - postgres-diagnostic-g-i
+      - postgres-diagnostic-s-u
       - security-readiness:
           requires:
             - static-build
