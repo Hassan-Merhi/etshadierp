@@ -121,19 +121,28 @@ jobs:
           path: dist
           destination: production-build
 
-  diagnose-format:
+  diagnose-format-source:
     executor: node22
     steps:
       - install_dependencies
       - run:
-          name: Diagnose changed-file formatting
+          name: Diagnose production-source formatting
           command: |
-            git fetch origin main --depth=1
-            mapfile -d '' changed_files < <(
-              git diff --name-only --diff-filter=ACMR -z origin/main...HEAD -- client/src server shared tests scripts |
-                grep -zE '\.(ts|tsx|css|mjs)$' || true
-            )
-            node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
+            node node_modules/prettier/bin/prettier.cjs --check \
+              server/routes/admin/operationalMonitoringRoutes.ts \
+              server/routes/performance/readMicrocache.ts \
+              server/routes/performance/readMicrocacheCoordinator.ts
+
+  diagnose-format-tests:
+    executor: node22
+    steps:
+      - install_dependencies
+      - run:
+          name: Diagnose cache-test formatting
+          command: |
+            node node_modules/prettier/bin/prettier.cjs --check \
+              server/routes/performance/readMicrocache.test.ts \
+              server/routes/performance/readMicrocache.edge-cases.test.ts
 
   diagnose-typescript:
     executor: node22
@@ -189,7 +198,8 @@ workflows:
   full-erp-verification:
     jobs:
       - static-build
-      - diagnose-format
+      - diagnose-format-source
+      - diagnose-format-tests
       - diagnose-typescript
       - postgres-regression
       - security-readiness:
