@@ -75,7 +75,7 @@ describe("repository-wide god-file architecture boundaries", () => {
     // A single number for the work remaining: lines carried above the repository
     // limit. It exists to be driven down, so it is asserted as a ceiling and
     // should be lowered as the split phases land.
-    expect(report.summary.grandfatheredFiles).toBeLessThanOrEqual(96);
-    expect(report.summary.grandfatheredExcessLines).toBeLessThanOrEqual(49646);
+    expect(report.summary.grandfatheredFiles).toBeLessThanOrEqual(86);
+    expect(report.summary.grandfatheredExcessLines).toBeLessThanOrEqual(47283);
   });
 });

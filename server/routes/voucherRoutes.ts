@@ -13,9 +13,9 @@ import { registerCentralJournalCreateRoute } from "./vouchers/centralJournalCrea
 import { registerCentralJournalLifecycleRoutes } from "./vouchers/centralJournalLifecycleRoute";
 import { registerCentralStockTransferDeleteRoutes } from "./vouchers/centralStockTransferDeleteRoute";
 import { registerVoucherJournalRoutes } from "./vouchers/voucherJournalRoutes";
-import { registerVoucherSalesUpdateRoutes } from "./vouchers/voucherSalesUpdateRoutes";
+import { registerVoucherSalesUpdateRoutes } from "./vouchers/sales-update";
 import { registerVoucherPurchaseUpdateRoutes } from "./vouchers/voucherPurchaseUpdateRoutes";
-import { registerVoucherTransferRoutes } from "./vouchers/voucherTransferRoutes";
+import { registerVoucherTransferRoutes } from "./vouchers/transfer";
 import { registerSmartTransferPreviewRoutes } from "./vouchers/smartTransferPreviewRoutes";
 import { registerStockTransferLifecycleRoutes } from "./vouchers/stockTransferLifecycleRoutes";
 import { registerStockTransferRevisionLifecycleRoutes } from "./vouchers/stockTransferRevisionLifecycleRoutes";

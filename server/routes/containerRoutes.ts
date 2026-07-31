@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { registerContainerListPaginationRoutes } from "./containers/containerListPaginationRoutes";
 import { registerContainerCrudRoutes } from "./containers/containerCrudRoutes";
 import { registerContainerTrackingRoutes } from "./containers/containerTrackingRoutes";
-import { registerContainerAccountingRoutes } from "./containers/containerAccountingRoutes";
+import { registerContainerAccountingRoutes } from "./containers/accounting";
 import { registerContainerFreightRoutes } from "./containers/containerFreightRoutes";
 import { registerContainerOffloadLifecycleGuard } from "./containers/containerOffloadLifecycleGuard";
 import { registerCentralContainerOffloadRoute } from "./containers/centralContainerOffloadRoute";

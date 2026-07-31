@@ -7,7 +7,7 @@ import { db } from "../db";
 import { eq, and, inArray, ne } from "drizzle-orm";
 import ExcelJS from "exceljs";
 import { buildAliasMap, resolveBarcode } from "./helpers/proformaBarcodeHelpers";
-import { registerContainerLoadedItemsRoutes } from "./containerLoadedItemsRoutes";
+import { registerContainerLoadedItemsRoutes } from "./container-loaded-items";
 import {
   supplierProformas,
   supplierProformaLines,

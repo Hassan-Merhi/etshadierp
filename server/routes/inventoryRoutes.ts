@@ -1,6 +1,6 @@
 import type { Express } from "express";
 
-import { registerInventoryMovementRoutes } from "./inventoryMovementRoutes";
+import { registerInventoryMovementRoutes } from "./inventory-movement";
 import { registerInventoryListRoutes } from "./inventory/inventoryListRoutes";
 import { registerInventoryQuickAdjustRoutes } from "./inventory/inventoryQuickAdjustRoutes";
 
