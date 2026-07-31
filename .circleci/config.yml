@@ -80,33 +80,6 @@ jobs:
     steps:
       - install_dependencies
       - run:
-          name: Auto-format bandwidth hardening branch
-          command: |
-            if [ "$CIRCLE_BRANCH" != "agent/final-bandwidth-cache-hardening" ]; then
-              echo "Auto-format is disabled for this branch."
-              exit 0
-            fi
-            git fetch origin main --depth=1
-            mapfile -d '' changed_files < <(
-              git diff --name-only --diff-filter=ACMR -z origin/main...HEAD -- client/src server shared tests scripts |
-                grep -zE '\.(ts|tsx|css|mjs)$' || true
-            )
-            if [ "${#changed_files[@]}" -eq 0 ]; then
-              echo "No changed source files require formatting."
-              exit 0
-            fi
-            node node_modules/prettier/bin/prettier.cjs --write "${changed_files[@]}"
-            if git diff --quiet -- "${changed_files[@]}"; then
-              echo "Changed source files were already formatted."
-              exit 0
-            fi
-            git config user.name "CircleCI Formatter"
-            git config user.email "circleci-formatter@users.noreply.github.com"
-            git add -- "${changed_files[@]}"
-            git commit -m "Format bandwidth cache hardening"
-            git push origin HEAD:"$CIRCLE_BRANCH"
-            circleci-agent step halt
-      - run:
           name: Verify lockfile and production dependencies
           command: |
             npm run verify:lockfile
