@@ -11,11 +11,11 @@ const AUDITED = ["server/routes/admin/userManagementRoutes.ts"];
 
 const UNAUDITED = [
   // No reference to logAudit at all.
-  "server/routes/accountRoutes.ts",
+  "server/routes/accounts",
   "server/routes/admin/repair",
   // Import present, no call site.
   "server/routes/admin/companySettingsRoutes.ts",
-  "server/routes/admin/importExportRoutes.ts",
+  "server/routes/admin/import-export",
 ];
 
 describe("Phase 8D audit coverage", () => {

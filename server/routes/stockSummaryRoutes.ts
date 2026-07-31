@@ -19,7 +19,7 @@ import {
   creditNoteItems,
 } from "@shared/schema";
 import { eq, and, sql, isNull } from "drizzle-orm";
-import { registerStockSummaryLocationRoutes } from "./stockSummaryLocationRoutes";
+import { registerStockSummaryLocationRoutes } from "./stock-summary-location";
 
 export function registerStockSummaryRoutes(app: Express) {
   app.get("/api/stock-items/:id/monthly-summary", requireAuth, async (req, res) => {

@@ -13,7 +13,7 @@ import { registerFactoryEmployeesPosRoutes } from "./factory/factoryEmployeesPos
 import { registerFactoryTransporterRoutes } from "./factory/factoryTransporterRoutes";
 import { registerFactoryStockAllocationV2Routes } from "./factory/factoryStockAllocationV2Routes";
 import { registerFactoryStockAllocationV5Routes } from "./factory/stock-allocation-v5";
-import { registerFactoryShippingContainerRoutes } from "./factory/factoryShippingContainerRoutes";
+import { registerFactoryShippingContainerRoutes } from "./factory/shipping-containers";
 import { registerFactoryDailyScanRoutes } from "./factory/factoryDailyScanRoutes";
 import { registerFactoryGroundScanRoutes } from "./factory/factoryGroundScanRoutes";
 import { registerFactoryContainerTrackingRoutes } from "./factory/factoryContainerTrackingRoutes";

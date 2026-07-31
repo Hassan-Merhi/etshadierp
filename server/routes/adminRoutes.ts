@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { registerDataToolsRoutes } from "./admin/dataToolsRoutes";
 import { registerUserManagementRoutes } from "./admin/userManagementRoutes";
 import { registerCompanySettingsRoutes } from "./admin/companySettingsRoutes";
-import { registerImportExportRoutes } from "./admin/importExportRoutes";
+import { registerImportExportRoutes } from "./admin/import-export";
 import { registerAdminPoFixRoutes } from "./admin/adminPoFixRoutes";
 import { registerAdminRepairRoutes } from "./admin/repair";
 import { registerDependentDeletedItemPermanentRoutes } from "./admin/dependentDeletedItemPermanentRoutes";
