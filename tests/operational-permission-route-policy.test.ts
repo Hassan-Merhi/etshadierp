@@ -15,6 +15,31 @@ describe("operational permission route policy", () => {
     expect(classifyOperationalPermissionRoute("GET", "/api/stats/import-cycle-balance")).toBeNull();
   });
 
+  it("protects the Factory Arabic workbook template and import mutations", () => {
+    expect(
+      classifyOperationalPermissionRoute(
+        "GET",
+        "/api/factory/bale-products/arabic-template"
+      )
+    ).toMatchObject({
+      operation: "import",
+      permissionType: "action",
+      permissionKey: "act_import_data",
+      deniedRoles: ["POS", "View Only"],
+    });
+    expect(
+      classifyOperationalPermissionRoute(
+        "POST",
+        "/api/factory/bale-products/arabic-import/apply"
+      )
+    ).toMatchObject({
+      operation: "import",
+      permissionType: "action",
+      permissionKey: "act_import_data",
+      deniedRoles: ["POS", "View Only"],
+    });
+  });
+
   it("classifies company-scoped repair and recalculation mutations", () => {
     expect(
       classifyOperationalPermissionRoute("POST", "/api/admin/recalculate-equity-adjustment")
