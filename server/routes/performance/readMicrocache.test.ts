@@ -150,10 +150,7 @@ describe("Phase 7C read microcache", () => {
     firstResponse.setHeader("X-Page", "2");
     firstResponse.setHeader("X-Page-Size", "10");
     firstResponse.setHeader("X-Total-Pages", "5");
-    firstResponse.setHeader(
-      "Access-Control-Expose-Headers",
-      "X-Total-Count, X-Page, X-Page-Size, X-Total-Pages"
-    );
+    firstResponse.setHeader("Access-Control-Expose-Headers", "X-Total-Count, X-Page, X-Page-Size, X-Total-Pages");
     storeJson(middleware, request, firstResponse, { items: [] });
 
     const secondResponse = makeResponse();
