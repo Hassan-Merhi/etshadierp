@@ -8,7 +8,10 @@ import { db } from "../../db";
 import { contentDisposition } from "../../lib/contentDisposition";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { requireActionAccess, requireExportAccess } from "../../lib/permissionMiddleware";
+import {
+  requireActionAccess,
+  requireExportAccess,
+} from "../../lib/permissionMiddleware";
 import { writeAuditEvent } from "../../services/audit/auditService";
 import {
   createArabicTranslationErrorWorkbook,
@@ -23,7 +26,8 @@ import {
   type TranslationPreviewEnvelope,
 } from "../../services/factoryArabicTranslationWorkbook";
 
-const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const XLSX_MIME =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_PREVIEW_RESPONSE_ROWS = 200;
 const AUDIT_BRANCH_SIZE = 100;
@@ -34,7 +38,9 @@ const upload = multer({
   fileFilter: (_req, file, callback) => {
     const validExtension = file.originalname.toLowerCase().endsWith(".xlsx");
     const validMime =
-      !file.mimetype || file.mimetype === XLSX_MIME || file.mimetype === "application/octet-stream";
+      !file.mimetype ||
+      file.mimetype === XLSX_MIME ||
+      file.mimetype === "application/octet-stream";
     const valid = validExtension && validMime;
     callback(valid ? null : new Error("Only .xlsx files are supported"), valid);
   },
@@ -52,7 +58,11 @@ class TranslationRouteError extends Error {
   }
 }
 
-function uploadArabicWorkbook(req: Request, res: Response, next: NextFunction): void {
+function uploadArabicWorkbook(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void {
   receiveArabicWorkbook(req, res, (error: unknown) => {
     if (!error) {
       next();
@@ -81,10 +91,13 @@ function getUpload(req: Request): { buffer: Buffer; fileName: string } {
       file?: { buffer: Buffer; originalname: string };
     }
   ).file;
-  if (!file?.buffer) throw new TranslationRouteError(400, "An .xlsx workbook is required");
+  if (!file?.buffer) {
+    throw new TranslationRouteError(400, "An .xlsx workbook is required");
+  }
   return {
     buffer: file.buffer,
-    fileName: file.originalname.trim().slice(0, 255) || "factory-arabic-names.xlsx",
+    fileName:
+      file.originalname.trim().slice(0, 255) || "factory-arabic-names.xlsx",
   };
 }
 
@@ -193,16 +206,25 @@ async function buildPreview(input: {
   });
 }
 
-function sendWorkbook(res: Response, workbook: Buffer, fileName: string): Response {
+function sendWorkbook(
+  res: Response,
+  workbook: Buffer,
+  fileName: string
+): Response {
   res.setHeader("Content-Type", XLSX_MIME);
-  res.setHeader("Content-Disposition", contentDisposition("attachment", fileName));
+  res.setHeader(
+    "Content-Disposition",
+    contentDisposition("attachment", fileName)
+  );
   res.setHeader("Cache-Control", "private, no-store");
   return res.send(workbook);
 }
 
 function sendRouteError(res: Response, error: unknown): Response {
   if (error instanceof TranslationRouteError) {
-    return res.status(error.status).json({ message: error.message, ...error.details });
+    return res
+      .status(error.status)
+      .json({ message: error.message, ...error.details });
   }
   return res.status(400).json({ message: getErrorMessage(error) });
 }
@@ -231,11 +253,24 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
     async (req: Request, res: Response) => {
       try {
         const companyId = getFactoryCompanyId(req);
-        if (!companyId) throw new TranslationRouteError(403, "Factory company access required");
-        const workbook = await createArabicTranslationTemplate(await loadCatalog(companyId));
-        return sendWorkbook(res, workbook, "factory-arabic-names-template.xlsx");
+        if (!companyId) {
+          throw new TranslationRouteError(
+            403,
+            "Factory company access required"
+          );
+        }
+        const workbook = await createArabicTranslationTemplate(
+          await loadCatalog(companyId)
+        );
+        return sendWorkbook(
+          res,
+          workbook,
+          "factory-arabic-names-template.xlsx"
+        );
       } catch (error) {
-        logger.error("Failed to export Factory Arabic translation template", { error });
+        logger.error("Failed to export Factory Arabic translation template", {
+          error,
+        });
         return sendRouteError(res, error);
       }
     }
@@ -249,12 +284,19 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
     async (req: Request, res: Response) => {
       try {
         const companyId = getFactoryCompanyId(req);
-        if (!companyId) throw new TranslationRouteError(403, "Factory company access required");
+        if (!companyId) {
+          throw new TranslationRouteError(
+            403,
+            "Factory company access required"
+          );
+        }
         const { buffer } = getUpload(req);
         const preview = await buildPreview({
           companyId,
           buffer,
-          mode: getImportMode((req.body as Record<string, unknown> | undefined)?.mode),
+          mode: getImportMode(
+            (req.body as Record<string, unknown> | undefined)?.mode
+          ),
         });
         return res.json(previewForResponse(preview));
       } catch (error) {
@@ -272,12 +314,19 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
     async (req: Request, res: Response) => {
       try {
         const companyId = getFactoryCompanyId(req);
-        if (!companyId) throw new TranslationRouteError(403, "Factory company access required");
+        if (!companyId) {
+          throw new TranslationRouteError(
+            403,
+            "Factory company access required"
+          );
+        }
         const { buffer } = getUpload(req);
         const preview = await buildPreview({
           companyId,
           buffer,
-          mode: getImportMode((req.body as Record<string, unknown> | undefined)?.mode),
+          mode: getImportMode(
+            (req.body as Record<string, unknown> | undefined)?.mode
+          ),
         });
         return sendWorkbook(
           res,
@@ -298,14 +347,22 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
     async (req: Request, res: Response) => {
       try {
         const companyId = getFactoryCompanyId(req);
-        if (!companyId) throw new TranslationRouteError(403, "Factory company access required");
+        if (!companyId) {
+          throw new TranslationRouteError(
+            403,
+            "Factory company access required"
+          );
+        }
         const { buffer, fileName } = getUpload(req);
         const body = (req.body ?? {}) as Record<string, unknown>;
         const mode = getImportMode(body.mode);
         const suppliedPreviewToken =
           typeof body.previewToken === "string" ? body.previewToken.trim() : "";
         if (!suppliedPreviewToken) {
-          throw new TranslationRouteError(400, "Preview the workbook before applying it");
+          throw new TranslationRouteError(
+            400,
+            "Preview the workbook before applying it"
+          );
         }
 
         const result = await db.transaction(
@@ -387,8 +444,15 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
                 changedProductIds.push(updatedProduct.id);
               }
 
-              if (row.categoryId && row.changes.categoryNameAr && row.targetCategoryNameAr) {
-                categoryTargets.set(row.categoryId, row.targetCategoryNameAr);
+              if (
+                row.categoryId &&
+                row.changes.categoryNameAr &&
+                row.targetCategoryNameAr
+              ) {
+                categoryTargets.set(
+                  row.categoryId,
+                  row.targetCategoryNameAr
+                );
               }
             }
 
@@ -436,7 +500,9 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
               {
                 userId: String((req.session as any).userId ?? ""),
                 username: String(
-                  (req.session as any).username ?? (req.session as any).userId ?? "unknown"
+                  (req.session as any).username ??
+                    (req.session as any).userId ??
+                    "unknown"
                 ),
                 companyId,
                 action: "import",
@@ -457,7 +523,9 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
         logger.info("Factory Arabic translation import applied", result);
         return res.json(result);
       } catch (error) {
-        logger.error("Failed to apply Factory Arabic translation import", { error });
+        logger.error("Failed to apply Factory Arabic translation import", {
+          error,
+        });
         return sendRouteError(res, error);
       }
     }
