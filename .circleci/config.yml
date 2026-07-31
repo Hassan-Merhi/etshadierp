@@ -156,45 +156,45 @@ jobs:
           name: Phase 2 bilingual schema test
           command: node node_modules/vitest/vitest.mjs run tests/factory-bilingual-schema.test.ts --maxWorkers=1 --no-file-parallelism
 
-  postgres-diagnostic-g-h:
+  postgres-diagnostic-s-a-f:
     executor: node22-postgres
     steps:
       - install_dependencies
       - wait_for_postgres
       - prepare_postgres_schema
       - run:
-          name: Backend diagnostic G-H
-          command: node node_modules/vitest/vitest.mjs run tests/[g-h]*.test.ts --maxWorkers=1 --no-file-parallelism
+          name: Backend diagnostic S A-F
+          command: node node_modules/vitest/vitest.mjs run tests/s[a-f]*.test.ts --maxWorkers=1 --no-file-parallelism
 
-  postgres-diagnostic-i:
+  postgres-diagnostic-s-g-l:
     executor: node22-postgres
     steps:
       - install_dependencies
       - wait_for_postgres
       - prepare_postgres_schema
       - run:
-          name: Backend diagnostic I
-          command: node node_modules/vitest/vitest.mjs run tests/i*.test.ts --maxWorkers=1 --no-file-parallelism
+          name: Backend diagnostic S G-L
+          command: node node_modules/vitest/vitest.mjs run tests/s[g-l]*.test.ts --maxWorkers=1 --no-file-parallelism
 
-  postgres-diagnostic-s:
+  postgres-diagnostic-s-m-r:
     executor: node22-postgres
     steps:
       - install_dependencies
       - wait_for_postgres
       - prepare_postgres_schema
       - run:
-          name: Backend diagnostic S
-          command: node node_modules/vitest/vitest.mjs run tests/s*.test.ts --maxWorkers=1 --no-file-parallelism
+          name: Backend diagnostic S M-R
+          command: node node_modules/vitest/vitest.mjs run tests/s[m-r]*.test.ts --maxWorkers=1 --no-file-parallelism
 
-  postgres-diagnostic-t-u:
+  postgres-diagnostic-s-s-z:
     executor: node22-postgres
     steps:
       - install_dependencies
       - wait_for_postgres
       - prepare_postgres_schema
       - run:
-          name: Backend diagnostic T-U
-          command: node node_modules/vitest/vitest.mjs run tests/[t-u]*.test.ts --maxWorkers=1 --no-file-parallelism
+          name: Backend diagnostic S S-Z
+          command: node node_modules/vitest/vitest.mjs run tests/s[s-z]*.test.ts --maxWorkers=1 --no-file-parallelism
 
   security-readiness:
     executor: node22-postgres
@@ -223,10 +223,10 @@ workflows:
       - static-build
       - postgres-regression
       - postgres-phase2-bilingual
-      - postgres-diagnostic-g-h
-      - postgres-diagnostic-i
-      - postgres-diagnostic-s
-      - postgres-diagnostic-t-u
+      - postgres-diagnostic-s-a-f
+      - postgres-diagnostic-s-g-l
+      - postgres-diagnostic-s-m-r
+      - postgres-diagnostic-s-s-z
       - security-readiness:
           requires:
             - static-build
