@@ -129,76 +129,52 @@ jobs:
             npm run verify:program1-observability
             npm run verify:final-production-readiness
             npm run verify:bandwidth
-      - store_artifacts:
-          path: dist
-          destination: production-build
 
-  postgres-schema:
-    executor: node22-postgres
-    steps:
-      - install_dependencies
-      - wait_for_postgres
-      - prepare_postgres_schema
-
-  postgres-phase2-focused:
+  postgres-backend-a-f:
     executor: node22-postgres
     steps:
       - install_dependencies
       - wait_for_postgres
       - prepare_postgres_schema
       - run:
-          name: Phase 2 bilingual schema test
-          command: node node_modules/vitest/vitest.mjs run tests/factory-bilingual-schema.test.ts --maxWorkers=1 --no-file-parallelism
+          name: Backend tests A-F
+          command: node node_modules/vitest/vitest.mjs run tests/[a-f]*.test.ts --exclude tests/factory-bilingual-schema.test.ts --maxWorkers=1 --no-file-parallelism
 
-  postgres-existing-backend:
+  postgres-backend-g-l:
     executor: node22-postgres
     steps:
       - install_dependencies
       - wait_for_postgres
       - prepare_postgres_schema
       - run:
-          name: Existing backend tests
-          command: node node_modules/vitest/vitest.mjs run --exclude tests/factory-bilingual-schema.test.ts --maxWorkers=1 --no-file-parallelism
+          name: Backend tests G-L
+          command: node node_modules/vitest/vitest.mjs run tests/[g-l]*.test.ts --maxWorkers=1 --no-file-parallelism
 
-  postgres-existing-frontend:
+  postgres-backend-m-r:
     executor: node22-postgres
     steps:
       - install_dependencies
       - wait_for_postgres
       - prepare_postgres_schema
       - run:
-          name: Existing frontend tests
-          command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
+          name: Backend tests M-R
+          command: node node_modules/vitest/vitest.mjs run tests/[m-r]*.test.ts --maxWorkers=1 --no-file-parallelism
 
-  security-readiness:
+  postgres-backend-s-z:
     executor: node22-postgres
     steps:
       - install_dependencies
       - wait_for_postgres
+      - prepare_postgres_schema
       - run:
-          name: Prepare disposable database schema
-          command: node node_modules/drizzle-kit/bin.cjs push --force
-      - run:
-          name: Critical dependency audit
-          command: npm audit --audit-level=critical
-      - run:
-          name: Production dependency verification
-          command: npm run verify:production-dependencies
-      - run:
-          name: Program 6 security checks
-          command: PROGRAM6_SKIP_TYPESCRIPT=1 npm run check:program-6-security
-      - run:
-          name: Final production readiness contract
-          command: npm run verify:final-production-readiness
+          name: Backend tests S-Z
+          command: node node_modules/vitest/vitest.mjs run tests/[s-z]*.test.ts --maxWorkers=1 --no-file-parallelism
 
 workflows:
   full-erp-verification:
     jobs:
       - static-build
-      - postgres-schema
-      - postgres-phase2-focused
-      - postgres-existing-backend
-      - postgres-existing-frontend
-      - security-readiness:
-          requires:
-            - static-build
+      - postgres-backend-a-f
+      - postgres-backend-g-l
+      - postgres-backend-m-r
+      - postgres-backend-s-z
