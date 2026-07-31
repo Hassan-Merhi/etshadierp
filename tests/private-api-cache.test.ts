@@ -24,12 +24,19 @@ function createTestApp() {
   installPrivateApiCache(app);
 
   let salesReportCalls = 0;
+  let delayedReportCalls = 0;
   let previewCalls = 0;
   let uncachedCalls = 0;
 
   app.get("/api/sales-report", (_req, res) => {
     salesReportCalls += 1;
     res.json({ calls: salesReportCalls, rows: [{ id: 1, value: "x".repeat(2_000) }] });
+  });
+
+  app.get("/api/location-summary", async (_req, res) => {
+    delayedReportCalls += 1;
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    res.json({ calls: delayedReportCalls });
   });
 
   app.post("/api/factory/payrolls/preview", (req, res) => {
@@ -49,6 +56,7 @@ function createTestApp() {
   return {
     app,
     getSalesReportCalls: () => salesReportCalls,
+    getDelayedReportCalls: () => delayedReportCalls,
     getPreviewCalls: () => previewCalls,
     getUncachedCalls: () => uncachedCalls,
   };
@@ -67,11 +75,28 @@ describe("private API cache", () => {
 
     expect(first.status).toBe(200);
     expect(first.headers["x-erp-cache"]).toBe("MISS");
+    expect(first.headers["cache-control"]).toBe("private, no-cache, must-revalidate");
     expect(second.status).toBe(200);
     expect(second.headers["x-erp-cache"]).toBe("HIT");
     expect(second.body.calls).toBe(1);
     expect(testApp.getSalesReportCalls()).toBe(1);
     expect(getPrivateApiCacheStats().hits).toBe(1);
+  });
+
+  it("coalesces concurrent identical misses into one route execution", async () => {
+    const testApp = createTestApp();
+
+    const responses = await Promise.all(
+      Array.from({ length: 8 }, () => request(testApp.app).get("/api/location-summary")),
+    );
+
+    expect(testApp.getDelayedReportCalls()).toBe(1);
+    expect(responses.every((response) => response.status === 200)).toBe(true);
+    expect(responses.every((response) => response.body.calls === 1)).toBe(true);
+    expect(
+      responses.filter((response) => response.headers["x-erp-cache"] === "COALESCED").length,
+    ).toBeGreaterThan(0);
+    expect(getPrivateApiCacheStats().coalesced).toBeGreaterThan(0);
   });
 
   it("returns 304 for a matching cached ETag without running the route", async () => {
