@@ -9,6 +9,12 @@ export function invalidateChargeQueries(containerId: number) {
   queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
   queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
   queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/by-container"] });
+  queryClient.invalidateQueries({
+    predicate: (query) => {
+      const key = query.queryKey[0];
+      return typeof key === "string" && key.startsWith("/api/factory/raw-stock/history/");
+    },
+  });
   queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
   queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"], refetchType: "active" });
   queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
