@@ -4,36 +4,36 @@ Issue: #347
 Status: Phase 1 complete  
 Scope: Factory bale product names, category names, article-code translation import, linked operational screens, invoices, PDFs, Excel files, labels, loading documents, and historical snapshots.
 
-## 1. Decisions locked by this phase
+## 1. Contract locked by this phase
 
-1. English and Arabic are fields on the same product/category record. Arabic products are never duplicated.
-2. The language-neutral identity is the company-scoped product ID plus article code. Excel translation imports match by normalized article code only.
-3. Article-code normalization is deliberately conservative: trim surrounding whitespace and uppercase. Do not remove punctuation, convert to a number, or drop leading zeroes.
-4. Live catalog fallback is:
+1. English and Arabic belong to the same product/category record. Arabic products are never duplicated.
+2. Product ID and company-scoped article code are language-neutral identifiers.
+3. Arabic translation workbooks match by article code only, never by product name.
+4. Article-code normalization is conservative: trim surrounding whitespace and uppercase. Preserve punctuation and leading zeroes.
+5. Live catalog fallback is:
    - Arabic request: Arabic -> English -> article code.
    - English request: English -> Arabic -> article code.
-5. Finalized-document fallback is:
+6. Finalized-document fallback is:
    - requested-language snapshot -> opposite-language snapshot -> requested current catalog value -> opposite current catalog value -> article code.
-6. Current catalog changes may update live operational records, but must never silently rename a finalized invoice or historical document.
-7. Language operations are text-only. They cannot change quantities, weights, prices, costs, stock, allocations, vouchers, journals, customer balances, or supplier balances.
-8. Every database read/write and every translation import remains company-scoped.
-9. The first Arabic translation import accepts `.xlsx` and supports `fill-missing` and explicit `replace-existing` modes.
-10. No page, route, PDF, or Excel generator may invent its own fallback. All later phases must use `shared/factoryBilingualContract.ts`.
+7. Current catalog edits may update live operational records but must never silently rename finalized documents.
+8. Language changes are text-only. They cannot alter quantities, weights, prices, costs, stock, allocations, vouchers, journals, or balances.
+9. Every lookup, import, mutation, diagnostic, and repair remains company-scoped.
+10. Later phases must use `shared/factoryBilingualContract.ts`; pages and exports must not create independent fallback rules.
 
 ## 2. Current data model findings
 
-### 2.1 Parallel catalogs exist
+### Parallel catalogs
 
-The schema contains both a legacy bale catalog and the active Factory catalog:
+The repository contains two bale catalogs:
 
 - Legacy: `bale_product_categories`, `bale_products`, `production_bales`.
 - Factory: `factory_categories`, `factory_bale_products`, `factory_bales`.
 
-The feature requested in issue #347 targets the Factory catalog. Legacy surfaces are still listed in the dependency manifest because several shared lookup, transfer, invoice, and label pages still read similar fields and must be explicitly verified rather than assumed unrelated.
+Issue #347 targets the Factory catalog. Legacy/shared surfaces remain in the dependency manifest because barcode, transfer, loading, invoice, and label flows still use related bale-name fields and must be classified explicitly in Phase 8.
 
-### 2.2 Factory catalog source of truth
+### Factory catalog source of truth
 
-`factory_bale_products` currently stores:
+`factory_bale_products` currently stores one English name and description together with:
 
 - `id`
 - `company_id`
@@ -43,140 +43,138 @@ The feature requested in issue #347 targets the Factory catalog. Legacy surfaces
 - `description`
 - `weight_per_bale_kg`
 - `category_id`
-- selling/production prices, label color, active/deleted state
+- production/selling prices, label color, status, and deletion state
 
-`factory_categories` currently stores one English `name` per company.
+`factory_categories` currently stores one English category name per company.
 
-The schema already has a unique company/article-code index. Phase 2 must preserve that behavior and add nullable Arabic fields without replacing English fields.
+The schema already has a company/article-code uniqueness boundary. Phase 2 must preserve it while adding nullable Arabic fields.
 
-### 2.3 Operational bale snapshot
+### Operational bale snapshots
 
-`factory_bales` stores both a live foreign-key reference and copied text:
+`factory_bales` stores:
 
 - `product_id`
 - `article_code`
 - `product_name`
 - `category`
 
-This is a mutable operational snapshot. The existing product cascade route updates `factory_bales.product_name`, `weight_kg`, and `article_code` for all company bales linked to the product. It does not currently carry an Arabic name or Arabic category.
+The existing product cascade updates linked `factory_bales.product_name`, `weight_kg`, and `article_code`. It has no Arabic fields and does not distinguish all historical/finalized use cases. Phase 6 must add bilingual propagation without allowing finalized document names to drift.
 
-Phase 6 must distinguish active/current bale display from finalized document history. Adding Arabic support must not make the existing broad cascade overwrite finalized document snapshots.
+### Proforma and order snapshots
 
-### 2.4 Proforma and order snapshots
+| Record | Current copied fields | Company scope |
+|---|---|---|
+| `customer_proforma_lines` | `article_code`, `product_name` | parent `customer_proformas.company_id` |
+| `customer_order_lines` | `article_code`, `bale_name` | parent `customer_orders.company_id` |
+| `customer_order_bales` | `article_code`, `bale_name`, `bale_id` | parent `customer_orders.company_id` |
+| `customer_order_bales_history` | `article_code`, `bale_name`, `bale_id` | historical parent order |
+| `customer_order_expected_lines` | `article_code`, `product_name`, `company_id` | direct and parent order |
 
-The current schema copies names into multiple records:
+Several child tables do not carry `company_id`. Repair and backfill code must scope them through their parent order/proforma; filtering by article code alone is unsafe.
 
-| Record | Current copied identifiers/text | Company scope path | Snapshot classification |
-|---|---|---|---|
-| `customer_proforma_lines` | `article_code`, `product_name` | join through `customer_proformas.company_id` | mutable draft/proforma snapshot |
-| `customer_order_lines` | `article_code`, `bale_name` | join through `customer_orders.company_id` | order/invoice line snapshot |
-| `customer_order_bales` | `article_code`, `bale_name`, `bale_id` | join through `customer_orders.company_id` | scanned order-bale snapshot |
-| `customer_order_bales_history` | `article_code`, `bale_name`, `bale_id` | join through historical order ID | immutable cancellation/history snapshot |
-| `customer_order_expected_lines` | `article_code`, `product_name`, `company_id` | direct and parent order | mutable expected-line snapshot |
+### Current update paths
 
-Several child tables do not carry `company_id`. Any import repair or backfill must scope them by joining to their parent proforma/order; filtering by article code alone is not safe.
+The product routes currently have:
 
-### 2.5 Current product update behavior
+- generic `PATCH /api/factory/bale-products/:id`
+- `POST /api/factory/bale-products/:id/cascade-update`
 
-The Factory product route has two update paths:
+The translation workbook must use a dedicated, transactional endpoint. It must not perform hundreds of generic product patches or accidentally expose pricing, stock, or accounting fields.
 
-- A generic `PATCH /api/factory/bale-products/:id` that spreads request fields into the product update.
-- A `POST /api/factory/bale-products/:id/cascade-update` path that validates selected fields and propagates English name/article/weight to `factory_bales`.
+## 3. Dependency inventory
 
-Later phases must add Arabic fields to explicit allowlists and avoid expanding unsafe arbitrary updates. Arabic translation imports must use a dedicated endpoint and transaction rather than reuse the generic patch route row-by-row.
-
-## 3. Dependency-map result
-
-The machine-readable dependency map is stored at:
+The machine-readable inventory is:
 
 `config/factory-bilingual-dependencies.json`
 
-It contains the exact files and assigns each group to the implementation phase that owns it. The map is protected by `tests/factory-bilingual-dependency-map.test.ts`, which checks unique ownership, required high-risk boundaries, and repository path existence.
+It assigns identified files to Phases 2–8 and records these groups:
 
-### 3.1 Catalog CRUD and editing
+- schema and shared contract
+- catalog CRUD and Bale Explorer UI
+- Arabic translation workbook import/export
+- barcode lookup, labels, and relabeling
+- production, stock, inventory, and history
+- allocation and dispatch
+- proformas
+- customer orders and invoices
+- PDF, Excel, loading, and messaging attachments
+- daybook, reports, and employee POS
+- legacy/shared bale surfaces
+- existing Arabic rendering references
 
-Primary boundaries:
+The manifest uses unique file ownership and identifies the critical catalog, import, snapshot, invoice, PDF, Excel, and loading boundaries that later phases must complete.
+
+## 4. Key linked surfaces identified
+
+### Catalog and editing
 
 - `server/routes/factory/factoryProductsRoutes.ts`
 - `client/src/pages/BaleProducts.tsx`
 - `client/src/components/CreateBaleProductDialog.tsx`
-- `client/src/pages/factory/MergeBaleProducts.tsx`
-- `client/src/pages/factory/BaleProductImages.tsx`
+- merge and product-image pages
+- legacy/shared bale product routes
 
-Current list, create, edit, merge statistics, product details, and cascade operations all expose only English names.
+### Translation workbook
 
-### 3.2 Import and translation workbook
+- current Factory bale import components, types, utilities, and history
+- a new narrow Arabic-name workflow must be separate from stock/bale creation imports
 
-Existing Factory import code is spread across:
+### Barcode and labels
 
-- `client/src/pages/factory/factoryimport/components/BaleImport.tsx`
-- `client/src/pages/factory/factoryimport/types.ts`
-- `client/src/pages/factory/factoryimport/utils.ts`
-- `client/src/pages/factory/FactoryBaleImportHistory.tsx`
+- barcode lookup route and page
+- shared label HTML
+- label reprint and relabeling
+- pressing and production-bale pages
 
-The Arabic-name workbook must be a separate, narrow workflow. It updates Arabic catalog fields only and must not reuse the general bale import in a way that could create bales, change stock, or modify pricing.
+Barcode identity remains unchanged regardless of display language.
 
-### 3.3 Barcode lookup, labels, pressing, and relabeling
+### Production and inventory
 
-The audit found linked name/article-code rendering in barcode lookup, shared label HTML, label reprint, relabeling, pressing, and production-bale pages. These surfaces must keep scanning language-neutral while choosing the requested display/print language.
+- Factory bale, daily scan, ground scan, stock, stock-entry history, and bale export routes
+- stock entry scanner/printing
+- location inventory, tracking, daily production, comparison, and re-entry pages
 
-A barcode must always resolve the same product regardless of the selected language.
+These are live operational surfaces and should resolve through product ID/article code where possible.
 
-### 3.4 Production, stock, inventory, and history
+### Allocation and dispatch
 
-Product names are returned or displayed by Factory bale routes, daily scan, ground scan, stock routes, stock-entry history, bale exports, location inventory, stock lists, product tracking, daily production reports, production comparison, and stock-entry print paths.
+- Stock Allocation V2, V3, and V5 routes/pages
+- V5 pagination payloads
+- scanning panels
+- dispatch batch list, detail, and scan flows
 
-These are live operational surfaces. They should resolve from product ID/article code when possible and use copied bale fields only when no catalog match exists.
+API changes must be additive so existing English consumers remain compatible.
 
-### 3.5 Allocation and dispatch
+### Proformas, orders, and invoices
 
-Stock Allocation V2, V3, V5, paginated V5 payloads, client pagination types, scanning panels, and dispatch batches all carry product names/article codes. Their API contracts must be extended additively; existing English consumers cannot break.
+- Factory proforma routes and drawers
+- customer-order helpers, CRUD, scanning, verify, and recover routes
+- invoice create, detail, pending, and verification pages
 
-### 3.6 Proformas, orders, and invoices
+These paths copy names into lines and scanned-bale rows. Phase 6 must persist both English and Arabic snapshots at write time.
 
-The audit covers:
+### PDFs, Excel, loading, and attachments
 
-- Factory proforma route and all current create/edit/list drawers.
-- Customer-order helpers and CRUD.
-- Bale scanning and verify/recover flows.
-- Invoice creation, detail, pending, and verification screens.
+- customer-order PDF export
+- customer-order Excel export
+- invoice loading routes/screens
+- Factory document-user routes
+- worker-bale PDF generation
+- label and product-sheet output
 
-These boundaries copy names instead of always joining the product catalog. Phase 6 must create bilingual snapshots at write time and repair safe historical gaps by product ID first, exact article code second, never fuzzy name matching.
+Existing Arabic PDF support is available in the account-statement generator and Arabic-capable Factory customer documents. Phase 7 should reuse that approach.
 
-### 3.7 PDF, Excel, loading, labels, and attachments
+No separate WhatsApp product-name resolver was found. WhatsApp correctness must be enforced at the attachment-generation boundary so the selected PDF/Excel/loading file already has the requested language.
 
-The following generators/flows must use a shared language parameter and resolver:
+## 5. Phase 2 schema ownership
 
-- Customer-order PDF export.
-- Customer-order Excel export.
-- Invoice loading routes and loading screens.
-- Factory document user routes.
-- Worker-bale PDF generator.
-- Product/bale labels and product sheets.
-
-Existing Arabic rendering is available in `server/lib/accountStatementPdfGenerator.ts` and Arabic-capable Factory customer document paths. Phase 7 should reuse the established Arabic font/shaping approach instead of introducing a second incompatible renderer.
-
-No independent WhatsApp product-name resolver was identified. WhatsApp output must therefore be verified at the attachment-generation boundary: the PDF/Excel/loading file selected for messaging must already be generated in the chosen language.
-
-### 3.8 Daybook, reports, employee POS, and legacy surfaces
-
-Bale history, loading-created daybook views, employee POS/waste routes, legacy transfers, legacy invoice pages, and legacy container loading were retained in the manifest. Phase 8 must classify each as one of:
-
-- active Factory dependency to update,
-- shared/legacy dependency to update,
-- confirmed out of scope with a recorded reason.
-
-They cannot simply be ignored because code search shows product-name/article-code use.
-
-## 4. Schema ownership for Phase 2
-
-Phase 2 should add the following catalog fields:
+Phase 2 should add these catalog fields:
 
 - `factory_bale_products.name_ar`
 - `factory_bale_products.description_ar`
 - `factory_categories.name_ar`
 
-The audit identifies these likely snapshot additions, subject to final migration naming consistency:
+Likely snapshot additions identified by the audit:
 
 - `factory_bales.product_name_ar`
 - `factory_bales.category_ar`
@@ -186,88 +184,77 @@ The audit identifies these likely snapshot additions, subject to final migration
 - `customer_order_bales_history.bale_name_ar`
 - `customer_order_expected_lines.product_name_ar`
 
-If category names are added to invoice/proforma line output, English and Arabic category snapshots must be added together rather than reading mutable categories for finalized documents.
+Where finalized outputs include categories, English and Arabic category snapshots must be stored together rather than reading a mutable current category.
 
-An optional `customer_orders.document_language` may store the user's default output language, but each export endpoint must still allow an explicit `lang=en|ar` override.
+An optional `customer_orders.document_language` may save the default output language, but each export route must still support an explicit `lang=en|ar` override.
 
-## 5. Translation workbook contract
+## 6. Arabic translation workbook contract
 
-The export template must contain one row per current-company product:
+The exported workbook must contain one current-company product per row:
 
-- `Article Code / Barcode` — locked/reference, exported as Excel text.
-- `English Product Name` — locked/reference.
-- `Arabic Product Name` — editable.
-- `English Category` — locked/reference.
-- `Arabic Category` — editable.
-- `Arabic Description` — optional/editable.
-- `Current Translation Status` — reference.
+- `Article Code / Barcode` — locked reference, exported as Excel text
+- `English Product Name` — locked reference
+- `Arabic Product Name` — editable
+- `English Category` — locked reference
+- `Arabic Category` — editable
+- `Arabic Description` — optional/editable
+- `Current Translation Status` — reference
 
 Import rules:
 
-1. `.xlsx` only in the first release.
-2. Normalize article code using trim + uppercase only.
-3. Match inside the selected company only.
-4. Never match by English or Arabic name.
+1. `.xlsx` only for the first release.
+2. Normalize article codes with trim + uppercase only.
+3. Match inside the active company only.
+4. Never match by English or Arabic product name.
 5. Preview matched, unchanged, update, unknown, duplicate, blank, and category-conflict counts.
 6. Duplicate codes and conflicting Arabic translations for one category block apply.
-7. Apply all accepted changes in one database transaction.
-8. `fill-missing` is the safe default. `replace-existing` requires explicit selection.
+7. Apply accepted changes in one database transaction.
+8. `fill-missing` is the safe default; `replace-existing` requires explicit selection.
 9. Re-importing the same workbook is idempotent.
-10. Audit user, company, filename, mode, counts, and changed IDs.
-11. Error workbook rows retain the original article code and include a rejection reason.
+10. Audit user, company, filename, mode, counts, and changed record IDs.
+11. Rejected rows can be downloaded with the original article code and rejection reason.
 
-## 6. Company-isolation rules
+## 7. Company and historical safety
 
-All later phases must follow these rules:
+- Confirm every product/category ID belongs to the active company.
+- Include company ID in every article-code lookup.
+- Scope child snapshot tables through parent orders/proformas when they lack `company_id`.
+- Never use a Company B product to repair a Company A record.
+- Resolve repairs by product ID first and exact article code second.
+- Never fuzzy-match by name.
+- Report ambiguous/orphaned records instead of guessing.
+- Allow dry-run before historical apply.
+- Do not overwrite an existing finalized Arabic snapshot during ordinary catalog edits.
+- Preserve all English historical names.
 
-- Catalog reads/writes filter `factory_bale_products.company_id` and `factory_categories.company_id`.
-- Category IDs supplied by an import must belong to the same company as the product.
-- Child snapshot tables without `company_id` are scoped through the parent proforma/order.
-- Product-ID lookup is accepted only after confirming the product belongs to the active company.
-- Article-code fallback always includes company ID.
-- Diagnostics and dry-run backfills return no data from another company.
-- An import cannot use a code found in Company B to update a missing code in Company A.
-
-## 7. Historical safety rules
-
-- Draft/current records may receive Arabic snapshots through a controlled repair.
-- Finalized records with no Arabic snapshot may be backfilled once from a company-scoped product match.
-- Once a finalized snapshot exists, later catalog edits do not overwrite it.
-- Existing English historical names remain unchanged.
-- Ambiguous or orphaned rows are reported, not guessed.
-- Name-only fuzzy matching is prohibited.
-- Repair endpoints must support dry run before apply and write an audit log.
-
-## 8. Phase 1 code delivered
+## 8. Phase 1 deliverables
 
 - `shared/factoryBilingualContract.ts`
   - language and import-mode types
   - article-code normalization
   - live English/Arabic resolver
   - snapshot-first finalized-document resolver
-  - snapshot builder
-  - translation-row normalizer
+  - bilingual snapshot builder
+  - Arabic translation-row normalizer
 - `config/factory-bilingual-dependencies.json`
-  - checked dependency inventory and phase ownership
+  - dependency inventory and implementation-phase ownership
 - `tests/factory-bilingual-contract.test.ts`
   - English-only, Arabic-only, bilingual, missing-value, code-fallback, import normalization, and historical snapshot fixtures
-- `tests/factory-bilingual-dependency-map.test.ts`
-  - manifest integrity and high-risk boundary checks
+- this audit document
 
-## 9. Phase 1 completion checklist
+## 9. Completion checklist
 
-- [x] Active Factory catalog tables identified.
-- [x] Legacy parallel bale catalog identified.
-- [x] Product/category CRUD and import boundaries identified.
+- [x] Active Factory and parallel legacy catalog tables identified.
+- [x] Catalog CRUD and Arabic import boundaries identified.
 - [x] Barcode, scanning, labels, pressing, and relabeling boundaries identified.
 - [x] Stock, allocation, dispatch, history, and reporting boundaries identified.
 - [x] Proforma, order, invoice, loading, PDF, and Excel boundaries identified.
 - [x] Copied-name snapshot tables identified.
 - [x] Parent-join company-scoping requirements identified.
-- [x] Live and finalized fallback contracts defined.
-- [x] Exact article-code import normalization defined.
-- [x] Historical non-renaming rule defined.
-- [x] Dependency map protected by tests.
-- [x] Shared contract protected by fixtures.
+- [x] Live and finalized fallback contracts implemented.
+- [x] Exact article-code import normalization implemented.
+- [x] Historical non-renaming rule implemented in the shared contract.
+- [x] Shared contract covered by regression fixtures.
+- [x] Dependency inventory assigned to remaining phases.
 
-Phase 2 can now add the schema and migrations without rediscovering or guessing the linked data paths.
+Phase 2 can now add the schema and migration without rediscovering or guessing the linked data paths.
