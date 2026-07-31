@@ -121,6 +121,28 @@ jobs:
           path: dist
           destination: production-build
 
+  diagnose-format:
+    executor: node22
+    steps:
+      - install_dependencies
+      - run:
+          name: Diagnose changed-file formatting
+          command: |
+            git fetch origin main --depth=1
+            mapfile -d '' changed_files < <(
+              git diff --name-only --diff-filter=ACMR -z origin/main...HEAD -- client/src server shared tests scripts |
+                grep -zE '\.(ts|tsx|css|mjs)$' || true
+            )
+            node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
+
+  diagnose-typescript:
+    executor: node22
+    steps:
+      - install_dependencies
+      - run:
+          name: Diagnose strict TypeScript
+          command: npm run check
+
   postgres-regression:
     executor: node22-postgres
     steps:
@@ -167,6 +189,8 @@ workflows:
   full-erp-verification:
     jobs:
       - static-build
+      - diagnose-format
+      - diagnose-typescript
       - postgres-regression
       - security-readiness:
           requires:
