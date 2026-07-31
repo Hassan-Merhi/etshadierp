@@ -46,7 +46,7 @@ function stableTestCompanyCode(prefix: string): string {
 function testCompanyType(prefix: string): "erp" | "factory" {
   // Factory export integration tests must exercise the same authorized factory
   // company resolution used in production. Ordinary ERP/POS tests remain ERP.
-  return prefix === "xlsexp" ? "factory" : "erp";
+  return prefix === "xlsexp" || prefix === "charfact" ? "factory" : "erp";
 }
 
 export async function setupTestApp(): Promise<express.Express> {
