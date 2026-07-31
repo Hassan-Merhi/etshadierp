@@ -91,14 +91,14 @@ const CACHE_POLICIES: readonly CachePolicy[] = [
   report("factory-customer-order", /^\/api\/factory\/customer-orders\/\d+\/?$/),
   report(
     "factory-customer-order-verification",
-    /^\/api\/factory\/customer-orders\/\d+\/verification-summary\/?$/,
+    /^\/api\/factory\/customer-orders\/\d+\/verification-summary\/?$/
   ),
   report("factory-bale-ledger", /^\/api\/factory\/bale-ledger\/?$/),
   report("factory-mix-batches", /^\/api\/factory\/mix-batches\/?$/),
   report("factory-daily-bale-scans", /^\/api\/factory\/daily-bale-scans\/?$/),
   report(
     "factory-produced-daily-bale-scans",
-    /^\/api\/factory\/daily-bale-scans\/produced\/?$/,
+    /^\/api\/factory\/daily-bale-scans\/produced\/?$/
   ),
   report("factory-stock-entry-history", /^\/api\/factory\/bales\/stock-entry-history\/?$/),
   report("factory-attendance", /^\/api\/factory\/attendance\/?$/),
@@ -114,7 +114,7 @@ const CACHE_POLICIES: readonly CachePolicy[] = [
   volatile("barcode-lookup", /^\/api\/barcode\/[^/]+\/?$/),
   volatile(
     "factory-raw-stock-containers",
-    /^\/api\/factory\/raw-stock\/available-containers\/?$/,
+    /^\/api\/factory\/raw-stock\/available-containers\/?$/
   ),
   volatile("factory-raw-stock", /^\/api\/factory\/raw-stock\/?$/),
   volatile("factory-bale-stock-count", /^\/api\/factory\/bale-stock-count\/?$/),
@@ -220,10 +220,7 @@ function setVary(res: Response, values: readonly string[]): void {
 
 function applyHeaders(res: Response, policy: CachePolicy, etag: string, state: string): void {
   if (policy.clientMaxAgeSeconds > 0) {
-    res.setHeader(
-      "Cache-Control",
-      `private, max-age=${policy.clientMaxAgeSeconds}, must-revalidate`,
-    );
+    res.setHeader("Cache-Control", `private, max-age=${policy.clientMaxAgeSeconds}, must-revalidate`);
   } else {
     res.setHeader("Cache-Control", "private, no-cache, must-revalidate");
   }
@@ -344,13 +341,7 @@ function invalidateAroundMutation(req: Request, res: Response, next: NextFunctio
   next();
 }
 
-function serveEntry(
-  req: Request,
-  res: Response,
-  policy: CachePolicy,
-  entry: CacheEntry,
-  state = "HIT",
-): void {
+function serveEntry(req: Request, res: Response, policy: CachePolicy, entry: CacheEntry, state = "HIT"): void {
   applyHeaders(res, policy, entry.etag, state);
   res.setHeader("Content-Type", entry.contentType);
 
