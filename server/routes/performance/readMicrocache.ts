@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import type { Request, RequestHandler } from "express";
 import { checkPOSLocation, requireAuth } from "../../auth";
+import { startReadMicrocacheCoordinator } from "./readMicrocacheCoordinator";
 
 export const READ_MICROCACHE_TTL_MS = new Map<string, number>([
   ["/api/sales-report", 120_000],
@@ -66,7 +67,6 @@ const DYNAMIC_READ_MICROCACHE_POLICIES: readonly DynamicReadPolicy[] = [
   { path: /^\/api\/factory\/customer-orders\/\d+\/verification-summary\/?$/, ttlMs: 60_000 },
   { path: /^\/api\/factory\/workers\/attendance-report\/?$/, ttlMs: 30_000 },
   { path: /^\/api\/vouchers\/\d+\/?$/, ttlMs: 30_000 },
-  { path: /^\/api\/barcode\/[^/]+\/?$/, ttlMs: 30_000 },
 ];
 
 const NON_INVALIDATING_WRITE_PATHS: readonly RegExp[] = [
@@ -78,7 +78,7 @@ const NON_INVALIDATING_WRITE_PATHS: readonly RegExp[] = [
   /^\/api\/auth\/activity(?:\/|$)/,
 ];
 
-const POS_LOCATION_READ_PATH = /^\/api\/locations\/\d+\/inventory\/?$/;
+const POS_LOCATION_READ_PATH = /^\/api\/locations\/(\d+)\/inventory\/?$/;
 
 interface ReadMicrocacheEntry {
   expiresAt: number;
@@ -101,6 +101,13 @@ interface ReadMicrocacheOptions {
   maxBodyBytes?: number;
   maxCacheBytes?: number;
   now?: () => number;
+  cacheEnabled?: () => boolean;
+  publishInvalidation?: () => Promise<void>;
+}
+
+interface ReadMicrocacheController {
+  middleware: RequestHandler;
+  invalidate: () => void;
 }
 
 export interface ReadMicrocacheStats {
@@ -200,7 +207,7 @@ function setCacheHeaders(res: any, entry: ReadMicrocacheEntry, state: string): v
   res.setHeader?.("X-ERP-Read-Cache", state);
 }
 
-export function createReadMicrocacheMiddleware(options: ReadMicrocacheOptions = {}): RequestHandler {
+function createReadMicrocacheController(options: ReadMicrocacheOptions = {}): ReadMicrocacheController {
   const overrideTtlMs = options.ttlMs;
   const maxEntries = options.maxEntries ?? 128;
   const maxBodyBytes = options.maxBodyBytes ?? 5_000_000;
@@ -272,18 +279,21 @@ export function createReadMicrocacheMiddleware(options: ReadMicrocacheOptions = 
     res.status(entry.statusCode).type(entry.contentType).send(entry.body);
   }
 
-  return (req, res, next) => {
+  const middleware: RequestHandler = (req, res, next) => {
     const method = req.method.toUpperCase();
 
     if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS" && !isReadOnlyPost(req)) {
       if (isNonInvalidatingWrite(req) || !req.session?.userId) return next();
       res.once?.("finish", () => {
-        if (res.statusCode >= 200 && res.statusCode < 300) clearForWrite();
+        if (res.statusCode < 200 || res.statusCode >= 300) return;
+        clearForWrite();
+        void options.publishInvalidation?.();
       });
       return next();
     }
 
     if (!isCacheableRead(req)) return next();
+    if (options.cacheEnabled && !options.cacheEnabled()) return next();
 
     if (req.headers["x-bypass-request-storm-guard"] !== undefined || req.query?.__refresh === "1") {
       return next();
@@ -370,7 +380,14 @@ export function createReadMicrocacheMiddleware(options: ReadMicrocacheOptions = 
           // Non-serializable responses continue normally and are not cached.
         }
       }
+
       settle(entry);
+      if (entry && etagMatches(req.headers["if-none-match"], entry.etag)) {
+        counters.revalidated += 1;
+        res.setHeader?.("X-ERP-Read-Cache", "REVALIDATED");
+        res.status(304).end();
+        return res;
+      }
       return originalJson(body);
     }) as typeof res.json;
 
@@ -380,6 +397,12 @@ export function createReadMicrocacheMiddleware(options: ReadMicrocacheOptions = 
 
     return next();
   };
+
+  return { middleware, invalidate: clearForWrite };
+}
+
+export function createReadMicrocacheMiddleware(options: ReadMicrocacheOptions = {}): RequestHandler {
+  return createReadMicrocacheController(options).middleware;
 }
 
 export function registerPerformanceReadMicrocache(app: { use: (handler: RequestHandler) => unknown }): void {
@@ -388,17 +411,30 @@ export function registerPerformanceReadMicrocache(app: { use: (handler: RequestH
   // deterministic while dedicated readMicrocache unit tests exercise the cache itself.
   if (process.env.NODE_ENV === "test") return;
 
-  const cacheMiddleware = createReadMicrocacheMiddleware();
+  let invalidateLocalCache = () => undefined;
+  const coordinator = startReadMicrocacheCoordinator(() => invalidateLocalCache());
+  const controller = createReadMicrocacheController({
+    cacheEnabled: coordinator.isReady,
+    publishInvalidation: coordinator.publishInvalidation,
+  });
+  invalidateLocalCache = controller.invalidate;
+
   app.use((req, res, next) => {
-    if (!isCacheableRead(req)) return cacheMiddleware(req, res, next);
+    if (!isCacheableRead(req)) return controller.middleware(req, res, next);
 
     void requireAuth(req, res, () => {
-      if (!POS_LOCATION_READ_PATH.test(req.path)) {
-        cacheMiddleware(req, res, next);
+      const locationMatch = POS_LOCATION_READ_PATH.exec(req.path);
+      if (!locationMatch) {
+        controller.middleware(req, res, next);
         return;
       }
 
-      void checkPOSLocation(req, res, () => cacheMiddleware(req, res, next));
+      const originalParams = req.params;
+      req.params = { ...originalParams, locationId: locationMatch[1] };
+      void checkPOSLocation(req, res, () => {
+        req.params = originalParams;
+        controller.middleware(req, res, next);
+      });
     });
   });
 }
