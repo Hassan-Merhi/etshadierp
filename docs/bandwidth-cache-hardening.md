@@ -2,46 +2,51 @@
 
 ## Why this change exists
 
-Production bandwidth snapshots showed that the problem was not one slow query. It was a combination of large JSON responses and the same requests being repeated many times within a five-minute reporting window.
+Production bandwidth snapshots showed a combination of large JSON responses and repeated requests within the same five-minute reporting window.
 
-The strongest example was `GET /api/sales-report`, whose response was roughly 3.4 MB and appeared as often as 185 times in one five-minute window. Other repeated heavy endpoints included factory payrolls, payroll preview, location inventory, workers, ledger accounts, POS drafts, last-sold prices, raw-stock containers, and report endpoints.
+The strongest example was `GET /api/sales-report`, whose response was roughly 3.4 MB and appeared as often as 185 times in one five-minute window. Other repeated heavy endpoints included factory payrolls, payroll preview, location inventory, workers, ledger accounts, last-sold prices, raw-stock containers, and report endpoints.
 
-The application already had gzip compression, immutable caching for hashed frontend assets, and conservative TanStack Query defaults. However, every API response was globally forced to `no-store`, ETags were disabled, and identical concurrent requests were not deduplicated at the server boundary.
+The application already had gzip compression, immutable caching for hashed frontend assets, a client request-storm guard, and a small server read microcache. The server cache did not cover the largest current hotspots, and harmless write traffic such as POS autosave and user-presence heartbeats could erase business-read cache entries repeatedly.
 
 ## What is implemented
 
-`server/middleware/privateApiCache.ts` installs a bounded, explicit allowlist cache before application routes are registered.
+The existing canonical cache in `server/routes/performance/readMicrocache.ts` is expanded and hardened rather than adding a second caching system.
 
 ### Safety boundaries
 
-- Cache keys include authenticated user, selected ERP company, pinned factory company, role, location, POS station, method, full URL, client date, and stable request body where relevant.
-- Only explicitly listed JSON read endpoints are cached.
-- The in-memory cache is limited to 64 MB, 400 entries, and 8 MB per response.
-- Payroll preview is treated as a read-only POST and is cached by a stable request-body key.
-- Real API writes clear the cache before execution and again after a successful response.
-- Cache generation prevents a read that started before a write from being inserted after that write.
-- Ephemeral writes such as POS draft autosave, user presence, notifications, chat, and client observability do not erase business caches.
-- Browser responses use `private, no-cache, must-revalidate`; the browser must revalidate instead of silently serving stale business data.
+- Every production cacheable read re-runs `requireAuth` before a cache hit can be served.
+- POS location-inventory reads also re-run the existing location-assignment check.
+- Cache keys include authenticated user, ERP company, factory company, role, location, POS station, method, full URL, client date, and stable request body where relevant.
+- Only explicit exact paths and reviewed dynamic path patterns are cacheable.
+- Payroll preview is treated as a read-only POST and keyed by a stable serialization of its request body.
+- POS draft reads are intentionally not cached so creates, autosaves, and deletions remain immediately visible.
+- Successful authenticated business writes invalidate the cache after the response completes.
+- Failed or unauthenticated writes cannot flush the process-wide cache.
+- Cache generation prevents an older in-flight read from being stored after a successful write invalidates the cache.
+- Presence heartbeats, POS draft autosaves, notifications, chat, and observability writes do not erase unrelated business caches.
 
 ### Bandwidth controls
 
-- Repeated requests are served from bounded process memory.
-- Concurrent identical misses are coalesced into one route/database execution.
-- Weak ETags allow unchanged browser requests to return `304 Not Modified` with no JSON body.
-- Existing gzip compression remains active for the first full response.
+- Repeated reads are served from bounded process memory.
+- Concurrent identical misses share one route and database execution.
+- Weak ETags allow unchanged browser revalidation to return `304 Not Modified` without resending JSON.
+- Browser responses use `private, no-cache, must-revalidate`, so the server still validates every reuse.
+- Service-worker `no-store` fetch semantics do not bypass the ERP server cache; explicit bypass uses `x-bypass-request-storm-guard` or `__refresh=1`.
+- Existing gzip compression remains active for full responses.
 - Existing immutable one-year caching for hashed frontend assets remains unchanged.
 
-### Cache classes
+### Cache limits and TTLs
 
-- Volatile accounting/inventory/POS reads: 30-second server TTL.
-- Heavy reports and payroll reads: 2-minute server TTL.
-- Reference lists such as workers, locations, stock groups, accounts, and suppliers: 5-minute server TTL.
-
-All classes still use browser revalidation rather than positive browser freshness, so application invalidations continue to reach the server.
+- Maximum entries: 128.
+- Maximum cached response: 5 MB.
+- Maximum total cached response bytes: 64 MB.
+- Heavy sales and payroll reads: up to 2 minutes.
+- Volatile accounting, inventory, POS, and factory reads: generally 10 to 60 seconds.
+- Reference lists such as workers, locations, stock groups, ledger accounts, and suppliers: up to 5 minutes.
 
 ## Operations and verification
 
-The existing admin-only `GET /api/admin/operational-monitoring` response now includes `privateApiCache` metrics:
+The existing admin-only `GET /api/admin/operational-monitoring` response includes `readMicrocache` metrics:
 
 - `entries`
 - `bytes`
@@ -53,26 +58,19 @@ The existing admin-only `GET /api/admin/operational-monitoring` response now inc
 - `evictions`
 - `invalidations`
 
-Cached responses also expose diagnostic headers:
+Cached responses expose `X-ERP-Read-Cache` with one of these states:
 
-- `X-ERP-Cache: MISS | HIT | COALESCED | REVALIDATED | REFRESH | BYPASS-SIZE`
-- `X-ERP-Cache-Policy: <policy-name>`
+- `MISS`
+- `HIT`
+- `COALESCED`
+- `REVALIDATED`
 
-Focused regression coverage is in `tests/private-api-cache.test.ts` and verifies:
+Focused regression coverage is in `server/routes/performance/readMicrocache.test.ts` and verifies hotspot coverage, key isolation, cache hits, service-worker behavior, ETag revalidation, payroll-preview body keys, dynamic paths, TTL expiry, authenticated successful-write invalidation, failed and anonymous write protection, and preservation across POS autosave and presence heartbeats.
 
-1. memory cache hits,
-2. concurrent request coalescing,
-3. ETag `304` revalidation,
-4. authenticated-user isolation,
-5. invalidation on business writes,
-6. preservation across POS autosave and presence heartbeats,
-7. stable-body payroll preview caching, and
-8. allowlist-only behavior.
-
-Recommended production acceptance check after deployment:
+## Production acceptance check
 
 1. Open Sales Report, Factory Payroll, POS, and Location Inventory in representative sessions.
-2. Confirm first requests show `MISS`, repeated requests show `HIT`, `COALESCED`, or `REVALIDATED`.
+2. Confirm first requests show `MISS` and repeated requests show `HIT`, `COALESCED`, or `REVALIDATED`.
 3. Create or edit a real voucher and confirm the next dependent read shows `MISS` with fresh values.
-4. Leave POS open long enough for autosave and verify report-cache entries and hit count continue increasing.
+4. Leave POS open long enough for autosave and verify report-cache entries remain available while hit counts increase.
 5. Compare five-minute bandwidth snapshots before and after deployment, especially `/api/sales-report`, `/api/factory/payrolls`, `/api/factory/payrolls/preview`, and `/api/locations/:locationId/inventory`.
