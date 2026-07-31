@@ -374,15 +374,23 @@ These were surfaced by the harness and are not yet acted on:
   `fileParallelism: false` serialises the files. The suite now produces
   byte-identical results across runs, at 378s instead of 165s — a cost worth
   paying, since a suite that fails randomly cannot certify a refactor.
-- **CI on `main` is red, and was before this work started.** Seven backend tests
-  fail deterministically: six in `factory-raw-stock-recalc-full-audit` and one in
-  `issue-fixes-regression`. That last one is worth someone's attention rather
-  than a re-baseline. It asserts `factory_mix_batches.cost_per_kg` has scale 7,
-  and a July 2026 migration does raise it to 7dp — but the final batch in the
-  same `startupMigrations` array lowers it back to 6dp, so the assertion cannot
-  hold as written. Which of the two is correct is a financial-precision
-  decision, so it is reported here rather than changed.
+- **CI on `main` was red before this work started, and is now green.** Seven
+  backend tests failed deterministically, plus the frontend coverage gate. Five
+  were one fixture bug (`factory_mix_batches.total_weight_kg` and `total_cost`
+  are NOT NULL with no default, and were omitted). One asserted a state the
+  schema forbids and the app cannot produce. One encoded a genuine contradiction
+  between two startup migrations, described below. Coverage was lifted past its
+  thresholds rather than the thresholds lowered.
 
-Every split in this program was verified against that same seven-failure
-baseline. A successor should confirm the baseline still matches before reading
-anything into a red run.
+- **One open money question, deliberately not decided.** Two migrations disagree
+  about `factory_mix_batches.cost_per_kg`: a July 2026 batch raises it to
+  `NUMERIC(20,7)` to stop rounding compounding on 20,000 kg batches, and a later
+  batch in the same array standardises Factory per-KG columns to `NUMERIC(20,6)`
+  and rounds it back down. The later one wins, and `shared/schema/factory.ts`
+  agrees with it, so 6 is what the tests now assert. But the sibling columns
+  `factory_mix_batch_sources.cost_per_kg` and `factory_bales.cost_per_kg` are
+  both still scale 7 — batch cost is aggregated from 7dp inputs and stored at
+  6dp. Whether that is correct is a decision for someone who owns the numbers.
+
+The backend suite is now the signal it should be: 1,967 passing, zero failures,
+byte-identical across runs. A successor can trust a red build again.
