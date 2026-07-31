@@ -2,7 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { getTableColumns } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { pool } from "../server/db";
 import {
   baleRecodeItems,
   customerDispatchBaleScans,
@@ -147,6 +146,8 @@ describe("Phase 2 Factory bilingual schema", () => {
   const databaseIt = process.env.DATABASE_URL ? it : it.skip;
 
   databaseIt("applies twice and round-trips Arabic text without changing English snapshots", async () => {
+    const { pool } = await import("../server/db");
+
     await pool.query(migrationSql);
     await pool.query(migrationSql);
 
