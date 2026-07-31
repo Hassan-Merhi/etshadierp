@@ -165,32 +165,34 @@ async function sendProductDetail(req: any, res: any, companyId: number, id: numb
   });
 }
 
+async function factoryBilingualCatalogMiddleware(req: any, res: any, next: any) {
+  if (req.method !== "GET" || req.query.legacy === "1") return next();
+
+  const categoriesRequest = /^\/categories\/?$/.test(req.path);
+  const productsRequest = /^\/bale-products\/?$/.test(req.path);
+  const productDetailMatch = req.path.match(/^\/bale-products\/(\d+)\/?$/);
+  if (!categoriesRequest && !productsRequest && !productDetailMatch) return next();
+
+  try {
+    const companyId = getFactoryCompanyId(req);
+    if (!companyId) return sendFactoryCompanyAccessError(res);
+    if (categoriesRequest) return await sendCategories(req, res, companyId);
+    if (productsRequest) return await sendProducts(req, res, companyId);
+
+    const id = Number(productDetailMatch?.[1]);
+    if (!Number.isSafeInteger(id) || id <= 0) return next();
+    return await sendProductDetail(req, res, companyId, id);
+  } catch (error: unknown) {
+    logger.error("Error fetching bilingual Factory catalog", { error });
+    return res.status(500).json({ message: getErrorMessage(error) });
+  }
+}
+
 /**
  * Intercepts the three existing catalog GET endpoints without adding duplicate
  * Express route registrations. Unmatched and explicit legacy requests continue
  * to the original Factory product/category handlers unchanged.
  */
 export function registerFactoryBilingualCatalogRoutes(app: Express) {
-  app.use("/api/factory", requireAuth, async (req: any, res: any, next: any) => {
-    if (req.method !== "GET" || req.query.legacy === "1") return next();
-
-    const categoriesRequest = /^\/categories\/?$/.test(req.path);
-    const productsRequest = /^\/bale-products\/?$/.test(req.path);
-    const productDetailMatch = req.path.match(/^\/bale-products\/(\d+)\/?$/);
-    if (!categoriesRequest && !productsRequest && !productDetailMatch) return next();
-
-    try {
-      const companyId = getFactoryCompanyId(req);
-      if (!companyId) return sendFactoryCompanyAccessError(res);
-      if (categoriesRequest) return await sendCategories(req, res, companyId);
-      if (productsRequest) return await sendProducts(req, res, companyId);
-
-      const id = Number(productDetailMatch?.[1]);
-      if (!Number.isSafeInteger(id) || id <= 0) return next();
-      return await sendProductDetail(req, res, companyId, id);
-    } catch (error: unknown) {
-      logger.error("Error fetching bilingual Factory catalog", { error });
-      return res.status(500).json({ message: getErrorMessage(error) });
-    }
-  });
+  app.use("/api/factory", requireAuth, factoryBilingualCatalogMiddleware);
 }
