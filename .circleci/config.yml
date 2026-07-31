@@ -74,6 +74,18 @@ commands:
             echo "PostgreSQL did not become ready."
             exit 1
 
+  prepare_postgres_schema:
+    steps:
+      - run:
+          name: Verify migration registry
+          command: node scripts/verify-migration-registry.mjs --json
+      - run:
+          name: Prepare disposable database schema
+          command: node node_modules/drizzle-kit/bin.cjs push --force
+      - run:
+          name: Verify disposable database schema
+          command: node scripts/verify-ci-disposable-schema.mjs
+
 jobs:
   static-build:
     executor: node22
@@ -121,26 +133,73 @@ jobs:
           path: dist
           destination: production-build
 
+  phase4-format:
+    executor: node22
+    steps:
+      - install_dependencies
+      - run:
+          name: Phase 4 formatting diagnostic
+          command: |
+            node node_modules/prettier/bin/prettier.cjs --check \
+              client/src/components/FactoryArabicTranslationActions.tsx \
+              client/src/pages/factory/FactoryBalesHub.tsx \
+              server/routes/factory/factoryArabicTranslationRoutes.ts \
+              server/routes/factory/factoryBilingualCatalogRoutes.ts \
+              server/services/factoryArabicTranslationWorkbook.ts \
+              server/services/security/operationalPermissionRoutePolicy.ts \
+              tests/factory-arabic-translation-routes.test.ts \
+              tests/factory-arabic-translation-workbook.test.ts \
+              tests/operational-permission-route-policy.test.ts \
+              tests/ui/factory-arabic-translation-actions.test.tsx
+
+  phase4-typescript:
+    executor: node22
+    steps:
+      - install_dependencies
+      - run:
+          name: Phase 4 TypeScript diagnostic
+          command: npm run check
+
   postgres-regression:
     executor: node22-postgres
     steps:
       - install_dependencies
       - wait_for_postgres
-      - run:
-          name: Verify migration registry
-          command: node scripts/verify-migration-registry.mjs --json
-      - run:
-          name: Prepare disposable database schema
-          command: node node_modules/drizzle-kit/bin.cjs push --force
-      - run:
-          name: Verify disposable database schema
-          command: node scripts/verify-ci-disposable-schema.mjs
+      - prepare_postgres_schema
       - run:
           name: Backend tests
           command: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
       - run:
           name: Frontend tests
           command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
+
+  phase4-backend:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - wait_for_postgres
+      - prepare_postgres_schema
+      - run:
+          name: Phase 4 backend diagnostic
+          command: >-
+            node node_modules/vitest/vitest.mjs run
+            tests/factory-arabic-translation-workbook.test.ts
+            tests/factory-arabic-translation-routes.test.ts
+            tests/operational-permission-route-policy.test.ts
+            tests/route-manifest.test.ts
+            --maxWorkers=1 --no-file-parallelism
+
+  phase4-frontend:
+    executor: node22
+    steps:
+      - install_dependencies
+      - run:
+          name: Phase 4 frontend diagnostic
+          command: >-
+            node node_modules/vitest/vitest.mjs run
+            --config vitest.config.frontend.ts
+            tests/ui/factory-arabic-translation-actions.test.tsx
+            --maxWorkers=1 --no-file-parallelism
 
   security-readiness:
     executor: node22-postgres
@@ -167,7 +226,11 @@ workflows:
   full-erp-verification:
     jobs:
       - static-build
+      - phase4-format
+      - phase4-typescript
       - postgres-regression
+      - phase4-backend
+      - phase4-frontend
       - security-readiness:
           requires:
             - static-build
