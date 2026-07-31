@@ -36,13 +36,16 @@ describe("Factory Arabic translation actions", () => {
     expect(
       screen.getByText("Import Arabic product and category names")
     ).toBeInTheDocument();
-    expect(screen.getByTestId("input-arabic-translation-workbook")).toHaveAttribute(
-      "accept",
-      expect.stringContaining(".xlsx")
+    expect(
+      screen
+        .getByTestId("input-arabic-translation-workbook")
+        .getAttribute("accept")
+    ).toContain(".xlsx");
+    expect(screen.getByTestId("select-arabic-import-mode")).toHaveTextContent(
+      "Fill missing Arabic names only"
     );
     expect(screen.getByTestId("button-preview-arabic-import")).toBeDisabled();
     expect(screen.getByTestId("button-apply-arabic-import")).toBeDisabled();
-    expect(screen.getByText("Fill missing Arabic names only")).toBeInTheDocument();
   });
 
   it("does not expose bulk translation controls to non-admin roles", () => {
