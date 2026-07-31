@@ -15,7 +15,8 @@
   ],
   "routeManifestMountAdditions": [
     "USE /api/factory/containers [postOffloadReconciliationMiddleware]",
-    "USE /api/factory [requireAuth > <anonymous>]"
+    "USE /api/factory [requireAuth]",
+    "USE /api/factory [factoryBilingualCatalogMiddleware]"
   ],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [
