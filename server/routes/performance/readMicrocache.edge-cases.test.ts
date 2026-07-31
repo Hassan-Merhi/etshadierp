@@ -22,7 +22,6 @@ function makeRequest(overrides: Record<string, unknown> = {}) {
 }
 
 function makeResponse(statusCode = 200) {
-  const listeners = new Map<string, Array<() => void>>();
   return {
     statusCode,
     sentBody: undefined as unknown,
@@ -52,10 +51,6 @@ function makeResponse(statusCode = 200) {
       this.ended = true;
       return this;
     },
-    once(event: string, listener: () => void) {
-      listeners.set(event, [...(listeners.get(event) ?? []), listener]);
-      return this;
-    },
   } as any;
 }
 
@@ -69,11 +64,7 @@ describe("read microcache edge cases", () => {
     currentTime = 1_011;
     const secondResponse = makeResponse();
     const secondNext = vi.fn(() => secondResponse.json({ total: 12 }));
-    middleware(
-      makeRequest({ headers: { "if-none-match": firstResponse.headers.ETag } }),
-      secondResponse,
-      secondNext
-    );
+    middleware(makeRequest({ headers: { "if-none-match": firstResponse.headers.ETag } }), secondResponse, secondNext);
 
     expect(secondNext).toHaveBeenCalledOnce();
     expect(secondResponse.statusCode).toBe(304);
