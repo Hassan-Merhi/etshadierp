@@ -20,8 +20,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import {
   MapPin,
@@ -32,9 +30,7 @@ import {
   FileText,
   ClipboardList,
   X,
-  Download,
   FileSpreadsheet,
-  Plus,
   Check,
   Trash2,
   Pencil,
@@ -68,6 +64,12 @@ import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 import type { CategoryGroup, Customer, FactoryBaleProduct, Location, ProformaSelection, SortDir, SortField } from "./factorylocationinventory/types";
 import { applySortProducts, catColor, isSpecialFactoryCategory } from "./factorylocationinventory/utils";
 import { StatCard } from "./factorylocationinventory/components/StatCard";
+import { L1 } from "./factory-location-inventory/dialogs/L1";
+import { L2 } from "./factory-location-inventory/dialogs/L2";
+import { L3 } from "./factory-location-inventory/dialogs/L3";
+import { L4 } from "./factory-location-inventory/dialogs/L4";
+import { L5 } from "./factory-location-inventory/dialogs/L5";
+import { L6 } from "./factory-location-inventory/dialogs/L6";
 export default function FactoryLocationInventory() {
   const { colors } = useLabelDesignColors();
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
@@ -908,226 +910,7 @@ export default function FactoryLocationInventory() {
   };
 
   const renderFinalizeDialog = () => (
-    <Dialog
-      open={finalizeOpen}
-      onOpenChange={(open) => {
-        if (!open) handleCloseFinalizeDialog();
-      }}
-    >
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle data-testid="text-finalize-title">
-            {savedProformaId ? "Proforma Saved" : "Finalize Proforma"}
-          </DialogTitle>
-        </DialogHeader>
-
-        {!savedProformaId ? (
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-1 block">Proforma Name</label>
-              <Input
-                placeholder="e.g. March 2026 Order"
-                value={proformaName}
-                onChange={(e) => setProformaName(e.target.value)}
-                data-testid="input-proforma-name"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-1 block">Customer</label>
-              {showCreateCustomer ? (
-                <div className="flex items-center gap-2">
-                  <Input
-                    placeholder="Customer name..."
-                    value={newCustomerName}
-                    onChange={(e) => setNewCustomerName(e.target.value)}
-                    className="flex-1"
-                    data-testid="input-new-customer-name"
-                  />
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      if (newCustomerName.trim()) createCustomerMutation.mutate({ legalName: newCustomerName.trim() });
-                    }}
-                    disabled={!newCustomerName.trim() || createCustomerMutation.isPending}
-                    data-testid="button-save-new-customer"
-                  >
-                    <Check className="h-4 w-4 mr-1" /> Save
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setShowCreateCustomer(false);
-                      setNewCustomerName("");
-                    }}
-                    data-testid="button-cancel-new-customer"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search customers..."
-                        value={customerSearch}
-                        onChange={(e) => setCustomerSearch(e.target.value)}
-                        className="pl-9"
-                        data-testid="input-search-customers"
-                      />
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowCreateCustomer(true)}
-                      data-testid="button-create-customer"
-                    >
-                      <Plus className="h-4 w-4 mr-1" /> New
-                    </Button>
-                  </div>
-                  <div className="max-h-32 overflow-y-auto border rounded-md">
-                    {filteredCustomers.length === 0 ? (
-                      <div className="text-center text-muted-foreground text-sm py-3">No customers found</div>
-                    ) : (
-                      filteredCustomers.map((c) => (
-                        <div
-                          key={c.id}
-                          className={`px-3 py-2 cursor-pointer text-sm hover-elevate ${selectedCustomerId === String(c.id) ? "bg-primary/10 font-medium" : ""}`}
-                          onClick={() => setSelectedCustomerId(String(c.id))}
-                          data-testid={`row-customer-${c.id}`}
-                        >
-                          {c.legalName}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">
-                Items ({selectedItems.length} selected, {totalSelectedBales} bales)
-              </label>
-              <div className="rounded-md border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Article</TableHead>
-                      <TableHead>Product</TableHead>
-                      <TableHead className="text-right w-[100px]">Qty</TableHead>
-                      <TableHead className="text-right w-[120px]">Price/Bale</TableHead>
-                      <TableHead className="text-right w-[120px]">Total</TableHead>
-                      <TableHead className="w-[40px]"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {selectedItems.map((item) => {
-                      const lineTotal = item.selectedQty * parseFloat(item.pricePerBale || "0");
-                      return (
-                        <TableRow key={item.productId} data-testid={`row-finalize-item-${item.productId}`}>
-                          <TableCell className="font-mono text-xs">{item.articleCode}</TableCell>
-                          <TableCell className="text-sm">{item.productName}</TableCell>
-                          <TableCell className="text-right">
-                            <Input
-                              type="number"
-                              value={item.selectedQty}
-                              onChange={(e) => updateFinalizeQty(item.productId, e.target.value)}
-                              className="w-[80px] text-right ml-auto"
-                              min={1}
-                              data-testid={`input-finalize-qty-${item.productId}`}
-                            />
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Input
-                              type="number"
-                              value={item.pricePerBale}
-                              onChange={(e) => updateFinalizePrice(item.productId, e.target.value)}
-                              className="w-[100px] text-right ml-auto"
-                              step="0.01"
-                              data-testid={`input-finalize-price-${item.productId}`}
-                            />
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-sm">{formatAmount(lineTotal)}</TableCell>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeFromFinalize(item.productId)}
-                              data-testid={`button-remove-finalize-${item.productId}`}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                    <TableRow className="bg-muted/50 font-bold">
-                      <TableCell colSpan={2}>Grand Total</TableCell>
-                      <TableCell className="text-right font-mono">{totalSelectedBales}</TableCell>
-                      <TableCell></TableCell>
-                      <TableCell className="text-right font-mono">{formatAmount(grandTotal)}</TableCell>
-                      <TableCell></TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={handleCloseFinalizeDialog} data-testid="button-cancel-finalize">
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSaveProforma}
-                disabled={
-                  !selectedCustomerId ||
-                  !proformaName.trim() ||
-                  selectedItems.length === 0 ||
-                  bulkCreateMutation.isPending ||
-                  replaceLinesMutation.isPending
-                }
-                data-testid="button-save-proforma"
-              >
-                <FileText className="h-4 w-4 mr-1" />
-                {bulkCreateMutation.isPending || replaceLinesMutation.isPending
-                  ? "Saving..."
-                  : editingProformaId
-                    ? "Update Proforma"
-                    : "Save Proforma"}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="text-center py-4">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 dark:bg-green-900 mb-3">
-                <Check className="h-6 w-6 text-green-600 dark:text-green-300" />
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Proforma "{proformaName}" saved with {selectedItems.length} items, {totalSelectedBales} bales.
-              </p>
-            </div>
-            <div className="flex items-center justify-center gap-3">
-              <Button variant="outline" onClick={handleExportExcel} data-testid="button-export-excel">
-                <FileSpreadsheet className="h-4 w-4 mr-1" /> Export Excel
-              </Button>
-              <Button variant="outline" onClick={handleExportPdf} data-testid="button-export-pdf">
-                <Download className="h-4 w-4 mr-1" /> Export PDF
-              </Button>
-            </div>
-            <div className="flex justify-center pt-2">
-              <Button onClick={handleCloseFinalizeDialog} data-testid="button-done-proforma">
-                Done
-              </Button>
-            </div>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
+      <L1 bulkCreateMutation={bulkCreateMutation} createCustomerMutation={createCustomerMutation} customerSearch={customerSearch} editingProformaId={editingProformaId} filteredCustomers={filteredCustomers} finalizeOpen={finalizeOpen} formatAmount={formatAmount} grandTotal={grandTotal} handleCloseFinalizeDialog={handleCloseFinalizeDialog} handleExportExcel={handleExportExcel} handleExportPdf={handleExportPdf} handleSaveProforma={handleSaveProforma} newCustomerName={newCustomerName} proformaName={proformaName} removeFromFinalize={removeFromFinalize} replaceLinesMutation={replaceLinesMutation} savedProformaId={savedProformaId} selectedCustomerId={selectedCustomerId} selectedItems={selectedItems} setCustomerSearch={setCustomerSearch} setNewCustomerName={setNewCustomerName} setProformaName={setProformaName} setSelectedCustomerId={setSelectedCustomerId} setShowCreateCustomer={setShowCreateCustomer} showCreateCustomer={showCreateCustomer} totalSelectedBales={totalSelectedBales} updateFinalizePrice={updateFinalizePrice} updateFinalizeQty={updateFinalizeQty} />
   );
 
   // ─── View 1: Location list ────────────────────────────────────────────────
@@ -1223,51 +1006,7 @@ export default function FactoryLocationInventory() {
           </div>
         </div>
 
-        <Dialog
-          open={renameDialogOpen}
-          onOpenChange={(open) => {
-            if (!open) setRenameDialogOpen(false);
-          }}
-        >
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Rename Location</DialogTitle>
-              <DialogDescription>
-                Enter a new name for <strong>{renamingLocation?.name}</strong>.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-2">
-              <Input
-                value={renameInput}
-                onChange={(e) => setRenameInput(e.target.value)}
-                placeholder="Location name"
-                data-testid="input-rename-location"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && renameInput.trim() && renamingLocation) {
-                    renameLocationMutation.mutate({ id: renamingLocation.id, name: renameInput.trim() });
-                  }
-                }}
-                autoFocus
-              />
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setRenameDialogOpen(false)} data-testid="button-rename-cancel">
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  if (renameInput.trim() && renamingLocation) {
-                    renameLocationMutation.mutate({ id: renamingLocation.id, name: renameInput.trim() });
-                  }
-                }}
-                disabled={!renameInput.trim() || renameLocationMutation.isPending}
-                data-testid="button-rename-confirm"
-              >
-                {renameLocationMutation.isPending ? "Saving..." : "Rename"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+      <L2 renameDialogOpen={renameDialogOpen} renameInput={renameInput} renameLocationMutation={renameLocationMutation} renamingLocation={renamingLocation} setRenameDialogOpen={setRenameDialogOpen} setRenameInput={setRenameInput} />
       </div>
     );
   }
@@ -2316,260 +2055,11 @@ export default function FactoryLocationInventory() {
 
       {renderFinalizeDialog()}
 
-      <Dialog
-        open={overloadWarning.open}
-        onOpenChange={(open) => {
-          if (!open) setOverloadWarning({ open: false, items: [], pendingFn: null });
-        }}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle data-testid="text-overload-warning-title">Stock Overload Warning</DialogTitle>
-            <DialogDescription>
-              The following items exceed available stock. You can still proceed, but the proforma will contain more
-              bales than currently in stock.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="overflow-auto max-h-[300px]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead className="text-right">Requested</TableHead>
-                  <TableHead className="text-right">Available</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {overloadWarning.items.map((item) => (
-                  <TableRow key={item.articleCode} data-testid={`row-overload-${item.articleCode}`}>
-                    <TableCell className="font-mono text-xs">{item.articleCode}</TableCell>
-                    <TableCell className="text-sm">{item.productName}</TableCell>
-                    <TableCell className="text-right font-mono font-semibold text-destructive">
-                      {item.requested}
-                    </TableCell>
-                    <TableCell className="text-right font-mono text-muted-foreground">{item.available}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setOverloadWarning({ open: false, items: [], pendingFn: null })}
-              data-testid="button-overload-cancel"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                const fn = overloadWarning.pendingFn;
-                setOverloadWarning({ open: false, items: [], pendingFn: null });
-                fn?.();
-              }}
-              data-testid="button-overload-proceed"
-            >
-              Proceed Anyway
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <L3 overloadWarning={overloadWarning} setOverloadWarning={setOverloadWarning} />
 
-      <Dialog
-        open={deleteDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            setDeleteDialogOpen(false);
-            setDeleteProduct(null);
-            setDeleteSupervisorUser("");
-            setDeleteSupervisorPass("");
-            setDeleteReason("");
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Remove Bales from Stock</DialogTitle>
-            <DialogDescription>
-              {deleteProduct && (
-                <>
-                  Remove bales of <strong>{deleteProduct.productName}</strong> from{" "}
-                  <strong>{selectedLocation.name}</strong>. Current stock: <strong>{deleteProduct.baleCount}</strong>{" "}
-                  bale(s).
-                </>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          {!navigator.onLine && (
-            <div className="rounded-md bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 px-3 py-2 text-sm text-amber-800 dark:text-amber-200">
-              You are offline. This removal will be queued and processed when back online.
-            </div>
-          )}
-          <div className="space-y-4 py-2">
-            <div className="space-y-1">
-              <Label htmlFor="delete-qty">Quantity to Remove</Label>
-              <Input
-                id="delete-qty"
-                type="number"
-                min={1}
-                max={deleteProduct?.baleCount ?? 1}
-                value={deleteQty}
-                onChange={(e) =>
-                  setDeleteQty(Math.max(1, Math.min(deleteProduct?.baleCount ?? 1, parseInt(e.target.value) || 1)))
-                }
-                data-testid="input-delete-qty"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="delete-reason">Reason</Label>
-              <Input
-                id="delete-reason"
-                placeholder="e.g. damaged, lost, correction"
-                value={deleteReason}
-                onChange={(e) => setDeleteReason(e.target.value)}
-                data-testid="input-delete-reason"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="delete-supervisor-user">Supervisor Username</Label>
-              <Input
-                id="delete-supervisor-user"
-                placeholder="Admin/Owner/Manager username"
-                value={deleteSupervisorUser}
-                onChange={(e) => setDeleteSupervisorUser(e.target.value)}
-                data-testid="input-delete-supervisor-user"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="delete-supervisor-pass">Supervisor Password</Label>
-              <Input
-                id="delete-supervisor-pass"
-                type="password"
-                placeholder="Password"
-                value={deleteSupervisorPass}
-                onChange={(e) => setDeleteSupervisorPass(e.target.value)}
-                data-testid="input-delete-supervisor-pass"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setDeleteDialogOpen(false);
-                setDeleteProduct(null);
-                setDeleteSupervisorUser("");
-                setDeleteSupervisorPass("");
-                setDeleteReason("");
-              }}
-              data-testid="button-delete-cancel"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={
-                removeBalesMutation.isPending || !deleteSupervisorUser || !deleteSupervisorPass || deleteQty < 1
-              }
-              onClick={() => {
-                if (!deleteProduct || !selectedLocation) return;
-                removeBalesMutation.mutate({
-                  productId: deleteProduct.productId,
-                  locationId: selectedLocation.id,
-                  qty: deleteQty,
-                  supervisorUsername: deleteSupervisorUser,
-                  supervisorPassword: deleteSupervisorPass,
-                  reason: deleteReason,
-                });
-              }}
-              data-testid="button-delete-confirm"
-            >
-              {removeBalesMutation.isPending ? "Removing..." : `Remove ${deleteQty} Bale(s)`}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <L4 deleteDialogOpen={deleteDialogOpen} deleteProduct={deleteProduct} deleteQty={deleteQty} deleteReason={deleteReason} deleteSupervisorPass={deleteSupervisorPass} deleteSupervisorUser={deleteSupervisorUser} removeBalesMutation={removeBalesMutation} selectedLocation={selectedLocation} setDeleteDialogOpen={setDeleteDialogOpen} setDeleteProduct={setDeleteProduct} setDeleteQty={setDeleteQty} setDeleteReason={setDeleteReason} setDeleteSupervisorPass={setDeleteSupervisorPass} setDeleteSupervisorUser={setDeleteSupervisorUser} />
 
-      <Dialog
-        open={reprintDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            setReprintDialogOpen(false);
-            setReprintBales([]);
-            setReprintProduct(null);
-          }
-        }}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle data-testid="text-reprint-dialog-title">
-              Print Barcodes{reprintProduct ? ` — ${reprintProduct.productName}` : ""}
-            </DialogTitle>
-            <DialogDescription>
-              {reprintLoading
-                ? "Loading bales…"
-                : `${reprintBales.length} bale(s) in stock at ${selectedLocation.name}. Click Print to generate labels for all of them.`}
-            </DialogDescription>
-          </DialogHeader>
-          {reprintLoading ? (
-            <div className="space-y-2 py-2">
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
-            </div>
-          ) : reprintBales.length > 0 ? (
-            <div className="overflow-auto max-h-[260px] rounded-md border">
-              <table className="text-sm w-full">
-                <thead className="bg-muted/50">
-                  <tr className="h-9">
-                    <th className="text-left px-3 font-medium">Reference No.</th>
-                    <th className="text-right px-3 font-medium">KG</th>
-                    <th className="text-right px-3 font-medium">Pcs</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {reprintBales.map((row: any) => (
-                    <tr key={row.bale.id} className="border-t h-9" data-testid={`row-reprint-bale-${row.bale.id}`}>
-                      <td className="px-3 font-mono text-xs text-muted-foreground">
-                        {row.bale.referenceNumber || row.bale.baleCode}
-                      </td>
-                      <td className="px-3 text-right font-mono text-xs">{parseFloat(row.bale.weightKg).toFixed(1)}</td>
-                      <td className="px-3 text-right font-mono text-xs">{row.bale.quantity}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground py-2">
-              No IN_STOCK bales found for this product at this location.
-            </p>
-          )}
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setReprintDialogOpen(false);
-                setReprintBales([]);
-                setReprintProduct(null);
-              }}
-              data-testid="button-reprint-cancel"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleDoPrint}
-              disabled={reprintLoading || reprintBales.length === 0}
-              data-testid="button-reprint-confirm"
-            >
-              <Printer className="h-4 w-4 mr-1.5" />
-              Print {reprintBales.length > 0 ? `${reprintBales.length} Label(s)` : ""}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <L5 handleDoPrint={handleDoPrint} reprintBales={reprintBales} reprintDialogOpen={reprintDialogOpen} reprintLoading={reprintLoading} reprintProduct={reprintProduct} selectedLocation={selectedLocation} setReprintBales={setReprintBales} setReprintDialogOpen={setReprintDialogOpen} setReprintProduct={setReprintProduct} />
 
       <Dialog open={reprintDesignPickerOpen} onOpenChange={setReprintDesignPickerOpen}>
         <DialogContent className="max-w-sm">
@@ -2608,51 +2098,7 @@ export default function FactoryLocationInventory() {
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={renameDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) setRenameDialogOpen(false);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rename Location</DialogTitle>
-            <DialogDescription>
-              Enter a new name for <strong>{renamingLocation?.name}</strong>.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            <Input
-              value={renameInput}
-              onChange={(e) => setRenameInput(e.target.value)}
-              placeholder="Location name"
-              data-testid="input-rename-location"
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && renameInput.trim() && renamingLocation) {
-                  renameLocationMutation.mutate({ id: renamingLocation.id, name: renameInput.trim() });
-                }
-              }}
-              autoFocus
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameDialogOpen(false)} data-testid="button-rename-cancel">
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (renameInput.trim() && renamingLocation) {
-                  renameLocationMutation.mutate({ id: renamingLocation.id, name: renameInput.trim() });
-                }
-              }}
-              disabled={!renameInput.trim() || renameLocationMutation.isPending}
-              data-testid="button-rename-confirm"
-            >
-              {renameLocationMutation.isPending ? "Saving..." : "Rename"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <L6 renameDialogOpen={renameDialogOpen} renameInput={renameInput} renameLocationMutation={renameLocationMutation} renamingLocation={renamingLocation} setRenameDialogOpen={setRenameDialogOpen} setRenameInput={setRenameInput} />
     </div>
   );
 }
