@@ -160,7 +160,7 @@ export function OffloadDialog({
     return kg * rate;
   }, [isSubsequentReceipt, selectedContainer, actualReceivedKg]);
 
-  /** Estimated landed avg cost/kg (USD) using the same valuation basis as the server. */
+  /** Fixed total container value divided by the actual received weight. */
   const estimatedAvgCostKg = useMemo(() => {
     const receivedKg = parseFloat(actualReceivedKg || "0");
     if (!receivedKg || !selectedContainerId || !selectedContainer) return null;
@@ -197,7 +197,7 @@ export function OffloadDialog({
     const dutyUsd = dutyPending ? 0 : parseFloat(dutyAmount || "0");
     const totalUsd = materialUsd + freightUsd + otherUsd + commissionUsd + extraUsd + dutyUsd;
 
-    return totalUsd / valuationKg;
+    return totalUsd / receivedKg;
   }, [
     actualReceivedKg, selectedContainer, selectedContainerId, costPerKg, fxRateToUsd,
     freight, freightFxRate, otherCharges, otherChargesFxRate,
