@@ -24,21 +24,31 @@ interface CacheStats {
   hits: number;
   misses: number;
   revalidated: number;
+  coalesced: number;
   stores: number;
   evictions: number;
   invalidations: number;
 }
 
+interface DeferredEntry {
+  promise: Promise<CacheEntry | null>;
+  resolve: (entry: CacheEntry | null) => void;
+}
+
 const DEFAULT_MAX_BODY_BYTES = 8 * 1024 * 1024;
 const MAX_CACHE_BYTES = 64 * 1024 * 1024;
 const MAX_CACHE_ENTRIES = 400;
+const COALESCE_WAIT_MS = 15_000;
 
 const cache = new Map<string, CacheEntry>();
+const inFlight = new Map<string, DeferredEntry>();
 let cachedBytes = 0;
+let cacheGeneration = 0;
 const counters = {
   hits: 0,
   misses: 0,
   revalidated: 0,
+  coalesced: 0,
   stores: 0,
   evictions: 0,
   invalidations: 0,
@@ -49,7 +59,7 @@ const volatile = (name: string, path: RegExp): CachePolicy => ({
   methods: ["GET", "HEAD"],
   path,
   serverTtlMs: 30_000,
-  clientMaxAgeSeconds: 5,
+  clientMaxAgeSeconds: 0,
 });
 
 const report = (name: string, path: RegExp): CachePolicy => ({
@@ -57,15 +67,15 @@ const report = (name: string, path: RegExp): CachePolicy => ({
   methods: ["GET", "HEAD"],
   path,
   serverTtlMs: 2 * 60_000,
-  clientMaxAgeSeconds: 15,
+  clientMaxAgeSeconds: 0,
 });
 
 const reference = (name: string, path: RegExp): CachePolicy => ({
   name,
   methods: ["GET", "HEAD"],
   path,
-  serverTtlMs: 10 * 60_000,
-  clientMaxAgeSeconds: 5 * 60,
+  serverTtlMs: 5 * 60_000,
+  clientMaxAgeSeconds: 0,
 });
 
 const CACHE_POLICIES: readonly CachePolicy[] = [
@@ -73,7 +83,10 @@ const CACHE_POLICIES: readonly CachePolicy[] = [
   report("sales-report-all", /^\/api\/dashboard\/sales-report-all\/?$/),
   report("location-summary", /^\/api\/location-summary\/?$/),
   report("stock-movement", /^\/api\/reports\/stock-movement\/?$/),
+  report("container-report", /^\/api\/reports\/containers\/?$/),
+  report("opening-stock-summary", /^\/api\/reports\/opening-stock-summary\/?$/),
   report("factory-payrolls", /^\/api\/factory\/payrolls\/?$/),
+  report("worker-payment-summary", /^\/api\/payroll\/worker-payments-summary\/?$/),
   report("factory-customer-proformas", /^\/api\/factory\/customer-proformas\/?$/),
   report("factory-customer-order", /^\/api\/factory\/customer-orders\/\d+\/?$/),
   report(
@@ -94,19 +107,24 @@ const CACHE_POLICIES: readonly CachePolicy[] = [
   volatile("ledger-transactions", /^\/api\/accounts\/ledger\/\d+\/transactions\/?$/),
   volatile("accounts-all", /^\/api\/accounts\/all\/?$/),
   volatile("voucher-sidebar", /^\/api\/accounts\/voucher-sidebar\/?$/),
+  volatile("voucher-detail", /^\/api\/vouchers\/\d+\/?$/),
   volatile("daybook", /^\/api\/daybook\/?$/),
   volatile("pos-drafts", /^\/api\/pos\/drafts\/?$/),
   volatile("pos-last-sold-prices", /^\/api\/pos\/last-sold-prices\/?$/),
+  volatile("barcode-lookup", /^\/api\/barcode\/[^/]+\/?$/),
   volatile(
     "factory-raw-stock-containers",
     /^\/api\/factory\/raw-stock\/available-containers\/?$/,
   ),
+  volatile("factory-raw-stock", /^\/api\/factory\/raw-stock\/?$/),
+  volatile("factory-bale-stock-count", /^\/api\/factory\/bale-stock-count\/?$/),
   volatile("factory-containers", /^\/api\/factory\/containers\/?$/),
   volatile("git-containers", /^\/api\/git\/containers\/?$/),
   reference("factory-workers", /^\/api\/factory\/workers\/?$/),
   reference("factory-employees", /^\/api\/factory\/employees\/?$/),
   reference("factory-bale-products", /^\/api\/factory\/bale-products\/?$/),
   reference("factory-cash-accounts", /^\/api\/factory\/cash-accounts\/?$/),
+  reference("factory-settings", /^\/api\/factory\/settings\/?$/),
   reference("ledger-accounts", /^\/api\/ledger-accounts\/?$/),
   reference("ledger-parent-groups", /^\/api\/ledger-accounts\/parent-groups\/?$/),
   reference("stock-items", /^\/api\/stock-items\/?$/),
@@ -118,6 +136,7 @@ const CACHE_POLICIES: readonly CachePolicy[] = [
   reference("employees", /^\/api\/employees\/?$/),
   reference("worker-groups", /^\/api\/worker-groups\/with-members\/?$/),
   reference("employee-groups", /^\/api\/employee-groups\/?$/),
+  reference("user-companies", /^\/api\/user\/companies\/?$/),
   reference("my-erp-pages", /^\/api\/my-erp-pages\/?$/),
   {
     name: "payroll-preview",
@@ -159,10 +178,10 @@ function sessionScope(req: Request): string | null {
   ].join(":");
 }
 
-function cacheKey(req: Request, scope: string): string {
+function cacheKey(req: Request, scope: string, generation: number): string {
   const bodyKey = req.method === "POST" ? stableSerialize(req.body ?? null) : "";
   const clientDate = String(req.get("x-client-date") ?? "");
-  return `${scope}|${req.method}|${req.originalUrl}|${clientDate}|${bodyKey}`;
+  return `${generation}|${scope}|${req.method}|${req.originalUrl}|${clientDate}|${bodyKey}`;
 }
 
 function makeEtag(body: string): string {
@@ -234,18 +253,40 @@ function storeEntry(key: string, entry: CacheEntry): void {
   evictToBudget();
 }
 
+function createDeferredEntry(): DeferredEntry {
+  let resolve!: (entry: CacheEntry | null) => void;
+  const promise = new Promise<CacheEntry | null>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+async function waitForEntry(promise: Promise<CacheEntry | null>): Promise<CacheEntry | null | undefined> {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => resolve(undefined), COALESCE_WAIT_MS);
+    promise.then((entry) => {
+      clearTimeout(timeout);
+      resolve(entry);
+    });
+  });
+}
+
 export function clearPrivateApiCache(): void {
   cache.clear();
   cachedBytes = 0;
+  cacheGeneration += 1;
   counters.invalidations += 1;
 }
 
 export function resetPrivateApiCacheForTests(): void {
   cache.clear();
+  inFlight.clear();
   cachedBytes = 0;
+  cacheGeneration = 0;
   counters.hits = 0;
   counters.misses = 0;
   counters.revalidated = 0;
+  counters.coalesced = 0;
   counters.stores = 0;
   counters.evictions = 0;
   counters.invalidations = 0;
@@ -281,8 +322,14 @@ function invalidateAroundMutation(req: Request, res: Response, next: NextFunctio
   next();
 }
 
-function serveEntry(req: Request, res: Response, policy: CachePolicy, entry: CacheEntry): void {
-  applyHeaders(res, policy, entry.etag, "HIT");
+function serveEntry(
+  req: Request,
+  res: Response,
+  policy: CachePolicy,
+  entry: CacheEntry,
+  state = "HIT",
+): void {
+  applyHeaders(res, policy, entry.etag, state);
   res.setHeader("Content-Type", entry.contentType);
 
   if (etagMatches(req.get("if-none-match"), entry.etag)) {
@@ -300,7 +347,7 @@ function serveEntry(req: Request, res: Response, policy: CachePolicy, entry: Cac
   res.status(200).end(entry.body);
 }
 
-function cacheReadResponse(req: Request, res: Response, next: NextFunction): void {
+async function cacheReadResponse(req: Request, res: Response, next: NextFunction): Promise<void> {
   const policy = findPolicy(req.method, req.path);
   if (!policy) return next();
 
@@ -308,7 +355,8 @@ function cacheReadResponse(req: Request, res: Response, next: NextFunction): voi
   if (!scope) return next();
 
   pruneExpired();
-  const key = cacheKey(req, scope);
+  const generation = cacheGeneration;
+  const key = cacheKey(req, scope, generation);
   const existing = cache.get(key);
   const forceRefresh = shouldForceRefresh(req);
 
@@ -320,23 +368,59 @@ function cacheReadResponse(req: Request, res: Response, next: NextFunction): voi
   }
 
   if (existing) deleteEntry(key);
+
+  const pending = inFlight.get(key);
+  if (pending) {
+    const completed = await waitForEntry(pending.promise);
+    if (completed === undefined) {
+      res.setHeader("X-ERP-Cache", "COALESCE-TIMEOUT");
+      return next();
+    }
+    if (generation !== cacheGeneration) return cacheReadResponse(req, res, next);
+    if (completed && completed.expiresAt > Date.now()) {
+      counters.coalesced += 1;
+      serveEntry(req, res, policy, completed, "COALESCED");
+      return;
+    }
+  }
+
   counters.misses += 1;
   res.setHeader("X-ERP-Cache", forceRefresh ? "REFRESH" : "MISS");
   res.setHeader("X-ERP-Cache-Policy", policy.name);
+
+  const deferred = createDeferredEntry();
+  inFlight.set(key, deferred);
+  let completedLeader = false;
+  const completeLeader = (entry: CacheEntry | null) => {
+    if (completedLeader) return;
+    completedLeader = true;
+    if (inFlight.get(key) === deferred) inFlight.delete(key);
+    deferred.resolve(entry);
+  };
+
+  res.once("finish", () => completeLeader(null));
+  res.once("close", () => completeLeader(null));
 
   const originalJson = res.json.bind(res);
   const originalSend = res.send.bind(res);
 
   (res as any).json = (payload: unknown) => {
-    if (res.headersSent || res.statusCode !== 200) return originalJson(payload);
+    if (res.headersSent || res.statusCode !== 200) {
+      completeLeader(null);
+      return originalJson(payload);
+    }
 
     const body = JSON.stringify(payload);
-    if (body === undefined) return originalJson(payload);
+    if (body === undefined) {
+      completeLeader(null);
+      return originalJson(payload);
+    }
 
     const sizeBytes = Buffer.byteLength(body);
     const maxBodyBytes = policy.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
     if (sizeBytes > maxBodyBytes) {
       res.setHeader("X-ERP-Cache", "BYPASS-SIZE");
+      completeLeader(null);
       return originalJson(payload);
     }
 
@@ -345,13 +429,20 @@ function cacheReadResponse(req: Request, res: Response, next: NextFunction): voi
     applyHeaders(res, policy, etag, forceRefresh ? "REFRESH" : "MISS");
     res.setHeader("Content-Type", contentType);
 
-    storeEntry(key, {
+    const entry: CacheEntry = {
       body,
       contentType,
       etag,
       expiresAt: Date.now() + policy.serverTtlMs,
       sizeBytes,
-    });
+    };
+
+    if (generation === cacheGeneration) {
+      storeEntry(key, entry);
+      completeLeader(entry);
+    } else {
+      completeLeader(null);
+    }
 
     if (etagMatches(req.get("if-none-match"), etag)) {
       counters.revalidated += 1;
