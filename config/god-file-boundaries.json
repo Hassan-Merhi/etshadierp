@@ -205,7 +205,6 @@
       "client/src/pages/pos/POSPriceList.tsx": 1475,
       "client/src/pages/pos/PosTransferOrders.tsx": 1625,
       "client/src/pages/properties/PropertiesDashboard.tsx": 1075,
-      "client/src/pages/properties/PropertyRentalPage.tsx": 3375,
       "client/src/pages/settings/DataToolsTab.tsx": 2975,
       "client/src/pages/sp/GcLshiMigration.tsx": 1375,
       "client/src/pages/vouchers/JournalForm.tsx": 1725,

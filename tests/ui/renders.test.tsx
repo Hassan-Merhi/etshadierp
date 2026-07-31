@@ -226,3 +226,18 @@ describe("FactoryDaybook page", () => {
     expect(heading).toHaveTextContent("Factory Daybook");
   });
 });
+
+// ── 13. PropertiesRentalShops (PropertyRentalPage shell) ─────────────────────
+// Added before the Phase 4 split of PropertyRentalPage.tsx. The page itself
+// takes props, so it is exercised through the real prop-less entry point.
+describe("PropertiesRentalShops page", () => {
+  it("renders the page title heading", async () => {
+    const { default: PropertiesRentalShops } = await import(
+      "@/pages/properties/PropertiesRentalShops"
+    );
+    renderWithProviders(<PropertiesRentalShops />);
+    const heading = await screen.findByTestId("text-page-title");
+    expect(heading).toHaveTextContent("Shop Rentals");
+  });
+});
+
