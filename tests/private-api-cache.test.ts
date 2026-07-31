@@ -48,6 +48,14 @@ function createTestApp() {
     res.json({ ok: true });
   });
 
+  app.patch("/api/pos/drafts/:id", (_req, res) => {
+    res.json({ ok: true });
+  });
+
+  app.patch("/api/user-presence", (_req, res) => {
+    res.json({ ok: true });
+  });
+
   app.get("/api/not-on-cache-allowlist", (_req, res) => {
     uncachedCalls += 1;
     res.json({ calls: uncachedCalls });
@@ -136,6 +144,19 @@ describe("private API cache", () => {
     const afterWrite = await request(testApp.app).get("/api/sales-report");
     expect(afterWrite.body.calls).toBe(2);
     expect(testApp.getSalesReportCalls()).toBe(2);
+  });
+
+  it("does not flush business caches for POS drafts or presence heartbeats", async () => {
+    const testApp = createTestApp();
+
+    await request(testApp.app).get("/api/sales-report");
+    await request(testApp.app).patch("/api/pos/drafts/42").send({ notes: "autosave" });
+    await request(testApp.app).patch("/api/user-presence").send({ type: "heartbeat" });
+    const afterEphemeralWrites = await request(testApp.app).get("/api/sales-report");
+
+    expect(afterEphemeralWrites.headers["x-erp-cache"]).toBe("HIT");
+    expect(afterEphemeralWrites.body.calls).toBe(1);
+    expect(testApp.getSalesReportCalls()).toBe(1);
   });
 
   it("caches payroll preview POST requests by stable request body", async () => {
