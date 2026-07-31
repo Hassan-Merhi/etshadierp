@@ -103,6 +103,22 @@ describe("Phase 2 Factory bilingual schema", () => {
     expect(migrationSql).not.toMatch(/\bUPDATE\b|\bDELETE\b|\bTRUNCATE\b/i);
   });
 
+  it("guards every optional linked table before altering it", () => {
+    const optionalTables = [
+      "factory_pos_sale_items",
+      "customer_order_bale_removals",
+      "factory_v3_load_bales",
+      "factory_invoice_loading_bales",
+      "customer_dispatch_bale_scans",
+      "bale_recode_items",
+    ];
+
+    for (const tableName of optionalTables) {
+      expect(migrationSql).toContain(`to_regclass('public.${tableName}')`);
+      expect(migrationSql).toContain(`ALTER TABLE ${tableName}`);
+    }
+  });
+
   it("registers the versioned migration and preloads the startup repair", () => {
     const journal = JSON.parse(
       fs.readFileSync(path.join(root, "migrations/meta/_journal.json"), "utf8")
