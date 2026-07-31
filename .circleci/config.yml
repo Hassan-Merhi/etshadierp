@@ -146,11 +146,31 @@ jobs:
           name: Frontend tests
           command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
 
-  postgres-phase3-bilingual:
+  postgres-backend-diagnostic:
     executor: node22-postgres
     steps:
       - install_dependencies
       - wait_for_postgres
+      - prepare_postgres_schema
+      - run:
+          name: Complete backend suite
+          command: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
+
+  postgres-frontend-diagnostic:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - wait_for_postgres
+      - prepare_postgres_schema
+      - run:
+          name: Complete frontend suite
+          command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
+
+  postgres-phase3-bilingual:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - wait_for-postgres
       - prepare_postgres_schema
       - run:
           name: Phase 3 resolver and catalog API tests
@@ -182,6 +202,8 @@ workflows:
     jobs:
       - static-build
       - postgres-regression
+      - postgres-backend-diagnostic
+      - postgres-frontend-diagnostic
       - postgres-phase3-bilingual
       - security-readiness:
           requires:
