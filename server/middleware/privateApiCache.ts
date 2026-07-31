@@ -148,6 +148,18 @@ const CACHE_POLICIES: readonly CachePolicy[] = [
   },
 ];
 
+// These writes change ephemeral UI state only. Flushing report/reference caches for
+// them would destroy the cache every few seconds (POS autosave) or every 90 seconds
+// (presence heartbeat) without making the cached business data stale.
+const NON_INVALIDATING_WRITE_PATHS: readonly RegExp[] = [
+  /^\/api\/user-presence(?:\/|$)/,
+  /^\/api\/pos\/drafts(?:\/|$)/,
+  /^\/api\/notifications(?:\/|$)/,
+  /^\/api\/chat(?:\/|$)/,
+  /^\/api\/client-observability(?:\/|$)/,
+  /^\/api\/auth\/activity(?:\/|$)/,
+];
+
 function findPolicy(method: string, path: string): CachePolicy | undefined {
   return CACHE_POLICIES.find((policy) => policy.methods.includes(method) && policy.path.test(path));
 }
@@ -305,6 +317,10 @@ function isReadOnlyPost(req: Request): boolean {
   return req.method === "POST" && /^\/api\/factory\/payrolls\/preview\/?$/.test(req.path);
 }
 
+function isNonInvalidatingWrite(req: Request): boolean {
+  return NON_INVALIDATING_WRITE_PATHS.some((pattern) => pattern.test(req.path));
+}
+
 function shouldForceRefresh(req: Request): boolean {
   if (req.query.__refresh === "1") return true;
   const requestCacheControl = String(req.get("cache-control") ?? "").toLowerCase();
@@ -313,7 +329,13 @@ function shouldForceRefresh(req: Request): boolean {
 
 function invalidateAroundMutation(req: Request, res: Response, next: NextFunction): void {
   if (!req.path.startsWith("/api/")) return next();
-  if (["GET", "HEAD", "OPTIONS"].includes(req.method) || isReadOnlyPost(req)) return next();
+  if (
+    ["GET", "HEAD", "OPTIONS"].includes(req.method) ||
+    isReadOnlyPost(req) ||
+    isNonInvalidatingWrite(req)
+  ) {
+    return next();
+  }
 
   clearPrivateApiCache();
   res.once("finish", () => {
