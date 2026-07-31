@@ -31,6 +31,7 @@ import {
 
 interface RatchetAllowances {
   routeManifestAdditions: string[];
+  routeManifestMountAdditions: string[];
 }
 
 const MANIFEST_PATH = path.join(process.cwd(), "config/route-manifest.json");
@@ -125,7 +126,11 @@ describe("route manifest", () => {
   it("matches the committed snapshot plus exact reviewed additions", () => {
     const expected = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as SerializedRouteManifest;
     const reviewedAdditions = new Set(allowances.routeManifestAdditions);
+    const reviewedMountAdditions = new Set(allowances.routeManifestMountAdditions);
     const actualWithoutReviewedAdditions = actual.routes.filter((entry) => !reviewedAdditions.has(entry));
+    const actualMountsWithoutReviewedAdditions = actual.middlewareMounts.filter(
+      (entry) => !reviewedMountAdditions.has(entry)
+    );
 
     expect(
       expected.formatVersion,
@@ -140,11 +145,20 @@ describe("route manifest", () => {
       expect(count, `Reviewed route addition is missing or duplicated: ${addition}`).toBe(1);
     }
 
-    const mountDiff = describeDiff("Middleware mounts", expected.middlewareMounts, actual.middlewareMounts);
+    const mountDiff = describeDiff(
+      "Middleware mounts",
+      expected.middlewareMounts,
+      actualMountsWithoutReviewedAdditions
+    );
     expect(mountDiff, mountDiff).toBe("");
 
+    for (const addition of reviewedMountAdditions) {
+      const count = actual.middlewareMounts.filter((entry) => entry === addition).length;
+      expect(count, `Reviewed middleware mount addition is missing or duplicated: ${addition}`).toBe(1);
+    }
+
     expect(actual.routeCount).toBe(expected.routeCount + reviewedAdditions.size);
-    expect(actual.middlewareMountCount).toBe(expected.middlewareMountCount);
+    expect(actual.middlewareMountCount).toBe(expected.middlewareMountCount + reviewedMountAdditions.size);
   });
 
   it("does not add shadowed route registrations", () => {
