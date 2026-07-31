@@ -8,6 +8,7 @@ BEGIN;
 SET LOCAL lock_timeout = '15s';
 SET LOCAL statement_timeout = '90s';
 
+-- Core Factory catalog and document tables are required by the active feature.
 ALTER TABLE factory_categories
   ADD COLUMN IF NOT EXISTS name_ar VARCHAR(100);
 
@@ -34,23 +35,42 @@ ALTER TABLE customer_order_bales_history
 ALTER TABLE customer_order_expected_lines
   ADD COLUMN IF NOT EXISTS product_name_ar TEXT;
 
-ALTER TABLE factory_pos_sale_items
-  ADD COLUMN IF NOT EXISTS product_name_ar TEXT;
+-- Some linked operational tables are installed only in deployments that use
+-- those modules. Guard the table itself, not only the column, so an older or
+-- partially provisioned database can still receive all required core columns.
+DO $$
+BEGIN
+  IF to_regclass('public.factory_pos_sale_items') IS NOT NULL THEN
+    ALTER TABLE factory_pos_sale_items
+      ADD COLUMN IF NOT EXISTS product_name_ar TEXT;
+  END IF;
 
-ALTER TABLE customer_order_bale_removals
-  ADD COLUMN IF NOT EXISTS product_name_ar TEXT;
+  IF to_regclass('public.customer_order_bale_removals') IS NOT NULL THEN
+    ALTER TABLE customer_order_bale_removals
+      ADD COLUMN IF NOT EXISTS product_name_ar TEXT;
+  END IF;
 
-ALTER TABLE factory_v3_load_bales
-  ADD COLUMN IF NOT EXISTS product_name_ar TEXT;
+  IF to_regclass('public.factory_v3_load_bales') IS NOT NULL THEN
+    ALTER TABLE factory_v3_load_bales
+      ADD COLUMN IF NOT EXISTS product_name_ar TEXT;
+  END IF;
 
-ALTER TABLE factory_invoice_loading_bales
-  ADD COLUMN IF NOT EXISTS product_name_ar TEXT;
+  IF to_regclass('public.factory_invoice_loading_bales') IS NOT NULL THEN
+    ALTER TABLE factory_invoice_loading_bales
+      ADD COLUMN IF NOT EXISTS product_name_ar TEXT;
+  END IF;
 
-ALTER TABLE customer_dispatch_bale_scans
-  ADD COLUMN IF NOT EXISTS product_name_ar TEXT;
+  IF to_regclass('public.customer_dispatch_bale_scans') IS NOT NULL THEN
+    ALTER TABLE customer_dispatch_bale_scans
+      ADD COLUMN IF NOT EXISTS product_name_ar TEXT;
+  END IF;
 
-ALTER TABLE bale_recode_items
-  ADD COLUMN IF NOT EXISTS product_name_ar TEXT;
+  IF to_regclass('public.bale_recode_items') IS NOT NULL THEN
+    ALTER TABLE bale_recode_items
+      ADD COLUMN IF NOT EXISTS product_name_ar TEXT;
+  END IF;
+END
+$$;
 
 -- Supports company-scoped exact matching after the approved conservative
 -- normalization (trim surrounding whitespace, then uppercase). The existing raw
