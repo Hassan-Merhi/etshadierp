@@ -7,7 +7,7 @@ import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
-import { applyOffloadMovingAverage, getLockedSupplierRate } from "../../../services/factory/rawStockLockedRate";
+import { applyOffloadMovingAverage } from "../../../services/factory/rawStockLockedRate";
 import { convertToUsdOrThrow, resolveStoredFxRateOrThrow, UnresolvedExchangeRateError } from "../../../services/factory/currencyConversion";
 import {
   writeDaybookEntry,
@@ -656,134 +656,6 @@ export function registerRawStockBalanceRoutes(app: Express) {
       res.json(bales);
     } catch (error: unknown) {
       logger.error("Error fetching unlinked bales:", { error: error });
-      res.status(500).json({ message: getErrorMessage(error) });
-    }
-  });
-
-  // Assign opening balance raw stock to already-pressed bales
-  app.post("/api/factory/raw-stock/:rawStockId/assign-to-bales", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-
-      const rawStockId = parseId(req.params.rawStockId);
-
-      if (rawStockId === null) return res.status(400).json({ message: "Invalid id" });
-      const { baleIds } = req.body as { baleIds: number[] };
-
-      if (!Array.isArray(baleIds) || baleIds.length === 0) {
-        return res.status(400).json({ message: "baleIds must be a non-empty array" });
-      }
-
-      // Fetch the raw stock record
-      const [rs] = await db
-        .select()
-        .from(factoryRawStock)
-        .where(and(eq(factoryRawStock.id, rawStockId), eq(factoryRawStock.companyId, companyId)));
-
-      if (!rs) return res.status(404).json({ message: "Raw stock record not found" });
-
-      // Validate all bales exist, belong to this company, and have no mix batch
-      const bales = await db
-        .select({ id: factoryBales.id, weightKg: factoryBales.weightKg, mixBatchId: factoryBales.mixBatchId })
-        .from(factoryBales)
-        .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
-
-      if (bales.length !== baleIds.length) {
-        return res.status(400).json({ message: "One or more bale IDs are invalid or belong to another company" });
-      }
-      const alreadyLinked = bales.filter((b) => b.mixBatchId !== null);
-      if (alreadyLinked.length > 0) {
-        return res.status(400).json({ message: `${alreadyLinked.length} bale(s) are already linked to a mix batch` });
-      }
-
-      const totalKg = bales.reduce((sum, b) => sum + parseFloat(b.weightKg as string), 0);
-      // Allow over-use: no availability guard — stock can go negative
-
-      // FIX 5: Load the container to check for a linked supplier.
-      // When the container belongs to a supplier, use the supplier's authoritative
-      // USD moving-average rate (getLockedSupplierRate) instead of the container's
-      // native-currency costPerKg — which is not a USD rate and should never be used
-      // as a USD source cost.
-      // DEFECT 5+6 FIX: Add companyId + deletedAt guard (cross-company container rejection).
-      const [containerRow] = await db
-        .select({ supplierId: factoryContainers.supplierId })
-        .from(factoryContainers)
-        .where(and(eq(factoryContainers.id, rs.containerId!), eq(factoryContainers.companyId, companyId), isNull(factoryContainers.deletedAt)));
-      if (!containerRow) return res.status(404).json({ message: "Container not found, deleted, or belongs to another company" });
-      const containerSupplierId = containerRow?.supplierId ?? null;
-
-      const now = new Date();
-
-      const result = await db.transaction(async (tx) => {
-        // FIX 7: Read getLockedSupplierRate inside the transaction with forUpdate: true
-        // so the supplier rate cannot change between the read and the batch/source INSERTs.
-        let costPerKgUsd: number;
-        if (containerSupplierId) {
-          costPerKgUsd = await getLockedSupplierRate(tx, companyId, containerSupplierId, { forUpdate: true });
-        } else {
-          costPerKgUsd = parseFloat(rs.costPerKgUsd as string) || parseFloat(rs.costPerKg as string) || 0;
-        }
-        const totalCost = new Decimal(totalKg).times(costPerKgUsd).toDecimalPlaces(6).toNumber();
-        // 1. Create a completed mix batch to represent this OB assignment.
-        const obBatchCode = `OB-ASSIGN-${rawStockId}-${Date.now()}`;
-        const [newBatch] = await tx
-          .insert(factoryMixBatches)
-          .values({
-            companyId,
-            batchCode: obBatchCode,
-            batchNumber: obBatchCode,
-            name: "OB Stock Assignment",
-            totalWeightKg: totalKg.toFixed(3),
-            usedKg: totalKg.toFixed(3),
-            costPerKg: new Decimal(costPerKgUsd).toDecimalPlaces(6).toFixed(6),
-            totalCost: new Decimal(totalCost).toDecimalPlaces(6).toFixed(6),
-            status: "COMPLETED",
-            updatedAt: now,
-          })
-          .returning({ id: factoryMixBatches.id });
-
-        // 2. Link the OB container as the source with FIX 5 corrections:
-        //    supplierId is set when the container belongs to a supplier so
-        //    the source gets SUPPLIER_FIFO pricing-basis and the replay engine
-        //    can correctly identify it in the timeline.
-        await tx.insert(factoryMixBatchSources).values({
-          mixBatchId: newBatch.id,
-          containerId: rs.containerId,
-          supplierId: containerSupplierId ?? undefined,
-          sourceType: containerSupplierId ? "SUPPLIER_FIFO" : "CONTAINER_DIRECT",
-          weightKg: totalKg.toFixed(3),
-          quantityKg: totalKg.toFixed(3),
-          costPerKg: new Decimal(costPerKgUsd).toDecimalPlaces(6).toFixed(6),
-          totalCost: new Decimal(totalCost).toDecimalPlaces(6).toFixed(6),
-          // V7: for OB stock assignment, containerSupplierId is the inventory owner.
-          inventorySupplierId: containerSupplierId ?? null,
-        });
-
-        // 3. Assign the mix batch to each bale with correct cost fields (DEFECT 5 FIX).
-        //    Each bale may have a different weightKg, so costs are computed per-bale.
-        for (const bale of bales) {
-          const baleWeightKg = parseFloat(bale.weightKg as string);
-          const baleCostPerKg = new Decimal(costPerKgUsd).toDecimalPlaces(6).toFixed(6);
-          const baleTotalCost = new Decimal(baleWeightKg).times(costPerKgUsd).toDecimalPlaces(6).toFixed(6);
-          await tx
-            .update(factoryBales)
-            .set({ mixBatchId: newBatch.id, updatedAt: now, costPerKg: baleCostPerKg, totalCost: baleTotalCost })
-            .where(and(eq(factoryBales.id, bale.id), eq(factoryBales.companyId, companyId)));
-        }
-
-        // 4. Increment usedKg on the raw stock record
-        await tx
-          .update(factoryRawStock)
-          .set({ usedKg: sql`${factoryRawStock.usedKg} + ${totalKg.toFixed(3)}` })
-          .where(eq(factoryRawStock.id, rawStockId));
-
-        return { mixBatchId: newBatch.id };
-      });
-
-      res.json({ success: true, mixBatchId: result.mixBatchId, totalKg, balesUpdated: baleIds.length });
-    } catch (error: unknown) {
-      logger.error("Error assigning raw stock to bales:", { error: error });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });

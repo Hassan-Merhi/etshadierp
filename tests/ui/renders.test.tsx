@@ -182,9 +182,7 @@ describe("Settings", () => {
     const { default: Settings } = await import("@/pages/Settings");
     const { container } = renderWithProviders(<Settings />);
     // Settings delegates to sub-hubs; assert the root container mounted content
-    await vi.waitFor(() =>
-      expect(container.firstChild).not.toBeNull()
-    );
+    await vi.waitFor(() => expect(container.firstChild).not.toBeNull());
     expect(document.body.textContent?.length).toBeGreaterThan(0);
   });
 });
@@ -192,22 +190,16 @@ describe("Settings", () => {
 // ── 9. FactoryWorkersHub ──────────────────────────────────────────────────────
 describe("FactoryWorkersHub", () => {
   it("renders the section selector", async () => {
-    const { default: FactoryWorkersHub } = await import(
-      "@/pages/factory/FactoryWorkersHub"
-    );
+    const { default: FactoryWorkersHub } = await import("@/pages/factory/FactoryWorkersHub");
     renderWithProviders(<FactoryWorkersHub />);
-    expect(
-      await screen.findByTestId("select-workers-section")
-    ).toBeInTheDocument();
+    expect(await screen.findByTestId("select-workers-section")).toBeInTheDocument();
   });
 });
 
 // ── 10. FactoryCustomers ──────────────────────────────────────────────────────
 describe("FactoryCustomers page", () => {
   it("renders the page title heading", async () => {
-    const { default: FactoryCustomers } = await import(
-      "@/pages/factory/FactoryCustomers"
-    );
+    const { default: FactoryCustomers } = await import("@/pages/factory/FactoryCustomers");
     renderWithProviders(<FactoryCustomers />);
     expect(await screen.findByTestId("text-page-title")).toBeInTheDocument();
   });
@@ -221,3 +213,31 @@ describe("BaleTransfers page", () => {
     expect(await screen.findByTestId("text-page-title")).toBeInTheDocument();
   });
 });
+
+// ── 12. FactoryDaybook ────────────────────────────────────────────────────────
+// Added before the Phase 4 split of FactoryDaybook.tsx: there is no route
+// manifest for React, so a page that mounts is the only cheap proof that an
+// extraction did not break the component graph.
+describe("FactoryDaybook page", () => {
+  it("renders the page title heading", async () => {
+    const { default: FactoryDaybook } = await import("@/pages/factory/FactoryDaybook");
+    renderWithProviders(<FactoryDaybook />);
+    const heading = await screen.findByTestId("text-page-title");
+    expect(heading).toHaveTextContent("Factory Daybook");
+  });
+});
+
+// ── 13. PropertiesRentalShops (PropertyRentalPage shell) ─────────────────────
+// Added before the Phase 4 split of PropertyRentalPage.tsx. The page itself
+// takes props, so it is exercised through the real prop-less entry point.
+describe("PropertiesRentalShops page", () => {
+  it("renders the page title heading", async () => {
+    const { default: PropertiesRentalShops } = await import(
+      "@/pages/properties/PropertiesRentalShops"
+    );
+    renderWithProviders(<PropertiesRentalShops />);
+    const heading = await screen.findByTestId("text-page-title");
+    expect(heading).toHaveTextContent("Shop Rentals");
+  });
+});
+

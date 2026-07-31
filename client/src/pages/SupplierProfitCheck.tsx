@@ -1,218 +1,24 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { PeriodFilter, PeriodFilterValue } from "@/components/ui/period-filter";
-import { useCompany } from "@/contexts/CompanyContext";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  AlertTriangle,
-  Search,
-  Download,
-  FileText,
-  CheckCircle,
-  Package,
-  Loader2,
-  BarChart2,
-  Save,
-  Hash,
-  ShoppingCart,
-  Columns,
-  RotateCcw,
-  Truck,
-  Filter,
-  ChevronDown,
-  CircleDollarSign,
-  MapPin,
-  Container,
-  Plus,
-  Upload,
-  X,
-  FileSpreadsheet,
-} from "lucide-react";
+import {useState, useMemo, useCallback, useEffect, useRef} from "react";
+import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
+import {PeriodFilter, PeriodFilterValue} from "@/components/ui/period-filter";
+import {useCompany} from "@/contexts/CompanyContext";
+import {useToast} from "@/hooks/use-toast";
+import {apiRequest} from "@/lib/queryClient";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Badge} from "@/components/ui/badge";
+import {Checkbox} from "@/components/ui/checkbox";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter} from "@/components/ui/dialog";
+import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
+import {TrendingUp, AlertTriangle, Search, Download, FileText, CheckCircle, Package, Loader2, BarChart2, Save, Hash, ShoppingCart, Columns, RotateCcw, Truck, Filter, ChevronDown, CircleDollarSign, MapPin, Container, Plus, Upload, X, FileSpreadsheet} from "lucide-react";
 
-// ─── Column definitions ───────────────────────────────────────────────────────
-const ALL_COLUMNS = [
-  { key: "code", label: "Code", default: true },
-  { key: "name", label: "Name", default: true },
-  { key: "salesQty", label: "Sales Qty", default: true },
-  { key: "avgSell", label: "Avg Sell", default: true },
-  { key: "dubaiPrice", label: "Dubai Price", default: true },
-  { key: "extraPerBale", label: "Extra / Bale", default: true },
-  { key: "landingCost", label: "Landing Cost", default: true },
-  { key: "costProfit", label: "Cost Profit", default: true },
-  { key: "status", label: "Status", default: true },
-  { key: "qtyToOrder", label: "Qty to Order", default: true },
-  { key: "inventoryAvgCost", label: "Inventory Avg Cost", default: false },
-  { key: "hassanPrice", label: "Hassan Price", default: false },
-  { key: "hassanProfit", label: "Hassan Profit", default: false },
-  { key: "currentStock", label: "Current Stock", default: false },
-] as const;
-
-type ColKey = (typeof ALL_COLUMNS)[number]["key"];
-type ColVisibility = Record<ColKey, boolean>;
-
-const DEFAULT_COL_VISIBILITY: ColVisibility = Object.fromEntries(
-  ALL_COLUMNS.map((c) => [c.key, c.default])
-) as ColVisibility;
-const STORAGE_KEY_COLS = "spc_col_visibility_v2";
-
-function loadColVisibility(): ColVisibility {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY_COLS);
-    if (saved) return { ...DEFAULT_COL_VISIBILITY, ...JSON.parse(saved) };
-  } catch {}
-  return { ...DEFAULT_COL_VISIBILITY };
-}
-
-// ─── Status options ───────────────────────────────────────────────────────────
-const STATUS_OPTIONS = [
-  { value: "gaining", label: "Gaining", dot: "bg-emerald-500" },
-  { value: "losing", label: "Losing", dot: "bg-red-500" },
-  { value: "break_even", label: "Break Even", dot: "bg-blue-500" },
-  { value: "no_sales_data", label: "No Data", dot: "bg-amber-500" },
-  { value: "missing_po", label: "Missing PO Price", dot: "bg-orange-500" },
-];
-
-// ─── Interfaces ───────────────────────────────────────────────────────────────
-interface AnalysisRow {
-  stockItemId: number;
-  code: string;
-  name: string;
-  stockGroupId: number | null;
-  stockGroupName: string | null;
-  currentStock: number;
-  salesQty: number;
-  avgSellingPrice: number | null;
-  groupSellingPrice: number | null;
-  poPrice: number | null;
-  poPriceSource: string;
-  inventoryAvgCost: number;
-  nCost: number;
-  configPrice: number;
-  offloadingCost: number;
-  profitPercent: number | null;
-  status: string;
-  proformaQty: number | null;
-  proformaBarcode: string | null;
-}
-
-interface OtwContainer {
-  id: number;
-  container_number: string;
-  eta: string | null;
-  status: string;
-  items_total: string | null;
-  item_name: string | null;
-  loaded_items_count: string;
-}
-
-interface LocationGroup {
-  id: number;
-  name: string;
-}
-
-interface ComputedRow extends AnalysisRow {
-  landingCost: number | null;
-  costProfit: number | null;
-  costProfitPct: number | null;
-  computedStatus: string;
-  hassanProfit: number;
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-function fmt(n: number | null | undefined, decimals = 2): string {
-  if (n == null) return "-";
-  return n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-}
-
-function ProfitCell({ value, pct }: { value: number | null; pct: number | null }) {
-  if (value == null) return <span className="text-muted-foreground text-xs">—</span>;
-  const positive = value >= 0;
-  return (
-    <div
-      className={`text-right font-semibold tabular-nums ${positive ? "text-emerald-500 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}
-    >
-      <div className="text-sm">
-        {value < 0 ? "-" : ""}${fmt(Math.abs(value))}
-      </div>
-      {pct != null && <div className="text-[11px] font-normal opacity-70">{fmt(Math.abs(pct), 1)}%</div>}
-    </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  if (status === "gaining")
-    return (
-      <Badge className="bg-emerald-500 text-white gap-1 font-medium">
-        <TrendingUp className="w-3 h-3" />
-        Gaining
-      </Badge>
-    );
-  if (status === "losing")
-    return (
-      <Badge className="bg-red-500 text-white gap-1 font-medium">
-        <TrendingDown className="w-3 h-3" />
-        Losing
-      </Badge>
-    );
-  if (status === "break_even")
-    return (
-      <Badge className="bg-blue-500 text-white gap-1 font-medium">
-        <Minus className="w-3 h-3" />
-        Break Even
-      </Badge>
-    );
-  return (
-    <Badge className="bg-amber-500 text-white gap-1 font-medium">
-      <AlertTriangle className="w-3 h-3" />
-      No Data
-    </Badge>
-  );
-}
-
-// ─── Stat Card ────────────────────────────────────────────────────────────────
-function StatCard({
-  icon: Icon,
-  iconBg,
-  label,
-  value,
-  sub,
-  valueColor,
-}: {
-  icon: any;
-  iconBg: string;
-  label: string;
-  value: string;
-  sub?: string;
-  valueColor?: string;
-}) {
-  return (
-    <div className="rounded-xl border bg-card px-4 py-3 flex items-center gap-3">
-      <div className={`p-2.5 rounded-lg shrink-0 ${iconBg}`}>
-        <Icon className="w-4 h-4" />
-      </div>
-      <div className="min-w-0">
-        <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{label}</div>
-        <div className={`text-xl font-bold leading-tight tabular-nums ${valueColor ?? ""}`}>{value}</div>
-        {sub && <div className="text-[11px] text-muted-foreground">{sub}</div>}
-      </div>
-    </div>
-  );
-}
-
-// ─── Component ────────────────────────────────────────────────────────────────
+import type {AnalysisRow, ColKey, ColVisibility, ComputedRow, LocationGroup, OtwContainer} from "./supplierprofitcheck/types";
+import {ALL_COLUMNS, DEFAULT_COL_VISIBILITY, STATUS_OPTIONS, STORAGE_KEY_COLS, fmt, loadColVisibility} from "./supplierprofitcheck/utils";
+import {ProfitCell} from "./supplierprofitcheck/components/ProfitCell";
+import {StatusBadge} from "./supplierprofitcheck/components/StatusBadge";
+import {StatCard} from "./supplierprofitcheck/components/StatCard";
 export default function SupplierProfitCheck() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
@@ -266,7 +72,9 @@ export default function SupplierProfitCheck() {
   // Excel import
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importedRows, setImportedRows] = useState<AnalysisRow[]>([]);
-  const [importParsed, setImportParsed] = useState<{ code: string; costPrice?: number; sellPrice?: number; qty?: number }[]>([]);
+  const [importParsed, setImportParsed] = useState<
+    { code: string; costPrice?: number; sellPrice?: number; qty?: number }[]
+  >([]);
   const [importPreview, setImportPreview] = useState<{ rows: AnalysisRow[]; notFound: string[] } | null>(null);
   const [importLoading, setImportLoading] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
@@ -454,7 +262,8 @@ export default function SupplierProfitCheck() {
             fromDate: periodFilter.fromDate || undefined,
             toDate: periodFilter.toDate || undefined,
             sellPriceSource,
-            locationId: sellPriceSource === "location_group" && selectedLocationId ? Number(selectedLocationId) : undefined,
+            locationId:
+              sellPriceSource === "location_group" && selectedLocationId ? Number(selectedLocationId) : undefined,
           });
           const result = await res.json();
           setImportPreview(result);
@@ -785,10 +594,9 @@ export default function SupplierProfitCheck() {
       // Auto-download supplier excel immediately using the freshly-returned id/reference
       // (can't use savedProforma state here — it hasn't re-rendered yet)
       try {
-        const exportRes = await fetch(
-          `/api/supplier-profit-check/proforma/${data.id}/export-supplier`,
-          { credentials: "include" }
-        );
+        const exportRes = await fetch(`/api/supplier-profit-check/proforma/${data.id}/export-supplier`, {
+          credentials: "include",
+        });
         if (exportRes.ok) {
           const blob = await exportRes.blob();
           const url = URL.createObjectURL(blob);
@@ -919,14 +727,19 @@ export default function SupplierProfitCheck() {
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) { handleExcelFile(file); e.target.value = ""; }
+                if (file) {
+                  handleExcelFile(file);
+                  e.target.value = "";
+                }
               }}
             />
             {importedRows.length > 0 && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => { setImportedRows([]); }}
+                onClick={() => {
+                  setImportedRows([]);
+                }}
                 className="shrink-0 text-muted-foreground"
                 data-testid="button-clear-import"
                 title="Clear imported items"
@@ -1935,7 +1748,15 @@ export default function SupplierProfitCheck() {
       </Dialog>
 
       {/* ── Excel Import Dialog ── */}
-      <Dialog open={showImportDialog} onOpenChange={(open) => { if (!open) { setShowImportDialog(false); setImportPreview(null); } }}>
+      <Dialog
+        open={showImportDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowImportDialog(false);
+            setImportPreview(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1947,10 +1768,18 @@ export default function SupplierProfitCheck() {
               <p className="font-medium text-foreground">Expected Excel format:</p>
               <p>Row 1 = headers. Supported column names (case-insensitive):</p>
               <ul className="list-disc list-inside space-y-0.5 ml-1">
-                <li><strong>Code</strong> (required) — item code from ERP</li>
-                <li><strong>Cost / Dubai / PO Price</strong> (optional) — overrides cost price</li>
-                <li><strong>Sell / Avg Price</strong> (optional) — overrides selling price</li>
-                <li><strong>Qty / Quantity</strong> (optional) — pre-fills order qty</li>
+                <li>
+                  <strong>Code</strong> (required) — item code from ERP
+                </li>
+                <li>
+                  <strong>Cost / Dubai / PO Price</strong> (optional) — overrides cost price
+                </li>
+                <li>
+                  <strong>Sell / Avg Price</strong> (optional) — overrides selling price
+                </li>
+                <li>
+                  <strong>Qty / Quantity</strong> (optional) — pre-fills order qty
+                </li>
               </ul>
             </div>
 
@@ -1983,12 +1812,24 @@ export default function SupplierProfitCheck() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="bg-muted/50 border-b">
-                            <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Code</th>
-                            <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</th>
-                            <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Cost Price</th>
-                            <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Avg Sell</th>
-                            <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Profit</th>
-                            <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</th>
+                            <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                              Code
+                            </th>
+                            <th className="text-left px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                              Name
+                            </th>
+                            <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                              Cost Price
+                            </th>
+                            <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                              Avg Sell
+                            </th>
+                            <th className="text-right px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                              Profit
+                            </th>
+                            <th className="text-center px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                              Status
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2000,12 +1841,21 @@ export default function SupplierProfitCheck() {
                             const isGaining = profit != null && profit > 0;
                             const isLosing = profit != null && profit < 0;
                             return (
-                              <tr key={r.stockItemId} className={`border-b last:border-0 ${i % 2 === 1 ? "bg-muted/20" : ""}`}>
+                              <tr
+                                key={r.stockItemId}
+                                className={`border-b last:border-0 ${i % 2 === 1 ? "bg-muted/20" : ""}`}
+                              >
                                 <td className="px-3 py-2 font-mono text-xs">{r.code}</td>
                                 <td className="px-3 py-2 text-xs max-w-[200px] truncate">{r.name}</td>
-                                <td className="px-3 py-2 text-right text-xs tabular-nums">{costP != null ? `$${costP.toFixed(2)}` : "—"}</td>
-                                <td className="px-3 py-2 text-right text-xs tabular-nums">{sellP != null ? `$${sellP.toFixed(2)}` : "—"}</td>
-                                <td className={`px-3 py-2 text-right text-xs tabular-nums font-semibold ${isGaining ? "text-emerald-500" : isLosing ? "text-red-500" : "text-muted-foreground"}`}>
+                                <td className="px-3 py-2 text-right text-xs tabular-nums">
+                                  {costP != null ? `$${costP.toFixed(2)}` : "—"}
+                                </td>
+                                <td className="px-3 py-2 text-right text-xs tabular-nums">
+                                  {sellP != null ? `$${sellP.toFixed(2)}` : "—"}
+                                </td>
+                                <td
+                                  className={`px-3 py-2 text-right text-xs tabular-nums font-semibold ${isGaining ? "text-emerald-500" : isLosing ? "text-red-500" : "text-muted-foreground"}`}
+                                >
                                   {profit != null ? `${profit < 0 ? "-" : ""}$${Math.abs(profit).toFixed(2)}` : "—"}
                                 </td>
                                 <td className="px-3 py-2 text-center">
@@ -2028,7 +1878,13 @@ export default function SupplierProfitCheck() {
             )}
           </div>
           <DialogFooter className="gap-2 border-t pt-4">
-            <Button variant="outline" onClick={() => { setShowImportDialog(false); setImportPreview(null); }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowImportDialog(false);
+                setImportPreview(null);
+              }}
+            >
               Cancel
             </Button>
             <Button

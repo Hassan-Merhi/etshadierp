@@ -1,235 +1,20 @@
-import { useState, Fragment } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import {
-  PlusCircle,
-  Plus,
-  X,
-  CheckCircle2,
-  Info,
-  Pencil,
-  Trash2,
-  AlertTriangle,
-  RotateCcw,
-  ChevronDown,
-  ChevronUp,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
-import { factoryApiRequest } from "@/lib/factoryApi";
-import { formatNumber } from "@/lib/formatNumber";
-import { useAdminOverride } from "@/hooks/use-admin-override";
-import type { ContainerWithSupplier } from "./otwHelpers";
+import {useState, Fragment} from "react";
+import {useMutation, useQuery} from "@tanstack/react-query";
+import {PlusCircle, Plus, X, Info, Pencil, Trash2, AlertTriangle, RotateCcw, ChevronDown, ChevronUp} from "lucide-react";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter} from "@/components/ui/dialog";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {useToast} from "@/hooks/use-toast";
+import {factoryApiRequest} from "@/lib/factoryApi";
+import {formatNumber} from "@/lib/formatNumber";
+import {useAdminOverride} from "@/hooks/use-admin-override";
 
+import type {HistoryRow, MutationResult, PostOffloadCharge, PostOffloadDialogProps} from "./postoffloaddialog/types";
+import {invalidateChargeQueries} from "./postoffloaddialog/utils";
+import {RateCell} from "./postoffloaddialog/components/RateCell";
+import {MutationResultPanel} from "./postoffloaddialog/components/MutationResultPanel";
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-type PostOffloadCharge = {
-  id: string;
-  description: string;
-  amount: string;
-  currencyCode: string;
-  ledgerAccountId: string;
-  supplierId: string;
-};
-
-type HistoryRow = {
-  id: number;
-  description: string;
-  amount: string;
-  currencyCode: string;
-  fxRateToUsd: string;
-  fxRateConfirmed: boolean;
-  fxRateDate: string | null;
-  ledgerAccountId: number | null;
-  supplierId: number | null;
-  voucherId: number | null;
-  daybookEntryId: number | null;
-  supplierLockedRateBefore: string | null;
-  supplierLockedRateAfter: string | null;
-  supplierRemainingKgAtApply: string | null;
-  fullContainerValueDeltaUsd: string | null;
-  supplierInventoryValueDeltaUsd: string | null;
-  remainingFractionAtApply: string | null;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt: string | null;
-  version: number;
-};
-
-type MutationResult = {
-  message: string;
-  containerId?: number;
-  chargeId?: number;
-  action?: string;
-  oldContainerCostPerKgUsd: number;
-  newContainerCostPerKgUsd: number;
-  supplierLockedRateBefore?: string | null;
-  supplierLockedRateAfter?: string | null;
-  supplierLockedRateOldExact?: string | null;
-  supplierLockedRateNewExact?: string | null;
-  supplierRemainingKg?: number;
-  containerReceivedKg?: number;
-  containerRemainingKg?: number;
-  remainingFraction?: number | string;
-  fullContainerValueDeltaUsd?: string;
-  supplierInventoryValueDeltaUsd?: string;
-  supplierValueBeforeUsd?: string | null;
-  supplierValueAfterUsd?: string | null;
-  rawStockRateWasStale?: boolean;
-  affectedBatches: {
-    batchId: number;
-    batchCode: string;
-    status: string | null;
-    wasCompleted: boolean;
-    weightKgFromContainer: number;
-    oldCostPerKg: number;
-    newCostPerKg: number;
-  }[];
-  affectedBalesCount: number;
-  rawStockRowsUpdated?: number;
-};
-
-interface PostOffloadDialogProps {
-  container: ContainerWithSupplier | null;
-  ledgerAccounts: any[];
-  onClose: () => void;
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function invalidateChargeQueries(containerId: number) {
-  queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
-  queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
-  queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/by-container"] });
-  queryClient.invalidateQueries({ queryKey: ["/api/factory/mix-batches"] });
-  queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"], refetchType: "active" });
-  queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
-  queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers/with-balances"] });
-  queryClient.invalidateQueries({ queryKey: ["/api/factory/production-value-report"] });
-  queryClient.invalidateQueries({ queryKey: [`/api/factory/containers/${containerId}/post-offload-charges`] });
-  queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
-}
-
-function RateCell({ label, value }: { label: string; value: string | null }) {
-  if (!value) return null;
-  return (
-    <div className="flex justify-between text-xs">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-mono">${parseFloat(value).toFixed(8)}</span>
-    </div>
-  );
-}
-
-function MutationResultPanel({ result }: { result: MutationResult }) {
-  const oldRate = result.supplierLockedRateBefore || result.supplierLockedRateOldExact;
-  const newRate = result.supplierLockedRateAfter || result.supplierLockedRateNewExact;
-  const supDelta = result.supplierInventoryValueDeltaUsd;
-  const fraction =
-    typeof result.remainingFraction === "number"
-      ? result.remainingFraction
-      : result.remainingFraction
-      ? parseFloat(result.remainingFraction)
-      : null;
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-start gap-3 p-3 rounded-md bg-green-50 dark:bg-green-950/20 text-green-800 dark:text-green-300 text-sm">
-        <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
-        <p className="font-semibold">{result.message}</p>
-      </div>
-
-      <div className="rounded-md border text-sm divide-y">
-        <div className="grid grid-cols-3 gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium bg-muted/30">
-          <span>Metric</span>
-          <span className="text-right">Previous</span>
-          <span className="text-right">New</span>
-        </div>
-        <div className="grid grid-cols-3 gap-2 px-3 py-2">
-          <span className="text-muted-foreground">Container cost/kg (USD)</span>
-          <span className="text-right font-mono">${result.oldContainerCostPerKgUsd.toFixed(6)}</span>
-          <span className="text-right font-mono font-semibold text-green-700 dark:text-green-400">
-            ${result.newContainerCostPerKgUsd.toFixed(6)}
-          </span>
-        </div>
-        {oldRate && (
-          <div className="grid grid-cols-3 gap-2 px-3 py-2">
-            <span className="text-muted-foreground">Supplier locked rate</span>
-            <span className="text-right font-mono">${parseFloat(oldRate).toFixed(8)}</span>
-            <span className="text-right font-mono font-semibold">{newRate ? `$${parseFloat(newRate).toFixed(8)}` : "—"}</span>
-          </div>
-        )}
-        {supDelta && result.supplierRemainingKg != null && (
-          <div className="px-3 py-2 bg-muted/30 text-xs text-muted-foreground space-y-0.5">
-            <div className="flex justify-between">
-              <span>Supplier remaining</span>
-              <span className="font-mono">{formatNumber(result.supplierRemainingKg)} kg</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Inventory value applied</span>
-              <span className="font-mono">${parseFloat(supDelta).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-            {fraction != null && fraction < 0.9999 && result.fullContainerValueDeltaUsd && (
-              <div className="mt-1 text-amber-700 dark:text-amber-400">
-                Only {(fraction * 100).toFixed(0)}% of this container remains in inventory.
-              </div>
-            )}
-          </div>
-        )}
-        <div className="grid grid-cols-3 gap-2 px-3 py-2 text-muted-foreground">
-          <span>Raw-stock rows updated</span>
-          <span className="text-right">—</span>
-          <span className="text-right font-mono">{result.rawStockRowsUpdated ?? 0}</span>
-        </div>
-        <div className="grid grid-cols-3 gap-2 px-3 py-2 text-muted-foreground">
-          <span>Bales updated</span>
-          <span className="text-right">—</span>
-          <span className="text-right font-mono">{result.affectedBalesCount}</span>
-        </div>
-      </div>
-
-      {result.affectedBatches.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-sm font-semibold">Affected Mix Batches</p>
-          <div className="border rounded-md divide-y text-sm">
-            <div className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium bg-muted/30">
-              <span>Batch</span>
-              <span className="text-right">Old Cost/kg</span>
-              <span className="text-right">New Cost/kg</span>
-              <span className="text-right">Wt from container</span>
-            </div>
-            {result.affectedBatches.map((b) => (
-              <div key={b.batchId} className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-2 px-3 py-2 items-center">
-                <span className="font-mono font-medium flex items-center gap-1.5 flex-wrap">
-                  {b.batchCode}
-                  {b.wasCompleted && (
-                    <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded whitespace-nowrap">
-                      Completed
-                    </span>
-                  )}
-                </span>
-                <span className="text-right font-mono text-muted-foreground">${b.oldCostPerKg.toFixed(4)}</span>
-                <span className="text-right font-mono font-semibold">${b.newCostPerKg.toFixed(4)}</span>
-                <span className="text-right font-mono text-muted-foreground">{formatNumber(b.weightKgFromContainer)} kg</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
 
 export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOffloadDialogProps) {
   const { toast } = useToast();
@@ -271,7 +56,15 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
 
   // ── Create mutation ──────────────────────────────────────────────────────
   const postOffloadMutation = useMutation({
-    mutationFn: async ({ containerId, charges: c, txDate: d }: { containerId: number; charges: any[]; txDate: string }) => {
+    mutationFn: async ({
+      containerId,
+      charges: c,
+      txDate: d,
+    }: {
+      containerId: number;
+      charges: any[];
+      txDate: string;
+    }) => {
       const res = await factoryApiRequest("POST", `/api/factory/containers/${containerId}/post-offload-charges`, {
         charges: c,
         txDate: d,
@@ -296,7 +89,11 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
   // ── Edit mutation ────────────────────────────────────────────────────────
   const editMutation = useMutation({
     mutationFn: async ({ containerId, chargeId, body }: { containerId: number; chargeId: number; body: any }) => {
-      const res = await factoryApiRequest("PATCH", `/api/factory/containers/${containerId}/post-offload-charges/${chargeId}`, body);
+      const res = await factoryApiRequest(
+        "PATCH",
+        `/api/factory/containers/${containerId}/post-offload-charges/${chargeId}`,
+        body
+      );
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Failed to update charge");
@@ -315,8 +112,16 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
 
   // ── Legacy rebuild mutation ──────────────────────────────────────────────
   const rebuildMutation = useMutation({
-    mutationFn: async ({ containerId, chargeId, legacyBaselineRate, expectedVersion }: {
-      containerId: number; chargeId: number; legacyBaselineRate: number; expectedVersion: number;
+    mutationFn: async ({
+      containerId,
+      chargeId,
+      legacyBaselineRate,
+      expectedVersion,
+    }: {
+      containerId: number;
+      chargeId: number;
+      legacyBaselineRate: number;
+      expectedVersion: number;
     }) => {
       const res = await factoryApiRequest(
         "PATCH",
@@ -342,7 +147,11 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
   // ── Undo mutation ────────────────────────────────────────────────────────
   const undoMutation = useMutation({
     mutationFn: async ({ containerId, chargeId, body }: { containerId: number; chargeId: number; body: any }) => {
-      const res = await factoryApiRequest("DELETE", `/api/factory/containers/${containerId}/post-offload-charges/${chargeId}`, body);
+      const res = await factoryApiRequest(
+        "DELETE",
+        `/api/factory/containers/${containerId}/post-offload-charges/${chargeId}`,
+        body
+      );
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Failed to undo charge");
@@ -410,16 +219,21 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
     if (!container || !editingCharge) return;
     const rate = parseFloat(editLegacyRate);
     if (!rate || rate <= 0) {
-      toast({ title: "Enter supplier rate", description: "Provide the supplier locked rate immediately before this charge.", variant: "destructive" });
+      toast({
+        title: "Enter supplier rate",
+        description: "Provide the supplier locked rate immediately before this charge.",
+        variant: "destructive",
+      });
       return;
     }
     wrapAdminAction(
-      () => rebuildMutation.mutate({
-        containerId: container.id,
-        chargeId: editingCharge.id,
-        legacyBaselineRate: rate,
-        expectedVersion: editingCharge.version,
-      }),
+      () =>
+        rebuildMutation.mutate({
+          containerId: container.id,
+          chargeId: editingCharge.id,
+          legacyBaselineRate: rate,
+          expectedVersion: editingCharge.version,
+        }),
       "Legacy Rebuild — Supplier Rate"
     );
   };
@@ -428,7 +242,11 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
     if (!container || !undoCharge) return;
     const isLegacy = undoCharge.supplierLockedRateBefore === null;
     if (isLegacy && !undoLegacyRate) {
-      toast({ title: "Enter baseline rate", description: "Provide the supplier locked rate before this charge to undo it.", variant: "destructive" });
+      toast({
+        title: "Enter baseline rate",
+        description: "Provide the supplier locked rate before this charge to undo it.",
+        variant: "destructive",
+      });
       return;
     }
     const body: any = {
@@ -448,7 +266,12 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
     const isLegacy = undoCharge.supplierLockedRateBefore === null;
     return (
       <>
-        <Dialog open={!!container} onOpenChange={(v) => { if (!v) handleClose(); }}>
+        <Dialog
+          open={!!container}
+          onOpenChange={(v) => {
+            if (!v) handleClose();
+          }}
+        >
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
@@ -458,8 +281,15 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
             <div className="space-y-4 py-2 text-sm">
               <p>This will reverse the following charge and all its downstream effects:</p>
               <div className="rounded-md border px-3 py-2 space-y-1">
-                <p><strong>{undoCharge.description}</strong></p>
-                <p className="text-muted-foreground">{undoCharge.currencyCode} {parseFloat(undoCharge.amount).toFixed(2)}{undoCharge.fxRateToUsd && undoCharge.currencyCode !== "USD" ? ` × ${parseFloat(undoCharge.fxRateToUsd).toFixed(6)}` : ""}</p>
+                <p>
+                  <strong>{undoCharge.description}</strong>
+                </p>
+                <p className="text-muted-foreground">
+                  {undoCharge.currencyCode} {parseFloat(undoCharge.amount).toFixed(2)}
+                  {undoCharge.fxRateToUsd && undoCharge.currencyCode !== "USD"
+                    ? ` × ${parseFloat(undoCharge.fxRateToUsd).toFixed(6)}`
+                    : ""}
+                </p>
               </div>
               <ul className="text-sm text-muted-foreground list-disc pl-4 space-y-0.5">
                 <li>Container landed cost reverted</li>
@@ -474,7 +304,9 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                   <p className="text-amber-800 dark:text-amber-300 font-medium flex items-center gap-1.5">
                     <AlertTriangle className="h-4 w-4" /> Legacy charge — original supplier rate required
                   </p>
-                  <p className="text-xs text-muted-foreground">Enter the supplier locked rate that was in effect immediately before this charge was applied.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Enter the supplier locked rate that was in effect immediately before this charge was applied.
+                  </p>
                   <Input
                     type="number"
                     step="0.000001"
@@ -490,7 +322,15 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
               </div>
             </div>
             <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => { setUndoCharge(null); setUndoLegacyRate(""); }}>Cancel</Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setUndoCharge(null);
+                  setUndoLegacyRate("");
+                }}
+              >
+                Cancel
+              </Button>
               <Button
                 variant="destructive"
                 onClick={handleConfirmUndo}
@@ -510,7 +350,12 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
   if (undoResult) {
     return (
       <>
-        <Dialog open={!!container} onOpenChange={(v) => { if (!v) handleClose(); }}>
+        <Dialog
+          open={!!container}
+          onOpenChange={(v) => {
+            if (!v) handleClose();
+          }}
+        >
           <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Charge Undone</DialogTitle>
@@ -519,7 +364,14 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
               <MutationResultPanel result={undoResult} />
             </div>
             <DialogFooter className="pt-2 border-t">
-              <Button variant="outline" onClick={() => { setUndoResult(null); }}>Back</Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setUndoResult(null);
+                }}
+              >
+                Back
+              </Button>
               <Button onClick={handleClose}>Close</Button>
             </DialogFooter>
           </DialogContent>
@@ -536,7 +388,12 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
 
     return (
       <>
-        <Dialog open={!!container} onOpenChange={(v) => { if (!v) handleClose(); }}>
+        <Dialog
+          open={!!container}
+          onOpenChange={(v) => {
+            if (!v) handleClose();
+          }}
+        >
           <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -558,8 +415,8 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                         <AlertTriangle className="h-4 w-4" /> Legacy charge — original supplier rate required
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        This charge was created before supplier-rate snapshots were stored. Enter the supplier locked rate
-                        that was in effect immediately before this charge. For CYPRUS MODA, enter 0.607861.
+                        This charge was created before supplier-rate snapshots were stored. Enter the supplier locked
+                        rate that was in effect immediately before this charge. For CYPRUS MODA, enter 0.607861.
                       </p>
                       <Input
                         type="number"
@@ -574,19 +431,33 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                   <div className="grid grid-cols-2 gap-3">
                     <div className="col-span-2 space-y-1">
                       <label className="text-sm font-medium">Description</label>
-                      <Input value={editDesc} onChange={(e) => setEditDesc(e.target.value)} placeholder="e.g. Port duty" />
+                      <Input
+                        value={editDesc}
+                        onChange={(e) => setEditDesc(e.target.value)}
+                        placeholder="e.g. Port duty"
+                      />
                     </div>
                     <div className="space-y-1">
                       <label className="text-sm font-medium">Amount</label>
-                      <Input type="number" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} step="0.01" placeholder="0.00" />
+                      <Input
+                        type="number"
+                        value={editAmount}
+                        onChange={(e) => setEditAmount(e.target.value)}
+                        step="0.01"
+                        placeholder="0.00"
+                      />
                     </div>
                     <div className="space-y-1">
                       <label className="text-sm font-medium">Currency</label>
                       <Select value={editCcy} onValueChange={setEditCcy}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
                         <SelectContent>
                           {["USD", "EUR", "GBP", "AUD", "LBP"].map((c) => (
-                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                            <SelectItem key={c} value={c}>
+                              {c}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -594,7 +465,9 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                     <div className="col-span-2 space-y-1">
                       <label className="text-sm font-medium">Account (optional)</label>
                       <Select value={editLedgerId} onValueChange={setEditLedgerId}>
-                        <SelectTrigger><SelectValue placeholder="Select account (optional)" /></SelectTrigger>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select account (optional)" />
+                        </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="">None</SelectItem>
                           {ledgerAccounts.map((a: any) => (
@@ -607,7 +480,12 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                     </div>
                     <div className="col-span-2 space-y-1">
                       <label className="text-sm font-medium">Date</label>
-                      <Input type="date" value={editTxDate} onChange={(e) => setEditTxDate(e.target.value)} className="w-48" />
+                      <Input
+                        type="date"
+                        value={editTxDate}
+                        onChange={(e) => setEditTxDate(e.target.value)}
+                        className="w-48"
+                      />
                     </div>
                   </div>
 
@@ -620,13 +498,17 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                       {editingCharge.supplierRemainingKgAtApply && (
                         <div className="flex justify-between">
                           <span>Supplier remaining at apply</span>
-                          <span className="font-mono">{formatNumber(parseFloat(editingCharge.supplierRemainingKgAtApply))} kg</span>
+                          <span className="font-mono">
+                            {formatNumber(parseFloat(editingCharge.supplierRemainingKgAtApply))} kg
+                          </span>
                         </div>
                       )}
                       {editingCharge.supplierInventoryValueDeltaUsd && (
                         <div className="flex justify-between">
                           <span>Inventory value applied</span>
-                          <span className="font-mono">${parseFloat(editingCharge.supplierInventoryValueDeltaUsd).toFixed(6)}</span>
+                          <span className="font-mono">
+                            ${parseFloat(editingCharge.supplierInventoryValueDeltaUsd).toFixed(6)}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -636,7 +518,13 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
             </div>
 
             <DialogFooter className="gap-2 pt-2 border-t flex-wrap">
-              <Button variant="outline" onClick={() => { setEditingCharge(null); setEditResult(null); }}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditingCharge(null);
+                  setEditResult(null);
+                }}
+              >
                 {editResult ? "Back" : "Cancel"}
               </Button>
               {!editResult && (
@@ -668,7 +556,12 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
   // ─── Main dialog ──────────────────────────────────────────────────────────
   return (
     <>
-      <Dialog open={!!container} onOpenChange={(v) => { if (!v) handleClose(); }}>
+      <Dialog
+        open={!!container}
+        onOpenChange={(v) => {
+          if (!v) handleClose();
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -676,7 +569,8 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
               Post-Offload Charges
             </DialogTitle>
             <DialogDescription>
-              Container <strong>{container?.containerNumber}</strong> — charges here update cost per kg and cascade into mix batches.
+              Container <strong>{container?.containerNumber}</strong> — charges here update cost per kg and cascade into
+              mix batches.
             </DialogDescription>
           </DialogHeader>
 
@@ -767,7 +661,8 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                               <Trash2 className="h-3.5 w-3.5 text-red-500 shrink-0" />
                               <span className="text-muted-foreground text-xs line-through">{charge.description}</span>
                               <span className="text-muted-foreground text-xs ml-auto shrink-0">
-                                {charge.currencyCode} {parseFloat(charge.amount).toFixed(2)} · Undone {charge.deletedAt ? new Date(charge.deletedAt).toLocaleDateString() : ""}
+                                {charge.currencyCode} {parseFloat(charge.amount).toFixed(2)} · Undone{" "}
+                                {charge.deletedAt ? new Date(charge.deletedAt).toLocaleDateString() : ""}
                               </span>
                             </div>
                           </div>
@@ -866,7 +761,9 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                                 </SelectTrigger>
                                 <SelectContent>
                                   {["USD", "EUR", "GBP", "AUD", "LBP"].map((ccy) => (
-                                    <SelectItem key={ccy} value={ccy}>{ccy}</SelectItem>
+                                    <SelectItem key={ccy} value={ccy}>
+                                      {ccy}
+                                    </SelectItem>
                                   ))}
                                 </SelectContent>
                               </Select>

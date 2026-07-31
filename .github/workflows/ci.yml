@@ -228,6 +228,24 @@ jobs:
           set -o pipefail
           npm run test:backend 2>&1 | tee backend-test-errors-ci.txt
 
+      - name: API smoke sweep
+        id: smoke_sweep
+        # Its own step so that "an endpoint stopped responding" is a distinct
+        # signal from a unit-test failure.
+        if: always() && steps.runtime_migrations.outcome == 'success'
+        run: |
+          set -o pipefail
+          npm run test:smoke-sweep 2>&1 | tee smoke-sweep-errors-ci.txt
+
+      - name: Upload smoke sweep failure log
+        if: always() && steps.smoke_sweep.outcome == 'failure'
+        uses: actions/upload-artifact@v7
+        with:
+          name: smoke-sweep-errors
+          path: smoke-sweep-errors-ci.txt
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Upload backend test failure log
         if: always() && steps.backend_tests.outcome == 'failure'
         uses: actions/upload-artifact@v7

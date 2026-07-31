@@ -26,6 +26,8 @@
     "audit:program-6d": "node scripts/audit-program6d-database-query-risks.mjs --json",
     "audit:program-6d:review": "node scripts/run-program6d-query-review.mjs",
     "audit:program-6d:validate": "node scripts/validate-program6d-query-classifications.mjs",
+    "audit:source-text-assertions": "node scripts/audit-source-text-assertions.mjs",
+    "audit:god-files": "node scripts/audit-god-file-boundaries.mjs",
     "start": "node --expose-gc --import ./server/factoryContainerSchemaBridge.mjs --import ./server/supplierCompanyScopeBridge.mjs --import ./server/exportBufferBridge.mjs --import ./server/scheduledAttachmentBridge.mjs --import ./server/apiPaginationBridge.mjs --import ./server/runtimeMemoryGuard.mjs dist/index.js",
     "check": "node node_modules/typescript/bin/tsc --noEmit",
     "check:program-6-security": "node scripts/run-program-6-focused-security-checks.mjs",
@@ -41,6 +43,7 @@
     "format": "node node_modules/prettier/bin/prettier.cjs --write \"client/src/**/*.{ts,tsx,css}\" \"server/**/*.ts\" \"shared/**/*.ts\"",
     "format:check": "node node_modules/prettier/bin/prettier.cjs --check \"client/src/**/*.{ts,tsx,css}\" \"server/**/*.ts\" \"shared/**/*.ts\"",
     "test:backend": "node node_modules/vitest/vitest.mjs run",
+    "test:smoke-sweep": "node node_modules/vitest/vitest.mjs run --config vitest.config.smoke-sweep.ts",
     "test:backend:coverage": "node node_modules/vitest/vitest.mjs run --coverage",
     "test:frontend": "node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts",
     "test:frontend:coverage": "node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --coverage"

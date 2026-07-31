@@ -127,6 +127,11 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     await pool.query("DELETE FROM factory_containers WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_suppliers WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_daybook_entries WHERE company_id = $1", [company.id]);
+    // Barcode sequence rows are allocated lazily on read — GET
+    // /api/production-bales/next-barcode writes one — so a test that only
+    // exercises read endpoints can still leave an FK reference behind.
+    await pool.query("DELETE FROM bale_sequences WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_bale_sequences WHERE company_id = $1", [company.id]);
     await db.delete(schema.companies).where(eq(schema.companies.id, company.id));
   }
 
@@ -139,6 +144,12 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     await pool.query("DELETE FROM login_history WHERE user_id = $1", [u.id]);
     await db.delete(schema.users).where(eq(schema.users.id, u.id));
   }
+
+  // Drop the parent-company pin with the fixture that owned it, so a later run
+  // cannot resolve a parent company that no longer exists. A delete is used
+  // rather than setParentCompanyId(null) because it is idempotent and cannot
+  // race another suite into a duplicate-key insert.
+  await pool.query("DELETE FROM system_settings WHERE key = 'parentCompanyId'");
 }
 
 export async function seedTestData(prefix: string): Promise<TestContext> {
@@ -167,6 +178,27 @@ export async function seedTestData(prefix: string): Promise<TestContext> {
       baseCurrency: "USD",
     })
     .returning();
+
+  // Pin the legacy parent company to this fixture.
+  //
+  // resolveParentCompanyId() falls back to "the only ERP company" when the
+  // parentCompanyId setting is unset, and throws outright when more than one
+  // exists. Companies default to companyType "erp", so the moment a test
+  // creates a second company - which several do, to exercise isolation - every
+  // endpoint that reads supplier balances starts returning 500, including
+  // /api/accounts/all. Configuring the setting is what a real deployment is
+  // required to do, and it makes resolution succeed no matter how many
+  // companies a test creates. In the single-company case it resolves to exactly
+  // the same company the fallback would have chosen.
+  //
+  // Written as an upsert rather than through setParentCompanyId(): test files
+  // are not serialised, and system_settings.key is unique, so a read-then-
+  // insert loses the race when two suites seed at the same moment.
+  await pool.query(
+    `INSERT INTO system_settings (key, value) VALUES ('parentCompanyId', $1)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+    [String(company.id)],
+  );
 
   await db.insert(schema.userCompanyRoles).values({
     userId: user.id,

@@ -18,7 +18,7 @@ import { Client } from "pg";
 import { requestLogger } from "./middleware/requestLogger";
 import { bandwidthDebugMiddleware } from "./middleware/bandwidthDebug";
 import { logger } from "./lib/logger";
-import { startupMigrations } from "./startupSchema";
+import { startupMigrations } from "./startup-schema";
 
 // Global error handlers
 // In production: log and exit so the process manager (Render/Replit) restarts cleanly.

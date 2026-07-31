@@ -1,582 +1,25 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient as useTQClient } from "@tanstack/react-query";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Switch } from "@/components/ui/switch";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  Radio,
-  RefreshCw,
-  Loader2,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Minus,
-  AlertCircle,
-  Settings2,
-  MapPin,
-  Activity,
-  Search,
-  X,
-  Package,
-  Pencil,
-  ArrowUp,
-  ArrowDown,
-  ChevronsUpDown,
-  Ship,
-  Truck,
-  CheckCircle2,
-  DollarSign,
-  Clock,
-  Filter,
-  ChevronDown,
-  Scale,
-  Download,
-  Upload,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
-import { factoryApiRequest } from "@/lib/factoryApi";
-import { useFactoryJsonCargoEta } from "./useFactoryJsonCargoEta";
-import type { FactoryContainer } from "@shared/schema";
+import {useState} from "react";
+import {useQuery, useMutation, useQueryClient as useTQClient} from "@tanstack/react-query";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Checkbox} from "@/components/ui/checkbox";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
+import {Tooltip, TooltipContent, TooltipTrigger} from "@/components/ui/tooltip";
+import {Radio, RefreshCw, Loader2, AlertTriangle, Settings2, Search, Package, Pencil, Ship, Truck, CheckCircle2, DollarSign, Clock, Filter, ChevronDown, Scale, Download, Upload} from "lucide-react";
+import {cn} from "@/lib/utils";
+import {useToast} from "@/hooks/use-toast";
+import {factoryApiRequest} from "@/lib/factoryApi";
+import {useFactoryJsonCargoEta} from "./useFactoryJsonCargoEta";
 
-// ── Types ───────────────────────────────────────────────────────────────────
-interface ContainerWithSupplier extends FactoryContainer {
-  supplierName?: string | null;
-}
-
-export interface OtwTrackingTabProps {
-  onEdit?: (container: ContainerWithSupplier) => void;
-}
-
-const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED"]);
-
-// ── Currency helpers ────────────────────────────────────────────────────────
-const CCY_SYMBOLS: Record<string, string> = {
-  USD: "$",
-  EUR: "€",
-  GBP: "£",
-  AUD: "A$",
-  CAD: "C$",
-  CHF: "CHF",
-  JPY: "¥",
-  CNY: "¥",
-  AED: "AED",
-  SAR: "SAR",
-  LBP: "LL",
-};
-function ccySym(code: string | null | undefined): string {
-  if (!code) return "$";
-  return CCY_SYMBOLS[code] || code;
-}
-function num(v: string | null | undefined): number {
-  const n = parseFloat(v ?? "");
-  return isNaN(n) ? 0 : n;
-}
-function fmtAmt(symbol: string, amount: number): string {
-  if (amount === 0) return "—";
-  return `${symbol} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-function fmtDate(d: string | null | undefined): string {
-  if (!d) return "—";
-  const plain = d.slice(0, 10);
-  const [y, m, day] = plain.split("-");
-  if (!y || !m || !day) return "—";
-  const monthName = MONTH_NAMES[parseInt(m, 10) - 1] ?? m;
-  return `${day} ${monthName} ${y.slice(2)}`;
-}
-function containerCost(c: ContainerWithSupplier): { symbol: string; amount: number } {
-  const ccy = c.currencyCode || "USD";
-  const symbol = ccySym(ccy);
-  const amount = num(c.finalPayableAmount) > 0 ? num(c.finalPayableAmount) : num(c.ratePerKg) * num(c.totalKg);
-  return { symbol, amount };
-}
-function calcDelayDays(c: ContainerWithSupplier): number {
-  if (!c.arrivalDate) return 0;
-  const plain = c.arrivalDate.slice(0, 10);
-  const parts = plain.split("-").map(Number);
-  if (parts.length < 3 || parts.some(isNaN)) return 0;
-  const [y, m, day] = parts;
-  const eta = new Date(y, m - 1, day);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const diff = Math.floor((today.getTime() - eta.getTime()) / 86400000);
-  return diff > 0 ? diff : 0;
-}
-function isOverdue(c: ContainerWithSupplier): boolean {
-  return calcDelayDays(c) > 0;
-}
-
-// ── Summary Card (mirrors ERP SummaryCard) ───────────────────────────────────
-function SummaryCard({
-  label,
-  value,
-  icon,
-  accent,
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ReactNode;
-  accent?: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3 min-w-0">
-      <div className={cn("flex items-center justify-center h-9 w-9 rounded-md shrink-0", accent ?? "bg-muted")}>
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <p className="text-xs text-muted-foreground font-medium leading-none mb-1 whitespace-nowrap">{label}</p>
-        <p className="text-xl font-bold leading-none tracking-tight whitespace-nowrap">{value}</p>
-      </div>
-    </div>
-  );
-}
-
-// ── Status badge ─────────────────────────────────────────────────────────────
-const CONTAINER_STATUS_LABELS: Record<string, string> = {
-  PENDING: "Pending",
-  IN_TRANSIT: "In Transit",
-  ARRIVED: "Arrived",
-  OFFLOADED: "Offloaded",
-  PARTIALLY_RECEIVED: "Partial",
-  RECEIVED: "Received",
-};
-function ContainerStatusBadge({ status }: { status: string }) {
-  const label = CONTAINER_STATUS_LABELS[status] ?? status;
-  if (status === "OFFLOADED")
-    return (
-      <Badge className="text-xs bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/20">{label}</Badge>
-    );
-  if (status === "IN_TRANSIT")
-    return (
-      <Badge className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20">{label}</Badge>
-    );
-  if (status === "ARRIVED")
-    return (
-      <Badge className="text-xs bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20">
-        {label}
-      </Badge>
-    );
-  return (
-    <Badge variant="secondary" className="text-xs">
-      {label}
-    </Badge>
-  );
-}
-
-// ── Inline ETA cell ──────────────────────────────────────────────────────────
-function EtaCell({
-  containerId,
-  arrivalDate,
-  overdue,
-  onSave,
-}: {
-  containerId: number;
-  arrivalDate: string | null | undefined;
-  overdue: boolean;
-  onSave: (id: number, val: string | null) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-
-  function startEdit(e: React.MouseEvent) {
-    e.stopPropagation();
-    const plain = arrivalDate ? arrivalDate.slice(0, 10) : "";
-    setDraft(plain);
-    setEditing(true);
-  }
-  function commit() {
-    onSave(containerId, draft || null);
-    setEditing(false);
-  }
-
-  if (editing) {
-    return (
-      <Input
-        autoFocus
-        type="date"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") commit();
-          if (e.key === "Escape") setEditing(false);
-        }}
-        className="h-7 text-xs w-[120px]"
-        data-testid={`input-eta-${containerId}`}
-      />
-    );
-  }
-  return (
-    <span
-      className={cn(
-        "text-xs cursor-pointer rounded px-1 py-0.5 hover-elevate block font-medium",
-        overdue ? "text-red-600 dark:text-red-400" : arrivalDate ? "text-foreground" : "text-muted-foreground italic"
-      )}
-      onClick={startEdit}
-      data-testid={`text-eta-${containerId}`}
-      title="Click to edit ETA"
-    >
-      {arrivalDate ? fmtDate(arrivalDate) : "Set ETA…"}
-    </span>
-  );
-}
-
-// ── Inline notes cell ────────────────────────────────────────────────────────
-function NotesCell({
-  containerId,
-  note,
-  onSave,
-}: {
-  containerId: number;
-  note: string;
-  onSave: (id: number, val: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const current = note ?? "";
-
-  function startEdit(e: React.MouseEvent) {
-    e.stopPropagation();
-    setDraft(current);
-    setEditing(true);
-  }
-  function commit() {
-    onSave(containerId, draft);
-    setEditing(false);
-  }
-
-  if (editing) {
-    return (
-      <Input
-        autoFocus
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") commit();
-          if (e.key === "Escape") setEditing(false);
-        }}
-        className="h-7 text-xs min-w-[140px]"
-        data-testid={`input-notes-${containerId}`}
-      />
-    );
-  }
-  return (
-    <span
-      className={`text-xs cursor-pointer rounded px-1 py-0.5 hover-elevate max-w-[140px] truncate block ${current ? "text-foreground" : "text-muted-foreground italic"}`}
-      onClick={startEdit}
-      data-testid={`text-notes-${containerId}`}
-      title={current || "Click to add note"}
-    >
-      {current || "Add note…"}
-    </span>
-  );
-}
-
-// ── Event Timeline Sheet ─────────────────────────────────────────────────────
-interface TrackingEvent {
-  id: number;
-  eventTime: string | null;
-  description: string | null;
-  location: string | null;
-  status: string | null;
-  provider: string | null;
-}
-function EventTimelineSheet({
-  containerId,
-  containerNumber,
-  open,
-  onClose,
-}: {
-  containerId: number | null;
-  containerNumber: string;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const { data: events = [], isLoading } = useQuery<TrackingEvent[]>({
-    queryKey: ["/api/factory/container-tracking", containerId, "events"],
-    queryFn: async () => {
-      if (!containerId) return [];
-      const res = await factoryApiRequest("GET", `/api/factory/container-tracking/${containerId}/events`);
-      return res.ok ? (res.json() as Promise<TrackingEvent[]>) : [];
-    },
-    enabled: open && !!containerId,
-  });
-
-  return (
-    <Sheet
-      open={open}
-      onOpenChange={(v) => {
-        if (!v) onClose();
-      }}
-    >
-      <SheetContent className="w-full sm:max-w-lg flex flex-col gap-0 p-0">
-        <SheetHeader className="px-6 py-4 border-b shrink-0">
-          <SheetTitle className="flex items-center gap-2 text-base">
-            <Activity className="h-4 w-4 text-muted-foreground" />
-            Event History
-            <span className="font-mono text-muted-foreground font-normal text-sm">{containerNumber}</span>
-          </SheetTitle>
-        </SheetHeader>
-        <ScrollArea className="flex-1">
-          <div className="px-6 py-4">
-            {isLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="flex gap-3 items-start">
-                    <div className="h-4 w-4 rounded-full bg-muted animate-pulse shrink-0 mt-0.5" />
-                    <div className="flex-1 space-y-1.5">
-                      <div className="h-3 bg-muted rounded w-3/4 animate-pulse" />
-                      <div className="h-3 bg-muted rounded w-1/2 animate-pulse" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : events.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
-                <Activity className="h-10 w-10 opacity-20" />
-                <p className="text-sm">No tracking events yet.</p>
-                <p className="text-xs">Click the refresh icon on the row to fetch live data.</p>
-              </div>
-            ) : (
-              <ol className="relative border-l border-border ml-2 space-y-0">
-                {events.map((ev, idx) => {
-                  const dt = ev.eventTime ? new Date(ev.eventTime) : null;
-                  return (
-                    <li key={ev.id} className="ml-4 pb-6 last:pb-0">
-                      <span className="absolute -left-1.5 flex h-3 w-3 items-center justify-center rounded-full border bg-background ring-2 ring-background">
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full ${idx === 0 ? "bg-blue-500" : "bg-muted-foreground/40"}`}
-                        />
-                      </span>
-                      <div className="flex flex-col gap-0.5">
-                        <p className="text-sm font-medium leading-snug">{ev.description ?? ev.status ?? "—"}</p>
-                        {ev.location && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <MapPin className="h-3 w-3 shrink-0" />
-                            {ev.location}
-                          </p>
-                        )}
-                        <p className="text-xs text-muted-foreground/70 mt-0.5">
-                          {dt
-                            ? `${dt.toLocaleDateString()} ${dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
-                            : "—"}
-                          {ev.provider && <span className="ml-2 opacity-60">via {ev.provider}</span>}
-                        </p>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
-            )}
-          </div>
-        </ScrollArea>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-// ── Tracking Settings Sheet ──────────────────────────────────────────────────
-function TrackingSettingsSheet({
-  container,
-  open,
-  onClose,
-}: {
-  container: ContainerWithSupplier | null;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const { toast } = useToast();
-  const tqClient = useTQClient();
-  const [enabled, setEnabled] = useState(true);
-  const [autoUpdate, setAutoUpdate] = useState(true);
-  const [carrierHint, setCarrierHint] = useState("");
-
-  useEffect(() => {
-    if (container) {
-      const fc = container as any;
-      setEnabled(fc.trackingEnabled !== false);
-      setAutoUpdate(fc.trackingAutoUpdate !== false);
-      setCarrierHint(fc.trackingCarrierHint ?? "");
-    }
-  }, [container]);
-
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      if (!container) return;
-      await factoryApiRequest("PATCH", `/api/factory/container-tracking/${container.id}/settings`, {
-        trackingEnabled: enabled,
-        trackingAutoUpdate: autoUpdate,
-        trackingCarrierHint: carrierHint.trim() || null,
-      });
-    },
-    onSuccess: () => {
-      tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
-      toast({ title: "Tracking settings saved" });
-      onClose();
-    },
-    onError: (err: any) => {
-      toast({ title: "Failed to save settings", description: err?.message, variant: "destructive" });
-    },
-  });
-
-  return (
-    <Sheet
-      open={open}
-      onOpenChange={(v) => {
-        if (!v) onClose();
-      }}
-    >
-      <SheetContent className="w-full sm:max-w-sm flex flex-col gap-0 p-0">
-        <SheetHeader className="px-6 py-4 border-b shrink-0">
-          <SheetTitle className="flex items-center gap-2 text-base">
-            <Settings2 className="h-4 w-4 text-muted-foreground" />
-            Tracking Settings
-            {container && (
-              <span className="font-mono text-muted-foreground font-normal text-sm">{container.containerNumber}</span>
-            )}
-          </SheetTitle>
-        </SheetHeader>
-        <div className="flex-1 px-6 py-5 space-y-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium">Enable Tracking</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Allow this container to be tracked via carrier APIs
-              </p>
-            </div>
-            <Switch checked={enabled} onCheckedChange={setEnabled} data-testid="switch-tracking-enabled" />
-          </div>
-          <Separator />
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium">Auto Update</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Let the scheduler check this container automatically
-              </p>
-            </div>
-            <Switch
-              checked={autoUpdate}
-              onCheckedChange={setAutoUpdate}
-              disabled={!enabled}
-              data-testid="switch-auto-update"
-            />
-          </div>
-          <Separator />
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">Carrier Hint</Label>
-            <p className="text-xs text-muted-foreground">
-              Select the shipping line — enables JSON Cargo ETA tracking for Maersk, Hapag-Lloyd,
-              MSC, and CMA CGM.
-            </p>
-            <Select
-              value={carrierHint || "NONE"}
-              onValueChange={(v) => setCarrierHint(v === "NONE" ? "" : v)}
-              disabled={!enabled}
-            >
-              <SelectTrigger data-testid="select-carrier-hint-tab">
-                <SelectValue placeholder="None (auto-detect)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="NONE">None (auto-detect)</SelectItem>
-                <SelectItem value="MAERSK">Maersk</SelectItem>
-                <SelectItem value="HAPAG">Hapag-Lloyd</SelectItem>
-                <SelectItem value="MSC">MSC</SelectItem>
-                <SelectItem value="CMA">CMA CGM</SelectItem>
-              </SelectContent>
-            </Select>
-            {carrierHint && !["MAERSK","HAPAG","MSC","CMA"].includes(carrierHint) && (
-              <p className="text-[11px] text-amber-500">
-                Custom value &quot;{carrierHint}&quot; — JSON Cargo only activates for Maersk, Hapag-Lloyd, MSC, CMA CGM.
-              </p>
-            )}
-          </div>
-        </div>
-        <div className="px-6 pb-6 shrink-0">
-          <Button
-            className="w-full"
-            onClick={() => saveMutation.mutate()}
-            disabled={saveMutation.isPending}
-            data-testid="button-save-tracking-settings-tab"
-          >
-            {saveMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Save Settings
-          </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-// ── Track-now progress log ────────────────────────────────────────────────────
-interface ProgressStep {
-  provider: string;
-  status: "running" | "success" | "fail" | "skip" | "blocked";
-  detail?: string;
-  ts: number;
-}
-function ProgressStepIcon({ status }: { status: ProgressStep["status"] }) {
-  if (status === "running") return <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />;
-  if (status === "success") return <CheckCircle className="h-3.5 w-3.5 text-green-500" />;
-  if (status === "fail") return <XCircle className="h-3.5 w-3.5 text-destructive" />;
-  if (status === "skip") return <Minus className="h-3.5 w-3.5 text-muted-foreground" />;
-  return <AlertCircle className="h-3.5 w-3.5 text-muted-foreground" />;
-}
-function TrackNowProgressLog({ containerId }: { containerId: number }) {
-  const [steps, setSteps] = useState<ProgressStep[]>([]);
-  useEffect(() => {
-    let cancelled = false;
-    const poll = async () => {
-      while (!cancelled) {
-        try {
-          const res = await factoryApiRequest("GET", `/api/factory/container-tracking/${containerId}/progress`);
-          const data: ProgressStep[] = res.ok ? await res.json() : [];
-          if (!cancelled) setSteps(data ?? []);
-        } catch {
-          /* ignore */
-        }
-        await new Promise((r) => setTimeout(r, 1500));
-      }
-    };
-    poll();
-    return () => {
-      cancelled = true;
-    };
-  }, [containerId]);
-
-  if (steps.length === 0) {
-    return (
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <Loader2 className="h-3 w-3 animate-spin" />
-        Starting…
-      </div>
-    );
-  }
-  return (
-    <div className="flex flex-col gap-0.5 max-w-[140px]">
-      {steps.map((s, i) => (
-        <div key={i} className="flex items-center gap-1.5 text-xs">
-          <ProgressStepIcon status={s.status} />
-          <span className="text-muted-foreground truncate">{s.provider}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ── Main component ───────────────────────────────────────────────────────────
+import type {ContainerWithSupplier, OtwTrackingTabProps} from "./factoryotwtrackingtab/types";
+import {STATUS_ACTIVE, calcDelayDays, ccySym, containerCost, fmtAmt, isOverdue, num} from "./factoryotwtrackingtab/utils";
+import {SummaryCard} from "./factoryotwtrackingtab/components/SummaryCard";
+import {EtaCell} from "./factoryotwtrackingtab/components/EtaCell";
+import {NotesCell} from "./factoryotwtrackingtab/components/NotesCell";
+import {EventTimelineSheet} from "./factoryotwtrackingtab/components/EventTimelineSheet";
+import {TrackingSettingsSheet} from "./factoryotwtrackingtab/components/TrackingSettingsSheet";
+import {TrackNowProgressLog} from "./factoryotwtrackingtab/components/TrackNowProgressLog";
 export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = {}) {
   const { toast } = useToast();
   const tqClient = useTQClient();
@@ -728,9 +171,8 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   /** Immediately patch the in-memory cache entry so the UI reflects the new
    *  value without waiting for the background refetch to complete. */
   function patchCacheContainer(id: number, patch: Partial<ContainerWithSupplier>) {
-    tqClient.setQueriesData<ContainerWithSupplier[]>(
-      { queryKey: ["/api/factory/containers"] },
-      (old) => old?.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+    tqClient.setQueriesData<ContainerWithSupplier[]>({ queryKey: ["/api/factory/containers"] }, (old) =>
+      old?.map((c) => (c.id === id ? { ...c, ...patch } : c))
     );
   }
 
@@ -820,9 +262,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
 
   // ── Dev-only: Export filtered containers as CSV ──────────────────────────
   function exportCsv() {
-    const rows = [
-      ["Container #", "Supplier", "ETA (YYYY-MM-DD)", "Status", "Cost", "Freight", "Weight (KG)", "Notes"],
-    ];
+    const rows = [["Container #", "Supplier", "ETA (YYYY-MM-DD)", "Status", "Cost", "Freight", "Weight (KG)", "Notes"]];
     for (const c of filtered) {
       rows.push([
         c.containerNumber || "",
@@ -835,9 +275,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
         (c as any).otwNote || "",
       ]);
     }
-    const csv = rows
-      .map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
-      .join("\n");
+    const csv = rows.map((r) => r.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -865,13 +303,16 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
         for (let i = 0; i < line.length; i++) {
           const ch = line[i];
           if (inQ) {
-            if (ch === '"' && line[i + 1] === '"') { cur += '"'; i++; }
-            else if (ch === '"') inQ = false;
+            if (ch === '"' && line[i + 1] === '"') {
+              cur += '"';
+              i++;
+            } else if (ch === '"') inQ = false;
             else cur += ch;
           } else if (ch === '"') {
             inQ = true;
           } else if (ch === ",") {
-            out.push(cur.trim()); cur = "";
+            out.push(cur.trim());
+            cur = "";
           } else {
             cur += ch;
           }
@@ -900,8 +341,18 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
         const dMonY = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
         if (dMonY) {
           const months: Record<string, string> = {
-            jan:"01",feb:"02",mar:"03",apr:"04",may:"05",jun:"06",
-            jul:"07",aug:"08",sep:"09",oct:"10",nov:"11",dec:"12",
+            jan: "01",
+            feb: "02",
+            mar: "03",
+            apr: "04",
+            may: "05",
+            jun: "06",
+            jul: "07",
+            aug: "08",
+            sep: "09",
+            oct: "10",
+            nov: "11",
+            dec: "12",
           };
           const [, d, mon, yRaw] = dMonY;
           const mm = months[mon.toLowerCase()];
@@ -934,13 +385,21 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
         const containerNum = (cols[cIdx] ?? "").toUpperCase().trim();
         const etaRaw = (cols[eIdx] ?? "").trim();
         const etaVal = normaliseDate(etaRaw);
-        if (!containerNum || !etaVal) { skipped++; continue; }
+        if (!containerNum || !etaVal) {
+          skipped++;
+          continue;
+        }
         const id = lookup.get(containerNum);
-        if (!id) { skipped++; continue; }
+        if (!id) {
+          skipped++;
+          continue;
+        }
         try {
           await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, { arrivalDate: etaVal });
           updated++;
-        } catch { skipped++; }
+        } catch {
+          skipped++;
+        }
       }
       tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
       toast({
@@ -1163,11 +622,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
               data-testid="button-import-csv"
               onClick={() => document.getElementById("otw-import-input")?.click()}
             >
-              {importing ? (
-                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-              ) : (
-                <Upload className="h-4 w-4 mr-1.5" />
-              )}
+              {importing ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Upload className="h-4 w-4 mr-1.5" />}
               Import CSV
             </Button>
             <input

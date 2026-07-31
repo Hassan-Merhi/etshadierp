@@ -1,45 +1,19 @@
-import { useState, useMemo, type Dispatch, type SetStateAction } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useDateFormat } from "@/contexts/DateFormatContext";
-import {
-  Play,
-  CheckCircle2,
-  Clock,
-  DollarSign,
-  ChevronDown,
-  ChevronRight,
-  X,
-  Users,
-  Trash2,
-  CalendarDays,
-  Printer,
-  RotateCcw,
-  Wrench,
-  FileDown,
-  ShieldCheck,
-  Layers,
-} from "lucide-react";
+import {useState, useMemo, type SetStateAction} from "react";
+import {useQuery, useMutation} from "@tanstack/react-query";
+import {useDateFormat} from "@/contexts/DateFormatContext";
+import {Play, CheckCircle2, Clock, DollarSign, ChevronDown, ChevronRight, X, Users, Trash2, CalendarDays, Printer, Wrench, FileDown, ShieldCheck, Layers} from "lucide-react";
 import * as XLSX from "@/lib/excelHelper";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { FactoryWorker } from "@shared/schema";
+import {Button} from "@/components/ui/button";
+import {Badge} from "@/components/ui/badge";
+import {Input} from "@/components/ui/input";
+import {Label} from "@/components/ui/label";
+import {Checkbox} from "@/components/ui/checkbox";
+import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter} from "@/components/ui/dialog";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {Skeleton} from "@/components/ui/skeleton";
+import {useToast} from "@/hooks/use-toast";
+import {queryClient, apiRequest} from "@/lib/queryClient";
+import type {FactoryWorker} from "@shared/schema";
 
 interface PayrollRecord {
   id: number;
@@ -357,10 +331,10 @@ function BatchRow({
           </Table>
         </div>
       )}
-    </div>
-  );
-}
 
+import type {AttendanceEntry, CashAccount, PayrollGroup, PayrollRecord, PreviewWorkerRow} from "./factorypayrolltab/types";
+import {fmtDate} from "./factorypayrolltab/utils";
+import {BatchRow} from "./factorypayrolltab/components/BatchRow";
 export default function FactoryPayrollTab() {
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
