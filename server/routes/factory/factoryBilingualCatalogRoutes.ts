@@ -11,6 +11,7 @@ import {
   resolveFactoryProductLanguage,
   type FactoryCatalogLanguage,
 } from "@shared/factoryBilingualContract";
+import { registerFactoryArabicTranslationRoutes } from "./factoryArabicTranslationRoutes";
 
 function getFactoryCompanyId(req: Request): number | null {
   const companyId = Number((req.session as any)?.factoryCompanyId);
@@ -194,5 +195,6 @@ async function factoryBilingualCatalogMiddleware(req: any, res: any, next: any) 
  * to the original Factory product/category handlers unchanged.
  */
 export function registerFactoryBilingualCatalogRoutes(app: Express) {
+  registerFactoryArabicTranslationRoutes(app);
   app.use("/api/factory", requireAuth, factoryBilingualCatalogMiddleware);
 }
