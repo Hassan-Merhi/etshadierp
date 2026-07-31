@@ -46,6 +46,9 @@ function makeResponse(statusCode = 200) {
       this.headers[name] = value;
       return this;
     },
+    getHeaders() {
+      return { ...this.headers };
+    },
     send(body: unknown) {
       this.sentBody = body;
       return this;
@@ -137,6 +140,30 @@ describe("Phase 7C read microcache", () => {
     expect(secondResponse.sentBody).toBe(JSON.stringify({ total: 12 }));
     expect(secondResponse.headers["X-ERP-Read-Cache"]).toBe("HIT");
     expect(getReadMicrocacheStats().hits).toBe(1);
+  });
+
+  it("preserves pagination metadata headers on cache hits", () => {
+    const middleware = createReadMicrocacheMiddleware({ ttlMs: 5_000 });
+    const request = makeRequest();
+    const firstResponse = makeResponse();
+    firstResponse.setHeader("X-Total-Count", "42");
+    firstResponse.setHeader("X-Page", "2");
+    firstResponse.setHeader("X-Page-Size", "10");
+    firstResponse.setHeader("X-Total-Pages", "5");
+    firstResponse.setHeader(
+      "Access-Control-Expose-Headers",
+      "X-Total-Count, X-Page, X-Page-Size, X-Total-Pages"
+    );
+    storeJson(middleware, request, firstResponse, { items: [] });
+
+    const secondResponse = makeResponse();
+    middleware(request, secondResponse, vi.fn());
+
+    expect(secondResponse.headers["X-Total-Count"]).toBe("42");
+    expect(secondResponse.headers["X-Page"]).toBe("2");
+    expect(secondResponse.headers["X-Page-Size"]).toBe("10");
+    expect(secondResponse.headers["X-Total-Pages"]).toBe("5");
+    expect(secondResponse.headers["Access-Control-Expose-Headers"]).toContain("X-Total-Count");
   });
 
   it("does not treat service-worker no-store semantics as an ERP-cache bypass", () => {
@@ -258,6 +285,27 @@ describe("Phase 7C read microcache", () => {
     const afterFinishNext = vi.fn();
     middleware(request, makeResponse(), afterFinishNext);
     expect(afterFinishNext).toHaveBeenCalledOnce();
+  });
+
+  it("invalidates cached reads when an authenticated write response closes early", () => {
+    const publishInvalidation = vi.fn(async () => undefined);
+    const middleware = createReadMicrocacheMiddleware({ ttlMs: 5_000, publishInvalidation });
+    const request = makeRequest();
+    storeJson(middleware, request, makeResponse(), { ok: true });
+
+    const writeRequest = makeRequest({
+      method: "POST",
+      path: "/api/vouchers",
+      originalUrl: "/api/vouchers",
+    });
+    const writeResponse = makeResponse(200);
+    middleware(writeRequest, writeResponse, vi.fn());
+    writeResponse.emit("close");
+
+    expect(publishInvalidation).toHaveBeenCalledOnce();
+    const readNext = vi.fn();
+    middleware(request, makeResponse(), readNext);
+    expect(readNext).toHaveBeenCalledOnce();
   });
 
   it("does not let unauthenticated or failed writes flush the cache", () => {
