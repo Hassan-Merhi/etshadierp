@@ -79,6 +79,9 @@ const NON_INVALIDATING_WRITE_PATHS: readonly RegExp[] = [
 ];
 
 const POS_LOCATION_READ_PATH = /^\/api\/locations\/(\d+)\/inventory\/?$/;
+const PAGINATION_HEADER_PATTERN = /^x-(?:total|page|per-page|pagination|has|next|previous|prev|limit|offset)(?:-|$)/;
+
+type ReplayableHeaders = Record<string, string | string[]>;
 
 interface ReadMicrocacheEntry {
   expiresAt: number;
@@ -87,6 +90,7 @@ interface ReadMicrocacheEntry {
   contentType: string;
   etag: string;
   sizeBytes: number;
+  headers: ReplayableHeaders;
 }
 
 interface PendingRead {
@@ -200,6 +204,29 @@ function etagMatches(value: unknown, etag: string): boolean {
     .some((candidate) => candidate === "*" || candidate === etag);
 }
 
+function isReplayableHeader(name: string): boolean {
+  const normalized = name.toLowerCase();
+  return normalized === "access-control-expose-headers" || PAGINATION_HEADER_PATTERN.test(normalized);
+}
+
+function captureReplayableHeaders(res: any): ReplayableHeaders {
+  const rawHeaders = res.getHeaders?.();
+  if (!rawHeaders || typeof rawHeaders !== "object") return {};
+
+  const headers: ReplayableHeaders = {};
+  for (const [name, value] of Object.entries(rawHeaders)) {
+    if (!isReplayableHeader(name) || value === undefined) continue;
+    headers[name] = Array.isArray(value) ? value.map(String) : String(value);
+  }
+  return headers;
+}
+
+function replayHeaders(res: any, headers: ReplayableHeaders): void {
+  for (const [name, value] of Object.entries(headers)) {
+    res.setHeader?.(name, value);
+  }
+}
+
 function setCacheHeaders(res: any, entry: ReadMicrocacheEntry, state: string): void {
   res.setHeader?.("Cache-Control", "private, no-cache, must-revalidate");
   res.setHeader?.("ETag", entry.etag);
@@ -265,7 +292,13 @@ function createReadMicrocacheController(options: ReadMicrocacheOptions = {}): Re
     }
   }
 
+  function publishInvalidation(): void {
+    clearForWrite();
+    void options.publishInvalidation?.();
+  }
+
   function sendEntry(req: Request, res: any, entry: ReadMicrocacheEntry, state: "HIT" | "COALESCED"): void {
+    replayHeaders(res, entry.headers);
     setCacheHeaders(res, entry, state);
     if (etagMatches(req.headers["if-none-match"], entry.etag)) {
       counters.revalidated += 1;
@@ -284,10 +317,17 @@ function createReadMicrocacheController(options: ReadMicrocacheOptions = {}): Re
 
     if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS" && !isReadOnlyPost(req)) {
       if (isNonInvalidatingWrite(req) || !req.session?.userId) return next();
+
+      let finalized = false;
       res.once?.("finish", () => {
-        if (res.statusCode < 200 || res.statusCode >= 300) return;
-        clearForWrite();
-        void options.publishInvalidation?.();
+        if (finalized) return;
+        finalized = true;
+        if (res.statusCode >= 200 && res.statusCode < 300) publishInvalidation();
+      });
+      res.once?.("close", () => {
+        if (finalized) return;
+        finalized = true;
+        publishInvalidation();
       });
       return next();
     }
@@ -365,6 +405,7 @@ function createReadMicrocacheController(options: ReadMicrocacheOptions = {}): Re
                 contentType: "application/json",
                 etag: makeEtag(serialized),
                 sizeBytes,
+                headers: captureReplayableHeaders(res),
               };
               pruneExpired(now());
               const previous = cache.get(key);
