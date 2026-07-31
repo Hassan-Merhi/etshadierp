@@ -8,8 +8,28 @@ import { calculateMovingAverageRate } from "../server/services/factory/factoryCo
 
 const repoFile = (...parts: string[]) => fs.readFileSync(path.join(process.cwd(), ...parts), "utf8");
 
+const buildContainer = (actualReceivedKg: string) => ({
+  id: 1,
+  companyId: 1,
+  containerNumber: "CMAU7353468",
+  currencyCode: "USD",
+  fxRateToUsd: "1",
+  fxRateToUsdOffload: "1",
+  fxRateConfirmed: true,
+  totalKg: "24000",
+  declaredKg: "24000",
+  actualReceivedKg,
+  ratePerKg: "0.500000",
+  freight: "648",
+  freightCurrencyCode: "USD",
+  otherCharges: "0",
+  commissionAmount: "0",
+  dutyStatus: "NONE",
+  dutyAmount: "0",
+}) as any;
+
 describe("partial offload cost consistency", () => {
-  it("uses the agreed container quantity for both preview and persisted landed rate", () => {
+  it("keeps the full container value fixed and divides it by actual received weight", () => {
     expect(
       resolveFactoryOffloadValuationKg({
         totalKg: "24000",
@@ -18,40 +38,23 @@ describe("partial offload cost consistency", () => {
       })
     ).toBe(24000);
 
-    const result = computeContainerLandedCost(
-      {
-        id: 1,
-        companyId: 1,
-        containerNumber: "CMAU7353468",
-        currencyCode: "USD",
-        fxRateToUsd: "1",
-        fxRateToUsdOffload: "1",
-        fxRateConfirmed: true,
-        totalKg: "24000",
-        declaredKg: "24000",
-        actualReceivedKg: "21340",
-        ratePerKg: "0.500000",
-        freight: "648",
-        freightCurrencyCode: "USD",
-        otherCharges: "0",
-        commissionAmount: "0",
-        dutyStatus: "NONE",
-        dutyAmount: "0",
-      } as any,
-      [],
-      null,
-      []
-    );
+    const shortReceipt = computeContainerLandedCost(buildContainer("21340"), [], null, []);
+    const fullReceipt = computeContainerLandedCost(buildContainer("24000"), [], null, []);
 
-    expect(result.valuationKg).toBe(24000);
-    expect(result.costPerKgUsd).toBeCloseTo(0.527, 6);
+    expect(shortReceipt.valuationKg).toBe(24000);
+    expect(shortReceipt.allocationKg).toBe(21340);
+    expect(shortReceipt.fullCostUsd).toBeCloseTo(12648, 6);
+    expect(fullReceipt.fullCostUsd).toBeCloseTo(12648, 6);
+    expect(shortReceipt.costPerKgUsd).toBeCloseTo(12648 / 21340, 6);
+    expect(fullReceipt.costPerKgUsd).toBeCloseTo(12648 / 24000, 6);
+    expect(shortReceipt.costPerKgUsd).toBeGreaterThan(fullReceipt.costPerKgUsd);
   });
 
   it("keeps the supplier row as a true moving average using actual incoming kg and the canonical new rate", () => {
     const oldRemainingKg = new Decimal("122880");
     const oldLockedRate = new Decimal("0.630000");
     const incomingKg = new Decimal("21340");
-    const canonicalIncomingRate = new Decimal("0.527000");
+    const canonicalIncomingRate = new Decimal(12648).div(incomingKg);
 
     const expected = oldRemainingKg
       .times(oldLockedRate)
@@ -78,6 +81,12 @@ describe("partial offload cost consistency", () => {
       "production-raw-stock",
       "OffloadDialog.tsx"
     );
+    const landedCost = repoFile(
+      "server",
+      "services",
+      "factory",
+      "containerLandedCost.ts"
+    );
     const offloadRoute = repoFile(
       "server",
       "routes",
@@ -103,8 +112,9 @@ describe("partial offload cost consistency", () => {
     );
 
     expect(dialog).toContain("resolveFactoryOffloadValuationKg");
-    expect(dialog).toContain("return totalUsd / valuationKg;");
-    expect(dialog).not.toContain("return totalUsd / kg;");
+    expect(dialog).toContain("return totalUsd / receivedKg;");
+    expect(dialog).not.toContain("return totalUsd / valuationKg;");
+    expect(landedCost).toContain("const allocationKg = receivedKg.gt(0) ? receivedKg : originalCostBasisKg;");
 
     expect(offloadRoute).toContain("newReceivedKg: dReceivedKg.toNumber()");
     expect(offloadRoute).toContain("newContainerLandedCostPerKgUsd: dCostPerKgUsd.toNumber()");
