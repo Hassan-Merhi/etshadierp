@@ -20,6 +20,21 @@ const root = process.cwd();
 const manifestPath = path.join(root, "config/factory-bilingual-dependencies.json");
 const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as DependencyManifest;
 const allFiles = manifest.groups.flatMap((group) => group.files);
+const criticalFiles = [
+  "shared/schema/factory.ts",
+  "shared/factoryBilingualContract.ts",
+  "server/routes/factory/factoryProductsRoutes.ts",
+  "client/src/pages/BaleProducts.tsx",
+  "client/src/pages/factory/factoryimport/components/BaleImport.tsx",
+  "server/routes/factory/factoryBalesRoutes.ts",
+  "server/routes/factory/factoryCustomerProformaRoutes.ts",
+  "server/routes/factory/customer-orders/orderHelpers.ts",
+  "server/routes/factory/customer-orders/baleScanningRoutes.ts",
+  "server/routes/factory/customer-orders/orderPdfExportRoutes.ts",
+  "server/routes/factory/customer-orders/orderExcelExportRoutes.ts",
+  "server/routes/factory/factoryInvoiceLoadingRoutes.ts",
+  "client/src/pages/factory/BalesHistory.tsx",
+];
 
 describe("factory bilingual dependency map", () => {
   it("is tied to the approved bilingual Factory issue and contract", () => {
@@ -31,33 +46,16 @@ describe("factory bilingual dependency map", () => {
 
   it("uses unique group identifiers and unique file ownership", () => {
     const groupIds = manifest.groups.map((group) => group.id);
+
     expect(new Set(groupIds).size).toBe(groupIds.length);
     expect(new Set(allFiles).size).toBe(allFiles.length);
   });
 
-  it("references files that exist in the repository", () => {
-    const missing = allFiles.filter((file) => !fs.existsSync(path.join(root, file)));
-    expect(missing).toEqual([]);
-  });
+  it("covers existing high-risk catalog, snapshot, import, and document boundaries", () => {
+    const missingCriticalFiles = criticalFiles.filter((file) => !fs.existsSync(path.join(root, file)));
 
-  it("covers the high-risk catalog, snapshot, import, and document boundaries", () => {
-    expect(allFiles).toEqual(
-      expect.arrayContaining([
-        "shared/schema/factory.ts",
-        "shared/factoryBilingualContract.ts",
-        "server/routes/factory/factoryProductsRoutes.ts",
-        "client/src/pages/BaleProducts.tsx",
-        "client/src/pages/factory/factoryimport/components/BaleImport.tsx",
-        "server/routes/factory/factoryBalesRoutes.ts",
-        "server/routes/factory/factoryCustomerProformaRoutes.ts",
-        "server/routes/factory/customer-orders/orderHelpers.ts",
-        "server/routes/factory/customer-orders/baleScanningRoutes.ts",
-        "server/routes/factory/customer-orders/orderPdfExportRoutes.ts",
-        "server/routes/factory/customer-orders/orderExcelExportRoutes.ts",
-        "server/routes/factory/factoryInvoiceLoadingRoutes.ts",
-        "client/src/pages/factory/BalesHistory.tsx",
-      ])
-    );
+    expect(missingCriticalFiles).toEqual([]);
+    expect(allFiles).toEqual(expect.arrayContaining(criticalFiles));
   });
 
   it("assigns every dependency to a remaining implementation phase", () => {
