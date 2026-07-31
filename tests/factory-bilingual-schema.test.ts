@@ -94,7 +94,6 @@ describe("Phase 2 Factory bilingual schema", () => {
     await pool.query(migrationSql);
 
     const client = await pool.connect();
-    const companyId = 1_700_000_000 + Math.floor(Math.random() * 100_000_000);
     const suffix = `${Date.now()}${Math.floor(Math.random() * 10_000)}`;
     const englishProductName = `PHASE2 ENGLISH PRODUCT ${suffix}`;
     const arabicProductName = "حقيبة رجالية كريمي 20 كغ";
@@ -104,6 +103,14 @@ describe("Phase 2 Factory bilingual schema", () => {
 
     try {
       await client.query("BEGIN");
+      const companyResult = await client.query(
+        `INSERT INTO companies (code, name, company_type, base_currency)
+         VALUES ($1, $2, 'factory', 'USD')
+         RETURNING id`,
+        [`P2C${suffix}`.slice(0, 50), `Phase 2 Bilingual Test ${suffix}`]
+      );
+      const companyId = companyResult.rows[0].id;
+
       const categoryResult = await client.query(
         `INSERT INTO factory_categories (company_id, name, name_ar)
          VALUES ($1, $2, $3)
