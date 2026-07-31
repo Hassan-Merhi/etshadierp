@@ -86,9 +86,9 @@ commands:
           name: Verify disposable database schema
           command: node scripts/verify-ci-disposable-schema.mjs
 
-  run_backend_prefix:
+  run_backend_pattern:
     parameters:
-      prefix:
+      pattern:
         type: string
       label:
         type: string
@@ -100,9 +100,9 @@ commands:
           name: Backend tests << parameters.label >>
           command: |
             shopt -s nullglob
-            files=(tests/<< parameters.prefix >>*.test.ts)
+            files=(tests/<< parameters.pattern >>.test.ts)
             if [ "${#files[@]}" -eq 0 ]; then
-              echo "No tests match << parameters.prefix >>"
+              echo "No tests match << parameters.pattern >>"
               exit 0
             fi
             printf 'Running %s test file(s):\n' "${#files[@]}"
@@ -187,47 +187,33 @@ jobs:
           name: Full frontend tests
           command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
 
-  backend-a:
+  backend-f-a-f:
     executor: node22-postgres
     steps:
-      - run_backend_prefix:
-          prefix: "a"
-          label: A
+      - run_backend_pattern:
+          pattern: "f[a-f]*"
+          label: F A-F
 
-  backend-b:
+  backend-f-g-l:
     executor: node22-postgres
     steps:
-      - run_backend_prefix:
-          prefix: "b"
-          label: B
+      - run_backend_pattern:
+          pattern: "f[g-l]*"
+          label: F G-L
 
-  backend-c:
+  backend-f-m-r:
     executor: node22-postgres
     steps:
-      - run_backend_prefix:
-          prefix: "c"
-          label: C
+      - run_backend_pattern:
+          pattern: "f[m-r]*"
+          label: F M-R
 
-  backend-d:
+  backend-f-s-z:
     executor: node22-postgres
     steps:
-      - run_backend_prefix:
-          prefix: "d"
-          label: D
-
-  backend-e:
-    executor: node22-postgres
-    steps:
-      - run_backend_prefix:
-          prefix: "e"
-          label: E
-
-  backend-f:
-    executor: node22-postgres
-    steps:
-      - run_backend_prefix:
-          prefix: "f"
-          label: F
+      - run_backend_pattern:
+          pattern: "f[s-z]*"
+          label: F S-Z
 
   postgres-phase3-backend:
     executor: node22-postgres
@@ -285,12 +271,10 @@ workflows:
       - postgres-regression
       - full-backend
       - full-frontend
-      - backend-a
-      - backend-b
-      - backend-c
-      - backend-d
-      - backend-e
-      - backend-f
+      - backend-f-a-f
+      - backend-f-g-l
+      - backend-f-m-r
+      - backend-f-s-z
       - postgres-phase3-backend
       - phase3-frontend
       - architecture-guards
