@@ -86,6 +86,20 @@ commands:
           name: Verify disposable database schema
           command: node scripts/verify-ci-disposable-schema.mjs
 
+  run_postgres_tests:
+    parameters:
+      name:
+        type: string
+      files:
+        type: string
+    steps:
+      - install_dependencies
+      - wait_for_postgres
+      - prepare_postgres_schema
+      - run:
+          name: << parameters.name >>
+          command: node node_modules/vitest/vitest.mjs run << parameters.files >> --maxWorkers=1 --no-file-parallelism
+
 jobs:
   static-build:
     executor: node22
@@ -137,7 +151,7 @@ jobs:
     executor: node22-postgres
     steps:
       - install_dependencies
-      - wait_for_postgres
+      - wait_for-postgres
       - prepare_postgres_schema
       - run:
           name: Backend tests
@@ -149,32 +163,37 @@ jobs:
   postgres-phase2-bilingual:
     executor: node22-postgres
     steps:
-      - install_dependencies
-      - wait_for_postgres
-      - prepare_postgres_schema
-      - run:
+      - run_postgres_tests:
           name: Phase 2 bilingual schema test
-          command: node node_modules/vitest/vitest.mjs run tests/factory-bilingual-schema.test.ts --maxWorkers=1 --no-file-parallelism
+          files: tests/factory-bilingual-schema.test.ts
 
-  postgres-diagnostic-g-i:
+  postgres-diagnostic-g-h:
     executor: node22-postgres
     steps:
-      - install_dependencies
-      - wait_for_postgres
-      - prepare_postgres_schema
-      - run:
-          name: Backend diagnostic G-I
-          command: node node_modules/vitest/vitest.mjs run tests/[g-i]*.test.ts --maxWorkers=1 --no-file-parallelism
+      - run_postgres_tests:
+          name: Backend diagnostic G-H
+          files: "tests/[g-h]*.test.ts"
 
-  postgres-diagnostic-s-u:
+  postgres-diagnostic-i:
     executor: node22-postgres
     steps:
-      - install_dependencies
-      - wait_for_postgres
-      - prepare_postgres_schema
-      - run:
-          name: Backend diagnostic S-U
-          command: node node_modules/vitest/vitest.mjs run tests/[s-u]*.test.ts --maxWorkers=1 --no-file-parallelism
+      - run_postgres_tests:
+          name: Backend diagnostic I
+          files: "tests/i*.test.ts"
+
+  postgres-diagnostic-s:
+    executor: node22-postgres
+    steps:
+      - run_postgres_tests:
+          name: Backend diagnostic S
+          files: "tests/s*.test.ts"
+
+  postgres-diagnostic-t-u:
+    executor: node22-postgres
+    steps:
+      - run_postgres_tests:
+          name: Backend diagnostic T-U
+          files: "tests/[t-u]*.test.ts"
 
   security-readiness:
     executor: node22-postgres
@@ -203,8 +222,10 @@ workflows:
       - static-build
       - postgres-regression
       - postgres-phase2-bilingual
-      - postgres-diagnostic-g-i
-      - postgres-diagnostic-s-u
+      - postgres-diagnostic-g-h
+      - postgres-diagnostic-i
+      - postgres-diagnostic-s
+      - postgres-diagnostic-t-u
       - security-readiness:
           requires:
             - static-build
