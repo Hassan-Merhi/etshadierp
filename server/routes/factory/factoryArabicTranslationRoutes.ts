@@ -30,8 +30,10 @@ const upload = multer({
   limits: { fileSize: MAX_FILE_SIZE_BYTES, files: 1 },
   fileFilter: (_req, file, callback) => {
     const validExtension = file.originalname.toLowerCase().endsWith(".xlsx");
-    const validMime = file.mimetype === XLSX_MIME || file.mimetype === "application/octet-stream";
-    callback(validExtension && validMime ? null : new Error("Only .xlsx files are supported"), validExtension && validMime);
+    const validMime =
+      !file.mimetype || file.mimetype === XLSX_MIME || file.mimetype === "application/octet-stream";
+    const valid = validExtension && validMime;
+    callback(valid ? null : new Error("Only .xlsx files are supported"), valid);
   },
 });
 const receiveArabicWorkbook = upload.single("file");
@@ -71,7 +73,11 @@ function getImportMode(value: unknown): TranslationImportMode {
 }
 
 function getUpload(req: Request): { buffer: Buffer; fileName: string } {
-  const file = (req as Request & { file?: Express.Multer.File }).file;
+  const file = (
+    req as Request & {
+      file?: { buffer: Buffer; originalname: string };
+    }
+  ).file;
   if (!file?.buffer) throw new TranslationRouteError(400, "An .xlsx workbook is required");
   return {
     buffer: file.buffer,
@@ -251,10 +257,7 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
         const suppliedPreviewToken =
           typeof body.previewToken === "string" ? body.previewToken.trim() : "";
         if (!suppliedPreviewToken) {
-          throw new TranslationRouteError(
-            400,
-            "Preview the workbook before applying it"
-          );
+          throw new TranslationRouteError(400, "Preview the workbook before applying it");
         }
 
         const result = await db.transaction(async (tx) => {
