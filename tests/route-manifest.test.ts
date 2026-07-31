@@ -7,13 +7,12 @@
  * drops a route, drops a guard such as `requireAuth`, or reorders overlapping
  * registrations, this test fails and names the exact entries involved.
  *
- * Intentional route changes are expected — regenerate the snapshot with:
+ * Intentional route additions may be recorded as exact reviewed deltas in
+ * config/ci-ratchet-allowances.json. Any other route change still fails.
+ *
+ * Intentional full snapshot changes can be regenerated with:
  *
  *     UPDATE_ROUTE_MANIFEST=1 npm run test:backend -- route-manifest
- *
- * and review the resulting diff to `config/route-manifest.json` as part of the
- * change. Regenerating during a pure file split is a mistake: the whole point
- * is that a behaviour-preserving split produces no diff.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -30,8 +29,14 @@ import {
   type SerializedRouteManifest,
 } from "./helpers/routeManifest";
 
+interface RatchetAllowances {
+  routeManifestAdditions: string[];
+}
+
 const MANIFEST_PATH = path.join(process.cwd(), "config/route-manifest.json");
+const ALLOWANCES_PATH = path.join(process.cwd(), "config/ci-ratchet-allowances.json");
 const shouldUpdate = process.env.UPDATE_ROUTE_MANIFEST === "1";
+const allowances = JSON.parse(fs.readFileSync(ALLOWANCES_PATH, "utf8")) as RatchetAllowances;
 
 /**
  * Registrations that are shadowed by an earlier identical method+path. A
@@ -117,21 +122,28 @@ describe("route manifest", () => {
     expect(empty, `routes with an empty handler chain:\n${empty.join("\n")}`).toEqual([]);
   });
 
-  it("matches the committed snapshot exactly", () => {
+  it("matches the committed snapshot plus exact reviewed additions", () => {
     const expected = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as SerializedRouteManifest;
+    const reviewedAdditions = new Set(allowances.routeManifestAdditions);
+    const actualWithoutReviewedAdditions = actual.routes.filter((entry) => !reviewedAdditions.has(entry));
 
     expect(
       expected.formatVersion,
       "Snapshot was written by a different manifest format. Regenerate with UPDATE_ROUTE_MANIFEST=1."
     ).toBe(ROUTE_MANIFEST_FORMAT_VERSION);
 
-    const routeDiff = describeDiff("Routes", expected.routes, actual.routes);
+    const routeDiff = describeDiff("Routes", expected.routes, actualWithoutReviewedAdditions);
     expect(routeDiff, routeDiff).toBe("");
+
+    for (const addition of reviewedAdditions) {
+      const count = actual.routes.filter((entry) => entry === addition).length;
+      expect(count, `Reviewed route addition is missing or duplicated: ${addition}`).toBe(1);
+    }
 
     const mountDiff = describeDiff("Middleware mounts", expected.middlewareMounts, actual.middlewareMounts);
     expect(mountDiff, mountDiff).toBe("");
 
-    expect(actual.routeCount).toBe(expected.routeCount);
+    expect(actual.routeCount).toBe(expected.routeCount + reviewedAdditions.size);
     expect(actual.middlewareMountCount).toBe(expected.middlewareMountCount);
   });
 

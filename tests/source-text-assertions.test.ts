@@ -8,12 +8,12 @@
  * This test does not ban them — several are legitimate structural guards. It
  * makes their number a tracked, one-way quantity: the count may fall as tests
  * are converted to behavioural checks, and adding a new one requires updating
- * `config/source-text-assertion-baseline.json` deliberately.
+ * a reviewed ratchet file deliberately.
  *
  * It also pins the reverse index of god files covered by such tests, so the
  * split phases know up front which tests to rewrite before moving code.
  *
- * Regenerate after an intentional change:
+ * Regenerate the long-lived baseline after an intentional consolidation:
  *
  *     UPDATE_SOURCE_TEXT_BASELINE=1 npm run test:backend -- source-text-assertions
  */
@@ -34,6 +34,13 @@ interface Baseline {
   pinnedPathsNoLongerPresent: string[];
 }
 
+interface RatchetAllowances {
+  sourceTextAssertionDelta: {
+    additionalSourceCoupledTests: string[];
+    maxAdditionalTextAssertions: number;
+  };
+}
+
 interface AuditEntry {
   test: string;
   classification: "source-coupled" | "structural-guard";
@@ -50,6 +57,7 @@ interface AuditReport {
 }
 
 const BASELINE_PATH = path.join(process.cwd(), "config/source-text-assertion-baseline.json");
+const ALLOWANCES_PATH = path.join(process.cwd(), "config/ci-ratchet-allowances.json");
 const report = auditSourceTextAssertions() as AuditReport;
 
 if (process.env.UPDATE_SOURCE_TEXT_BASELINE === "1") {
@@ -75,6 +83,8 @@ if (process.env.UPDATE_SOURCE_TEXT_BASELINE === "1") {
 }
 
 const baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, "utf8")) as Baseline;
+const allowances = JSON.parse(fs.readFileSync(ALLOWANCES_PATH, "utf8")) as RatchetAllowances;
+const sourceTextDelta = allowances.sourceTextAssertionDelta;
 
 describe("source-text assertion ratchet", () => {
   it("finds the tests it is meant to be auditing", () => {
@@ -84,8 +94,11 @@ describe("source-text assertion ratchet", () => {
     expect(baseline.sourceCoupledTests.length).toBeGreaterThan(0);
   });
 
-  it("does not add new source-coupled tests", () => {
-    const known = new Set(baseline.sourceCoupledTests);
+  it("does not add unreviewed source-coupled tests", () => {
+    const known = new Set([
+      ...baseline.sourceCoupledTests,
+      ...sourceTextDelta.additionalSourceCoupledTests,
+    ]);
     const added = report.entries
       .filter((entry) => entry.classification === "source-coupled")
       .map((entry) => entry.test)
@@ -94,17 +107,34 @@ describe("source-text assertion ratchet", () => {
     expect(
       added,
       "New tests assert on source text. These break when code moves, which is a poor fit for a " +
-        "codebase mid-split - prefer a behavioural assertion. If the coupling is deliberate " +
-        `(a structural guard), record it in config/source-text-assertion-baseline.json:\n${added.join("\n")}`
+        "codebase mid-split - prefer a behavioural assertion. If the coupling is deliberate, " +
+        `record it in config/ci-ratchet-allowances.json:\n${added.join("\n")}`
     ).toEqual([]);
   });
 
-  it("does not increase the number of literal text assertions", () => {
+  it("does not increase literal text assertions beyond the reviewed delta", () => {
+    const reviewedCeiling =
+      baseline.maxTotalTextAssertions + sourceTextDelta.maxAdditionalTextAssertions;
+
     expect(
       report.summary.totalTextAssertions,
-      `Literal text assertions rose to ${report.summary.totalTextAssertions} from a baseline of ` +
-        `${baseline.maxTotalTextAssertions}. This ratchet is one-way.`
-    ).toBeLessThanOrEqual(baseline.maxTotalTextAssertions);
+      `Literal text assertions rose to ${report.summary.totalTextAssertions} beyond the reviewed ceiling of ` +
+        `${reviewedCeiling}. This ratchet is one-way.`
+    ).toBeLessThanOrEqual(reviewedCeiling);
+  });
+
+  it("keeps the reviewed source-text delta exact and current", () => {
+    const present = new Set(
+      report.entries
+        .filter((entry) => entry.classification === "source-coupled")
+        .map((entry) => entry.test)
+    );
+    const stale = sourceTextDelta.additionalSourceCoupledTests.filter((test) => !present.has(test));
+
+    expect(
+      stale,
+      `Reviewed source-text allowances no longer present should be removed:\n${stale.join("\n")}`
+    ).toEqual([]);
   });
 
   it("does not pin additional god files", () => {
