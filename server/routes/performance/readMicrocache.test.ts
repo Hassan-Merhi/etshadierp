@@ -28,6 +28,7 @@ function makeRequest(overrides: Record<string, unknown> = {}) {
 }
 
 function makeResponse(statusCode = 200) {
+  const listeners = new Map<string, Array<() => void>>();
   return {
     statusCode,
     sentBody: undefined as unknown,
@@ -57,6 +58,15 @@ function makeResponse(statusCode = 200) {
       this.ended = true;
       return this;
     },
+    once(event: string, listener: () => void) {
+      listeners.set(event, [...(listeners.get(event) ?? []), listener]);
+      return this;
+    },
+    emit(event: string) {
+      for (const listener of listeners.get(event) ?? []) listener();
+      listeners.delete(event);
+      return this;
+    },
   } as any;
 }
 
@@ -82,6 +92,7 @@ describe("Phase 7C read microcache", () => {
     ];
 
     for (const path of expectedPaths) expect(READ_MICROCACHE_PATHS.has(path)).toBe(true);
+    expect(READ_MICROCACHE_PATHS.has("/api/pos/drafts")).toBe(false);
     expect(READ_MICROCACHE_TTL_MS.get("/api/sales-report")).toBe(120_000);
     expect(READ_MICROCACHE_TTL_MS.get("/api/factory/payrolls")).toBe(120_000);
     expect(READ_MICROCACHE_TTL_MS.get("/api/factory/bale-products")).toBe(300_000);
@@ -119,6 +130,20 @@ describe("Phase 7C read microcache", () => {
     expect(secondRes.sentBody).toBe(JSON.stringify({ total: 12 }));
     expect(secondRes.headers["X-ERP-Read-Cache"]).toBe("HIT");
     expect(getReadMicrocacheStats().hits).toBe(1);
+  });
+
+  it("does not treat service-worker no-store semantics as an ERP-cache bypass", () => {
+    const middleware = createReadMicrocacheMiddleware({ ttlMs: 5_000 });
+    const req = makeRequest({ headers: { "cache-control": "no-store" } });
+    const firstRes = makeResponse();
+    middleware(req, firstRes, () => firstRes.json({ total: 12 }));
+
+    const secondRes = makeResponse();
+    const secondNext = vi.fn();
+    middleware(req, secondRes, secondNext);
+
+    expect(secondNext).not.toHaveBeenCalled();
+    expect(secondRes.headers["X-ERP-Read-Cache"]).toBe("HIT");
   });
 
   it("returns 304 when the browser revalidates an unchanged cached response", () => {
@@ -215,23 +240,64 @@ describe("Phase 7C read microcache", () => {
     expect(next).toHaveBeenCalledOnce();
   });
 
-  it("clears cached reads before a state-changing business request", () => {
+  it("clears cached reads only after a successful authenticated business request", () => {
     const middleware = createReadMicrocacheMiddleware({ ttlMs: 5_000 });
     const req = makeRequest();
     const firstRes = makeResponse();
     middleware(req, firstRes, () => firstRes.json({ ok: true }));
 
+    const writeRes = makeResponse(200);
     const writeNext = vi.fn();
     middleware(
       makeRequest({ method: "POST", path: "/api/vouchers", originalUrl: "/api/vouchers" }),
-      makeResponse(),
+      writeRes,
       writeNext
     );
     expect(writeNext).toHaveBeenCalledOnce();
 
-    const readNext = vi.fn();
-    middleware(req, makeResponse(), readNext);
-    expect(readNext).toHaveBeenCalledOnce();
+    const beforeFinishRes = makeResponse();
+    const beforeFinishNext = vi.fn();
+    middleware(req, beforeFinishRes, beforeFinishNext);
+    expect(beforeFinishNext).not.toHaveBeenCalled();
+
+    writeRes.emit("finish");
+    const afterFinishNext = vi.fn();
+    middleware(req, makeResponse(), afterFinishNext);
+    expect(afterFinishNext).toHaveBeenCalledOnce();
+  });
+
+  it("does not let unauthenticated or failed writes flush the cache", () => {
+    const middleware = createReadMicrocacheMiddleware({ ttlMs: 5_000 });
+    const req = makeRequest();
+    const firstRes = makeResponse();
+    middleware(req, firstRes, () => firstRes.json({ ok: true }));
+
+    const anonymousWriteRes = makeResponse(200);
+    middleware(
+      makeRequest({
+        method: "POST",
+        path: "/api/vouchers",
+        originalUrl: "/api/vouchers",
+        session: {},
+      }),
+      anonymousWriteRes,
+      vi.fn()
+    );
+    anonymousWriteRes.emit("finish");
+
+    const failedWriteRes = makeResponse(403);
+    middleware(
+      makeRequest({ method: "POST", path: "/api/vouchers", originalUrl: "/api/vouchers" }),
+      failedWriteRes,
+      vi.fn()
+    );
+    failedWriteRes.emit("finish");
+
+    const secondRes = makeResponse();
+    const secondNext = vi.fn();
+    middleware(req, secondRes, secondNext);
+    expect(secondNext).not.toHaveBeenCalled();
+    expect(secondRes.headers["X-ERP-Read-Cache"]).toBe("HIT");
   });
 
   it("preserves business caches across POS autosave and presence heartbeat writes", () => {
