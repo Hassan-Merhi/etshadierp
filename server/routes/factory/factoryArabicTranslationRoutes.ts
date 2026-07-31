@@ -1,6 +1,6 @@
 import type { Express, NextFunction, Request, Response } from "express";
 import multer from "multer";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { factoryBaleProducts, factoryCategories } from "@shared/schema";
 import { parseFactoryArabicImportMode } from "@shared/factoryBilingualContract";
 import { requireAuth } from "../../auth";
@@ -24,6 +24,8 @@ import {
 
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+const MAX_PREVIEW_RESPONSE_ROWS = 200;
+const AUDIT_BRANCH_SIZE = 100;
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -138,6 +140,43 @@ function previewSummary(preview: TranslationPreview) {
   };
 }
 
+function previewForResponse(preview: TranslationPreviewEnvelope) {
+  const rejectedRows = preview.rows.filter(
+    (row) => !["update", "unchanged"].includes(row.status)
+  );
+  return {
+    ...preview,
+    rows: rejectedRows.slice(0, MAX_PREVIEW_RESPONSE_ROWS),
+    returnedRows: Math.min(rejectedRows.length, MAX_PREVIEW_RESPONSE_ROWS),
+    totalRejectedRows: rejectedRows.length,
+    rowsTruncated: rejectedRows.length > MAX_PREVIEW_RESPONSE_ROWS,
+  };
+}
+
+function chunkValues<T>(values: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+  return chunks;
+}
+
+/**
+ * auditService deliberately caps every array/object branch at 100 values. Build
+ * a bounded tree so large imports preserve every changed ID without weakening
+ * the repository-wide audit sanitizer.
+ */
+function auditSafeIdList(ids: number[]): unknown {
+  const uniqueIds = [...new Set(ids)].sort((left, right) => left - right);
+  if (uniqueIds.length <= AUDIT_BRANCH_SIZE) return uniqueIds;
+
+  let level: unknown[] = chunkValues(uniqueIds, AUDIT_BRANCH_SIZE);
+  while (level.length > AUDIT_BRANCH_SIZE) {
+    level = chunkValues(level, AUDIT_BRANCH_SIZE);
+  }
+  return level;
+}
+
 async function buildPreview(input: {
   companyId: number;
   buffer: Buffer;
@@ -207,7 +246,7 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
           buffer,
           mode: getImportMode((req.body as Record<string, unknown> | undefined)?.mode),
         });
-        return res.json(preview);
+        return res.json(previewForResponse(preview));
       } catch (error) {
         return sendRouteError(res, error);
       }
@@ -261,6 +300,23 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
         }
 
         const result = await db.transaction(async (tx) => {
+          // Stabilize the current company's translation catalog until preview,
+          // writes, and durable audit persistence have all committed.
+          await tx.execute(sql`
+            SELECT id
+            FROM factory_bale_products
+            WHERE company_id = ${companyId} AND deleted_at IS NULL
+            ORDER BY id
+            FOR UPDATE
+          `);
+          await tx.execute(sql`
+            SELECT id
+            FROM factory_categories
+            WHERE company_id = ${companyId} AND deleted_at IS NULL
+            ORDER BY id
+            FOR UPDATE
+          `);
+
           const preview = await buildPreview({
             companyId,
             buffer,
@@ -272,14 +328,14 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
             throw new TranslationRouteError(
               409,
               "The workbook or catalog changed after preview. Preview it again before applying.",
-              { preview }
+              { preview: previewForResponse(preview) }
             );
           }
           if (preview.blocked) {
             throw new TranslationRouteError(
               409,
               "Import is blocked by duplicate codes, ambiguous catalog codes, or category conflicts",
-              { preview }
+              { preview: previewForResponse(preview) }
             );
           }
 
@@ -366,6 +422,11 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
             appliedByUserId: String((req.session as any).userId),
             companyId,
           };
+          const auditSummary = {
+            ...summary,
+            changedProductIds: auditSafeIdList(uniqueProductIds),
+            changedCategoryIds: auditSafeIdList(uniqueCategoryIds),
+          };
 
           await writeAuditEvent(
             {
@@ -378,7 +439,7 @@ export function registerFactoryArabicTranslationRoutes(app: Express) {
               tableName: "factory_bale_products",
               recordIdentifier: fileName,
               changes: {
-                arabicTranslationImport: { new: summary },
+                arabicTranslationImport: { new: auditSummary },
               },
             },
             tx as any
