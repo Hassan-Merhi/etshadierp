@@ -187,33 +187,47 @@ jobs:
           name: Full frontend tests
           command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
 
-  backend-f-a-f:
+  backend-fa:
     executor: node22-postgres
     steps:
       - run_backend_pattern:
-          pattern: "f[a-f]*"
-          label: F A-F
+          pattern: "fa*"
+          label: FA
 
-  backend-f-g-l:
+  backend-fb:
     executor: node22-postgres
     steps:
       - run_backend_pattern:
-          pattern: "f[g-l]*"
-          label: F G-L
+          pattern: "fb*"
+          label: FB
 
-  backend-f-m-r:
+  backend-fc:
     executor: node22-postgres
     steps:
       - run_backend_pattern:
-          pattern: "f[m-r]*"
-          label: F M-R
+          pattern: "fc*"
+          label: FC
 
-  backend-f-s-z:
+  backend-fd:
     executor: node22-postgres
     steps:
       - run_backend_pattern:
-          pattern: "f[s-z]*"
-          label: F S-Z
+          pattern: "fd*"
+          label: FD
+
+  backend-fe:
+    executor: node22-postgres
+    steps:
+      - run_backend_pattern:
+          pattern: "fe*"
+          label: FE
+
+  backend-ff:
+    executor: node22-postgres
+    steps:
+      - run_backend_pattern:
+          pattern: "ff*"
+          label: FF
 
   postgres-phase3-backend:
     executor: node22-postgres
@@ -271,10 +285,12 @@ workflows:
       - postgres-regression
       - full-backend
       - full-frontend
-      - backend-f-a-f
-      - backend-f-g-l
-      - backend-f-m-r
-      - backend-f-s-z
+      - backend-fa
+      - backend-fb
+      - backend-fc
+      - backend-fd
+      - backend-fe
+      - backend-ff
       - postgres-phase3-backend
       - phase3-frontend
       - architecture-guards
