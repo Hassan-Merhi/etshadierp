@@ -196,7 +196,6 @@
       "server/routes/containers/containerFreightWriteRoutes.ts": 1400,
       "server/routes/factory/employee-pos/employeeNetPositionRoutes.ts": 1775,
       "server/routes/factory/raw-stock/rawStockOffloadRoutes.ts": 1500,
-      "server/routes/factory/suppliers/supplierBalanceRoutes.ts": 1500,
       "server/routes/factory/suppliers/supplierStatementRoutes.ts": 1075,
       "server/routes/netProfitExcelRoute.ts": 1150,
       "server/routes/rental/_rentalShared.ts": 1175,

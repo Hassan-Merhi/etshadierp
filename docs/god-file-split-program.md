@@ -143,18 +143,58 @@ npm run audit:god-files
 
 | Phase | Scope | Notes |
 |---|---|---|
-| 1 | ~~`server/startupSchema.ts`~~ | **Done.** Split into ten parts under `server/startup-schema/`, largest 772 lines. Order preserved and proven by a sha256 pin of the assembled array in `tests/startup-schema-integrity.test.ts`. |
+| 1 | ~~`server/startupSchema.ts`~~ | **Done.** Ten parts under `server/startup-schema/`, largest 772 lines. Order proven by a sha256 pin in `tests/startup-schema-integrity.test.ts`. |
 | 2 | ~~Delete before splitting~~ | **Done, and the premise was wrong** — see below. No file was deletable; three dead *handlers* (349 lines) were removed instead. |
-| 3 | Route monoliths | **In progress — 2 of 66 done**, 64 files and 31,952 lines remain. Split by URL prefix into a directory with an `index.ts` barrel. `gitRoutes.ts` (1,969) and `spMigrationRoutes.ts` (2,349) done. |
-| 3b | Services, storage, `server/index.ts` | **Not started** — 15 files, 6,968 lines. Not routes, so the manifest does not cover them; they need their own approach. |
-| 4 | Page components | **In progress — 54 files and 31,109 lines remain**, and the mechanical part is finished. See below. |
+| 3 | Route monoliths | **Nearly done — 6 files and 4,050 lines remain.** Every file whose bulk is a *run of endpoints* has been split. What is left is six files whose bulk is a single handler; see "Where Phase 3 stops" below. |
+| 3b | Services, storage, `server/index.ts` | **Not started** — 16 files, 7,227 lines. Not routes, so the manifest does not cover them. |
+| 4 | Page components | **Stalled by design — 54 files, 31,109 lines.** Every compiler-verifiable seam has been taken; the rest is component-boundary design. |
 | 5 | `shared/schema/*.ts` | **Not started** — 2 files, 3,622 lines. Highest blast radius, lowest urgency. Barrel must preserve every export name. |
 | 6 | Tighten the ratchet | Lower `softMaxLines` as the backlog empties. |
+| — | Oversized test files | **Not started** — 4 files, 1,207 lines. Unassigned in the original plan but ratcheted like everything else, so they block reaching zero. |
 
 The backlog started at **162 files and 102,337 excess lines**. It now stands at
-**139 files and 74,858** — 27% cleared.
+**82 files and 45,684** — 55% cleared.
 
-Phases 3 and 4 touch disjoint trees and can run in parallel.
+### Where Phase 3 stops
+
+The route splits were safe because `config/route-manifest.json` is regenerated
+and compared byte for byte after every one: same methods, same paths, same guard
+chains, same registration order. That is a real proof, and it is why 60 files
+could be split quickly and without incident.
+
+Six route files remain, and the manifest cannot carry them:
+
+| File | Lines | Endpoints | Largest handler |
+|---|---|---|---|
+| `factory/employee-pos/employeeNetPositionRoutes.ts` | 1,755 | 1 | 1,623 |
+| `factory/raw-stock/rawStockOffloadRoutes.ts` | 1,496 | 2 | 972 |
+| `containers/containerFreightWriteRoutes.ts` | 1,380 | 3 | 1,156 |
+| `netProfitExcelRoute.ts` | 1,131 | 1 | 1,007 |
+| `stats/statsNetProfitRoutes.ts` | 1,104 | 1 | 993 |
+| `factory/suppliers/supplierStatementRoutes.ts` | 1,053 | 1 | 925 |
+
+In each, the file *is* one handler. Reducing them means extracting logic from
+inside that handler, and the manifest says nothing about whether extracted logic
+still computes the same numbers — it only proves the route is still registered.
+Only tests can carry that, and the coverage is thin exactly where the risk is
+highest:
+
+- `GET /api/reports/net-profit-excel`, `GET /api/factory/suppliers/:id/statement`
+  and `PATCH /api/purchase-orders/:id` have **no test referencing them at all**.
+- The parameterless GETs among them are reached by the smoke sweep, but the
+  sweep asserts only "does not return 5xx" — not that the figures are unchanged.
+
+These are net-profit, supplier-statement and purchase-order handlers: a silent
+arithmetic change is the worst failure mode this codebase has. So the next step
+is **characterization tests first** — pin each endpoint's current response for a
+seeded fixture, then extract against that pin, exactly as Phase 0 pinned the
+route manifest before any route was touched. Splitting them without that pin
+trades a readability win for an unverifiable risk to money figures, which is a
+bad trade.
+
+Phases 3b and 4 touch disjoint trees and can run in parallel.
+
+
 
 ### Where to go next
 
