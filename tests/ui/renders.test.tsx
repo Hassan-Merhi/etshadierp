@@ -241,3 +241,13 @@ describe("PropertiesRentalShops page", () => {
   });
 });
 
+// ── 14. StockTransferOrder ───────────────────────────────────────────────────
+// Added before decomposing StockTransferOrder.tsx in Phase 4.
+describe("StockTransferOrder page", () => {
+  it("renders the page title heading", async () => {
+    const { default: StockTransferOrder } = await import("@/pages/StockTransferOrder");
+    renderWithProviders(<StockTransferOrder />);
+    expect(await screen.findByTestId("text-page-title")).toBeInTheDocument();
+  });
+});
+
