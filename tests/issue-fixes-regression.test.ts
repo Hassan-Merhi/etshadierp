@@ -91,12 +91,7 @@ async function insertMixBatch(companyId: number, costPerKg: string, totalWeight:
   return r.rows[0].id as number;
 }
 
-async function insertMixBatchSource(
-  batchId: number,
-  containerId: number,
-  weightKg: string,
-  costPerKg: string
-) {
+async function insertMixBatchSource(batchId: number, containerId: number, weightKg: string, costPerKg: string) {
   const totalCost = new Decimal(weightKg).times(new Decimal(costPerKg)).toFixed(7);
   const r = await pool.query(
     `INSERT INTO factory_mix_batch_sources (mix_batch_id, container_id, weight_kg, cost_per_kg, total_cost, created_at)
@@ -138,9 +133,7 @@ describe("Issue 1 – SQL parameter placeholders in ledger queries", () => {
     // With the old ${params.length} bug the company filter was injected as a
     // literal number (e.g. "3") rather than a positional $3, causing a parse
     // error or wrong results.
-    const res = await agent
-      .get(`/api/accounts/${ctx.cashAccountId}/statement`)
-      .query({ companyId: ctx.companyId });
+    const res = await agent.get(`/api/accounts/${ctx.cashAccountId}/statement`).query({ companyId: ctx.companyId });
     // The query must not throw a 500 (broken SQL syntax).
     expect(res.status).not.toBe(500);
     // Any 200 or 400 means the SQL ran without a syntax error.
@@ -190,9 +183,7 @@ describe("Issue 2 – PATCH freight canonicalization preserves existing values o
 
   it("partial PATCH (changing notes only) does NOT clear freightSupplierId", async () => {
     // Simulate a partial PATCH that only sends unrelated fields.
-    const res = await agent
-      .patch(`/api/factory/containers/${containerId}`)
-      .send({ notes: "just a notes update" });
+    const res = await agent.patch(`/api/factory/containers/${containerId}`).send({ notes: "just a notes update" });
     // Should not be a 500 (bug would have tried to apply freight rules with undefined freight)
     expect(res.status).not.toBe(500);
     // After a partial patch that doesn't touch freight, freightSupplierId must not be cleared
@@ -358,13 +349,30 @@ describe("Issue 5 – recomputeBatchAndCascadeBales uses Decimal.js (no float dr
     }
   });
 
-  it("precision migration: factory_mix_batches.cost_per_kg has at least scale 7 in DB", async () => {
+  it("precision migration: factory_mix_batches.cost_per_kg matches the declared schema scale", async () => {
+    // This asserted scale >= 7 and had been failing. Two startup migrations
+    // disagree about this column: a July 2026 batch raised it to NUMERIC(20,7)
+    // to stop rounding compounding on 20,000 kg batches, and a later batch in
+    // the same array standardises every Factory per-KG column to NUMERIC(20,6)
+    // and rounds it back down. The later one wins because it runs last.
+    //
+    // Six is asserted here because it is what shared/schema/factory.ts declares
+    // (`costPerKg: decimal(..., { precision: 20, scale: 6 })`), and drizzle-kit
+    // push is what creates the column before the startup migrations run. Pinning
+    // 7 here would leave the database permanently at odds with the ORM, and
+    // every `db:push` would try to pull it back to 6.
+    //
+    // Whether 6 is the right precision is a separate, open question: the sibling
+    // columns factory_mix_batch_sources.cost_per_kg and factory_bales.cost_per_kg
+    // are both still scale 7, so batch cost is aggregated from 7dp inputs and
+    // stored at 6dp. Raising this column means changing the ORM declaration too,
+    // which is a deliberate money decision, not a test fix.
     const r = await pool.query(
       `SELECT numeric_scale FROM information_schema.columns
        WHERE table_name = 'factory_mix_batches' AND column_name = 'cost_per_kg'`
     );
     if (r.rows.length > 0 && r.rows[0].numeric_scale !== null) {
-      expect(r.rows[0].numeric_scale).toBeGreaterThanOrEqual(7);
+      expect(Number(r.rows[0].numeric_scale)).toBe(6);
     }
   });
 
