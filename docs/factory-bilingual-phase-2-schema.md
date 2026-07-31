@@ -49,7 +49,7 @@ The versioned migration is:
 
 `migrations/20260731_001_factory_bilingual_catalog_snapshots.sql`
 
-It is registered as journal entry 15 and uses only `ADD COLUMN IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS` statements inside a bounded transaction.
+It is registered as journal entry 15 and is bounded by transaction, lock-timeout, and statement-timeout controls. Core catalog/order tables are required. Linked module tables that may be absent in older or partial deployments are checked with `to_regclass(...)` before their additive `ALTER TABLE` runs, so a missing optional module cannot roll back the required bilingual fields.
 
 Production also preloads `server/factoryBilingualSchemaBridge.mjs` through the existing supplier-company startup bridge. This covers deployments that run with `RUN_STARTUP_MIGRATIONS=false`. The bridge:
 
@@ -83,11 +83,12 @@ Snapshot population and safe historical repair remain owned by Phase 6.
 
 - every declared Arabic catalog and snapshot column;
 - additive/idempotent migration statements;
+- guards for every optional linked table;
 - migration journal registration;
 - startup bridge preload and failure behavior;
-- applying the migration twice;
+- applying the migration twice against PostgreSQL;
 - round-tripping Arabic product, category, description, and bale snapshot text;
-- preserving the original English values during that round trip.
+- preserving the original English values during that database round trip.
 
 ## Rollback posture
 
