@@ -4,74 +4,47 @@ import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
+import { factoryBaleProducts, factoryCategories } from "@shared/schema";
 import {
-  companies,
-  factoryBaleProducts,
-  factoryCategories,
-  userCompanyRoles,
-} from "@shared/schema";
-import {
-  normalizeFactoryLanguage,
+  parseFactoryCatalogLanguage,
+  resolveFactoryCategoryName,
   resolveFactoryProductLanguage,
-  resolveFactoryText,
-} from "@shared/factoryBilingual";
+  type FactoryCatalogLanguage,
+} from "@shared/factoryBilingualContract";
 
-async function resolveAuthorizedFactoryCompanyId(req: Request): Promise<number | null> {
-  const session = req.session as any;
-  const requestedCompanyId = Number(session?.factoryCompanyId || session?.currentCompanyId);
-  const userId = Number(session?.userId);
-  if (!Number.isInteger(requestedCompanyId) || requestedCompanyId <= 0) return null;
-  if (!Number.isInteger(userId) || userId <= 0) return null;
-
-  const [company] = await db
-    .select({ id: companies.id, companyType: companies.companyType, active: companies.active })
-    .from(companies)
-    .where(eq(companies.id, requestedCompanyId))
-    .limit(1);
-
-  if (!company?.active || !["factory", "factory_v2"].includes(company.companyType)) return null;
-  if (session.currentRole === "Developer") return company.id;
-
-  const [membership] = await db
-    .select({ companyId: userCompanyRoles.companyId })
-    .from(userCompanyRoles)
-    .where(
-      and(
-        eq(userCompanyRoles.userId, userId),
-        eq(userCompanyRoles.companyId, requestedCompanyId)
-      )
-    )
-    .limit(1);
-
-  return membership ? company.id : null;
+function getFactoryCompanyId(req: Request): number | null {
+  const companyId = Number((req.session as any)?.factoryCompanyId);
+  return Number.isSafeInteger(companyId) && companyId > 0 ? companyId : null;
 }
 
-function mapCategory(category: typeof factoryCategories.$inferSelect, language: "en" | "ar") {
+function mapCategory(
+  category: typeof factoryCategories.$inferSelect,
+  language: FactoryCatalogLanguage
+) {
   return {
     ...category,
     nameEn: category.name,
     nameAr: category.nameAr,
-    displayName: resolveFactoryText(
-      { en: category.name, ar: category.nameAr, fallback: String(category.id) },
-      language
-    ),
+    displayName: resolveFactoryCategoryName(category, language),
     language,
   };
+}
+
+function sendFactoryCompanyAccessError(res: any) {
+  return res.status(403).json({
+    message: "You do not have access to the selected Factory company.",
+    code: "FACTORY_COMPANY_ACCESS_REQUIRED",
+  });
 }
 
 export function registerFactoryBilingualCatalogRoutes(app: Express) {
   app.get("/api/factory/categories", requireAuth, async (req: any, res: any, next: any) => {
     if (req.query.legacy === "1") return next();
     try {
-      const companyId = await resolveAuthorizedFactoryCompanyId(req);
-      if (!companyId) {
-        return res.status(403).json({
-          message: "You do not have access to the selected Factory company.",
-          code: "FACTORY_COMPANY_ACCESS_REQUIRED",
-        });
-      }
+      const companyId = getFactoryCompanyId(req);
+      if (!companyId) return sendFactoryCompanyAccessError(res);
 
-      const language = normalizeFactoryLanguage(req.query.lang);
+      const language = parseFactoryCatalogLanguage(req.query.lang);
       const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
       const filters = [
         eq(factoryCategories.companyId, companyId),
@@ -102,15 +75,10 @@ export function registerFactoryBilingualCatalogRoutes(app: Express) {
   app.get("/api/factory/bale-products", requireAuth, async (req: any, res: any, next: any) => {
     if (req.query.legacy === "1") return next();
     try {
-      const companyId = await resolveAuthorizedFactoryCompanyId(req);
-      if (!companyId) {
-        return res.status(403).json({
-          message: "You do not have access to the selected Factory company.",
-          code: "FACTORY_COMPANY_ACCESS_REQUIRED",
-        });
-      }
+      const companyId = getFactoryCompanyId(req);
+      if (!companyId) return sendFactoryCompanyAccessError(res);
 
-      const language = normalizeFactoryLanguage(req.query.lang);
+      const language = parseFactoryCatalogLanguage(req.query.lang);
       const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
       const filters = [
         eq(factoryBaleProducts.companyId, companyId),
@@ -179,15 +147,10 @@ export function registerFactoryBilingualCatalogRoutes(app: Express) {
     if (!Number.isInteger(id) || id <= 0) return next();
 
     try {
-      const companyId = await resolveAuthorizedFactoryCompanyId(req);
-      if (!companyId) {
-        return res.status(403).json({
-          message: "You do not have access to the selected Factory company.",
-          code: "FACTORY_COMPANY_ACCESS_REQUIRED",
-        });
-      }
+      const companyId = getFactoryCompanyId(req);
+      if (!companyId) return sendFactoryCompanyAccessError(res);
 
-      const language = normalizeFactoryLanguage(req.query.lang);
+      const language = parseFactoryCatalogLanguage(req.query.lang);
       const [row] = await db
         .select({
           product: factoryBaleProducts,
@@ -206,8 +169,7 @@ export function registerFactoryBilingualCatalogRoutes(app: Express) {
         .where(
           and(
             eq(factoryBaleProducts.id, id),
-            eq(factoryBaleProducts.companyId, companyId),
-            isNull(factoryBaleProducts.deletedAt)
+            eq(factoryBaleProducts.companyId, companyId)
           )
         )
         .limit(1);
