@@ -11,9 +11,6 @@ import {
   Truck,
   FlaskConical,
   CheckCircle2,
-  AlertCircle,
-  XCircle,
-  ArchiveX,
   Ship,
   FileText,
   User2,
@@ -47,42 +44,9 @@ import { useAdminOverride } from "@/hooks/use-admin-override";
 import type { BaleProduct, BaleLabelPrint } from "@shared/schema";
 import { BaleWeightEditDialog, type WeightEditBale } from "@/components/BaleWeightEditDialog";
 
-function BaleStatusBadge({ status }: { status: string }) {
-  const map: Record<
-    string,
-    { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: any }
-  > = {
-    IN_STOCK: { label: "In Stock", variant: "default", icon: CheckCircle2 },
-    SOLD: { label: "Sold", variant: "secondary", icon: ArchiveX },
-    FINALIZED: { label: "Finalized", variant: "secondary", icon: CheckCircle2 },
-    DISPATCHED: { label: "Dispatched", variant: "secondary", icon: XCircle },
-    DELETED: { label: "Deleted", variant: "destructive", icon: XCircle },
-    REMOVED: { label: "Deleted", variant: "destructive", icon: XCircle },
-    PENDING_PRESSING: { label: "Pending Pressing", variant: "outline", icon: AlertCircle },
-  };
-  const info = map[status] || { label: status, variant: "outline" as const, icon: AlertCircle };
-  const Icon = info.icon;
-  return (
-    <Badge variant={info.variant} className="gap-1" data-testid="badge-bale-status">
-      <Icon className="h-3 w-3" />
-      {info.label}
-    </Badge>
-  );
-}
-
-function InfoRow({ label, value, mono = false }: { label: string; value: React.ReactNode; mono?: boolean }) {
-  return (
-    <div>
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className={`font-medium ${mono ? "font-mono" : ""}`}>
-        {value ?? <span className="text-muted-foreground">N/A</span>}
-      </p>
-    </div>
-  );
-}
-
-type SearchMode = "reference" | "article";
-
+import type { SearchMode } from "./barcodelookup/types";
+import { BaleStatusBadge } from "./barcodelookup/components/BaleStatusBadge";
+import { InfoRow } from "./barcodelookup/components/InfoRow";
 export default function BarcodeLookup() {
   const [searchMode, setSearchMode] = useState<SearchMode>("reference");
   const [searchValue, setSearchValue] = useState("");

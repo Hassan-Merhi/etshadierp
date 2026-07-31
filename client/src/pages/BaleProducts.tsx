@@ -8,8 +8,6 @@ import {
   Download,
   ChevronDown,
   ChevronRight,
-  LayoutGrid,
-  List,
   Tags,
   Pencil,
   Trash2,
@@ -33,12 +31,10 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { PageHeader } from "@/components/PageHeader";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -51,26 +47,9 @@ import { CreateBaleProductDialog } from "../components/CreateBaleProductDialog";
 import { AdminAuthDialog } from "@/components/AdminAuthDialog";
 import type { FactoryBaleProduct, FactoryCategory } from "@shared/schema";
 
-const hmdLogoPath = "/hmd-logo-export.png";
-
-interface ImportPreviewRow {
-  articleCode: string;
-  name: string;
-  category?: string;
-  description?: string;
-  weightPerBaleKg?: string;
-  productionPrice?: number | string;
-  sellingPrice?: number | string;
-  active?: boolean;
-}
-
-interface GroupedProduct {
-  articleCode: string;
-  name: string;
-  count: number;
-  items: FactoryBaleProduct[];
-}
-
+import type { GroupedProduct, ImportPreviewRow } from "./baleproducts/types";
+import { hmdLogoPath } from "./baleproducts/utils";
+import { EmptyState } from "./baleproducts/components/EmptyState";
 export default function BaleProducts() {
   const { colors: designColors } = useLabelDesignColors();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -2095,20 +2074,6 @@ export default function BaleProducts() {
           setPendingDelete(null);
         }}
       />
-    </div>
-  );
-}
-
-function EmptyState({ onCreateClick }: { onCreateClick: () => void }) {
-  return (
-    <div className="text-center py-12">
-      <Package className="mx-auto h-12 w-12 text-muted-foreground" />
-      <h3 className="mt-4 text-lg font-semibold">No products found</h3>
-      <p className="text-muted-foreground mt-2">Create your first product to get started</p>
-      <Button className="mt-4" onClick={onCreateClick}>
-        <Plus className="h-4 w-4 mr-2" />
-        Create Product
-      </Button>
     </div>
   );
 }

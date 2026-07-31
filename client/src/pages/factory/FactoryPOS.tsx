@@ -24,14 +24,12 @@ import {
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { PageHeader } from "@/components/PageHeader";
 import {
-  ShoppingCart,
   Printer,
   Plus,
   Trash2,
   Search,
   Package,
   History,
-  X,
   Check,
   MapPin,
   Wallet,
@@ -39,66 +37,11 @@ import {
   ChevronRight,
   CreditCard,
   Banknote,
-  AlertCircle,
   Pencil,
 } from "lucide-react";
 
-interface CartRow {
-  id: string;
-  productId: number | null;
-  productName: string;
-  articleCode: string;
-  availableQty: number;
-  quantity: number;
-  unitPrice: number;
-  weightPerBale: number;
-}
-
-interface InventoryItem {
-  productId: number;
-  productName: string;
-  articleCode: string;
-  category: string | null;
-  quantity: number;
-  totalWeight: number;
-  sellingPrice: string;
-  referenceNumbers?: string[];
-}
-
-interface ExpenseRow {
-  id: string;
-  accountId: string;
-  description: string;
-  amount: string;
-}
-
-function emptyRow(id?: string): CartRow {
-  return {
-    id: id ?? String(Date.now()),
-    productId: null,
-    productName: "",
-    articleCode: "",
-    availableQty: 0,
-    quantity: 1,
-    unitPrice: 0,
-    weightPerBale: 0,
-  };
-}
-
-function formatNum(v: string | number) {
-  const n = parseFloat(String(v));
-  if (isNaN(n)) return "0.00";
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-const COLUMNS = [
-  { key: "productName", label: "Description", width: "flex-1" },
-  { key: "quantity", label: "Qty", width: "w-20" },
-  { key: "unitPrice", label: "Price", width: "w-28" },
-  { key: "amount", label: "Amount", width: "w-28" },
-  { key: "delete", label: "", width: "w-10" },
-];
-
+import type { CartRow, ExpenseRow, InventoryItem } from "./factorypos/types";
+import { COLUMNS, emptyRow, formatNum } from "./factorypos/utils";
 export default function FactoryPOS() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();

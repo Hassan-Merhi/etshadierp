@@ -44,38 +44,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { InvoiceSummaryBar } from "@/components/InvoiceSummaryBar";
 
-interface Customer {
-  id: number;
-  legalName: string;
-  balance: number;
-  balanceSide: string;
-}
-
-interface CustomerOrder {
-  id: number;
-  companyId: number;
-  customerId: number;
-  orderDate: string;
-  status: string;
-  invoiceNumber?: string;
-  subtotalBales: string;
-  freightAmount: string;
-  otherChargesTotal: string;
-  grandTotal: string;
-  totalQtyBales: number;
-  totalWeightKg: string;
-  proformaExpectedBales: string;
-  loadedNotInProformaBales: string;
-  customerName: string;
-  containerNumber?: string | null;
-  proformaName?: string | null;
-  destination?: string | null;
-  containerNotes?: string | null;
-  isHidden?: boolean;
-}
-
-type StatusFilter = "LOADING" | "VERIFIED" | "FINALIZED" | "ALL";
-
+import type { Customer, CustomerOrder, StatusFilter } from "./factoryinvoices/types";
 export default function FactoryInvoices() {
   const { toast } = useToast();
   const [, navigate] = useLocation();

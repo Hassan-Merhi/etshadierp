@@ -1,15 +1,14 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { format } from "date-fns";
 import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useAppMode, useModePrefix } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
-import { queryClient, keyStartsWith } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
 import { utils, writeFile } from "@/lib/excelHelper";
 import { parseDateLocal } from "@/components/vouchers/PrintTemplate";
@@ -24,7 +23,7 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
@@ -69,42 +68,8 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 
-interface StockItem {
-  id: number;
-  code: string;
-  name: string;
-  uom: string;
-}
-interface Location {
-  id: number;
-  code?: string;
-  name: string;
-}
-
-const stockTransferEntrySchema = z.object({
-  sourceLocationId: z.coerce.number(),
-  sourceLocationName: z.string(),
-  stockItemId: z.coerce.number(),
-  stockItemCode: z.string().default(""),
-  stockItemName: z.string(),
-  quantity: z.string(),
-  rate: z.string(),
-});
-const stockTransferFormSchema = z.object({
-  voucherDate: z.date(),
-  destinationLocationId: z.number(),
-  entries: z.array(stockTransferEntrySchema),
-  notes: z.string().optional(),
-  optional: z.boolean().default(false),
-});
-type StockTransferFormData = z.infer<typeof stockTransferFormSchema>;
-
-interface StockTransferFormProps {
-  voucherIdToEdit: number | null;
-  isPOS: boolean;
-  posUser?: { assignedLocationId?: number };
-}
-
+import type { Location, StockItem, StockTransferFormData, StockTransferFormProps } from "./stocktransferform/types";
+import { stockTransferFormSchema } from "./stocktransferform/utils";
 export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTransferFormProps) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
@@ -143,7 +108,6 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       return res.json();
     },
   });
-
 
   const { data: stockTransferToEdit } = useQuery({
     queryKey: ["/api/stock-transfers", voucherIdToEdit],

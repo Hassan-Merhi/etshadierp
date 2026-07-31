@@ -21,7 +21,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -64,77 +63,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
 
-interface LocationData {
-  quantity: number;
-  rate: number;
-  value: number;
-}
-
-interface StockItemData {
-  id: number;
-  code: string;
-  name: string;
-  uom: string;
-  locationData: Record<number, LocationData>;
-}
-
-interface StockGroupData {
-  id: number;
-  code: string;
-  name: string;
-  locationData: Record<number, LocationData>;
-  items: StockItemData[];
-}
-
-interface LocationSummaryResponse {
-  stockGroups: StockGroupData[];
-  grandTotals: Record<number, LocationData>;
-  asOfDate: string;
-}
-
-interface Location {
-  id: number;
-  name: string;
-  code: string;
-}
-
-interface OrderItem {
-  stockItemId: number;
-  stockItemName: string;
-  stockItemCode: string;
-  uom: string;
-  sourceLocationId: number;
-  sourceLocationName: string;
-  quantity: number;
-  availableQty: number;
-  rate: number;
-}
-
-interface QuantityPickerState {
-  open: boolean;
-  stockItem: StockItemData | null;
-  locationId: number;
-  locationName: string;
-  availableQty: number;
-}
-
-interface ImportPreviewRow {
-  rawCode: string;
-  rawName: string;
-  stockItemId: number | null;
-  stockItemName: string;
-  currentQty: number;
-  change: number;
-  newQty: number;
-  sourceLocationId: number | null;
-  sourceLocationName: string;
-  status: "ok" | "not_found" | "remove" | "new_item";
-}
-
-const STORAGE_KEY = "stockTransferOrder_selectedLocations";
-const SESSION_STATE_KEY = "stockTransferOrder_session_state";
-const DRAFT_KEY = "stockTransferOrder_autosave_draft";
-
+import type { ImportPreviewRow, Location, LocationSummaryResponse, OrderItem, QuantityPickerState, StockItemData } from "./stocktransferorder/types";
+import { DRAFT_KEY, SESSION_STATE_KEY, STORAGE_KEY } from "./stocktransferorder/utils";
 export default function StockTransferOrder() {
   const [_location, navigate] = useLocation();
   const { toast } = useToast();

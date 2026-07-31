@@ -10,7 +10,6 @@ import {
   PlayCircle,
   Banknote,
   FileSpreadsheet,
-  FileText,
   Printer,
   CheckCircle2,
   History,
@@ -25,7 +24,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -54,101 +52,8 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useCompany } from "@/contexts/CompanyContext";
 
-const AVATAR_COLORS = [
-  "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
-  "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-  "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-  "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
-  "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300",
-  "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300",
-  "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300",
-];
-function getAvatarColor(name: string) {
-  let h = 0;
-  for (const c of name) h = c.charCodeAt(0) + ((h << 5) - h);
-  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
-}
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase();
-}
-function fmt(val: string | number | null | undefined) {
-  const n = parseFloat(String(val || 0));
-  return isNaN(n) ? "0.00" : n.toFixed(2);
-}
-
-interface Employee {
-  id: number;
-  code: string;
-  firstName: string;
-  lastName: string;
-  department: string | null;
-  employeeType: string;
-  monthlySalary: string | null;
-  active: boolean;
-}
-interface WorkerGroup {
-  id: number;
-  name: string;
-  members: { id: number }[];
-}
-interface LedgerAccount {
-  id: number;
-  name: string;
-  code: string;
-  accountType: string;
-}
-interface SalaryAdvance {
-  id: number;
-  employeeId: number;
-  amount: string;
-  remainingBalance: string;
-  fullyPaid: boolean;
-}
-interface PreviewItem {
-  employeeId: number;
-  employeeName: string;
-  groupName: string;
-  baseSalary: number;
-  deduction: number;
-  pendingDeductions: number;
-  netPay: number;
-}
-interface WorkerDeductionRow {
-  workerId: number;
-  amount: string;
-  applied: boolean;
-}
-interface PayrollRun {
-  id: number;
-  status: string;
-  date: string;
-  notes: string | null;
-  paymentAccountId: number | null;
-  paidAt: string | null;
-  createdAt: string;
-  itemCount: number;
-  totalNet: string;
-  totalBase: string;
-  items: PayrollRunItem[];
-}
-interface PayrollRunItem {
-  id: number;
-  runId: number;
-  employeeId: number;
-  employeeName: string;
-  groupName: string | null;
-  baseSalary: string;
-  deduction: string;
-  netPay: string;
-}
-
+import type { Employee, LedgerAccount, PayrollRun, PreviewItem, SalaryAdvance, WorkerDeductionRow, WorkerGroup } from "./erprunpayroll/types";
+import { getAvatarColor, getInitials } from "./erprunpayroll/utils";
 export default function ERPRunPayroll() {
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();

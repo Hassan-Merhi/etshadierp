@@ -11,11 +11,8 @@ import {
   Check,
   X,
   ArrowRight,
-  TrendingUp,
-  TrendingDown,
   Trash2,
-  Wrench,
-} from "lucide-react";
+  } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
@@ -40,14 +37,13 @@ import { useEscapeBack } from "@/hooks/use-escape-back";
 import { getDefaultPeriodValue, PeriodFilterValue } from "@/components/ui/period-filter";
 import { useReactToPrint } from "react-to-print";
 
-import { Account, Transaction, GroupedVoucher, WaRule, WaChat, exportLabels } from "./accounts/accountTypes";
+import { Account, Transaction, WaRule, WaChat, exportLabels } from "./accounts/accountTypes";
 import { AccountDialogs } from "./accounts/AccountDialogs";
 import { AccountTable } from "./accounts/AccountTable";
 import { AccountStatementView } from "./accounts/AccountStatementView";
 import {
   LedgerAccount,
   BankAccount,
-  insertLedgerAccountSchema,
   insertBankAccountSchema,
   updateLedgerAccountSchema,
 } from "@shared/schema";
@@ -66,28 +62,7 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { useDebounce } from "@/hooks/use-debounce";
 
-// Maps a voucher's stored type to the vouchers-page tab that edits it.
-// Mirrors the mapping used in Daybook/OptionalVouchers; falls back to "payment".
-const VOUCHER_TYPE_TAB_MAP: Record<string, string> = {
-  PurchaseOrder: "purchase-order",
-  Payment: "payment",
-  Receipt: "receipt",
-  Journal: "journal",
-  Contra: "contra",
-  StockTransfer: "transferorder",
-  "Stock Transfer": "transferorder",
-  Transfer: "transfer",
-  "Credit Note": "credit-note",
-  "Debit Note": "credit-note",
-  Production: "adjustment",
-  Consumption: "adjustment",
-  Mixed: "adjustment",
-};
-
-function voucherTypeToTab(voucherType: string): string {
-  return VOUCHER_TYPE_TAB_MAP[voucherType] ?? "payment";
-}
-
+import { voucherTypeToTab } from "./accountslegacy/utils";
 export default function Accounts() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();

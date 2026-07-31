@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import { useRef } from "react";
 import { useReactToPrint } from "react-to-print";
-import { format, startOfDay, endOfDay, isValid, parseISO, addDays } from "date-fns";
+import { format, isValid, parseISO, addDays } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -44,48 +44,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
 
-interface Voucher {
-  id: number;
-  voucherNumber: string;
-  voucherType: string;
-  voucherDate: string;
-  description: string | null;
-  totalAmount: string;
-  locationId: number;
-  locationName?: string;
-  createdAt: string;
-  userId?: string | null;
-}
-
-interface SalesItem {
-  id: number;
-  stockItemId: number;
-  stockItemName?: string;
-  quantity: string;
-  sellingPrice: string;
-  costPrice: string;
-  totalSales: string;
-  totalCost: string;
-  profit: string;
-  configuredPrice?: string | null;
-}
-
-interface VoucherWithItems extends Voucher {
-  salesItems?: SalesItem[];
-  exchangeRate?: string | null;
-  isCreditSale?: boolean;
-  customerName?: string | null;
-}
-
-interface InventoryItem {
-  stockItemId: number;
-  stockItemCode: string;
-  stockItemName: string;
-  quantity: string;
-  averageRate: string;
-  lastSellingPrice: string | null;
-}
-
+import type { InventoryItem, SalesItem, Voucher, VoucherWithItems } from "./posdaybook/types";
 export default function POSDaybook() {
   const { formatDisplayDate } = useDateFormat();
   const { formatCashAmount } = useCurrencyContext();

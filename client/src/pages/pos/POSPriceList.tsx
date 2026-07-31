@@ -29,55 +29,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
-const ALL_LOCATIONS_ID = -1;
-
-interface Location {
-  id: number;
-  code: string;
-  name: string;
-  active?: boolean;
-}
-
-interface PriceListItem {
-  stockItemId: number;
-  code: string;
-  name: string;
-  stockGroupName: string;
-  baseSellingPrice: string | null;
-  hasCustomPrice: boolean;
-  sellingPrice: string | null;
-  quantity: string;
-  costPrice?: string | null;
-  offloadingCost?: string | null;
-}
-
-interface MasterItem {
-  stockItemId: number;
-  code: string;
-  name: string;
-  stockGroupName: string;
-  baseSellingPrice: string | null;
-  masterPrices: Record<number, string>;
-  costPrice?: string | null;
-  offloadingCost?: string | null;
-}
-
-interface MasterPriceListResponse {
-  masters: { id: number; name: string }[];
-  items: MasterItem[];
-}
-
-interface POSPriceListProps {
-  posUser?: any;
-}
-
-function formatQty(raw: string | number | null | undefined): string {
-  if (raw == null) return "—";
-  const n = typeof raw === "string" ? parseFloat(raw) : raw;
-  if (isNaN(n) || n === 0) return "—";
-  return n % 1 === 0 ? n.toLocaleString() : n.toLocaleString(undefined, { maximumFractionDigits: 3 });
-}
-
+import type { Location, MasterItem, MasterPriceListResponse, POSPriceListProps, PriceListItem } from "./pospricelist/types";
+import { ALL_LOCATIONS_ID, formatQty } from "./pospricelist/utils";
 export default function POSPriceList({ posUser }: POSPriceListProps) {
   const { formatAmount } = useCurrencyContext();
   const { toast } = useToast();

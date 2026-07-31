@@ -33,87 +33,8 @@ import {
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
-interface Employee {
-  id: number;
-  code: string;
-  firstName: string;
-  lastName: string;
-  email?: string;
-  phone?: string;
-  joinDate?: string;
-  department?: string;
-  employeeType: string;
-  monthlySalary: string;
-  openingBalance?: string;
-  currentBalance?: string;
-  totalDeposits?: string;
-  totalWithdrawals?: string;
-  active?: boolean;
-}
-
-interface SalaryAdvance {
-  id: number;
-  companyId: number;
-  employeeId: number;
-  employeeCode?: string;
-  employeeName?: string;
-  advanceDate: string;
-  amount: string;
-  remainingBalance: string;
-  fullyPaid: boolean;
-  notes?: string;
-  createdAt: string;
-}
-
-interface ErpWorkerDoc {
-  id: number;
-  employeeId: number;
-  companyId: number;
-  fileName: string;
-  fileType: string;
-  fileSize: number;
-  description?: string;
-  uploadedBy?: string;
-  uploadedAt: string;
-}
-
-interface Transaction {
-  id: number;
-  voucherId?: number;
-  voucherNumber?: string;
-  voucherType?: string;
-  voucherDate?: string;
-  voucherDescription?: string;
-  narration?: string;
-  debitAmount?: string;
-  creditAmount?: string;
-}
-
-interface Props {
-  worker: Employee;
-  onBack: () => void;
-  onEdit?: (worker: Employee) => void;
-}
-
-const ALLOWED_TYPES = [
-  "application/pdf",
-  "image/jpeg",
-  "image/jpg",
-  "image/png",
-  "image/webp",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "text/plain",
-];
-
-function formatBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
+import type { ErpWorkerDoc, Props, SalaryAdvance, Transaction } from "./erpworkerdetail/types";
+import { ALLOWED_TYPES, formatBytes } from "./erpworkerdetail/utils";
 export function ERPWorkerDetail({ worker, onBack, onEdit }: Props) {
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();

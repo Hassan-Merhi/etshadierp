@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PageHeader } from "@/components/PageHeader";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
@@ -29,41 +28,8 @@ import {
   X,
 } from "lucide-react";
 
-function fmt(n: number) {
-  if (n === 0) return "$0";
-  const r = Math.round(n * 100) / 100;
-  if (r % 1 === 0) return "$" + new Intl.NumberFormat("en-US").format(r);
-  return "$" + new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(r);
-}
-function fmtKg(n: number) {
-  return new Intl.NumberFormat("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n);
-}
-
-function today() {
-  return new Date().toLocaleDateString("en-CA");
-}
-
-
-interface Bale {
-  id: number;
-  referenceNumber: string;
-  productName: string;
-  categoryName: string;
-  locationName: string;
-  weightKg: number;
-  totalCost: number;
-}
-
-interface ProductGroup {
-  key: string;
-  productName: string;
-  categoryName: string;
-  bales: Bale[];
-  totalWeight: number;
-  totalCost: number;
-  avgRate: number;
-}
-
+import type { Bale, ProductGroup } from "./wastedispatch/types";
+import { fmt, fmtKg, today } from "./wastedispatch/utils";
 export default function WasteDispatch() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -341,7 +307,6 @@ export default function WasteDispatch() {
     win.print();
     win.close();
   };
-
 
   return (
     <div className="flex flex-col h-full overflow-hidden">

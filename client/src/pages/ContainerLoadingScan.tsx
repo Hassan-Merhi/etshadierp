@@ -29,57 +29,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/PageHeader";
 
-interface Customer {
-  id: number;
-  legalName: string;
-}
-
-interface Location {
-  id: number;
-  name: string;
-  code?: string;
-}
-
-interface ProformaLine {
-  id: number;
-  articleCode: string;
-  productName: string;
-  quantity: number;
-  pricePerBale: string;
-  weightPerBaleKg?: string | null;
-}
-
-interface Proforma {
-  id: number;
-  customerId: number;
-  name: string;
-  isActive: boolean;
-  lines: ProformaLine[];
-}
-
-interface OrderBale {
-  id: number;
-  baleId: number;
-  baleReference: string;
-  articleCode: string;
-  baleName: string;
-  weight: string;
-  priceUsed: string;
-}
-
-interface OrderDetail {
-  id: number;
-  customerId: number;
-  locationId: number;
-  companyId: number;
-  orderDate: string;
-  status: string;
-  proformaIdUsed: number | null;
-  totalQtyBales: number;
-  containerNotes: string | null;
-  bales: OrderBale[];
-}
-
+import type { Customer, Location, OrderBale, OrderDetail, Proforma } from "./containerloadingscan/types";
 export default function ContainerLoadingScan() {
   const { toast } = useToast();
   const [, navigate] = useLocation();

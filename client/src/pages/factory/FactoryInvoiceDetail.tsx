@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAppMode } from "@/contexts/AppModeContext";
@@ -53,64 +53,9 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+  } from "@/components/ui/alert-dialog";
 
-interface OrderLine {
-  articleCode: string;
-  baleName: string;
-  qty: number;
-  weightPerBale: number;
-  totalWeight: number;
-  pricePerBale: number;
-  totalPrice: number;
-  pricingMode?: string;
-  pricePerKg?: number;
-}
-
-interface OrderBale {
-  id: number;
-  baleId: number;
-  baleReference: string;
-  locationId: number;
-  weight: number;
-  articleCode: string;
-  baleName: string;
-  priceUsed: number;
-}
-
-interface OrderCharge {
-  id: number;
-  name: string;
-  amount: string;
-  chargeType: string;
-  ledgerAccountId?: number;
-  voucherId?: number;
-}
-
-interface OrderDetail {
-  id: number;
-  companyId: number;
-  customerId: number;
-  orderDate: string;
-  status: string;
-  invoiceNumber?: string;
-  subtotalBales: string;
-  freightAmount: string;
-  otherChargesTotal: string;
-  grandTotal: string;
-  totalQtyBales: number;
-  customerName: string;
-  customerCode: string;
-  containerNumber?: string | null;
-  shippingCompany?: string | null;
-  destination?: string | null;
-  lines: OrderLine[];
-  bales: OrderBale[];
-  charges: OrderCharge[];
-  dispatchBatchId?: number | null;
-}
-
+import type { OrderDetail } from "./factoryinvoicedetail/types";
 export default function FactoryInvoiceDetail() {
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();

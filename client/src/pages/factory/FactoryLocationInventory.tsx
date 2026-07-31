@@ -11,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog,
@@ -30,7 +29,6 @@ import {
   Package,
   Search,
   Printer,
-  ArrowUpDown,
   FileText,
   ClipboardList,
   X,
@@ -67,129 +65,9 @@ import {
 } from "@/lib/labelHtml";
 import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 
-type SortField = "name" | "bales" | "kg" | "value";
-type SortDir = "asc" | "desc";
-
-interface Location {
-  id: number;
-  code: string;
-  name: string;
-  city: string | null;
-  state: string | null;
-  country: string | null;
-}
-
-interface FactoryBaleProduct {
-  productId: number;
-  articleCode: string;
-  productName: string;
-  category: string | null;
-  categoryId: number | null;
-  quantity: number;
-  totalWeight: number;
-  totalCost: number;
-  baleCount: number;
-  loadingCount?: number;
-  sellingPrice: string;
-  productionPrice: number;
-  reservedQty?: number;
-  availableQty?: number;
-  reservations?: Array<{ proformaId: number; proformaName: string; customerId: number; qty: number }>;
-  isInactive?: boolean;
-}
-
-interface CategoryGroup {
-  categoryId: number | null;
-  categoryName: string;
-  baleCount: number;
-  totalWeight: number;
-  totalCost: number;
-  totalSellValue: number;
-  productCount: number;
-  products: FactoryBaleProduct[];
-}
-
-interface ProformaSelection {
-  productId: number;
-  articleCode: string;
-  productName: string;
-  availableBales: number;
-  totalWeight: number;
-  selectedQty: number;
-  pricePerBale: string;
-}
-
-interface Customer {
-  id: number;
-  legalName: string;
-  balance: number;
-  balanceSide: string;
-}
-
-function applySortProducts(items: FactoryBaleProduct[], field: SortField, dir: SortDir) {
-  return [...items].sort((a, b) => {
-    let cmp = 0;
-    switch (field) {
-      case "name":
-        cmp = a.productName.localeCompare(b.productName);
-        break;
-      case "bales":
-        cmp = a.baleCount - b.baleCount;
-        break;
-      case "kg":
-        cmp = a.totalWeight - b.totalWeight;
-        break;
-      case "value":
-        cmp =
-          (a.baleCount - (a.loadingCount ?? 0)) * parseFloat(a.sellingPrice || "0") -
-          (b.baleCount - (b.loadingCount ?? 0)) * parseFloat(b.sellingPrice || "0");
-        break;
-    }
-    return dir === "desc" ? -cmp : cmp;
-  });
-}
-
-const SPECIAL_FACTORY_CATS = ["Wipers", "Garbage"];
-function isSpecialFactoryCategory(name: string) {
-  return SPECIAL_FACTORY_CATS.some((s) => s.toLowerCase() === name.trim().toLowerCase());
-}
-
-const CATEGORY_COLORS: Record<string, string> = {
-  Adult: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30",
-  Uniform: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30",
-  "AS MIX": "bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30",
-  Kids: "bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30",
-  Ladies: "bg-pink-500/15 text-pink-600 dark:text-pink-400 border-pink-500/30",
-  Winter: "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border-cyan-500/30",
-  Wipers: "bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30",
-  Garbage: "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30",
-};
-function catColor(cat: string | null) {
-  return CATEGORY_COLORS[cat ?? ""] ?? "bg-muted text-muted-foreground border-border";
-}
-
-interface StatCardProps {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  sub?: string;
-  accent?: string;
-}
-function StatCard({ icon, label, value, sub, accent }: StatCardProps) {
-  return (
-    <div className="rounded-xl border overflow-hidden flex-1 min-w-[140px]">
-      <div className="px-4 py-4">
-        <div className="mb-3">
-          <div className={`inline-flex p-1.5 rounded-md ${accent ?? "bg-muted"}`}>{icon}</div>
-        </div>
-        <div className="text-2xl font-bold font-mono leading-tight">{value}</div>
-        <div className="text-xs text-muted-foreground mt-0.5">{label}</div>
-        {sub && <div className="text-xs text-muted-foreground/70 mt-0.5">{sub}</div>}
-      </div>
-    </div>
-  );
-}
-
+import type { CategoryGroup, Customer, FactoryBaleProduct, Location, ProformaSelection, SortDir, SortField } from "./factorylocationinventory/types";
+import { applySortProducts, catColor, isSpecialFactoryCategory } from "./factorylocationinventory/utils";
+import { StatCard } from "./factorylocationinventory/components/StatCard";
 export default function FactoryLocationInventory() {
   const { colors } = useLabelDesignColors();
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);

@@ -22,7 +22,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -50,61 +49,8 @@ import CreateProformaV5Drawer from "./CreateProformaV5Drawer";
 import EditProformaV5Drawer from "./EditProformaV5Drawer";
 import { PageHeader } from "@/components/PageHeader";
 
-/* ─── Types ───────────────────────────────────────────────────────────────── */
-interface ContainerDetail {
-  orderId: number;
-  containerName: string;
-  status: string;
-  expectedQty: number;
-  loadedQty: number;
-  remainingQty: number;
-}
-interface ProformaDetail {
-  proformaId: number;
-  proformaName: string;
-  customerId: number;
-  customerName: string;
-  lineQty: number;
-  containerCount: number;
-  totalExpected: number;
-  containers: ContainerDetail[];
-}
-interface V5Row {
-  articleCode: string;
-  productName: string;
-  categoryName?: string;
-  stockAvailable: number;
-  totalLoaded: number;
-  expectedToLoad: number;
-  freeToPromise: number;
-  totalKg: number;
-  proformaDetails: ProformaDetail[];
-  isGarbageOrWipers?: boolean;
-}
-interface V5Totals {
-  stockAvailable: number;
-  totalLoaded: number;
-  expectedToLoad: number;
-  freeToPromise: number;
-  totalKg: number;
-  shortageCount: number;
-}
-interface V5Data {
-  rows: V5Row[];
-  totals: V5Totals;
-  productNames: Record<string, string>;
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  DRAFT: "Draft",
-  LOADING: "Loading",
-  PENDING_VERIFICATION: "Verified",
-  VERIFIED: "Verified",
-  FINALIZED: "Finalized",
-  CANCELLED: "Cancelled",
-};
-
-/* ═══════════════════════════════════════════════════════════════════════════ */
+import type { V5Data, V5Row } from "./factorystockallocationv5/types";
+import { STATUS_LABELS } from "./factorystockallocationv5/utils";
 export default function FactoryStockAllocationV5() {
   const { toast } = useToast();
   const searchString = useSearch();

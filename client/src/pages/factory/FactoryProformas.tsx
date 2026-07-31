@@ -1,6 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
@@ -8,7 +7,7 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -19,9 +18,7 @@ import {
   Star,
   Pencil,
   FileText,
-  LayoutGrid,
   Download,
-  RefreshCw,
   Search,
   BookOpen,
   PenLine,
@@ -29,7 +26,6 @@ import {
   ArrowRightLeft,
   Upload,
   AlertCircle,
-  Layers,
   BookmarkCheck,
   ChevronDown,
   ChevronRight,
@@ -51,47 +47,9 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { read as readExcel, utils as excelUtils, writeFile as writeExcel } from "@/lib/excelHelper";
-import { PageHeader } from "@/components/PageHeader";
 
-interface ProformaLine {
-  id: number;
-  proformaId: number;
-  articleCode: string;
-  productName: string;
-  quantity: number;
-  pricePerBale: string;
-  weightPerBaleKg?: string | null;
-  pricingMode?: string | null;
-  pricePerKg?: string | null;
-}
-
-function effectivePricePerBale(line: ProformaLine): number {
-  if (line.pricingMode === "per_kg" && line.pricePerKg && line.weightPerBaleKg) {
-    const kg = parseFloat(line.weightPerBaleKg);
-    const pkk = parseFloat(line.pricePerKg);
-    if (kg > 0 && pkk > 0) return kg * pkk;
-  }
-  return parseFloat(line.pricePerBale) || 0;
-}
-
-interface Proforma {
-  id: number;
-  customerId: number;
-  companyId: number;
-  name: string;
-  isActive: boolean;
-  createdAt: string | null;
-  updatedAt: string | null;
-  lines: ProformaLine[];
-}
-
-interface Customer {
-  id: number;
-  legalName: string;
-  balance: number;
-  balanceSide: string;
-}
-
+import type { Customer, Proforma, ProformaLine } from "./factoryproformas/types";
+import { effectivePricePerBale } from "./factoryproformas/utils";
 export default function FactoryProformas() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();

@@ -1,7 +1,6 @@
 import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { PageHeader } from "@/components/PageHeader";
 import {
   Plus,
   Pencil,
@@ -60,83 +59,8 @@ import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import type { FactoryWorker, FactoryWorkerCategory } from "@shared/schema";
 
-interface CashAccount {
-  id: number;
-  name: string;
-  code: string;
-}
-
-const emptyForm = {
-  fullName: "",
-  fatherName: "",
-  motherName: "",
-  nationalId: "",
-  passportNumber: "",
-  dateOfBirth: "",
-  gender: "",
-  nationality: "",
-  maritalStatus: "",
-  numberOfChildren: 0,
-  phone1: "",
-  phone2: "",
-  emergencyContactName: "",
-  emergencyContactPhone: "",
-  address: "",
-  city: "",
-  country: "",
-  position: "",
-  department: "",
-  dateJoined: "",
-  contractStartDate: "",
-  contractEndDate: "",
-  salaryType: "Monthly",
-  baseSalary: "",
-  perBaleRate: "",
-  perKgRate: "",
-  overtimeRate: "",
-  shiftType: "",
-  payFrequency: "Monthly",
-  hourlyRate: "",
-  weeklySalary: "",
-  biWeeklySalary: "",
-  transportAllowance: "",
-  visaNumber: "",
-  visaExpiry: "",
-  workPermitNumber: "",
-  workPermitExpiry: "",
-  residentialPermit: "",
-  residentialPermitExpiry: "",
-  bankName: "",
-  bankAccountNumber: "",
-  paymentMethod: "Cash",
-  notes: "",
-};
-
-const AVATAR_COLORS = [
-  "bg-blue-100 text-blue-700",
-  "bg-purple-100 text-purple-700",
-  "bg-emerald-100 text-emerald-700",
-  "bg-amber-100 text-amber-700",
-  "bg-rose-100 text-rose-700",
-  "bg-cyan-100 text-cyan-700",
-];
-
-function getAvatarColor(name: string) {
-  let hash = 0;
-  for (const c of name) hash = c.charCodeAt(0) + ((hash << 5) - hash);
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
-
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase();
-}
-
+import type { CashAccount } from "./factoryworkers/types";
+import { emptyForm, getAvatarColor, getInitials } from "./factoryworkers/utils";
 export default function FactoryWorkers() {
   const { data: settings } = useQuery<any>({
     queryKey: ["/api/factory/settings"],

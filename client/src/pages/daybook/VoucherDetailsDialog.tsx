@@ -14,54 +14,10 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getVoucherTypeBadge } from "@/lib/voucherTypeBadge";
-import { Voucher, ViewVoucherEntry, Employee, LedgerAccount, BankAccount } from "./types";
+import { ViewVoucherEntry } from "./types";
 
-/**
- * Returns a formatted string of the original transaction-currency amount
- * when it differs from USD (i.e. for CFA vouchers).  Returns null for USD
- * or when multi-currency fields are not populated yet (pre-backfill rows).
- */
-function txCurrencyLabel(entry: ViewVoucherEntry): string | null {
-  if (!entry.transactionCurrency || entry.transactionCurrency === "USD") return null;
-  const debit = parseFloat(entry.transactionDebitAmount || "0");
-  const credit = parseFloat(entry.transactionCreditAmount || "0");
-  const amt = Math.max(debit, credit);
-  if (!amt) return null;
-  if (entry.transactionCurrency === "CFA") {
-    return `CFA ${Math.round(amt).toLocaleString()}`;
-  }
-  return `${entry.transactionCurrency} ${amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-interface VoucherDetailsDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  selectedVoucher: Voucher | null;
-  viewEntriesLoading: boolean;
-  viewVoucherEntries: ViewVoucherEntry[];
-  isStockTransferVoucher: boolean;
-  voucherRevisions: any[];
-  revisionsLoading: boolean;
-  formatAmount: (amt: any) => string;
-  formatDisplayDate: (date: any) => string;
-  formatDisplayTime: (date: string) => string;
-  cashAccountBalance: string;
-  entryBalances: Record<number, string>;
-  purchaseOrderData: any;
-  poSupplierBalance: string | null;
-  selectedDialogRow: number | null;
-  setSelectedDialogRow: (n: number | null) => void;
-  employees?: Employee[];
-  ledgerAccounts?: LedgerAccount[];
-  bankAccounts?: BankAccount[];
-  viewProfitFilter: "all" | "gain" | "loss" | "even";
-  setViewProfitFilter: (v: "all" | "gain" | "loss" | "even") => void;
-  user: any;
-  handleEdit: (v: Voucher) => void;
-  canEdit: (v: Voucher) => boolean;
-  navigate: (path: string) => void;
-}
-
+import type { VoucherDetailsDialogProps } from "./voucherdetailsdialog/types";
+import { txCurrencyLabel } from "./voucherdetailsdialog/utils";
 export function VoucherDetailsDialog({
   open,
   onOpenChange,

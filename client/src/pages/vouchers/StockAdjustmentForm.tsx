@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { format } from "date-fns";
 import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -29,40 +28,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { X, Plus, FileDown, ChevronDown, Search } from "lucide-react";
 
-interface StockItem {
-  id: number;
-  code: string;
-  name: string;
-  uom: string;
-}
-interface Location {
-  id: number;
-  code?: string;
-  name: string;
-}
-
-const stockAdjustmentEntrySchema = z.object({
-  type: z.enum(["CONSUME", "PRODUCE"]),
-  stockItemId: z.number().min(1, "Please select a stock item"),
-  stockItemCode: z.string().default(""),
-  stockItemName: z.string(),
-  quantity: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) !== 0, "Quantity cannot be zero"),
-  rate: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Rate must be non-negative"),
-});
-const stockAdjustmentFormSchema = z.object({
-  voucherDate: z.date(),
-  locationId: z.number().min(1, "Location required"),
-  entries: z.array(stockAdjustmentEntrySchema).min(1, "At least one entry is required"),
-  notes: z.string().optional(),
-  optional: z.boolean().default(false),
-});
-type StockAdjustmentFormData = z.infer<typeof stockAdjustmentFormSchema>;
-
-interface StockAdjustmentFormProps {
-  voucherIdToEdit: number | null;
-  isPOS: boolean;
-}
-
+import type { Location, StockAdjustmentFormData, StockAdjustmentFormProps, StockItem } from "./stockadjustmentform/types";
+import { stockAdjustmentFormSchema } from "./stockadjustmentform/utils";
 export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProps) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();

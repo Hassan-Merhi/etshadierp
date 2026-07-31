@@ -1,6 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -31,7 +30,6 @@ import {
   History,
   ChevronDown,
   ChevronUp,
-  Pencil,
   ShieldOff,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -46,69 +44,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-interface Customer {
-  id: number;
-  legalName: string;
-}
-
-interface Location {
-  id: number;
-  name: string;
-  code?: string;
-}
-
-interface ProformaLine {
-  id: number;
-  articleCode: string;
-  productName: string;
-  quantity: number;
-  pricePerBale: string;
-  weightPerBaleKg?: string | null;
-}
-
-interface Proforma {
-  id: number;
-  customerId: number;
-  name: string;
-  isActive: boolean;
-  lines: ProformaLine[];
-}
-
-interface OrderBale {
-  id: number;
-  baleId: number;
-  baleReference: string;
-  articleCode: string;
-  baleName: string;
-  weight: string;
-  priceUsed: string;
-}
-
-interface OrderDetail {
-  id: number;
-  customerId: number;
-  locationId: number;
-  companyId: number;
-  orderDate: string;
-  status: string;
-  proformaIdUsed: number | null;
-  totalQtyBales: number;
-  containerNotes: string | null;
-  bales: OrderBale[];
-}
-
-interface BaleRemoval {
-  id: number;
-  orderId: number;
-  baleId: number;
-  referenceNumber: string;
-  articleCode: string | null;
-  productName: string | null;
-  weightKg: string | null;
-  removedByUsername: string | null;
-  removedAt: string;
-}
-
+import type { BaleRemoval, Customer, Location, OrderBale, OrderDetail, Proforma } from "./factorycontainerloadingscan/types";
 export default function FactoryContainerLoadingScan() {
   const { toast } = useToast();
   const [, navigate] = useLocation();

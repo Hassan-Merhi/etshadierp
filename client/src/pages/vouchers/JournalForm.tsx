@@ -4,7 +4,6 @@ import type { WhatsAppPromptState } from "@/lib/whatsapp-prompt";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { format } from "date-fns";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { ExchangeRateInput } from "@/components/ExchangeRateInput";
@@ -47,82 +46,8 @@ import { Plus, X, Search, ChevronDown, FileDown, Loader2, CheckCircle, AlertTria
 import { utils, writeFile } from "@/lib/excelHelper";
 import { cn } from "@/lib/utils";
 
-interface BankAccount {
-  id: number;
-  accountNumber: string;
-  bankName: string;
-  accountName: string;
-  balance: string;
-}
-interface LedgerAccount {
-  id: number;
-  code: string;
-  name: string;
-  accountType: string;
-}
-interface Supplier {
-  id: number;
-  code: string;
-  legalName: string;
-}
-interface Customer {
-  id: number;
-  code: string;
-  legalName: string;
-  openingBalance?: string;
-}
-interface Employee {
-  id: number;
-  code: string;
-  firstName: string;
-  lastName: string;
-  openingBalance?: string;
-}
-interface FixedAsset {
-  id: number;
-  code: string;
-  name: string;
-  openingBalance?: string;
-}
-interface FactorySupplierBasic {
-  id: number;
-  name: string;
-  parentId: number | null;
-}
-interface Account {
-  id: number;
-  name: string;
-  type: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "customer" | "factorySupplier";
-  code?: string;
-  balance?: number;
-}
-
-const journalEntrySchema = z.object({
-  type: z.enum(["DR", "CR"]),
-  accountType: z.enum(["ledger", "bank", "supplier", "employee", "fixedAsset", "customer", "factorySupplier"]),
-  accountId: z.number().min(1, "Please select an account"),
-  accountName: z.string(),
-  amount: z
-    .string()
-    .min(1, "Amount required")
-    .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, { message: "Amount must be a positive number" }),
-  narration: z.string().optional(),
-});
-
-const journalFormSchema = z.object({
-  voucherDate: z.date(),
-  entries: z.array(journalEntrySchema).min(1, "Add at least one entry"),
-  notes: z.string().optional(),
-  optional: z.boolean().default(false),
-});
-
-type JournalFormData = z.infer<typeof journalFormSchema>;
-
-interface JournalFormProps {
-  voucherIdToEdit: number | null;
-  isPOS: boolean;
-}
-
+import type { Account, BankAccount, Customer, Employee, FactorySupplierBasic, FixedAsset, JournalFormData, JournalFormProps, LedgerAccount, Supplier } from "./journalform/types";
+import { journalFormSchema } from "./journalform/utils";
 export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
