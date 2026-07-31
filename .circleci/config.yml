@@ -176,15 +176,25 @@ jobs:
           name: Backend diagnostic G-L
           command: node node_modules/vitest/vitest.mjs run tests/[g-l]*.test.ts --maxWorkers=1 --no-file-parallelism
 
-  postgres-backend-m-r:
+  postgres-backend-m-o:
     executor: node22-postgres
     steps:
       - install_dependencies
       - wait_for_postgres
       - prepare_postgres_schema
       - run:
-          name: Backend diagnostic M-R
-          command: node node_modules/vitest/vitest.mjs run tests/[m-r]*.test.ts --maxWorkers=1 --no-file-parallelism
+          name: Backend diagnostic M-O
+          command: node node_modules/vitest/vitest.mjs run tests/[m-o]*.test.ts --maxWorkers=1 --no-file-parallelism
+
+  postgres-backend-p-r:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - wait_for_postgres
+      - prepare_postgres_schema
+      - run:
+          name: Backend diagnostic P-R
+          command: node node_modules/vitest/vitest.mjs run tests/[p-r]*.test.ts --maxWorkers=1 --no-file-parallelism
 
   postgres-backend-s-z:
     executor: node22-postgres
@@ -235,7 +245,8 @@ workflows:
       - postgres-phase3-bilingual
       - postgres-backend-a-f
       - postgres-backend-g-l
-      - postgres-backend-m-r
+      - postgres-backend-m-o
+      - postgres-backend-p-r
       - postgres-backend-s-z
       - postgres-frontend-diagnostic
       - security-readiness:
