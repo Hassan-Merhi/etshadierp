@@ -168,7 +168,7 @@
       "client/src/pages/factory/FactoryAttendance.tsx": 1725,
       "client/src/pages/factory/FactoryBaleRelabeling.tsx": 950,
       "client/src/pages/factory/FactoryContainerLoadingScan.tsx": 1925,
-      "client/src/pages/factory/FactoryDaybook.tsx": 3250,
+      "client/src/pages/factory/FactoryDaybook.tsx": 1500,
       "client/src/pages/factory/FactoryDispatchBatchDetail.tsx": 1025,
       "client/src/pages/factory/FactoryFinancialSnapshot.tsx": 1175,
       "client/src/pages/factory/FactoryImport.tsx": 1425,

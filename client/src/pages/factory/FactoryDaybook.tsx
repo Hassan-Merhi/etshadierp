@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { AuditLog } from "@/pages/settings/AuditLog";
 import { useAdminOverride } from "@/hooks/use-admin-override";
@@ -10,18 +10,13 @@ import { PageHeader } from "@/components/PageHeader";
 import {
   BookOpen,
   Eye,
-  EyeOff,
   ExternalLink,
-  List,
-  AlignJustify,
-  Package,
   Trash2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   X,
   FileDown,
-  Plus,
   Pencil,
   AlertTriangle,
 } from "lucide-react";
@@ -50,7 +45,6 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,1763 +55,21 @@ import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/compon
 import { useDateJump } from "@/hooks/use-date-jump";
 import { cn } from "@/lib/utils";
 import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
-
-interface DaybookEntry {
-  id: number;
-  companyId: number;
-  txDate: string;
-  txType: string;
-  referenceId: number | null;
-  referenceTable: string | null;
-  description: string;
-  metaJson: string | null;
-  currencyCode: string;
-  amountCurrency: string;
-  fxRateToUsd: string;
-  amountUsd: string;
-  optional?: boolean;
-  createdAt: string;
-  createdBy: number | null;
-  voucherNumber?: string;
-  effectiveDate?: string | null;
-}
-
-interface BaleMeta {
-  id: number;
-  ref: string;
-  productName: string;
-  weightKg: string;
-  status: string;
-}
-
-function parseBalesMeta(entry: DaybookEntry): BaleMeta[] {
-  if (!entry.metaJson) return [];
-  try {
-    const parsed = JSON.parse(entry.metaJson);
-    return Array.isArray(parsed.bales) ? parsed.bales : [];
-  } catch {
-    return [];
-  }
-}
-
-// A DisplayEntry is a DaybookEntry augmented with a stable React key and a
-// reference back to the original entry (used by the detail panel so it always
-// shows all bales, not just the per-bale virtual row).
-type DisplayEntry = DaybookEntry & { _vKey: string; _source: DaybookEntry };
-
-// Merge multiple BALE_STOCK_ENTRY records (e.g. several batches in one day)
-// into a single synthetic entry so the detail popup shows ALL bales together.
-function mergeBaleEntries(entries: DaybookEntry[]): DaybookEntry {
-  if (entries.length === 1) return entries[0];
-  const allBales = entries.flatMap((e) => parseBalesMeta(e));
-  const totalCurrency = entries.reduce((s, e) => s + parseFloat(e.amountCurrency || "0"), 0);
-  const totalUsd = entries.reduce((s, e) => s + parseFloat(e.amountUsd || "0"), 0);
-  const base = entries[0];
-  const productNames = [...new Set(allBales.map((b: any) => b.productName || b.ref || "Unknown"))];
-  return {
-    ...base,
-    amountCurrency: totalCurrency.toFixed(2),
-    amountUsd: totalUsd.toFixed(2),
-    metaJson: JSON.stringify({ bales: allBales }),
-    description: `${allBales.length} bales - ${productNames.join(" | ")}`,
-  };
-}
-
-// Expand multi-bale BALE_STOCK_ENTRY rows into one virtual row per bale so
-// each bale gets its own named row (like single-bale entries already do).
-// The cost is divided equally across bales.
-function expandBaleEntries(entries: DaybookEntry[]): DisplayEntry[] {
-  const out: DisplayEntry[] = [];
-  for (const e of entries) {
-    if (e.txType === "BALE_STOCK_ENTRY") {
-      const bales = parseBalesMeta(e);
-      if (bales.length > 1) {
-        const totalAmt = parseFloat(e.amountCurrency || "0");
-        const totalUsd = parseFloat(e.amountUsd || "0");
-        bales.forEach((bale, i) => {
-          out.push({
-            ...e,
-            metaJson: JSON.stringify({ bales: [bale] }),
-            amountCurrency: (totalAmt / bales.length).toFixed(2),
-            amountUsd: (totalUsd / bales.length).toFixed(2),
-            _vKey: `${e.id}_b${i}`,
-            _source: e,
-          } as DisplayEntry);
-        });
-        continue;
-      }
-    }
-    out.push({ ...e, _vKey: String(e.id), _source: e } as DisplayEntry);
-  }
-  return out;
-}
-
-function formatDaybookDescription(entry: DaybookEntry): string {
-  if (entry.txType === "BALE_STOCK_ENTRY") {
-    const bales = parseBalesMeta(entry);
-    if (bales.length === 1) return bales[0].productName || bales[0].ref || "Unknown";
-    if (bales.length > 1) return `${bales.length} bales`;
-    return entry.description
-      .replace(/^Stock entry:\s*/i, "")
-      .replace(/\d+ bales? - /i, "")
-      .replace(/\s*[–-]\s*REF\w+/g, "")
-      .replace(/,\s*REF\w+/g, "")
-      .trim();
-  }
-  return entry.description;
-}
-
-const CURRENCY_SYMBOLS: Record<string, string> = {
-  USD: "$",
-  EUR: "€",
-  GBP: "£",
-  AUD: "A$",
-  LBP: "LL",
-  LKR: "₨",
-};
-function currencySymbol(code: string): string {
-  return CURRENCY_SYMBOLS[code] || code + " ";
-}
-
-const TX_TYPE_LABELS: Record<string, string> = {
-  LOADING_CREATED: "Loading Started",
-  CONTAINER_IMPORT: "Container Import",
-  OFFLOAD_RAW_STOCK: "Offload Raw Stock",
-  COMMISSION: "Commission",
-  DUTY: "Duty",
-  BALE_PRESSING: "Bale Pressing",
-  BALE_FINALIZE: "Bale Finalize",
-  BALE_STOCK_ENTRY: "Bale Stock Entry",
-  BALE_REMOVAL: "Bale Removal",
-  BALE_TRANSFER: "Bale Transfer",
-  BALE_IMPORT: "Bale Import",
-  BALE_REIMPORT: "Bale Reimport",
-  OPENING_BALANCE_RAW: "Opening Balance",
-  MIX_BATCH_CREATED: "Mix Batch Created",
-  ORDER_VERIFIED: "Order Verified",
-  INVOICE: "Invoice",
-  PAYMENT: "Payment",
-  RECEIPT: "Receipt",
-  JOURNAL: "Journal",
-  DOC_UPLOAD: "Doc Upload",
-  DOC_DELETE: "Doc Delete",
-  FREIGHT_ADD: "Freight Add",
-  FREIGHT_DELETE: "Freight Delete",
-  FREIGHT_PAYMENT: "Freight Payment",
-  FREIGHT_PAYMENT_DELETE: "Freight Pmt Delete",
-  WORKER_CREATED: "Worker Created",
-  WORKER_EDITED: "Worker Edited",
-  WORKER_IMPORT: "Worker Import",
-  CONTRACT_ENDED: "Contract Ended",
-  CONTRACT_SETTLED: "Contract Settled",
-  WORKER_PHOTO_UPLOADED: "Worker Photo",
-  PAYROLL_GENERATED: "Payroll Generated",
-  PAYROLL_PAYMENT: "Payroll Payment",
-  PAYROLL_STATUS_CHANGE: "Payroll Status",
-  BALE_SALE: "POS Sale",
-  POS_EXPENSE: "POS Deduction",
-  SUPPLIER_PAYMENT: "Supplier Payment",
-  SUPPLIER_PAYMENT_DELETE: "Supplier Pmt. Deleted",
-  ORDER_CANCELLED: "Order Cancelled",
-  REPORT_GENERATED: "Report Generated",
-  PAYMENT_VOIDED: "Payment Voided",
-  RECEIPT_VOIDED: "Receipt Voided",
-  JOURNAL_VOIDED: "Journal Voided",
-};
-
-function formatTxType(type: string): string {
-  if (TX_TYPE_LABELS[type]) return TX_TYPE_LABELS[type];
-  return type
-    .replace(/_/g, " ")
-    .toLowerCase()
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function getFactoryTxTypeBadge(type: string): {
-  variant: "default" | "secondary" | "destructive" | "outline";
-  className?: string;
-} {
-  switch (type) {
-    case "PAYMENT":
-    case "SUPPLIER_PAYMENT":
-    case "FREIGHT_PAYMENT":
-    case "PAYROLL_PAYMENT":
-      return { variant: "outline", className: "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/40" };
-    case "RECEIPT":
-      return {
-        variant: "outline",
-        className: "bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/40",
-      };
-    case "JOURNAL":
-      return {
-        variant: "outline",
-        className: "bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/40",
-      };
-    case "INVOICE":
-      return { variant: "outline", className: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/40" };
-    case "CONTAINER_IMPORT":
-      return {
-        variant: "outline",
-        className: "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/40",
-      };
-    case "COMMISSION":
-    case "DUTY":
-      return { variant: "outline", className: "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/40" };
-    case "BALE_PRESSING":
-    case "BALE_FINALIZE":
-      return {
-        variant: "outline",
-        className: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500/40",
-      };
-    case "BALE_STOCK_ENTRY":
-    case "BALE_IMPORT":
-    case "BALE_REIMPORT":
-    case "OPENING_BALANCE_RAW":
-      return {
-        variant: "outline",
-        className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/40",
-      };
-    case "BALE_SALE":
-      return {
-        variant: "outline",
-        className: "bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/40",
-      };
-    case "POS_EXPENSE":
-      return { variant: "outline", className: "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/40" };
-    case "BALE_REMOVAL":
-    case "BALE_TRANSFER":
-      return { variant: "outline", className: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/40" };
-    case "OFFLOAD_RAW_STOCK":
-      return {
-        variant: "outline",
-        className: "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/40",
-      };
-    case "FREIGHT_ADD":
-      return {
-        variant: "outline",
-        className: "bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/40",
-      };
-    case "LOADING_CREATED":
-      return { variant: "outline", className: "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/40" };
-    case "ORDER_VERIFIED":
-      return { variant: "outline", className: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/40" };
-    case "PAYROLL_GENERATED":
-    case "WORKER_CREATED":
-    case "WORKER_EDITED":
-    case "WORKER_IMPORT":
-    case "CONTRACT_ENDED":
-    case "CONTRACT_SETTLED":
-      return {
-        variant: "outline",
-        className: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/40",
-      };
-    default:
-      return { variant: "outline" };
-  }
-}
-
-const VOUCHER_TX_TYPES: Record<string, string> = {
-  PAYMENT: "payment",
-  RECEIPT: "receipt",
-  JOURNAL: "journal",
-  INVOICE: "receipt",
-  FREIGHT_PAYMENT: "payment",
-  BALE_SALE: "factory_pos",
-  POS_EXPENSE: "factory_pos",
-};
-
-// ─── Factory Daybook sessionStorage persistence ───────────────────────────────
-const FACTORY_DAYBOOK_STATE_KEY = "factory-daybook-ui-state";
-
-interface FactoryDaybookUIState {
-  periodFilter: PeriodFilterValue;
-  txTypeFilter: string;
-  currencyFilter: string;
-  statusFilter: string;
-  searchQuery: string;
-  minAmount: string;
-  maxAmount: string;
-  sortOrder: "asc" | "desc";
-  scrollY: number;
-}
-
-function loadFactoryDaybookState(): FactoryDaybookUIState | null {
-  try {
-    const raw = sessionStorage.getItem(FACTORY_DAYBOOK_STATE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as FactoryDaybookUIState;
-  } catch {
-    return null;
-  }
-}
-
-function saveFactoryDaybookState(state: FactoryDaybookUIState): void {
-  try {
-    sessionStorage.setItem(FACTORY_DAYBOOK_STATE_KEY, JSON.stringify(state));
-  } catch {}
-}
-
-function ViewEntryModal({
-  entry,
-  onClose,
-  onNavigate,
-  formatDisplayDate,
-}: {
-  entry: DaybookEntry;
-  onClose: () => void;
-  onNavigate: (path: string) => void;
-  formatDisplayDate: (d: string) => string;
-}) {
-  const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
-  const isBaleStockEntry = entry.txType === "BALE_STOCK_ENTRY";
-  const isBaleRemoval = entry.txType === "BALE_REMOVAL";
-  const hasBalesMeta = isBaleStockEntry || isBaleRemoval;
-  const isContainerImport = entry.txType === "CONTAINER_IMPORT" && !!entry.referenceId;
-  const isPayrollPayment = entry.txType === "PAYROLL_PAYMENT" && !!entry.referenceId;
-  const isMixBatchCreated =
-    (entry.txType === "MIX_BATCH_CREATED" || entry.txType === "MIX_BATCH_TOPUP") && !!entry.referenceId;
-  const isLoadingCreated = entry.txType === "LOADING_CREATED" && !!entry.referenceId;
-  const isOffloadRawStock = entry.txType === "OFFLOAD_RAW_STOCK";
-  const isCommission = entry.txType === "COMMISSION";
-  const isWasteDisposal = entry.txType === "WASTE_DISPOSAL";
-  const isOtherCharge = entry.txType === "OTHER_CHARGE";
-
-  const entryMeta = (() => {
-    try {
-      return JSON.parse(entry.metaJson || "{}");
-    } catch {
-      return {};
-    }
-  })();
-  const metaContainerId: number | undefined = entryMeta.containerId;
-
-  const { data: viewEntries = [] } = useQuery<any[]>({
-    queryKey: [`/api/vouchers/${entry.referenceId}/view-entries`],
-    enabled: isVoucherBacked && !!entry.referenceId,
-  });
-
-  const { data: containerDetail } = useQuery<any>({
-    queryKey: [`/api/factory/containers/${entry.referenceId}`],
-    enabled: isContainerImport,
-  });
-
-  const { data: supplierBalance } = useQuery<any>({
-    queryKey: [`/api/factory/suppliers/${containerDetail?.supplierId}/balance`],
-    enabled: isContainerImport && !!containerDetail?.supplierId,
-  });
-
-  const { data: payrollSummary } = useQuery<any>({
-    queryKey: [`/api/factory/payroll/${entry.referenceId}/summary`],
-    enabled: isPayrollPayment,
-  });
-
-  const { data: mixBatchDetail } = useQuery<any>({
-    queryKey: [`/api/factory/mix-batches/${entry.referenceId}`],
-    enabled: isMixBatchCreated,
-  });
-
-  const { data: mixBatchSources = [] } = useQuery<any[]>({
-    queryKey: [`/api/factory/mix-batches/${entry.referenceId}/sources`],
-    enabled: isMixBatchCreated,
-  });
-
-  const { data: loadingOrder } = useQuery<any>({
-    queryKey: [`/api/factory/customer-orders/${entry.referenceId}`],
-    enabled: isLoadingCreated,
-  });
-
-  const { data: metaContainerDetail } = useQuery<any>({
-    queryKey: [`/api/factory/containers/${metaContainerId}`],
-    enabled: (isOffloadRawStock || isCommission) && !!metaContainerId,
-  });
-
-  const { data: otherChargeContainerDetail } = useQuery<any>({
-    queryKey: [`/api/factory/containers/${entry.referenceId}`],
-    enabled: isOtherCharge && !!entry.referenceId,
-  });
-
-  // Balance fetching for Payment / Receipt / Journal vouchers
-  const [sourceBalance, setSourceBalance] = useState<string | null>(null);
-  const [entryBalances, setEntryBalances] = useState<Record<number, string>>({});
-
-  useEffect(() => {
-    if (!isVoucherBacked || viewEntries.length === 0) {
-      setSourceBalance(null);
-      setEntryBalances({});
-      return;
-    }
-    const txType = entry.txType;
-    if (txType !== "PAYMENT" && txType !== "RECEIPT" && txType !== "JOURNAL") {
-      setSourceBalance(null);
-      setEntryBalances({});
-      return;
-    }
-
-    // Determine source entry (the "Paid From" / "Received In" account)
-    const src =
-      txType === "PAYMENT"
-        ? viewEntries.find((e: any) => parseFloat(e.creditAmount || "0") > 0)
-        : txType === "RECEIPT"
-          ? viewEntries.find((e: any) => parseFloat(e.debitAmount || "0") > 0)
-          : null;
-
-    // Determine display entries
-    const display =
-      txType === "PAYMENT"
-        ? viewEntries.filter((e: any) => parseFloat(e.debitAmount || "0") > 0)
-        : txType === "RECEIPT"
-          ? viewEntries.filter((e: any) => parseFloat(e.creditAmount || "0") > 0)
-          : viewEntries;
-
-    const resolveUrl = (e: any): string | null => {
-      if (e.ledgerAccountId) return `/api/accounts/ledger/${e.ledgerAccountId}/balance`;
-      if (e.bankAccountId) return `/api/accounts/ledger/${e.bankAccountId}/balance`;
-      if (e.customerId) return `/api/customers/${e.customerId}/balance`;
-      if (e.employeeId) return `/api/employees/${e.employeeId}/balance`;
-      if (e.supplierId) return `/api/suppliers/${e.supplierId}/balance`;
-      if (e.factorySupplierId) return `/api/factory/suppliers/${e.factorySupplierId}/balance`;
-      return null;
-    };
-
-    const fetchAll = async () => {
-      // Source balance
-      if (src) {
-        const url = resolveUrl(src);
-        if (url) {
-          try {
-            const r = await fetch(url, { credentials: "include" });
-            if (r.ok) {
-              const d = await r.json();
-              setSourceBalance(d.balance?.toString() ?? null);
-            }
-          } catch {
-            /* ignore */
-          }
-        }
-      }
-      // Per-entry balances
-      const results: Record<number, string> = {};
-      await Promise.all(
-        display.map(async (e: any) => {
-          const url = resolveUrl(e);
-          if (!url) return;
-          try {
-            const r = await fetch(url, { credentials: "include" });
-            if (r.ok) {
-              const d = await r.json();
-              results[e.id] = d.balance?.toString() || "0";
-            }
-          } catch {
-            /* ignore */
-          }
-        })
-      );
-      setEntryBalances(results);
-    };
-
-    fetchAll();
-  }, [isVoucherBacked, viewEntries, entry.txType]);
-
-  const bales = parseBalesMeta(entry);
-  const amt = parseFloat(entry.amountCurrency || "0");
-  const sym = currencySymbol(entry.currencyCode);
-
-  const totalDebit = viewEntries.reduce((s, e) => s + parseFloat(e.debitAmount || "0"), 0);
-  const totalCredit = viewEntries.reduce((s, e) => s + parseFloat(e.creditAmount || "0"), 0);
-
-  const { variant: badgeVariant, className: badgeClass } = getFactoryTxTypeBadge(entry.txType);
-
-  if (isVoucherBacked) {
-    // Determine voucher type from txType: PAYMENT → Payment, RECEIPT → Receipt, JOURNAL → Journal
-    const voucherType =
-      entry.txType === "PAYMENT"
-        ? "Payment"
-        : entry.txType === "RECEIPT"
-          ? "Receipt"
-          : entry.txType === "JOURNAL"
-            ? "Journal"
-            : entry.txType;
-
-    const isPayment = voucherType === "Payment";
-    const isReceipt = voucherType === "Receipt";
-    const isJournal = voucherType === "Journal";
-    const isPaymentOrReceipt = isPayment || isReceipt;
-
-    // Source account: For Payment = credit entry (cash going OUT), For Receipt = debit entry (cash coming IN)
-    const sourceEntry = isPayment
-      ? viewEntries.find((e: any) => parseFloat(e.creditAmount || "0") > 0)
-      : isReceipt
-        ? viewEntries.find((e: any) => parseFloat(e.debitAmount || "0") > 0)
-        : null;
-
-    // Total = opposite side of source for Payment/Receipt
-    const totalAmount = isPayment
-      ? viewEntries.reduce((s: number, e: any) => s + parseFloat(e.debitAmount || "0"), 0)
-      : isReceipt
-        ? viewEntries.reduce((s: number, e: any) => s + parseFloat(e.creditAmount || "0"), 0)
-        : Math.max(totalDebit, totalCredit);
-
-    // Display entries: Payment = debit side only, Receipt = credit side only, Journal = all
-    const displayEntries = isPayment
-      ? viewEntries.filter((e: any) => parseFloat(e.debitAmount || "0") > 0)
-      : isReceipt
-        ? viewEntries.filter((e: any) => parseFloat(e.creditAmount || "0") > 0)
-        : viewEntries;
-
-    return (
-      <>
-        <DialogHeader>
-          <DialogTitle>Voucher Details</DialogTitle>
-          <DialogDescription>View voucher information</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4 md:space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Date</p>
-              <p className="font-medium">{formatDisplayDate(entry.txDate + "T00:00:00")}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Type</p>
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant={badgeVariant} className={badgeClass}>
-                  {voucherType}
-                </Badge>
-                {entry.optional && <span className="text-sm text-muted-foreground">Optional</span>}
-              </div>
-            </div>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground mb-1">Description</p>
-            <p className="text-sm font-medium">{formatDaybookDescription(entry)}</p>
-          </div>
-
-          {/* Paid From / Received In card — Payment and Receipt only */}
-          {isPaymentOrReceipt && sourceEntry && (
-            <div className="p-3 md:p-4 bg-muted/50 rounded-md">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">{isPayment ? "Paid From" : "Received In"}</p>
-                  <p className="font-medium text-base md:text-lg">{sourceEntry.accountName}</p>
-                  {sourceBalance !== null && (
-                    <p className="text-sm font-mono mt-2 text-muted-foreground">
-                      Balance: {sym}
-                      {formatNumber(parseFloat(sourceBalance))}
-                    </p>
-                  )}
-                </div>
-                <div className="sm:text-right">
-                  <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
-                  <p className="text-xl md:text-2xl font-bold font-mono">
-                    {sym} {formatNumber(totalAmount)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Entries table */}
-          <div>
-            <h3 className="font-semibold mb-3">Entries</h3>
-            {viewEntries.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No entries found</p>
-            ) : (
-              <div className="rounded-md border overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/40">
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Account
-                      </th>
-                      {isPaymentOrReceipt || isJournal ? (
-                        <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                          Amount
-                        </th>
-                      ) : (
-                        <>
-                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                            Debit
-                          </th>
-                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                            Credit
-                          </th>
-                        </>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {displayEntries.map((e: any, i: number) => (
-                      <tr key={e.id ?? i} className="border-b last:border-0">
-                        <td className="px-3 py-2">
-                          <p className="font-medium">{e.accountName || "—"}</p>
-                          {(isPaymentOrReceipt || isJournal) && entryBalances[e.id] !== undefined && (
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              Balance: {sym}
-                              {formatNumber(parseFloat(entryBalances[e.id] || "0"))}
-                            </p>
-                          )}
-                        </td>
-                        {isPaymentOrReceipt || isJournal ? (
-                          <td className="px-3 py-2 text-right font-mono">
-                            {sym}
-                            {formatNumber(
-                              Math.max(parseFloat(e.debitAmount || "0"), parseFloat(e.creditAmount || "0"))
-                            )}
-                          </td>
-                        ) : (
-                          <>
-                            <td className="px-3 py-2 text-right font-mono">
-                              {parseFloat(e.debitAmount || "0") > 0
-                                ? `${sym}${formatNumber(parseFloat(e.debitAmount))}`
-                                : "-"}
-                            </td>
-                            <td className="px-3 py-2 text-right font-mono">
-                              {parseFloat(e.creditAmount || "0") > 0
-                                ? `${sym}${formatNumber(parseFloat(e.creditAmount))}`
-                                : "-"}
-                            </td>
-                          </>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-muted/50 font-bold border-t">
-                      <td className="px-3 py-2">Total</td>
-                      {isPaymentOrReceipt || isJournal ? (
-                        <td className="px-3 py-2 text-right font-mono">
-                          {sym}
-                          {formatNumber(totalAmount)}
-                        </td>
-                      ) : (
-                        <>
-                          <td className="px-3 py-2 text-right font-mono">
-                            {sym}
-                            {formatNumber(totalDebit)}
-                          </td>
-                          <td className="px-3 py-2 text-right font-mono">
-                            {sym}
-                            {formatNumber(totalCredit)}
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  // ── CONTAINER_IMPORT enriched view ──────────────────────────────────────
-  if (isContainerImport) {
-    const c = containerDetail;
-    const csym = c ? currencySymbol(c.currencyCode || "USD") : "$";
-    const fx = c ? parseFloat(c.fxRateToUsd || "1") || 1 : 1;
-    const totalKg = c ? parseFloat(c.totalKg || "0") : 0;
-    const ratePerKg = c ? parseFloat(c.ratePerKg || "0") : 0;
-    const goodsTotal = totalKg * ratePerKg;
-    const freight = c ? parseFloat(c.freight || "0") : 0;
-    const commission = c ? parseFloat(c.commissionAmount || "0") : 0;
-    const grandTotal = c
-      ? parseFloat(c.finalPayableAmount || String(goodsTotal + freight + commission)) ||
-        goodsTotal + freight + commission
-      : 0;
-    const grandTotalUsd = c ? parseFloat(c.finalPayableAmountUsd || "0") || grandTotal * fx : 0;
-    const balanceUsd: number = supplierBalance?.balance ?? supplierBalance?.outstandingUsd ?? null;
-
-    return (
-      <>
-        <DialogHeader>
-          <DialogTitle>Transaction Details</DialogTitle>
-          <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          {/* Supplier card */}
-          <div className="rounded-md border p-4 space-y-2">
-            {!c ? (
-              <p className="text-sm text-muted-foreground">Loading container details…</p>
-            ) : (
-              <>
-                <div className="flex items-start justify-between gap-2 flex-wrap">
-                  <div>
-                    <p className="font-semibold text-base">{c.supplierName || "Unknown Supplier"}</p>
-                    {balanceUsd !== null && (
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        Balance:{" "}
-                        <span className="font-mono font-medium text-foreground">${formatNumber(balanceUsd)}</span>
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-0.5">Container: {c.containerNumber}</p>
-                    {c.origin && <p className="text-xs text-muted-foreground">Origin: {c.origin}</p>}
-                    {totalKg > 0 && parseFloat(c.actualReceivedKg || "0") < totalKg && (
-                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        <span className="text-xs text-muted-foreground">Total KG imported:</span>
-                        <span className="font-mono text-sm font-semibold">{formatNumber(totalKg)} kg</span>
-                        {parseFloat(c.actualReceivedKg || "0") === 0 ? (
-                          <Badge
-                            variant="outline"
-                            className="text-xs bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40"
-                          >
-                            Pending
-                          </Badge>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">
-                            ({formatNumber(parseFloat(c.actualReceivedKg))} kg received)
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="default"
-                    onClick={() => {
-                      onClose();
-                      onNavigate(`/factory/containers?edit=${entry.referenceId}`);
-                    }}
-                    data-testid="button-open-container"
-                  >
-                    Open
-                  </Button>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Cost breakdown table */}
-          {c && (
-            <div className="rounded-md border overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-muted/40 border-b">
-                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Item
-                    </th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Qty / KG
-                    </th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Rate
-                    </th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                      Total
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* Goods row */}
-                  <tr className="border-b">
-                    <td className="px-3 py-2 font-medium">Goods (Raw Stock)</td>
-                    <td className="px-3 py-2 text-right font-mono text-muted-foreground">{formatNumber(totalKg)} kg</td>
-                    <td className="px-3 py-2 text-right font-mono text-muted-foreground">
-                      {csym}
-                      {formatNumber(ratePerKg)}/kg
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono font-medium">
-                      {csym}
-                      {formatNumber(goodsTotal)}
-                    </td>
-                  </tr>
-                  {/* Freight row */}
-                  {freight > 0 && (
-                    <tr className="border-b">
-                      <td className="px-3 py-2 font-medium">Freight</td>
-                      <td className="px-3 py-2 text-right text-muted-foreground">—</td>
-                      <td className="px-3 py-2 text-right text-muted-foreground">—</td>
-                      <td className="px-3 py-2 text-right font-mono font-medium">
-                        {currencySymbol(c.freightCurrencyCode || c.currencyCode || "USD")}
-                        {formatNumber(freight)}
-                      </td>
-                    </tr>
-                  )}
-                  {/* Commission row */}
-                  {commission > 0 && (
-                    <tr className="border-b">
-                      <td className="px-3 py-2 font-medium">Commission</td>
-                      <td className="px-3 py-2 text-right text-muted-foreground">—</td>
-                      <td className="px-3 py-2 text-right text-muted-foreground">—</td>
-                      <td className="px-3 py-2 text-right font-mono font-medium">
-                        {currencySymbol(c.commissionCurrencyCode || c.currencyCode || "USD")}
-                        {formatNumber(commission)}
-                      </td>
-                    </tr>
-                  )}
-                  {/* Actual received KG info */}
-                  {parseFloat(c.actualReceivedKg || "0") > 0 && parseFloat(c.actualReceivedKg || "0") !== totalKg && (
-                    <tr className="border-b bg-muted/20">
-                      <td className="px-3 py-2 text-muted-foreground text-xs" colSpan={2}>
-                        Actual Received
-                      </td>
-                      <td className="px-3 py-2 text-right text-xs text-muted-foreground font-mono" colSpan={2}>
-                        {formatNumber(parseFloat(c.actualReceivedKg))} kg
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-muted/50 font-bold border-t">
-                    <td className="px-3 py-2" colSpan={3}>
-                      Grand Total
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono">
-                      <div>
-                        {csym}
-                        {formatNumber(grandTotal)}
-                      </div>
-                      {c.currencyCode !== "USD" && grandTotalUsd > 0 && (
-                        <div className="text-xs text-muted-foreground font-normal">${formatNumber(grandTotalUsd)}</div>
-                      )}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          )}
-        </div>
-      </>
-    );
-  }
-
-  // ── PAYROLL_PAYMENT enriched view ────────────────────────────────────────
-  if (isPayrollPayment) {
-    const p = payrollSummary;
-    const n = (v: any) => parseFloat(v || "0");
-
-    const grossEarnings = p
-      ? n(p.baseSalary) + n(p.baleEarnings) + n(p.kgEarnings) + n(p.overtimePay) + n(p.bonuses) + n(p.transport)
-      : 0;
-    const totalDeductions = p ? n(p.deductions) + n(p.advances) : 0;
-    const netPay = p ? n(p.netSalary) : 0;
-
-    const periodLabel = p ? `${p.periodStart} – ${p.periodEnd}` : "—";
-
-    return (
-      <>
-        <DialogHeader>
-          <DialogTitle>Payroll Payment</DialogTitle>
-          <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          {!p ? (
-            <p className="text-sm text-muted-foreground">Loading payroll details…</p>
-          ) : (
-            <>
-              {/* Worker + period card */}
-              <div className="rounded-md border p-4">
-                <div className="flex items-start justify-between gap-2 flex-wrap">
-                  <div>
-                    <p className="font-semibold text-base">{p.workerName || `Worker #${p.workerId}`}</p>
-                    {p.workerPosition && <p className="text-xs text-muted-foreground">{p.workerPosition}</p>}
-                    {p.workerCode && <p className="text-xs text-muted-foreground">ID: {p.workerCode}</p>}
-                  </div>
-                  <Badge variant={badgeVariant} className={badgeClass}>
-                    {p.status}
-                  </Badge>
-                </div>
-                <p className="text-sm text-muted-foreground mt-2">Period: {periodLabel}</p>
-              </div>
-
-              {/* Account flow: From → To */}
-              <div className="rounded-md border overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-muted/40 border-b">
-                      <th
-                        className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide"
-                        colSpan={2}
-                      >
-                        Payment Accounts
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b">
-                      <td className="px-3 py-2 text-muted-foreground w-1/3">Paid From</td>
-                      <td className="px-3 py-2 font-medium">{p.cashAccountName || "Cash"}</td>
-                    </tr>
-                    <tr>
-                      <td className="px-3 py-2 text-muted-foreground">Paid To</td>
-                      <td className="px-3 py-2 font-medium">{p.workerName || `Worker #${p.workerId}`}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Earnings breakdown */}
-              <div className="rounded-md border overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-muted/40 border-b">
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Earnings Breakdown
-                      </th>
-                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Amount
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {n(p.baseSalary) > 0 && (
-                      <tr className="border-b">
-                        <td className="px-3 py-2">Base Salary</td>
-                        <td className="px-3 py-2 text-right font-mono">${formatNumber(n(p.baseSalary))}</td>
-                      </tr>
-                    )}
-                    {n(p.baleEarnings) > 0 && (
-                      <tr className="border-b">
-                        <td className="px-3 py-2">
-                          Bale Earnings
-                          {n(p.balesCount) > 0 && (
-                            <span className="text-xs text-muted-foreground ml-1">({p.balesCount} bales)</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono">${formatNumber(n(p.baleEarnings))}</td>
-                      </tr>
-                    )}
-                    {n(p.kgEarnings) > 0 && (
-                      <tr className="border-b">
-                        <td className="px-3 py-2">
-                          KG Earnings
-                          {n(p.kgProcessed) > 0 && (
-                            <span className="text-xs text-muted-foreground ml-1">
-                              ({formatNumber(n(p.kgProcessed))} kg)
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono">${formatNumber(n(p.kgEarnings))}</td>
-                      </tr>
-                    )}
-                    {n(p.overtimePay) > 0 && (
-                      <tr className="border-b">
-                        <td className="px-3 py-2">
-                          Overtime
-                          {n(p.overtimeHours) > 0 && (
-                            <span className="text-xs text-muted-foreground ml-1">
-                              ({formatNumber(n(p.overtimeHours))} hrs)
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono">${formatNumber(n(p.overtimePay))}</td>
-                      </tr>
-                    )}
-                    {n(p.bonuses) > 0 && (
-                      <tr className="border-b">
-                        <td className="px-3 py-2">Bonuses</td>
-                        <td className="px-3 py-2 text-right font-mono">${formatNumber(n(p.bonuses))}</td>
-                      </tr>
-                    )}
-                    {n(p.transport) > 0 && (
-                      <tr className="border-b">
-                        <td className="px-3 py-2">Transport</td>
-                        <td className="px-3 py-2 text-right font-mono">${formatNumber(n(p.transport))}</td>
-                      </tr>
-                    )}
-                    <tr className="border-b bg-muted/20">
-                      <td className="px-3 py-2 font-medium">Gross Earnings</td>
-                      <td className="px-3 py-2 text-right font-mono font-medium">${formatNumber(grossEarnings)}</td>
-                    </tr>
-                    {n(p.deductions) > 0 && (
-                      <tr className="border-b">
-                        <td className="px-3 py-2 text-destructive">Deductions</td>
-                        <td className="px-3 py-2 text-right font-mono text-destructive">
-                          −${formatNumber(n(p.deductions))}
-                        </td>
-                      </tr>
-                    )}
-                    {n(p.advances) > 0 && (
-                      <tr className="border-b">
-                        <td className="px-3 py-2 text-destructive">Advance Recovery</td>
-                        <td className="px-3 py-2 text-right font-mono text-destructive">
-                          −${formatNumber(n(p.advances))}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-muted/50 font-bold border-t">
-                      <td className="px-3 py-2">Net Pay</td>
-                      <td className="px-3 py-2 text-right font-mono">${formatNumber(netPay)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-
-              {/* Attendance summary */}
-              {(n(p.presentDays) > 0 || n(p.absentDays) > 0) && (
-                <div className="flex gap-4 text-sm">
-                  <div className="flex-1 rounded-md border px-3 py-2 text-center">
-                    <p className="text-xs text-muted-foreground">Days Present</p>
-                    <p className="font-semibold">{p.presentDays}</p>
-                  </div>
-                  <div className="flex-1 rounded-md border px-3 py-2 text-center">
-                    <p className="text-xs text-muted-foreground">Days Absent</p>
-                    <p className="font-semibold">{p.absentDays}</p>
-                  </div>
-                  {p.totalWorkingDays > 0 && (
-                    <div className="flex-1 rounded-md border px-3 py-2 text-center">
-                      <p className="text-xs text-muted-foreground">Working Days</p>
-                      <p className="font-semibold">{p.totalWorkingDays}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {p.notes && (
-                <div className="rounded-md bg-muted/40 px-3 py-2 text-sm text-muted-foreground">{p.notes}</div>
-              )}
-            </>
-          )}
-        </div>
-      </>
-    );
-  }
-
-  // ── MIX_BATCH_CREATED / MIX_BATCH_TOPUP enriched view ────────────────────
-  if (isMixBatchCreated) {
-    const mb = mixBatchDetail;
-    const totalKg = mb ? parseFloat(mb.totalWeightKg || "0") : 0;
-    const totalCost = mb ? parseFloat(mb.totalCost || "0") : 0;
-    const costPerKg = mb ? parseFloat(mb.costPerKg || "0") : 0;
-    const sourcesTotalKg = mixBatchSources.reduce((s: number, src: any) => s + parseFloat(src.weightKg || "0"), 0);
-
-    return (
-      <>
-        <DialogHeader>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <DialogTitle>Mix Batch Details</DialogTitle>
-            <Badge variant="outline" className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40">
-              {entry.txType === "MIX_BATCH_TOPUP" ? "Top-up" : "Mix Batch Created"}
-            </Badge>
-          </div>
-          <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          {/* Batch summary card */}
-          <div className="rounded-md border p-4 space-y-3">
-            {!mb ? (
-              <p className="text-sm text-muted-foreground">Loading batch details…</p>
-            ) : (
-              <>
-                <div className="flex items-start justify-between gap-2 flex-wrap">
-                  <div>
-                    <p className="font-semibold text-base font-mono">{mb.batchCode}</p>
-                    {mb.name && <p className="text-sm text-muted-foreground mt-0.5">{mb.name}</p>}
-                    {mb.operatorUser && (
-                      <p className="text-xs text-muted-foreground mt-0.5">Operator: {mb.operatorUser}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="text-xs">
-                      {mb.status}
-                    </Badge>
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={() => {
-                        onClose();
-                        onNavigate(`/factory/mix-batches`);
-                      }}
-                      data-testid="button-open-mix-batch"
-                    >
-                      Open
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                  <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
-                    <p className="text-xs text-muted-foreground">Total Weight</p>
-                    <p className="font-semibold font-mono">{formatNumber(totalKg)} kg</p>
-                  </div>
-                  <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
-                    <p className="text-xs text-muted-foreground">Total Cost</p>
-                    <p className="font-semibold font-mono">${formatNumber(totalCost)}</p>
-                  </div>
-                  <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
-                    <p className="text-xs text-muted-foreground">Cost / kg</p>
-                    <p className="font-semibold font-mono">${formatNumber(costPerKg)}</p>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Sources breakdown */}
-          <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
-              Mixed From ({mixBatchSources.length} source{mixBatchSources.length !== 1 ? "s" : ""}
-              {sourcesTotalKg > 0 ? ` · ${formatNumber(sourcesTotalKg)} kg total` : ""})
-            </p>
-            {mixBatchSources.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4 rounded-md border">
-                No source records found
-              </p>
-            ) : (
-              <div className="rounded-md border overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-muted/40 border-b">
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Source
-                      </th>
-                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Weight
-                      </th>
-                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        $/kg
-                      </th>
-                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                        Total
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {mixBatchSources.map((src: any, i: number) => {
-                      const srcKg = parseFloat(src.weightKg || "0");
-                      const srcCpk = parseFloat(src.costPerKg || "0");
-                      const srcTotal = parseFloat(src.totalCost || "0");
-                      const pct = sourcesTotalKg > 0 ? (srcKg / sourcesTotalKg) * 100 : 0;
-
-                      let sourceLabel: string;
-                      let sourceSubLabel = "";
-                      if (src.sourceType === "batch" && src.sourceBatchCode) {
-                        sourceLabel = src.sourceBatchCode;
-                        sourceSubLabel = "Carry-forward batch";
-                      } else if (src.supplierName) {
-                        sourceLabel = src.supplierName;
-                        sourceSubLabel = src.containerNumber ? `Container: ${src.containerNumber}` : "";
-                      } else if (src.containerNumber) {
-                        sourceLabel = src.containerNumber;
-                      } else {
-                        sourceLabel = `Source #${src.id}`;
-                      }
-
-                      return (
-                        <tr key={src.id ?? i} className="border-b last:border-0">
-                          <td className="px-3 py-2.5">
-                            <p className="font-medium">{sourceLabel}</p>
-                            {sourceSubLabel && <p className="text-xs text-muted-foreground mt-0.5">{sourceSubLabel}</p>}
-                            <p className="text-xs text-muted-foreground mt-0.5">{pct.toFixed(1)}% of batch</p>
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-mono">{formatNumber(srcKg)} kg</td>
-                          <td className="px-3 py-2.5 text-right font-mono text-muted-foreground">
-                            ${formatNumber(srcCpk)}
-                          </td>
-                          <td className="px-3 py-2.5 text-right font-mono font-medium">${formatNumber(srcTotal)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                  {mixBatchSources.length > 1 && (
-                    <tfoot>
-                      <tr className="bg-muted/30 border-t">
-                        <td className="px-3 py-2 text-xs font-medium text-muted-foreground">Total</td>
-                        <td className="px-3 py-2 text-right font-mono font-medium">
-                          {formatNumber(sourcesTotalKg)} kg
-                        </td>
-                        <td />
-                        <td className="px-3 py-2 text-right font-mono font-medium">
-                          $
-                          {formatNumber(
-                            mixBatchSources.reduce((s: number, src: any) => s + parseFloat(src.totalCost || "0"), 0)
-                          )}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  )}
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  // ── LOADING_CREATED enriched view ───────────────────────────────────────
-  if (isLoadingCreated) {
-    const lo = loadingOrder;
-    const lines: any[] = lo?.lines ?? [];
-    const balesList: any[] = lo?.bales ?? [];
-    const n = (v: any) => parseFloat(v || "0");
-
-    const expectedBalesTotal = lines.reduce((s: number, l: any) => s + (parseInt(l.quantity || "0") || 0), 0);
-    const scannedBales = balesList.length;
-    const totalWeightKg = balesList.reduce((s: number, b: any) => s + n(b.weight), 0);
-    const grandTotal = lo ? n(lo.grandTotal) : 0;
-    const subtotalBales = lo ? n(lo.subtotalBales) : 0;
-    const freightAmount = lo ? n(lo.freightAmount) : 0;
-
-    return (
-      <>
-        <DialogHeader>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <DialogTitle>Loading Started</DialogTitle>
-            <Badge variant={badgeVariant} className={badgeClass}>
-              Loading Started
-            </Badge>
-          </div>
-          <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          {!lo ? (
-            <p className="text-sm text-muted-foreground">Loading order details…</p>
-          ) : (
-            <>
-              {/* Customer + status card */}
-              <div className="rounded-md border p-4 space-y-2">
-                <div className="flex items-start justify-between gap-2 flex-wrap">
-                  <div>
-                    <p className="font-semibold text-base">{lo.customerName || `Customer #${lo.customerId}`}</p>
-                    {lo.customerCode && <p className="text-xs text-muted-foreground font-mono">{lo.customerCode}</p>}
-                    {lo.destination && (
-                      <p className="text-xs text-muted-foreground mt-0.5">Destination: {lo.destination}</p>
-                    )}
-                    {lo.containerNotes && (
-                      <p className="text-xs text-muted-foreground mt-0.5 italic">{lo.containerNotes}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="secondary" className="text-xs">
-                      {lo.status}
-                    </Badge>
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={() => {
-                        onClose();
-                        onNavigate(`/factory/customer-orders`);
-                      }}
-                      data-testid="button-open-loading-order"
-                    >
-                      Open
-                    </Button>
-                  </div>
-                </div>
-                {lo.proformaName && (
-                  <p className="text-xs text-muted-foreground">
-                    Proforma: <span className="font-medium text-foreground">{lo.proformaName}</span>
-                  </p>
-                )}
-                {lo.loadingStartedAt && (
-                  <p className="text-xs text-muted-foreground">
-                    Loading started: {formatDisplayDate(lo.loadingStartedAt)}
-                  </p>
-                )}
-              </div>
-
-              {/* Stats grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
-                  <p className="text-xs text-muted-foreground">Expected Bales</p>
-                  <p className="font-semibold font-mono text-lg">{expectedBalesTotal > 0 ? expectedBalesTotal : "—"}</p>
-                </div>
-                <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
-                  <p className="text-xs text-muted-foreground">Scanned Bales</p>
-                  <p className="font-semibold font-mono text-lg">{scannedBales}</p>
-                </div>
-                <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
-                  <p className="text-xs text-muted-foreground">Total Weight</p>
-                  <p className="font-semibold font-mono text-lg">
-                    {totalWeightKg > 0 ? `${formatNumber(totalWeightKg)} kg` : "—"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Order lines (proforma lines / article breakdown) */}
-              {lines.length > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
-                    Order Lines ({lines.length})
-                  </p>
-                  <div className="rounded-md border overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="bg-muted/40 border-b">
-                          <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                            Article
-                          </th>
-                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                            Qty (bales)
-                          </th>
-                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                            Price / bale
-                          </th>
-                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                            Total
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {lines.map((l: any, i: number) => {
-                          const qty = parseInt(l.quantity || "0") || 0;
-                          const price = n(l.pricePerBale || l.unitPrice || "0");
-                          const total = n(l.totalAmount || l.lineTotal || String(qty * price));
-                          return (
-                            <tr key={l.id ?? i} className="border-b last:border-0">
-                              <td className="px-3 py-2">
-                                <p className="font-medium font-mono text-xs">{l.articleCode || "—"}</p>
-                                {l.productName && <p className="text-xs text-muted-foreground">{l.productName}</p>}
-                              </td>
-                              <td className="px-3 py-2 text-right font-mono">{qty}</td>
-                              <td className="px-3 py-2 text-right font-mono text-muted-foreground">
-                                {price > 0 ? `$${formatNumber(price)}` : "—"}
-                              </td>
-                              <td className="px-3 py-2 text-right font-mono font-medium">
-                                {total > 0 ? `$${formatNumber(total)}` : "—"}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                      {lines.length > 1 && expectedBalesTotal > 0 && (
-                        <tfoot>
-                          <tr className="bg-muted/50 border-t font-semibold">
-                            <td className="px-3 py-2 text-xs">Total</td>
-                            <td className="px-3 py-2 text-right font-mono">{expectedBalesTotal}</td>
-                            <td />
-                            <td className="px-3 py-2 text-right font-mono">
-                              {subtotalBales > 0 ? `$${formatNumber(subtotalBales)}` : "—"}
-                            </td>
-                          </tr>
-                        </tfoot>
-                      )}
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* When no proforma lines exist, show scanned bales grouped by product */}
-              {lines.length === 0 && balesList.length > 0 && (
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
-                    Scanned Bales by Item ({balesList.length} total)
-                  </p>
-                  <div className="rounded-md border overflow-hidden">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="bg-muted/40 border-b">
-                          <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                            Item
-                          </th>
-                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                            Bales
-                          </th>
-                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                            Weight (kg)
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Object.entries(
-                          balesList.reduce((acc: Record<string, { count: number; weight: number }>, b: any) => {
-                            const key = b.productName || b.baleName || b.articleCode || "Unknown";
-                            if (!acc[key]) acc[key] = { count: 0, weight: 0 };
-                            acc[key].count += 1;
-                            acc[key].weight += parseFloat(b.weight || b.weightKg || "0");
-                            return acc;
-                          }, {})
-                        )
-                          .sort(([a], [b]) => a.localeCompare(b))
-                          .map(([name, stats]) => (
-                            <tr key={name} className="border-b last:border-0">
-                              <td className="px-3 py-2 font-medium">{name}</td>
-                              <td className="px-3 py-2 text-right font-mono">{stats.count}</td>
-                              <td className="px-3 py-2 text-right font-mono text-muted-foreground">
-                                {formatNumber(stats.weight)}
-                              </td>
-                            </tr>
-                          ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="bg-muted/50 border-t font-semibold">
-                          <td className="px-3 py-2 text-xs">Total</td>
-                          <td className="px-3 py-2 text-right font-mono">{balesList.length}</td>
-                          <td className="px-3 py-2 text-right font-mono text-muted-foreground">
-                            {formatNumber(
-                              balesList.reduce(
-                                (sum: number, b: any) => sum + parseFloat(b.weight || b.weightKg || "0"),
-                                0
-                              )
-                            )}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* Financial summary */}
-              {(grandTotal > 0 || freightAmount > 0) && (
-                <div className="rounded-md border overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <tbody>
-                      {subtotalBales > 0 && (
-                        <tr className="border-b">
-                          <td className="px-3 py-2 text-muted-foreground">Subtotal (bales)</td>
-                          <td className="px-3 py-2 text-right font-mono font-medium">${formatNumber(subtotalBales)}</td>
-                        </tr>
-                      )}
-                      {freightAmount > 0 && (
-                        <tr className="border-b">
-                          <td className="px-3 py-2 text-muted-foreground">Freight</td>
-                          <td className="px-3 py-2 text-right font-mono font-medium">${formatNumber(freightAmount)}</td>
-                        </tr>
-                      )}
-                      {grandTotal > 0 && (
-                        <tr className="bg-muted/50 font-bold">
-                          <td className="px-3 py-2">Grand Total</td>
-                          <td className="px-3 py-2 text-right font-mono">${formatNumber(grandTotal)}</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </>
-    );
-  }
-
-  // ── BALE_STOCK_ENTRY enriched view ────────────────────────────────────────
-  if (isBaleStockEntry && bales.length > 0) {
-    const totalAmt = amt;
-    const amtPerBale = bales.length > 0 ? totalAmt / bales.length : 0;
-    const groups = bales.reduce((acc: Record<string, { count: number; totalAmount: number }>, b: any) => {
-      const key = b.productName || b.ref || "Unknown";
-      if (!acc[key]) acc[key] = { count: 0, totalAmount: 0 };
-      acc[key].count += 1;
-      acc[key].totalAmount += amtPerBale;
-      return acc;
-    }, {});
-    const sortedGroups = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
-    return (
-      <>
-        <DialogHeader>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <DialogTitle>Bale Stock Entry</DialogTitle>
-            <Badge variant={badgeVariant} className={badgeClass}>
-              Bale Stock Entry
-            </Badge>
-          </div>
-          <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="rounded-md border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-muted/40 border-b">
-                  <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Item
-                  </th>
-                  <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Qty
-                  </th>
-                  <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Total Amount
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedGroups.map(([name, stats]) => (
-                  <tr key={name} className="border-b last:border-0">
-                    <td className="px-3 py-2 font-medium">{name}</td>
-                    <td className="px-3 py-2 text-right font-mono">{stats.count}</td>
-                    <td className="px-3 py-2 text-right font-mono">
-                      {sym}
-                      {formatNumber(stats.totalAmount)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="bg-muted/50 border-t font-semibold">
-                  <td className="px-3 py-2 text-xs">Total</td>
-                  <td className="px-3 py-2 text-right font-mono">{bales.length}</td>
-                  <td className="px-3 py-2 text-right font-mono">
-                    {sym}
-                    {formatNumber(totalAmt)}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  // ── OFFLOAD_RAW_STOCK enriched view ────────────────────────────────────────
-  if (isOffloadRawStock) {
-    const c = metaContainerDetail;
-    return (
-      <>
-        <DialogHeader>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <DialogTitle>Offload Raw Stock</DialogTitle>
-            <Badge variant={badgeVariant} className={badgeClass}>
-              Offload Raw Stock
-            </Badge>
-          </div>
-          <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="rounded-md border p-4 space-y-2">
-            {!c && metaContainerId ? (
-              <p className="text-sm text-muted-foreground">Loading container details…</p>
-            ) : c ? (
-              <div className="flex items-start justify-between gap-2 flex-wrap">
-                <div>
-                  <p className="font-semibold text-base">{c.supplierName || "Unknown Supplier"}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Container: <span className="font-mono">{c.containerNumber}</span>
-                  </p>
-                  {c.origin && <p className="text-xs text-muted-foreground">Origin: {c.origin}</p>}
-                </div>
-                <Button
-                  size="sm"
-                  variant="default"
-                  onClick={() => {
-                    onClose();
-                    onNavigate(`/factory/containers?edit=${metaContainerId}`);
-                  }}
-                  data-testid="button-open-container"
-                >
-                  Open Container
-                </Button>
-              </div>
-            ) : null}
-          </div>
-          <div className="rounded-md border px-4 py-3 space-y-1">
-            <p className="text-xs text-muted-foreground">Amount</p>
-            <p className="text-lg font-bold font-mono">
-              {sym}
-              {formatNumber(amt)}
-            </p>
-            {entry.currencyCode !== "USD" && parseFloat(entry.fxRateToUsd || "1") !== 1 && (
-              <p className="text-xs font-mono text-muted-foreground">
-                ${formatNumber(parseFloat(entry.amountUsd || "0"))} USD
-              </p>
-            )}
-            {entry.description && <p className="text-sm text-muted-foreground mt-1">{entry.description}</p>}
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  // ── COMMISSION enriched view ───────────────────────────────────────────────
-  if (isCommission) {
-    const c = metaContainerDetail;
-    return (
-      <>
-        <DialogHeader>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <DialogTitle>Commission</DialogTitle>
-            <Badge variant={badgeVariant} className={badgeClass}>
-              Commission
-            </Badge>
-          </div>
-          <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="rounded-md border p-4 space-y-2">
-            {!c && metaContainerId ? (
-              <p className="text-sm text-muted-foreground">Loading container details…</p>
-            ) : c ? (
-              <div className="flex items-start justify-between gap-2 flex-wrap">
-                <div>
-                  <p className="font-semibold text-base">{c.containerNumber}</p>
-                  {c.supplierName && <p className="text-xs text-muted-foreground">Supplier: {c.supplierName}</p>}
-                </div>
-                <Button
-                  size="sm"
-                  variant="default"
-                  onClick={() => {
-                    onClose();
-                    onNavigate(`/factory/containers?edit=${metaContainerId}`);
-                  }}
-                  data-testid="button-open-container"
-                >
-                  Open Container
-                </Button>
-              </div>
-            ) : null}
-          </div>
-          <div className="rounded-md border px-4 py-3 space-y-1">
-            <p className="text-xs text-muted-foreground">Commission Amount</p>
-            <p className="text-lg font-bold font-mono">
-              {sym}
-              {formatNumber(amt)}
-            </p>
-            {entry.description && <p className="text-sm text-muted-foreground mt-1">{entry.description}</p>}
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  // ── WASTE_DISPOSAL enriched view ───────────────────────────────────────────
-  if (isWasteDisposal) {
-    return (
-      <>
-        <DialogHeader>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <DialogTitle>Waste Disposal</DialogTitle>
-            <Badge variant={badgeVariant} className={badgeClass}>
-              Waste Disposal
-            </Badge>
-          </div>
-          <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          {entry.description && (
-            <div className="rounded-md border p-4">
-              <p className="text-sm font-medium">{entry.description}</p>
-            </div>
-          )}
-          <div className="rounded-md border px-4 py-3">
-            <p className="text-xs text-muted-foreground">Written Off Value</p>
-            <p className="text-lg font-bold font-mono">
-              {sym}
-              {formatNumber(amt)}
-            </p>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  // ── OTHER_CHARGE enriched view ─────────────────────────────────────────────
-  if (isOtherCharge) {
-    const c = otherChargeContainerDetail;
-    return (
-      <>
-        <DialogHeader>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <DialogTitle>Other Charge</DialogTitle>
-            <Badge variant={badgeVariant} className={badgeClass}>
-              Other Charge
-            </Badge>
-          </div>
-          <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          {c && (
-            <div className="rounded-md border p-4">
-              <div className="flex items-start justify-between gap-2 flex-wrap">
-                <div>
-                  <p className="font-semibold text-base">{c.supplierName || c.containerNumber}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Container: <span className="font-mono">{c.containerNumber}</span>
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="default"
-                  onClick={() => {
-                    onClose();
-                    onNavigate(`/factory/containers?edit=${entry.referenceId}`);
-                  }}
-                  data-testid="button-open-container"
-                >
-                  Open Container
-                </Button>
-              </div>
-            </div>
-          )}
-          <div className="rounded-md border px-4 py-3 space-y-1">
-            <p className="text-xs text-muted-foreground">Amount</p>
-            <p className="text-lg font-bold font-mono">
-              {sym}
-              {formatNumber(amt)}
-            </p>
-            {entry.description && <p className="text-sm text-muted-foreground mt-1">{entry.description}</p>}
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  return (
-    <>
-      <DialogHeader>
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <DialogTitle>Transaction Details</DialogTitle>
-          <Badge variant={badgeVariant} className={badgeClass}>
-            {formatTxType(entry.txType)}
-          </Badge>
-        </div>
-        <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
-      </DialogHeader>
-      <div className="space-y-4">
-        <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Description</p>
-          <p className="text-sm font-medium">{formatDaybookDescription(entry)}</p>
-        </div>
-        <div className="rounded-md border px-4 py-3 flex items-center justify-between gap-4">
-          <div>
-            <p className="text-xs text-muted-foreground">Amount</p>
-            <p className="text-lg font-bold font-mono">
-              {sym}
-              {formatNumber(amt)}
-            </p>
-          </div>
-          {entry.currencyCode !== "USD" && parseFloat(entry.fxRateToUsd) !== 1 && (
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground">USD Equivalent</p>
-              <p className="text-sm font-mono">${formatNumber(parseFloat(entry.amountUsd || "0"))}</p>
-            </div>
-          )}
-        </div>
-        {isBaleRemoval && bales.length === 0 && (
-          <div className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-            Bale details were not recorded for this entry (created before bale tracking was enabled).
-          </div>
-        )}
-        {hasBalesMeta && bales.length > 0 && (
-          <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
-              {isBaleRemoval ? "Removed Bales" : "Bales"} ({bales.length})
-            </p>
-            <div className="max-h-64 overflow-y-auto space-y-1">
-              {bales.map((bale) => (
-                <div
-                  key={bale.ref}
-                  className="flex items-center justify-between rounded-md border px-3 py-2 text-sm hover-elevate cursor-pointer"
-                  onClick={() => {
-                    onClose();
-                    onNavigate(`/factory/barcode-lookup?ref=${encodeURIComponent(bale.ref)}`);
-                  }}
-                  data-testid={`view-bale-row-${bale.ref}`}
-                >
-                  <div>
-                    <span className="font-mono font-medium">{bale.ref}</span>
-                    <span className="text-muted-foreground ml-2 text-xs">{bale.productName}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground text-xs">{parseFloat(bale.weightKg).toFixed(1)} kg</span>
-                    <Badge variant={bale.status === "IN_STOCK" ? "secondary" : "outline"} className="text-xs">
-                      {bale.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </>
-  );
-}
+import type { DaybookEntry, DisplayEntry, FactoryDaybookUIState } from "./daybook/types";
+import {
+  parseBalesMeta,
+  mergeBaleEntries,
+  expandBaleEntries,
+  formatDaybookDescription,
+  currencySymbol,
+  formatTxType,
+  getFactoryTxTypeBadge,
+  CURRENCY_SYMBOLS,
+  TX_TYPE_LABELS,
+  VOUCHER_TX_TYPES,
+} from "./daybook/daybookUtils";
+import { FACTORY_DAYBOOK_STATE_KEY, loadFactoryDaybookState, saveFactoryDaybookState } from "./daybook/daybookUiState";
+import { ViewEntryModal } from "./daybook/ViewEntryModal";
 
 export default function FactoryDaybook() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
@@ -1842,18 +94,14 @@ export default function FactoryDaybook() {
   );
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
   const [txTypeFilter, setTxTypeFilter] = useState(() => initialDaybookStateRef.current?.txTypeFilter || "ALL");
-  const [currencyFilter, setCurrencyFilter] = useState(
-    () => initialDaybookStateRef.current?.currencyFilter || "ALL"
-  );
+  const [currencyFilter, setCurrencyFilter] = useState(() => initialDaybookStateRef.current?.currencyFilter || "ALL");
   const [statusFilter, setStatusFilter] = useState<"all" | "exclude" | "only">(
     () => (initialDaybookStateRef.current?.statusFilter as "all" | "exclude" | "only") || "all"
   );
   const [searchQuery, setSearchQuery] = useState(() => initialDaybookStateRef.current?.searchQuery || "");
   const [minAmount, setMinAmount] = useState(() => initialDaybookStateRef.current?.minAmount || "");
   const [maxAmount, setMaxAmount] = useState(() => initialDaybookStateRef.current?.maxAmount || "");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(
-    () => initialDaybookStateRef.current?.sortOrder || "desc"
-  );
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">(() => initialDaybookStateRef.current?.sortOrder || "desc");
   // searchQuery filters client-side only (not part of the query key below), but debounce
   // it anyway so rapid typing doesn't thrash the derived filteredEntries memo on large lists.
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
@@ -2455,770 +703,784 @@ export default function FactoryDaybook() {
       </div>
 
       {/* Tab selector: Transactions / Edits & Activity */}
-      <Tabs value={activeDaybookTab} onValueChange={(value) => setActiveDaybookTab(value as "transactions" | "activity")}>
+      <Tabs
+        value={activeDaybookTab}
+        onValueChange={(value) => setActiveDaybookTab(value as "transactions" | "activity")}
+      >
         <TabsList className="w-fit">
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="activity">Edits &amp; Activity</TabsTrigger>
         </TabsList>
 
         <TabsContent value="transactions" className="space-y-4 mt-2">
-        {/* Filters */}
-      <Card>
-        <CardContent className="pt-4 pb-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <Input
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              data-testid="input-search"
-              className="w-44 h-8 text-sm"
-            />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                const fmt = "yyyy-MM-dd";
-                setPeriodFilter((prev) => ({
-                  fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), -1), fmt),
-                  toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), -1), fmt),
-                  preset: "custom",
-                }));
-              }}
-              title="Previous day (−)"
-              data-testid="button-prev-day"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                const fmt = "yyyy-MM-dd";
-                setPeriodFilter((prev) => ({
-                  fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), 1), fmt),
-                  toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), 1), fmt),
-                  preset: "custom",
-                }));
-              }}
-              title="Next day (+)"
-              data-testid="button-next-day"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Select value={txTypeFilter} onValueChange={setTxTypeFilter}>
-              <SelectTrigger className="w-36 h-8 text-sm" data-testid="select-tx-type">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All Types</SelectItem>
-                <SelectItem value="PAYMENT">Payment</SelectItem>
-                <SelectItem value="RECEIPT">Receipt</SelectItem>
-                <SelectItem value="JOURNAL">Journal</SelectItem>
-                <SelectItem value="INVOICE">Invoice</SelectItem>
-                <SelectItem value="BALE_TRANSFER">Bale Transfer</SelectItem>
-                <SelectItem value="CONTAINER_IMPORT">Container Import</SelectItem>
-                <SelectItem value="OFFLOAD_RAW_STOCK">Offload Raw Stock</SelectItem>
-                <SelectItem value="COMMISSION">Commission</SelectItem>
-                <SelectItem value="BALE_PRESSING">Bale Pressing</SelectItem>
-                <SelectItem value="BALE_FINALIZE">Bale Finalize</SelectItem>
-                <SelectItem value="BALE_STOCK_ENTRY">Bale Stock Entry</SelectItem>
-                <SelectItem value="BALE_REMOVAL">Bale Removal</SelectItem>
-                <SelectItem value="FREIGHT_PAYMENT">Freight Payment</SelectItem>
-                <SelectItem value="SUPPLIER_PAYMENT">Supplier Payment</SelectItem>
-                <SelectItem value="PAYROLL_PAYMENT">Payroll Payment</SelectItem>
-                <SelectItem value="DOC_UPLOAD">Doc Upload</SelectItem>
-                <SelectItem value="DOC_DELETE">Doc Delete</SelectItem>
-                <SelectItem value="FREIGHT_ADD">Freight Add</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "exclude" | "only")}>
-              <SelectTrigger className="w-36 h-8 text-sm" data-testid="select-status-filter">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Entries</SelectItem>
-                <SelectItem value="exclude">Exclude Optional</SelectItem>
-                <SelectItem value="only">Only Optional</SelectItem>
-              </SelectContent>
-            </Select>
-            {hasActiveFilters && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearFilters}
-                data-testid="button-clear-filters"
-                className="gap-1 h-8 text-sm"
-              >
-                <X className="w-3.5 h-3.5" />
-                Clear
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Transactions Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5" />
-              Transactions
-              {filteredEntries.length > 0 && (
-                <span className="text-sm font-normal text-muted-foreground">
-                  ({`${condensedRows.length} group${condensedRows.length === 1 ? "" : "s"}`})
-                </span>
-              )}
-            </CardTitle>
-          </div>
-          <CardDescription>All factory transactions in one view</CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="space-y-2 p-6">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : filteredEntries.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              {hasActiveFilters ? (
-                <div>
-                  <p className="mb-2">No transactions found matching your filters.</p>
-                  <Button variant="outline" onClick={clearFilters} data-testid="button-clear-filters-empty">
-                    Clear Filters
+          {/* Filters */}
+          <Card>
+            <CardContent className="pt-4 pb-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <Input
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  data-testid="input-search"
+                  className="w-44 h-8 text-sm"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    const fmt = "yyyy-MM-dd";
+                    setPeriodFilter((prev) => ({
+                      fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), -1), fmt),
+                      toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), -1), fmt),
+                      preset: "custom",
+                    }));
+                  }}
+                  title="Previous day (−)"
+                  data-testid="button-prev-day"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    const fmt = "yyyy-MM-dd";
+                    setPeriodFilter((prev) => ({
+                      fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), 1), fmt),
+                      toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), 1), fmt),
+                      preset: "custom",
+                    }));
+                  }}
+                  title="Next day (+)"
+                  data-testid="button-next-day"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Select value={txTypeFilter} onValueChange={setTxTypeFilter}>
+                  <SelectTrigger className="w-36 h-8 text-sm" data-testid="select-tx-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Types</SelectItem>
+                    <SelectItem value="PAYMENT">Payment</SelectItem>
+                    <SelectItem value="RECEIPT">Receipt</SelectItem>
+                    <SelectItem value="JOURNAL">Journal</SelectItem>
+                    <SelectItem value="INVOICE">Invoice</SelectItem>
+                    <SelectItem value="BALE_TRANSFER">Bale Transfer</SelectItem>
+                    <SelectItem value="CONTAINER_IMPORT">Container Import</SelectItem>
+                    <SelectItem value="OFFLOAD_RAW_STOCK">Offload Raw Stock</SelectItem>
+                    <SelectItem value="COMMISSION">Commission</SelectItem>
+                    <SelectItem value="BALE_PRESSING">Bale Pressing</SelectItem>
+                    <SelectItem value="BALE_FINALIZE">Bale Finalize</SelectItem>
+                    <SelectItem value="BALE_STOCK_ENTRY">Bale Stock Entry</SelectItem>
+                    <SelectItem value="BALE_REMOVAL">Bale Removal</SelectItem>
+                    <SelectItem value="FREIGHT_PAYMENT">Freight Payment</SelectItem>
+                    <SelectItem value="SUPPLIER_PAYMENT">Supplier Payment</SelectItem>
+                    <SelectItem value="PAYROLL_PAYMENT">Payroll Payment</SelectItem>
+                    <SelectItem value="DOC_UPLOAD">Doc Upload</SelectItem>
+                    <SelectItem value="DOC_DELETE">Doc Delete</SelectItem>
+                    <SelectItem value="FREIGHT_ADD">Freight Add</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "exclude" | "only")}>
+                  <SelectTrigger className="w-36 h-8 text-sm" data-testid="select-status-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Entries</SelectItem>
+                    <SelectItem value="exclude">Exclude Optional</SelectItem>
+                    <SelectItem value="only">Only Optional</SelectItem>
+                  </SelectContent>
+                </Select>
+                {hasActiveFilters && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearFilters}
+                    data-testid="button-clear-filters"
+                    className="gap-1 h-8 text-sm"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Clear
                   </Button>
-                </div>
-              ) : (
-                <>
-                  <BookOpen className="mx-auto h-12 w-12 text-muted-foreground" />
-                  <h3 className="mt-4 text-lg font-semibold">No transactions found</h3>
-                  <p className="mt-2">Factory transactions will appear here as you perform operations</p>
-                </>
-              )}
-            </div>
-          ) : (
-            /* ── CONDENSED VIEW — matches ERP Daybook: Date/Type | Count | Total ── */
-            <div className="w-full">
-              {/* Header */}
-              <div
-                className={cn(
-                  "sticky top-0 z-30 bg-background border-b grid w-full px-4 py-2",
-                  showAmounts ? "grid-cols-[minmax(0,1fr)_100px_180px]" : "grid-cols-[minmax(0,1fr)_100px]"
-                )}
-              >
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Date / Type</span>
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider text-center">
-                  Count
-                </span>
-                {showAmounts && (
-                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider text-right">
-                    Total
-                  </span>
                 )}
               </div>
+            </CardContent>
+          </Card>
 
-              {/* Group condensedRows by date for date-separator rows */}
-              {(() => {
-                const dateMap = new Map<string, typeof condensedRows>();
-                for (const row of condensedRows) {
-                  if (!dateMap.has(row.date)) dateMap.set(row.date, []);
-                  dateMap.get(row.date)!.push(row);
-                }
-                return Array.from(dateMap.entries()).map(([date, rows]) => {
-                  const dayTotal = rows.reduce((s, r) => s + r.totalAmountCurrency, 0);
-                  const dayCcy = rows[0]?.currencyCode ?? "USD";
-                  const colsClass = showAmounts
-                    ? "grid-cols-[minmax(0,1fr)_100px_180px]"
-                    : "grid-cols-[minmax(0,1fr)_100px]";
-                  return (
-                    <div key={date} className="w-full">
-                      {/* Date separator row */}
-                      <div className={cn("grid w-full px-4 py-1.5 bg-muted/40 border-b", colsClass)}>
-                        <span className="font-semibold text-sm">{formatDisplayDate(date + "T00:00:00")}</span>
-                        <span />
-                        {showAmounts && (
-                          <span className="font-mono font-medium text-sm text-right">
-                            {currencySymbol(dayCcy)}
-                            {formatNumber(dayTotal)}
-                          </span>
-                        )}
-                      </div>
+          {/* Transactions Table */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <CardTitle className="flex items-center gap-2">
+                  <BookOpen className="h-5 w-5" />
+                  Transactions
+                  {filteredEntries.length > 0 && (
+                    <span className="text-sm font-normal text-muted-foreground">
+                      ({`${condensedRows.length} group${condensedRows.length === 1 ? "" : "s"}`})
+                    </span>
+                  )}
+                </CardTitle>
+              </div>
+              <CardDescription>All factory transactions in one view</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {isLoading ? (
+                <div className="space-y-2 p-6">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              ) : filteredEntries.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  {hasActiveFilters ? (
+                    <div>
+                      <p className="mb-2">No transactions found matching your filters.</p>
+                      <Button variant="outline" onClick={clearFilters} data-testid="button-clear-filters-empty">
+                        Clear Filters
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <BookOpen className="mx-auto h-12 w-12 text-muted-foreground" />
+                      <h3 className="mt-4 text-lg font-semibold">No transactions found</h3>
+                      <p className="mt-2">Factory transactions will appear here as you perform operations</p>
+                    </>
+                  )}
+                </div>
+              ) : (
+                /* ── CONDENSED VIEW — matches ERP Daybook: Date/Type | Count | Total ── */
+                <div className="w-full">
+                  {/* Header */}
+                  <div
+                    className={cn(
+                      "sticky top-0 z-30 bg-background border-b grid w-full px-4 py-2",
+                      showAmounts ? "grid-cols-[minmax(0,1fr)_100px_180px]" : "grid-cols-[minmax(0,1fr)_100px]"
+                    )}
+                  >
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Date / Type
+                    </span>
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider text-center">
+                      Count
+                    </span>
+                    {showAmounts && (
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider text-right">
+                        Total
+                      </span>
+                    )}
+                  </div>
 
-                      {/* Type rows under this date */}
-                      {rows.map((row) => {
-                        const isExpanded = expandedRowKey === row.key;
-                        const expandedEntries = isExpanded ? getEntriesForCondensedRow(row.key) : [];
-                        const { variant: bv, className: bc } = getFactoryTxTypeBadge(row.txType);
-                        return (
-                          <div key={row.key} className="w-full border-b last:border-b-0">
-                            {/* Group type row */}
-                            <div
-                              data-testid={`row-condensed-${row.date}-${row.txType}`}
-                              onClick={() => setExpandedRowKey(isExpanded ? null : row.key)}
-                              className={cn(
-                                "grid w-full pl-6 pr-4 py-3 cursor-pointer hover-elevate items-center",
-                                colsClass
-                              )}
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                {isExpanded ? (
-                                  <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
-                                ) : (
-                                  <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
-                                )}
-                                <Badge variant={bv} className={cn(bc, "whitespace-nowrap")}>
-                                  {formatTxType(row.txType)}
-                                </Badge>
-                              </div>
-                              <div className="text-center text-muted-foreground text-sm font-mono">{row.count}</div>
-                              {showAmounts && (
-                                <div className="text-right font-mono font-medium text-sm">
-                                  {currencySymbol(row.currencyCode)}
-                                  {formatNumber(row.totalAmountCurrency)}
-                                  {row.currencyCode !== "USD" && (
-                                    <div className="text-xs text-muted-foreground font-mono">{row.currencyCode}</div>
+                  {/* Group condensedRows by date for date-separator rows */}
+                  {(() => {
+                    const dateMap = new Map<string, typeof condensedRows>();
+                    for (const row of condensedRows) {
+                      if (!dateMap.has(row.date)) dateMap.set(row.date, []);
+                      dateMap.get(row.date)!.push(row);
+                    }
+                    return Array.from(dateMap.entries()).map(([date, rows]) => {
+                      const dayTotal = rows.reduce((s, r) => s + r.totalAmountCurrency, 0);
+                      const dayCcy = rows[0]?.currencyCode ?? "USD";
+                      const colsClass = showAmounts
+                        ? "grid-cols-[minmax(0,1fr)_100px_180px]"
+                        : "grid-cols-[minmax(0,1fr)_100px]";
+                      return (
+                        <div key={date} className="w-full">
+                          {/* Date separator row */}
+                          <div className={cn("grid w-full px-4 py-1.5 bg-muted/40 border-b", colsClass)}>
+                            <span className="font-semibold text-sm">{formatDisplayDate(date + "T00:00:00")}</span>
+                            <span />
+                            {showAmounts && (
+                              <span className="font-mono font-medium text-sm text-right">
+                                {currencySymbol(dayCcy)}
+                                {formatNumber(dayTotal)}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Type rows under this date */}
+                          {rows.map((row) => {
+                            const isExpanded = expandedRowKey === row.key;
+                            const expandedEntries = isExpanded ? getEntriesForCondensedRow(row.key) : [];
+                            const { variant: bv, className: bc } = getFactoryTxTypeBadge(row.txType);
+                            return (
+                              <div key={row.key} className="w-full border-b last:border-b-0">
+                                {/* Group type row */}
+                                <div
+                                  data-testid={`row-condensed-${row.date}-${row.txType}`}
+                                  onClick={() => setExpandedRowKey(isExpanded ? null : row.key)}
+                                  className={cn(
+                                    "grid w-full pl-6 pr-4 py-3 cursor-pointer hover-elevate items-center",
+                                    colsClass
+                                  )}
+                                >
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {isExpanded ? (
+                                      <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+                                    ) : (
+                                      <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+                                    )}
+                                    <Badge variant={bv} className={cn(bc, "whitespace-nowrap")}>
+                                      {formatTxType(row.txType)}
+                                    </Badge>
+                                  </div>
+                                  <div className="text-center text-muted-foreground text-sm font-mono">{row.count}</div>
+                                  {showAmounts && (
+                                    <div className="text-right font-mono font-medium text-sm">
+                                      {currencySymbol(row.currencyCode)}
+                                      {formatNumber(row.totalAmountCurrency)}
+                                      {row.currencyCode !== "USD" && (
+                                        <div className="text-xs text-muted-foreground font-mono">
+                                          {row.currencyCode}
+                                        </div>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
-                              )}
-                            </div>
 
-                            {/* Expanded entry sub-rows */}
-                            {isExpanded &&
-                              row.txType === "BALE_STOCK_ENTRY" &&
-                              (() => {
-                                const hasEntries = expandedEntries.length > 0;
-                                const mergedEntry = hasEntries
-                                  ? mergeBaleEntries(
-                                      expandedEntries.map((e) => (e as DisplayEntry)._source ?? (e as DaybookEntry))
-                                    )
-                                  : undefined;
-                                return (
-                                  <div className={cn("grid w-full bg-muted/20 border-t items-center", colsClass)}>
-                                    <div className="pl-14 pr-2 py-2 min-w-0">
-                                      <span className="text-sm text-foreground">
-                                        {row.count} bale{row.count !== 1 ? "s" : ""}
-                                      </span>
-                                    </div>
-                                    <div />
-                                    {showAmounts ? (
-                                      <div className="flex items-center justify-end gap-1 pr-2 py-2">
-                                        <span className="text-sm font-mono font-medium">
-                                          {currencySymbol(row.currencyCode)}
-                                          {formatNumber(row.totalAmountCurrency)}
-                                        </span>
-                                        {mergedEntry && (
-                                          <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            title="View details"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setViewEntry(mergedEntry);
-                                            }}
-                                            data-testid="button-view-bale-summary"
-                                          >
-                                            <Eye className="h-3 w-3" />
-                                          </Button>
+                                {/* Expanded entry sub-rows */}
+                                {isExpanded &&
+                                  row.txType === "BALE_STOCK_ENTRY" &&
+                                  (() => {
+                                    const hasEntries = expandedEntries.length > 0;
+                                    const mergedEntry = hasEntries
+                                      ? mergeBaleEntries(
+                                          expandedEntries.map((e) => (e as DisplayEntry)._source ?? (e as DaybookEntry))
+                                        )
+                                      : undefined;
+                                    return (
+                                      <div className={cn("grid w-full bg-muted/20 border-t items-center", colsClass)}>
+                                        <div className="pl-14 pr-2 py-2 min-w-0">
+                                          <span className="text-sm text-foreground">
+                                            {row.count} bale{row.count !== 1 ? "s" : ""}
+                                          </span>
+                                        </div>
+                                        <div />
+                                        {showAmounts ? (
+                                          <div className="flex items-center justify-end gap-1 pr-2 py-2">
+                                            <span className="text-sm font-mono font-medium">
+                                              {currencySymbol(row.currencyCode)}
+                                              {formatNumber(row.totalAmountCurrency)}
+                                            </span>
+                                            {mergedEntry && (
+                                              <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                title="View details"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setViewEntry(mergedEntry);
+                                                }}
+                                                data-testid="button-view-bale-summary"
+                                              >
+                                                <Eye className="h-3 w-3" />
+                                              </Button>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <div className="flex items-center justify-end gap-1 pr-2 py-2">
+                                            {mergedEntry && (
+                                              <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                title="View details"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setViewEntry(mergedEntry);
+                                                }}
+                                                data-testid="button-view-bale-summary"
+                                              >
+                                                <Eye className="h-3 w-3" />
+                                              </Button>
+                                            )}
+                                          </div>
                                         )}
                                       </div>
-                                    ) : (
-                                      <div className="flex items-center justify-end gap-1 pr-2 py-2">
-                                        {mergedEntry && (
-                                          <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            title="View details"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setViewEntry(mergedEntry);
-                                            }}
-                                            data-testid="button-view-bale-summary"
-                                          >
-                                            <Eye className="h-3 w-3" />
-                                          </Button>
+                                    );
+                                  })()}
+                                {isExpanded &&
+                                  row.txType !== "BALE_STOCK_ENTRY" &&
+                                  expandedEntries.map((entry) => {
+                                    const de = entry as DisplayEntry;
+                                    const isBaleTransfer = entry.txType === "BALE_TRANSFER";
+                                    const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
+                                    const canEdit =
+                                      !!VOUCHER_TX_TYPES[entry.txType] &&
+                                      !!entry.referenceId &&
+                                      entry.txType !== "BALE_STOCK_ENTRY";
+                                    const inlineMeta = (() => {
+                                      try {
+                                        return JSON.parse(entry.metaJson || "{}");
+                                      } catch {
+                                        return {};
+                                      }
+                                    })();
+                                    let pencilTarget: string | null = null;
+                                    if (entry.txType === "CONTAINER_IMPORT" && entry.referenceId)
+                                      pencilTarget = `/factory/containers?edit=${entry.referenceId}`;
+                                    else if (entry.txType === "OFFLOAD_RAW_STOCK" && inlineMeta.containerId)
+                                      pencilTarget = `/factory/containers?edit=${inlineMeta.containerId}`;
+                                    else if (entry.txType === "COMMISSION" && inlineMeta.containerId)
+                                      pencilTarget = `/factory/containers?edit=${inlineMeta.containerId}`;
+                                    else if (entry.txType === "OTHER_CHARGE" && entry.referenceId)
+                                      pencilTarget = `/factory/containers?edit=${entry.referenceId}`;
+                                    const showPencil = pencilTarget && isAdminOrOwner;
+                                    return (
+                                      <div
+                                        key={de._vKey ?? entry.id}
+                                        data-testid={`row-expanded-${entry.id}`}
+                                        onClick={isBaleTransfer ? (e) => handleEntryClick(entry, e) : undefined}
+                                        className={cn(
+                                          "grid w-full bg-muted/20 border-t items-center",
+                                          colsClass,
+                                          isBaleTransfer && "cursor-pointer"
                                         )}
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })()}
-                            {isExpanded &&
-                              row.txType !== "BALE_STOCK_ENTRY" &&
-                              expandedEntries.map((entry) => {
-                                const de = entry as DisplayEntry;
-                                const isBaleTransfer = entry.txType === "BALE_TRANSFER";
-                                const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
-                                const canEdit =
-                                  !!VOUCHER_TX_TYPES[entry.txType] &&
-                                  !!entry.referenceId &&
-                                  entry.txType !== "BALE_STOCK_ENTRY";
-                                const inlineMeta = (() => {
-                                  try {
-                                    return JSON.parse(entry.metaJson || "{}");
-                                  } catch {
-                                    return {};
-                                  }
-                                })();
-                                let pencilTarget: string | null = null;
-                                if (entry.txType === "CONTAINER_IMPORT" && entry.referenceId)
-                                  pencilTarget = `/factory/containers?edit=${entry.referenceId}`;
-                                else if (entry.txType === "OFFLOAD_RAW_STOCK" && inlineMeta.containerId)
-                                  pencilTarget = `/factory/containers?edit=${inlineMeta.containerId}`;
-                                else if (entry.txType === "COMMISSION" && inlineMeta.containerId)
-                                  pencilTarget = `/factory/containers?edit=${inlineMeta.containerId}`;
-                                else if (entry.txType === "OTHER_CHARGE" && entry.referenceId)
-                                  pencilTarget = `/factory/containers?edit=${entry.referenceId}`;
-                                const showPencil = pencilTarget && isAdminOrOwner;
-                                return (
-                                  <div
-                                    key={de._vKey ?? entry.id}
-                                    data-testid={`row-expanded-${entry.id}`}
-                                    onClick={isBaleTransfer ? (e) => handleEntryClick(entry, e) : undefined}
-                                    className={cn(
-                                      "grid w-full bg-muted/20 border-t items-center",
-                                      colsClass,
-                                      isBaleTransfer && "cursor-pointer"
-                                    )}
-                                  >
-                                    {/* Description — deep indent to align under badge */}
-                                    <div className="pl-14 pr-2 py-2 min-w-0">
-                                      <div className="flex items-center gap-1.5 min-w-0">
-                                        <span
-                                          className="text-sm text-foreground truncate"
-                                          title={formatDaybookDescription(entry)}
-                                        >
-                                          {formatDaybookDescription(entry)}
-                                        </span>
-                                        {entry.optional && (
-                                          <Badge
-                                            variant="outline"
-                                            className="text-muted-foreground text-xs shrink-0"
-                                            data-testid={`badge-optional-${entry.id}`}
-                                          >
-                                            Optional
-                                          </Badge>
-                                        )}
-                                      </div>
-                                    </div>
-                                    {/* Empty count cell */}
-                                    <div />
-                                    {/* Amount + actions */}
-                                    {showAmounts ? (
-                                      <div className="flex items-center justify-end gap-1 pr-2 py-2">
-                                        <span className="text-sm font-mono font-medium">
-                                          {currencySymbol(entry.currencyCode)}
-                                          {formatNumber(parseFloat(entry.amountCurrency))}
-                                        </span>
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          title="View details"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setViewEntry((de._source ?? entry) as DaybookEntry);
-                                          }}
-                                          data-testid={`button-view-${entry.id}`}
-                                        >
-                                          <Eye className="h-3 w-3" />
-                                        </Button>
-                                        {showPencil && (
-                                          <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            title="Go to container"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              navigate(pencilTarget!);
-                                            }}
-                                            data-testid={`button-pencil-${entry.id}`}
-                                          >
-                                            <Pencil className="h-3 w-3 text-amber-500" />
-                                          </Button>
-                                        )}
-                                        {canEdit && (
-                                          <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            title="Edit"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              editSourceRecord(entry);
-                                            }}
-                                            data-testid={`button-edit-source-${entry.id}`}
-                                          >
-                                            <ExternalLink className="h-3 w-3" />
-                                          </Button>
-                                        )}
-                                        {isAdminOrOwner &&
-                                          isVoucherBacked &&
-                                          ["PAYMENT", "RECEIPT", "JOURNAL"].includes(entry.txType) && (
+                                      >
+                                        {/* Description — deep indent to align under badge */}
+                                        <div className="pl-14 pr-2 py-2 min-w-0">
+                                          <div className="flex items-center gap-1.5 min-w-0">
+                                            <span
+                                              className="text-sm text-foreground truncate"
+                                              title={formatDaybookDescription(entry)}
+                                            >
+                                              {formatDaybookDescription(entry)}
+                                            </span>
+                                            {entry.optional && (
+                                              <Badge
+                                                variant="outline"
+                                                className="text-muted-foreground text-xs shrink-0"
+                                                data-testid={`badge-optional-${entry.id}`}
+                                              >
+                                                Optional
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        </div>
+                                        {/* Empty count cell */}
+                                        <div />
+                                        {/* Amount + actions */}
+                                        {showAmounts ? (
+                                          <div className="flex items-center justify-end gap-1 pr-2 py-2">
+                                            <span className="text-sm font-mono font-medium">
+                                              {currencySymbol(entry.currencyCode)}
+                                              {formatNumber(parseFloat(entry.amountCurrency))}
+                                            </span>
                                             <Button
                                               size="icon"
                                               variant="ghost"
-                                              title="Void"
+                                              title="View details"
                                               onClick={(e) => {
                                                 e.stopPropagation();
-                                                setVoidEntry(entry);
+                                                setViewEntry((de._source ?? entry) as DaybookEntry);
                                               }}
-                                              data-testid={`button-void-voucher-${entry.id}`}
+                                              data-testid={`button-view-${entry.id}`}
                                             >
-                                              <Trash2 className="h-3 w-3" />
+                                              <Eye className="h-3 w-3" />
                                             </Button>
-                                          )}
-                                        {/* Hard-delete button for non-voucher entries (admin/developer only).
+                                            {showPencil && (
+                                              <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                title="Go to container"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  navigate(pencilTarget!);
+                                                }}
+                                                data-testid={`button-pencil-${entry.id}`}
+                                              >
+                                                <Pencil className="h-3 w-3 text-amber-500" />
+                                              </Button>
+                                            )}
+                                            {canEdit && (
+                                              <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                title="Edit"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  editSourceRecord(entry);
+                                                }}
+                                                data-testid={`button-edit-source-${entry.id}`}
+                                              >
+                                                <ExternalLink className="h-3 w-3" />
+                                              </Button>
+                                            )}
+                                            {isAdminOrOwner &&
+                                              isVoucherBacked &&
+                                              ["PAYMENT", "RECEIPT", "JOURNAL"].includes(entry.txType) && (
+                                                <Button
+                                                  size="icon"
+                                                  variant="ghost"
+                                                  title="Void"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setVoidEntry(entry);
+                                                  }}
+                                                  data-testid={`button-void-voucher-${entry.id}`}
+                                                >
+                                                  <Trash2 className="h-3 w-3" />
+                                                </Button>
+                                              )}
+                                            {/* Hard-delete button for non-voucher entries (admin/developer only).
                                             SUPPLIER_FX_TRANSFER must be deleted from the supplier management
                                             page so the underlying transfer record is also removed. */}
-                                        {isAdminOrOwner &&
-                                          entry.id > 0 &&
-                                          entry.txType !== "SUPPLIER_FX_TRANSFER" &&
-                                          !(isVoucherBacked && ["PAYMENT", "RECEIPT", "JOURNAL"].includes(entry.txType)) && (
+                                            {isAdminOrOwner &&
+                                              entry.id > 0 &&
+                                              entry.txType !== "SUPPLIER_FX_TRANSFER" &&
+                                              !(
+                                                isVoucherBacked &&
+                                                ["PAYMENT", "RECEIPT", "JOURNAL"].includes(entry.txType)
+                                              ) && (
+                                                <Button
+                                                  size="icon"
+                                                  variant="ghost"
+                                                  title="Delete entry"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setDeleteEntry(de._source as DaybookEntry);
+                                                  }}
+                                                  data-testid={`button-delete-${entry.id}`}
+                                                >
+                                                  <Trash2 className="h-3 w-3 text-destructive/70" />
+                                                </Button>
+                                              )}
+                                          </div>
+                                        ) : (
+                                          <div className="flex items-center justify-end gap-1 pr-2 py-2">
                                             <Button
                                               size="icon"
                                               variant="ghost"
-                                              title="Delete entry"
+                                              title="View details"
                                               onClick={(e) => {
                                                 e.stopPropagation();
-                                                setDeleteEntry(de._source as DaybookEntry);
+                                                setViewEntry((de._source ?? entry) as DaybookEntry);
                                               }}
-                                              data-testid={`button-delete-${entry.id}`}
+                                              data-testid={`button-view-${entry.id}`}
                                             >
-                                              <Trash2 className="h-3 w-3 text-destructive/70" />
+                                              <Eye className="h-3 w-3" />
                                             </Button>
-                                          )}
-                                      </div>
-                                    ) : (
-                                      <div className="flex items-center justify-end gap-1 pr-2 py-2">
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          title="View details"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setViewEntry((de._source ?? entry) as DaybookEntry);
-                                          }}
-                                          data-testid={`button-view-${entry.id}`}
-                                        >
-                                          <Eye className="h-3 w-3" />
-                                        </Button>
-                                        {showPencil && (
-                                          <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            title="Go to container"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              navigate(pencilTarget!);
-                                            }}
-                                            data-testid={`button-pencil-${entry.id}`}
-                                          >
-                                            <Pencil className="h-3 w-3 text-amber-500" />
-                                          </Button>
+                                            {showPencil && (
+                                              <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                title="Go to container"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  navigate(pencilTarget!);
+                                                }}
+                                                data-testid={`button-pencil-${entry.id}`}
+                                              >
+                                                <Pencil className="h-3 w-3 text-amber-500" />
+                                              </Button>
+                                            )}
+                                          </div>
                                         )}
                                       </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
+                                    );
+                                  })}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Edit Dialog */}
+          <Dialog
+            open={editEntry !== null}
+            onOpenChange={(open) => {
+              if (!open) setEditEntry(null);
+            }}
+          >
+            <DialogContent data-testid="dialog-edit-daybook">
+              <DialogHeader>
+                <DialogTitle>Edit Daybook Entry</DialogTitle>
+                <DialogDescription>
+                  Modify the entry details. A reason is required for the audit trail.
+                </DialogDescription>
+              </DialogHeader>
+              {editEntry &&
+                (() => {
+                  const isVoucherBacked = editEntry.referenceTable === "vouchers" || editEntry.id < 0;
+                  return (
+                    <div className="space-y-4">
+                      {isVoucherBacked && (
+                        <div
+                          className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
+                          data-testid="note-voucher-sync"
+                        >
+                          Saving will update the description on the linked voucher, so Accounts statements stay in sync.
+                          To change amounts, use the source record edit button.
+                        </div>
+                      )}
+                      <div>
+                        <Label className="text-sm font-medium">Description</Label>
+                        <Textarea
+                          value={editDescription}
+                          onChange={(e) => setEditDescription(e.target.value)}
+                          data-testid="input-edit-description"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium">Date</Label>
+                        <Input
+                          type="date"
+                          value={editTxDate}
+                          onChange={(e) => setEditTxDate(e.target.value)}
+                          data-testid="input-edit-tx-date"
+                        />
+                      </div>
+                      {!isVoucherBacked && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label className="text-sm font-medium">Amount ({editEntry.currencyCode})</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={editAmountCurrency}
+                              onChange={(e) => setEditAmountCurrency(e.target.value)}
+                              data-testid="input-edit-amount-currency"
+                            />
                           </div>
-                        );
-                      })}
+                          <div>
+                            <Label className="text-sm font-medium">Amount (USD)</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={editAmountUsd}
+                              onChange={(e) => setEditAmountUsd(e.target.value)}
+                              data-testid="input-edit-amount-usd"
+                            />
+                          </div>
+                        </div>
+                      )}
+                      <div>
+                        <Label className="text-sm font-medium">Reason for edit *</Label>
+                        <Textarea
+                          value={editReason}
+                          onChange={(e) => setEditReason(e.target.value)}
+                          placeholder="Why is this change needed?"
+                          data-testid="input-edit-reason"
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setEditEntry(null)} data-testid="button-cancel-edit">
+                          Cancel
+                        </Button>
+                        <Button
+                          disabled={!editReason.trim() || editMutation.isPending}
+                          onClick={() => wrapAdminAction(handleEditSubmit, "Edit Entry")}
+                          data-testid="button-submit-edit"
+                        >
+                          {editMutation.isPending ? "Saving..." : "Save Changes"}
+                        </Button>
+                      </div>
                     </div>
                   );
-                });
-              })()}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                })()}
+            </DialogContent>
+          </Dialog>
 
-      {/* Edit Dialog */}
-      <Dialog
-        open={editEntry !== null}
-        onOpenChange={(open) => {
-          if (!open) setEditEntry(null);
-        }}
-      >
-        <DialogContent data-testid="dialog-edit-daybook">
-          <DialogHeader>
-            <DialogTitle>Edit Daybook Entry</DialogTitle>
-            <DialogDescription>Modify the entry details. A reason is required for the audit trail.</DialogDescription>
-          </DialogHeader>
-          {editEntry &&
-            (() => {
-              const isVoucherBacked = editEntry.referenceTable === "vouchers" || editEntry.id < 0;
-              return (
-                <div className="space-y-4">
-                  {isVoucherBacked && (
-                    <div
-                      className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
-                      data-testid="note-voucher-sync"
-                    >
-                      Saving will update the description on the linked voucher, so Accounts statements stay in sync. To
-                      change amounts, use the source record edit button.
-                    </div>
-                  )}
-                  <div>
-                    <Label className="text-sm font-medium">Description</Label>
-                    <Textarea
-                      value={editDescription}
-                      onChange={(e) => setEditDescription(e.target.value)}
-                      data-testid="input-edit-description"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">Date</Label>
-                    <Input
-                      type="date"
-                      value={editTxDate}
-                      onChange={(e) => setEditTxDate(e.target.value)}
-                      data-testid="input-edit-tx-date"
-                    />
-                  </div>
-                  {!isVoucherBacked && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label className="text-sm font-medium">Amount ({editEntry.currencyCode})</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={editAmountCurrency}
-                          onChange={(e) => setEditAmountCurrency(e.target.value)}
-                          data-testid="input-edit-amount-currency"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-sm font-medium">Amount (USD)</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={editAmountUsd}
-                          onChange={(e) => setEditAmountUsd(e.target.value)}
-                          data-testid="input-edit-amount-usd"
-                        />
-                      </div>
-                    </div>
-                  )}
-                  <div>
-                    <Label className="text-sm font-medium">Reason for edit *</Label>
-                    <Textarea
-                      value={editReason}
-                      onChange={(e) => setEditReason(e.target.value)}
-                      placeholder="Why is this change needed?"
-                      data-testid="input-edit-reason"
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button variant="outline" onClick={() => setEditEntry(null)} data-testid="button-cancel-edit">
-                      Cancel
-                    </Button>
-                    <Button
-                      disabled={!editReason.trim() || editMutation.isPending}
-                      onClick={() => wrapAdminAction(handleEditSubmit, "Edit Entry")}
-                      data-testid="button-submit-edit"
-                    >
-                      {editMutation.isPending ? "Saving..." : "Save Changes"}
-                    </Button>
-                  </div>
-                </div>
-              );
-            })()}
-        </DialogContent>
-      </Dialog>
-
-      {/* View Details Modal */}
-      <Dialog
-        open={viewEntry !== null}
-        onOpenChange={(open) => {
-          if (!open) setViewEntry(null);
-        }}
-      >
-        <DialogContent
-          className="w-full max-w-[95vw] md:max-w-4xl max-h-[90vh] overflow-y-auto"
-          data-testid="dialog-view-entry"
-        >
-          {viewEntry && (
-            <ViewEntryModal
-              entry={viewEntry}
-              onClose={() => setViewEntry(null)}
-              onNavigate={navigate}
-              formatDisplayDate={formatDisplayDate}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Void Alert */}
-      <AlertDialog
-        open={voidEntry !== null}
-        onOpenChange={(open) => {
-          if (!open) setVoidEntry(null);
-        }}
-      >
-        <AlertDialogContent data-testid="dialog-void-voucher">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this voucher?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will reverse all accounting entries. This action cannot be undone.
-              {voidEntry && <span className="block mt-2 font-medium text-foreground">{voidEntry.description}</span>}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-void">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => wrapAdminAction(() => voidEntry && voidMutation.mutate(voidEntry.id), "Void Entry")}
-              disabled={voidMutation.isPending}
-              className="bg-destructive text-destructive-foreground"
-              data-testid="button-confirm-void"
+          {/* View Details Modal */}
+          <Dialog
+            open={viewEntry !== null}
+            onOpenChange={(open) => {
+              if (!open) setViewEntry(null);
+            }}
+          >
+            <DialogContent
+              className="w-full max-w-[95vw] md:max-w-4xl max-h-[90vh] overflow-y-auto"
+              data-testid="dialog-view-entry"
             >
-              {voidMutation.isPending ? "Voiding..." : "Void Voucher"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      {/* Hard Delete Alert */}
-      <AlertDialog
-        open={deleteEntry !== null}
-        onOpenChange={(open) => {
-          if (!open) setDeleteEntry(null);
-        }}
-      >
-        <AlertDialogContent data-testid="dialog-delete-entry">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Permanently delete this entry?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently remove the daybook entry. This action cannot be undone.
-              {deleteEntry && (
-                <span className="block mt-2 font-medium text-foreground">{formatDaybookDescription(deleteEntry)}</span>
+              {viewEntry && (
+                <ViewEntryModal
+                  entry={viewEntry}
+                  onClose={() => setViewEntry(null)}
+                  onNavigate={navigate}
+                  formatDisplayDate={formatDisplayDate}
+                />
               )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteEntry && deleteMutation.mutate(deleteEntry.id)}
-              disabled={deleteMutation.isPending}
-              className="bg-destructive text-destructive-foreground"
-              data-testid="button-confirm-delete"
-            >
-              {deleteMutation.isPending ? "Deleting..." : "Delete Entry"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </DialogContent>
+          </Dialog>
 
-      {/* Cost Edit Dialog */}
-      <Dialog
-        open={costEditEntry !== null}
-        onOpenChange={(open) => {
-          if (!open) setCostEditEntry(null);
-        }}
-      >
-        <DialogContent className="max-w-md" data-testid="dialog-cost-edit-daybook">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Pencil className="h-4 w-4 text-amber-500" />
-              Edit Container Cost
-            </DialogTitle>
-            <DialogDescription>
+          {/* Void Alert */}
+          <AlertDialog
+            open={voidEntry !== null}
+            onOpenChange={(open) => {
+              if (!open) setVoidEntry(null);
+            }}
+          >
+            <AlertDialogContent data-testid="dialog-void-voucher">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete this voucher?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will reverse all accounting entries. This action cannot be undone.
+                  {voidEntry && <span className="block mt-2 font-medium text-foreground">{voidEntry.description}</span>}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-testid="button-cancel-void">Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => wrapAdminAction(() => voidEntry && voidMutation.mutate(voidEntry.id), "Void Entry")}
+                  disabled={voidMutation.isPending}
+                  className="bg-destructive text-destructive-foreground"
+                  data-testid="button-confirm-void"
+                >
+                  {voidMutation.isPending ? "Voiding..." : "Void Voucher"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          {/* Hard Delete Alert */}
+          <AlertDialog
+            open={deleteEntry !== null}
+            onOpenChange={(open) => {
+              if (!open) setDeleteEntry(null);
+            }}
+          >
+            <AlertDialogContent data-testid="dialog-delete-entry">
+              <AlertDialogHeader>
+                <AlertDialogTitle>Permanently delete this entry?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently remove the daybook entry. This action cannot be undone.
+                  {deleteEntry && (
+                    <span className="block mt-2 font-medium text-foreground">
+                      {formatDaybookDescription(deleteEntry)}
+                    </span>
+                  )}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => deleteEntry && deleteMutation.mutate(deleteEntry.id)}
+                  disabled={deleteMutation.isPending}
+                  className="bg-destructive text-destructive-foreground"
+                  data-testid="button-confirm-delete"
+                >
+                  {deleteMutation.isPending ? "Deleting..." : "Delete Entry"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Cost Edit Dialog */}
+          <Dialog
+            open={costEditEntry !== null}
+            onOpenChange={(open) => {
+              if (!open) setCostEditEntry(null);
+            }}
+          >
+            <DialogContent className="max-w-md" data-testid="dialog-cost-edit-daybook">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Pencil className="h-4 w-4 text-amber-500" />
+                  Edit Container Cost
+                </DialogTitle>
+                <DialogDescription>
+                  {costEditEntry &&
+                    (() => {
+                      const txLabels: Record<string, string> = {
+                        OFFLOAD_RAW_STOCK: "Total inclusive cost (base material)",
+                        FREIGHT: "Freight charge",
+                        COMMISSION: "Commission",
+                        DUTY: "Duty",
+                        OTHER_CHARGE: "Other charge / additional charge",
+                      };
+                      return `${txLabels[costEditEntry.txType] || costEditEntry.txType} — ${costEditEntry.description}`;
+                    })()}
+                </DialogDescription>
+              </DialogHeader>
               {costEditEntry &&
                 (() => {
-                  const txLabels: Record<string, string> = {
-                    OFFLOAD_RAW_STOCK: "Total inclusive cost (base material)",
-                    FREIGHT: "Freight charge",
-                    COMMISSION: "Commission",
-                    DUTY: "Duty",
-                    OTHER_CHARGE: "Other charge / additional charge",
-                  };
-                  return `${txLabels[costEditEntry.txType] || costEditEntry.txType} — ${costEditEntry.description}`;
-                })()}
-            </DialogDescription>
-          </DialogHeader>
-          {costEditEntry &&
-            (() => {
-              const isDuty = costEditEntry.txType === "DUTY";
-              const isBaseMaterial = costEditEntry.txType === "OFFLOAD_RAW_STOCK";
-              return (
-                <div className="space-y-4 py-1">
-                  <div className="rounded-md border bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 p-3 text-sm space-y-1">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                      <div className="space-y-1">
-                        <p className="font-medium">This will cascade to inventory costs.</p>
-                        <p>
-                          Saving updates the raw stock cost per kg and recalculates the weighted-average cost of all mix
-                          batches that used this container.
-                        </p>
-                        {isBaseMaterial && <p>Editing the total cost will back-calculate a new base rate per kg.</p>}
-                        {isDuty && (
-                          <p>Only confirmed duty can be edited here. A duty audit log entry will be written.</p>
-                        )}
+                  const isDuty = costEditEntry.txType === "DUTY";
+                  const isBaseMaterial = costEditEntry.txType === "OFFLOAD_RAW_STOCK";
+                  return (
+                    <div className="space-y-4 py-1">
+                      <div className="rounded-md border bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 p-3 text-sm space-y-1">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                          <div className="space-y-1">
+                            <p className="font-medium">This will cascade to inventory costs.</p>
+                            <p>
+                              Saving updates the raw stock cost per kg and recalculates the weighted-average cost of all
+                              mix batches that used this container.
+                            </p>
+                            {isBaseMaterial && (
+                              <p>Editing the total cost will back-calculate a new base rate per kg.</p>
+                            )}
+                            {isDuty && (
+                              <p>Only confirmed duty can be edited here. A duty audit log entry will be written.</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium">Current amount ({costEditEntry.currencyCode})</Label>
+                        <div className="text-sm text-muted-foreground font-mono mt-0.5">
+                          {formatNumber(parseFloat(costEditEntry.amountCurrency || "0"), 2)}{" "}
+                          {costEditEntry.currencyCode}
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium">New amount ({costEditEntry.currencyCode}) *</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={costEditAmount}
+                          onChange={(e) => setCostEditAmount(e.target.value)}
+                          placeholder="Enter corrected amount"
+                          data-testid="input-cost-edit-amount"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium">Reason for edit *</Label>
+                        <Textarea
+                          value={costEditReason}
+                          onChange={(e) => setCostEditReason(e.target.value)}
+                          placeholder="Why is this correction needed?"
+                          data-testid="input-cost-edit-reason"
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => setCostEditEntry(null)}
+                          data-testid="button-cancel-cost-edit"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          disabled={!costEditReason.trim() || !costEditAmount || costEditMutation.isPending}
+                          onClick={() => {
+                            if (!costEditEntry) return;
+                            costEditMutation.mutate({
+                              entryId: costEditEntry.id,
+                              newAmount: costEditAmount,
+                              reason: costEditReason.trim(),
+                            });
+                          }}
+                          data-testid="button-submit-cost-edit"
+                        >
+                          {costEditMutation.isPending ? "Saving..." : "Save & Recalculate"}
+                        </Button>
                       </div>
                     </div>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">Current amount ({costEditEntry.currencyCode})</Label>
-                    <div className="text-sm text-muted-foreground font-mono mt-0.5">
-                      {formatNumber(parseFloat(costEditEntry.amountCurrency || "0"), 2)} {costEditEntry.currencyCode}
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">New amount ({costEditEntry.currencyCode}) *</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={costEditAmount}
-                      onChange={(e) => setCostEditAmount(e.target.value)}
-                      placeholder="Enter corrected amount"
-                      data-testid="input-cost-edit-amount"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">Reason for edit *</Label>
-                    <Textarea
-                      value={costEditReason}
-                      onChange={(e) => setCostEditReason(e.target.value)}
-                      placeholder="Why is this correction needed?"
-                      data-testid="input-cost-edit-reason"
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setCostEditEntry(null)}
-                      data-testid="button-cancel-cost-edit"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      disabled={!costEditReason.trim() || !costEditAmount || costEditMutation.isPending}
-                      onClick={() => {
-                        if (!costEditEntry) return;
-                        costEditMutation.mutate({
-                          entryId: costEditEntry.id,
-                          newAmount: costEditAmount,
-                          reason: costEditReason.trim(),
-                        });
-                      }}
-                      data-testid="button-submit-cost-edit"
-                    >
-                      {costEditMutation.isPending ? "Saving..." : "Save & Recalculate"}
-                    </Button>
-                  </div>
-                </div>
-              );
-            })()}
-        </DialogContent>
-      </Dialog>
-
+                  );
+                })()}
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="activity" className="mt-2">
-          {activeDaybookTab === "activity" && (
-            <AuditLog context="daybook" defaultActions="all" />
-          )}
+          {activeDaybookTab === "activity" && <AuditLog context="daybook" defaultActions="all" />}
         </TabsContent>
       </Tabs>
 

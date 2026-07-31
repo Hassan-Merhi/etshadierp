@@ -5,7 +5,7 @@ the TypeScript source. This document describes the program for splitting them
 and — more importantly — the safety harness that makes those splits verifiable
 rather than hopeful.
 
-Phases 0, 1 and 2 are complete. Phase 3 is in progress.
+Phases 0, 1 and 2 are complete. Phases 3 and 4 are in progress.
 
 ## Why a harness came first
 
@@ -141,12 +141,12 @@ npm run audit:god-files
 | 1 | ~~`server/startupSchema.ts`~~ | **Done.** Split into ten parts under `server/startup-schema/`, largest 772 lines. Order preserved and proven by a sha256 pin of the assembled array in `tests/startup-schema-integrity.test.ts`. |
 | 2 | ~~Delete before splitting~~ | **Done, and the premise was wrong** — see below. No file was deletable; three dead *handlers* (349 lines) were removed instead. |
 | 3 | Route monoliths (~71 files) | **In progress.** Split by URL prefix into a directory with an `index.ts` barrel. `gitRoutes.ts` (1,969) and `spMigrationRoutes.ts` (2,349) done. |
-| 4 | Page components (~63 files) | Extract types, then pure helpers, then sub-components, then hooks — strictly safest first. |
+| 4 | Page components (~63 files) | **In progress.** Extract types, then pure helpers, then sub-components, then hooks — strictly safest first. `FactoryDaybook.tsx` (3,228) done. |
 | 5 | `shared/schema/*.ts` | Highest blast radius, lowest urgency. Barrel must preserve every export name. |
 | 6 | Tighten the ratchet | Lower `softMaxLines` as the backlog empties. |
 
-Phase 1 removed 4,312 lines from the backlog and Phase 2 a further 349; it now
-stands at 161 files and 98,565 excess lines.
+The backlog started at 162 files and 102,337 excess lines. It now stands at
+159 files and 94,307.
 
 Phases 3 and 4 touch disjoint trees and can run in parallel.
 
@@ -225,6 +225,44 @@ function, so it had to be hoisted into `_helpers.ts` before the endpoints that
 use it could move. Nested declarations are worth grepping for before choosing
 cut points — `^  (const|function|async function)` inside the register body finds
 them.
+
+## Phase 4 — the recipe, as applied to `FactoryDaybook.tsx`
+
+There is no route manifest for React, so the safety net has to be built per
+page. The order of operations matters more here than on the server.
+
+**A render smoke test goes in first, before any code moves.** `FactoryDaybook`
+had zero tests; a case was added to `tests/ui/renders.test.tsx` and confirmed
+green against the untouched 3,228-line file. Only then was anything extracted.
+Without that, a passing test after the split proves nothing.
+
+Then, strictly safest first:
+
+| Step | Output | Lines | Why this order |
+|---|---|---|---|
+| 1. Types | `daybook/types.ts` | 52 | Type-only moves cannot change runtime behaviour |
+| 2. Pure helpers | `daybook/daybookUtils.ts` | 239 | No React, no I/O — and now unit-testable |
+| 3. Storage helpers | `daybook/daybookUiState.ts` | 25 | Small, isolated, no rendering |
+| 4. Sub-component | `daybook/ViewEntryModal.tsx` | 766 | The single largest block |
+| 5. Sub-sub-components | `daybook/entry-views/*.tsx` | 180–267 | Four per-transaction-type detail views |
+
+`FactoryDaybook.tsx` itself went 3,228 → 1,489 and stays at its original path,
+so the lazy import in `lazyPages.ts` and the preload in `offlinePrep.ts` did not
+have to change.
+
+Two things worth carrying forward:
+
+- **Extracting helpers is what makes them testable.** `expandBaleEntries` could
+  not be exercised without mounting the whole page; it now has direct unit
+  tests. The frontend suite went from 147 to 165 tests as a side effect of the
+  split, not as separate work.
+- **Do not stop at the first extraction if it leaves a new oversized file.**
+  Pulling `ViewEntryModal` out produced a 1,483-line file, which the size
+  ratchet immediately rejected as a new file over the limit. That was the
+  ratchet doing its job. Rather than baseline it, the four largest
+  `if (isSomeTxType) { ... return (...) }` branches were extracted into
+  `entry-views/`, taking the modal to 766. Those branches declared no hooks, so
+  each was a straight move behind a props boundary.
 
 ## A note on scope
 
