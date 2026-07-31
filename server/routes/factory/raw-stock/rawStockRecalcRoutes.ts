@@ -5,7 +5,7 @@ import { registerHistoricalReplayPhase6GuardRoutes } from "./historicalReplayPha
 import { registerHistoricalReplayPhase8ReadinessRoutes } from "./historicalReplayPhase8ReadinessRoutes";
 import { registerHistoricalReplayPhase8VerificationRoutes } from "./historicalReplayPhase8VerificationRoutes";
 import { registerHistoricalReplayRoutesV4 } from "./historicalReplayRoutesV4";
-import { registerRawStockRecalcRoutes as registerPreservedRawStockRecalcRoutes } from "./rawStockRecalcRoutesLegacy";
+import { registerRawStockRecalcRoutes as registerPreservedRawStockRecalcRoutes } from "./recalc";
 
 /**
  * The preserved legacy module still contains an old route-registration-time

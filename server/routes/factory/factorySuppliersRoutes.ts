@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { registerSupplierCrudRoutes } from "./suppliers/supplierCrudRoutes";
-import { registerSupplierFxRoutes } from "./suppliers/supplierFxRoutes";
+import { registerSupplierFxRoutes } from "./suppliers/fx";
 import { registerSupplierBalanceRoutes } from "./suppliers/supplierBalanceRoutes";
 import { registerSupplierStatementRoutes } from "./suppliers/supplierStatementRoutes";
 import { registerSupplierBrokerRoutes } from "./suppliers/supplierBrokerRoutes";

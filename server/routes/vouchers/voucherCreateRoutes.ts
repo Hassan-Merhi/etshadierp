@@ -127,7 +127,7 @@ import { classifyNetPositionAccounts, getAccountNetBalance } from "../../netPosi
 import path from "path";
 import fs from "fs";
 
-import { registerVoucherEntryRoutes } from "../voucherEntryRoutes";
+import { registerVoucherEntryRoutes } from "../voucher-entries";
 import { normalizeVoucherEntryAmounts } from "../../services/accounting/currencyAmounts";
 import { recalculateOrderTotals } from "../factory/_helpers";
 import {

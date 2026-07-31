@@ -12,7 +12,7 @@ describe("Phase 8D audit coverage", () => {
     "server/routes/admin/userManagementRoutes.ts",
     "server/routes/admin/companySettingsRoutes.ts",
     "server/routes/admin/importExportRoutes.ts",
-    "server/routes/admin/adminRepairRoutes.ts",
+    "server/routes/admin/repair/rebuild-inventory.ts",
   ])("keeps %s connected to awaited audit writes", (path) => {
     const contents = source(path);
     expect(contents).toContain("logAudit");
@@ -26,12 +26,13 @@ describe("Phase 8D audit coverage", () => {
   });
 
   it("keeps the reviewed payroll exception visible until atomic integration is possible", () => {
-    const payroll = source("server/routes/employeeRoutes.ts");
+    const runs = source("server/routes/erp-payroll/runs.ts");
+    const lifecycle = source("server/routes/erp-payroll/runs-lifecycle.ts");
     const guidance = source("docs/phase-8d-domain-auditing.md");
 
-    expect(payroll).toContain('app.post("/api/payroll/runs"');
-    expect(payroll).toContain('app.patch("/api/payroll/runs/:id"');
-    expect(payroll).toContain('app.post("/api/payroll/runs/:id/undo"');
+    expect(runs).toContain('app.post("/api/payroll/runs"');
+    expect(runs).toContain('app.patch("/api/payroll/runs/:id"');
+    expect(lifecycle).toContain('app.post("/api/payroll/runs/:id/undo"');
     expect(guidance).toContain("documented safety exception");
     expect(guidance).toContain("legacy multi-step payroll mutations");
   });

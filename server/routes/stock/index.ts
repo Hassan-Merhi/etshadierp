@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { registerStockLightRoutes } from "./stockLightRoutes";
 import { registerStockGroupsItemsRoutes } from "./stockGroupsItemsRoutes";
 import { registerStockTransferAdjRoutes } from "./stockTransferAdjRoutes";
-import { registerStockMergeRoutes } from "./stockMergeRoutes";
+import { registerStockMergeRoutes } from "./merge";
 
 export function registerStockRoutes(app: Express) {
   registerStockLightRoutes(app);
