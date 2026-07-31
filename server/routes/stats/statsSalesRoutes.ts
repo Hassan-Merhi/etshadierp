@@ -1,108 +1,9 @@
 import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
-import { storage } from "../../storage";
-import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
-import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory } from "../_helpers";
-import { getClientDate } from "../../lib/dateUtils";
-import {
-  inventory,
-  stockItems,
-  stockGroups,
-  stockTransferVouchers,
-  stockTransferItems,
-  stockAdjustmentVouchers,
-  stockAdjustmentItems,
-  containers,
-  containerOffloads,
-  containerOffloadItems,
-  bankAccounts,
-  fixedAssets,
-  ledgerAccounts,
-  insertLedgerAccountSchema,
-  insertStockGroupSchema,
-  insertStockItemSchema,
-  insertContainerSchema,
-  insertStockTransferVoucherSchema,
-  insertStockAdjustmentVoucherSchema,
-  updateStockTransferSchema,
-  updateStockAdjustmentSchema,
-  vouchers,
-  voucherEntries,
-  salesItems,
-  suppliers,
-  customers,
-  customerBalances,
-  employees,
-  locations,
-  userLocations,
-  userCompanyRoles,
-  companies,
-  auditLog,
-  users,
-  FEATURE_KEYS,
-  companySettings,
-  purchaseOrders,
-  poLineItems,
-  interCompanyTransfers,
-  insertInterCompanyTransferSchema,
-  insertContainerSaleSchema,
-  containerSales,
-  insertUserPreferencesSchema,
-  userPreferences,
-  insertDraftPosSaleSchema,
-  InsertDraftPosSale,
-  insertSalaryAdvanceSchema,
-  insertSalaryAdvanceDeductionSchema,
-  salaryAdvances,
-  salaryAdvanceDeductions,
-  fiscalPeriodClosures,
-  wasteDispatches,
-  wasteDispatchItems,
-  dashboardCashAccounts,
-  dashboardPayableAccounts,
-  dashboardAccountSelections,
-  insertDashboardCashAccountSchema,
-  insertDashboardPayableAccountSchema,
-  insertDashboardAccountSelectionSchema,
-  creditNoteItems,
-  pendingBarcodes,
-  insertPendingBarcodeSchema,
-  bales,
-  baleProducts,
-  baleProductCategories,
-  storedFiles,
-  stockItemLocationPrices,
-  exchangeRates,
-  factoryWorkerAdvances,
-  propertyContracts,
-  propertyMonthlyLedger,
-  propertyPayments,
-} from "@shared/schema";
-import {
-  eq,
-  and,
-  or,
-  desc,
-  asc,
-  lt,
-  gt,
-  ne,
-  inArray,
-  sql,
-  isNull,
-  isNotNull,
-  not,
-  gte,
-  lte,
-  like,
-  ilike,
-} from "drizzle-orm";
-import { format } from "date-fns";
-import { z } from "zod";
-import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../../excelHelper";
-import { adjustInventory, reverseInventoryByExactValue } from "../../inventoryHelper";
-import { classifyNetPositionAccounts, getAccountNetBalance, round2 } from "../../netPositionHelper";
+import { requireAuth, requireNonPOS } from "../../auth";
+import { inventory, stockItems, vouchers, salesItems } from "@shared/schema";
+import { eq, and, sql, isNull } from "drizzle-orm";
 
 import { getProfitLoss, getBalanceSheet } from "../../services/reports/financialReportsService";
 
@@ -241,11 +142,7 @@ export function registerStatsSalesRoutes(app: Express) {
       }
 
       const { startDate, endDate } = req.query;
-      const result = await getProfitLoss(
-        companyId,
-        startDate as string | undefined,
-        endDate as string | undefined
-      );
+      const result = await getProfitLoss(companyId, startDate as string | undefined, endDate as string | undefined);
       res.json(result);
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });

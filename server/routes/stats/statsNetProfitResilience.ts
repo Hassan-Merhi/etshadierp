@@ -85,11 +85,7 @@ function setFinancialResponseHeaders(res: Response, status: "live" | "cached" | 
   res.setHeader("X-Financial-Data-Status", status);
 }
 
-function sendCachedPayload(
-  res: Response,
-  cached: CachedFinancialPayload,
-  status: "cached" | "stale",
-): Response {
+function sendCachedPayload(res: Response, cached: CachedFinancialPayload, status: "cached" | "stale"): Response {
   setFinancialResponseHeaders(res, status);
   res.status(200);
 
