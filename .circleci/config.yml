@@ -133,16 +133,21 @@ jobs:
               server/routes/performance/readMicrocache.ts \
               server/routes/performance/readMicrocacheCoordinator.ts
 
-  diagnose-format-tests:
+  diagnose-format-main-test:
     executor: node22
     steps:
       - install_dependencies
       - run:
-          name: Diagnose cache-test formatting
-          command: |
-            node node_modules/prettier/bin/prettier.cjs --check \
-              server/routes/performance/readMicrocache.test.ts \
-              server/routes/performance/readMicrocache.edge-cases.test.ts
+          name: Diagnose main cache-test formatting
+          command: node node_modules/prettier/bin/prettier.cjs --check server/routes/performance/readMicrocache.test.ts
+
+  diagnose-format-edge-test:
+    executor: node22
+    steps:
+      - install_dependencies
+      - run:
+          name: Diagnose edge cache-test formatting
+          command: node node_modules/prettier/bin/prettier.cjs --check server/routes/performance/readMicrocache.edge-cases.test.ts
 
   diagnose-typescript:
     executor: node22
@@ -199,7 +204,8 @@ workflows:
     jobs:
       - static-build
       - diagnose-format-source
-      - diagnose-format-tests
+      - diagnose-format-main-test
+      - diagnose-format-edge-test
       - diagnose-typescript
       - postgres-regression
       - security-readiness:
