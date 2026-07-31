@@ -49,7 +49,7 @@ export const Customers = lazy(() => import("@/pages/Customers"));
 export const SoldContainers = lazy(() => import("@/pages/SoldContainers"));
 export const Bales = lazy(() => import("@/pages/Bales"));
 export const ProductionBales = lazy(() => import("@/pages/ProductionBales"));
-export const BaleProducts = lazy(() => import("@/pages/BaleProducts"));
+export const BaleProducts = lazy(() => import("@/pages/BaleProductsBilingual"));
 export const OrphanedRecords = lazy(() => import("@/pages/OrphanedRecords"));
 export const DeletedItems = lazy(() => import("@/pages/DeletedItems"));
 export const ChatbotSettings = lazy(() => import("@/pages/ChatbotSettings"));
