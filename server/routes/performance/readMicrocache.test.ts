@@ -28,7 +28,7 @@ function makeRequest(overrides: Record<string, unknown> = {}) {
 }
 
 function makeResponse(statusCode = 200) {
-  const listeners = new Map<string, Array<() => void>>();
+  const listeners = new Map<string, (() => void)[]>();
   return {
     statusCode,
     sentBody: undefined as unknown,
@@ -70,6 +70,10 @@ function makeResponse(statusCode = 200) {
   } as any;
 }
 
+function storeJson(middleware: any, request: any, response: any, body: unknown) {
+  middleware(request, response, () => response.json(body));
+}
+
 describe("Phase 7C read microcache", () => {
   it("covers the current production bandwidth hotspots", () => {
     const expectedPaths = [
@@ -100,227 +104,215 @@ describe("Phase 7C read microcache", () => {
 
   it("isolates cache keys by user, company, role, location, station, query, and client date", () => {
     const base = buildReadMicrocacheKey(makeRequest());
-    expect(buildReadMicrocacheKey(makeRequest({ originalUrl: "/api/accounts/all?startDate=2026-07-02" }))).not.toBe(
-      base
+    const differentQuery = buildReadMicrocacheKey(
+      makeRequest({ originalUrl: "/api/accounts/all?startDate=2026-07-02" })
     );
-    expect(buildReadMicrocacheKey(makeRequest({ headers: { "x-client-date": "2026-07-31" } }))).not.toBe(base);
-    expect(buildReadMicrocacheKey(makeRequest({ session: { userId: 8, currentCompanyId: 3 } }))).not.toBe(base);
-    expect(buildReadMicrocacheKey(makeRequest({ session: { userId: 7, currentCompanyId: 4 } }))).not.toBe(base);
+    const differentDate = buildReadMicrocacheKey(makeRequest({ headers: { "x-client-date": "2026-07-31" } }));
+    const differentUser = buildReadMicrocacheKey(makeRequest({ session: { userId: 8, currentCompanyId: 3 } }));
+    const differentCompany = buildReadMicrocacheKey(makeRequest({ session: { userId: 7, currentCompanyId: 4 } }));
+
+    expect(differentQuery).not.toBe(base);
+    expect(differentDate).not.toBe(base);
+    expect(differentUser).not.toBe(base);
+    expect(differentCompany).not.toBe(base);
   });
 
   it("serves a successful repeated JSON read from the short cache", () => {
     let currentTime = 1_000;
     const middleware = createReadMicrocacheMiddleware({ ttlMs: 1_000, now: () => currentTime });
-    const req = makeRequest();
-    const firstRes = makeResponse();
-    const firstNext = vi.fn(() => firstRes.json({ total: 12 }));
+    const request = makeRequest();
+    const firstResponse = makeResponse();
+    storeJson(middleware, request, firstResponse, { total: 12 });
 
-    middleware(req, firstRes, firstNext);
-    expect(firstNext).toHaveBeenCalledOnce();
-    expect(firstRes.jsonBody).toEqual({ total: 12 });
-    expect(firstRes.headers["Cache-Control"]).toBe("private, no-cache, must-revalidate");
-    expect(firstRes.headers.ETag).toBeTruthy();
+    expect(firstResponse.jsonBody).toEqual({ total: 12 });
+    expect(firstResponse.headers["Cache-Control"]).toBe("private, no-cache, must-revalidate");
+    expect(firstResponse.headers.ETag).toBeTruthy();
 
     currentTime = 1_500;
-    const secondRes = makeResponse();
+    const secondResponse = makeResponse();
     const secondNext = vi.fn();
-    middleware(req, secondRes, secondNext);
+    middleware(request, secondResponse, secondNext);
 
     expect(secondNext).not.toHaveBeenCalled();
-    expect(secondRes.sentBody).toBe(JSON.stringify({ total: 12 }));
-    expect(secondRes.headers["X-ERP-Read-Cache"]).toBe("HIT");
+    expect(secondResponse.sentBody).toBe(JSON.stringify({ total: 12 }));
+    expect(secondResponse.headers["X-ERP-Read-Cache"]).toBe("HIT");
     expect(getReadMicrocacheStats().hits).toBe(1);
   });
 
   it("does not treat service-worker no-store semantics as an ERP-cache bypass", () => {
     const middleware = createReadMicrocacheMiddleware({ ttlMs: 5_000 });
-    const req = makeRequest({ headers: { "cache-control": "no-store" } });
-    const firstRes = makeResponse();
-    middleware(req, firstRes, () => firstRes.json({ total: 12 }));
+    const request = makeRequest({ headers: { "cache-control": "no-store" } });
+    storeJson(middleware, request, makeResponse(), { total: 12 });
 
-    const secondRes = makeResponse();
+    const secondResponse = makeResponse();
     const secondNext = vi.fn();
-    middleware(req, secondRes, secondNext);
+    middleware(request, secondResponse, secondNext);
 
     expect(secondNext).not.toHaveBeenCalled();
-    expect(secondRes.headers["X-ERP-Read-Cache"]).toBe("HIT");
+    expect(secondResponse.headers["X-ERP-Read-Cache"]).toBe("HIT");
   });
 
   it("returns 304 when the browser revalidates an unchanged cached response", () => {
     const middleware = createReadMicrocacheMiddleware({ ttlMs: 5_000 });
-    const req = makeRequest();
-    const firstRes = makeResponse();
-    middleware(req, firstRes, () => firstRes.json({ total: 12 }));
+    const firstResponse = makeResponse();
+    storeJson(middleware, makeRequest(), firstResponse, { total: 12 });
 
-    const secondRes = makeResponse();
-    middleware(
-      makeRequest({ headers: { "if-none-match": firstRes.headers.ETag } }),
-      secondRes,
-      vi.fn()
-    );
+    const secondResponse = makeResponse();
+    const request = makeRequest({ headers: { "if-none-match": firstResponse.headers.ETag } });
+    middleware(request, secondResponse, vi.fn());
 
-    expect(secondRes.statusCode).toBe(304);
-    expect(secondRes.ended).toBe(true);
-    expect(secondRes.sentBody).toBeUndefined();
-    expect(secondRes.headers["X-ERP-Read-Cache"]).toBe("REVALIDATED");
+    expect(secondResponse.statusCode).toBe(304);
+    expect(secondResponse.ended).toBe(true);
+    expect(secondResponse.sentBody).toBeUndefined();
+    expect(secondResponse.headers["X-ERP-Read-Cache"]).toBe("REVALIDATED");
   });
 
   it("caches payroll preview POSTs by stable request body", () => {
     const middleware = createReadMicrocacheMiddleware({ ttlMs: 5_000 });
-    const firstReq = makeRequest({
+    const firstRequest = makeRequest({
       method: "POST",
       path: "/api/factory/payrolls/preview",
       originalUrl: "/api/factory/payrolls/preview",
       body: { periodEnd: "2026-07-31", periodStart: "2026-07-01" },
     });
-    const firstRes = makeResponse();
-    middleware(firstReq, firstRes, () => firstRes.json({ workers: 12 }));
+    storeJson(middleware, firstRequest, makeResponse(), { workers: 12 });
 
-    const secondReq = makeRequest({
+    const secondRequest = makeRequest({
       method: "POST",
       path: "/api/factory/payrolls/preview",
       originalUrl: "/api/factory/payrolls/preview",
       body: { periodStart: "2026-07-01", periodEnd: "2026-07-31" },
     });
-    const secondRes = makeResponse();
+    const secondResponse = makeResponse();
     const secondNext = vi.fn();
-    middleware(secondReq, secondRes, secondNext);
+    middleware(secondRequest, secondResponse, secondNext);
 
     expect(secondNext).not.toHaveBeenCalled();
-    expect(secondRes.headers["X-ERP-Read-Cache"]).toBe("HIT");
-    expect(secondRes.sentBody).toBe(JSON.stringify({ workers: 12 }));
+    expect(secondResponse.headers["X-ERP-Read-Cache"]).toBe("HIT");
+    expect(secondResponse.sentBody).toBe(JSON.stringify({ workers: 12 }));
   });
 
   it("supports dynamic heavy read paths", () => {
     const middleware = createReadMicrocacheMiddleware({ ttlMs: 5_000 });
-    const req = makeRequest({
+    const request = makeRequest({
       path: "/api/locations/12/inventory",
       originalUrl: "/api/locations/12/inventory?profile=combined",
     });
-    const firstRes = makeResponse();
-    middleware(req, firstRes, () => firstRes.json({ rows: 10 }));
+    storeJson(middleware, request, makeResponse(), { rows: 10 });
 
-    const secondRes = makeResponse();
+    const secondResponse = makeResponse();
     const secondNext = vi.fn();
-    middleware(req, secondRes, secondNext);
+    middleware(request, secondResponse, secondNext);
 
     expect(secondNext).not.toHaveBeenCalled();
-    expect(secondRes.headers["X-ERP-Read-Cache"]).toBe("HIT");
+    expect(secondResponse.headers["X-ERP-Read-Cache"]).toBe("HIT");
   });
 
   it("does not cache failed responses or requests outside the allowlist", () => {
     const middleware = createReadMicrocacheMiddleware();
-    const req = makeRequest();
-    const failedRes = makeResponse(500);
-    middleware(req, failedRes, () => failedRes.json({ message: "failed" }));
+    const request = makeRequest();
+    storeJson(middleware, request, makeResponse(500), { message: "failed" });
 
     const retryNext = vi.fn();
-    middleware(req, makeResponse(), retryNext);
+    middleware(request, makeResponse(), retryNext);
     expect(retryNext).toHaveBeenCalledOnce();
 
+    const unrelatedRequest = makeRequest({ path: "/api/vouchers", originalUrl: "/api/vouchers" });
     const unrelatedNext = vi.fn();
-    middleware(
-      makeRequest({ path: "/api/vouchers", originalUrl: "/api/vouchers" }),
-      makeResponse(),
-      unrelatedNext
-    );
+    middleware(unrelatedRequest, makeResponse(), unrelatedNext);
     expect(unrelatedNext).toHaveBeenCalledOnce();
   });
 
   it("expires entries after the configured TTL", () => {
     let currentTime = 10;
     const middleware = createReadMicrocacheMiddleware({ ttlMs: 5, now: () => currentTime });
-    const req = makeRequest();
-    const firstRes = makeResponse();
-    middleware(req, firstRes, () => firstRes.json({ ok: true }));
+    const request = makeRequest();
+    storeJson(middleware, request, makeResponse(), { ok: true });
 
     currentTime = 16;
     const next = vi.fn();
-    middleware(req, makeResponse(), next);
+    middleware(request, makeResponse(), next);
     expect(next).toHaveBeenCalledOnce();
   });
 
   it("clears cached reads only after a successful authenticated business request", () => {
     const middleware = createReadMicrocacheMiddleware({ ttlMs: 5_000 });
-    const req = makeRequest();
-    const firstRes = makeResponse();
-    middleware(req, firstRes, () => firstRes.json({ ok: true }));
+    const request = makeRequest();
+    storeJson(middleware, request, makeResponse(), { ok: true });
 
-    const writeRes = makeResponse(200);
+    const writeRequest = makeRequest({
+      method: "POST",
+      path: "/api/vouchers",
+      originalUrl: "/api/vouchers",
+    });
+    const writeResponse = makeResponse(200);
     const writeNext = vi.fn();
-    middleware(
-      makeRequest({ method: "POST", path: "/api/vouchers", originalUrl: "/api/vouchers" }),
-      writeRes,
-      writeNext
-    );
+    middleware(writeRequest, writeResponse, writeNext);
     expect(writeNext).toHaveBeenCalledOnce();
 
-    const beforeFinishRes = makeResponse();
     const beforeFinishNext = vi.fn();
-    middleware(req, beforeFinishRes, beforeFinishNext);
+    middleware(request, makeResponse(), beforeFinishNext);
     expect(beforeFinishNext).not.toHaveBeenCalled();
 
-    writeRes.emit("finish");
+    writeResponse.emit("finish");
     const afterFinishNext = vi.fn();
-    middleware(req, makeResponse(), afterFinishNext);
+    middleware(request, makeResponse(), afterFinishNext);
     expect(afterFinishNext).toHaveBeenCalledOnce();
   });
 
   it("does not let unauthenticated or failed writes flush the cache", () => {
     const middleware = createReadMicrocacheMiddleware({ ttlMs: 5_000 });
-    const req = makeRequest();
-    const firstRes = makeResponse();
-    middleware(req, firstRes, () => firstRes.json({ ok: true }));
+    const request = makeRequest();
+    storeJson(middleware, request, makeResponse(), { ok: true });
 
-    const anonymousWriteRes = makeResponse(200);
-    middleware(
-      makeRequest({
-        method: "POST",
-        path: "/api/vouchers",
-        originalUrl: "/api/vouchers",
-        session: {},
-      }),
-      anonymousWriteRes,
-      vi.fn()
-    );
-    anonymousWriteRes.emit("finish");
+    const anonymousRequest = makeRequest({
+      method: "POST",
+      path: "/api/vouchers",
+      originalUrl: "/api/vouchers",
+      session: {},
+    });
+    const anonymousResponse = makeResponse(200);
+    middleware(anonymousRequest, anonymousResponse, vi.fn());
+    anonymousResponse.emit("finish");
 
-    const failedWriteRes = makeResponse(403);
-    middleware(
-      makeRequest({ method: "POST", path: "/api/vouchers", originalUrl: "/api/vouchers" }),
-      failedWriteRes,
-      vi.fn()
-    );
-    failedWriteRes.emit("finish");
+    const failedRequest = makeRequest({
+      method: "POST",
+      path: "/api/vouchers",
+      originalUrl: "/api/vouchers",
+    });
+    const failedResponse = makeResponse(403);
+    middleware(failedRequest, failedResponse, vi.fn());
+    failedResponse.emit("finish");
 
-    const secondRes = makeResponse();
+    const secondResponse = makeResponse();
     const secondNext = vi.fn();
-    middleware(req, secondRes, secondNext);
+    middleware(request, secondResponse, secondNext);
     expect(secondNext).not.toHaveBeenCalled();
-    expect(secondRes.headers["X-ERP-Read-Cache"]).toBe("HIT");
+    expect(secondResponse.headers["X-ERP-Read-Cache"]).toBe("HIT");
   });
 
   it("preserves business caches across POS autosave and presence heartbeat writes", () => {
     const middleware = createReadMicrocacheMiddleware({ ttlMs: 5_000 });
-    const req = makeRequest();
-    const firstRes = makeResponse();
-    middleware(req, firstRes, () => firstRes.json({ ok: true }));
+    const request = makeRequest();
+    storeJson(middleware, request, makeResponse(), { ok: true });
 
-    middleware(
-      makeRequest({ method: "PATCH", path: "/api/pos/drafts/42", originalUrl: "/api/pos/drafts/42" }),
-      makeResponse(),
-      vi.fn()
-    );
-    middleware(
-      makeRequest({ method: "PATCH", path: "/api/user-presence", originalUrl: "/api/user-presence" }),
-      makeResponse(),
-      vi.fn()
-    );
+    const draftRequest = makeRequest({
+      method: "PATCH",
+      path: "/api/pos/drafts/42",
+      originalUrl: "/api/pos/drafts/42",
+    });
+    const presenceRequest = makeRequest({
+      method: "PATCH",
+      path: "/api/user-presence",
+      originalUrl: "/api/user-presence",
+    });
+    middleware(draftRequest, makeResponse(), vi.fn());
+    middleware(presenceRequest, makeResponse(), vi.fn());
 
-    const secondRes = makeResponse();
+    const secondResponse = makeResponse();
     const secondNext = vi.fn();
-    middleware(req, secondRes, secondNext);
+    middleware(request, secondResponse, secondNext);
     expect(secondNext).not.toHaveBeenCalled();
-    expect(secondRes.headers["X-ERP-Read-Cache"]).toBe("HIT");
+    expect(secondResponse.headers["X-ERP-Read-Cache"]).toBe("HIT");
   });
 });
