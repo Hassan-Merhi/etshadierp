@@ -193,7 +193,10 @@ describe("Factory Arabic translation import routes", () => {
     const previewResponse = await request(ctx.app)
       .post("/api/factory/bale-products/arabic-import/preview")
       .field("mode", "replace-existing")
-      .attach("file", workbook, { filename: "translations.xlsx", contentType: XLSX_MIME });
+      .attach("file", workbook, {
+        filename: "translations.xlsx",
+        contentType: XLSX_MIME,
+      });
     expect(previewResponse.status).toBe(401);
   });
 
@@ -208,14 +211,18 @@ describe("Factory Arabic translation import routes", () => {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(response.body as Buffer);
     const sheet = workbook.worksheets[0];
-    const row = [...sheet.getColumn(1).values].find((value) => value === "000-AR-001");
-    expect(row).toBe("000-AR-001");
-    const productRow = sheet.findRow(
-      [...Array(sheet.rowCount)].find(
-        (_, index) => sheet.getRow(index + 1).getCell(1).value === "000-AR-001"
-      ) ?? 0
+    const productRowNumber = Array.from(
+      { length: sheet.rowCount },
+      (_, index) => index + 1
+    ).find(
+      (rowNumber) => sheet.getRow(rowNumber).getCell(1).value === "000-AR-001"
     );
+    expect(productRowNumber).toBeDefined();
+    const productRow = productRowNumber ? sheet.getRow(productRowNumber) : undefined;
+    expect(productRow?.getCell(1).value).toBe("000-AR-001");
     expect(productRow?.getCell(1).numFmt).toBe("@");
+    expect(productRow?.getCell(1).protection.locked).toBe(true);
+    expect(productRow?.getCell(3).protection.locked).toBe(false);
   });
 
   it("requires a preview token before apply", async () => {
@@ -267,10 +274,10 @@ describe("Factory Arabic translation import routes", () => {
       nameAr: "منتج اختبار المسار",
       description: "English route description",
       descriptionAr: "وصف عربي للمسار",
-      productionPrice: "12.3400",
-      sellingPrice: "56.7800",
-      weightPerBaleKg: "100.000",
     });
+    expect(Number(product.productionPrice)).toBeCloseTo(12.34);
+    expect(Number(product.sellingPrice)).toBeCloseTo(56.78);
+    expect(Number(product.weightPerBaleKg)).toBeCloseTo(100);
 
     const [category] = await db
       .select()
