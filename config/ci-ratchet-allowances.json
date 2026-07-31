@@ -12,10 +12,12 @@
     "GET /api/payroll/worker-deductions [requireAuth > <anonymous>]",
     "POST /api/payroll/workers/:id/deductions [requireAuth > <anonymous>]",
     "DELETE /api/payroll/workers/:workerId/deductions/:id [requireAuth > <anonymous>]",
-    "GET /api/factory/bale-products/arabic-template [requireAuth > <anonymous>]",
-    "POST /api/factory/bale-products/arabic-import/preview [requireAuth > uploadArabicWorkbook > <anonymous>]",
-    "POST /api/factory/bale-products/arabic-import/errors [requireAuth > uploadArabicWorkbook > <anonymous>]",
-    "POST /api/factory/bale-products/arabic-import/apply [requireAuth > uploadArabicWorkbook > <anonymous>]"
+    "GET /api/factory/bale-products/arabic-import/capabilities/import [requireAuth > <anonymous> > <anonymous>]",
+    "GET /api/factory/bale-products/arabic-import/capabilities/export [requireAuth > <anonymous> > <anonymous> > <anonymous>]",
+    "GET /api/factory/bale-products/arabic-template [requireAuth > <anonymous> > <anonymous> > <anonymous>]",
+    "POST /api/factory/bale-products/arabic-import/preview [requireAuth > <anonymous> > uploadArabicWorkbook > <anonymous>]",
+    "POST /api/factory/bale-products/arabic-import/errors [requireAuth > <anonymous> > <anonymous> > uploadArabicWorkbook > <anonymous>]",
+    "POST /api/factory/bale-products/arabic-import/apply [requireAuth > <anonymous> > uploadArabicWorkbook > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
     "USE /api/factory/containers [postOffloadReconciliationMiddleware]",
