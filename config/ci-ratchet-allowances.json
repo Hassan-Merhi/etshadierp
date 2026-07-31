@@ -14,7 +14,8 @@
     "DELETE /api/payroll/workers/:workerId/deductions/:id [requireAuth > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
-    "USE /api/factory/containers [postOffloadReconciliationMiddleware]"
+    "USE /api/factory/containers [postOffloadReconciliationMiddleware]",
+    "USE /api/factory [requireAuth > <anonymous>]"
   ],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [
