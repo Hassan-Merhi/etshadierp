@@ -76,54 +76,54 @@ commands:
             node node_modules/vitest/vitest.mjs run "${files[@]}" --maxWorkers=1 --no-file-parallelism
 
 jobs:
-  factory-container-exact:
+  factory-container-a:
     executor: node22-postgres
     steps:
       - run_backend_pattern:
-          pattern: "factory-container"
-          label: Factory Container Exact
+          pattern: "factory-container-a*"
+          label: Factory Container A
 
-  factory-container-a-f:
+  factory-container-b:
     executor: node22-postgres
     steps:
       - run_backend_pattern:
-          pattern: "factory-container-[a-f]*"
-          label: Factory Container A-F
+          pattern: "factory-container-b*"
+          label: Factory Container B
 
-  factory-container-g-l:
+  factory-container-c:
     executor: node22-postgres
     steps:
       - run_backend_pattern:
-          pattern: "factory-container-[g-l]*"
-          label: Factory Container G-L
+          pattern: "factory-container-c*"
+          label: Factory Container C
 
-  factory-container-m-r:
+  factory-container-d:
     executor: node22-postgres
     steps:
       - run_backend_pattern:
-          pattern: "factory-container-[m-r]*"
-          label: Factory Container M-R
+          pattern: "factory-container-d*"
+          label: Factory Container D
 
-  factory-container-s-z:
+  factory-container-e:
     executor: node22-postgres
     steps:
       - run_backend_pattern:
-          pattern: "factory-container-[s-z]*"
-          label: Factory Container S-Z
+          pattern: "factory-container-e*"
+          label: Factory Container E
 
-  factory-containers:
+  factory-container-f:
     executor: node22-postgres
     steps:
       - run_backend_pattern:
-          pattern: "factory-containers*"
-          label: Factory Containers
+          pattern: "factory-container-f*"
+          label: Factory Container F
 
 workflows:
-  phase3-container-diagnostics:
+  phase3-container-prefix-diagnostics:
     jobs:
-      - factory-container-exact
-      - factory-container-a-f
-      - factory-container-g-l
-      - factory-container-m-r
-      - factory-container-s-z
-      - factory-containers
+      - factory-container-a
+      - factory-container-b
+      - factory-container-c
+      - factory-container-d
+      - factory-container-e
+      - factory-container-f
