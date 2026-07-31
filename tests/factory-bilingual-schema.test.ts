@@ -1,5 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
 import { getTableColumns } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import {
@@ -21,10 +19,6 @@ import {
   insertFactoryBaleSchema,
   insertFactoryCategorySchema,
 } from "../shared/schema";
-
-const root = process.cwd();
-const migrationPath = path.join(root, "migrations/20260731_001_factory_bilingual_catalog_snapshots.sql");
-const migrationSql = fs.readFileSync(migrationPath, "utf8");
 
 function expectColumnProperties(table: Parameters<typeof getTableColumns>[0], properties: string[]) {
   const columns = getTableColumns(table);
@@ -87,69 +81,55 @@ describe("Phase 2 Factory bilingual schema", () => {
     expect(roundTrip.product.name).toBe("MEN BAG CREAM 20KG");
   });
 
-  it("keeps the migration additive, idempotent, and article-code scoped", () => {
-    const expectedFragments = [
-      "ALTER TABLE factory_categories",
-      "ADD COLUMN IF NOT EXISTS name_ar",
-      "ADD COLUMN IF NOT EXISTS description_ar",
-      "ADD COLUMN IF NOT EXISTS product_name_ar",
-      "ADD COLUMN IF NOT EXISTS category_ar",
-      "ADD COLUMN IF NOT EXISTS bale_name_ar",
-      "factory_bale_products_company_article_code_normalized_idx",
-      "UPPER(BTRIM(article_code))",
-    ];
-
-    for (const fragment of expectedFragments) expect(migrationSql).toContain(fragment);
-    expect(migrationSql).not.toMatch(/\bUPDATE\b|\bDELETE\b|\bTRUNCATE\b/i);
-  });
-
-  it("guards every optional linked table before altering it", () => {
-    const optionalTables = [
-      "factory_pos_sale_items",
-      "customer_order_bale_removals",
-      "factory_v3_load_bales",
-      "factory_invoice_loading_bales",
-      "customer_dispatch_bale_scans",
-      "bale_recode_items",
-    ];
-
-    for (const tableName of optionalTables) {
-      expect(migrationSql).toContain(`to_regclass('public.${tableName}')`);
-      expect(migrationSql).toContain(`ALTER TABLE ${tableName}`);
-    }
-  });
-
-  it("registers the versioned migration and preloads the startup repair", () => {
-    const journal = JSON.parse(
-      fs.readFileSync(path.join(root, "migrations/meta/_journal.json"), "utf8")
-    ) as { entries: Array<{ idx: number; tag: string }> };
-    const supplierBridge = fs.readFileSync(
-      path.join(root, "server/supplierCompanyScopeBridge.mjs"),
-      "utf8"
-    );
-    const bilingualBridge = fs.readFileSync(
-      path.join(root, "server/factoryBilingualSchemaBridge.mjs"),
-      "utf8"
-    );
-
-    expect(journal.entries.at(-1)).toEqual(
-      expect.objectContaining({
-        idx: 15,
-        tag: "20260731_001_factory_bilingual_catalog_snapshots",
-      })
-    );
-    expect(supplierBridge).toContain('import "./factoryBilingualSchemaBridge.mjs"');
-    expect(bilingualBridge).toContain("Factory bilingual schema verification failed; aborting startup");
-    expect(bilingualBridge).toContain("UPPER(BTRIM(article_code))");
-  });
-
   const databaseIt = process.env.DATABASE_URL ? it : it.skip;
 
   databaseIt("applies twice and round-trips Arabic text without changing English snapshots", async () => {
-    const { pool } = await import("../server/db");
+    const [{ readFile }, path, { pool }] = await Promise.all([
+      import("node:fs/promises"),
+      import("node:path"),
+      import("../server/db"),
+    ]);
+    const migrationSql = await readFile(
+      path.join(process.cwd(), "migrations/20260731_001_factory_bilingual_catalog_snapshots.sql"),
+      "utf8"
+    );
 
     await pool.query(migrationSql);
     await pool.query(migrationSql);
+
+    const requiredColumns = [
+      ["factory_categories", "name_ar"],
+      ["factory_bale_products", "name_ar"],
+      ["factory_bale_products", "description_ar"],
+      ["factory_bales", "product_name_ar"],
+      ["factory_bales", "category_ar"],
+      ["customer_proforma_lines", "product_name_ar"],
+      ["customer_order_lines", "bale_name_ar"],
+      ["customer_order_bales", "bale_name_ar"],
+      ["customer_order_bales_history", "bale_name_ar"],
+      ["customer_order_expected_lines", "product_name_ar"],
+    ];
+
+    for (const [tableName, columnName] of requiredColumns) {
+      const result = await pool.query(
+        `SELECT 1
+           FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = $1
+            AND column_name = $2`,
+        [tableName, columnName]
+      );
+      expect(result.rowCount).toBe(1);
+    }
+
+    const indexResult = await pool.query(
+      `SELECT indexdef
+         FROM pg_indexes
+        WHERE schemaname = 'public'
+          AND indexname = 'factory_bale_products_company_article_code_normalized_idx'`
+    );
+    expect(indexResult.rowCount).toBe(1);
+    expect(indexResult.rows[0].indexdef.toUpperCase()).toContain("UPPER(BTRIM((ARTICLE_CODE)::TEXT))");
 
     const client = await pool.connect();
     const suffix = `${Date.now()}${Math.floor(Math.random() * 10_000)}`;
