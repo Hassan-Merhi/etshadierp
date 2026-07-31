@@ -411,7 +411,7 @@ export function registerPerformanceReadMicrocache(app: { use: (handler: RequestH
   // deterministic while dedicated readMicrocache unit tests exercise the cache itself.
   if (process.env.NODE_ENV === "test") return;
 
-  let invalidateLocalCache = () => undefined;
+  let invalidateLocalCache: () => void = () => undefined;
   const coordinator = startReadMicrocacheCoordinator(() => invalidateLocalCache());
   const controller = createReadMicrocacheController({
     cacheEnabled: coordinator.isReady,
