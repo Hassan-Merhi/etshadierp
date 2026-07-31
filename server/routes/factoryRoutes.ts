@@ -6,7 +6,7 @@ import { registerFactorySuppliersRoutes } from "./factory/factorySuppliersRoutes
 import { registerFactoryProductsRoutes } from "./factory/products";
 import { registerFactoryContainersRoutes } from "./factory/containers";
 import { registerFactoryBalesRoutes } from "./factory/bales";
-import { registerFactoryCustomersRoutes } from "./factory/factoryCustomersRoutes";
+import { registerFactoryCustomersRoutes } from "./factory/customers-core";
 import { registerFactoryContainerReadAccessRoutes } from "./factory/factoryContainerReadAccessRoutes";
 import { registerFactoryDocsUsersRoutes } from "./factory/docs-users";
 import { registerFactoryEmployeesPosRoutes } from "./factory/factoryEmployeesPosRoutes";

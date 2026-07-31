@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { registerPayrollCoreRoutes } from "./payrollCoreRoutes";
+import { registerPayrollCoreRoutes } from "./core";
 import { registerWorkerStatsAdvancesRoutes } from "./workerStatsAdvancesRoutes";
 import { registerAdvanceManagementRoutes } from "./advanceManagementRoutes";
 import { registerAdvanceAccountingRoutes } from "./advanceAccountingRoutes";

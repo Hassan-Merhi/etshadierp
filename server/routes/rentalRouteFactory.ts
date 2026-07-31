@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
-import { registerRentalUnitsContractsRoutes } from "./rental/rentalUnitsContractsRoutes";
+import { registerRentalUnitsContractsRoutes } from "./rental/units-contracts";
 import { registerCentralRentalPaymentDeletionRoute } from "./rental/centralRentalPaymentDeletionRoute";
 import { registerRentalPaymentsAccrualRoutes } from "./rental/rentalPaymentsAccrualRoutes";
 import { registerRentalAccrualConfigRoutes } from "./rental/rentalAccrualConfigRoutes";
