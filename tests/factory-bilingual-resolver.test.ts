@@ -1,28 +1,45 @@
 import { describe, expect, it } from "vitest";
 import {
   factorySearchValues,
-  normalizeFactoryLanguage,
+  parseFactoryCatalogLanguage,
+  resolveFactoryLocalizedText,
   resolveFactoryProductLanguage,
-  resolveFactoryText,
-} from "../shared/factoryBilingual";
+} from "../shared/factoryBilingualContract";
 
 describe("Factory bilingual shared resolver", () => {
-  it("normalizes unsupported languages to English", () => {
-    expect(normalizeFactoryLanguage("ar")).toBe("ar");
-    expect(normalizeFactoryLanguage("AR")).toBe("ar");
-    expect(normalizeFactoryLanguage("fr")).toBe("en");
-    expect(normalizeFactoryLanguage(undefined)).toBe("en");
+  it("accepts only the supported API language values", () => {
+    expect(parseFactoryCatalogLanguage("ar")).toBe("ar");
+    expect(parseFactoryCatalogLanguage("en")).toBe("en");
+    expect(parseFactoryCatalogLanguage("AR")).toBe("en");
+    expect(parseFactoryCatalogLanguage("fr")).toBe("en");
+    expect(parseFactoryCatalogLanguage(undefined)).toBe("en");
   });
 
   it("uses the approved Arabic and English fallback order", () => {
-    expect(resolveFactoryText({ en: "Men Bag", ar: "حقيبة رجالية", fallback: "HMD10014" }, "ar")).toBe(
-      "حقيبة رجالية"
-    );
-    expect(resolveFactoryText({ en: "Men Bag", ar: null, fallback: "HMD10014" }, "ar")).toBe("Men Bag");
-    expect(resolveFactoryText({ en: null, ar: "حقيبة رجالية", fallback: "HMD10014" }, "en")).toBe(
-      "حقيبة رجالية"
-    );
-    expect(resolveFactoryText({ en: null, ar: null, fallback: "HMD10014" }, "ar")).toBe("HMD10014");
+    expect(
+      resolveFactoryLocalizedText(
+        { english: "Men Bag", arabic: "حقيبة رجالية", articleCode: "HMD10014" },
+        "ar"
+      )
+    ).toBe("حقيبة رجالية");
+    expect(
+      resolveFactoryLocalizedText(
+        { english: "Men Bag", arabic: null, articleCode: "HMD10014" },
+        "ar"
+      )
+    ).toBe("Men Bag");
+    expect(
+      resolveFactoryLocalizedText(
+        { english: null, arabic: "حقيبة رجالية", articleCode: "HMD10014" },
+        "en"
+      )
+    ).toBe("حقيبة رجالية");
+    expect(
+      resolveFactoryLocalizedText(
+        { english: null, arabic: null, articleCode: " hmd10014 " },
+        "ar"
+      )
+    ).toBe("HMD10014");
   });
 
   it("resolves product, category, and description with one contract", () => {
@@ -48,10 +65,33 @@ describe("Factory bilingual shared resolver", () => {
     });
   });
 
-  it("keeps article code and both languages searchable", () => {
+  it("uses the article code when product, category, and description text are all missing", () => {
+    expect(
+      resolveFactoryProductLanguage(
+        {
+          articleCode: " 00-ab-019 ",
+          name: null,
+          nameAr: null,
+          categoryName: null,
+          categoryNameAr: null,
+          description: null,
+          descriptionAr: null,
+        },
+        "ar"
+      )
+    ).toEqual({
+      language: "ar",
+      articleCode: "00-AB-019",
+      name: "00-AB-019",
+      categoryName: "00-AB-019",
+      description: "00-AB-019",
+    });
+  });
+
+  it("keeps normalized article code and both languages searchable", () => {
     expect(
       factorySearchValues({
-        articleCode: "HMD10014",
+        articleCode: " hmd10014 ",
         name: "MEN BAG CREME 20KG",
         nameAr: "حقيبة رجالية كريمي 20 كغ",
         categoryName: "BAGS & BELTS",
