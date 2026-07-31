@@ -75,6 +75,140 @@ function hasDeferredArabic(update: { nameAr?: string | null; descriptionAr?: str
   return update.nameAr !== undefined || update.descriptionAr !== undefined;
 }
 
+function factoryBilingualCatalogMutationMiddleware(req: any, res: any, next: any) {
+  const path = req.path;
+  const method = req.method.toUpperCase();
+  const language = readFactoryCatalogRequestLanguage(req);
+  let deferredArabic: { nameAr?: string | null; descriptionAr?: string | null } = {};
+  let suppressProductFallbacks = false;
+  let deferredCategoryNameAr: string | null | undefined;
+
+  if (method === "PATCH" && /^\/categories\/\d+$/.test(path) && req.body && language === "ar") {
+    if (Object.prototype.hasOwnProperty.call(req.body, "name")) {
+      deferredCategoryNameAr = typeof req.body.name === "string" ? req.body.name.trim() || null : null;
+      delete req.body.name;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body, "nameAr")) {
+      deferredCategoryNameAr = typeof req.body.nameAr === "string" ? req.body.nameAr.trim() || null : null;
+      delete req.body.nameAr;
+    }
+  }
+
+  if (method === "PATCH" && /^\/bale-products\/\d+$/.test(path) && req.body) {
+    const mapped = mapFactoryLegacyProductEdit(req.body, language);
+    req.body = mapped.body;
+    deferredArabic = mapped.deferredArabic;
+    suppressProductFallbacks = language === "ar";
+  }
+
+  if (method === "POST" && /^\/bale-products\/\d+\/cascade-update$/.test(path) && req.body) {
+    const mapped = mapFactoryLegacyProductEdit(req.body, language);
+    req.body = mapped.body;
+    deferredArabic = mapped.deferredArabic;
+    suppressProductFallbacks = language === "ar";
+  }
+
+  if (method === "POST" && path === "/bale-products" && req.body) {
+    if (Object.prototype.hasOwnProperty.call(req.body, "nameAr")) {
+      deferredArabic.nameAr = typeof req.body.nameAr === "string" ? req.body.nameAr.trim() || null : null;
+      delete req.body.nameAr;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body, "descriptionAr")) {
+      deferredArabic.descriptionAr =
+        typeof req.body.descriptionAr === "string" ? req.body.descriptionAr.trim() || null : null;
+      delete req.body.descriptionAr;
+    }
+    if (typeof req.body.nameEn === "string" && req.body.nameEn.trim()) {
+      req.body.name = req.body.nameEn.trim();
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body, "descriptionEn")) {
+      req.body.description = typeof req.body.descriptionEn === "string" ? req.body.descriptionEn.trim() : "";
+    }
+    delete req.body.nameEn;
+    delete req.body.descriptionEn;
+  }
+
+  const shouldWrap =
+    (method === "POST" && (path === "/bale-products" || /^\/bale-products\/\d+\/cascade-update$/.test(path))) ||
+    (method === "PATCH" && (/^\/bale-products\/\d+$/.test(path) || /^\/categories\/\d+$/.test(path))) ||
+    (method === "POST" && path === "/categories");
+
+  if (!shouldWrap) return next();
+
+  const originalJson = res.json.bind(res);
+  res.json = ((payload: any) => {
+    const send = async () => {
+      let responsePayload = payload;
+      const companyId = getFactoryCompanyId(req);
+
+      if (deferredCategoryNameAr !== undefined && payload?.id && companyId) {
+        const shouldSkipFallback =
+          payload.nameAr == null && deferredCategoryNameAr === resolveFactoryCategoryName(payload, "ar");
+        if (!shouldSkipFallback) {
+          const [updatedCategory] = await db
+            .update(factoryCategories)
+            .set({ nameAr: deferredCategoryNameAr, updatedAt: new Date() })
+            .where(
+              and(
+                eq(factoryCategories.id, Number(payload.id)),
+                eq(factoryCategories.companyId, companyId),
+                isNull(factoryCategories.deletedAt)
+              )
+            )
+            .returning();
+          if (updatedCategory) responsePayload = updatedCategory;
+        }
+      }
+
+      if (hasDeferredArabic(deferredArabic)) {
+        const currentProduct = payload?.product ?? payload;
+        const productId = Number(currentProduct?.id);
+        if (Number.isInteger(productId) && productId > 0 && companyId) {
+          const safeArabic = suppressProductFallbacks
+            ? suppressUnchangedFactoryArabicFallbacks(deferredArabic, currentProduct)
+            : deferredArabic;
+
+          if (hasDeferredArabic(safeArabic)) {
+            const update: Partial<typeof factoryBaleProducts.$inferInsert> = { updatedAt: new Date() };
+            if (safeArabic.nameAr !== undefined) update.nameAr = safeArabic.nameAr;
+            if (safeArabic.descriptionAr !== undefined) update.descriptionAr = safeArabic.descriptionAr;
+
+            const [updated] = await db
+              .update(factoryBaleProducts)
+              .set(update)
+              .where(
+                and(
+                  eq(factoryBaleProducts.id, productId),
+                  eq(factoryBaleProducts.companyId, companyId),
+                  isNull(factoryBaleProducts.deletedAt)
+                )
+              )
+              .returning();
+
+            if (updated) {
+              responsePayload = payload?.product ? { ...payload, product: updated } : updated;
+            }
+          }
+        }
+      }
+
+      return originalJson(localizeMutationResponse(path, responsePayload, language));
+    };
+
+    void send().catch((error) => {
+      logger.error("Factory bilingual catalog response transformation failed", {
+        error,
+        path,
+        method,
+      });
+      if (!res.headersSent) originalJson({ message: getErrorMessage(error) });
+    });
+    return res;
+  }) as typeof res.json;
+
+  return next();
+}
+
 /**
  * Compatibility middleware for legacy create/edit actions. Catalog list reads
  * use explorer-specific endpoints below, so operational consumers of the shared
@@ -82,139 +216,7 @@ function hasDeferredArabic(update: { nameAr?: string | null; descriptionAr?: str
  * search state and the production read microcache remains untouched.
  */
 export function registerFactoryBilingualCatalogMiddleware(app: Express): void {
-  app.use("/api/factory", (req: any, res: any, next: any) => {
-    const path = req.path;
-    const method = req.method.toUpperCase();
-    const language = readFactoryCatalogRequestLanguage(req);
-    let deferredArabic: { nameAr?: string | null; descriptionAr?: string | null } = {};
-    let suppressProductFallbacks = false;
-    let deferredCategoryNameAr: string | null | undefined;
-
-    if (method === "PATCH" && /^\/categories\/\d+$/.test(path) && req.body && language === "ar") {
-      if (Object.prototype.hasOwnProperty.call(req.body, "name")) {
-        deferredCategoryNameAr = typeof req.body.name === "string" ? req.body.name.trim() || null : null;
-        delete req.body.name;
-      }
-      if (Object.prototype.hasOwnProperty.call(req.body, "nameAr")) {
-        deferredCategoryNameAr = typeof req.body.nameAr === "string" ? req.body.nameAr.trim() || null : null;
-        delete req.body.nameAr;
-      }
-    }
-
-    if (method === "PATCH" && /^\/bale-products\/\d+$/.test(path) && req.body) {
-      const mapped = mapFactoryLegacyProductEdit(req.body, language);
-      req.body = mapped.body;
-      deferredArabic = mapped.deferredArabic;
-      suppressProductFallbacks = language === "ar";
-    }
-
-    if (method === "POST" && /^\/bale-products\/\d+\/cascade-update$/.test(path) && req.body) {
-      const mapped = mapFactoryLegacyProductEdit(req.body, language);
-      req.body = mapped.body;
-      deferredArabic = mapped.deferredArabic;
-      suppressProductFallbacks = language === "ar";
-    }
-
-    if (method === "POST" && path === "/bale-products" && req.body) {
-      if (Object.prototype.hasOwnProperty.call(req.body, "nameAr")) {
-        deferredArabic.nameAr = typeof req.body.nameAr === "string" ? req.body.nameAr.trim() || null : null;
-        delete req.body.nameAr;
-      }
-      if (Object.prototype.hasOwnProperty.call(req.body, "descriptionAr")) {
-        deferredArabic.descriptionAr =
-          typeof req.body.descriptionAr === "string" ? req.body.descriptionAr.trim() || null : null;
-        delete req.body.descriptionAr;
-      }
-      if (typeof req.body.nameEn === "string" && req.body.nameEn.trim()) {
-        req.body.name = req.body.nameEn.trim();
-      }
-      if (Object.prototype.hasOwnProperty.call(req.body, "descriptionEn")) {
-        req.body.description = typeof req.body.descriptionEn === "string" ? req.body.descriptionEn.trim() : "";
-      }
-      delete req.body.nameEn;
-      delete req.body.descriptionEn;
-    }
-
-    const shouldWrap =
-      (method === "POST" && (path === "/bale-products" || /^\/bale-products\/\d+\/cascade-update$/.test(path))) ||
-      (method === "PATCH" && (/^\/bale-products\/\d+$/.test(path) || /^\/categories\/\d+$/.test(path))) ||
-      (method === "POST" && path === "/categories");
-
-    if (!shouldWrap) return next();
-
-    const originalJson = res.json.bind(res);
-    res.json = ((payload: any) => {
-      const send = async () => {
-        let responsePayload = payload;
-        const companyId = getFactoryCompanyId(req);
-
-        if (deferredCategoryNameAr !== undefined && payload?.id && companyId) {
-          const shouldSkipFallback =
-            payload.nameAr == null && deferredCategoryNameAr === resolveFactoryCategoryName(payload, "ar");
-          if (!shouldSkipFallback) {
-            const [updatedCategory] = await db
-              .update(factoryCategories)
-              .set({ nameAr: deferredCategoryNameAr, updatedAt: new Date() })
-              .where(
-                and(
-                  eq(factoryCategories.id, Number(payload.id)),
-                  eq(factoryCategories.companyId, companyId),
-                  isNull(factoryCategories.deletedAt)
-                )
-              )
-              .returning();
-            if (updatedCategory) responsePayload = updatedCategory;
-          }
-        }
-
-        if (hasDeferredArabic(deferredArabic)) {
-          const currentProduct = payload?.product ?? payload;
-          const productId = Number(currentProduct?.id);
-          if (Number.isInteger(productId) && productId > 0 && companyId) {
-            const safeArabic = suppressProductFallbacks
-              ? suppressUnchangedFactoryArabicFallbacks(deferredArabic, currentProduct)
-              : deferredArabic;
-
-            if (hasDeferredArabic(safeArabic)) {
-              const update: Partial<typeof factoryBaleProducts.$inferInsert> = { updatedAt: new Date() };
-              if (safeArabic.nameAr !== undefined) update.nameAr = safeArabic.nameAr;
-              if (safeArabic.descriptionAr !== undefined) update.descriptionAr = safeArabic.descriptionAr;
-
-              const [updated] = await db
-                .update(factoryBaleProducts)
-                .set(update)
-                .where(
-                  and(
-                    eq(factoryBaleProducts.id, productId),
-                    eq(factoryBaleProducts.companyId, companyId),
-                    isNull(factoryBaleProducts.deletedAt)
-                  )
-                )
-                .returning();
-
-              if (updated) {
-                responsePayload = payload?.product ? { ...payload, product: updated } : updated;
-              }
-            }
-          }
-        }
-
-        return originalJson(localizeMutationResponse(path, responsePayload, language));
-      };
-
-      void send().catch((error) => {
-        logger.error("Factory bilingual catalog response transformation failed", {
-          error,
-          path,
-          method,
-        });
-        if (!res.headersSent) originalJson({ message: getErrorMessage(error) });
-      });
-      return res;
-    }) as typeof res.json;
-
-    return next();
-  });
+  app.use("/api/factory", factoryBilingualCatalogMutationMiddleware);
 }
 
 function isFactoryCatalogAdmin(req: any): boolean {

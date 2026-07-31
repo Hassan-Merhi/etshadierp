@@ -11,10 +11,16 @@
     "POST /api/factory/payrolls/preview-excel [requireAuth > <anonymous>]",
     "GET /api/payroll/worker-deductions [requireAuth > <anonymous>]",
     "POST /api/payroll/workers/:id/deductions [requireAuth > <anonymous>]",
-    "DELETE /api/payroll/workers/:workerId/deductions/:id [requireAuth > <anonymous>]"
+    "DELETE /api/payroll/workers/:workerId/deductions/:id [requireAuth > <anonymous>]",
+    "GET /api/factory/catalog-bilingual/products [requireAuth > <anonymous>]",
+    "GET /api/factory/catalog-bilingual/categories [requireAuth > <anonymous>]",
+    "POST /api/factory/catalog-bilingual/categories [requireAuth > <anonymous>]",
+    "PATCH /api/factory/catalog-bilingual/categories/:id [requireAuth > <anonymous>]",
+    "PATCH /api/factory/catalog-bilingual/products/:id [requireAuth > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
-    "USE /api/factory/containers [postOffloadReconciliationMiddleware]"
+    "USE /api/factory/containers [postOffloadReconciliationMiddleware]",
+    "USE /api/factory [factoryBilingualCatalogMutationMiddleware]"
   ],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [
