@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { requireAuth, requireRole } from "../../auth";
-import { getPrivateApiCacheStats } from "../../middleware/privateApiCache";
 import { getOperationalHealthSnapshot } from "../../services/operations/operationalHealthService";
+import { getReadMicrocacheStats } from "../performance/readMicrocache";
 
 /**
  * Read-only operational monitoring endpoint. It exposes aggregate process,
@@ -17,8 +17,8 @@ export function registerOperationalMonitoringRoutes(app: Express): void {
     (_req: Request, res: Response) => {
       res.status(200).json({
         ...getOperationalHealthSnapshot(),
-        privateApiCache: getPrivateApiCacheStats(),
+        readMicrocache: getReadMicrocacheStats(),
       });
-    },
+    }
   );
 }
