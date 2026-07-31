@@ -16,7 +16,6 @@ interface CacheEntry {
   etag: string;
   expiresAt: number;
   sizeBytes: number;
-  policyName: string;
 }
 
 interface CacheStats {
@@ -98,7 +97,10 @@ const CACHE_POLICIES: readonly CachePolicy[] = [
   volatile("daybook", /^\/api\/daybook\/?$/),
   volatile("pos-drafts", /^\/api\/pos\/drafts\/?$/),
   volatile("pos-last-sold-prices", /^\/api\/pos\/last-sold-prices\/?$/),
-  volatile("factory-raw-stock-containers", /^\/api\/factory\/raw-stock\/available-containers\/?$/),
+  volatile(
+    "factory-raw-stock-containers",
+    /^\/api\/factory\/raw-stock\/available-containers\/?$/,
+  ),
   volatile("factory-containers", /^\/api\/factory\/containers\/?$/),
   volatile("git-containers", /^\/api\/git\/containers\/?$/),
   reference("factory-workers", /^\/api\/factory\/workers\/?$/),
@@ -132,7 +134,7 @@ function findPolicy(method: string, path: string): CachePolicy | undefined {
 }
 
 function stableSerialize(value: unknown): string {
-  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "undefined";
   if (Array.isArray(value)) return `[${value.map(stableSerialize).join(",")}]`;
 
   const objectValue = value as Record<string, unknown>;
@@ -143,7 +145,7 @@ function stableSerialize(value: unknown): string {
 }
 
 function sessionScope(req: Request): string | null {
-  const session = (req as Request & { session?: Record<string, unknown> }).session;
+  const session = (req as any).session as Record<string, unknown> | undefined;
   const userId = session?.userId;
   if (userId === undefined || userId === null) return null;
 
@@ -198,6 +200,7 @@ function applyHeaders(res: Response, policy: CachePolicy, etag: string, state: s
   res.removeHeader("Expires");
   res.setHeader("ETag", etag);
   res.setHeader("X-ERP-Cache", state);
+  res.setHeader("X-ERP-Cache-Policy", policy.name);
   setVary(res, ["Cookie", "Accept-Encoding", "X-Client-Date"]);
 }
 
@@ -319,11 +322,12 @@ function cacheReadResponse(req: Request, res: Response, next: NextFunction): voi
   if (existing) deleteEntry(key);
   counters.misses += 1;
   res.setHeader("X-ERP-Cache", forceRefresh ? "REFRESH" : "MISS");
+  res.setHeader("X-ERP-Cache-Policy", policy.name);
 
   const originalJson = res.json.bind(res);
   const originalSend = res.send.bind(res);
 
-  (res as Response & { json: typeof res.json }).json = ((payload: unknown) => {
+  (res as any).json = (payload: unknown) => {
     if (res.headersSent || res.statusCode !== 200) return originalJson(payload);
 
     const body = JSON.stringify(payload);
@@ -347,7 +351,6 @@ function cacheReadResponse(req: Request, res: Response, next: NextFunction): voi
       etag,
       expiresAt: Date.now() + policy.serverTtlMs,
       sizeBytes,
-      policyName: policy.name,
     });
 
     if (etagMatches(req.get("if-none-match"), etag)) {
@@ -363,7 +366,7 @@ function cacheReadResponse(req: Request, res: Response, next: NextFunction): voi
     }
 
     return originalSend(body);
-  }) as typeof res.json;
+  };
 
   next();
 }
