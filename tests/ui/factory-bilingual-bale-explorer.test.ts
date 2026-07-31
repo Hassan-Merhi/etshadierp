@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   FACTORY_CATALOG_LANGUAGE_STORAGE_KEY,
   persistFactoryCatalogLanguagePreference,
-  persistFactoryCatalogSearch,
   readFactoryCatalogLanguagePreference,
 } from "@/lib/factoryCatalogPreference";
 
@@ -10,7 +9,6 @@ describe("Factory Bale Explorer language preference", () => {
   beforeEach(() => {
     window.localStorage.clear();
     document.cookie = "factory_catalog_language=; Path=/; Max-Age=0";
-    document.cookie = "factory_catalog_search=; Path=/; Max-Age=0";
   });
 
   it("defaults safely to English and reads a persisted Arabic selection", () => {
@@ -26,14 +24,5 @@ describe("Factory Bale Explorer language preference", () => {
 
     expect(window.localStorage.getItem(FACTORY_CATALOG_LANGUAGE_STORAGE_KEY)).toBe("ar");
     expect(document.cookie).toContain("factory_catalog_language=ar");
-  });
-
-  it("encodes bilingual search text and clears the cookie when the search is empty", () => {
-    persistFactoryCatalogSearch("حقيبة cream", document);
-    expect(document.cookie).toContain("factory_catalog_search=");
-    expect(decodeURIComponent(document.cookie)).toContain("حقيبة cream");
-
-    persistFactoryCatalogSearch("", document);
-    expect(document.cookie).not.toContain("factory_catalog_search=");
   });
 });

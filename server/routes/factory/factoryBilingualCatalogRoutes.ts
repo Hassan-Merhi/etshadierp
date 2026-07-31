@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import {
   factoryBaleProducts,
   factoryCategories,
@@ -7,13 +7,14 @@ import {
 } from "@shared/schema";
 import {
   parseFactoryCatalogLanguage,
+  resolveFactoryCategoryName,
   type FactoryCatalogLanguage,
 } from "@shared/factoryBilingualContract";
 import {
-  mapFactoryLegacyCategoryEdit,
   mapFactoryLegacyProductEdit,
   presentFactoryCatalogCategories,
   presentFactoryCatalogProducts,
+  suppressUnchangedFactoryArabicFallbacks,
 } from "@shared/factoryBilingualCatalogPresentation";
 import { db } from "../../db";
 import { parseId } from "../../lib/parseId";
@@ -21,7 +22,6 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 
 const LANGUAGE_COOKIE = "factory_catalog_language";
-const SEARCH_COOKIE = "factory_catalog_search";
 
 function readCookie(header: unknown, name: string): string | null {
   if (typeof header !== "string" || !header) return null;
@@ -45,7 +45,7 @@ export function readFactoryCatalogRequestLanguage(req: any): FactoryCatalogLangu
 }
 
 export function readFactoryCatalogRequestSearch(req: any): string {
-  const value = req.query?.catalogSearch ?? readCookie(req.headers?.cookie, SEARCH_COOKIE);
+  const value = req.query?.search ?? req.query?.catalogSearch;
   return typeof value === "string" ? value.trim() : "";
 }
 
@@ -55,13 +55,7 @@ function getFactoryCompanyId(req: any): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-function localizeResponse(path: string, payload: any, language: FactoryCatalogLanguage, search: string): any {
-  if (path === "/bale-products" && Array.isArray(payload)) {
-    return presentFactoryCatalogProducts(payload, language, search);
-  }
-  if (path === "/categories" && Array.isArray(payload)) {
-    return presentFactoryCatalogCategories(payload, language);
-  }
+function localizeMutationResponse(path: string, payload: any, language: FactoryCatalogLanguage): any {
   if (payload?.product && typeof payload.product === "object") {
     return {
       ...payload,
@@ -82,31 +76,43 @@ function hasDeferredArabic(update: { nameAr?: string | null; descriptionAr?: str
 }
 
 /**
- * Compatibility middleware for the legacy Bale Explorer. It keeps the existing
- * endpoints and permissions intact while presenting localized names and routing
- * Arabic-mode edits into the nullable Arabic catalog columns.
+ * Compatibility middleware for legacy create/edit actions. Catalog list reads
+ * use explorer-specific endpoints below, so operational consumers of the shared
+ * `/api/factory/bale-products` endpoint never inherit the explorer language or
+ * search state and the production read microcache remains untouched.
  */
 export function registerFactoryBilingualCatalogMiddleware(app: Express): void {
   app.use("/api/factory", (req: any, res: any, next: any) => {
     const path = req.path;
     const method = req.method.toUpperCase();
     const language = readFactoryCatalogRequestLanguage(req);
-    const search = readFactoryCatalogRequestSearch(req);
     let deferredArabic: { nameAr?: string | null; descriptionAr?: string | null } = {};
+    let suppressProductFallbacks = false;
+    let deferredCategoryNameAr: string | null | undefined;
 
-    if (method === "PATCH" && /^\/categories\/\d+$/.test(path) && req.body) {
-      req.body = mapFactoryLegacyCategoryEdit(req.body, language);
+    if (method === "PATCH" && /^\/categories\/\d+$/.test(path) && req.body && language === "ar") {
+      if (Object.prototype.hasOwnProperty.call(req.body, "name")) {
+        deferredCategoryNameAr = typeof req.body.name === "string" ? req.body.name.trim() || null : null;
+        delete req.body.name;
+      }
+      if (Object.prototype.hasOwnProperty.call(req.body, "nameAr")) {
+        deferredCategoryNameAr = typeof req.body.nameAr === "string" ? req.body.nameAr.trim() || null : null;
+        delete req.body.nameAr;
+      }
     }
 
     if (method === "PATCH" && /^\/bale-products\/\d+$/.test(path) && req.body) {
       const mapped = mapFactoryLegacyProductEdit(req.body, language);
-      req.body = { ...mapped.body, ...mapped.deferredArabic };
+      req.body = mapped.body;
+      deferredArabic = mapped.deferredArabic;
+      suppressProductFallbacks = language === "ar";
     }
 
     if (method === "POST" && /^\/bale-products\/\d+\/cascade-update$/.test(path) && req.body) {
       const mapped = mapFactoryLegacyProductEdit(req.body, language);
       req.body = mapped.body;
       deferredArabic = mapped.deferredArabic;
+      suppressProductFallbacks = language === "ar";
     }
 
     if (method === "POST" && path === "/bale-products" && req.body) {
@@ -130,7 +136,6 @@ export function registerFactoryBilingualCatalogMiddleware(app: Express): void {
     }
 
     const shouldWrap =
-      (method === "GET" && (path === "/bale-products" || path === "/categories")) ||
       (method === "POST" && (path === "/bale-products" || /^\/bale-products\/\d+\/cascade-update$/.test(path))) ||
       (method === "PATCH" && (/^\/bale-products\/\d+$/.test(path) || /^\/categories\/\d+$/.test(path))) ||
       (method === "POST" && path === "/categories");
@@ -141,37 +146,60 @@ export function registerFactoryBilingualCatalogMiddleware(app: Express): void {
     res.json = ((payload: any) => {
       const send = async () => {
         let responsePayload = payload;
+        const companyId = getFactoryCompanyId(req);
 
-        if (hasDeferredArabic(deferredArabic)) {
-          const productId = Number(payload?.product?.id ?? payload?.id);
-          const companyId = getFactoryCompanyId(req);
-          if (Number.isInteger(productId) && productId > 0 && companyId) {
-            const update: typeof factoryBaleProducts.$inferInsert = {} as typeof factoryBaleProducts.$inferInsert;
-            if (deferredArabic.nameAr !== undefined) update.nameAr = deferredArabic.nameAr;
-            if (deferredArabic.descriptionAr !== undefined) update.descriptionAr = deferredArabic.descriptionAr;
-            update.updatedAt = new Date();
-
-            const [updated] = await db
-              .update(factoryBaleProducts)
-              .set(update)
+        if (deferredCategoryNameAr !== undefined && payload?.id && companyId) {
+          const shouldSkipFallback =
+            payload.nameAr == null && deferredCategoryNameAr === resolveFactoryCategoryName(payload, "ar");
+          if (!shouldSkipFallback) {
+            const [updatedCategory] = await db
+              .update(factoryCategories)
+              .set({ nameAr: deferredCategoryNameAr, updatedAt: new Date() })
               .where(
                 and(
-                  eq(factoryBaleProducts.id, productId),
-                  eq(factoryBaleProducts.companyId, companyId),
-                  isNull(factoryBaleProducts.deletedAt)
+                  eq(factoryCategories.id, Number(payload.id)),
+                  eq(factoryCategories.companyId, companyId),
+                  isNull(factoryCategories.deletedAt)
                 )
               )
               .returning();
+            if (updatedCategory) responsePayload = updatedCategory;
+          }
+        }
 
-            if (updated) {
-              responsePayload = payload?.product
-                ? { ...payload, product: updated }
-                : updated;
+        if (hasDeferredArabic(deferredArabic)) {
+          const currentProduct = payload?.product ?? payload;
+          const productId = Number(currentProduct?.id);
+          if (Number.isInteger(productId) && productId > 0 && companyId) {
+            const safeArabic = suppressProductFallbacks
+              ? suppressUnchangedFactoryArabicFallbacks(deferredArabic, currentProduct)
+              : deferredArabic;
+
+            if (hasDeferredArabic(safeArabic)) {
+              const update: Partial<typeof factoryBaleProducts.$inferInsert> = { updatedAt: new Date() };
+              if (safeArabic.nameAr !== undefined) update.nameAr = safeArabic.nameAr;
+              if (safeArabic.descriptionAr !== undefined) update.descriptionAr = safeArabic.descriptionAr;
+
+              const [updated] = await db
+                .update(factoryBaleProducts)
+                .set(update)
+                .where(
+                  and(
+                    eq(factoryBaleProducts.id, productId),
+                    eq(factoryBaleProducts.companyId, companyId),
+                    isNull(factoryBaleProducts.deletedAt)
+                  )
+                )
+                .returning();
+
+              if (updated) {
+                responsePayload = payload?.product ? { ...payload, product: updated } : updated;
+              }
             }
           }
         }
 
-        return originalJson(localizeResponse(path, responsePayload, language, search));
+        return originalJson(localizeMutationResponse(path, responsePayload, language));
       };
 
       void send().catch((error) => {
@@ -180,9 +208,7 @@ export function registerFactoryBilingualCatalogMiddleware(app: Express): void {
           path,
           method,
         });
-        if (!res.headersSent) {
-          originalJson({ message: getErrorMessage(error) });
-        }
+        if (!res.headersSent) originalJson({ message: getErrorMessage(error) });
       });
       return res;
     }) as typeof res.json;
@@ -197,11 +223,52 @@ function isFactoryCatalogAdmin(req: any): boolean {
 }
 
 /**
- * Explicit bilingual write endpoints used by the compact Phase 3 controls.
- * They are registered after the legacy Factory registry, so all existing
- * company-resolution and admin middleware executes before these handlers.
+ * Explorer-specific reads and explicit bilingual writes. These routes are
+ * registered after the legacy Factory registry, so all existing company and
+ * permission middleware executes before them. Their unique path also avoids the
+ * shared 30-second bale-product microcache.
  */
 export function registerFactoryBilingualCatalogRoutes(app: Express, requireAuth: any): void {
+  app.get("/api/factory/catalog-bilingual/products", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const products = await db
+        .select()
+        .from(factoryBaleProducts)
+        .where(and(eq(factoryBaleProducts.companyId, companyId), isNull(factoryBaleProducts.deletedAt)))
+        .orderBy(asc(factoryBaleProducts.id));
+      return res.json(
+        presentFactoryCatalogProducts(
+          products,
+          readFactoryCatalogRequestLanguage(req),
+          readFactoryCatalogRequestSearch(req)
+        )
+      );
+    } catch (error) {
+      logger.error("Error loading bilingual Factory products", { error });
+      return res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
+  app.get("/api/factory/catalog-bilingual/categories", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getFactoryCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const categories = await db
+        .select()
+        .from(factoryCategories)
+        .where(and(eq(factoryCategories.companyId, companyId), isNull(factoryCategories.deletedAt)))
+        .orderBy(asc(factoryCategories.name));
+      return res.json(
+        presentFactoryCatalogCategories(categories, readFactoryCatalogRequestLanguage(req))
+      );
+    } catch (error) {
+      logger.error("Error loading bilingual Factory categories", { error });
+      return res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
   app.post("/api/factory/catalog-bilingual/categories", requireAuth, async (req: any, res: any) => {
     try {
       if (!isFactoryCatalogAdmin(req)) {
@@ -216,8 +283,9 @@ export function registerFactoryBilingualCatalogRoutes(app: Express, requireAuth:
         nameAr: typeof req.body?.nameAr === "string" ? req.body.nameAr.trim() || null : null,
       });
       const [category] = await db.insert(factoryCategories).values(parsed).returning();
-      const language = readFactoryCatalogRequestLanguage(req);
-      return res.json(presentFactoryCatalogCategories([category], language)[0]);
+      return res.json(
+        presentFactoryCatalogCategories([category], readFactoryCatalogRequestLanguage(req))[0]
+      );
     } catch (error) {
       logger.error("Error creating bilingual Factory category", { error });
       return res.status(400).json({ message: getErrorMessage(error) });

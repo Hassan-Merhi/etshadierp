@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Languages, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,16 +12,65 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import type { FactoryCatalogLanguage } from "@shared/factoryBilingualContract";
 import {
   persistFactoryCatalogLanguagePreference,
-  persistFactoryCatalogSearch,
   readFactoryCatalogLanguagePreference,
 } from "@/lib/factoryCatalogPreference";
 import BaleProductsPage from "./BaleProducts";
+
+interface CatalogFetchBoundaryProps {
+  language: FactoryCatalogLanguage;
+  search: string;
+}
+
+function CatalogFetchBoundary({ language, search }: CatalogFetchBoundaryProps) {
+  const [ready, setReady] = useState(false);
+
+  useLayoutEffect(() => {
+    const originalFetch = window.fetch;
+    const patchedFetch: typeof window.fetch = (input, init) => {
+      const requestMethod = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+      if (requestMethod !== "GET") return originalFetch(input, init);
+
+      const rawUrl =
+        typeof input === "string" || input instanceof URL
+          ? input.toString()
+          : input.url;
+      const parsed = new URL(rawUrl, window.location.origin);
+      const isRelative = rawUrl.startsWith("/");
+
+      if (parsed.pathname === "/api/factory/bale-products") {
+        parsed.pathname = "/api/factory/catalog-bilingual/products";
+        parsed.search = new URLSearchParams({ lang: language, search }).toString();
+        return originalFetch(isRelative ? `${parsed.pathname}${parsed.search}` : parsed.toString(), init);
+      }
+
+      if (parsed.pathname === "/api/factory/categories") {
+        parsed.pathname = "/api/factory/catalog-bilingual/categories";
+        parsed.search = new URLSearchParams({ lang: language }).toString();
+        return originalFetch(isRelative ? `${parsed.pathname}${parsed.search}` : parsed.toString(), init);
+      }
+
+      return originalFetch(input, init);
+    };
+
+    window.fetch = patchedFetch;
+    setReady(true);
+
+    return () => {
+      if (window.fetch === patchedFetch) window.fetch = originalFetch;
+      queryClient.removeQueries({ queryKey: ["/api/factory/bale-products"] });
+      queryClient.removeQueries({ queryKey: ["/api/factory/categories"] });
+    };
+  }, [language, search]);
+
+  return ready ? <BaleProductsPage /> : null;
+}
 
 export default function BaleProductsBilingual() {
   const [language, setLanguage] = useState<FactoryCatalogLanguage>(() =>
     readFactoryCatalogLanguagePreference(typeof window === "undefined" ? null : window.localStorage)
   );
   const [catalogSearch, setCatalogSearch] = useState("");
+  const [requestSearch, setRequestSearch] = useState("");
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [categoryNameEn, setCategoryNameEn] = useState("");
   const [categoryNameAr, setCategoryNameAr] = useState("");
@@ -38,24 +87,12 @@ export default function BaleProductsBilingual() {
       typeof window === "undefined" ? null : window.localStorage,
       typeof document === "undefined" ? null : document
     );
-    void queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
-    void queryClient.invalidateQueries({ queryKey: ["/api/factory/categories"] });
   }, [language]);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      persistFactoryCatalogSearch(catalogSearch, document);
-      void queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
-    }, 250);
+    const timeout = window.setTimeout(() => setRequestSearch(catalogSearch.trim()), 250);
     return () => window.clearTimeout(timeout);
   }, [catalogSearch]);
-
-  useEffect(
-    () => () => {
-      persistFactoryCatalogSearch("", typeof document === "undefined" ? null : document);
-    },
-    []
-  );
 
   const createCategoryMutation = useMutation({
     mutationFn: async () => {
@@ -157,7 +194,7 @@ export default function BaleProductsBilingual() {
         </div>
       </div>
 
-      <BaleProductsPage />
+      <CatalogFetchBoundary key={`${language}:${requestSearch}`} language={language} search={requestSearch} />
 
       <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
         <DialogContent className="max-w-lg">

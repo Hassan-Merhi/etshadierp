@@ -117,6 +117,36 @@ export function mapFactoryLegacyProductEdit(
   return { body, deferredArabic };
 }
 
+/**
+ * A localized form can display English/article-code fallback text when Arabic
+ * is absent. Saving an unrelated price or weight change must not turn that
+ * fallback into a real Arabic translation.
+ */
+export function suppressUnchangedFactoryArabicFallbacks(
+  update: FactoryLegacyLocalizedEdit["deferredArabic"],
+  current: FactoryCatalogProductPresentationSource
+): FactoryLegacyLocalizedEdit["deferredArabic"] {
+  const safe = { ...update };
+
+  if (
+    current.nameAr == null &&
+    safe.nameAr !== undefined &&
+    safe.nameAr === resolveFactoryProductName(current, "ar")
+  ) {
+    delete safe.nameAr;
+  }
+
+  if (
+    current.descriptionAr == null &&
+    safe.descriptionAr !== undefined &&
+    safe.descriptionAr === resolveFactoryProductDescription(current, "ar")
+  ) {
+    delete safe.descriptionAr;
+  }
+
+  return safe;
+}
+
 export function mapFactoryLegacyCategoryEdit(
   input: Record<string, unknown>,
   language: FactoryCatalogLanguage

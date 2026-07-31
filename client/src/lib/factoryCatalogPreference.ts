@@ -5,7 +5,6 @@ import {
 
 export const FACTORY_CATALOG_LANGUAGE_STORAGE_KEY = "factory.catalog.language";
 export const FACTORY_CATALOG_LANGUAGE_COOKIE = "factory_catalog_language";
-export const FACTORY_CATALOG_SEARCH_COOKIE = "factory_catalog_search";
 
 interface StorageLike {
   getItem(key: string): string | null;
@@ -34,23 +33,10 @@ export function persistFactoryCatalogLanguagePreference(
     storage?.setItem(FACTORY_CATALOG_LANGUAGE_STORAGE_KEY, language);
   } catch {
     // Private browsing or hardened browser storage may be unavailable. The
-    // cookie still keeps the active page and API responses consistent.
+    // cookie still keeps edit mutations consistent with the active language.
   }
 
   if (documentLike) {
     documentLike.cookie = `${FACTORY_CATALOG_LANGUAGE_COOKIE}=${language}; Path=/; Max-Age=31536000; SameSite=Lax`;
   }
-}
-
-export function persistFactoryCatalogSearch(
-  search: string,
-  documentLike?: CookieDocumentLike | null
-): void {
-  if (!documentLike) return;
-  const normalized = search.trim();
-  if (!normalized) {
-    documentLike.cookie = `${FACTORY_CATALOG_SEARCH_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
-    return;
-  }
-  documentLike.cookie = `${FACTORY_CATALOG_SEARCH_COOKIE}=${encodeURIComponent(normalized)}; Path=/; Max-Age=3600; SameSite=Lax`;
 }

@@ -4,6 +4,7 @@ import {
   mapFactoryLegacyProductEdit,
   presentFactoryCatalogCategories,
   presentFactoryCatalogProducts,
+  suppressUnchangedFactoryArabicFallbacks,
 } from "../shared/factoryBilingualCatalogPresentation";
 
 describe("Phase 3 Factory bilingual Bale Explorer presentation", () => {
@@ -72,6 +73,22 @@ describe("Phase 3 Factory bilingual Bale Explorer presentation", () => {
       nameAr: "اسم عربي جديد",
       descriptionAr: "وصف عربي جديد",
     });
+  });
+
+  it("does not persist English or article-code fallbacks as Arabic translations", () => {
+    const current = products[1];
+    const safe = suppressUnchangedFactoryArabicFallbacks(
+      {
+        nameAr: "English Only Product",
+        descriptionAr: "HMD10002",
+      },
+      current
+    );
+
+    expect(safe).toEqual({});
+    expect(
+      suppressUnchangedFactoryArabicFallbacks({ nameAr: "ترجمة عربية حقيقية" }, current)
+    ).toEqual({ nameAr: "ترجمة عربية حقيقية" });
   });
 
   it("keeps English-mode edits on canonical English fields", () => {
