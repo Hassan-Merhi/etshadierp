@@ -1,235 +1,27 @@
-import { KPICard } from "@/components/KPICard";
-import { CountryActivityKPI } from "@/components/CountryActivityKPI";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/PageHeader";
-import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import {
-  TrendingUp,
-  Plus,
-  X,
-  Wallet,
-  ArrowUpRight,
-  ArrowDownLeft,
-  ArrowDownRight,
-  Minus,
-  Check,
-  ChevronsUpDown,
-  Truck,
-  Package,
-  Scale,
-  Layers,
-  ChevronRight,
-  ChevronDown,
-  DollarSign,
-  GripVertical,
-  ReceiptText,
-  BookOpen,
-  BarChart2,
-  Boxes,
-  Factory,
-  CheckCircle2,
-  Zap,
-  type LucideIcon,
-} from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useLocation } from "wouter";
-import { cn } from "@/lib/utils";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useCompany } from "@/contexts/CompanyContext";
-import { useState, useRef, useMemo } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
-import { useAppMode, useModePrefix } from "@/contexts/AppModeContext";
-import { getApiRequest } from "@/lib/factoryApi";
+import {KPICard} from "@/components/KPICard";
+import {CountryActivityKPI} from "@/components/CountryActivityKPI";
+import {Card} from "@/components/ui/card";
+import {Button} from "@/components/ui/button";
+import {PageHeader} from "@/components/PageHeader";
+import {useCurrencyContext} from "@/contexts/CurrencyContext";
+import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger} from "@/components/ui/dialog";
+import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
+import {Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList} from "@/components/ui/command";
+import {TrendingUp, Plus, X, Wallet, ArrowUpRight, ArrowDownLeft, Check, ChevronsUpDown, Truck, Package, Scale, Layers, ChevronRight, ChevronDown, DollarSign, GripVertical, ReceiptText, BookOpen, BarChart2, Boxes, Factory, CheckCircle2, Zap} from "lucide-react";
+import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
+import {useLocation} from "wouter";
+import {cn} from "@/lib/utils";
+import {useQuery, useMutation} from "@tanstack/react-query";
+import {useCompany} from "@/contexts/CompanyContext";
+import {useState, useRef, useMemo} from "react";
+import {useToast} from "@/hooks/use-toast";
+import {queryClient} from "@/lib/queryClient";
+import {useAppMode, useModePrefix} from "@/contexts/AppModeContext";
+import {getApiRequest} from "@/lib/factoryApi";
 
-type ProfitData = {
-  totalIncome: number;
-  totalExpenses: number;
-  netProfit: number;
-  forUsTotal: number;
-  forUs: { total: number; breakdown: { name: string; value: number }[]; accounts: any[] };
-  onUsTotal: number;
-  onUs: { total: number; breakdown: { name: string; value: number }[]; accounts: any[] };
-  expensesTotal: number;
-  expenses: {
-    total: number;
-    breakdown: { name: string; value: number }[];
-  };
-  ownersCapital: number;
-  netWorth: number;
-  netPosition: number;
-  netPositionLabel: string;
-  netPositionBreakdown: {
-    assets: {
-      total: number;
-      breakdown: { name: string; value: number }[];
-    };
-    liabilities: {
-      total: number;
-      breakdown: { name: string; value: number }[];
-    };
-    expenses: {
-      total: number;
-      breakdown: { name: string; value: number }[];
-    };
-    netPosition: number;
-  };
-};
-
-type ImportCycleBalanceData = {
-  netImportCycleBalance: number;
-  components: {
-    supplierBalance: number;
-    stockOtwValue: number;
-    dutyAgentBalance: number;
-    transporterAgentBalance: number;
-    loansBalance: number;
-    cashBalance: number;
-    bankBalance: number;
-    directExpenseBalance: number;
-    indirectExpenseBalance: number;
-    incomeBalance: number;
-    stockOnFloorValue: number;
-    cogsBalance: number;
-    payrollExpenseBalance: number;
-    salaryAdvancesBalance: number;
-    payrollLiabilitiesBalance: number;
-  };
-};
-
-type DashboardCashAccount = {
-  id: number;
-  accountType: string;
-  accountId: number;
-  displayOrder: number;
-  account: {
-    id: number;
-    code: string;
-    name: string;
-    balance?: number;
-    currentBalance?: number;
-    openingBalance?: string;
-    type: string;
-  };
-};
-
-type Account = {
-  id: string;
-  accountId: number;
-  type: string;
-  code: string;
-  name: string;
-  balance: number;
-};
-
-type PayableAccount = {
-  id: number;
-  accountId: number;
-  code: string;
-  name: string;
-  balance: number;
-};
-
-type FactoryDashboardKPIs = {
-  openingStockKg: string;
-  closingStockKg: string;
-  balesPressedToday: number;
-  kgsUsedToday: string;
-  totalBaleWeightToday: string;
-  categories: { name: string; count: number; totalKg: number }[];
-  balesDetail: {
-    id: number;
-    baleCode: string;
-    productName: string | null;
-    category: string | null;
-    weightKg: string;
-    pressedAt: string | null;
-    status: string;
-  }[];
-};
-
-function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
-}
-
-function DashboardKPICard({
-  title,
-  value,
-  change,
-  changeType,
-  icon: Icon,
-  stripeClass,
-  iconBgClass,
-  iconFgClass,
-  onClick,
-  testId,
-}: {
-  title: string;
-  value: string;
-  change?: string;
-  changeType?: "positive" | "negative" | "neutral";
-  icon: LucideIcon;
-  stripeClass: string;
-  iconBgClass: string;
-  iconFgClass: string;
-  onClick?: () => void;
-  testId?: string;
-}) {
-  const ChangeIcon = changeType === "positive" ? ArrowUpRight : changeType === "negative" ? ArrowDownRight : Minus;
-  return (
-    <Card
-      className={cn("overflow-hidden p-0", onClick && "cursor-pointer hover-elevate active-elevate-2")}
-      onClick={onClick}
-      data-testid={testId}
-    >
-      <div className={cn("h-1 w-full", stripeClass)} />
-      <div className="p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</span>
-            <div className="text-2xl sm:text-3xl font-bold tracking-tight tabular-nums mt-1.5 leading-none">
-              {value}
-            </div>
-            {change && (
-              <span
-                className={cn(
-                  "mt-2 flex items-center gap-0.5 text-xs font-medium",
-                  changeType === "positive"
-                    ? "text-chart-2"
-                    : changeType === "negative"
-                      ? "text-destructive"
-                      : "text-muted-foreground"
-                )}
-              >
-                <ChangeIcon className="h-3 w-3 shrink-0" />
-                {change}
-              </span>
-            )}
-          </div>
-          <div
-            className={cn("flex h-12 w-12 items-center justify-center rounded-xl shrink-0", iconBgClass, iconFgClass)}
-          >
-            <Icon className="h-5 w-5" />
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
+import type {Account, DashboardCashAccount, FactoryDashboardKPIs, ImportCycleBalanceData, PayableAccount, ProfitData} from "./dashboard/types";
+import {getGreeting} from "./dashboard/utils";
+import {DashboardKPICard} from "./dashboard/components/DashboardKPICard";
 export default function Dashboard() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
@@ -518,7 +310,10 @@ export default function Dashboard() {
       {isError && (
         <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           <span className="font-medium">⚠</span>
-          <span>Some financial data could not be loaded. Figures may be incomplete — please refresh or contact support if the issue persists.</span>
+          <span>
+            Some financial data could not be loaded. Figures may be incomplete — please refresh or contact support if
+            the issue persists.
+          </span>
         </div>
       )}
 

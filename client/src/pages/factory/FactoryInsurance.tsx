@@ -1,364 +1,27 @@
-import { useState, useMemo, useRef, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import {
-  Shield,
-  Plus,
-  Edit,
-  ToggleLeft,
-  ToggleRight,
-  Trash2,
-  DollarSign,
-  Users,
-  UserCheck,
-  Loader2,
-  FileText,
-  ExternalLink,
-  Receipt,
-  Search,
-  BookOpen,
-} from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { PageHeader } from "@/components/PageHeader";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { useDateFormat } from "@/contexts/DateFormatContext";
-import { useCompany } from "@/contexts/CompanyContext";
+import {useState, useMemo, useRef, useEffect} from "react";
+import {useQuery, useMutation} from "@tanstack/react-query";
+import {useLocation} from "wouter";
+import {Shield, Plus, Edit, ToggleLeft, ToggleRight, Trash2, DollarSign, Users, UserCheck, Loader2, Receipt, Search, BookOpen} from "lucide-react";
+import {useToast} from "@/hooks/use-toast";
+import {queryClient, apiRequest} from "@/lib/queryClient";
+import {Button} from "@/components/ui/button";
+import {Card, CardContent} from "@/components/ui/card";
+import {Badge} from "@/components/ui/badge";
+import {PageHeader} from "@/components/PageHeader";
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
+import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter} from "@/components/ui/dialog";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {Input} from "@/components/ui/input";
+import {Label} from "@/components/ui/label";
+import {Textarea} from "@/components/ui/textarea";
+import {Switch} from "@/components/ui/switch";
+import {useDateFormat} from "@/contexts/DateFormatContext";
+import {useCompany} from "@/contexts/CompanyContext";
 
-
-interface InsuranceMember {
-  id: number;
-  companyId: number;
-  name: string;
-  nationality: string | null;
-  positionWorking: string | null;
-  insuranceNumber: string | null;
-  startDate: string;
-  amount: string;
-  dob: string | null;
-  notes: string | null;
-  active: boolean;
-  ledgerAccountId: number | null;
-  createdAt: string;
-}
-
-interface LedgerEntry {
-  id: number;
-  voucherId: number;
-  voucherNumber: string;
-  voucherDate: string;
-  description: string | null;
-  debitAmount: string | null;
-  creditAmount: string | null;
-  narration: string | null;
-}
-
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
-const currentYear = new Date().getFullYear();
-const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
-
-// ─── Member Form Dialog ───────────────────────────────────────────────────────
-function MemberFormDialog({
-  open,
-  onClose,
-  existing,
-}: {
-  open: boolean;
-  onClose: () => void;
-  existing?: InsuranceMember | null;
-}) {
-  const { toast } = useToast();
-  const [name, setName] = useState(existing?.name ?? "");
-  const [nationality, setNationality] = useState(existing?.nationality ?? "");
-  const [positionWorking, setPositionWorking] = useState(existing?.positionWorking ?? "");
-  const [insuranceNumber, setInsuranceNumber] = useState(existing?.insuranceNumber ?? "");
-  const [startDate, setStartDate] = useState(existing?.startDate ?? "");
-  const [amount, setAmount] = useState(existing?.amount ?? "");
-  const [dob, setDob] = useState(existing?.dob ?? "");
-  const [notes, setNotes] = useState(existing?.notes ?? "");
-
-  const saveMutation = useMutation({
-    mutationFn: async (data: any) => {
-      if (existing) {
-        return apiRequest("PATCH", `/api/insurance/members/${existing.id}`, data);
-      } else {
-        return apiRequest("POST", "/api/insurance/members", data);
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/insurance/members"] });
-      toast({ title: existing ? "Member updated" : "Member added" });
-      onClose();
-    },
-    onError: (e: any) => {
-      toast({ title: "Save failed", description: e.message, variant: "destructive" });
-    },
-  });
-
-  const handleSubmit = () => {
-    if (!name.trim() || !startDate || !amount) {
-      toast({ title: "Please fill in required fields", variant: "destructive" });
-      return;
-    }
-    saveMutation.mutate({
-      name: name.trim(),
-      nationality: nationality || null,
-      positionWorking: positionWorking || null,
-      insuranceNumber: insuranceNumber || null,
-      startDate,
-      amount,
-      dob: dob || null,
-      notes: notes || null,
-    });
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{existing ? "Edit Member" : "Add Insurance Member"}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-1">
-            <Label>Name <span className="text-destructive">*</span></Label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Full name"
-              data-testid="input-member-name"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>Nationality</Label>
-              <Input
-                value={nationality}
-                onChange={(e) => setNationality(e.target.value)}
-                placeholder="e.g. Congolese"
-                data-testid="input-member-nationality"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Position / Working</Label>
-              <Input
-                value={positionWorking}
-                onChange={(e) => setPositionWorking(e.target.value)}
-                placeholder="e.g. Operator"
-                data-testid="input-member-position"
-              />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <Label>Insurance Number</Label>
-            <Input
-              value={insuranceNumber}
-              onChange={(e) => setInsuranceNumber(e.target.value)}
-              placeholder="e.g. INS-00123"
-              data-testid="input-member-insurance-number"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label>Start Date <span className="text-destructive">*</span></Label>
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                data-testid="input-member-startdate"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>Date of Birth</Label>
-              <Input
-                type="date"
-                value={dob}
-                onChange={(e) => setDob(e.target.value)}
-                data-testid="input-member-dob"
-              />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <Label>Monthly Amount <span className="text-destructive">*</span></Label>
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0.00"
-              data-testid="input-member-amount"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label>Notes</Label>
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Optional notes"
-              className="resize-none"
-              rows={2}
-              data-testid="input-member-notes"
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} data-testid="button-cancel-member">
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={saveMutation.isPending}
-            data-testid="button-save-member"
-          >
-            {saveMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
-            {existing ? "Save Changes" : "Add Member"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ─── Member Statement Drawer ──────────────────────────────────────────────────
-function MemberStatementDrawer({
-  member,
-  onClose,
-}: {
-  member: InsuranceMember;
-  onClose: () => void;
-}) {
-  const { formatDisplayDate } = useDateFormat();
-
-  const { data: entries = [], isLoading } = useQuery<LedgerEntry[]>({
-    queryKey: ["/api/insurance/members", member.id, "entries"],
-    queryFn: async () => {
-      const res = await fetch(
-        `/api/insurance/members/${member.id}/entries`,
-        { credentials: "include" }
-      );
-      if (!res.ok) return [];
-      return res.json();
-    },
-  });
-
-  const runningBalance = useMemo(() => {
-    let bal = 0;
-    return entries.map((e) => {
-      const dr = parseFloat(e.debitAmount || "0");
-      const cr = parseFloat(e.creditAmount || "0");
-      bal = bal + dr - cr;
-      return { ...e, balance: bal };
-    });
-  }, [entries]);
-
-  const totalCredit = entries.reduce((s, e) => s + parseFloat(e.creditAmount || "0"), 0);
-  const totalDebit = entries.reduce((s, e) => s + parseFloat(e.debitAmount || "0"), 0);
-
-  return (
-    <Sheet open onOpenChange={(v) => !v && onClose()}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl flex flex-col gap-0 p-0">
-        <SheetHeader className="px-6 pt-6 pb-4 border-b">
-          <SheetTitle className="flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            {member.name} — Insurance Statement
-          </SheetTitle>
-          <p className="text-sm text-muted-foreground">
-            {member.nationality && <span>{member.nationality} · </span>}
-            {member.positionWorking && <span>{member.positionWorking} · </span>}
-            <span>Started {formatDisplayDate(member.startDate)}</span>
-          </p>
-        </SheetHeader>
-
-        <div className="flex-1 overflow-auto p-6">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : entries.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <FileText className="h-8 w-8 mb-2 opacity-30" />
-              <p className="text-sm">No entries posted yet for this member.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
-                <Card>
-                  <CardContent className="pt-3 pb-3">
-                    <p className="text-xs text-muted-foreground">Total Credited</p>
-                    <p className="text-lg font-bold">${totalCredit.toFixed(2)}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-3 pb-3">
-                    <p className="text-xs text-muted-foreground">Total Debited</p>
-                    <p className="text-lg font-bold">${totalDebit.toFixed(2)}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-3 pb-3">
-                    <p className="text-xs text-muted-foreground">Net Balance</p>
-                    <p className="text-lg font-bold">${(totalCredit - totalDebit).toFixed(2)}</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Voucher</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Credit</TableHead>
-                    <TableHead className="text-right">Debit</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {runningBalance.map((e) => (
-                    <TableRow key={e.id} data-testid={`row-entry-${e.id}`}>
-                      <TableCell className="whitespace-nowrap">
-                        {formatDisplayDate(e.voucherDate)}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{e.voucherNumber}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm max-w-xs truncate">
-                        {e.narration || e.description || "—"}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {parseFloat(e.creditAmount || "0") > 0
-                          ? `$${parseFloat(e.creditAmount!).toFixed(2)}`
-                          : "—"}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {parseFloat(e.debitAmount || "0") > 0
-                          ? `$${parseFloat(e.debitAmount!).toFixed(2)}`
-                          : "—"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
-// ─── Main Page ────────────────────────────────────────────────────────────────
+import type {InsuranceMember} from "./factoryinsurance/types";
+import {MONTHS, YEARS} from "./factoryinsurance/utils";
+import {MemberFormDialog} from "./factoryinsurance/components/MemberFormDialog";
+import {MemberStatementDrawer} from "./factoryinsurance/components/MemberStatementDrawer";
 export default function FactoryInsurance() {
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
@@ -390,7 +53,11 @@ export default function FactoryInsurance() {
   const ecDrRef = useRef<HTMLDivElement>(null);
   const ecCrRef = useRef<HTMLDivElement>(null);
 
-  const { data: ledgerAccounts = [] } = useQuery<any[]>({ queryKey: ["/api/ledger-accounts?includeHidden=true"], staleTime: 60_000, refetchOnWindowFocus: false });
+  const { data: ledgerAccounts = [] } = useQuery<any[]>({
+    queryKey: ["/api/ledger-accounts?includeHidden=true"],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
 
   // Find the Insurance Expense account dynamically from the fetched accounts list
   const insuranceExpenseAccount = useMemo(
@@ -400,7 +67,9 @@ export default function FactoryInsurance() {
   const { data: insExpenseBalance } = useQuery<{ balance: number }>({
     queryKey: ["/api/accounts/ledger", insuranceExpenseAccount?.id, "balance"],
     queryFn: async () => {
-      const res = await fetch(`/api/accounts/ledger/${insuranceExpenseAccount!.id}/balance`, { credentials: "include" });
+      const res = await fetch(`/api/accounts/ledger/${insuranceExpenseAccount!.id}/balance`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch balance");
       return res.json();
     },
@@ -429,8 +98,12 @@ export default function FactoryInsurance() {
     },
     onSuccess: () => {
       setShowExtraCharges(false);
-      setEcAmount(""); setEcDrId(null); setEcCrId(null);
-      setEcDrSearch(""); setEcCrSearch(""); setEcNotes("");
+      setEcAmount("");
+      setEcDrId(null);
+      setEcCrId(null);
+      setEcDrSearch("");
+      setEcCrSearch("");
+      setEcNotes("");
       setEcDate(new Date().toISOString().slice(0, 10));
       toast({ title: "Extra charge posted", description: "Voucher created and visible in Daybook & Accounts." });
     },
@@ -447,7 +120,12 @@ export default function FactoryInsurance() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const { data: members = [], isLoading, isError, error: membersError } = useQuery<InsuranceMember[]>({
+  const {
+    data: members = [],
+    isLoading,
+    isError,
+    error: membersError,
+  } = useQuery<InsuranceMember[]>({
     queryKey: ["/api/insurance/members", selectedCompany?.id, includeInactive],
     queryFn: async () => {
       const params = new URLSearchParams({ includeInactive: String(includeInactive) });
@@ -504,10 +182,7 @@ export default function FactoryInsurance() {
         description: (
           <span>
             {data.membersCount} member(s) · Total ${parseFloat(data.totalAmount).toFixed(2)}{" "}
-            <button
-              className="underline font-medium ml-1"
-              onClick={() => navigate("/factory/daybook")}
-            >
+            <button className="underline font-medium ml-1" onClick={() => navigate("/factory/daybook")}>
               View in Daybook
             </button>
           </span>
@@ -540,31 +215,17 @@ export default function FactoryInsurance() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <PageHeader
-          title="Insurance"
-          subtitle="Manage insurance members and generate monthly entries"
-        />
+        <PageHeader title="Insurance" subtitle="Manage insurance members and generate monthly entries" />
         <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            onClick={() => setShowExtraCharges(true)}
-            data-testid="button-extra-charges"
-          >
+          <Button variant="outline" onClick={() => setShowExtraCharges(true)} data-testid="button-extra-charges">
             <Receipt className="h-4 w-4 mr-1" />
             Add Extra Charges
           </Button>
-          <Button
-            onClick={() => setShowGenDialog(true)}
-            data-testid="button-generate-entries"
-          >
+          <Button onClick={() => setShowGenDialog(true)} data-testid="button-generate-entries">
             <DollarSign className="h-4 w-4 mr-1" />
             Generate Entries
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => setShowAddDialog(true)}
-            data-testid="button-add-member"
-          >
+          <Button variant="outline" onClick={() => setShowAddDialog(true)} data-testid="button-add-member">
             <Plus className="h-4 w-4 mr-1" />
             Add Member
           </Button>
@@ -579,7 +240,9 @@ export default function FactoryInsurance() {
               <Users className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">Total Members</span>
             </div>
-            <div className="text-2xl font-bold mt-1" data-testid="stat-total">{stats.total}</div>
+            <div className="text-2xl font-bold mt-1" data-testid="stat-total">
+              {stats.total}
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -618,7 +281,10 @@ export default function FactoryInsurance() {
             </div>
             <div className="text-2xl font-bold mt-1 font-mono" data-testid="stat-expense-balance">
               {insExpenseBalance != null
-                ? (() => { const v = Math.abs(insExpenseBalance.balance); return `${v % 1 === 0 ? v.toFixed(0) : v.toFixed(2)}`; })()
+                ? (() => {
+                    const v = Math.abs(insExpenseBalance.balance);
+                    return `${v % 1 === 0 ? v.toFixed(0) : v.toFixed(2)}`;
+                  })()
                 : "—"}
             </div>
             {insExpenseBalance != null && (
@@ -666,7 +332,12 @@ export default function FactoryInsurance() {
               <p className="text-xs text-muted-foreground max-w-xs text-center">
                 {(membersError as Error)?.message || "Unknown error"}
               </p>
-              <Button size="sm" variant="outline" className="mt-1" onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/insurance/members"] })}>
+              <Button
+                size="sm"
+                variant="outline"
+                className="mt-1"
+                onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/insurance/members"] })}
+              >
                 Retry
               </Button>
             </div>
@@ -708,9 +379,7 @@ export default function FactoryInsurance() {
                     <TableCell className="text-muted-foreground">{m.positionWorking || "—"}</TableCell>
                     <TableCell>{formatDisplayDate(m.startDate)}</TableCell>
                     <TableCell>{m.dob ? formatDisplayDate(m.dob) : "—"}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      ${parseFloat(m.amount).toFixed(2)}
-                    </TableCell>
+                    <TableCell className="text-right font-mono">${parseFloat(m.amount).toFixed(2)}</TableCell>
                     <TableCell>
                       {m.active ? (
                         <Badge
@@ -727,10 +396,7 @@ export default function FactoryInsurance() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div
-                        className="flex items-center justify-end gap-1"
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                         <Button
                           size="icon"
                           variant="ghost"
@@ -773,12 +439,7 @@ export default function FactoryInsurance() {
       </Card>
 
       {/* Member Statement Drawer */}
-      {statementMember && (
-        <MemberStatementDrawer
-          member={statementMember}
-          onClose={() => setStatementMember(null)}
-        />
-      )}
+      {statementMember && <MemberStatementDrawer member={statementMember} onClose={() => setStatementMember(null)} />}
 
       {/* Add / Edit Member Dialog */}
       {(showAddDialog || editMember) && (
@@ -799,11 +460,13 @@ export default function FactoryInsurance() {
             <DialogTitle>Delete Member</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Permanently delete <span className="font-semibold text-foreground">{deleteMember?.name}</span>?
-            This cannot be undone.
+            Permanently delete <span className="font-semibold text-foreground">{deleteMember?.name}</span>? This cannot
+            be undone.
           </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteMember(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDeleteMember(null)}>
+              Cancel
+            </Button>
             <Button
               variant="destructive"
               onClick={() => deleteMember && deleteMutation.mutate(deleteMember.id)}
@@ -817,7 +480,12 @@ export default function FactoryInsurance() {
       </Dialog>
 
       {/* Extra Charges Dialog */}
-      <Dialog open={showExtraCharges} onOpenChange={(v) => { if (!v) setShowExtraCharges(false); }}>
+      <Dialog
+        open={showExtraCharges}
+        onOpenChange={(v) => {
+          if (!v) setShowExtraCharges(false);
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Add Extra Charges</DialogTitle>
@@ -830,7 +498,14 @@ export default function FactoryInsurance() {
               </div>
               <div className="space-y-1">
                 <Label>Amount</Label>
-                <Input type="number" min="0" step="0.01" placeholder="0.00" value={ecAmount} onChange={(e) => setEcAmount(e.target.value)} />
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={ecAmount}
+                  onChange={(e) => setEcAmount(e.target.value)}
+                />
               </div>
             </div>
             {/* DR Account */}
@@ -843,7 +518,11 @@ export default function FactoryInsurance() {
                   placeholder="Search account name…"
                   value={ecDrSearch}
                   onFocus={() => setEcDrOpen(true)}
-                  onChange={(e) => { setEcDrSearch(e.target.value); setEcDrId(null); setEcDrOpen(true); }}
+                  onChange={(e) => {
+                    setEcDrSearch(e.target.value);
+                    setEcDrId(null);
+                    setEcDrOpen(true);
+                  }}
                 />
                 {ecDrOpen && (
                   <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md text-sm">
@@ -851,14 +530,20 @@ export default function FactoryInsurance() {
                       .filter((a: any) => a.name.toLowerCase().includes(ecDrSearch.toLowerCase()))
                       .slice(0, 60)
                       .map((a: any) => (
-                        <div key={a.id} className="px-3 py-2 cursor-pointer hover:bg-muted"
-                          onMouseDown={() => { setEcDrId(a.id); setEcDrSearch(a.name); setEcDrOpen(false); }}>
+                        <div
+                          key={a.id}
+                          className="px-3 py-2 cursor-pointer hover:bg-muted"
+                          onMouseDown={() => {
+                            setEcDrId(a.id);
+                            setEcDrSearch(a.name);
+                            setEcDrOpen(false);
+                          }}
+                        >
                           {a.name}
                         </div>
                       ))}
-                    {ledgerAccounts.filter((a: any) => a.name.toLowerCase().includes(ecDrSearch.toLowerCase())).length === 0 && (
-                      <div className="px-3 py-2 text-muted-foreground italic">No accounts found</div>
-                    )}
+                    {ledgerAccounts.filter((a: any) => a.name.toLowerCase().includes(ecDrSearch.toLowerCase()))
+                      .length === 0 && <div className="px-3 py-2 text-muted-foreground italic">No accounts found</div>}
                   </div>
                 )}
               </div>
@@ -873,7 +558,11 @@ export default function FactoryInsurance() {
                   placeholder="Search account name…"
                   value={ecCrSearch}
                   onFocus={() => setEcCrOpen(true)}
-                  onChange={(e) => { setEcCrSearch(e.target.value); setEcCrId(null); setEcCrOpen(true); }}
+                  onChange={(e) => {
+                    setEcCrSearch(e.target.value);
+                    setEcCrId(null);
+                    setEcCrOpen(true);
+                  }}
                 />
                 {ecCrOpen && (
                   <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md text-sm">
@@ -881,21 +570,29 @@ export default function FactoryInsurance() {
                       .filter((a: any) => a.name.toLowerCase().includes(ecCrSearch.toLowerCase()))
                       .slice(0, 60)
                       .map((a: any) => (
-                        <div key={a.id} className="px-3 py-2 cursor-pointer hover:bg-muted"
-                          onMouseDown={() => { setEcCrId(a.id); setEcCrSearch(a.name); setEcCrOpen(false); }}>
+                        <div
+                          key={a.id}
+                          className="px-3 py-2 cursor-pointer hover:bg-muted"
+                          onMouseDown={() => {
+                            setEcCrId(a.id);
+                            setEcCrSearch(a.name);
+                            setEcCrOpen(false);
+                          }}
+                        >
                           {a.name}
                         </div>
                       ))}
-                    {ledgerAccounts.filter((a: any) => a.name.toLowerCase().includes(ecCrSearch.toLowerCase())).length === 0 && (
-                      <div className="px-3 py-2 text-muted-foreground italic">No accounts found</div>
-                    )}
+                    {ledgerAccounts.filter((a: any) => a.name.toLowerCase().includes(ecCrSearch.toLowerCase()))
+                      .length === 0 && <div className="px-3 py-2 text-muted-foreground italic">No accounts found</div>}
                   </div>
                 )}
               </div>
             </div>
             {/* Notes */}
             <div className="space-y-1">
-              <Label>Notes <span className="text-xs text-muted-foreground">(saved as voucher description)</span></Label>
+              <Label>
+                Notes <span className="text-xs text-muted-foreground">(saved as voucher description)</span>
+              </Label>
               <Textarea
                 placeholder="e.g. Extra insurance charge — July 2026"
                 value={ecNotes}
@@ -905,7 +602,9 @@ export default function FactoryInsurance() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowExtraCharges(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowExtraCharges(false)}>
+              Cancel
+            </Button>
             <Button
               onClick={() => extraChargesMutation.mutate()}
               disabled={extraChargesMutation.isPending || !ecDrId || !ecCrId || !ecAmount || ecDrId === ecCrId}
@@ -926,17 +625,13 @@ export default function FactoryInsurance() {
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Posts a journal voucher for all active members: Dr Insurance Expense / Cr each
-              member's personal account. Members whose start date falls within the month are
-              prorated.
+              Posts a journal voucher for all active members: Dr Insurance Expense / Cr each member's personal account.
+              Members whose start date falls within the month are prorated.
             </p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Month</Label>
-                <Select
-                  value={String(genMonth)}
-                  onValueChange={(v) => setGenMonth(parseInt(v))}
-                >
+                <Select value={String(genMonth)} onValueChange={(v) => setGenMonth(parseInt(v))}>
                   <SelectTrigger data-testid="select-gen-month">
                     <SelectValue />
                   </SelectTrigger>
@@ -951,10 +646,7 @@ export default function FactoryInsurance() {
               </div>
               <div className="space-y-1">
                 <Label>Year</Label>
-                <Select
-                  value={String(genYear)}
-                  onValueChange={(v) => setGenYear(parseInt(v))}
-                >
+                <Select value={String(genYear)} onValueChange={(v) => setGenYear(parseInt(v))}>
                   <SelectTrigger data-testid="select-gen-year">
                     <SelectValue />
                   </SelectTrigger>

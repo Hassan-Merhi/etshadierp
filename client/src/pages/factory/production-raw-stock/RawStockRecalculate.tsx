@@ -1,239 +1,24 @@
-import { useMemo, useState, Suspense, lazy } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
-import {
-  ArrowLeft,
-  RefreshCw,
-  CheckCircle2,
-  Layers,
-  ShieldAlert,
-  History,
-  ChevronDown,
-  ChevronRight,
-  Undo2,
-  RotateCcw,
-  AlertTriangle,
-  ShieldCheck,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/hooks/use-toast";
-import { useAdminOverride } from "@/hooks/use-admin-override";
-import { queryClient } from "@/lib/queryClient";
-import { useAppMode } from "@/contexts/AppModeContext";
-import { getApiRequest } from "@/lib/factoryApi";
-import { formatNumber } from "@/lib/formatNumber";
+import {useMemo, useState, Suspense} from "react";
+import {useQuery, useMutation} from "@tanstack/react-query";
+import {Link} from "wouter";
+import {ArrowLeft, RefreshCw, CheckCircle2, Layers, ShieldAlert, History, ChevronDown, ChevronRight, Undo2, RotateCcw, AlertTriangle, ShieldCheck} from "lucide-react";
+import {Button} from "@/components/ui/button";
+import {Checkbox} from "@/components/ui/checkbox";
+import {Input} from "@/components/ui/input";
+import {Label} from "@/components/ui/label";
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
+import {Badge} from "@/components/ui/badge";
+import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription} from "@/components/ui/dialog";
+import {Skeleton} from "@/components/ui/skeleton";
+import {useToast} from "@/hooks/use-toast";
+import {useAdminOverride} from "@/hooks/use-admin-override";
+import {queryClient} from "@/lib/queryClient";
+import {useAppMode} from "@/contexts/AppModeContext";
+import {getApiRequest} from "@/lib/factoryApi";
+import {formatNumber} from "@/lib/formatNumber";
 
-const BatchDetail = lazy(() => import("@/pages/BatchDetail"));
-
-// ─── Interfaces ──────────────────────────────────────────────────────────────
-
-interface RecalcRow {
-  containerId: number;
-  rawStockId: number | null;
-  containerNumber: string;
-  containerStatus: string;
-  supplierId: number | null;
-  supplierName: string;
-  currencyCode: string;
-  receivedKg: number;
-  usedKg: number;
-  remainingKg: number;
-  fullyUsed: boolean;
-  activeRawStockRowExists: boolean;
-  rawStockDeleted: boolean;
-  mixSourceCount: number;
-  affectedOpenBatchCount: number;
-  affectedCompletedBatchCount: number;
-  old: { costPerKg: number; costPerKgUsd: number };
-  next: { costPerKg: number; costPerKgUsd: number };
-  diffPct: number;
-  changed: boolean;
-  fxUnresolved: boolean;
-  valuationKg?: number;
-  actualReceivedKg?: number;
-  wasPartialReceipt?: boolean;
-}
-
-interface AffectedMixBatchRow {
-  batchId: number;
-  batchCode: string;
-  name: string | null;
-  status: string;
-  batchDate: string | null;
-  wasCompleted: boolean;
-  totalWeightKg: number;
-  weightKgFromSelectedContainers: number;
-  oldCostPerKg: number;
-  newCostPerKg: number;
-  costDifferencePerKg: number;
-  totalCostDifference: number;
-  oldTotalCost: number;
-  newTotalCost: number;
-  diffPct: number;
-  baleCount: number;
-  sourceContainerNumbers: string[];
-  sourceChanges: Array<{
-    containerId: number;
-    containerNumber: string;
-    weightKg: number;
-    oldCostPerKgUsd: number;
-    newCostPerKgUsd: number;
-  }>;
-}
-
-interface SourceMismatchRow {
-  sourceId: number;
-  batchId: number;
-  batchCode: string;
-  batchStatus: string;
-  containerId: number | null;
-  containerNumber: string | null;
-  supplierId: number | null;
-  supplierName: string | null;
-  weightKg: number;
-  oldCostPerKgUsd: number;
-  newCostPerKgUsd: number;
-  fixable: boolean;
-  reason: string;
-}
-
-interface FullAuditSummary {
-  totalContainersScanned: number;
-  containersCorrect: number;
-  containerCostMismatches: number;
-  activeRawStockMismatches: number;
-  fullyUsedContainersWithMismatches: number;
-  missingRawStockContainers: number;
-  zeroCostSources: number;
-  nonZeroSourceCostMismatches: number;
-  unresolvedFxContainers: number;
-  safeRepairsAvailable: number;
-}
-
-interface FullAuditRow {
-  containerId: number;
-  containerNumber: string;
-  containerStatus: string;
-  codes: string[];
-  safeToRepair: boolean;
-  fxUnresolved: boolean;
-  fullyUsed: boolean;
-}
-
-interface FullAuditResult {
-  summary: FullAuditSummary;
-  rows: FullAuditRow[];
-}
-
-interface UndoLogRow {
-  id: number;
-  companyId: number;
-  userId: number | null;
-  username: string | null;
-  description: string;
-  containerCount: number;
-  containerNumbers: string[];
-  appliedAt: string;
-  undoneAt: string | null;
-  undoneByUserId: number | null;
-  undoneByUsername: string | null;
-}
-
-interface SupplierRateAuditRow {
-  supplierId: number;
-  supplierName: string;
-  /** The moving-average rate that was in place before "Recompute Supplier Rates" overwrote it. */
-  oldRate: number;
-  /** The all-time stable rate that the recompute wrote. */
-  recomputedRate: number;
-  /** The rate currently stored in the DB (may differ from recomputedRate if something else changed it since). */
-  currentRate: number;
-  overwroteAt: string;
-  changedBy: string | null;
-  /** True only when currentRate still matches what the recompute wrote — safe to restore. */
-  canRestore: boolean;
-}
-
-interface SupplierRatePreviewRow {
-  supplierId: number;
-  supplierName: string;
-  oldRate: number;
-  newRate: number;
-  rowCount: number;
-  totalReceivedKg: number;
-  skipped?: string;
-}
-
-// ─── Historical Replay interfaces ────────────────────────────────────────────
-
-interface ReplaySupplierRow {
-  supplierId: number;
-  supplierName: string;
-  startingRate: number;
-  endingExpectedRate: number;
-  currentStoredRate: number;
-  replayRemainingKg: number;
-  authoritativeRemainingKg: number;
-  safeToRepair: boolean;
-  reasons: string[];
-  eventCount: number;
-  affectedContainerCount: number;
-  affectedSourceCount: number;
-  affectedBatchCount: number;
-  affectedBaleCount: number;
-}
-
-interface ReplaySummary {
-  totalReceivedContainers: number;
-  containersScanned: number;
-  canonicalContainerMismatches: number;
-  suppliersScanned: number;
-  safeSuppliers: number;
-  manualReviewSuppliers: number;
-  supplierPricedSourcesScanned: number;
-  sourceMismatches: number;
-  batchesToUpdate: number;
-  completedBatchesToUpdate?: number;
-  balesToUpdate: number;
-  finalizedBalesToUpdate?: number;
-  unresolvedFx: number;
-  missingDates: number;
-  quantityTimelineMismatches: number;
-  ambiguousEventOrdering: number;
-  scanCoverageError: boolean;
-}
-
-interface HistoricalReplayResult {
-  summary: ReplaySummary;
-  supplierRows: ReplaySupplierRow[];
-  containerRows: any[];
-  sourceRows: any[];
-  batchRows: any[];
-}
-
-// ─── Component ───────────────────────────────────────────────────────────────
-
+import type {AffectedMixBatchRow, FullAuditResult, HistoricalReplayResult, RecalcRow, SourceMismatchRow, SupplierRateAuditRow, SupplierRatePreviewRow, UndoLogRow} from "./rawstockrecalculate/types";
+import {BatchDetail} from "./rawstockrecalculate/utils";
 export default function RawStockRecalculate() {
   const { toast } = useToast();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
@@ -246,7 +31,9 @@ export default function RawStockRecalculate() {
   const [selectedZeroCostSources, setSelectedZeroCostSources] = useState<Set<number>>(new Set());
   const [manualRates, setManualRates] = useState<Record<number, string>>({});
   const [expandedBatchSources, setExpandedBatchSources] = useState<Set<number>>(new Set());
-  const [activeTab, setActiveTab] = useState<"recalc" | "sources" | "audit" | "history" | "replay" | "partialfix">("recalc");
+  const [activeTab, setActiveTab] = useState<"recalc" | "sources" | "audit" | "history" | "replay" | "partialfix">(
+    "recalc"
+  );
 
   // ── Historical Replay confirmation dialog (requires typing "APPLY HISTORICAL REPLAY") ──
   const [showReplayConfirmDialog, setShowReplayConfirmDialog] = useState(false);
@@ -295,7 +82,13 @@ export default function RawStockRecalculate() {
   const [selectedRestoreIds, setSelectedRestoreIds] = useState<Set<number>>(new Set());
 
   // ── Main preview ──────────────────────────────────────────────────────────
-  const { data: rows, isLoading, isError: isPreviewError, error: previewErrorMsg, refetch } = useQuery<RecalcRow[]>({
+  const {
+    data: rows,
+    isLoading,
+    isError: isPreviewError,
+    error: previewErrorMsg,
+    refetch,
+  } = useQuery<RecalcRow[]>({
     queryKey: ["/api/factory/raw-stock/recalc/preview"],
     queryFn: async () => {
       const res = await modeApiRequest("GET", "/api/factory/raw-stock/recalc/preview");
@@ -319,9 +112,7 @@ export default function RawStockRecalculate() {
   );
   const hiddenHistoricalCount = changedRows.length - visibleChangedRows.length;
 
-  const allSelected =
-    visibleChangedRows.length > 0 &&
-    visibleChangedRows.every((r) => selected.has(r.containerId));
+  const allSelected = visibleChangedRows.length > 0 && visibleChangedRows.every((r) => selected.has(r.containerId));
   const selectedIds = useMemo(() => Array.from(selected).sort((a, b) => a - b), [selected]);
 
   // ── Affected mix batches ──────────────────────────────────────────────────
@@ -339,7 +130,11 @@ export default function RawStockRecalculate() {
   });
 
   // ── Source cost mismatches (full scan, replaces zero-cost-only) ───────────
-  const { data: sourceMismatches, isLoading: sourceMismatchLoading, refetch: refetchSources } = useQuery<SourceMismatchRow[]>({
+  const {
+    data: sourceMismatches,
+    isLoading: sourceMismatchLoading,
+    refetch: refetchSources,
+  } = useQuery<SourceMismatchRow[]>({
     queryKey: ["/api/factory/raw-stock/recalc/source-cost-mismatches"],
     queryFn: async () => {
       const res = await modeApiRequest("GET", "/api/factory/raw-stock/recalc/source-cost-mismatches");
@@ -349,17 +144,13 @@ export default function RawStockRecalculate() {
     enabled: activeTab === "sources",
   });
 
-  const fixableSourceMismatches = useMemo(
-    () => (sourceMismatches || []).filter((r) => r.fixable),
-    [sourceMismatches]
-  );
+  const fixableSourceMismatches = useMemo(() => (sourceMismatches || []).filter((r) => r.fixable), [sourceMismatches]);
   const manualSourceMismatches = useMemo(
     () => (sourceMismatches || []).filter((r) => !r.fixable && r.containerId == null),
     [sourceMismatches]
   );
   const allSourceMismatchSelected =
-    fixableSourceMismatches.length > 0 &&
-    fixableSourceMismatches.every((r) => selectedZeroCostSources.has(r.sourceId));
+    fixableSourceMismatches.length > 0 && fixableSourceMismatches.every((r) => selectedZeroCostSources.has(r.sourceId));
 
   // ── Full audit ────────────────────────────────────────────────────────────
   const {
@@ -406,10 +197,7 @@ export default function RawStockRecalculate() {
     enabled: activeTab === "history",
   });
 
-  const restorableRows = useMemo(
-    () => (rateAuditRows || []).filter((r) => r.canRestore),
-    [rateAuditRows]
-  );
+  const restorableRows = useMemo(() => (rateAuditRows || []).filter((r) => r.canRestore), [rateAuditRows]);
 
   // ── Historical Cost Replay ────────────────────────────────────────────────
   const {
@@ -422,7 +210,8 @@ export default function RawStockRecalculate() {
     queryKey: ["/api/factory/raw-stock/recalc/historical-replay"],
     queryFn: async () => {
       const res = await modeApiRequest("GET", "/api/factory/raw-stock/recalc/historical-replay");
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || "Failed to load historical replay preview");
+      if (!res.ok)
+        throw new Error((await res.json().catch(() => ({}))).message || "Failed to load historical replay preview");
       return res.json();
     },
     enabled: activeTab === "replay",
@@ -515,7 +304,10 @@ export default function RawStockRecalculate() {
     mutationFn: async (containerIds: number[]) => {
       const res = await modeApiRequest("POST", "/api/factory/raw-stock/recalc/auto-apply-fx", { containerIds });
       if (!res.ok) throw new Error((await res.json()).message || "Failed to auto-apply FX");
-      return res.json() as Promise<{ results: { containerNumber: string; rate: number | null; applied: boolean; reason?: string }[]; applied: number }>;
+      return res.json() as Promise<{
+        results: { containerNumber: string; rate: number | null; applied: boolean; reason?: string }[];
+        applied: number;
+      }>;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock/recalc/full-audit"] });
@@ -556,9 +348,12 @@ export default function RawStockRecalculate() {
   });
 
   const handleUndo = (row: UndoLogRow) => {
-    wrapAdminAction(() => {
-      undoMutation.mutate(row.id);
-    }, `Undo recalculation applied ${new Date(row.appliedAt).toLocaleString()} — restores ${row.containerCount} container(s)`);
+    wrapAdminAction(
+      () => {
+        undoMutation.mutate(row.id);
+      },
+      `Undo recalculation applied ${new Date(row.appliedAt).toLocaleString()} — restores ${row.containerCount} container(s)`
+    );
   };
 
   // ── Actions ───────────────────────────────────────────────────────────────
@@ -645,13 +440,11 @@ export default function RawStockRecalculate() {
       const skipped = results.filter((r: any) => !r.applied);
       const totalBatches = results.reduce((s: number, r: any) => s + r.affectedBatches, 0);
       const totalBales = results.reduce((s: number, r: any) => s + r.affectedBales, 0);
-      const totalCompleted = results.reduce(
-        (s: number, r: any) => s + (r.completedBatchesRewritten || 0),
-        0
-      );
-      const skipSummary = skipped.length > 0
-        ? ` (${skipped.length} skipped: ${[...new Set(skipped.map((r: any) => r.skippedReason).filter(Boolean))].join("; ")})`
-        : "";
+      const totalCompleted = results.reduce((s: number, r: any) => s + (r.completedBatchesRewritten || 0), 0);
+      const skipSummary =
+        skipped.length > 0
+          ? ` (${skipped.length} skipped: ${[...new Set(skipped.map((r: any) => r.skippedReason).filter(Boolean))].join("; ")})`
+          : "";
       toast({
         title: "Recalculation applied",
         description:
@@ -774,7 +567,10 @@ export default function RawStockRecalculate() {
     onSuccess: (data) => {
       const changedRows = (data.results as SupplierRatePreviewRow[]).filter((r) => !r.skipped);
       if (changedRows.length === 0) {
-        toast({ title: "No changes needed", description: "All supplier rates already match the all-time stable average." });
+        toast({
+          title: "No changes needed",
+          description: "All supplier rates already match the all-time stable average.",
+        });
         return;
       }
       setRecomputePreviewRows(data.results);
@@ -796,7 +592,9 @@ export default function RawStockRecalculate() {
   // ── Restore supplier rates from audit log ─────────────────────────────────
   const restoreRatesMutation = useMutation({
     mutationFn: async (restorations: Array<{ supplierId: number; rate: number }>) => {
-      const res = await modeApiRequest("POST", "/api/factory/raw-stock/supplier-rate/restore-from-audit", { restorations });
+      const res = await modeApiRequest("POST", "/api/factory/raw-stock/supplier-rate/restore-from-audit", {
+        restorations,
+      });
       if (!res.ok) throw new Error((await res.json()).message || "Failed to restore supplier rates");
       return res.json();
     },
@@ -982,8 +780,8 @@ export default function RawStockRecalculate() {
       code === "CORRECT"
         ? "text-emerald-500 border-emerald-500/30 bg-emerald-500/10"
         : code === "UNRESOLVED_FX" || code === "MANUAL_REVIEW_REQUIRED"
-        ? "text-amber-600 border-amber-500/30 bg-amber-500/10"
-        : "text-red-500 border-red-500/30 bg-red-500/10";
+          ? "text-amber-600 border-amber-500/30 bg-amber-500/10"
+          : "text-red-500 border-red-500/30 bg-red-500/10";
     return (
       <Badge key={code} variant="outline" className={`${cls} text-[10px] mr-1`}>
         {code}
@@ -1014,8 +812,8 @@ export default function RawStockRecalculate() {
           <div>
             <h1 className="text-lg font-bold leading-tight">Recalculate Raw Material Cost</h1>
             <p className="text-xs text-muted-foreground leading-tight">
-              Recomputes each container's true landed cost/kg from its stored charges and shows what would change
-              before anything is saved.
+              Recomputes each container's true landed cost/kg from its stored charges and shows what would change before
+              anything is saved.
             </p>
           </div>
         </div>
@@ -1047,7 +845,16 @@ export default function RawStockRecalculate() {
           >
             <RefreshCw className="h-3.5 w-3.5" /> Recompute Supplier Rates
           </Button>
-          <Button variant="outline" size="sm" onClick={() => { refetch(); refetchAudit(); refetchSources(); }} className="gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              refetch();
+              refetchAudit();
+              refetchSources();
+            }}
+            className="gap-2"
+          >
             <RefreshCw className="h-3.5 w-3.5" /> Refresh
           </Button>
         </div>
@@ -1087,8 +894,8 @@ export default function RawStockRecalculate() {
 
       {includeCompletedBatches && (
         <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
-          This will rewrite the cost of completed/closed mix batches (and any bales pressed from them) sourced from
-          the selected containers — normally protected as locked historical record.
+          This will rewrite the cost of completed/closed mix batches (and any bales pressed from them) sourced from the
+          selected containers — normally protected as locked historical record.
         </div>
       )}
       {includeHistoricalContainers && (
@@ -1113,7 +920,9 @@ export default function RawStockRecalculate() {
                   className="gap-2 text-blue-700 border-blue-400/50 hover:bg-blue-500/10"
                 >
                   <Layers className="h-3.5 w-3.5" />
-                  {applyMutation.isPending ? "Applying..." : `Fix All Partial Offloads (${partialOffloadCandidates.length})`}
+                  {applyMutation.isPending
+                    ? "Applying..."
+                    : `Fix All Partial Offloads (${partialOffloadCandidates.length})`}
                 </Button>
               )}
             </div>
@@ -1131,8 +940,12 @@ export default function RawStockRecalculate() {
           {isPreviewError ? (
             <div className="border border-red-500/30 bg-red-500/10 rounded-md p-3 text-sm text-red-700 dark:text-red-400 space-y-2">
               <div className="font-medium">Failed to load recalculation preview.</div>
-              <div className="text-xs">{(previewErrorMsg as any)?.message || "An unexpected error occurred. Check server logs."}</div>
-              <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button>
+              <div className="text-xs">
+                {(previewErrorMsg as any)?.message || "An unexpected error occurred. Check server logs."}
+              </div>
+              <Button size="sm" variant="outline" onClick={() => refetch()}>
+                Retry
+              </Button>
             </div>
           ) : isLoading ? (
             <div className="text-sm text-muted-foreground py-12 text-center">Computing recalculation preview...</div>
@@ -1157,8 +970,8 @@ export default function RawStockRecalculate() {
 
               {hiddenHistoricalCount > 0 && (
                 <div className="text-xs text-muted-foreground bg-muted/40 border rounded-md px-3 py-2">
-                  {hiddenHistoricalCount} CLOSED/COMPLETED container(s) with mismatches are hidden — enable
-                  "Include CLOSED/COMPLETED containers" to see and repair them.
+                  {hiddenHistoricalCount} CLOSED/COMPLETED container(s) with mismatches are hidden — enable "Include
+                  CLOSED/COMPLETED containers" to see and repair them.
                 </div>
               )}
 
@@ -1289,14 +1102,10 @@ export default function RawStockRecalculate() {
                                   }}
                                 >
                                   <span className="hover:underline cursor-pointer">{b.batchCode}</span>
-                                  {b.name ? (
-                                    <span className="text-muted-foreground"> — {b.name}</span>
-                                  ) : null}
+                                  {b.name ? <span className="text-muted-foreground"> — {b.name}</span> : null}
                                 </TableCell>
                                 <TableCell className="text-xs text-muted-foreground">
-                                  {b.batchDate
-                                    ? new Date(b.batchDate).toLocaleDateString()
-                                    : "—"}
+                                  {b.batchDate ? new Date(b.batchDate).toLocaleDateString() : "—"}
                                 </TableCell>
                                 <TableCell>
                                   <Badge
@@ -1323,10 +1132,12 @@ export default function RawStockRecalculate() {
                                   ${(b.newCostPerKg ?? 0).toFixed(6)}
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-xs">
-                                  {(b.costDifferencePerKg ?? 0) > 0 ? "+" : ""}${(b.costDifferencePerKg ?? 0).toFixed(6)}
+                                  {(b.costDifferencePerKg ?? 0) > 0 ? "+" : ""}$
+                                  {(b.costDifferencePerKg ?? 0).toFixed(6)}
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-xs">
-                                  {(b.totalCostDifference ?? 0) > 0 ? "+" : ""}${(b.totalCostDifference ?? 0).toFixed(2)}
+                                  {(b.totalCostDifference ?? 0) > 0 ? "+" : ""}$
+                                  {(b.totalCostDifference ?? 0).toFixed(2)}
                                 </TableCell>
                                 <TableCell className="text-right">{badgePct(b.diffPct)}</TableCell>
                                 <TableCell className="text-right font-mono text-xs text-muted-foreground">
@@ -1335,15 +1146,9 @@ export default function RawStockRecalculate() {
                               </TableRow>
                               {expandedBatchSources.has(b.batchId) &&
                                 (b.sourceChanges || []).map((sc) => (
-                                  <TableRow
-                                    key={`${b.batchId}-${sc.containerId}`}
-                                    className="bg-muted/20"
-                                  >
+                                  <TableRow key={`${b.batchId}-${sc.containerId}`} className="bg-muted/20">
                                     <TableCell />
-                                    <TableCell
-                                      colSpan={2}
-                                      className="font-mono text-[10px] text-muted-foreground pl-8"
-                                    >
+                                    <TableCell colSpan={2} className="font-mono text-[10px] text-muted-foreground pl-8">
                                       ↳ {sc.containerNumber}
                                     </TableCell>
                                     <TableCell />
@@ -1433,8 +1238,8 @@ export default function RawStockRecalculate() {
                           {r.containerNumber
                             ? `Container ${r.containerNumber}`
                             : r.supplierName
-                            ? `Supplier: ${r.supplierName}`
-                            : "—"}
+                              ? `Supplier: ${r.supplierName}`
+                              : "—"}
                         </TableCell>
                         <TableCell className="text-right font-mono text-xs text-muted-foreground">
                           {formatNumber(r.weightKg)}
@@ -1452,9 +1257,7 @@ export default function RawStockRecalculate() {
                               placeholder="Enter $/kg USD"
                               className="w-28 text-right text-xs border rounded px-1.5 py-0.5 bg-background"
                               value={manualRates[r.sourceId] || ""}
-                              onChange={(e) =>
-                                setManualRates((prev) => ({ ...prev, [r.sourceId]: e.target.value }))
-                              }
+                              onChange={(e) => setManualRates((prev) => ({ ...prev, [r.sourceId]: e.target.value }))}
                             />
                           ) : (
                             "—"
@@ -1469,10 +1272,7 @@ export default function RawStockRecalculate() {
                               Ready
                             </Badge>
                           ) : r.containerId == null ? (
-                            <Badge
-                              variant="outline"
-                              className="text-amber-600 border-amber-500/30 bg-amber-500/10"
-                            >
+                            <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/10">
                               Needs manual rate
                             </Badge>
                           ) : (
@@ -1488,8 +1288,8 @@ export default function RawStockRecalculate() {
               </div>
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
-                  {fixableSourceMismatches.length} fixable automatically ·{" "}
-                  {manualSourceMismatches.length} need a manual rate.
+                  {fixableSourceMismatches.length} fixable automatically · {manualSourceMismatches.length} need a manual
+                  rate.
                 </p>
                 <div className="flex items-center gap-2">
                   {fixableSourceMismatches.length > 0 && (
@@ -1506,7 +1306,11 @@ export default function RawStockRecalculate() {
                   )}
                   <Button
                     size="sm"
-                    disabled={selectedZeroCostSources.size === 0 || sourceMismatchFixMutation.isPending || fixAllSourcesMutation.isPending}
+                    disabled={
+                      selectedZeroCostSources.size === 0 ||
+                      sourceMismatchFixMutation.isPending ||
+                      fixAllSourcesMutation.isPending
+                    }
                     onClick={handleFixSourceMismatches}
                   >
                     <CheckCircle2 className="h-4 w-4 mr-1.5" />
@@ -1535,10 +1339,22 @@ export default function RawStockRecalculate() {
                   { label: "Correct", value: fullAudit.summary.containersCorrect, cls: "text-emerald-600" },
                   { label: "Safe repairs", value: fullAudit.summary.safeRepairsAvailable, cls: "text-red-600" },
                   { label: "Unresolved FX", value: fullAudit.summary.unresolvedFxContainers, cls: "text-amber-600" },
-                  { label: "Container cost mismatch", value: fullAudit.summary.containerCostMismatches, cls: "text-red-600" },
-                  { label: "Active RS mismatch", value: fullAudit.summary.activeRawStockMismatches, cls: "text-red-600" },
+                  {
+                    label: "Container cost mismatch",
+                    value: fullAudit.summary.containerCostMismatches,
+                    cls: "text-red-600",
+                  },
+                  {
+                    label: "Active RS mismatch",
+                    value: fullAudit.summary.activeRawStockMismatches,
+                    cls: "text-red-600",
+                  },
                   { label: "Zero-cost sources", value: fullAudit.summary.zeroCostSources, cls: "text-red-600" },
-                  { label: "Nonzero source mismatch", value: fullAudit.summary.nonZeroSourceCostMismatches, cls: "text-red-600" },
+                  {
+                    label: "Nonzero source mismatch",
+                    value: fullAudit.summary.nonZeroSourceCostMismatches,
+                    cls: "text-red-600",
+                  },
                 ].map(({ label, value, cls }) => (
                   <div key={label} className="border rounded-md p-3 bg-card text-center space-y-1">
                     <div className={`text-xl font-bold ${cls}`}>{value}</div>
@@ -1551,8 +1367,8 @@ export default function RawStockRecalculate() {
                 <div className="flex items-center gap-3 border border-amber-500/30 bg-amber-500/10 rounded-md p-3">
                   <ShieldAlert className="h-4 w-4 text-amber-600 shrink-0" />
                   <p className="text-xs text-amber-700 dark:text-amber-400 flex-1">
-                    {fullAudit.summary.safeRepairsAvailable} container(s) can be automatically repaired. Use "Apply
-                    All Safe" to fix them all in one operation.
+                    {fullAudit.summary.safeRepairsAvailable} container(s) can be automatically repaired. Use "Apply All
+                    Safe" to fix them all in one operation.
                   </p>
                   <Button
                     size="sm"
@@ -1578,43 +1394,42 @@ export default function RawStockRecalculate() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {fullAudit.rows.filter((r) => !r.codes.includes("CORRECT") && !r.codes.includes("FULLY_USED")).map((r) => (
-                      <TableRow key={r.containerId}>
-                        <TableCell className="font-mono text-xs">{r.containerNumber}</TableCell>
-                        <TableCell>{statusBadge(r.containerStatus)}</TableCell>
-                        <TableCell>{r.codes.map(codeBadge)}</TableCell>
-                        <TableCell className="text-right">
-                          {r.safeToRepair ? (
-                            <Badge
-                              variant="outline"
-                              className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10"
-                            >
-                              Yes
-                            </Badge>
-                          ) : r.codes.includes("MANUAL_REVIEW_REQUIRED") ? (
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-6 text-xs px-2 text-blue-600 border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20"
-                                disabled={autoApplyFxMutation.isPending}
-                                onClick={() => autoApplyFxMutation.mutate([r.containerId])}
-                              >
-                                Apply rate from FX table
-                              </Button>
+                    {fullAudit.rows
+                      .filter((r) => !r.codes.includes("CORRECT") && !r.codes.includes("FULLY_USED"))
+                      .map((r) => (
+                        <TableRow key={r.containerId}>
+                          <TableCell className="font-mono text-xs">{r.containerNumber}</TableCell>
+                          <TableCell>{statusBadge(r.containerStatus)}</TableCell>
+                          <TableCell>{r.codes.map(codeBadge)}</TableCell>
+                          <TableCell className="text-right">
+                            {r.safeToRepair ? (
                               <Badge
                                 variant="outline"
-                                className="text-amber-600 border-amber-500/30 bg-amber-500/10"
+                                className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10"
                               >
-                                Manual review
+                                Yes
                               </Badge>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                            ) : r.codes.includes("MANUAL_REVIEW_REQUIRED") ? (
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-6 text-xs px-2 text-blue-600 border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20"
+                                  disabled={autoApplyFxMutation.isPending}
+                                  onClick={() => autoApplyFxMutation.mutate([r.containerId])}
+                                >
+                                  Apply rate from FX table
+                                </Button>
+                                <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/10">
+                                  Manual review
+                                </Badge>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
                   </TableBody>
                 </Table>
               </div>
@@ -1626,7 +1441,6 @@ export default function RawStockRecalculate() {
       {/* ── Tab: History & Undo ────────────────────────────────────────────── */}
       {activeTab === "history" && (
         <div className="space-y-6">
-
           {/* ── Supplier Rate Recovery ──────────────────────────────────────── */}
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-2">
@@ -1636,12 +1450,20 @@ export default function RawStockRecalculate() {
                   Restore supplier rates from audit log
                 </h2>
                 <p className="text-xs text-muted-foreground leading-tight mt-0.5">
-                  When "Recompute Supplier Rates" overwrites moving-average rates with all-time stable averages,
-                  the original values are captured in the audit log. Restore them here — 100% accurate, no guessing.
-                  After restoring, refresh "Source Cost Mismatches" to fix all affected mix-batch costs.
+                  When "Recompute Supplier Rates" overwrites moving-average rates with all-time stable averages, the
+                  original values are captured in the audit log. Restore them here — 100% accurate, no guessing. After
+                  restoring, refresh "Source Cost Mismatches" to fix all affected mix-batch costs.
                 </p>
               </div>
-              <Button variant="outline" size="sm" onClick={() => { refetchRateAudit(); refetchUndoLog(); }} className="gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  refetchRateAudit();
+                  refetchUndoLog();
+                }}
+                className="gap-2 shrink-0"
+              >
                 <RefreshCw className="h-3.5 w-3.5" /> Refresh
               </Button>
             </div>
@@ -1657,9 +1479,11 @@ export default function RawStockRecalculate() {
                 {restorableRows.length > 0 && (
                   <div className="flex items-center gap-2 flex-wrap">
                     <div className="text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2 flex-1">
-                      <strong>{restorableRows.length} supplier rate(s)</strong> were overwritten and can be restored to their
-                      pre-recompute moving-average values. After restoring, go to{" "}
-                      <button className="underline font-medium" onClick={() => setActiveTab("sources")}>Source Cost Mismatches</button>{" "}
+                      <strong>{restorableRows.length} supplier rate(s)</strong> were overwritten and can be restored to
+                      their pre-recompute moving-average values. After restoring, go to{" "}
+                      <button className="underline font-medium" onClick={() => setActiveTab("sources")}>
+                        Source Cost Mismatches
+                      </button>{" "}
                       and click "Fix All" to correct all affected mix-batch costs.
                     </div>
                     <div className="flex gap-2 shrink-0">
@@ -1696,9 +1520,13 @@ export default function RawStockRecalculate() {
                           <input
                             type="checkbox"
                             className="h-3.5 w-3.5"
-                            checked={restorableRows.length > 0 && restorableRows.every((r) => selectedRestoreIds.has(r.supplierId))}
+                            checked={
+                              restorableRows.length > 0 &&
+                              restorableRows.every((r) => selectedRestoreIds.has(r.supplierId))
+                            }
                             onChange={(e) => {
-                              if (e.target.checked) setSelectedRestoreIds(new Set(restorableRows.map((r) => r.supplierId)));
+                              if (e.target.checked)
+                                setSelectedRestoreIds(new Set(restorableRows.map((r) => r.supplierId)));
                               else setSelectedRestoreIds(new Set());
                             }}
                           />
@@ -1745,11 +1573,18 @@ export default function RawStockRecalculate() {
                           </TableCell>
                           <TableCell>
                             {row.canRestore ? (
-                              <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/10 text-[10px]">
+                              <Badge
+                                variant="outline"
+                                className="text-amber-600 border-amber-500/30 bg-amber-500/10 text-[10px]"
+                              >
                                 Restorable
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="text-muted-foreground text-[10px]" title="Current rate no longer matches what recompute wrote — something else changed it since.">
+                              <Badge
+                                variant="outline"
+                                className="text-muted-foreground text-[10px]"
+                                title="Current rate no longer matches what recompute wrote — something else changed it since."
+                              >
                                 Already changed
                               </Badge>
                             )}
@@ -1767,90 +1602,93 @@ export default function RawStockRecalculate() {
 
           {/* ── Recalculation undo log ──────────────────────────────────────── */}
           <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold leading-tight">Recalculation history</h2>
-              <p className="text-xs text-muted-foreground leading-tight">
-                Each row is a saved snapshot of the before-state. Undo restores all affected containers,
-                mix batches, bales, and supplier locked rates atomically.
-              </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold leading-tight">Recalculation history</h2>
+                <p className="text-xs text-muted-foreground leading-tight">
+                  Each row is a saved snapshot of the before-state. Undo restores all affected containers, mix batches,
+                  bales, and supplier locked rates atomically.
+                </p>
+              </div>
             </div>
-          </div>
 
-          {undoLogLoading ? (
-            <Skeleton className="h-40 w-full" />
-          ) : !undoLog || undoLog.length === 0 ? (
-            <div className="text-sm text-muted-foreground py-12 text-center border rounded-md bg-card">
-              No recalculation history yet. Apply a recalculation and it will appear here.
-            </div>
-          ) : (
-            <div className="border rounded-md overflow-hidden bg-card shadow-sm">
-              <Table>
-                <TableHeader className="bg-muted/50">
-                  <TableRow>
-                    <TableHead>Applied at</TableHead>
-                    <TableHead>By</TableHead>
-                    <TableHead>Containers</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {undoLog.map((row) => (
-                    <TableRow key={row.id} className={row.undoneAt ? "opacity-50" : ""}>
-                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                        {new Date(row.appliedAt).toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {row.username ?? `User #${row.userId ?? "?"}`}
-                      </TableCell>
-                      <TableCell className="text-xs">
-                        <div className="font-medium text-foreground">{row.description}</div>
-                        {row.containerNumbers && row.containerNumbers.length > 0 && (
-                          <div className="font-mono text-[10px] text-muted-foreground mt-0.5">
-                            {row.containerNumbers.slice(0, 6).join(", ")}
-                            {row.containerNumbers.length > 6 && ` +${row.containerNumbers.length - 6} more`}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {row.undoneAt ? (
-                          <Badge variant="outline" className="text-muted-foreground text-[10px]">
-                            Undone {new Date(row.undoneAt).toLocaleDateString()}
-                            {row.undoneByUsername ? ` by ${row.undoneByUsername}` : ""}
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10 text-[10px]">
-                            Applied
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {!row.undoneAt && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1.5 h-7 text-xs border-amber-500/40 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
-                            disabled={undoMutation.isPending}
-                            onClick={() => handleUndo(row)}
-                          >
-                            <Undo2 className="h-3 w-3" />
-                            Undo
-                          </Button>
-                        )}
-                      </TableCell>
+            {undoLogLoading ? (
+              <Skeleton className="h-40 w-full" />
+            ) : !undoLog || undoLog.length === 0 ? (
+              <div className="text-sm text-muted-foreground py-12 text-center border rounded-md bg-card">
+                No recalculation history yet. Apply a recalculation and it will appear here.
+              </div>
+            ) : (
+              <div className="border rounded-md overflow-hidden bg-card shadow-sm">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead>Applied at</TableHead>
+                      <TableHead>By</TableHead>
+                      <TableHead>Containers</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                  </TableHeader>
+                  <TableBody>
+                    {undoLog.map((row) => (
+                      <TableRow key={row.id} className={row.undoneAt ? "opacity-50" : ""}>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                          {new Date(row.appliedAt).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {row.username ?? `User #${row.userId ?? "?"}`}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          <div className="font-medium text-foreground">{row.description}</div>
+                          {row.containerNumbers && row.containerNumbers.length > 0 && (
+                            <div className="font-mono text-[10px] text-muted-foreground mt-0.5">
+                              {row.containerNumbers.slice(0, 6).join(", ")}
+                              {row.containerNumbers.length > 6 && ` +${row.containerNumbers.length - 6} more`}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {row.undoneAt ? (
+                            <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                              Undone {new Date(row.undoneAt).toLocaleDateString()}
+                              {row.undoneByUsername ? ` by ${row.undoneByUsername}` : ""}
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant="outline"
+                              className="text-emerald-500 border-emerald-500/30 bg-emerald-500/10 text-[10px]"
+                            >
+                              Applied
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {!row.undoneAt && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5 h-7 text-xs border-amber-500/40 text-amber-700 hover:bg-amber-500/10 dark:text-amber-400"
+                              disabled={undoMutation.isPending}
+                              onClick={() => handleUndo(row)}
+                            >
+                              <Undo2 className="h-3 w-3" />
+                              Undo
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
 
-          <div className="text-xs text-muted-foreground bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
-            <strong>Important:</strong> Undo restores the exact numerical values that were in place before the
-            recalculation. If any other changes were made to the same containers between the recalculation and now
-            (e.g. new charges, new offloads), those will also be reverted. Review before confirming.
-          </div>
+            <div className="text-xs text-muted-foreground bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
+              <strong>Important:</strong> Undo restores the exact numerical values that were in place before the
+              recalculation. If any other changes were made to the same containers between the recalculation and now
+              (e.g. new charges, new offloads), those will also be reverted. Review before confirming.
+            </div>
           </div>
         </div>
       )}
@@ -1860,9 +1698,9 @@ export default function RawStockRecalculate() {
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="text-xs text-muted-foreground max-w-2xl">
-              Replays container receipts, adjustments, and mix-batch consumption events in strict chronological order
-              to compute the correct supplier moving-average rate at every point in time, then compares stored source
-              costs against those historically-correct rates.
+              Replays container receipts, adjustments, and mix-batch consumption events in strict chronological order to
+              compute the correct supplier moving-average rate at every point in time, then compares stored source costs
+              against those historically-correct rates.
             </div>
             <Button
               size="sm"
@@ -1879,8 +1717,12 @@ export default function RawStockRecalculate() {
           {isReplayError && (
             <div className="border border-red-500/30 bg-red-500/10 rounded-md p-3 text-sm text-red-700 dark:text-red-400 space-y-2">
               <div className="font-medium">Failed to load historical replay preview.</div>
-              <div className="text-xs">{(replayErrorMsg as any)?.message || "An unexpected error occurred. Check server logs."}</div>
-              <Button size="sm" variant="outline" onClick={() => refetchReplay()}>Retry</Button>
+              <div className="text-xs">
+                {(replayErrorMsg as any)?.message || "An unexpected error occurred. Check server logs."}
+              </div>
+              <Button size="sm" variant="outline" onClick={() => refetchReplay()}>
+                Retry
+              </Button>
             </div>
           )}
 
@@ -1899,10 +1741,18 @@ export default function RawStockRecalculate() {
                   { label: "Suppliers scanned", value: replayPreview.summary.suppliersScanned },
                   { label: "Safe to repair", value: replayPreview.summary.safeSuppliers, cls: "text-emerald-600" },
                   { label: "Manual review", value: replayPreview.summary.manualReviewSuppliers, cls: "text-amber-600" },
-                  { label: "Source mismatches", value: replayPreview.summary.sourceMismatches, cls: replayPreview.summary.sourceMismatches > 0 ? "text-red-500" : undefined },
+                  {
+                    label: "Source mismatches",
+                    value: replayPreview.summary.sourceMismatches,
+                    cls: replayPreview.summary.sourceMismatches > 0 ? "text-red-500" : undefined,
+                  },
                   { label: "Batches to update", value: replayPreview.summary.batchesToUpdate },
                   { label: "Bales to update", value: replayPreview.summary.balesToUpdate },
-                  { label: "Unresolved FX", value: replayPreview.summary.unresolvedFx, cls: replayPreview.summary.unresolvedFx > 0 ? "text-amber-600" : undefined },
+                  {
+                    label: "Unresolved FX",
+                    value: replayPreview.summary.unresolvedFx,
+                    cls: replayPreview.summary.unresolvedFx > 0 ? "text-amber-600" : undefined,
+                  },
                 ].map(({ label, value, cls }) => (
                   <div key={label} className="border rounded-md px-3 py-2 bg-card">
                     <div className={`text-lg font-bold tabular-nums ${cls || ""}`}>{value}</div>
@@ -1914,25 +1764,25 @@ export default function RawStockRecalculate() {
               {replayPreview.summary.scanCoverageError && (
                 <div className="border border-amber-500/30 bg-amber-500/10 rounded-md p-3 text-xs text-amber-700 dark:text-amber-400">
                   <strong>Scan coverage mismatch:</strong> Some containers could not be included in the replay.
-                  Containers scanned ({replayPreview.summary.containersScanned}) differs from universe
-                  ({replayPreview.summary.totalReceivedContainers}). Check server logs for details.
+                  Containers scanned ({replayPreview.summary.containersScanned}) differs from universe (
+                  {replayPreview.summary.totalReceivedContainers}). Check server logs for details.
                 </div>
               )}
 
               {replayPreview.summary.missingDates > 0 && (
                 <div className="border border-amber-500/30 bg-amber-500/10 rounded-md p-3 text-xs text-amber-700 dark:text-amber-400">
-                  <strong>{replayPreview.summary.missingDates} event(s)</strong> have no effective date and were
-                  placed at the end of the timeline. These suppliers are marked as requiring manual review and
-                  will be skipped by the automated repair.
+                  <strong>{replayPreview.summary.missingDates} event(s)</strong> have no effective date and were placed
+                  at the end of the timeline. These suppliers are marked as requiring manual review and will be skipped
+                  by the automated repair.
                 </div>
               )}
 
               {replayPreview.summary.quantityTimelineMismatches > 0 && (
                 <div className="border border-amber-500/30 bg-amber-500/10 rounded-md p-3 text-xs text-amber-700 dark:text-amber-400">
                   <strong>{replayPreview.summary.quantityTimelineMismatches} supplier(s)</strong> have a quantity
-                  reconciliation mismatch — the event timeline's total kg doesn't match the raw stock remaining kg.
-                  This usually means a batch consumed slightly more or fewer kg than what's recorded in the raw stock row.
-                  {" "}Rows with <em>only</em> this issue can still be force-applied by checking them below.
+                  reconciliation mismatch — the event timeline's total kg doesn't match the raw stock remaining kg. This
+                  usually means a batch consumed slightly more or fewer kg than what's recorded in the raw stock row.{" "}
+                  Rows with <em>only</em> this issue can still be force-applied by checking them below.
                 </div>
               )}
 
@@ -1949,21 +1799,45 @@ export default function RawStockRecalculate() {
                   {(() => {
                     const safeIds = replayPreview.supplierRows.filter((s) => s.safeToRepair).map((s) => s.supplierId);
                     const forceableIds = replayPreview.supplierRows
-                      .filter((s) => !s.safeToRepair && s.reasons.length === 1 && s.reasons[0] === "TIMELINE_QUANTITY_MISMATCH")
+                      .filter(
+                        (s) =>
+                          !s.safeToRepair && s.reasons.length === 1 && s.reasons[0] === "TIMELINE_QUANTITY_MISMATCH"
+                      )
                       .map((s) => s.supplierId);
                     const totalSelectable = safeIds.length + forceableIds.length;
                     return totalSelectable > 0 ? (
                       <div className="flex items-center gap-2 px-3 py-1.5 border-b text-xs text-muted-foreground bg-muted/20">
-                        <Button size="sm" variant="ghost" className="h-6 text-xs px-2"
-                          onClick={() => { setSelectedSupplierIds(new Set([...safeIds, ...forceableIds])); setPreparedReplayToken(null); }}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 text-xs px-2"
+                          onClick={() => {
+                            setSelectedSupplierIds(new Set([...safeIds, ...forceableIds]));
+                            setPreparedReplayToken(null);
+                          }}
+                        >
                           Select All
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-6 text-xs px-2"
-                          onClick={() => { setSelectedSupplierIds(new Set(safeIds)); setPreparedReplayToken(null); }}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 text-xs px-2"
+                          onClick={() => {
+                            setSelectedSupplierIds(new Set(safeIds));
+                            setPreparedReplayToken(null);
+                          }}
+                        >
                           Safe Only
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-6 text-xs px-2"
-                          onClick={() => { setSelectedSupplierIds(new Set()); setPreparedReplayToken(null); }}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 text-xs px-2"
+                          onClick={() => {
+                            setSelectedSupplierIds(new Set());
+                            setPreparedReplayToken(null);
+                          }}
+                        >
                           Clear
                         </Button>
                         <span className="ml-auto font-medium">
@@ -1994,19 +1868,28 @@ export default function RawStockRecalculate() {
                         const delta = s.endingExpectedRate - s.currentStoredRate;
                         const isChecked = selectedSupplierIds.has(s.supplierId);
                         // A quantity-mismatch-only row can be force-applied (user acknowledges the gap).
-                        const isForceAppliable = !s.safeToRepair && s.reasons.length === 1 && s.reasons[0] === "TIMELINE_QUANTITY_MISMATCH";
+                        const isForceAppliable =
+                          !s.safeToRepair && s.reasons.length === 1 && s.reasons[0] === "TIMELINE_QUANTITY_MISMATCH";
                         const kgGap = Math.abs((s.replayRemainingKg ?? 0) - (s.authoritativeRemainingKg ?? 0));
                         return (
-                          <TableRow key={s.supplierId} className={`text-xs ${isForceAppliable && isChecked ? "bg-amber-500/5" : ""}`}>
+                          <TableRow
+                            key={s.supplierId}
+                            className={`text-xs ${isForceAppliable && isChecked ? "bg-amber-500/5" : ""}`}
+                          >
                             {/* Checkbox: enabled for safe rows; also enabled (amber) for force-appliable rows */}
                             <TableCell className="pl-3">
                               <Checkbox
                                 checked={isChecked}
                                 disabled={!s.safeToRepair && !isForceAppliable}
-                                className={isForceAppliable ? "border-amber-500 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500" : ""}
+                                className={
+                                  isForceAppliable
+                                    ? "border-amber-500 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+                                    : ""
+                                }
                                 onCheckedChange={(v) => {
                                   const next = new Set(selectedSupplierIds);
-                                  if (v) next.add(s.supplierId); else next.delete(s.supplierId);
+                                  if (v) next.add(s.supplierId);
+                                  else next.delete(s.supplierId);
                                   setSelectedSupplierIds(next);
                                   // DEFECT 3 FIX: Changing supplier selection invalidates the
                                   // prepared token — user must re-Prepare after changing scope.
@@ -2017,28 +1900,38 @@ export default function RawStockRecalculate() {
                             <TableCell className="font-medium">{s.supplierName}</TableCell>
                             <TableCell className="text-right font-mono">${s.currentStoredRate.toFixed(6)}</TableCell>
                             <TableCell className="text-right font-mono">${s.endingExpectedRate.toFixed(6)}</TableCell>
-                            <TableCell className={`text-right font-mono ${Math.abs(delta) > 0.000001 ? (delta > 0 ? "text-red-500" : "text-emerald-500") : "text-muted-foreground"}`}>
-                              {delta > 0 ? "+" : ""}{delta.toFixed(6)}
+                            <TableCell
+                              className={`text-right font-mono ${Math.abs(delta) > 0.000001 ? (delta > 0 ? "text-red-500" : "text-emerald-500") : "text-muted-foreground"}`}
+                            >
+                              {delta > 0 ? "+" : ""}
+                              {delta.toFixed(6)}
                             </TableCell>
                             <TableCell className="text-right">{s.affectedSourceCount}</TableCell>
                             <TableCell className="text-right">{s.affectedBatchCount}</TableCell>
                             <TableCell className="text-right">{s.affectedBaleCount}</TableCell>
                             <TableCell>
                               {s.safeToRepair ? (
-                                <Badge variant="outline" className="text-emerald-600 border-emerald-500/30 bg-emerald-500/10 text-[10px]">
+                                <Badge
+                                  variant="outline"
+                                  className="text-emerald-600 border-emerald-500/30 bg-emerald-500/10 text-[10px]"
+                                >
                                   Safe
                                 </Badge>
                               ) : isForceAppliable ? (
                                 <div className="flex flex-col gap-0.5">
-                                  <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/10 text-[10px]">
+                                  <Badge
+                                    variant="outline"
+                                    className="text-amber-600 border-amber-500/30 bg-amber-500/10 text-[10px]"
+                                  >
                                     {s.reasons[0]}
                                   </Badge>
-                                  <span className="text-[10px] text-muted-foreground">
-                                    gap: {kgGap.toFixed(3)} kg
-                                  </span>
+                                  <span className="text-[10px] text-muted-foreground">gap: {kgGap.toFixed(3)} kg</span>
                                 </div>
                               ) : (
-                                <Badge variant="outline" className="text-red-600 border-red-500/30 bg-red-500/10 text-[10px]">
+                                <Badge
+                                  variant="outline"
+                                  className="text-red-600 border-red-500/30 bg-red-500/10 text-[10px]"
+                                >
                                   {s.reasons[0] || "Manual review"}
                                 </Badge>
                               )}
@@ -2052,9 +1945,10 @@ export default function RawStockRecalculate() {
               )}
 
               {/* Options and apply — show when there are safe suppliers OR force-appliable ones */}
-              {(replayPreview.summary.safeSuppliers > 0 || replayPreview.supplierRows.some(
-                (s) => !s.safeToRepair && s.reasons.length === 1 && s.reasons[0] === "TIMELINE_QUANTITY_MISMATCH"
-              )) && (
+              {(replayPreview.summary.safeSuppliers > 0 ||
+                replayPreview.supplierRows.some(
+                  (s) => !s.safeToRepair && s.reasons.length === 1 && s.reasons[0] === "TIMELINE_QUANTITY_MISMATCH"
+                )) && (
                 <div className="space-y-2 pt-2">
                   {/* includeFinalizedBales toggle */}
                   {(replayPreview.summary.finalizedBalesToUpdate ?? 0) > 0 && (
@@ -2065,7 +1959,8 @@ export default function RawStockRecalculate() {
                         onCheckedChange={(v) => setIncludeFinalizedBales(Boolean(v))}
                       />
                       <label htmlFor="include-finalized-bales" className="cursor-pointer font-medium text-amber-800">
-                        Also update {replayPreview.summary.finalizedBalesToUpdate} finalized bale(s) (sold / dispatched / invoiced)
+                        Also update {replayPreview.summary.finalizedBalesToUpdate} finalized bale(s) (sold / dispatched
+                        / invoiced)
                       </label>
                     </div>
                   )}
@@ -2079,16 +1974,22 @@ export default function RawStockRecalculate() {
                         Select at least one supplier above to enable Prepare.
                       </span>
                     )}
-                    {selectedSupplierIds.size > 0 && (() => {
-                      const forceableSelected = replayPreview.supplierRows.filter(
-                        (s) => !s.safeToRepair && s.reasons.length === 1 && s.reasons[0] === "TIMELINE_QUANTITY_MISMATCH" && selectedSupplierIds.has(s.supplierId)
-                      );
-                      return forceableSelected.length > 0 ? (
-                        <span className="text-xs text-amber-600">
-                          ⚠ {forceableSelected.length} quantity-mismatch supplier(s) will be force-applied — rates are computed from an incomplete timeline.
-                        </span>
-                      ) : null;
-                    })()}
+                    {selectedSupplierIds.size > 0 &&
+                      (() => {
+                        const forceableSelected = replayPreview.supplierRows.filter(
+                          (s) =>
+                            !s.safeToRepair &&
+                            s.reasons.length === 1 &&
+                            s.reasons[0] === "TIMELINE_QUANTITY_MISMATCH" &&
+                            selectedSupplierIds.has(s.supplierId)
+                        );
+                        return forceableSelected.length > 0 ? (
+                          <span className="text-xs text-amber-600">
+                            ⚠ {forceableSelected.length} quantity-mismatch supplier(s) will be force-applied — rates are
+                            computed from an incomplete timeline.
+                          </span>
+                        ) : null;
+                      })()}
                     <div className="ml-auto">
                       <Button
                         size="sm"
@@ -2104,21 +2005,21 @@ export default function RawStockRecalculate() {
                           );
                           const forceSelected = allSelected.filter((id) =>
                             replayPreview.supplierRows.some(
-                              (s) => s.supplierId === id && !s.safeToRepair &&
-                                     s.reasons.length === 1 && s.reasons[0] === "TIMELINE_QUANTITY_MISMATCH"
+                              (s) =>
+                                s.supplierId === id &&
+                                !s.safeToRepair &&
+                                s.reasons.length === 1 &&
+                                s.reasons[0] === "TIMELINE_QUANTITY_MISMATCH"
                             )
                           );
-                          wrapAdminAction(
-                            () => {
-                              replayPrepareMutation.mutate({
-                                supplierIds: safeSelected,
-                                forceSupplierIds: forceSelected,
-                                includeCompletedBatches,
-                                includeFinalizedBales,
-                              });
-                            },
-                            `Prepare historical cost replay for ${selectedSupplierIds.size} selected supplier(s) — a signed review token will be issued before any data is written.`
-                          );
+                          wrapAdminAction(() => {
+                            replayPrepareMutation.mutate({
+                              supplierIds: safeSelected,
+                              forceSupplierIds: forceSelected,
+                              includeCompletedBatches,
+                              includeFinalizedBales,
+                            });
+                          }, `Prepare historical cost replay for ${selectedSupplierIds.size} selected supplier(s) — a signed review token will be issued before any data is written.`);
                         }}
                         className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
                       >
@@ -2132,15 +2033,17 @@ export default function RawStockRecalculate() {
                 </div>
               )}
 
-              {replayPreview.summary.safeSuppliers === 0 && !replayPreview.supplierRows.some(
-                (s) => !s.safeToRepair && s.reasons.length === 1 && s.reasons[0] === "TIMELINE_QUANTITY_MISMATCH"
-              ) && replayPreview.supplierRows.length > 0 && (
-                <div className="text-sm text-muted-foreground py-8 text-center border rounded-md bg-card">
-                  No suppliers are safe to repair automatically.
-                  {replayPreview.summary.manualReviewSuppliers > 0 &&
-                    ` ${replayPreview.summary.manualReviewSuppliers} supplier(s) require manual review (missing event dates or quantity mismatches).`}
-                </div>
-              )}
+              {replayPreview.summary.safeSuppliers === 0 &&
+                !replayPreview.supplierRows.some(
+                  (s) => !s.safeToRepair && s.reasons.length === 1 && s.reasons[0] === "TIMELINE_QUANTITY_MISMATCH"
+                ) &&
+                replayPreview.supplierRows.length > 0 && (
+                  <div className="text-sm text-muted-foreground py-8 text-center border rounded-md bg-card">
+                    No suppliers are safe to repair automatically.
+                    {replayPreview.summary.manualReviewSuppliers > 0 &&
+                      ` ${replayPreview.summary.manualReviewSuppliers} supplier(s) require manual review (missing event dates or quantity mismatches).`}
+                  </div>
+                )}
 
               {replayPreview.supplierRows.length === 0 && (
                 <div className="text-sm text-muted-foreground py-12 text-center border rounded-md bg-card">
@@ -2158,7 +2061,10 @@ export default function RawStockRecalculate() {
       <Dialog
         open={showReplayConfirmDialog}
         onOpenChange={(open) => {
-          if (!open) { setShowReplayConfirmDialog(false); setReplayConfirmText(""); }
+          if (!open) {
+            setShowReplayConfirmDialog(false);
+            setReplayConfirmText("");
+          }
         }}
       >
         <DialogContent className="max-w-lg">
@@ -2172,8 +2078,7 @@ export default function RawStockRecalculate() {
                   NOT from replayPreview.summary (which is global, not scoped to selection). */}
               {preparedReplayToken?.scope ? (
                 <span className="block">
-                  This will update{" "}
-                  <strong>{preparedReplayToken.scope.suppliers}</strong> supplier(s),{" "}
+                  This will update <strong>{preparedReplayToken.scope.suppliers}</strong> supplier(s),{" "}
                   <strong>{preparedReplayToken.scope.containers}</strong> container(s),{" "}
                   <strong>{preparedReplayToken.scope.supplierSources}</strong> source row(s),{" "}
                   <strong>{preparedReplayToken.scope.batches}</strong> batch(es), and{" "}
@@ -2182,15 +2087,23 @@ export default function RawStockRecalculate() {
                     <span> (including {preparedReplayToken.scope.finalizedBales} finalized bale(s))</span>
                   )}
                   {preparedReplayToken.scope.blockedBatches > 0 && (
-                    <span className="text-amber-600"> — {preparedReplayToken.scope.blockedBatches} batch(es) blocked from correction</span>
-                  )}.
-                  <br />This operation <strong>corrects historical cost data</strong> and cannot be trivially reversed — an undo snapshot will be saved.
+                    <span className="text-amber-600">
+                      {" "}
+                      — {preparedReplayToken.scope.blockedBatches} batch(es) blocked from correction
+                    </span>
+                  )}
+                  .
+                  <br />
+                  This operation <strong>corrects historical cost data</strong> and cannot be trivially reversed — an
+                  undo snapshot will be saved.
                 </span>
               ) : replayPreview ? (
                 <span className="block">
                   This will apply the historical cost replay for{" "}
                   <strong>{preparedReplayToken?.safeSupplierIds?.length ?? 0}</strong> supplier(s).
-                  <br />This operation <strong>corrects historical cost data</strong> and cannot be trivially reversed — an undo snapshot will be saved.
+                  <br />
+                  This operation <strong>corrects historical cost data</strong> and cannot be trivially reversed — an
+                  undo snapshot will be saved.
                 </span>
               ) : null}
             </DialogDescription>
@@ -2217,7 +2130,10 @@ export default function RawStockRecalculate() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => { setShowReplayConfirmDialog(false); setReplayConfirmText(""); }}
+              onClick={() => {
+                setShowReplayConfirmDialog(false);
+                setReplayConfirmText("");
+              }}
             >
               Cancel
             </Button>
@@ -2261,7 +2177,15 @@ export default function RawStockRecalculate() {
       </Dialog>
 
       {/* ── Recompute Supplier Rates — dry-run preview & confirmation dialog ── */}
-      <Dialog open={showRecomputeDialog} onOpenChange={(open) => { if (!open) { setShowRecomputeDialog(false); setRecomputePreviewRows(null); } }}>
+      <Dialog
+        open={showRecomputeDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowRecomputeDialog(false);
+            setRecomputePreviewRows(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -2270,13 +2194,14 @@ export default function RawStockRecalculate() {
             </DialogTitle>
             <DialogDescription className="text-xs">
               This will overwrite each supplier's locked rate with the{" "}
-              <strong>all-time receipt-weighted average</strong> across all raw-stock rows.
-              This differs from the <strong>moving-average formula</strong> used during real offloads, which
-              weights by remaining kg at the moment of each offload.
-              <br /><br />
+              <strong>all-time receipt-weighted average</strong> across all raw-stock rows. This differs from the{" "}
+              <strong>moving-average formula</strong> used during real offloads, which weights by remaining kg at the
+              moment of each offload.
+              <br />
+              <br />
               <span className="text-amber-700 dark:text-amber-400 font-medium">
-                If you accidentally clicked this, close the dialog and use
-                "History &amp; Rates → Restore from Audit Log" instead.
+                If you accidentally clicked this, close the dialog and use "History &amp; Rates → Restore from Audit
+                Log" instead.
               </span>
             </DialogDescription>
           </DialogHeader>
@@ -2299,19 +2224,24 @@ export default function RawStockRecalculate() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {recomputePreviewRows.filter((r) => !r.skipped).map((r) => {
-                        const delta = r.newRate - r.oldRate;
-                        return (
-                          <TableRow key={r.supplierId}>
-                            <TableCell className="text-sm font-medium">{r.supplierName}</TableCell>
-                            <TableCell className="text-right font-mono text-xs">${r.oldRate.toFixed(6)}</TableCell>
-                            <TableCell className="text-right font-mono text-xs">${r.newRate.toFixed(6)}</TableCell>
-                            <TableCell className={`text-right font-mono text-xs ${delta > 0 ? "text-red-500" : "text-emerald-500"}`}>
-                              {delta > 0 ? "+" : ""}{delta.toFixed(6)}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                      {recomputePreviewRows
+                        .filter((r) => !r.skipped)
+                        .map((r) => {
+                          const delta = r.newRate - r.oldRate;
+                          return (
+                            <TableRow key={r.supplierId}>
+                              <TableCell className="text-sm font-medium">{r.supplierName}</TableCell>
+                              <TableCell className="text-right font-mono text-xs">${r.oldRate.toFixed(6)}</TableCell>
+                              <TableCell className="text-right font-mono text-xs">${r.newRate.toFixed(6)}</TableCell>
+                              <TableCell
+                                className={`text-right font-mono text-xs ${delta > 0 ? "text-red-500" : "text-emerald-500"}`}
+                              >
+                                {delta > 0 ? "+" : ""}
+                                {delta.toFixed(6)}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                     </TableBody>
                   </Table>
                 </div>
@@ -2320,7 +2250,8 @@ export default function RawStockRecalculate() {
               {/* Skipped suppliers */}
               {recomputePreviewRows.filter((r) => !!r.skipped).length > 0 && (
                 <p className="text-xs text-muted-foreground">
-                  {recomputePreviewRows.filter((r) => !!r.skipped).length} supplier(s) skipped (already correct or no data).
+                  {recomputePreviewRows.filter((r) => !!r.skipped).length} supplier(s) skipped (already correct or no
+                  data).
                 </p>
               )}
 
@@ -2332,7 +2263,10 @@ export default function RawStockRecalculate() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => { setShowRecomputeDialog(false); setRecomputePreviewRows(null); }}
+                  onClick={() => {
+                    setShowRecomputeDialog(false);
+                    setRecomputePreviewRows(null);
+                  }}
                 >
                   Close
                 </Button>
@@ -2348,9 +2282,9 @@ export default function RawStockRecalculate() {
           <div>
             <h2 className="text-sm font-semibold leading-tight">Partial Offload Legacy Cost Fix</h2>
             <p className="text-xs text-muted-foreground leading-tight max-w-2xl">
-              Finds containers that were partially received and whose stored cost/kg was calculated
-              using the old wrong formula (supplier rate only, ignoring freight + commission + other charges).
-              Applies the correct formula: <span className="font-mono">total landed cost ÷ actual received kg</span>.
+              Finds containers that were partially received and whose stored cost/kg was calculated using the old wrong
+              formula (supplier rate only, ignoring freight + commission + other charges). Applies the correct formula:{" "}
+              <span className="font-mono">total landed cost ÷ actual received kg</span>.
             </p>
           </div>
 
@@ -2367,8 +2301,8 @@ export default function RawStockRecalculate() {
               </div>
               {partialOffloadScan.skippedFx.length > 0 && (
                 <div className="text-xs text-amber-600 bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
-                  {partialOffloadScan.skippedFx.length} container(s) skipped — unresolved FX rate.
-                  Set their FX rate then re-scan.
+                  {partialOffloadScan.skippedFx.length} container(s) skipped — unresolved FX rate. Set their FX rate
+                  then re-scan.
                 </div>
               )}
             </div>
@@ -2412,11 +2346,9 @@ export default function RawStockRecalculate() {
                           ${r.next.costPerKgUsd.toFixed(6)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Badge
-                            variant="outline"
-                            className="text-red-500 border-red-500/30 bg-red-500/10 text-[10px]"
-                          >
-                            {r.diffPct > 0 ? "+" : ""}{r.diffPct.toFixed(1)}%
+                          <Badge variant="outline" className="text-red-500 border-red-500/30 bg-red-500/10 text-[10px]">
+                            {r.diffPct > 0 ? "+" : ""}
+                            {r.diffPct.toFixed(1)}%
                           </Badge>
                         </TableCell>
                       </TableRow>

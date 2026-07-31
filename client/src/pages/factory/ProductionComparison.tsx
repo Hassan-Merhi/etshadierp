@@ -1,369 +1,23 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { PageHeader } from "@/components/PageHeader";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { TrendingUp, TrendingDown, Minus, AlertTriangle, Check, ChevronDown, X, Package, Scale } from "lucide-react";
+import {useState, useMemo} from "react";
+import {useQuery} from "@tanstack/react-query";
+import {PageHeader} from "@/components/PageHeader";
+import {Button} from "@/components/ui/button";
+import {Badge} from "@/components/ui/badge";
+import {Skeleton} from "@/components/ui/skeleton";
+import {Input} from "@/components/ui/input";
+import {} from "@/components/ui/command";
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
+import {AlertTriangle, ChevronDown, Package, Scale} from "lucide-react";
 import React from "react";
-import { cn } from "@/lib/utils";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {cn} from "@/lib/utils";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
 
+import type {MergedRow, Preset, ReportData, SupplierDayRow} from "./productioncomparison/types";
+import {deriveGrade, fmtDateRange, fmtKg, fmtMoney, fmtNum, fmtPct, fmtUsd, lastMonthRange, lastYearRange, pctChange, thisMonthRange, thisYearRange, todayStr, yesterdayStr} from "./productioncomparison/utils";
+import {MultiSelectFilter} from "./productioncomparison/components/MultiSelectFilter";
+import {DiffCell} from "./productioncomparison/components/DiffCell";
+import {StatCard} from "./productioncomparison/components/StatCard";
 // ── Date helpers ─────────────────────────────────────────────────────────────
-
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
-function yesterdayStr() {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
-}
-function thisMonthRange(): [string, string] {
-  const d = new Date();
-  const first = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-  const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
-  return [first, last];
-}
-function lastMonthRange(): [string, string] {
-  const d = new Date();
-  const first = new Date(d.getFullYear(), d.getMonth() - 1, 1).toISOString().slice(0, 10);
-  const last = new Date(d.getFullYear(), d.getMonth(), 0).toISOString().slice(0, 10);
-  return [first, last];
-}
-function thisYearRange(): [string, string] {
-  const y = new Date().getFullYear();
-  return [`${y}-01-01`, `${y}-12-31`];
-}
-function lastYearRange(): [string, string] {
-  const y = new Date().getFullYear() - 1;
-  return [`${y}-01-01`, `${y}-12-31`];
-}
-function fmtDateRange(from: string, to: string) {
-  if (from === to) return from;
-  return `${from} → ${to}`;
-}
-
-// ── Grade derivation ─────────────────────────────────────────────────────────
-
-const GRADE_PREFIXES: [string, string][] = [
-  ["HMD10", "CREAM"],
-  ["HMD11", "#1"],
-  ["HMD12", "#2"],
-  ["HMD13", "#3"],
-  ["HMD14", "#4"],
-  ["HMD16", "Garbage"],
-];
-function deriveGrade(articleCode: string): string {
-  const code = (articleCode || "").toUpperCase();
-  for (const [prefix, grade] of GRADE_PREFIXES) {
-    if (code.startsWith(prefix)) return grade;
-  }
-  return "—";
-}
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface ProductRow {
-  articleCode: string;
-  productName: string;
-  categoryName: string;
-  qty: number;
-  totalWeightKg: number;
-}
-interface SupplierDayRow {
-  date: string;
-  supplierName: string;
-  totalKg: number;
-  totalCost: number;
-}
-interface ReportData {
-  production: {
-    totalBales: number;
-    totalWeightKg: number;
-    byProduct: ProductRow[];
-  };
-  summary?: {
-    batchCost: number;
-    productionValue: number;
-    statusValue: number;
-  };
-  supplierMixBreakdown?: SupplierDayRow[];
-}
-type Preset = "today-yesterday" | "month" | "year" | "custom";
-
-interface MergedRow {
-  articleCode: string;
-  productName: string;
-  categoryName: string;
-  grade: string;
-  aQty: number;
-  bQty: number;
-  aKg: number;
-  bKg: number;
-}
-
-// ── Formatting ────────────────────────────────────────────────────────────────
-
-function fmtKg(n: number) {
-  // Show 1 decimal only when needed (strips ".0" for whole numbers)
-  return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 1 });
-}
-function fmtNum(n: number) {
-  return n.toLocaleString("en-US");
-}
-function fmtMoney(n: number) {
-  const sign = n < 0 ? "-" : "+";
-  return `${sign}$${Math.abs(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-function fmtUsd(n: number) {
-  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-function pctChange(a: number, b: number): number | null {
-  if (b === 0 && a === 0) return 0;
-  if (b === 0) return null;
-  return ((a - b) / b) * 100;
-}
-function fmtPct(p: number | null) {
-  if (p === null) return "N/A";
-  const sign = p > 0 ? "+" : "";
-  return `${sign}${p.toFixed(1)}%`;
-}
-
-// ── MultiSelectFilter ─────────────────────────────────────────────────────────
-
-function MultiSelectFilter({
-  options,
-  selected,
-  onChange,
-  placeholder,
-  allLabel,
-  className,
-}: {
-  options: string[];
-  selected: string[];
-  onChange: (next: string[]) => void;
-  placeholder: string;
-  allLabel: string;
-  className?: string;
-}) {
-  const [open, setOpen] = useState(false);
-
-  const toggle = (value: string) => {
-    if (selected.includes(value)) {
-      onChange(selected.filter((v) => v !== value));
-    } else {
-      onChange([...selected, value]);
-    }
-  };
-
-  const label =
-    selected.length === 0
-      ? allLabel
-      : selected.length === 1
-        ? selected[0]
-        : `${selected.length} selected`;
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          className={cn(
-            "inline-flex items-center justify-between gap-2 rounded-md border bg-background px-3 py-2 text-sm shadow-sm hover:bg-accent transition-colors min-w-[140px]",
-            selected.length > 0 && "border-primary/50",
-            className,
-          )}
-        >
-          <span className="truncate">{label}</span>
-          <div className="flex items-center gap-1 shrink-0">
-            {selected.length > 0 && (
-              <span
-                role="button"
-                tabIndex={0}
-                className="rounded-full hover:bg-muted p-0.5"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onChange([]);
-                }}
-                onKeyDown={(e) => e.key === "Enter" && (e.stopPropagation(), onChange([]))}
-              >
-                <X className="h-3 w-3 text-muted-foreground" />
-              </span>
-            )}
-            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-          </div>
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-52 p-0" align="start">
-        <Command>
-          <CommandInput placeholder={`Search ${placeholder.toLowerCase()}…`} />
-          <CommandList>
-            <CommandEmpty>No results.</CommandEmpty>
-            <CommandGroup>
-              {options.map((opt) => {
-                const checked = selected.includes(opt);
-                return (
-                  <CommandItem
-                    key={opt}
-                    value={opt}
-                    onSelect={() => toggle(opt)}
-                    className="flex items-center gap-2 cursor-pointer"
-                  >
-                    <div
-                      className={cn(
-                        "flex h-4 w-4 items-center justify-center rounded border shrink-0",
-                        checked
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-muted-foreground/40",
-                      )}
-                    >
-                      {checked && <Check className="h-3 w-3" />}
-                    </div>
-                    <span className="truncate">{opt}</span>
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function DiffCell({
-  value,
-  fmt,
-  isInfinite,
-}: {
-  value: number;
-  fmt: (n: number) => string;
-  isInfinite?: boolean;
-}) {
-  if (isInfinite)
-    return <span className="text-xs text-muted-foreground">N/A</span>;
-  if (value > 0)
-    return (
-      <span className="inline-flex items-center justify-end gap-0.5 text-emerald-600 font-medium tabular-nums">
-        <TrendingUp className="h-3.5 w-3.5 shrink-0" />
-        {fmt(value)}
-      </span>
-    );
-  if (value < 0)
-    return (
-      <span className="inline-flex items-center justify-end gap-0.5 text-red-500 font-medium tabular-nums">
-        <TrendingDown className="h-3.5 w-3.5 shrink-0" />
-        {fmt(value)}
-      </span>
-    );
-  return (
-    <span className="inline-flex items-center justify-end gap-0.5 text-muted-foreground tabular-nums">
-      <Minus className="h-3.5 w-3.5 shrink-0" />0
-    </span>
-  );
-}
-
-function PctCell({ pct }: { pct: number | null }) {
-  if (pct === null) return <span className="text-xs text-muted-foreground">N/A</span>;
-  if (pct > 0)
-    return (
-      <span className="inline-flex items-center justify-end gap-0.5 text-emerald-600 font-medium tabular-nums">
-        <TrendingUp className="h-3.5 w-3.5 shrink-0" />
-        {fmtPct(pct)}
-      </span>
-    );
-  if (pct < 0)
-    return (
-      <span className="inline-flex items-center justify-end gap-0.5 text-red-500 font-medium tabular-nums">
-        <TrendingDown className="h-3.5 w-3.5 shrink-0" />
-        {fmtPct(pct)}
-      </span>
-    );
-  return (
-    <span className="inline-flex items-center justify-end gap-0.5 text-muted-foreground tabular-nums">
-      <Minus className="h-3.5 w-3.5 shrink-0" />
-      0.0%
-    </span>
-  );
-}
-
-function StatCard({
-  title,
-  value,
-  sub,
-  valueClass,
-  accent,
-  icon,
-  extraLine,
-}: {
-  title: string;
-  value: string;
-  sub?: string;
-  valueClass?: string;
-  accent?: "green" | "red" | "neutral";
-  icon?: React.ReactNode;
-  extraLine?: { label: string; value: string };
-}) {
-  const borderClass =
-    accent === "green"
-      ? "border-emerald-500/40"
-      : accent === "red"
-        ? "border-red-500/40"
-        : "";
-  return (
-    <Card className={cn("relative overflow-hidden", borderClass)}>
-      {accent === "green" && (
-        <div className="absolute inset-x-0 top-0 h-0.5 bg-emerald-500/60 rounded-t" />
-      )}
-      {accent === "red" && (
-        <div className="absolute inset-x-0 top-0 h-0.5 bg-red-500/60 rounded-t" />
-      )}
-      <CardContent className="px-4 pt-4 pb-4">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <p className="text-xs font-semibold text-muted-foreground tracking-widest uppercase leading-tight">
-            {title}
-          </p>
-          {icon && <span className="text-muted-foreground/50 shrink-0">{icon}</span>}
-        </div>
-        <p className={cn("text-3xl font-extrabold leading-none tabular-nums", valueClass)}>
-          {value}
-        </p>
-        {extraLine && (
-          <div className="mt-2 flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">{extraLine.label}</span>
-            <span className="text-sm font-semibold tabular-nums text-foreground/80">
-              {extraLine.value}
-            </span>
-          </div>
-        )}
-        {sub && <p className="text-xs text-muted-foreground mt-1.5">{sub}</p>}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function ProductionComparison() {
   const [preset, setPreset] = useState<Preset>("month");
@@ -387,7 +41,10 @@ export default function ProductionComparison() {
 
   const [rangeA, rangeB] = useMemo<[[string, string], [string, string]]>(() => {
     if (preset === "today-yesterday")
-      return [[todayStr(), todayStr()], [yesterdayStr(), yesterdayStr()]];
+      return [
+        [todayStr(), todayStr()],
+        [yesterdayStr(), yesterdayStr()],
+      ];
     if (preset === "month") return [thisMonthRange(), lastMonthRange()];
     if (preset === "year") return [thisYearRange(), lastYearRange()];
     return [customA, customB];
@@ -440,10 +97,7 @@ export default function ProductionComparison() {
   const { categories, grades } = useMemo(() => {
     const catSet = new Set<string>();
     const gradeSet = new Set<string>();
-    for (const row of [
-      ...(qA.data?.production.byProduct ?? []),
-      ...(qB.data?.production.byProduct ?? []),
-    ]) {
+    for (const row of [...(qA.data?.production.byProduct ?? []), ...(qB.data?.production.byProduct ?? [])]) {
       if (row.categoryName) catSet.add(row.categoryName);
       const g = deriveGrade(row.articleCode);
       if (g !== "—") gradeSet.add(g);
@@ -489,23 +143,15 @@ export default function ProductionComparison() {
   const filtered = useMemo(
     () =>
       mergedAll
-        .filter(
-          (r) =>
-            filterCategories.length === 0 || filterCategories.includes(r.categoryName),
-        )
-        .filter(
-          (r) => filterGrades.length === 0 || filterGrades.includes(r.grade),
-        )
+        .filter((r) => filterCategories.length === 0 || filterCategories.includes(r.categoryName))
+        .filter((r) => filterGrades.length === 0 || filterGrades.includes(r.grade))
         .filter((r) => {
           if (!filterProduct) return true;
           const q = filterProduct.toLowerCase();
-          return (
-            r.articleCode.toLowerCase().includes(q) ||
-            r.productName.toLowerCase().includes(q)
-          );
+          return r.articleCode.toLowerCase().includes(q) || r.productName.toLowerCase().includes(q);
         })
         .sort((a, b) => (a.productName || a.articleCode).localeCompare(b.productName || b.articleCode)),
-    [mergedAll, filterCategories, filterGrades, filterProduct],
+    [mergedAll, filterCategories, filterGrades, filterProduct]
   );
 
   const totalABales = filtered.reduce((s, r) => s + r.aQty, 0);
@@ -552,12 +198,19 @@ export default function ProductionComparison() {
       for (const r of rows) {
         const ex = map.get(r.supplierName);
         if (ex) {
-          if (period === "a") { ex.aKg += r.totalKg; ex.aCost += r.totalCost; }
-          else { ex.bKg += r.totalKg; ex.bCost += r.totalCost; }
+          if (period === "a") {
+            ex.aKg += r.totalKg;
+            ex.aCost += r.totalCost;
+          } else {
+            ex.bKg += r.totalKg;
+            ex.bCost += r.totalCost;
+          }
         } else {
-          map.set(r.supplierName, period === "a"
-            ? { supplier: r.supplierName, aKg: r.totalKg, aCost: r.totalCost, bKg: 0, bCost: 0 }
-            : { supplier: r.supplierName, aKg: 0, aCost: 0, bKg: r.totalKg, bCost: r.totalCost }
+          map.set(
+            r.supplierName,
+            period === "a"
+              ? { supplier: r.supplierName, aKg: r.totalKg, aCost: r.totalCost, bKg: 0, bCost: 0 }
+              : { supplier: r.supplierName, aKg: 0, aCost: 0, bKg: r.totalKg, bCost: r.totalCost }
           );
         }
       }
@@ -574,9 +227,11 @@ export default function ProductionComparison() {
       ...supplierBreakdownB.map((r) => ({ ...r, period: labelB })),
     ];
     return rows.sort((a, b) =>
-      a.date !== b.date ? a.date.localeCompare(b.date) :
-      a.period !== b.period ? a.period.localeCompare(b.period) :
-      a.supplierName.localeCompare(b.supplierName)
+      a.date !== b.date
+        ? a.date.localeCompare(b.date)
+        : a.period !== b.period
+          ? a.period.localeCompare(b.period)
+          : a.supplierName.localeCompare(b.supplierName)
     );
   }, [supplierBreakdownA, supplierBreakdownB, labelA, labelB]);
 
@@ -592,10 +247,7 @@ export default function ProductionComparison() {
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
       {/* Header + preset buttons */}
-      <PageHeader
-        title="Production Comparison"
-        subtitle="Compare output across two time periods"
-      >
+      <PageHeader title="Production Comparison" subtitle="Compare output across two time periods">
         <div className="flex flex-wrap gap-2">
           {(
             [
@@ -605,12 +257,7 @@ export default function ProductionComparison() {
               ["custom", "Custom"],
             ] as [Preset, string][]
           ).map(([p, label]) => (
-            <Button
-              key={p}
-              variant={preset === p ? "default" : "outline"}
-              size="sm"
-              onClick={() => setPreset(p)}
-            >
+            <Button key={p} variant={preset === p ? "default" : "outline"} size="sm" onClick={() => setPreset(p)}>
               {label}
             </Button>
           ))}
@@ -711,13 +358,7 @@ export default function ProductionComparison() {
               sub={`${labelA} vs ${labelB}`}
               accent={baleDiff > 0 ? "green" : baleDiff < 0 ? "red" : "neutral"}
               icon={<Package className="h-4 w-4" />}
-              valueClass={
-                baleDiff > 0
-                  ? "text-emerald-600"
-                  : baleDiff < 0
-                    ? "text-red-500"
-                    : "text-muted-foreground"
-              }
+              valueClass={baleDiff > 0 ? "text-emerald-600" : baleDiff < 0 ? "text-red-500" : "text-muted-foreground"}
             />
             <StatCard
               title="Kilogram Difference"
@@ -725,13 +366,7 @@ export default function ProductionComparison() {
               sub={`${labelA} vs ${labelB}`}
               accent={kgDiff > 0 ? "green" : kgDiff < 0 ? "red" : "neutral"}
               icon={<Scale className="h-4 w-4" />}
-              valueClass={
-                kgDiff > 0
-                  ? "text-emerald-600"
-                  : kgDiff < 0
-                    ? "text-red-500"
-                    : "text-muted-foreground"
-              }
+              valueClass={kgDiff > 0 ? "text-emerald-600" : kgDiff < 0 ? "text-red-500" : "text-muted-foreground"}
             />
             <StatCard
               title="% Change"
@@ -739,11 +374,7 @@ export default function ProductionComparison() {
               sub={`Bales · Kg: ${fmtPct(kgPct)}`}
               accent={(balePct ?? 0) > 0 ? "green" : (balePct ?? 0) < 0 ? "red" : "neutral"}
               valueClass={
-                (balePct ?? 0) > 0
-                  ? "text-emerald-600"
-                  : (balePct ?? 0) < 0
-                    ? "text-red-500"
-                    : "text-muted-foreground"
+                (balePct ?? 0) > 0 ? "text-emerald-600" : (balePct ?? 0) < 0 ? "text-red-500" : "text-muted-foreground"
               }
             />
           </div>
@@ -757,10 +388,13 @@ export default function ProductionComparison() {
                 sub={fmtDateRange(rangeA[0], rangeA[1])}
                 accent={profitA != null ? (profitA > 0 ? "green" : profitA < 0 ? "red" : "neutral") : undefined}
                 valueClass={
-                  profitA == null ? "text-muted-foreground"
-                    : profitA > 0 ? "text-emerald-600"
-                    : profitA < 0 ? "text-red-500"
-                    : "text-muted-foreground"
+                  profitA == null
+                    ? "text-muted-foreground"
+                    : profitA > 0
+                      ? "text-emerald-600"
+                      : profitA < 0
+                        ? "text-red-500"
+                        : "text-muted-foreground"
                 }
               />
               <StatCard
@@ -769,22 +403,30 @@ export default function ProductionComparison() {
                 sub={fmtDateRange(rangeB[0], rangeB[1])}
                 accent={profitB != null ? (profitB > 0 ? "green" : profitB < 0 ? "red" : "neutral") : undefined}
                 valueClass={
-                  profitB == null ? "text-muted-foreground"
-                    : profitB > 0 ? "text-emerald-600"
-                    : profitB < 0 ? "text-red-500"
-                    : "text-muted-foreground"
+                  profitB == null
+                    ? "text-muted-foreground"
+                    : profitB > 0
+                      ? "text-emerald-600"
+                      : profitB < 0
+                        ? "text-red-500"
+                        : "text-muted-foreground"
                 }
               />
               <StatCard
                 title="Profit Difference"
                 value={profitDiff != null ? fmtMoney(profitDiff) : "—"}
                 sub={`${labelA} vs ${labelB}`}
-                accent={profitDiff != null ? (profitDiff > 0 ? "green" : profitDiff < 0 ? "red" : "neutral") : undefined}
+                accent={
+                  profitDiff != null ? (profitDiff > 0 ? "green" : profitDiff < 0 ? "red" : "neutral") : undefined
+                }
                 valueClass={
-                  profitDiff == null ? "text-muted-foreground"
-                    : profitDiff > 0 ? "text-emerald-600"
-                    : profitDiff < 0 ? "text-red-500"
-                    : "text-muted-foreground"
+                  profitDiff == null
+                    ? "text-muted-foreground"
+                    : profitDiff > 0
+                      ? "text-emerald-600"
+                      : profitDiff < 0
+                        ? "text-red-500"
+                        : "text-muted-foreground"
                 }
               />
             </div>
@@ -834,9 +476,13 @@ export default function ProductionComparison() {
                       <TableRow key={row.supplier}>
                         <TableCell className="font-medium">{row.supplier}</TableCell>
                         <TableCell className="text-right tabular-nums">{fmtKg(row.aKg)} kg</TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">{fmtUsd(row.aCost)}</TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          {fmtUsd(row.aCost)}
+                        </TableCell>
                         <TableCell className="text-right tabular-nums">{fmtKg(row.bKg)} kg</TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">{fmtUsd(row.bCost)}</TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          {fmtUsd(row.bCost)}
+                        </TableCell>
                         <TableCell className="text-right">
                           <DiffCell value={kd} fmt={(n) => `${n > 0 ? "+" : ""}${fmtKg(n)} kg`} />
                         </TableCell>
@@ -879,11 +525,15 @@ export default function ProductionComparison() {
                           <TableRow key={i}>
                             <TableCell className="tabular-nums text-sm">{r.date}</TableCell>
                             <TableCell>
-                              <Badge variant="outline" className="text-xs font-normal">{r.period}</Badge>
+                              <Badge variant="outline" className="text-xs font-normal">
+                                {r.period}
+                              </Badge>
                             </TableCell>
                             <TableCell className="font-medium text-sm">{r.supplierName}</TableCell>
                             <TableCell className="text-right tabular-nums text-sm">{fmtKg(r.totalKg)} kg</TableCell>
-                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">{fmtUsd(r.totalCost)}</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
+                              {fmtUsd(r.totalCost)}
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -971,29 +621,54 @@ export default function ProductionComparison() {
                   <thead>
                     {/* Group row */}
                     <tr className="bg-muted/40 border-b border-border">
-                      <th rowSpan={2} className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground min-w-[200px] border-r border-border/50 align-bottom">
+                      <th
+                        rowSpan={2}
+                        className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground min-w-[200px] border-r border-border/50 align-bottom"
+                      >
                         Product
                       </th>
-                      <th rowSpan={2} className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom">
+                      <th
+                        rowSpan={2}
+                        className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom"
+                      >
                         Category
                       </th>
-                      <th rowSpan={2} className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom">
+                      <th
+                        rowSpan={2}
+                        className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom"
+                      >
                         Grade
                       </th>
-                      <th colSpan={3} className="px-4 py-2 text-center text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 border-b border-border/50 border-r border-border/50">
+                      <th
+                        colSpan={3}
+                        className="px-4 py-2 text-center text-xs font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 border-b border-border/50 border-r border-border/50"
+                      >
                         Quantity (Bales)
                       </th>
-                      <th colSpan={3} className="px-4 py-2 text-center text-xs font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400 border-b border-border/50">
+                      <th
+                        colSpan={3}
+                        className="px-4 py-2 text-center text-xs font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400 border-b border-border/50"
+                      >
                         Weight (kg)
                       </th>
                     </tr>
                     {/* Sub-header row */}
                     <tr className="bg-muted/20 border-b border-border">
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-foreground whitespace-nowrap">{labelA}</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">{labelB}</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-foreground border-r border-border/50">Diff</th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-foreground whitespace-nowrap">{labelA}</th>
-                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">{labelB}</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-foreground whitespace-nowrap">
+                        {labelA}
+                      </th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">
+                        {labelB}
+                      </th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-foreground border-r border-border/50">
+                        Diff
+                      </th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-foreground whitespace-nowrap">
+                        {labelA}
+                      </th>
+                      <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">
+                        {labelB}
+                      </th>
                       <th className="px-4 py-2 text-right text-xs font-semibold text-foreground">Diff</th>
                     </tr>
                   </thead>
@@ -1006,11 +681,13 @@ export default function ProductionComparison() {
                           key={row.articleCode}
                           className={cn(
                             "border-b border-border/30 hover:bg-accent/40 transition-colors",
-                            idx % 2 === 1 && "bg-muted/10",
+                            idx % 2 === 1 && "bg-muted/10"
                           )}
                         >
                           <td className="px-4 py-2.5 border-r border-border/30">
-                            <span className="font-medium text-sm leading-snug">{row.productName || row.articleCode}</span>
+                            <span className="font-medium text-sm leading-snug">
+                              {row.productName || row.articleCode}
+                            </span>
                           </td>
                           <td className="px-3 py-2.5 text-sm text-muted-foreground border-r border-border/30">
                             {row.categoryName || "—"}

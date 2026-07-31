@@ -1,308 +1,31 @@
-import { useState, useEffect, useRef, useMemo, Fragment } from "react";
-import { useEscapeBack } from "@/hooks/use-escape-back";
-import { useQuery } from "@tanstack/react-query";
-import { useDateFormat } from "@/contexts/DateFormatContext";
-import { useLocation } from "wouter";
-import { useCompany } from "@/contexts/CompanyContext";
-import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { DatePickerInput } from "@/components/ui/date-picker-input";
-import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
-import { useDateJump } from "@/hooks/use-date-jump";
-import { PageHeader } from "@/components/PageHeader";
-import {
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  Wallet,
-  Package,
-  FileText,
-  ChevronRight,
-  ChevronDown,
-  Download,
-  RefreshCw,
-  BarChart3,
-  ShoppingCart,
-  Container as ContainerIcon,
-  Landmark,
-  Check,
-  type LucideIcon,
-} from "lucide-react";
-import { EmptyState } from "@/components/ui/empty-state";
-import { useToast } from "@/hooks/use-toast";
-import { utils, writeFile, readFile, ExcelJS } from "@/lib/excelHelper";
-import { formatNumber, drCrClass } from "@/lib/formatNumber";
-import { useAppMode } from "@/contexts/AppModeContext";
-import { getApiRequest } from "@/lib/factoryApi";
+import {useState, useEffect, useRef, Fragment} from "react";
+import {useEscapeBack} from "@/hooks/use-escape-back";
+import {useQuery} from "@tanstack/react-query";
+import {useDateFormat} from "@/contexts/DateFormatContext";
+import {useLocation} from "wouter";
+import {useCompany} from "@/contexts/CompanyContext";
+import {useCurrencyContext} from "@/contexts/CurrencyContext";
+import {Card, CardContent} from "@/components/ui/card";
+import {Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow} from "@/components/ui/table";
+import {Skeleton} from "@/components/ui/skeleton";
+import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
+import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Label} from "@/components/ui/label";
+import {DatePickerInput} from "@/components/ui/date-picker-input";
+import {PeriodFilter, PeriodFilterValue, getDefaultPeriodValue} from "@/components/ui/period-filter";
+import {useDateJump} from "@/hooks/use-date-jump";
+import {PageHeader} from "@/components/PageHeader";
+import {TrendingDown, DollarSign, Wallet, Package, FileText, ChevronRight, ChevronDown, BarChart3, ShoppingCart, Container as ContainerIcon, Landmark, Check, type LucideIcon} from "lucide-react";
+import {EmptyState} from "@/components/ui/empty-state";
+import {useToast} from "@/hooks/use-toast";
+import {formatNumber, drCrClass} from "@/lib/formatNumber";
+import {useAppMode} from "@/contexts/AppModeContext";
+import {getApiRequest} from "@/lib/factoryApi";
 
-// Type definitions
-interface Account {
-  id: string;
-  accountId: number;
-  type: string;
-  code: string;
-  name: string;
-  accountType?: string;
-  subType?: string;
-  balance: number;
-  balanceSide: string | null;
-  active: boolean;
-  parentId?: number;
-  customerId?: number;
-}
-
-interface LocationSales {
-  locationId: number;
-  locationName: string;
-  locationCode: string;
-  totalSales: number;
-  totalTransactions: number;
-  totalQuantity: number;
-}
-
-interface POSTransaction {
-  id: number;
-  voucherNumber: string;
-  voucherDate: string;
-  createdAt: string;
-  description: string | null;
-  customerName: string | null;
-  cashAccountName: string | null;
-  totalAmount: number;
-  totalQuantity: number;
-  itemCount: number;
-  items: any[];
-}
-
-interface StockLocation {
-  locationId: number;
-  locationName: string;
-  quantity: number;
-  averageRate: number;
-  totalValue: number;
-}
-
-interface StockMovementItem {
-  stockItemId: number;
-  stockItemCode: string;
-  stockItemName: string;
-  locations: StockLocation[];
-  totalQuantity: number;
-  totalValue: number;
-}
-
-interface StockMovementData {
-  items: StockMovementItem[];
-  summary: {
-    totalItems: number;
-    grandTotalQuantity: number;
-    grandTotalValue: number;
-  };
-  filters: {
-    startDate: string | null;
-    endDate: string | null;
-    locationId: string | null;
-    stockGroupId: string | null;
-  };
-}
-
-interface Container {
-  id: number;
-  containerNumber: string;
-  supplierName: string;
-  status: string;
-  importDate: string;
-  offloadDate: string | null;
-  itemsTotal: string;
-  chargesTotal: string;
-  grandTotal: string;
-}
-
-interface ReportContainer {
-  id: number;
-  containerNumber: string;
-  supplierId: number;
-  supplierName: string;
-  status: string;
-  importDate: string | null;
-  offloadDate: string | null;
-  itemsTotal: string;
-  chargesTotal: string;
-  grandTotal: string;
-  companyId: number;
-  companyName: string;
-}
-
-interface ContainerData {
-  containers: ReportContainer[];
-  summary: {
-    totalContainers: number;
-    totalItemsTotal: number;
-    totalChargesTotal: number;
-    totalGrandTotal: number;
-  };
-  filters: {
-    startDate: string | null;
-    endDate: string | null;
-    supplierId: string | null;
-    status: string | null;
-  };
-}
-
-interface Location {
-  id: number;
-  code: string;
-  name: string;
-}
-
-interface StockGroup {
-  id: number;
-  code: string;
-  name: string;
-}
-
-interface Supplier {
-  id: number;
-  code: string;
-  legalName: string;
-}
-
-interface OpeningStockGroup {
-  id: number;
-  code: string;
-  name: string;
-  opening: {
-    quantity: number;
-    rate: number;
-    value: number;
-  };
-  closing: {
-    quantity: number;
-    rate: number;
-    value: number;
-  };
-  itemCount: number;
-}
-
-interface OpeningStockItem {
-  id: number;
-  code: string;
-  name: string;
-  uom: string;
-  opening: {
-    quantity: number;
-    rate: number;
-    value: number;
-  };
-  closing: {
-    quantity: number;
-    rate: number;
-    value: number;
-  };
-}
-
-interface OpeningStockSummaryData {
-  stockGroups: OpeningStockGroup[];
-  grandTotal: {
-    opening: { quantity: number; value: number };
-    closing: { quantity: number; value: number };
-  };
-  filters: {
-    locationId: string | null;
-  };
-  notes?: {
-    opening: string;
-    closing: string;
-  };
-}
-
-interface OpeningStockItemsData {
-  items: OpeningStockItem[];
-  totals: {
-    opening: { quantity: number; value: number };
-    closing: { quantity: number; value: number };
-  };
-}
-
-interface NetProfitAccount {
-  id: number;
-  code: string;
-  name: string;
-  debit: number;
-  credit: number;
-  balance: number;
-  parentId?: number;
-}
-
-interface NetProfitStatementData {
-  netPosition: number;
-  openingBalancesNet?: number | null;
-  leftPane: {
-    openingStock: {
-      value: number;
-    };
-    purchaseAccounts: {
-      total: number;
-      accounts: NetProfitAccount[];
-      count: number;
-    };
-    directExpenses: {
-      total: number;
-      accounts: NetProfitAccount[];
-      count: number;
-    };
-    tradingTotal: number;
-    grossProfit: number;
-    indirectExpenses: {
-      total: number;
-      accounts: NetProfitAccount[];
-      count: number;
-    };
-    netProfit: number;
-  };
-  rightPane?: {
-    salesAccounts: {
-      total: number;
-    };
-    directIncomes: {
-      total: number;
-      accounts: NetProfitAccount[];
-      count: number;
-    };
-    closingStock: {
-      value: number;
-    };
-    tradingTotal: number;
-    grossProfitBf: number;
-    indirectIncomes: {
-      total: number;
-      accounts: NetProfitAccount[];
-      count: number;
-    };
-    total: number;
-  };
-}
-
-function formatSmartNumber(num: number | string | null | undefined): string {
-  if (num === null || num === undefined) return "";
-  const value = typeof num === "string" ? parseFloat(num) : num;
-  if (isNaN(value)) return "";
-  const isWholeNumber = value % 1 === 0;
-  if (isWholeNumber) {
-    return value.toLocaleString("en-US", { maximumFractionDigits: 0 });
-  }
-  return value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
+import type {Account, ContainerData, Location, LocationSales, NetProfitAccount, NetProfitStatementData, OpeningStockItemsData, OpeningStockSummaryData, POSTransaction, ReportContainer, StockGroup, StockMovementData, Supplier} from "./analyticslegacy/types";
 export default function Analytics() {
   const { formatDisplayDate } = useDateFormat();
   const appMode = useAppMode();
@@ -2371,7 +2094,9 @@ export default function Analytics() {
                           className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded hover:bg-accent"
                           onClick={() => setReportSupplierIds([])}
                         >
-                          <Check className={`h-4 w-4 ${reportSupplierIds.length === 0 ? "opacity-100" : "opacity-0"}`} />
+                          <Check
+                            className={`h-4 w-4 ${reportSupplierIds.length === 0 ? "opacity-100" : "opacity-0"}`}
+                          />
                           All Suppliers
                         </button>
                         <div className="border-t my-1" />
@@ -2389,7 +2114,9 @@ export default function Analytics() {
                               )
                             }
                           >
-                            <Check className={`h-4 w-4 shrink-0 ${reportSupplierIds.includes(supplier.id) ? "opacity-100" : "opacity-0"}`} />
+                            <Check
+                              className={`h-4 w-4 shrink-0 ${reportSupplierIds.includes(supplier.id) ? "opacity-100" : "opacity-0"}`}
+                            />
                             <span className="truncate">{supplier.name}</span>
                           </button>
                         ))}
@@ -2444,10 +2171,18 @@ export default function Analytics() {
                     : containerData.containers.filter((c) => reportSupplierIds.includes(c.supplierId));
 
                 // Group by supplierId, sorted alphabetically; within each group sort by date DESC
-                const supplierMap = new Map<number, { supplierId: number; supplierName: string; containers: ReportContainer[]; total: number }>();
+                const supplierMap = new Map<
+                  number,
+                  { supplierId: number; supplierName: string; containers: ReportContainer[]; total: number }
+                >();
                 for (const c of visibleContainers) {
                   if (!supplierMap.has(c.supplierId)) {
-                    supplierMap.set(c.supplierId, { supplierId: c.supplierId, supplierName: c.supplierName, containers: [], total: 0 });
+                    supplierMap.set(c.supplierId, {
+                      supplierId: c.supplierId,
+                      supplierName: c.supplierName,
+                      containers: [],
+                      total: 0,
+                    });
                   }
                   const g = supplierMap.get(c.supplierId)!;
                   g.containers.push(c);
@@ -2495,7 +2230,8 @@ export default function Analytics() {
                             <TableBody>
                               <TableRow className="bg-muted/40 font-semibold">
                                 <TableCell colSpan={colSpan - 1} className="text-sm">
-                                  {sg.supplierName} — {sg.containers.length} container{sg.containers.length !== 1 ? "s" : ""}
+                                  {sg.supplierName} — {sg.containers.length} container
+                                  {sg.containers.length !== 1 ? "s" : ""}
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-sm">{formatAmount(sg.total)}</TableCell>
                               </TableRow>
@@ -2525,7 +2261,8 @@ export default function Analytics() {
                                 </div>
                                 <div className="flex items-center justify-between gap-2 text-sm">
                                   <span className="text-muted-foreground">
-                                    {isAllCompanies ? `${container.companyName} · ` : ""}{getDate(container)}
+                                    {isAllCompanies ? `${container.companyName} · ` : ""}
+                                    {getDate(container)}
                                   </span>
                                   <span className="font-mono font-semibold">
                                     {formatAmount(parseFloat(container.grandTotal))}
