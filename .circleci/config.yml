@@ -187,33 +187,47 @@ jobs:
           name: Full frontend tests
           command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
 
-  factory-c-a-f:
+  factory-cm:
     executor: node22-postgres
     steps:
       - run_backend_pattern:
-          pattern: "factory-c[a-f]*"
-          label: Factory C A-F
+          pattern: "factory-cm*"
+          label: Factory CM
 
-  factory-c-g-l:
+  factory-cn:
     executor: node22-postgres
     steps:
       - run_backend_pattern:
-          pattern: "factory-c[g-l]*"
-          label: Factory C G-L
+          pattern: "factory-cn*"
+          label: Factory CN
 
-  factory-c-m-r:
+  factory-co:
     executor: node22-postgres
     steps:
       - run_backend_pattern:
-          pattern: "factory-c[m-r]*"
-          label: Factory C M-R
+          pattern: "factory-co*"
+          label: Factory CO
 
-  factory-c-s-z:
+  factory-cp:
     executor: node22-postgres
     steps:
       - run_backend_pattern:
-          pattern: "factory-c[s-z]*"
-          label: Factory C S-Z
+          pattern: "factory-cp*"
+          label: Factory CP
+
+  factory-cq:
+    executor: node22-postgres
+    steps:
+      - run_backend_pattern:
+          pattern: "factory-cq*"
+          label: Factory CQ
+
+  factory-cr:
+    executor: node22-postgres
+    steps:
+      - run_backend_pattern:
+          pattern: "factory-cr*"
+          label: Factory CR
 
   postgres-phase3-backend:
     executor: node22-postgres
@@ -271,10 +285,12 @@ workflows:
       - postgres-regression
       - full-backend
       - full-frontend
-      - factory-c-a-f
-      - factory-c-g-l
-      - factory-c-m-r
-      - factory-c-s-z
+      - factory-cm
+      - factory-cn
+      - factory-co
+      - factory-cp
+      - factory-cq
+      - factory-cr
       - postgres-phase3-backend
       - phase3-frontend
       - architecture-guards
