@@ -61,9 +61,9 @@ Production also preloads `server/factoryBilingualSchemaBridge.mjs` through the e
 
 ## Schema module structure
 
-The previous Factory schema is preserved verbatim as `shared/schema/factoryBase.ts`. The public `shared/schema/factory.ts` facade re-exports all unaffected definitions from that base and explicitly replaces only the bilingual tables from `shared/schema/factoryBilingualTables.ts`.
+The existing `shared/schema/factory.ts` file remains unchanged as the English Factory schema source. `shared/schema/factoryBilingualTables.ts` contains only the table definitions that gain Arabic columns. The top-level `shared/schema/index.ts` explicitly exports those bilingual replacements after the existing Factory export, so normal `@shared/schema` consumers and Drizzle receive the additive Arabic contract without copying or growing the existing Factory schema file.
 
-This keeps the Phase 2 change reviewable while preserving the existing public imports used throughout the ERP.
+`shared/schema/factoryBase.ts` is a three-line compatibility boundary used only by the bilingual definitions to reference unchanged parent tables. This avoids introducing another god file and keeps direct legacy imports stable.
 
 ## Safety
 
