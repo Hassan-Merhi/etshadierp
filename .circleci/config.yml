@@ -86,6 +86,20 @@ commands:
           name: Verify disposable database schema
           command: node scripts/verify-ci-disposable-schema.mjs
 
+  run_backend_range:
+    parameters:
+      range:
+        type: string
+      label:
+        type: string
+    steps:
+      - install_dependencies
+      - wait_for_postgres
+      - prepare_postgres_schema
+      - run:
+          name: Backend tests << parameters.label >>
+          command: node node_modules/vitest/vitest.mjs run tests/[<< parameters.range >>]*.test.ts --maxWorkers=1 --no-file-parallelism
+
 jobs:
   static-build:
     executor: node22
@@ -130,51 +144,39 @@ jobs:
             npm run verify:final-production-readiness
             npm run verify:bandwidth
 
-  postgres-backend-a-f:
+  postgres-backend-g-i:
     executor: node22-postgres
     steps:
-      - install_dependencies
-      - wait_for_postgres
-      - prepare_postgres_schema
-      - run:
-          name: Backend tests A-F
-          command: node node_modules/vitest/vitest.mjs run tests/[a-f]*.test.ts --exclude tests/factory-bilingual-schema.test.ts --maxWorkers=1 --no-file-parallelism
+      - run_backend_range:
+          range: "g-i"
+          label: G-I
 
-  postgres-backend-g-l:
+  postgres-backend-j-l:
     executor: node22-postgres
     steps:
-      - install_dependencies
-      - wait_for_postgres
-      - prepare_postgres_schema
-      - run:
-          name: Backend tests G-L
-          command: node node_modules/vitest/vitest.mjs run tests/[g-l]*.test.ts --maxWorkers=1 --no-file-parallelism
+      - run_backend_range:
+          range: "j-l"
+          label: J-L
 
-  postgres-backend-m-r:
+  postgres-backend-s-u:
     executor: node22-postgres
     steps:
-      - install_dependencies
-      - wait_for_postgres
-      - prepare_postgres_schema
-      - run:
-          name: Backend tests M-R
-          command: node node_modules/vitest/vitest.mjs run tests/[m-r]*.test.ts --maxWorkers=1 --no-file-parallelism
+      - run_backend_range:
+          range: "s-u"
+          label: S-U
 
-  postgres-backend-s-z:
+  postgres-backend-v-z:
     executor: node22-postgres
     steps:
-      - install_dependencies
-      - wait_for_postgres
-      - prepare_postgres_schema
-      - run:
-          name: Backend tests S-Z
-          command: node node_modules/vitest/vitest.mjs run tests/[s-z]*.test.ts --maxWorkers=1 --no-file-parallelism
+      - run_backend_range:
+          range: "v-z"
+          label: V-Z
 
 workflows:
   full-erp-verification:
     jobs:
       - static-build
-      - postgres-backend-a-f
-      - postgres-backend-g-l
-      - postgres-backend-m-r
-      - postgres-backend-s-z
+      - postgres-backend-g-i
+      - postgres-backend-j-l
+      - postgres-backend-s-u
+      - postgres-backend-v-z
