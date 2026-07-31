@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import type { Request, RequestHandler } from "express";
+import { checkPOSLocation, requireAuth } from "../../auth";
 
 export const READ_MICROCACHE_TTL_MS = new Map<string, number>([
   ["/api/sales-report", 120_000],
@@ -46,7 +47,6 @@ export const READ_MICROCACHE_TTL_MS = new Map<string, number>([
   ["/api/employee-groups", 300_000],
   ["/api/user/companies", 300_000],
   ["/api/my-erp-pages", 300_000],
-  ["/api/pos/drafts", 30_000],
   ["/api/pos/last-sold-prices", 30_000],
   ["/api/containers/active", 30_000],
   ["/api/stock-transfers", 30_000],
@@ -77,6 +77,8 @@ const NON_INVALIDATING_WRITE_PATHS: readonly RegExp[] = [
   /^\/api\/client-observability(?:\/|$)/,
   /^\/api\/auth\/activity(?:\/|$)/,
 ];
+
+const POS_LOCATION_READ_PATH = /^\/api\/locations\/\d+\/inventory\/?$/;
 
 interface ReadMicrocacheEntry {
   expiresAt: number;
@@ -274,27 +276,16 @@ export function createReadMicrocacheMiddleware(options: ReadMicrocacheOptions = 
     const method = req.method.toUpperCase();
 
     if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS" && !isReadOnlyPost(req)) {
-      if (isNonInvalidatingWrite(req)) return next();
-      clearForWrite();
-      let finalized = false;
-      const finalizeWrite = () => {
-        if (finalized) return;
-        finalized = true;
-        clearForWrite();
-      };
-      res.once?.("finish", finalizeWrite);
-      res.once?.("close", finalizeWrite);
+      if (isNonInvalidatingWrite(req) || !req.session?.userId) return next();
+      res.once?.("finish", () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) clearForWrite();
+      });
       return next();
     }
 
     if (!isCacheableRead(req)) return next();
 
-    const cacheControl = String(req.headers["cache-control"] || "").toLowerCase();
-    if (
-      cacheControl.includes("no-store") ||
-      req.headers["x-bypass-request-storm-guard"] !== undefined ||
-      req.query?.__refresh === "1"
-    ) {
+    if (req.headers["x-bypass-request-storm-guard"] !== undefined || req.query?.__refresh === "1") {
       return next();
     }
 
@@ -353,25 +344,27 @@ export function createReadMicrocacheMiddleware(options: ReadMicrocacheOptions = 
       if (res.statusCode >= 200 && res.statusCode < 300 && generationAtStart === writeGeneration) {
         try {
           const serialized = JSON.stringify(body);
-          const sizeBytes = Buffer.byteLength(serialized, "utf8");
-          if (sizeBytes <= maxBodyBytes) {
-            const ttlMs = overrideTtlMs ?? getReadTtlMs(req) ?? 1_000;
-            entry = {
-              expiresAt: now() + ttlMs,
-              statusCode: res.statusCode,
-              body: serialized,
-              contentType: "application/json",
-              etag: makeEtag(serialized),
-              sizeBytes,
-            };
-            pruneExpired(now());
-            const previous = cache.get(key);
-            if (previous) cachedBytes -= previous.sizeBytes;
-            cache.set(key, entry);
-            cachedBytes += sizeBytes;
-            counters.stores += 1;
-            trimCache();
-            setCacheHeaders(res, entry, "MISS");
+          if (serialized !== undefined) {
+            const sizeBytes = Buffer.byteLength(serialized, "utf8");
+            if (sizeBytes <= maxBodyBytes) {
+              const ttlMs = overrideTtlMs ?? getReadTtlMs(req) ?? 1_000;
+              entry = {
+                expiresAt: now() + ttlMs,
+                statusCode: res.statusCode,
+                body: serialized,
+                contentType: "application/json",
+                etag: makeEtag(serialized),
+                sizeBytes,
+              };
+              pruneExpired(now());
+              const previous = cache.get(key);
+              if (previous) cachedBytes -= previous.sizeBytes;
+              cache.set(key, entry);
+              cachedBytes += sizeBytes;
+              counters.stores += 1;
+              trimCache();
+              setCacheHeaders(res, entry, "MISS");
+            }
           }
         } catch {
           // Non-serializable responses continue normally and are not cached.
@@ -394,5 +387,18 @@ export function registerPerformanceReadMicrocache(app: { use: (handler: RequestH
   // HTTP write boundary that invalidates this production cache. Keep those suites
   // deterministic while dedicated readMicrocache unit tests exercise the cache itself.
   if (process.env.NODE_ENV === "test") return;
-  app.use(createReadMicrocacheMiddleware());
+
+  const cacheMiddleware = createReadMicrocacheMiddleware();
+  app.use((req, res, next) => {
+    if (!isCacheableRead(req)) return cacheMiddleware(req, res, next);
+
+    void requireAuth(req, res, () => {
+      if (!POS_LOCATION_READ_PATH.test(req.path)) {
+        cacheMiddleware(req, res, next);
+        return;
+      }
+
+      void checkPOSLocation(req, res, () => cacheMiddleware(req, res, next));
+    });
+  });
 }
