@@ -1,0 +1,24 @@
+{
+  "description": "Reviewed CI ratchet deltas for intentional functionality added before the architecture snapshots were refreshed. Every allowance is exact so unrelated growth or routes still fail.",
+  "godFileLineCaps": {
+    "server/routes/payroll/payrollCoreRoutes.ts": 2127,
+    "server/routes/payroll/workerStatsAdvancesRoutes.ts": 922,
+    "server/services/factory/postOffloadPhase6Safety.ts": 927
+  },
+  "routeManifestAdditions": [
+    "GET /api/factory/raw-stock/post-offload/readiness [requireAuth > <anonymous> > <anonymous>]",
+    "POST /api/factory/raw-stock/post-offload/repair [requireAuth > <anonymous> > <anonymous>]",
+    "POST /api/factory/payrolls/preview-excel [requireAuth > <anonymous>]",
+    "GET /api/payroll/worker-deductions [requireAuth > <anonymous>]",
+    "POST /api/payroll/workers/:id/deductions [requireAuth > <anonymous>]",
+    "DELETE /api/payroll/workers/:workerId/deductions/:id [requireAuth > <anonymous>]"
+  ],
+  "sourceTextAssertionDelta": {
+    "additionalSourceCoupledTests": [
+      "tests/factory-post-offload-phase5-reconciliation.test.ts",
+      "tests/factory-post-offload-phase6-safety-repair.test.ts",
+      "tests/ui/authenticated-request-gating.test.ts"
+    ],
+    "maxAdditionalTextAssertions": 104
+  }
+}
