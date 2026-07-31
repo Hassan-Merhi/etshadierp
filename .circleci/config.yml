@@ -170,7 +170,7 @@ jobs:
     executor: node22-postgres
     steps:
       - install_dependencies
-      - wait_for-postgres
+      - wait_for_postgres
       - prepare_postgres_schema
       - run:
           name: Phase 3 resolver and catalog API tests
