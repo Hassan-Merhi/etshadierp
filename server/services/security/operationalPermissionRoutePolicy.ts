@@ -38,7 +38,14 @@ const IMPORT_PREFIXES = [
   "/api/import",
 ];
 
-function posShiftPermission(method: string, path: string): OperationalPermissionRouteMatch | null {
+const IMPORT_TEMPLATE_PATHS = new Set([
+  "/api/factory/bale-products/arabic-template",
+]);
+
+function posShiftPermission(
+  method: string,
+  path: string
+): OperationalPermissionRouteMatch | null {
   const normalizedMethod = method.toUpperCase();
   if (
     normalizedMethod === "POST" &&
@@ -69,6 +76,7 @@ function isImportRoute(method: string, path: string): boolean {
   if (path.startsWith("/api/import-cycle") || path.startsWith("/api/stats/import-cycle")) {
     return false;
   }
+  if (IMPORT_TEMPLATE_PATHS.has(path)) return true;
   if (IMPORT_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))) {
     return true;
   }
@@ -78,7 +86,9 @@ function isImportRoute(method: string, path: string): boolean {
 
 function isBulkMaintenanceRoute(method: string, path: string): boolean {
   if (!isMutation(method)) return false;
-  return /(?:^|[-/])(repair|recalculate|rebuild|cleanup|backfill|reconcile|resync|fix)(?:[-/]|$)/.test(path);
+  return /(?:^|[-/])(repair|recalculate|rebuild|cleanup|backfill|reconcile|resync|fix)(?:[-/]|$)/.test(
+    path
+  );
 }
 
 function exportPermission(path: string): OperationalPermissionRouteMatch | null {
@@ -107,7 +117,10 @@ function exportPermission(path: string): OperationalPermissionRouteMatch | null 
       permissionKey: "exp_whatsapp_send",
     };
   }
-  if (lower.includes("stock") && (lower.includes("export") || lower.includes("excel") || lower.includes("pdf"))) {
+  if (
+    lower.includes("stock") &&
+    (lower.includes("export") || lower.includes("excel") || lower.includes("pdf"))
+  ) {
     return {
       operation: "stock-export",
       permissionType: "export",
@@ -128,7 +141,11 @@ function exportPermission(path: string): OperationalPermissionRouteMatch | null 
       permissionKey: "exp_print_invoice",
     };
   }
-  if (lower.includes("backup") || lower.includes("daily-export") || lower.includes("data-export")) {
+  if (
+    lower.includes("backup") ||
+    lower.includes("daily-export") ||
+    lower.includes("data-export")
+  ) {
     return {
       operation: "backup-export",
       permissionType: "export",
