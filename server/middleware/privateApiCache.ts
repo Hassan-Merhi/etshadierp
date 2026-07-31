@@ -89,17 +89,11 @@ const CACHE_POLICIES: readonly CachePolicy[] = [
   report("worker-payment-summary", /^\/api\/payroll\/worker-payments-summary\/?$/),
   report("factory-customer-proformas", /^\/api\/factory\/customer-proformas\/?$/),
   report("factory-customer-order", /^\/api\/factory\/customer-orders\/\d+\/?$/),
-  report(
-    "factory-customer-order-verification",
-    /^\/api\/factory\/customer-orders\/\d+\/verification-summary\/?$/
-  ),
+  report("factory-customer-order-verification", /^\/api\/factory\/customer-orders\/\d+\/verification-summary\/?$/),
   report("factory-bale-ledger", /^\/api\/factory\/bale-ledger\/?$/),
   report("factory-mix-batches", /^\/api\/factory\/mix-batches\/?$/),
   report("factory-daily-bale-scans", /^\/api\/factory\/daily-bale-scans\/?$/),
-  report(
-    "factory-produced-daily-bale-scans",
-    /^\/api\/factory\/daily-bale-scans\/produced\/?$/
-  ),
+  report("factory-produced-daily-bale-scans", /^\/api\/factory\/daily-bale-scans\/produced\/?$/),
   report("factory-stock-entry-history", /^\/api\/factory\/bales\/stock-entry-history\/?$/),
   report("factory-attendance", /^\/api\/factory\/attendance\/?$/),
   report("factory-attendance-report", /^\/api\/factory\/workers\/attendance-report\/?$/),
@@ -112,10 +106,7 @@ const CACHE_POLICIES: readonly CachePolicy[] = [
   volatile("pos-drafts", /^\/api\/pos\/drafts\/?$/),
   volatile("pos-last-sold-prices", /^\/api\/pos\/last-sold-prices\/?$/),
   volatile("barcode-lookup", /^\/api\/barcode\/[^/]+\/?$/),
-  volatile(
-    "factory-raw-stock-containers",
-    /^\/api\/factory\/raw-stock\/available-containers\/?$/
-  ),
+  volatile("factory-raw-stock-containers", /^\/api\/factory\/raw-stock\/available-containers\/?$/),
   volatile("factory-raw-stock", /^\/api\/factory\/raw-stock\/?$/),
   volatile("factory-bale-stock-count", /^\/api\/factory\/bale-stock-count\/?$/),
   volatile("factory-containers", /^\/api\/factory\/containers\/?$/),
@@ -326,11 +317,7 @@ function shouldForceRefresh(req: Request): boolean {
 
 function invalidateAroundMutation(req: Request, res: Response, next: NextFunction): void {
   if (!req.path.startsWith("/api/")) return next();
-  if (
-    ["GET", "HEAD", "OPTIONS"].includes(req.method) ||
-    isReadOnlyPost(req) ||
-    isNonInvalidatingWrite(req)
-  ) {
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method) || isReadOnlyPost(req) || isNonInvalidatingWrite(req)) {
     return next();
   }
 
