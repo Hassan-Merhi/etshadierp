@@ -150,7 +150,7 @@ jobs:
           name: Phase 2 bilingual schema test
           command: node node_modules/vitest/vitest.mjs run tests/factory-bilingual-schema.test.ts --maxWorkers=1 --no-file-parallelism
 
-  postgres-existing-regression:
+  postgres-existing-backend:
     executor: node22-postgres
     steps:
       - install_dependencies
@@ -159,8 +159,15 @@ jobs:
       - run:
           name: Existing backend tests
           command: node node_modules/vitest/vitest.mjs run --exclude tests/factory-bilingual-schema.test.ts --maxWorkers=1 --no-file-parallelism
+
+  postgres-existing-frontend:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - wait_for_postgres
+      - prepare_postgres_schema
       - run:
-          name: Frontend tests
+          name: Existing frontend tests
           command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
 
   security-readiness:
@@ -190,7 +197,8 @@ workflows:
       - static-build
       - postgres-schema
       - postgres-phase2-focused
-      - postgres-existing-regression
+      - postgres-existing-backend
+      - postgres-existing-frontend
       - security-readiness:
           requires:
             - static-build
