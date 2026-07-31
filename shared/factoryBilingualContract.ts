@@ -38,6 +38,28 @@ export interface FactoryResolvedProductLanguage {
   description: string;
 }
 
+/** Additive response fields returned by bilingual Factory category GET APIs. */
+export interface FactoryBilingualCategoryApiExtension {
+  nameEn: string;
+  nameAr: string | null;
+  displayName: string;
+  language: FactoryCatalogLanguage;
+}
+
+/** Additive response fields returned by bilingual Factory product GET APIs. */
+export interface FactoryBilingualProductApiExtension {
+  nameEn: string;
+  nameAr: string | null;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
+  categoryName: string | null;
+  categoryNameAr: string | null;
+  displayName: string;
+  displayDescription: string;
+  displayCategoryName: string;
+  language: FactoryCatalogLanguage;
+}
+
 export interface FactoryBilingualProductSnapshot {
   articleCode: string;
   productNameEn: string | null;
