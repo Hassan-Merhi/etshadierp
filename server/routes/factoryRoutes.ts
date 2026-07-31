@@ -1,9 +1,9 @@
 import type { Express } from "express";
 import { eq, and, or } from "drizzle-orm";
 import { companies, userCompanyRoles } from "@shared/schema";
-import { registerFactoryStockRoutes } from "./factory/factoryStockRoutes";
+import { registerFactoryStockRoutes } from "./factory/stock";
 import { registerFactorySuppliersRoutes } from "./factory/factorySuppliersRoutes";
-import { registerFactoryProductsRoutes } from "./factory/factoryProductsRoutes";
+import { registerFactoryProductsRoutes } from "./factory/products";
 import { registerFactoryContainersRoutes } from "./factory/factoryContainersRoutes";
 import { registerFactoryBalesRoutes } from "./factory/bales";
 import { registerFactoryCustomersRoutes } from "./factory/factoryCustomersRoutes";
