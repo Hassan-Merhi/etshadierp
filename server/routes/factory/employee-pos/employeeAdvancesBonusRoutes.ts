@@ -4,7 +4,7 @@ import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
-import { buildBrokerStatement } from "../suppliers/supplierBrokerRoutes";
+import { buildBrokerStatement } from "../suppliers/broker";
 import { adjustInventory } from "../../../inventoryHelper";
 import {
   writeDaybookEntry,

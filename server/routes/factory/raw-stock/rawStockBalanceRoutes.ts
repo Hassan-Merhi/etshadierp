@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { registerOpeningBalanceAssignmentRoutesV5 } from "./openingBalanceAssignmentRoutesV5";
-import { registerRawStockBalanceRoutes as registerLegacyRawStockBalanceRoutes } from "./rawStockBalanceRoutesLegacy";
+import { registerRawStockBalanceRoutes as registerLegacyRawStockBalanceRoutes } from "./opening-balance";
 
 /**
  * Register the transaction-safe assignment endpoint first. Express resolves it

@@ -3,7 +3,7 @@ import { registerPayrollCoreRoutes } from "./payroll/core";
 import { registerWorkerStatsAdvancesRoutes } from "./payroll/workerStatsAdvancesRoutes";
 import { registerAdvanceManagementRoutes } from "./payroll/advanceManagementRoutes";
 import { registerAdvanceAccountingRoutes } from "./payroll/advance-accounting";
-import { registerWorkerStatementRoutes } from "./payroll/workerStatementRoutes";
+import { registerWorkerStatementRoutes } from "./payroll/worker-statement";
 
 export function registerFactoryWorkerPayrollRoutes(app: Express) {
   registerPayrollCoreRoutes(app);

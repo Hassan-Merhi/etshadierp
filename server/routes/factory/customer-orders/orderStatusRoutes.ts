@@ -1,6 +1,6 @@
 import type { Express } from "express";
-import { registerOrderFinalizeLoadingRoutes } from "./orderFinalizeLoadingRoutes";
-import { registerOrderVerifyRecoverRoutes } from "./orderVerifyRecoverRoutes";
+import { registerOrderFinalizeLoadingRoutes } from "./finalize-loading";
+import { registerOrderVerifyRecoverRoutes } from "./verify-recover";
 
 export function registerOrderStatusRoutes(app: Express) {
   registerOrderFinalizeLoadingRoutes(app);

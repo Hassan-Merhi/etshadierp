@@ -23,7 +23,7 @@ const UNAUDITED = [
   "server/routes/inventoryRoutes.ts",
   // Imports logAudit but never calls it - the import is the only trace of the
   // intent, so it is asserted here to stop the module drifting further away.
-  "server/routes/containers/containerOffloadRoutes.ts",
+  "server/routes/containers/offload",
 ];
 
 describe("Phase 8C domain audit coverage", () => {
