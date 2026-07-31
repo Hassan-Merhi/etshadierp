@@ -86,9 +86,9 @@ commands:
           name: Verify disposable database schema
           command: node scripts/verify-ci-disposable-schema.mjs
 
-  run_backend_range:
+  run_backend_prefix:
     parameters:
-      range:
+      prefix:
         type: string
       label:
         type: string
@@ -98,7 +98,16 @@ commands:
       - prepare_postgres_schema
       - run:
           name: Backend tests << parameters.label >>
-          command: node node_modules/vitest/vitest.mjs run tests/[<< parameters.range >>]*.test.ts --maxWorkers=1 --no-file-parallelism
+          command: |
+            shopt -s nullglob
+            files=(tests/<< parameters.prefix >>*.test.ts)
+            if [ "${#files[@]}" -eq 0 ]; then
+              echo "No tests match << parameters.prefix >>"
+              exit 0
+            fi
+            printf 'Running %s test file(s):\n' "${#files[@]}"
+            printf ' - %s\n' "${files[@]}"
+            node node_modules/vitest/vitest.mjs run "${files[@]}" --maxWorkers=1 --no-file-parallelism
 
 jobs:
   static-build:
@@ -164,7 +173,7 @@ jobs:
     executor: node22-postgres
     steps:
       - install_dependencies
-      - wait_for_postgres
+      - wait_for-postgres
       - prepare_postgres_schema
       - run:
           name: Full backend tests
@@ -178,33 +187,47 @@ jobs:
           name: Full frontend tests
           command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
 
-  backend-a-f:
+  backend-a:
     executor: node22-postgres
     steps:
-      - run_backend_range:
-          range: "a-f"
-          label: A-F
+      - run_backend_prefix:
+          prefix: "a"
+          label: A
 
-  backend-g-l:
+  backend-b:
     executor: node22-postgres
     steps:
-      - run_backend_range:
-          range: "g-l"
-          label: G-L
+      - run_backend_prefix:
+          prefix: "b"
+          label: B
 
-  backend-m-r:
+  backend-c:
     executor: node22-postgres
     steps:
-      - run_backend_range:
-          range: "m-r"
-          label: M-R
+      - run_backend_prefix:
+          prefix: "c"
+          label: C
 
-  backend-s-z:
+  backend-d:
     executor: node22-postgres
     steps:
-      - run_backend_range:
-          range: "s-z"
-          label: S-Z
+      - run_backend_prefix:
+          prefix: "d"
+          label: D
+
+  backend-e:
+    executor: node22-postgres
+    steps:
+      - run_backend_prefix:
+          prefix: "e"
+          label: E
+
+  backend-f:
+    executor: node22-postgres
+    steps:
+      - run_backend_prefix:
+          prefix: "f"
+          label: F
 
   postgres-phase3-backend:
     executor: node22-postgres
@@ -262,10 +285,12 @@ workflows:
       - postgres-regression
       - full-backend
       - full-frontend
-      - backend-a-f
-      - backend-g-l
-      - backend-m-r
-      - backend-s-z
+      - backend-a
+      - backend-b
+      - backend-c
+      - backend-d
+      - backend-e
+      - backend-f
       - postgres-phase3-backend
       - phase3-frontend
       - architecture-guards
