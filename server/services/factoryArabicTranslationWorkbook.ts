@@ -40,6 +40,9 @@ export interface TranslationPreviewRow extends TranslationWorkbookRow {
   categoryId?: number | null;
   status: TranslationPreviewStatus;
   reasons: string[];
+  currentProductNameAr: string | null;
+  currentCategoryNameAr: string | null;
+  currentDescriptionAr: string | null;
   targetProductNameAr: string | null;
   targetCategoryNameAr: string | null;
   targetDescriptionAr: string | null;
@@ -101,18 +104,28 @@ function cellText(cell: ExcelJS.Cell): string {
   const objectValue = value as Record<string, unknown>;
   if (Array.isArray(objectValue.richText)) {
     return objectValue.richText
-      .map((part) => (typeof part === "object" && part ? clean((part as Record<string, unknown>).text) : ""))
+      .map((part) =>
+        typeof part === "object" && part
+          ? clean((part as Record<string, unknown>).text)
+          : ""
+      )
       .join("")
       .trim();
   }
-  if (objectValue.result !== undefined && objectValue.result !== null) return clean(objectValue.result);
-  if (objectValue.text !== undefined && objectValue.text !== null) return clean(objectValue.text);
+  if (objectValue.result !== undefined && objectValue.result !== null) {
+    return clean(objectValue.result);
+  }
+  if (objectValue.text !== undefined && objectValue.text !== null) {
+    return clean(objectValue.text);
+  }
   return "";
 }
 
 function translationStatus(product: TranslationCatalogProduct): string {
   if (!clean(product.nameAr)) return "Missing Arabic Product Name";
-  if (product.categoryId && !clean(product.categoryNameAr)) return "Missing Arabic Category";
+  if (product.categoryId && !clean(product.categoryNameAr)) {
+    return "Missing Arabic Category";
+  }
   return "Complete";
 }
 
@@ -138,7 +151,9 @@ function validateTranslation(value: string, label: string, reasons: string[]): v
 }
 
 function uniqueSorted(values: Iterable<string>): string[] {
-  return [...new Set(values)].filter(Boolean).sort((left, right) => left.localeCompare(right));
+  return [...new Set(values)]
+    .filter(Boolean)
+    .sort((left, right) => left.localeCompare(right));
 }
 
 function previewFingerprintPayload(input: {
@@ -158,6 +173,9 @@ function previewFingerprintPayload(input: {
       productId: row.productId ?? null,
       categoryId: row.categoryId ?? null,
       status: row.status,
+      currentProductNameAr: row.currentProductNameAr,
+      currentCategoryNameAr: row.currentCategoryNameAr,
+      currentDescriptionAr: row.currentDescriptionAr,
       targetProductNameAr: row.targetProductNameAr,
       targetCategoryNameAr: row.targetCategoryNameAr,
       targetDescriptionAr: row.targetDescriptionAr,
@@ -235,11 +253,27 @@ export async function createArabicTranslationTemplate(
     });
     row.getCell(1).numFmt = "@";
     row.getCell(1).value = String(product.articleCode ?? "");
-    row.getCell(3).alignment = { horizontal: "right", readingOrder: "rtl", wrapText: true };
-    row.getCell(5).alignment = { horizontal: "right", readingOrder: "rtl", wrapText: true };
-    row.getCell(6).alignment = { horizontal: "right", readingOrder: "rtl", wrapText: true };
-    for (const column of [1, 2, 4, 7]) row.getCell(column).protection = { locked: true };
-    for (const column of [3, 5, 6]) row.getCell(column).protection = { locked: false };
+    row.getCell(3).alignment = {
+      horizontal: "right",
+      readingOrder: "rtl",
+      wrapText: true,
+    };
+    row.getCell(5).alignment = {
+      horizontal: "right",
+      readingOrder: "rtl",
+      wrapText: true,
+    };
+    row.getCell(6).alignment = {
+      horizontal: "right",
+      readingOrder: "rtl",
+      wrapText: true,
+    };
+    for (const column of [1, 2, 4, 7]) {
+      row.getCell(column).protection = { locked: true };
+    }
+    for (const column of [3, 5, 6]) {
+      row.getCell(column).protection = { locked: false };
+    }
   }
 
   await sheet.protect("factory-arabic-template", {
@@ -334,12 +368,15 @@ export function previewArabicTranslationImport(
     };
     const reasons: string[] = [];
     const matches = row.articleCode ? catalogByCode.get(row.articleCode) ?? [] : [];
-    const duplicateInFile = row.articleCode && (codeCounts.get(row.articleCode) ?? 0) > 1;
+    const duplicateInFile =
+      Boolean(row.articleCode) && (codeCounts.get(row.articleCode) ?? 0) > 1;
 
     if (!row.articleCode) reasons.push("Missing article code");
     if (duplicateInFile) reasons.push("Duplicate article code in workbook");
     if (row.articleCode && matches.length === 0) reasons.push("Unknown article code");
-    if (matches.length > 1) reasons.push("Article code matches multiple products in this company");
+    if (matches.length > 1) {
+      reasons.push("Article code matches multiple products in this company");
+    }
 
     const product = matches.length === 1 ? matches[0] : undefined;
     if (product?.categoryId && conflictingCategoryIds.has(product.categoryId)) {
@@ -352,6 +389,9 @@ export function previewArabicTranslationImport(
     validateTranslation(row.categoryNameAr, "Arabic category name", reasons);
     validateTranslation(row.descriptionAr, "Arabic description", reasons);
 
+    const currentProductNameAr = clean(product?.nameAr) || null;
+    const currentCategoryNameAr = clean(product?.categoryNameAr) || null;
+    const currentDescriptionAr = clean(product?.descriptionAr) || null;
     const targetProductNameAr = product
       ? selectedValue(product.nameAr, row.productNameAr, mode)
       : null;
@@ -362,13 +402,10 @@ export function previewArabicTranslationImport(
       ? selectedValue(product.descriptionAr, row.descriptionAr, mode)
       : null;
     const changes = {
-      productNameAr:
-        Boolean(product) && targetProductNameAr !== (clean(product?.nameAr) || null),
+      productNameAr: Boolean(product) && targetProductNameAr !== currentProductNameAr,
       categoryNameAr:
-        Boolean(product?.categoryId) &&
-        targetCategoryNameAr !== (clean(product?.categoryNameAr) || null),
-      descriptionAr:
-        Boolean(product) && targetDescriptionAr !== (clean(product?.descriptionAr) || null),
+        Boolean(product?.categoryId) && targetCategoryNameAr !== currentCategoryNameAr,
+      descriptionAr: Boolean(product) && targetDescriptionAr !== currentDescriptionAr,
     };
 
     let status: TranslationPreviewStatus;
@@ -390,6 +427,9 @@ export function previewArabicTranslationImport(
       categoryId: product?.categoryId,
       status,
       reasons,
+      currentProductNameAr,
+      currentCategoryNameAr,
+      currentDescriptionAr,
       targetProductNameAr,
       targetCategoryNameAr,
       targetDescriptionAr,
