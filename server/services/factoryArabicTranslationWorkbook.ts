@@ -1,7 +1,11 @@
+import { createHash } from "node:crypto";
 import ExcelJS from "exceljs";
-import { normalizeFactoryArticleCode } from "@shared/factoryBilingualContract";
+import {
+  normalizeFactoryArticleCode,
+  type FactoryArabicImportMode,
+} from "@shared/factoryBilingualContract";
 
-export type TranslationImportMode = "fill-missing" | "replace";
+export type TranslationImportMode = FactoryArabicImportMode;
 
 export interface TranslationCatalogProduct {
   id: number;
@@ -22,28 +26,53 @@ export interface TranslationWorkbookRow {
   descriptionAr: string;
 }
 
+export type TranslationPreviewStatus =
+  | "update"
+  | "unchanged"
+  | "unknown"
+  | "duplicate"
+  | "invalid"
+  | "category-conflict"
+  | "ambiguous";
+
 export interface TranslationPreviewRow extends TranslationWorkbookRow {
   productId?: number;
   categoryId?: number | null;
-  status: "update" | "unchanged" | "unknown" | "duplicate" | "invalid" | "category-conflict";
+  status: TranslationPreviewStatus;
   reasons: string[];
+  targetProductNameAr: string | null;
+  targetCategoryNameAr: string | null;
+  targetDescriptionAr: string | null;
+  changes: {
+    productNameAr: boolean;
+    categoryNameAr: boolean;
+    descriptionAr: boolean;
+  };
 }
 
 export interface TranslationPreview {
   totalRows: number;
   matchedProducts: number;
   unchangedRows: number;
+  rowsToApply: number;
   productsToUpdate: number;
   categoriesToUpdate: number;
   unknownArticleCodes: string[];
   duplicateArticleCodes: string[];
+  ambiguousArticleCodes: string[];
   blankOrInvalidArabicNames: number;
   categoryConflicts: number;
   blocked: boolean;
   rows: TranslationPreviewRow[];
 }
 
-const HEADERS = [
+export interface TranslationPreviewEnvelope extends TranslationPreview {
+  mode: TranslationImportMode;
+  workbookSha256: string;
+  previewToken: string;
+}
+
+export const ARABIC_TRANSLATION_TEMPLATE_HEADERS = [
   "Article Code / Barcode",
   "English Product Name",
   "Arabic Product Name",
@@ -53,26 +82,147 @@ const HEADERS = [
   "Current Translation Status",
 ] as const;
 
-function text(value: unknown): string {
+const MAX_WORKBOOK_ROWS = 50_000;
+const MAX_TRANSLATION_LENGTH = 2_000;
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
+
+function clean(value: unknown): string {
   if (value === null || value === undefined) return "";
-  if (typeof value === "object" && value && "text" in value) return String((value as any).text ?? "").trim();
   return String(value).trim();
 }
 
-export async function createArabicTranslationTemplate(products: TranslationCatalogProduct[]): Promise<Buffer> {
+function cellText(cell: ExcelJS.Cell): string {
+  const value = cell.value;
+  if (value === null || value === undefined) return "";
+  if (["string", "number", "boolean"].includes(typeof value)) return clean(value);
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value !== "object") return clean(value);
+
+  const objectValue = value as Record<string, unknown>;
+  if (Array.isArray(objectValue.richText)) {
+    return objectValue.richText
+      .map((part) => (typeof part === "object" && part ? clean((part as Record<string, unknown>).text) : ""))
+      .join("")
+      .trim();
+  }
+  if (objectValue.result !== undefined && objectValue.result !== null) return clean(objectValue.result);
+  if (objectValue.text !== undefined && objectValue.text !== null) return clean(objectValue.text);
+  return "";
+}
+
+function translationStatus(product: TranslationCatalogProduct): string {
+  if (!clean(product.nameAr)) return "Missing Arabic Product Name";
+  if (product.categoryId && !clean(product.categoryNameAr)) return "Missing Arabic Category";
+  return "Complete";
+}
+
+function selectedValue(
+  currentValue: string | null,
+  workbookValue: string,
+  mode: TranslationImportMode
+): string | null {
+  const current = clean(currentValue);
+  const supplied = clean(workbookValue);
+  if (mode === "fill-missing") return current || supplied || null;
+  return supplied || current || null;
+}
+
+function validateTranslation(value: string, label: string, reasons: string[]): void {
+  if (!value) return;
+  if (value.length > MAX_TRANSLATION_LENGTH) {
+    reasons.push(`${label} exceeds ${MAX_TRANSLATION_LENGTH} characters`);
+  }
+  if (CONTROL_CHARACTER_PATTERN.test(value)) {
+    reasons.push(`${label} contains unsupported control characters`);
+  }
+}
+
+function uniqueSorted(values: Iterable<string>): string[] {
+  return [...new Set(values)].filter(Boolean).sort((left, right) => left.localeCompare(right));
+}
+
+function previewFingerprintPayload(input: {
+  companyId: number;
+  mode: TranslationImportMode;
+  workbookSha256: string;
+  preview: TranslationPreview;
+}) {
+  return {
+    companyId: input.companyId,
+    mode: input.mode,
+    workbookSha256: input.workbookSha256,
+    blocked: input.preview.blocked,
+    rows: input.preview.rows.map((row) => ({
+      rowNumber: row.rowNumber,
+      articleCode: row.articleCode,
+      productId: row.productId ?? null,
+      categoryId: row.categoryId ?? null,
+      status: row.status,
+      targetProductNameAr: row.targetProductNameAr,
+      targetCategoryNameAr: row.targetCategoryNameAr,
+      targetDescriptionAr: row.targetDescriptionAr,
+      changes: row.changes,
+      reasons: row.reasons,
+    })),
+  };
+}
+
+export function createWorkbookSha256(buffer: Buffer): string {
+  return createHash("sha256").update(buffer).digest("hex");
+}
+
+export function createArabicTranslationPreviewToken(input: {
+  companyId: number;
+  mode: TranslationImportMode;
+  workbookSha256: string;
+  preview: TranslationPreview;
+}): string {
+  return createHash("sha256")
+    .update(JSON.stringify(previewFingerprintPayload(input)))
+    .digest("hex");
+}
+
+export function createArabicTranslationPreviewEnvelope(input: {
+  companyId: number;
+  mode: TranslationImportMode;
+  workbookSha256: string;
+  preview: TranslationPreview;
+}): TranslationPreviewEnvelope {
+  return {
+    ...input.preview,
+    mode: input.mode,
+    workbookSha256: input.workbookSha256,
+    previewToken: createArabicTranslationPreviewToken(input),
+  };
+}
+
+export async function createArabicTranslationTemplate(
+  products: TranslationCatalogProduct[]
+): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet("Arabic Names");
+  workbook.creator = "HMD ERP";
+  workbook.created = new Date();
+  const sheet = workbook.addWorksheet("Arabic Names", {
+    views: [{ state: "frozen", ySplit: 1 }],
+  });
+
   sheet.columns = [
-    { header: HEADERS[0], key: "articleCode", width: 24 },
-    { header: HEADERS[1], key: "name", width: 36 },
-    { header: HEADERS[2], key: "nameAr", width: 36 },
-    { header: HEADERS[3], key: "categoryName", width: 28 },
-    { header: HEADERS[4], key: "categoryNameAr", width: 28 },
-    { header: HEADERS[5], key: "descriptionAr", width: 42 },
-    { header: HEADERS[6], key: "status", width: 24 },
+    { header: ARABIC_TRANSLATION_TEMPLATE_HEADERS[0], key: "articleCode", width: 24 },
+    { header: ARABIC_TRANSLATION_TEMPLATE_HEADERS[1], key: "name", width: 36 },
+    { header: ARABIC_TRANSLATION_TEMPLATE_HEADERS[2], key: "nameAr", width: 36 },
+    { header: ARABIC_TRANSLATION_TEMPLATE_HEADERS[3], key: "categoryName", width: 28 },
+    { header: ARABIC_TRANSLATION_TEMPLATE_HEADERS[4], key: "categoryNameAr", width: 28 },
+    { header: ARABIC_TRANSLATION_TEMPLATE_HEADERS[5], key: "descriptionAr", width: 42 },
+    { header: ARABIC_TRANSLATION_TEMPLATE_HEADERS[6], key: "status", width: 30 },
   ];
-  sheet.views = [{ state: "frozen", ySplit: 1 }];
+  sheet.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: 1, column: ARABIC_TRANSLATION_TEMPLATE_HEADERS.length },
+  };
   sheet.getRow(1).font = { bold: true };
+  sheet.getRow(1).alignment = { vertical: "middle", wrapText: true };
+  sheet.getRow(1).height = 32;
+
   for (const product of products) {
     const row = sheet.addRow({
       articleCode: product.articleCode ?? "",
@@ -81,34 +231,55 @@ export async function createArabicTranslationTemplate(products: TranslationCatal
       categoryName: product.categoryName ?? "",
       categoryNameAr: product.categoryNameAr ?? "",
       descriptionAr: product.descriptionAr ?? "",
-      status: product.nameAr && (!product.categoryId || product.categoryNameAr) ? "Complete" : "Missing Arabic",
+      status: translationStatus(product),
     });
     row.getCell(1).numFmt = "@";
     row.getCell(1).value = String(product.articleCode ?? "");
+    row.getCell(3).alignment = { horizontal: "right", readingOrder: "rtl", wrapText: true };
+    row.getCell(5).alignment = { horizontal: "right", readingOrder: "rtl", wrapText: true };
+    row.getCell(6).alignment = { horizontal: "right", readingOrder: "rtl", wrapText: true };
     for (const column of [1, 2, 4, 7]) row.getCell(column).protection = { locked: true };
     for (const column of [3, 5, 6]) row.getCell(column).protection = { locked: false };
   }
-  await sheet.protect("factory-arabic-template", { selectLockedCells: true, selectUnlockedCells: true });
-  const data = await workbook.xlsx.writeBuffer();
-  return Buffer.from(data);
+
+  await sheet.protect("factory-arabic-template", {
+    selectLockedCells: true,
+    selectUnlockedCells: true,
+    autoFilter: true,
+    sort: true,
+  });
+  return Buffer.from(await workbook.xlsx.writeBuffer());
 }
 
-export async function parseArabicTranslationWorkbook(buffer: Buffer): Promise<TranslationWorkbookRow[]> {
+export async function parseArabicTranslationWorkbook(
+  buffer: Buffer
+): Promise<TranslationWorkbookRow[]> {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer as any);
   const sheet = workbook.worksheets[0];
   if (!sheet) throw new Error("Workbook does not contain a worksheet");
-  const actualHeaders = HEADERS.map((_, index) => text(sheet.getRow(1).getCell(index + 1).value));
-  if (actualHeaders.some((value, index) => value !== HEADERS[index])) {
+  if (sheet.actualRowCount > MAX_WORKBOOK_ROWS + 1) {
+    throw new Error(`Workbook exceeds the ${MAX_WORKBOOK_ROWS.toLocaleString()} row limit`);
+  }
+
+  const actualHeaders = ARABIC_TRANSLATION_TEMPLATE_HEADERS.map((_, index) =>
+    cellText(sheet.getRow(1).getCell(index + 1))
+  );
+  if (
+    actualHeaders.some(
+      (value, index) => value !== ARABIC_TRANSLATION_TEMPLATE_HEADERS[index]
+    )
+  ) {
     throw new Error("Workbook columns do not match the Arabic translation template");
   }
+
   const rows: TranslationWorkbookRow[] = [];
   sheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) return;
-    const articleCode = normalizeFactoryArticleCode(text(row.getCell(1).value));
-    const productNameAr = text(row.getCell(3).value);
-    const categoryNameAr = text(row.getCell(5).value);
-    const descriptionAr = text(row.getCell(6).value);
+    const articleCode = normalizeFactoryArticleCode(cellText(row.getCell(1)));
+    const productNameAr = cellText(row.getCell(3));
+    const categoryNameAr = cellText(row.getCell(5));
+    const descriptionAr = cellText(row.getCell(6));
     if (!articleCode && !productNameAr && !categoryNameAr && !descriptionAr) return;
     rows.push({ rowNumber, articleCode, productNameAr, categoryNameAr, descriptionAr });
   });
@@ -120,53 +291,152 @@ export function previewArabicTranslationImport(
   products: TranslationCatalogProduct[],
   mode: TranslationImportMode
 ): TranslationPreview {
-  const productByCode = new Map(products.map((product) => [normalizeFactoryArticleCode(product.articleCode), product]));
-  const codeCounts = new Map<string, number>();
-  for (const row of rows) codeCounts.set(row.articleCode, (codeCounts.get(row.articleCode) ?? 0) + 1);
-  const categoryTranslations = new Map<number, Set<string>>();
-  for (const row of rows) {
-    const product = productByCode.get(row.articleCode);
-    if (product?.categoryId && row.categoryNameAr) {
-      const values = categoryTranslations.get(product.categoryId) ?? new Set<string>();
-      values.add(row.categoryNameAr);
-      categoryTranslations.set(product.categoryId, values);
-    }
+  const catalogByCode = new Map<string, TranslationCatalogProduct[]>();
+  for (const product of products) {
+    const code = normalizeFactoryArticleCode(product.articleCode);
+    if (!code) continue;
+    const matching = catalogByCode.get(code) ?? [];
+    matching.push(product);
+    catalogByCode.set(code, matching);
   }
-  const conflictingCategoryIds = new Set([...categoryTranslations].filter(([, values]) => values.size > 1).map(([id]) => id));
-  const previewRows: TranslationPreviewRow[] = rows.map((row) => {
+
+  const codeCounts = new Map<string, number>();
+  for (const row of rows) {
+    if (!row.articleCode) continue;
+    codeCounts.set(row.articleCode, (codeCounts.get(row.articleCode) ?? 0) + 1);
+  }
+
+  const categoryTargets = new Map<number, Set<string>>();
+  for (const row of rows) {
+    const matches = catalogByCode.get(row.articleCode) ?? [];
+    if (matches.length !== 1) continue;
+    const product = matches[0];
+    if (!product.categoryId) continue;
+    const target = selectedValue(product.categoryNameAr, row.categoryNameAr, mode);
+    if (!target) continue;
+    const targets = categoryTargets.get(product.categoryId) ?? new Set<string>();
+    targets.add(target);
+    categoryTargets.set(product.categoryId, targets);
+  }
+  const conflictingCategoryIds = new Set(
+    [...categoryTargets]
+      .filter(([, targets]) => targets.size > 1)
+      .map(([categoryId]) => categoryId)
+  );
+
+  const previewRows: TranslationPreviewRow[] = rows.map((sourceRow) => {
+    const row = {
+      ...sourceRow,
+      articleCode: normalizeFactoryArticleCode(sourceRow.articleCode),
+      productNameAr: clean(sourceRow.productNameAr),
+      categoryNameAr: clean(sourceRow.categoryNameAr),
+      descriptionAr: clean(sourceRow.descriptionAr),
+    };
     const reasons: string[] = [];
-    const product = productByCode.get(row.articleCode);
+    const matches = row.articleCode ? catalogByCode.get(row.articleCode) ?? [] : [];
+    const duplicateInFile = row.articleCode && (codeCounts.get(row.articleCode) ?? 0) > 1;
+
     if (!row.articleCode) reasons.push("Missing article code");
-    if ((codeCounts.get(row.articleCode) ?? 0) > 1) reasons.push("Duplicate article code in workbook");
-    if (!product) reasons.push("Unknown article code");
-    if (product?.categoryId && conflictingCategoryIds.has(product.categoryId)) reasons.push("Conflicting Arabic category translations");
-    if (!row.productNameAr && !row.categoryNameAr && !row.descriptionAr) reasons.push("No Arabic translation supplied");
-    let status: TranslationPreviewRow["status"] = "update";
-    if (reasons.includes("Duplicate article code in workbook")) status = "duplicate";
-    else if (reasons.includes("Unknown article code")) status = "unknown";
-    else if (reasons.includes("Conflicting Arabic category translations")) status = "category-conflict";
-    else if (reasons.length) status = "invalid";
-    else if (product) {
-      const productName = mode === "fill-missing" && product.nameAr ? product.nameAr : row.productNameAr || product.nameAr || "";
-      const description = mode === "fill-missing" && product.descriptionAr ? product.descriptionAr : row.descriptionAr || product.descriptionAr || "";
-      const categoryName = mode === "fill-missing" && product.categoryNameAr ? product.categoryNameAr : row.categoryNameAr || product.categoryNameAr || "";
-      if (productName === (product.nameAr ?? "") && description === (product.descriptionAr ?? "") && categoryName === (product.categoryNameAr ?? "")) status = "unchanged";
+    if (duplicateInFile) reasons.push("Duplicate article code in workbook");
+    if (row.articleCode && matches.length === 0) reasons.push("Unknown article code");
+    if (matches.length > 1) reasons.push("Article code matches multiple products in this company");
+
+    const product = matches.length === 1 ? matches[0] : undefined;
+    if (product?.categoryId && conflictingCategoryIds.has(product.categoryId)) {
+      reasons.push("Conflicting Arabic category translations");
     }
-    return { ...row, productId: product?.id, categoryId: product?.categoryId, status, reasons };
+    if (!row.productNameAr && !row.categoryNameAr && !row.descriptionAr) {
+      reasons.push("No Arabic translation supplied");
+    }
+    validateTranslation(row.productNameAr, "Arabic product name", reasons);
+    validateTranslation(row.categoryNameAr, "Arabic category name", reasons);
+    validateTranslation(row.descriptionAr, "Arabic description", reasons);
+
+    const targetProductNameAr = product
+      ? selectedValue(product.nameAr, row.productNameAr, mode)
+      : null;
+    const targetCategoryNameAr = product
+      ? selectedValue(product.categoryNameAr, row.categoryNameAr, mode)
+      : null;
+    const targetDescriptionAr = product
+      ? selectedValue(product.descriptionAr, row.descriptionAr, mode)
+      : null;
+    const changes = {
+      productNameAr:
+        Boolean(product) && targetProductNameAr !== (clean(product?.nameAr) || null),
+      categoryNameAr:
+        Boolean(product?.categoryId) &&
+        targetCategoryNameAr !== (clean(product?.categoryNameAr) || null),
+      descriptionAr:
+        Boolean(product) && targetDescriptionAr !== (clean(product?.descriptionAr) || null),
+    };
+
+    let status: TranslationPreviewStatus;
+    if (duplicateInFile) status = "duplicate";
+    else if (matches.length > 1) status = "ambiguous";
+    else if (row.articleCode && matches.length === 0) status = "unknown";
+    else if (product?.categoryId && conflictingCategoryIds.has(product.categoryId)) {
+      status = "category-conflict";
+    } else if (reasons.length > 0) status = "invalid";
+    else if (changes.productNameAr || changes.categoryNameAr || changes.descriptionAr) {
+      status = "update";
+    } else {
+      status = "unchanged";
+    }
+
+    return {
+      ...row,
+      productId: product?.id,
+      categoryId: product?.categoryId,
+      status,
+      reasons,
+      targetProductNameAr,
+      targetCategoryNameAr,
+      targetDescriptionAr,
+      changes,
+    };
   });
+
   const updateRows = previewRows.filter((row) => row.status === "update");
-  const categoryIds = new Set(updateRows.filter((row) => row.categoryId && row.categoryNameAr).map((row) => row.categoryId as number));
-  const duplicateArticleCodes = [...codeCounts].filter(([, count]) => count > 1).map(([code]) => code);
-  const unknownArticleCodes = previewRows.filter((row) => row.status === "unknown").map((row) => row.articleCode);
-  const blocked = duplicateArticleCodes.length > 0 || conflictingCategoryIds.size > 0;
+  const matchedProductIds = new Set(
+    previewRows.flatMap((row) => (row.productId ? [row.productId] : []))
+  );
+  const productIdsToUpdate = new Set(
+    updateRows.flatMap((row) =>
+      row.productId && (row.changes.productNameAr || row.changes.descriptionAr)
+        ? [row.productId]
+        : []
+    )
+  );
+  const categoryIdsToUpdate = new Set(
+    updateRows.flatMap((row) =>
+      row.categoryId && row.changes.categoryNameAr ? [row.categoryId] : []
+    )
+  );
+  const duplicateArticleCodes = uniqueSorted(
+    [...codeCounts].filter(([, count]) => count > 1).map(([code]) => code)
+  );
+  const unknownArticleCodes = uniqueSorted(
+    previewRows.filter((row) => row.status === "unknown").map((row) => row.articleCode)
+  );
+  const ambiguousArticleCodes = uniqueSorted(
+    previewRows.filter((row) => row.status === "ambiguous").map((row) => row.articleCode)
+  );
+  const blocked =
+    duplicateArticleCodes.length > 0 ||
+    conflictingCategoryIds.size > 0 ||
+    ambiguousArticleCodes.length > 0;
+
   return {
     totalRows: rows.length,
-    matchedProducts: previewRows.filter((row) => row.productId).length,
+    matchedProducts: matchedProductIds.size,
     unchangedRows: previewRows.filter((row) => row.status === "unchanged").length,
-    productsToUpdate: updateRows.length,
-    categoriesToUpdate: categoryIds.size,
+    rowsToApply: updateRows.length,
+    productsToUpdate: productIdsToUpdate.size,
+    categoriesToUpdate: categoryIdsToUpdate.size,
     unknownArticleCodes,
     duplicateArticleCodes,
+    ambiguousArticleCodes,
     blankOrInvalidArabicNames: previewRows.filter((row) => row.status === "invalid").length,
     categoryConflicts: conflictingCategoryIds.size,
     blocked,
@@ -174,7 +444,9 @@ export function previewArabicTranslationImport(
   };
 }
 
-export async function createArabicTranslationErrorWorkbook(preview: TranslationPreview): Promise<Buffer> {
+export async function createArabicTranslationErrorWorkbook(
+  preview: TranslationPreview
+): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Rejected Rows");
   sheet.columns = [
@@ -183,12 +455,28 @@ export async function createArabicTranslationErrorWorkbook(preview: TranslationP
     { header: "Arabic Product Name", key: "productNameAr", width: 36 },
     { header: "Arabic Category", key: "categoryNameAr", width: 30 },
     { header: "Arabic Description", key: "descriptionAr", width: 42 },
-    { header: "Reasons", key: "reasons", width: 50 },
+    { header: "Status", key: "status", width: 22 },
+    { header: "Reasons", key: "reasons", width: 60 },
   ];
+  sheet.views = [{ state: "frozen", ySplit: 1, rightToLeft: true }];
   sheet.getRow(1).font = { bold: true };
-  for (const row of preview.rows.filter((item) => !["update", "unchanged"].includes(item.status))) {
-    const excelRow = sheet.addRow({ ...row, reasons: row.reasons.join("; ") });
+  sheet.getRow(1).alignment = { vertical: "middle", wrapText: true };
+
+  for (const row of preview.rows.filter(
+    (item) => !["update", "unchanged"].includes(item.status)
+  )) {
+    const excelRow = sheet.addRow({
+      ...row,
+      reasons: row.reasons.join("; "),
+    });
     excelRow.getCell(2).numFmt = "@";
+    for (const column of [3, 4, 5, 7]) {
+      excelRow.getCell(column).alignment = {
+        horizontal: "right",
+        readingOrder: "rtl",
+        wrapText: true,
+      };
+    }
   }
   return Buffer.from(await workbook.xlsx.writeBuffer());
 }
