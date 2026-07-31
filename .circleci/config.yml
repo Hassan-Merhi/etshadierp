@@ -86,9 +86,9 @@ commands:
           name: Verify disposable database schema
           command: node scripts/verify-ci-disposable-schema.mjs
 
-  run_backend_prefix:
+  run_backend_pattern:
     parameters:
-      prefix:
+      pattern:
         type: string
       label:
         type: string
@@ -98,7 +98,7 @@ commands:
       - prepare_postgres_schema
       - run:
           name: Backend tests << parameters.label >>
-          command: node node_modules/vitest/vitest.mjs run tests/<< parameters.prefix >>*.test.ts --maxWorkers=1 --no-file-parallelism
+          command: node node_modules/vitest/vitest.mjs run "tests/<< parameters.pattern >>.test.ts" --maxWorkers=1 --no-file-parallelism
 
 jobs:
   static-build:
@@ -160,47 +160,33 @@ jobs:
           name: Frontend tests
           command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
 
-  backend-m:
+  backend-r-a-f:
     executor: node22-postgres
     steps:
-      - run_backend_prefix:
-          prefix: "m"
-          label: M
+      - run_backend_pattern:
+          pattern: "r[a-f]*"
+          label: R A-F
 
-  backend-n:
+  backend-r-g-l:
     executor: node22-postgres
     steps:
-      - run_backend_prefix:
-          prefix: "n"
-          label: N
+      - run_backend_pattern:
+          pattern: "r[g-l]*"
+          label: R G-L
 
-  backend-o:
+  backend-r-m-r:
     executor: node22-postgres
     steps:
-      - run_backend_prefix:
-          prefix: "o"
-          label: O
+      - run_backend_pattern:
+          pattern: "r[m-r]*"
+          label: R M-R
 
-  backend-p:
+  backend-r-s-z:
     executor: node22-postgres
     steps:
-      - run_backend_prefix:
-          prefix: "p"
-          label: P
-
-  backend-q:
-    executor: node22-postgres
-    steps:
-      - run_backend_prefix:
-          prefix: "q"
-          label: Q
-
-  backend-r:
-    executor: node22-postgres
-    steps:
-      - run_backend_prefix:
-          prefix: "r"
-          label: R
+      - run_backend_pattern:
+          pattern: "r[s-z]*"
+          label: R S-Z
 
   postgres-phase3-backend:
     executor: node22-postgres
@@ -256,12 +242,10 @@ workflows:
     jobs:
       - static-build
       - postgres-regression
-      - backend-m
-      - backend-n
-      - backend-o
-      - backend-p
-      - backend-q
-      - backend-r
+      - backend-r-a-f
+      - backend-r-g-l
+      - backend-r-m-r
+      - backend-r-s-z
       - postgres-phase3-backend
       - phase3-frontend
       - architecture-guards
