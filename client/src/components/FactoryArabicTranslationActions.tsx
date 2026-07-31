@@ -52,14 +52,19 @@ interface TranslationPreview {
   blankOrInvalidArabicNames: number;
   categoryConflicts: number;
   blocked: boolean;
-  mode: FactoryArabicImportMode;
-  workbookSha256: string;
   previewToken: string;
   rows: TranslationPreviewRow[];
 }
 
 interface FactoryArabicTranslationActionsProps {
   className?: string;
+}
+
+async function permissionProbe(path: string): Promise<boolean> {
+  const response = await fetch(path, { credentials: "include", cache: "no-store" });
+  if (response.status === 401 || response.status === 403) return false;
+  if (!response.ok) throw new Error("Permission check failed");
+  return true;
 }
 
 async function downloadResponse(response: Response, fallbackName: string): Promise<void> {
@@ -121,8 +126,20 @@ export function FactoryArabicTranslationActions({
   const [preview, setPreview] = useState<TranslationPreview | null>(null);
   const [exporting, setExporting] = useState(false);
 
-  const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
-  const isAdmin = ["Admin", "Owner", "Developer"].includes(currentUser?.role || "");
+  const { data: canImport = false } = useQuery({
+    queryKey: ["/api/factory/bale-products/arabic-import/capabilities/import"],
+    queryFn: () =>
+      permissionProbe("/api/factory/bale-products/arabic-import/capabilities/import"),
+    retry: false,
+    staleTime: 60_000,
+  });
+  const { data: canExport = false } = useQuery({
+    queryKey: ["/api/factory/bale-products/arabic-import/capabilities/export"],
+    queryFn: () =>
+      permissionProbe("/api/factory/bale-products/arabic-import/capabilities/export"),
+    retry: false,
+    staleTime: 60_000,
+  });
 
   const resetSelection = () => {
     setFile(null);
@@ -144,11 +161,7 @@ export function FactoryArabicTranslationActions({
     },
     onSuccess: setPreview,
     onError: (error: Error) =>
-      toast({
-        title: "Preview failed",
-        description: error.message,
-        variant: "destructive",
-      }),
+      toast({ title: "Preview failed", description: error.message, variant: "destructive" }),
   });
 
   const applyMutation = useMutation({
@@ -202,11 +215,7 @@ export function FactoryArabicTranslationActions({
       resetSelection();
     },
     onError: (error: Error) =>
-      toast({
-        title: "Import failed",
-        description: error.message,
-        variant: "destructive",
-      }),
+      toast({ title: "Import failed", description: error.message, variant: "destructive" }),
   });
 
   const exportTemplate = async () => {
@@ -250,7 +259,7 @@ export function FactoryArabicTranslationActions({
     }
   };
 
-  if (!isAdmin) return null;
+  if (!canImport && !canExport) return null;
 
   const rejectedRows = preview?.rows.filter(
     (row) => !["update", "unchanged"].includes(row.status)
@@ -259,24 +268,28 @@ export function FactoryArabicTranslationActions({
   return (
     <>
       <div className={`flex flex-wrap gap-2 ${className || ""}`} data-testid="factory-arabic-actions">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={exportTemplate}
-          disabled={exporting}
-          data-testid="button-export-arabic-template"
-        >
-          <Download className="mr-2 h-4 w-4" />
-          {exporting ? "Exporting…" : "Export Arabic Names Template"}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setOpen(true)}
-          data-testid="button-import-arabic-names"
-        >
-          <Upload className="mr-2 h-4 w-4" /> Import Arabic Names
-        </Button>
+        {canExport && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportTemplate}
+            disabled={exporting}
+            data-testid="button-export-arabic-template"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            {exporting ? "Exporting…" : "Export Arabic Names Template"}
+          </Button>
+        )}
+        {canImport && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setOpen(true)}
+            data-testid="button-import-arabic-names"
+          >
+            <Upload className="mr-2 h-4 w-4" /> Import Arabic Names
+          </Button>
+        )}
       </div>
 
       <Dialog
@@ -404,7 +417,7 @@ export function FactoryArabicTranslationActions({
           </div>
 
           <DialogFooter className="flex-wrap gap-2">
-            {rejectedRows && rejectedRows.length > 0 && (
+            {canExport && rejectedRows && rejectedRows.length > 0 && (
               <Button variant="outline" onClick={downloadErrors}>
                 <FileSpreadsheet className="mr-2 h-4 w-4" /> Download error workbook
               </Button>
