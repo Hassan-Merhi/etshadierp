@@ -4,7 +4,7 @@ import { companies, userCompanyRoles } from "@shared/schema";
 import { registerFactoryStockRoutes } from "./factory/stock";
 import { registerFactorySuppliersRoutes } from "./factory/factorySuppliersRoutes";
 import { registerFactoryProductsRoutes } from "./factory/products";
-import { registerFactoryContainersRoutes } from "./factory/factoryContainersRoutes";
+import { registerFactoryContainersRoutes } from "./factory/containers";
 import { registerFactoryBalesRoutes } from "./factory/bales";
 import { registerFactoryCustomersRoutes } from "./factory/factoryCustomersRoutes";
 import { registerFactoryContainerReadAccessRoutes } from "./factory/factoryContainerReadAccessRoutes";

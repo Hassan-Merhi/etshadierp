@@ -121,7 +121,7 @@ import path from "path";
 import fs from "fs";
 
 import { registerFactoryDaybookRoutes } from "./factoryDaybookRoutes";
-import { registerFactoryCustomerProformaRoutes } from "./factoryCustomerProformaRoutes";
+import { registerFactoryCustomerProformaRoutes } from "./customer-proformas";
 import { registerFactoryCustomerOrderRoutes } from "./factoryCustomerOrderRoutes";
 
 export function registerFactoryCustomersRoutes(app: Express) {

@@ -16,10 +16,10 @@ export default defineConfig({
     // Backend suites share one database and several process-global settings
     // (notably system_settings.parentCompanyId). Running files in parallel lets
     // one suite's fixture company be observed by another, which made results
-    // vary run to run. `singleFork` alone does not serialise files - it is not a
-    // recognised top-level option - so file parallelism is disabled explicitly.
+    // vary run to run. Vitest 4 removed `poolOptions.forks.singleFork`; the
+    // supported equivalent is `fileParallelism: false`, which also pins the
+    // pool to a single worker.
     fileParallelism: false,
-    poolOptions: { forks: { singleFork: true } },
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary"],

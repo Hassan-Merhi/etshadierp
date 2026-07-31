@@ -16,7 +16,7 @@ import { writeDaybookEntry } from "../_helpers";
 import { factoryBaleProducts, factoryPressingBatches, factoryBales, factoryBaleSequences } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { registerFactoryMixBatchRoutes } from "../factoryMixBatchRoutes";
-import { registerFactoryBaleExportRoutes } from "../factoryBaleExportRoutes";
+import { registerFactoryBaleExportRoutes } from "../bale-exports";
 import { registerFactoryFxRatesRoutes } from "../factoryFxRatesRoutes";
 
 export function registerBalesPressingRoutes(app: Express) {
