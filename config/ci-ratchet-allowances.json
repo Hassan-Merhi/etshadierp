@@ -11,7 +11,11 @@
     "POST /api/factory/payrolls/preview-excel [requireAuth > <anonymous>]",
     "GET /api/payroll/worker-deductions [requireAuth > <anonymous>]",
     "POST /api/payroll/workers/:id/deductions [requireAuth > <anonymous>]",
-    "DELETE /api/payroll/workers/:workerId/deductions/:id [requireAuth > <anonymous>]"
+    "DELETE /api/payroll/workers/:workerId/deductions/:id [requireAuth > <anonymous>]",
+    "GET /api/factory/bale-products/arabic-template [requireAuth > <anonymous>]",
+    "POST /api/factory/bale-products/arabic-import/preview [requireAuth > uploadArabicWorkbook > <anonymous>]",
+    "POST /api/factory/bale-products/arabic-import/errors [requireAuth > uploadArabicWorkbook > <anonymous>]",
+    "POST /api/factory/bale-products/arabic-import/apply [requireAuth > uploadArabicWorkbook > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
     "USE /api/factory/containers [postOffloadReconciliationMiddleware]",
