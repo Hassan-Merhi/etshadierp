@@ -61,7 +61,10 @@ interface FactoryArabicTranslationActionsProps {
 }
 
 async function permissionProbe(path: string): Promise<boolean> {
-  const response = await fetch(path, { credentials: "include", cache: "no-store" });
+  const response = await fetch(path, {
+    credentials: "include",
+    cache: "no-store",
+  });
   if (response.status === 401 || response.status === 403) return false;
   if (!response.ok) throw new Error("Permission check failed");
   return true;
@@ -76,7 +79,9 @@ async function downloadResponse(response: Response, fallbackName: string): Promi
   if (blob.size === 0) throw new Error("The server returned an empty workbook");
   const disposition = response.headers.get("content-disposition") || "";
   const match = disposition.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i);
-  const fileName = match ? decodeURIComponent(match[1].replace(/\"/g, "")) : fallbackName;
+  const fileName = match
+    ? decodeURIComponent(match[1].replace(/\"/g, ""))
+    : fallbackName;
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -109,7 +114,9 @@ function CodeList({ label, values }: { label: string; values: string[] }) {
       </p>
       <p className="mt-1 break-words font-mono text-xs">
         {displayed.join(", ")}
-        {values.length > displayed.length ? ` … and ${values.length - displayed.length} more` : ""}
+        {values.length > displayed.length
+          ? ` … and ${values.length - displayed.length} more`
+          : ""}
       </p>
     </div>
   );
@@ -129,14 +136,18 @@ export function FactoryArabicTranslationActions({
   const { data: canImport = false } = useQuery({
     queryKey: ["/api/factory/bale-products/arabic-import/capabilities/import"],
     queryFn: () =>
-      permissionProbe("/api/factory/bale-products/arabic-import/capabilities/import"),
+      permissionProbe(
+        "/api/factory/bale-products/arabic-import/capabilities/import"
+      ),
     retry: false,
     staleTime: 60_000,
   });
   const { data: canExport = false } = useQuery({
     queryKey: ["/api/factory/bale-products/arabic-import/capabilities/export"],
     queryFn: () =>
-      permissionProbe("/api/factory/bale-products/arabic-import/capabilities/export"),
+      permissionProbe(
+        "/api/factory/bale-products/arabic-import/capabilities/export"
+      ),
     retry: false,
     staleTime: 60_000,
   });
@@ -150,36 +161,50 @@ export function FactoryArabicTranslationActions({
   const previewMutation = useMutation({
     mutationFn: async () => {
       if (!file) throw new Error("Choose an .xlsx workbook first");
-      const response = await fetch("/api/factory/bale-products/arabic-import/preview", {
-        method: "POST",
-        credentials: "include",
-        body: createFormData(file, mode),
-      });
+      const response = await fetch(
+        "/api/factory/bale-products/arabic-import/preview",
+        {
+          method: "POST",
+          credentials: "include",
+          body: createFormData(file, mode),
+        }
+      );
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.message || "Preview failed");
       return payload as TranslationPreview;
     },
     onSuccess: setPreview,
     onError: (error: Error) =>
-      toast({ title: "Preview failed", description: error.message, variant: "destructive" }),
+      toast({
+        title: "Preview failed",
+        description: error.message,
+        variant: "destructive",
+      }),
   });
 
   const applyMutation = useMutation({
     mutationFn: async () => {
-      if (!file || !preview) throw new Error("Preview the workbook before applying it");
+      if (!file || !preview) {
+        throw new Error("Preview the workbook before applying it");
+      }
       if (preview.blocked) {
         throw new Error(
           "Resolve duplicate article codes, ambiguous catalog codes, and category conflicts first"
         );
       }
-      const response = await fetch("/api/factory/bale-products/arabic-import/apply", {
-        method: "POST",
-        credentials: "include",
-        body: createFormData(file, mode, preview.previewToken),
-      });
+      const response = await fetch(
+        "/api/factory/bale-products/arabic-import/apply",
+        {
+          method: "POST",
+          credentials: "include",
+          body: createFormData(file, mode, preview.previewToken),
+        }
+      );
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        if (payload.preview?.previewToken) setPreview(payload.preview as TranslationPreview);
+        if (payload.preview?.previewToken) {
+          setPreview(payload.preview as TranslationPreview);
+        }
         throw new Error(payload.message || "Import failed");
       }
       return payload;
@@ -215,7 +240,11 @@ export function FactoryArabicTranslationActions({
       resetSelection();
     },
     onError: (error: Error) =>
-      toast({ title: "Import failed", description: error.message, variant: "destructive" }),
+      toast({
+        title: "Import failed",
+        description: error.message,
+        variant: "destructive",
+      }),
   });
 
   const exportTemplate = async () => {
@@ -267,7 +296,10 @@ export function FactoryArabicTranslationActions({
 
   return (
     <>
-      <div className={`flex flex-wrap gap-2 ${className || ""}`} data-testid="factory-arabic-actions">
+      <div
+        className={`flex flex-wrap gap-2 ${className || ""}`}
+        data-testid="factory-arabic-actions"
+      >
         {canExport && (
           <Button
             variant="outline"
@@ -311,7 +343,9 @@ export function FactoryArabicTranslationActions({
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="factory-arabic-workbook">Arabic translation workbook (.xlsx)</Label>
+              <Label htmlFor="factory-arabic-workbook">
+                Arabic translation workbook (.xlsx)
+              </Label>
               <input
                 ref={inputRef}
                 id="factory-arabic-workbook"
@@ -323,7 +357,8 @@ export function FactoryArabicTranslationActions({
                   if (selected && !selected.name.toLowerCase().endsWith(".xlsx")) {
                     toast({
                       title: "Unsupported file",
-                      description: "Choose the .xlsx template exported from Bale Explorer.",
+                      description:
+                        "Choose the .xlsx template exported from Bale Explorer.",
                       variant: "destructive",
                     });
                     event.target.value = "";
@@ -335,7 +370,11 @@ export function FactoryArabicTranslationActions({
                   setPreview(null);
                 }}
               />
-              {file && <p className="text-xs text-muted-foreground">Selected: {file.name}</p>}
+              {file && (
+                <p className="text-xs text-muted-foreground">
+                  Selected: {file.name}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -351,14 +390,21 @@ export function FactoryArabicTranslationActions({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="fill-missing">Fill missing Arabic names only</SelectItem>
-                  <SelectItem value="replace-existing">Replace existing Arabic names</SelectItem>
+                  <SelectItem value="fill-missing">
+                    Fill missing Arabic names only
+                  </SelectItem>
+                  <SelectItem value="replace-existing">
+                    Replace existing Arabic names
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {preview && (
-              <div className="space-y-3 rounded-md border p-4 text-sm" data-testid="arabic-import-preview">
+              <div
+                className="space-y-3 rounded-md border p-4 text-sm"
+                data-testid="arabic-import-preview"
+              >
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
                   <span>Total rows: {preview.totalRows}</span>
                   <span>Matched products: {preview.matchedProducts}</span>
@@ -370,14 +416,24 @@ export function FactoryArabicTranslationActions({
                   <span>Invalid rows: {preview.blankOrInvalidArabicNames}</span>
                 </div>
 
-                <CodeList label="Unknown article codes" values={preview.unknownArticleCodes} />
-                <CodeList label="Duplicate article codes in workbook" values={preview.duplicateArticleCodes} />
-                <CodeList label="Ambiguous article codes in catalog" values={preview.ambiguousArticleCodes} />
+                <CodeList
+                  label="Unknown article codes"
+                  values={preview.unknownArticleCodes}
+                />
+                <CodeList
+                  label="Duplicate article codes in workbook"
+                  values={preview.duplicateArticleCodes}
+                />
+                <CodeList
+                  label="Ambiguous article codes in catalog"
+                  values={preview.ambiguousArticleCodes}
+                />
 
                 {preview.categoryConflicts > 0 && (
                   <p className="rounded-md border border-destructive/30 bg-destructive/5 p-2 font-medium text-destructive">
-                    {preview.categoryConflicts} categor{preview.categoryConflicts === 1 ? "y has" : "ies have"} conflicting
-                    Arabic translations in this workbook.
+                    {preview.categoryConflicts} categor
+                    {preview.categoryConflicts === 1 ? "y has" : "ies have"} conflicting Arabic
+                    translations in this workbook.
                   </p>
                 )}
 
@@ -401,9 +457,14 @@ export function FactoryArabicTranslationActions({
                       </thead>
                       <tbody>
                         {rejectedRows.slice(0, 50).map((row) => (
-                          <tr key={`${row.rowNumber}-${row.articleCode}`} className="border-b last:border-0">
+                          <tr
+                            key={`${row.rowNumber}-${row.articleCode}`}
+                            className="border-b last:border-0"
+                          >
                             <td className="p-2">{row.rowNumber}</td>
-                            <td className="p-2 font-mono">{row.articleCode || "—"}</td>
+                            <td className="p-2 font-mono">
+                              {row.articleCode || "—"}
+                            </td>
                             <td className="p-2">{row.status}</td>
                             <td className="p-2">{row.reasons.join("; ")}</td>
                           </tr>
@@ -431,7 +492,12 @@ export function FactoryArabicTranslationActions({
               {previewMutation.isPending ? "Previewing…" : "Preview"}
             </Button>
             <Button
-              disabled={!preview || preview.blocked || applyMutation.isPending || previewMutation.isPending}
+              disabled={
+                !preview ||
+                preview.blocked ||
+                applyMutation.isPending ||
+                previewMutation.isPending
+              }
               onClick={() => applyMutation.mutate()}
               data-testid="button-apply-arabic-import"
             >
