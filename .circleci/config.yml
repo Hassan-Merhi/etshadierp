@@ -86,9 +86,9 @@ commands:
           name: Verify disposable database schema
           command: node scripts/verify-ci-disposable-schema.mjs
 
-  run_backend_pattern:
+  run_backend_range:
     parameters:
-      pattern:
+      range:
         type: string
       label:
         type: string
@@ -98,16 +98,7 @@ commands:
       - prepare_postgres_schema
       - run:
           name: Backend tests << parameters.label >>
-          command: |
-            shopt -s nullglob
-            files=(tests/<< parameters.pattern >>.test.ts)
-            if [ "${#files[@]}" -eq 0 ]; then
-              echo "No tests match << parameters.pattern >>"
-              exit 0
-            fi
-            printf 'Running %s test file(s):\n' "${#files[@]}"
-            printf ' - %s\n' "${files[@]}"
-            node node_modules/vitest/vitest.mjs run "${files[@]}" --maxWorkers=1 --no-file-parallelism
+          command: node node_modules/vitest/vitest.mjs run tests/[<< parameters.range >>]*.test.ts --maxWorkers=1 --no-file-parallelism
 
 jobs:
   static-build:
@@ -169,33 +160,51 @@ jobs:
           name: Frontend tests
           command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
 
-  backend-ro-a-f:
+  full-backend:
     executor: node22-postgres
     steps:
-      - run_backend_pattern:
-          pattern: "ro[a-f]*"
-          label: RO A-F
+      - install_dependencies
+      - wait_for_postgres
+      - prepare_postgres_schema
+      - run:
+          name: Full backend tests
+          command: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
 
-  backend-ro-g-l:
-    executor: node22-postgres
+  full-frontend:
+    executor: node22
     steps:
-      - run_backend_pattern:
-          pattern: "ro[g-l]*"
-          label: RO G-L
+      - install_dependencies
+      - run:
+          name: Full frontend tests
+          command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
 
-  backend-ro-m-r:
+  backend-a-f:
     executor: node22-postgres
     steps:
-      - run_backend_pattern:
-          pattern: "ro[m-r]*"
-          label: RO M-R
+      - run_backend_range:
+          range: "a-f"
+          label: A-F
 
-  backend-ro-s-z:
+  backend-g-l:
     executor: node22-postgres
     steps:
-      - run_backend_pattern:
-          pattern: "ro[s-z]*"
-          label: RO S-Z
+      - run_backend_range:
+          range: "g-l"
+          label: G-L
+
+  backend-m-r:
+    executor: node22-postgres
+    steps:
+      - run_backend_range:
+          range: "m-r"
+          label: M-R
+
+  backend-s-z:
+    executor: node22-postgres
+    steps:
+      - run_backend_range:
+          range: "s-z"
+          label: S-Z
 
   postgres-phase3-backend:
     executor: node22-postgres
@@ -223,7 +232,7 @@ jobs:
       - prepare_postgres_schema
       - run:
           name: Architecture guard tests
-          command: node node_modules/vitest/vitest.mjs run tests/god-file-boundaries.test.ts tests/source-text-assertions.test.ts --maxWorkers=1 --no-file-parallelism
+          command: node node_modules/vitest/vitest.mjs run tests/god-file-boundaries.test.ts tests/source-text-assertions.test.ts tests/route-manifest.test.ts --maxWorkers=1 --no-file-parallelism
 
   security-readiness:
     executor: node22-postgres
@@ -251,10 +260,12 @@ workflows:
     jobs:
       - static-build
       - postgres-regression
-      - backend-ro-a-f
-      - backend-ro-g-l
-      - backend-ro-m-r
-      - backend-ro-s-z
+      - full-backend
+      - full-frontend
+      - backend-a-f
+      - backend-g-l
+      - backend-m-r
+      - backend-s-z
       - postgres-phase3-backend
       - phase3-frontend
       - architecture-guards
