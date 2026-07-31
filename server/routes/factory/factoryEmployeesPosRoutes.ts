@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { registerEmployeeCrudRoutes } from "./employee-pos/employeeCrudRoutes";
+import { registerEmployeeCrudRoutes } from "./employee-pos/employee-crud";
 import { registerEmployeeAdvancesBonusRoutes } from "./employee-pos/employeeAdvancesBonusRoutes";
 import { registerEmployeeLedgerWasteRoutes } from "./employee-pos/employeeLedgerWasteRoutes";
 import { registerEmployeePosFinancialRoutes } from "./employee-pos/employeePosFinancialRoutes";

@@ -4,7 +4,7 @@ import { requireAuth } from "../auth";
 import { getLedgerParentGroupOptions } from "../services/ledgerAccountOptionsService";
 import { registerLedgerAccountPaginationRoutes } from "./ledgerAccountPaginationRoutes";
 import { registerAccountTransactionPaginationRoutes } from "./accountTransactionPaginationRoutes";
-import { registerLedgerRoutes as registerLegacyLedgerRoutes } from "./ledgerRoutesLegacy";
+import { registerLedgerRoutes as registerLegacyLedgerRoutes } from "./ledger";
 import {
   normalizeAccountOpeningBalance,
   registerAccountCurrencyRoutes,

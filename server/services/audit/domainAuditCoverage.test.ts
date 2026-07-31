@@ -13,7 +13,7 @@ import { hasAwaitedAuditWrite, moduleSource } from "./auditCoverageSource";
  * may grow silently.
  */
 const AUDITED = [
-  "server/routes/stock/stockTransferAdjRoutes.ts",
+  "server/routes/stock/transfer-adj",
   "server/routes/containers/containerCrudRoutes.ts",
   "server/routes/containers/containerFreightWriteRoutes.ts",
 ];
