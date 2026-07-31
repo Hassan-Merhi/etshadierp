@@ -121,42 +121,6 @@ jobs:
           path: dist
           destination: production-build
 
-  diagnose-format-source:
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: Diagnose production-source formatting
-          command: |
-            node node_modules/prettier/bin/prettier.cjs --check \
-              server/routes/admin/operationalMonitoringRoutes.ts \
-              server/routes/performance/readMicrocache.ts \
-              server/routes/performance/readMicrocacheCoordinator.ts
-
-  diagnose-format-main-test:
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: Diagnose main cache-test formatting
-          command: node node_modules/prettier/bin/prettier.cjs --check server/routes/performance/readMicrocache.test.ts
-
-  diagnose-format-edge-test:
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: Diagnose edge cache-test formatting
-          command: node node_modules/prettier/bin/prettier.cjs --check server/routes/performance/readMicrocache.edge-cases.test.ts
-
-  diagnose-typescript:
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: Diagnose strict TypeScript
-          command: npm run check
-
   postgres-regression:
     executor: node22-postgres
     steps:
@@ -203,10 +167,6 @@ workflows:
   full-erp-verification:
     jobs:
       - static-build
-      - diagnose-format-source
-      - diagnose-format-main-test
-      - diagnose-format-edge-test
-      - diagnose-typescript
       - postgres-regression
       - security-readiness:
           requires:
