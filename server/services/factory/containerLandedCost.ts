@@ -1,11 +1,11 @@
 /**
  * Shared, authoritative landed-cost computation for a factory container.
  *
- * Business rule: the full material value and every fixed landed charge are
- * allocated across the original agreed quantity
- * (`totalKg || declaredKg || actualReceivedKg`). A partial receipt therefore
- * receives only its proportional value, while the rate/kg remains fixed across
- * the first receipt, later receipts, and final offload.
+ * Business rule: the full material value is based on the original agreed
+ * container quantity (`totalKg || declaredKg`) and all landed charges are added
+ * once. That fixed total value is then divided by the actual received weight,
+ * so a shortage raises cost/kg and an overage lowers cost/kg without changing
+ * the container's total value.
  */
 import Decimal from "decimal.js";
 import {
@@ -79,10 +79,13 @@ export function computeContainerLandedCost(
     };
   }
 
-  // Allocate the full material value and fixed landed charges over the original
-  // agreed container quantity. Partial receipts must keep the same fixed cost/kg
-  // as later receipts and the final offload.
-  const allocationKg = originalCostBasisKg;
+  // Keep the numerator fixed from the agreed container quantity, but divide
+  // that fixed total value by the actual received weight entered at offload.
+  const receivedKg = factoryCostDecimal(
+    container.actualReceivedKg || "0",
+    "container.actualReceivedKg",
+  );
+  const allocationKg = receivedKg.gt(0) ? receivedKg : originalCostBasisKg;
   const dFxRate = factoryCostDecimal(fxRate, "container.fxRateToUsd", { allowZero: false });
   const baseRate = factoryCostDecimal(container.ratePerKg || "0", "container.ratePerKg");
   const basePayable = calculateCostLine(originalCostBasisKg, baseRate).totalCost;

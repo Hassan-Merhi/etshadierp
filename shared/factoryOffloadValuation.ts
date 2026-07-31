@@ -16,13 +16,12 @@ function positiveDecimal(value: string | number | null | undefined): Decimal | n
 }
 
 /**
- * One authoritative quantity basis for initial offload costing.
+ * Authoritative quantity used to calculate the container's fixed material value.
  *
- * The landed rate belongs to the full agreed container quantity. A partial
- * receipt receives only its proportional value, so changing the received
- * quantity must not change the established landed cost/kg. Both the client
- * preview and the server calculation call this helper to prevent denominator
- * drift.
+ * The numerator is based on the agreed container quantity. The actual received
+ * quantity is only a fallback when no agreed quantity exists; it is not the
+ * normal cost-per-kg divisor. Client and server divide the resulting fixed total
+ * value by the actual received weight separately.
  */
 export function resolveFactoryOffloadValuationKg(input: FactoryOffloadValuationInput): number {
   return (
