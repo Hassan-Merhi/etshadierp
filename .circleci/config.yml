@@ -169,47 +169,33 @@ jobs:
           name: Frontend tests
           command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
 
-  backend-rm:
+  backend-ro-a-f:
     executor: node22-postgres
     steps:
       - run_backend_pattern:
-          pattern: "rm*"
-          label: RM
+          pattern: "ro[a-f]*"
+          label: RO A-F
 
-  backend-rn:
+  backend-ro-g-l:
     executor: node22-postgres
     steps:
       - run_backend_pattern:
-          pattern: "rn*"
-          label: RN
+          pattern: "ro[g-l]*"
+          label: RO G-L
 
-  backend-ro:
+  backend-ro-m-r:
     executor: node22-postgres
     steps:
       - run_backend_pattern:
-          pattern: "ro*"
-          label: RO
+          pattern: "ro[m-r]*"
+          label: RO M-R
 
-  backend-rp:
+  backend-ro-s-z:
     executor: node22-postgres
     steps:
       - run_backend_pattern:
-          pattern: "rp*"
-          label: RP
-
-  backend-rq:
-    executor: node22-postgres
-    steps:
-      - run_backend_pattern:
-          pattern: "rq*"
-          label: RQ
-
-  backend-rr:
-    executor: node22-postgres
-    steps:
-      - run_backend_pattern:
-          pattern: "rr*"
-          label: RR
+          pattern: "ro[s-z]*"
+          label: RO S-Z
 
   postgres-phase3-backend:
     executor: node22-postgres
@@ -265,12 +251,10 @@ workflows:
     jobs:
       - static-build
       - postgres-regression
-      - backend-rm
-      - backend-rn
-      - backend-ro
-      - backend-rp
-      - backend-rq
-      - backend-rr
+      - backend-ro-a-f
+      - backend-ro-g-l
+      - backend-ro-m-r
+      - backend-ro-s-z
       - postgres-phase3-backend
       - phase3-frontend
       - architecture-guards
