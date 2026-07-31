@@ -98,7 +98,16 @@ commands:
       - prepare_postgres_schema
       - run:
           name: Backend tests << parameters.label >>
-          command: node node_modules/vitest/vitest.mjs run "tests/<< parameters.pattern >>.test.ts" --maxWorkers=1 --no-file-parallelism
+          command: |
+            shopt -s nullglob
+            files=(tests/<< parameters.pattern >>.test.ts)
+            if [ "${#files[@]}" -eq 0 ]; then
+              echo "No tests match << parameters.pattern >>"
+              exit 0
+            fi
+            printf 'Running %s test file(s):\n' "${#files[@]}"
+            printf ' - %s\n' "${files[@]}"
+            node node_modules/vitest/vitest.mjs run "${files[@]}" --maxWorkers=1 --no-file-parallelism
 
 jobs:
   static-build:
