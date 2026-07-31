@@ -50,17 +50,18 @@ export function startReadMicrocacheCoordinator(onExternalInvalidation: () => voi
   const connect = async () => {
     let client: PoolClient | null = null;
     try {
-      client = await pool.connect();
-      activeClient = client;
+      const connectedClient = await pool.connect();
+      client = connectedClient;
+      activeClient = connectedClient;
 
-      client.on("notification", (notification: Notification) => {
+      connectedClient.on("notification", (notification: Notification) => {
         if (notification.channel !== INVALIDATION_CHANNEL || notification.payload === instanceId) return;
         onExternalInvalidation();
       });
-      client.on("error", (error) => handleDisconnect(client as PoolClient, error));
-      client.on("end", () => handleDisconnect(client as PoolClient));
+      connectedClient.on("error", (error) => handleDisconnect(connectedClient, error));
+      connectedClient.on("end", () => handleDisconnect(connectedClient));
 
-      await client.query(`LISTEN ${INVALIDATION_CHANNEL}`);
+      await connectedClient.query(`LISTEN ${INVALIDATION_CHANNEL}`);
       ready = true;
       logger.info("Read microcache invalidation listener ready", {
         module: "read-microcache",
