@@ -74,6 +74,18 @@ commands:
             echo "PostgreSQL did not become ready."
             exit 1
 
+  prepare_postgres_schema:
+    steps:
+      - run:
+          name: Verify migration registry
+          command: node scripts/verify-migration-registry.mjs --json
+      - run:
+          name: Prepare disposable database schema
+          command: node node_modules/drizzle-kit/bin.cjs push --force
+      - run:
+          name: Verify disposable database schema
+          command: node scripts/verify-ci-disposable-schema.mjs
+
 jobs:
   static-build:
     executor: node22
@@ -126,21 +138,41 @@ jobs:
     steps:
       - install_dependencies
       - wait_for_postgres
-      - run:
-          name: Verify migration registry
-          command: node scripts/verify-migration-registry.mjs --json
-      - run:
-          name: Prepare disposable database schema
-          command: node node_modules/drizzle-kit/bin.cjs push --force
-      - run:
-          name: Verify disposable database schema
-          command: node scripts/verify-ci-disposable-schema.mjs
+      - prepare_postgres_schema
       - run:
           name: Backend tests
           command: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
       - run:
           name: Frontend tests
           command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
+
+  postgres-phase3-backend:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - wait_for_postgres
+      - prepare_postgres_schema
+      - run:
+          name: Phase 3 backend tests
+          command: node node_modules/vitest/vitest.mjs run tests/factory-bilingual-bale-explorer.test.ts --maxWorkers=1 --no-file-parallelism
+
+  phase3-frontend:
+    executor: node22
+    steps:
+      - install_dependencies
+      - run:
+          name: Phase 3 frontend tests
+          command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts tests/ui/factory-bilingual-bale-explorer.test.ts --maxWorkers=1 --no-file-parallelism
+
+  architecture-guards:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - wait_for_postgres
+      - prepare_postgres_schema
+      - run:
+          name: Architecture guard tests
+          command: node node_modules/vitest/vitest.mjs run tests/god-file-boundaries.test.ts tests/source-text-assertions.test.ts --maxWorkers=1 --no-file-parallelism
 
   security-readiness:
     executor: node22-postgres
@@ -168,6 +200,9 @@ workflows:
     jobs:
       - static-build
       - postgres-regression
+      - postgres-phase3-backend
+      - phase3-frontend
+      - architecture-guards
       - security-readiness:
           requires:
             - static-build
