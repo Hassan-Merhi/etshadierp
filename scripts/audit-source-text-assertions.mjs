@@ -27,7 +27,10 @@ import { fileURLToPath } from "node:url";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-const TEST_ROOTS = ["tests"];
+// Co-located tests under server/ and client/ assert on source text too - the
+// stale audit-coverage guards were invisible to this audit precisely because it
+// only looked in tests/.
+const TEST_ROOTS = ["tests", "server", "client", "shared"];
 const TEST_EXTENSIONS = [".test.ts", ".test.tsx"];
 const SOURCE_PATH_PATTERN = /["'`]((?:server|client|shared|scripts)\/[^"'`\s]+\.(?:ts|tsx|mjs|cjs|js|jsx))["'`]/g;
 const CONFIG_PATH_PATTERN = /["'`](config\/[^"'`\s]+\.json)["'`]/g;

@@ -2,9 +2,10 @@
   "description": "Triage baseline for tests that assert on source text. structuralGuardTests intentionally constrain repository shape and survive code motion. sourceCoupledTests pin literal code substrings and will fail when code moves even if behaviour is unchanged, so they must be reviewed before splitting the files they pin. This list is a ratchet: it may shrink, never grow.",
   "regenerate": "UPDATE_SOURCE_TEXT_BASELINE=1 npm run test:backend -- source-text-assertions",
   "classificationCaveat": "Classification is heuristic: a test that reads source files and also asserts substrings on parsed JSON can be reported as source-coupled. The godFileHotspots reverse index below is exact and is the actionable output.",
-  "maxSourceCoupledTests": 61,
-  "maxTotalTextAssertions": 713,
+  "maxSourceCoupledTests": 62,
+  "maxTotalTextAssertions": 715,
   "sourceCoupledTests": [
+    "server/routes/location/commonInventoryPerformanceRoutes.test.ts",
     "tests/auth-route-composition.test.ts",
     "tests/company-access-boundary-contract.test.ts",
     "tests/critical-schema-readiness.test.ts",
@@ -74,20 +75,23 @@
     "tests/factory-historical-replay-phase6-boundary.test.ts",
     "tests/factory-historical-replay-source-priority.test.ts",
     "tests/factory-insurance-company-isolation.test.ts",
+    "tests/god-file-boundaries.test.ts",
     "tests/route-manifest.test.ts",
+    "tests/source-text-assertions.test.ts",
+    "tests/startup-schema-integrity.test.ts",
     "tests/tenant-control-migration-safety.test.ts"
   ],
   "godFileHotspots": [
     {
       "path": "client/src/pages/factory/production-raw-stock/RawStockRecalculate.tsx",
-      "lines": 2479,
+      "lines": 2411,
       "pinnedBy": [
         "tests/factory-historical-replay-typed-confirmation.test.ts"
       ]
     },
     {
       "path": "client/src/pages/factory/FactoryWorkers.tsx",
-      "lines": 2174,
+      "lines": 2098,
       "pinnedBy": [
         "tests/frontend-layout.test.ts"
       ]
@@ -101,7 +105,7 @@
     },
     {
       "path": "client/src/pages/vouchers/JournalForm.tsx",
-      "lines": 1701,
+      "lines": 1626,
       "pinnedBy": [
         "tests/frontend-layout.test.ts"
       ]

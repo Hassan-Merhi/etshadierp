@@ -8,7 +8,10 @@ export default defineConfig({
     testTimeout: 30000,
     hookTimeout: 30000,
     setupFiles: ["./server/supplierCompanyScopeBridge.mjs"],
-    include: ["tests/**/*.test.ts"],
+    // Co-located tests under server/ and shared/ are included too. They existed
+    // from the initial import but no config matched them, so 78 tests never ran
+    // anywhere - including the audit-coverage guards that had silently gone stale.
+    include: ["tests/**/*.test.ts", "server/**/*.test.ts", "shared/**/*.test.ts"],
     // The smoke sweep runs as its own invocation so that "an endpoint stopped
     // responding" is a separate CI signal: npm run test:smoke-sweep
     exclude: ["tests/ui/**", "tests/api-smoke-sweep.test.ts"],
