@@ -415,7 +415,7 @@ export default function AccountMigration() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Account Migration" description="Move one or more ledger accounts with their complete statement history to another company" />
+      <PageHeader title="Account Migration" subtitle="Move one or more ledger accounts with their complete statement history to another company" />
 
       <Card>
         <CardHeader>
