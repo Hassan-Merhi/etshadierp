@@ -82,7 +82,8 @@ export const factoryBaleProducts = pgTable(
       t.companyId,
       t.articleCode
     ),
-    normalizedCompanyArticleCode: index("factory_bale_products_company_article_code_normalized_idx").on(
+    normalizedCompanyArticleCode: index("factory_bale_products_company_article_code_normalized_idx").using(
+      "btree",
       t.companyId,
       sql`upper(btrim(${t.articleCode}))`
     ),
