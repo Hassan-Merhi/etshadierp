@@ -11,16 +11,14 @@ import {
   resolveFactoryProductLanguage,
   type FactoryCatalogLanguage,
 } from "@shared/factoryBilingualContract";
+import { registerFactoryArabicTranslationRoutes } from "./factoryArabicTranslationRoutes";
 
 function getFactoryCompanyId(req: Request): number | null {
   const companyId = Number((req.session as any)?.factoryCompanyId);
   return Number.isSafeInteger(companyId) && companyId > 0 ? companyId : null;
 }
 
-function mapCategory(
-  category: typeof factoryCategories.$inferSelect,
-  language: FactoryCatalogLanguage
-) {
+function mapCategory(category: typeof factoryCategories.$inferSelect, language: FactoryCatalogLanguage) {
   return {
     ...category,
     nameEn: category.name,
@@ -40,10 +38,7 @@ function sendFactoryCompanyAccessError(res: any) {
 async function sendCategories(req: any, res: any, companyId: number) {
   const language = parseFactoryCatalogLanguage(req.query.lang);
   const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
-  const filters = [
-    eq(factoryCategories.companyId, companyId),
-    isNull(factoryCategories.deletedAt),
-  ];
+  const filters = [eq(factoryCategories.companyId, companyId), isNull(factoryCategories.deletedAt)];
   if (query) {
     filters.push(
       or(
@@ -65,10 +60,7 @@ async function sendCategories(req: any, res: any, companyId: number) {
 async function sendProducts(req: any, res: any, companyId: number) {
   const language = parseFactoryCatalogLanguage(req.query.lang);
   const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
-  const filters = [
-    eq(factoryBaleProducts.companyId, companyId),
-    isNull(factoryBaleProducts.deletedAt),
-  ];
+  const filters = [eq(factoryBaleProducts.companyId, companyId), isNull(factoryBaleProducts.deletedAt)];
   if (query) {
     filters.push(
       or(
@@ -101,10 +93,7 @@ async function sendProducts(req: any, res: any, companyId: number) {
 
   return res.json(
     rows.map(({ product, categoryName, categoryNameAr }) => {
-      const resolved = resolveFactoryProductLanguage(
-        { ...product, categoryName, categoryNameAr },
-        language
-      );
+      const resolved = resolveFactoryProductLanguage({ ...product, categoryName, categoryNameAr }, language);
       return {
         ...product,
         nameEn: product.name,
@@ -139,14 +128,16 @@ async function sendProductDetail(req: any, res: any, companyId: number, id: numb
         isNull(factoryCategories.deletedAt)
       )
     )
-    .where(
-      and(eq(factoryBaleProducts.id, id), eq(factoryBaleProducts.companyId, companyId))
-    )
+    .where(and(eq(factoryBaleProducts.id, id), eq(factoryBaleProducts.companyId, companyId)))
     .limit(1);
 
   if (!row) return res.status(404).json({ message: "Product not found" });
   const resolved = resolveFactoryProductLanguage(
-    { ...row.product, categoryName: row.categoryName, categoryNameAr: row.categoryNameAr },
+    {
+      ...row.product,
+      categoryName: row.categoryName,
+      categoryNameAr: row.categoryNameAr,
+    },
     language
   );
 
@@ -194,5 +185,6 @@ async function factoryBilingualCatalogMiddleware(req: any, res: any, next: any) 
  * to the original Factory product/category handlers unchanged.
  */
 export function registerFactoryBilingualCatalogRoutes(app: Express) {
+  registerFactoryArabicTranslationRoutes(app);
   app.use("/api/factory", requireAuth, factoryBilingualCatalogMiddleware);
 }
