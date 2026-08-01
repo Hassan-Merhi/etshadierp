@@ -65,6 +65,12 @@ describe("Desktop table structure is preserved", () => {
 // ── Mobile-compatible layout ──────────────────────────────────────────────────
 
 describe("Mobile-compatible layout patterns", () => {
+  it("Login.tsx — fills the viewport at browser zoom levels without clipping overflow", () => {
+    const s = src("client/src/pages/Login.tsx");
+    expect(s).toContain("min-h-screen min-h-[100dvh]");
+    expect(s).not.toContain("xl:h-full xl:overflow-hidden");
+  });
+
   it("FactoryWorkers.tsx — filter panel can be toggled (filtersOpen state)", () => {
     // Collapsible filter panel is a mobile UX pattern
     expect(src("client/src/pages/factory/FactoryWorkers.tsx")).toContain("filtersOpen");
