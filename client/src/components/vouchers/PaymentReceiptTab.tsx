@@ -35,6 +35,7 @@ import { AccountAutocomplete } from "@/components/AccountAutocomplete";
 import type { CombinedAccount } from "@/components/AccountAutocomplete";
 import AccountSidebar, { Account } from "@/components/AccountSidebar";
 import { VoucherEntriesTable } from "@/components/vouchers/VoucherEntriesTable";
+import { VoucherSourceCard } from "@/components/vouchers/VoucherSourceCard";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 export interface PaymentReceiptTabProps {
@@ -207,22 +208,6 @@ export function PaymentReceiptTab({
     }
   };
 
-  // Balance display helpers
-  const balColor = (v: number) =>
-    v < 0
-      ? "text-red-600 dark:text-red-400"
-      : v > 0
-        ? "text-emerald-600 dark:text-emerald-400"
-        : "text-muted-foreground";
-
-  const fmtCurr = (n: number, curr: string) =>
-    curr !== "USD"
-      ? `${curr} ${Math.abs(n).toLocaleString(undefined, {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}`
-      : formatAmount(Math.abs(n));
-
   // Projected balance after save.
   // Payment edit: undo the original deduction, apply the new one.
   // Receipt edit: undo the original addition, apply the new one.
@@ -241,14 +226,6 @@ export function PaymentReceiptTab({
     const capacity = Math.max(Math.abs(accountBalance), total);
     return capacity > 0 ? Math.min(100, (total / capacity) * 100) : 0;
   })();
-
-  // Initials for the source tile, e.g. "Access Cash" → "AC".
-  const accountInitials = paymentAccountName
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
 
   // When the Pay From / Receive Into field is active, restrict the sidebar and autocomplete to
   // Cash / Bank / Loans ledger accounts + bank accounts only.
@@ -480,75 +457,17 @@ export function PaymentReceiptTab({
                 <div className="grid gap-3 lg:grid-cols-[1fr_minmax(170px,210px)]">
                   {/* Selected-account summary card — the picker collapses into this */}
                   {paymentAccountId > 0 && !editingSource && (
-                    <div
-                      className="flex items-center gap-3 rounded-lg border bg-muted/20 px-4 py-3 min-w-0"
-                      style={{ borderLeftColor: accentColor, borderLeftWidth: "3px" }}
-                      data-testid="card-selected-source"
-                    >
-                      <div
-                        className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-mono text-xs font-semibold"
-                        style={{ backgroundColor: `${accentColor}22`, color: accentColor }}
-                        aria-hidden="true"
-                      >
-                        {accountInitials}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                          {accountLabel}
-                        </div>
-                        <div className="text-sm font-semibold truncate mt-0.5">{paymentAccountName}</div>
-
-                        {/* Consumption meter */}
-                        {total > 0 && (
-                          <div className="h-1 rounded-full bg-muted mt-2 overflow-hidden">
-                            <div
-                              className="h-full rounded-full transition-all duration-300"
-                              style={{ width: `${meterPct}%`, backgroundColor: accentColor }}
-                            />
-                          </div>
-                        )}
-
-                        {/* Balance / projection */}
-                        {accountCurrencyBalances && accountCurrencyBalances.length > 0 ? (
-                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
-                            {accountCurrencyBalances.map(({ currency, balance }) => (
-                              <span key={currency} className="text-xs font-mono tabular-nums">
-                                <span className="text-muted-foreground">Bal </span>
-                                <span className={cn(balColor(balance))}>
-                                  {fmtCurr(balance, currency)} {balance > 0 ? "CR" : balance < 0 ? "DR" : ""}
-                                </span>
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5 flex-wrap text-xs mt-1.5 font-mono tabular-nums">
-                            <span className="text-muted-foreground">Bal</span>
-                            <span className={cn(balColor(accountBalance))}>{formatAmount(accountBalance)}</span>
-                            {total > 0 && (
-                              <>
-                                <span className="text-muted-foreground">→</span>
-                                <span className={cn("font-semibold", balColor(projected))}>
-                                  {formatAmount(projected)}
-                                </span>
-                                <span className="text-muted-foreground">after</span>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="shrink-0 text-muted-foreground"
-                        onClick={() => setEditingSource(true)}
-                        data-testid="button-change-source"
-                      >
-                        Change
-                      </Button>
-                    </div>
+                    <VoucherSourceCard
+                      label={accountLabel}
+                      accountName={paymentAccountName}
+                      accentColor={accentColor}
+                      balance={accountBalance}
+                      projected={projected}
+                      total={total}
+                      meterPct={meterPct}
+                      currencyBalances={accountCurrencyBalances}
+                      onChange={() => setEditingSource(true)}
+                    />
                   )}
 
                   {/* Account picker — shown until an account is chosen, or on "Change" */}
