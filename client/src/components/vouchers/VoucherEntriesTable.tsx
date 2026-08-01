@@ -158,7 +158,30 @@ export function VoucherEntriesTable({
     });
   };
 
+  // Focus helper shared by the Tab / arrow navigation below. Fields are addressed by the
+  // same data-testid attributes the keyboard test-suite already asserts on.
+  const focusField = (field: "account" | "amount", index: number, select = true) => {
+    requestAnimationFrame(() => {
+      const el = document.querySelector(`[data-testid="input-${field}-${index}"]`) as HTMLInputElement | null;
+      if (!el) return;
+      el.focus();
+      if (select) el.select();
+    });
+  };
+
   const handleAccountKeyDown = async (e: React.KeyboardEvent, index: number) => {
+    // Tab takes the highlighted account (only when the row has none yet, so tabbing
+    // through a filled row never reassigns it) and moves along to the amount.
+    if (e.key === "Tab" && !e.shiftKey) {
+      e.preventDefault();
+      const hasAccount = (entries[index]?.accountId ?? 0) > 0;
+      if (!hasAccount && filteredSidebarAccounts.length > 0 && sidebarHighlightedIndex >= 0) {
+        const highlighted = filteredSidebarAccounts[sidebarHighlightedIndex];
+        if (highlighted) handleSidebarAccountSelect(highlighted);
+      }
+      focusField("amount", index);
+      return;
+    }
     if (e.key === "ArrowDown") {
       e.preventDefault();
       if (filteredSidebarAccounts.length === 0) return;
@@ -197,6 +220,34 @@ export function VoucherEntriesTable({
   };
 
   const handleAmountKeyDown = (e: React.KeyboardEvent, index: number) => {
+    // Tab commits the amount and carries on to the next row, adding one when needed —
+    // the same motion as Enter, minus the requirement that the amount be positive.
+    if (e.key === "Tab" && !e.shiftKey) {
+      e.preventDefault();
+      const amount = Number(entries[index]?.amount);
+      if (!isNaN(amount) && amount > 0 && onAmountCommit) onAmountCommit(index);
+
+      const isLastRow = index === fields.length - 1;
+      const rowHasContent = (entries[index]?.accountId ?? 0) > 0 || (!isNaN(amount) && amount > 0);
+      if (isLastRow) {
+        // Only grow the table off a row that actually holds something, so tabbing
+        // out of an untouched last row doesn't leave a trail of blank lines.
+        if (!rowHasContent) return;
+        handleAddRow();
+      }
+      focusField("account", index + 1, false);
+      return;
+    }
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      focusField("account", index, false);
+      return;
+    }
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      if (index < fields.length - 1) focusField("account", index + 1, false);
+      return;
+    }
     if (e.key === "Enter") {
       e.preventDefault();
       const amount = Number(entries[index]?.amount);
@@ -252,12 +303,25 @@ export function VoucherEntriesTable({
     if (bal == null) return null;
     return (
       <p
-        className={`text-xs font-mono mt-0.5 ${bal < 0 ? "text-red-500 dark:text-red-400" : bal > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
+        className={`text-[10px] font-mono tabular-nums mt-0.5 ${bal < 0 ? "text-red-500 dark:text-red-400" : bal > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
       >
-        Balance: {formatAmount(bal)}
+        bal {formatAmount(bal)}
       </p>
     );
   };
+
+  // Running subtotal down the amount column, so a batch can be checked against paper
+  // as it is typed. Derived from the same entries the total is derived from.
+  const runningTotals: number[] = [];
+  {
+    let running = 0;
+    for (let i = 0; i < fields.length; i++) {
+      const value = parseFloat(entries[i]?.amount || "0");
+      if (!isNaN(value) && value > 0) running += value;
+      runningTotals.push(running);
+    }
+  }
+  const hasAnyAmount = runningTotals.length > 0 && runningTotals[runningTotals.length - 1] > 0;
 
   return (
     <>
@@ -265,10 +329,12 @@ export function VoucherEntriesTable({
       <div className="hidden sm:block border rounded-md overflow-hidden">
         <table className="w-full">
           <thead className="bg-muted/50 sticky top-0 z-30">
-            <tr>
-              <th className="text-center p-3 font-medium w-8 text-muted-foreground">#</th>
-              <th className="text-left p-3 font-medium">Account</th>
-              <th className="text-right p-3 font-medium w-[32%]">Amount</th>
+            <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              <th className="text-center px-2 py-2 font-semibold w-8">#</th>
+              <th className="text-left px-2 py-2 font-semibold">Account</th>
+              <th className="text-left px-2 py-2 font-semibold w-24 hidden lg:table-cell">Type</th>
+              <th className="text-right px-2 py-2 font-semibold w-[26%]">Amount</th>
+              <th className="text-right px-2 py-2 font-semibold w-28 hidden lg:table-cell">Running</th>
               <th className="w-10"></th>
             </tr>
           </thead>
@@ -282,16 +348,16 @@ export function VoucherEntriesTable({
                   key={field.id}
                   className={cn(
                     "border-t hover-elevate",
-                    isEmpty && "bg-muted/20",
                     activeRow === index &&
-                      !isEmpty &&
-                      (mode === "payment" ? "bg-amber-50 dark:bg-amber-950/20" : "bg-emerald-50 dark:bg-emerald-950/20")
+                      (mode === "payment"
+                        ? "bg-amber-50/60 dark:bg-amber-950/20 shadow-[inset_2px_0_0_#f59e0b]"
+                        : "bg-emerald-50/60 dark:bg-emerald-950/20 shadow-[inset_2px_0_0_#10b981]")
                   )}
                 >
-                  <td className="px-2 py-3 text-center text-xs font-medium text-muted-foreground tabular-nums">
+                  <td className="px-2 py-1.5 text-center text-[11px] font-mono text-muted-foreground tabular-nums align-top pt-3">
                     {index + 1}
                   </td>
-                  <td className="p-2">
+                  <td className="px-2 py-1.5">
                     <FormField
                       control={form.control}
                       name={`entries.${index}.accountName`}
@@ -301,7 +367,7 @@ export function VoucherEntriesTable({
                             <Input
                               {...field}
                               placeholder="Type to search..."
-                              className="text-sm"
+                              className="text-sm h-8"
                               data-testid={`input-account-${index}`}
                               onChange={(e) => {
                                 field.onChange(e);
@@ -312,9 +378,10 @@ export function VoucherEntriesTable({
                               onBlur={() => setTimeout(() => onRowBlur(), 200)}
                             />
                           </FormControl>
+                          {/* Type badge lives in its own column on lg+, inline below the name otherwise */}
                           {!isEmpty && typeBadge && (
                             <span
-                              className={`inline-block text-[10px] font-medium px-1.5 py-0 rounded mt-0.5 ${typeBadge.cls}`}
+                              className={`lg:hidden inline-block text-[10px] font-medium px-1.5 py-0 rounded mt-0.5 ${typeBadge.cls}`}
                             >
                               {typeBadge.label}
                             </span>
@@ -325,7 +392,14 @@ export function VoucherEntriesTable({
                       )}
                     />
                   </td>
-                  <td className="p-2">
+                  <td className="px-2 py-1.5 align-top pt-3 hidden lg:table-cell">
+                    {!isEmpty && typeBadge && (
+                      <span className={`inline-block text-[10px] font-medium px-1.5 py-0 rounded ${typeBadge.cls}`}>
+                        {typeBadge.label}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-2 py-1.5">
                     <FormField
                       control={form.control}
                       name={`entries.${index}.amount`}
@@ -337,7 +411,7 @@ export function VoucherEntriesTable({
                               type="number"
                               step="0.01"
                               placeholder="0.00"
-                              className="font-mono text-right"
+                              className="font-mono tabular-nums text-right h-8"
                               data-testid={`input-amount-${index}`}
                               onKeyDown={(e) => handleAmountKeyDown(e, index)}
                               onBlur={(e) => handleAmountBlur(e, index)}
@@ -349,12 +423,21 @@ export function VoucherEntriesTable({
                       )}
                     />
                   </td>
-                  <td className="p-2">
+                  <td className="px-2 py-1.5 align-top pt-3 text-right hidden lg:table-cell">
+                    <span
+                      className="text-xs font-mono tabular-nums text-muted-foreground"
+                      data-testid={`text-running-${index}`}
+                    >
+                      {runningTotals[index] > 0 ? formatAmount(runningTotals[index]) : "—"}
+                    </span>
+                  </td>
+                  <td className="px-1 py-1.5 align-top pt-2">
                     {fields.length > 1 && (
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
+                        className="h-8 w-8"
                         onClick={() => remove(index)}
                         data-testid={`button-remove-${index}`}
                       >
@@ -366,27 +449,37 @@ export function VoucherEntriesTable({
               );
             })}
           </tbody>
-          <tfoot className="bg-muted/40 border-t-2">
+          <tfoot className="bg-muted/30 border-t">
             <tr>
-              <td></td>
-              <td className="p-3">
-                <Button type="button" variant="outline" size="sm" onClick={handleAddRow} data-testid="button-add-row">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Row
-                </Button>
-              </td>
-              <td className="p-3 text-right">
-                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Total</div>
-                <div
-                  className={cn(
-                    "text-base font-bold font-mono",
-                    total > 0 ? "text-foreground" : "text-muted-foreground"
+              <td colSpan={6} className="px-2 py-2">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    onClick={handleAddRow}
+                    data-testid="button-add-row"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                    Add Row
+                  </Button>
+
+                  {/* The running column already ends on the total, so the footer only
+                      carries the shortcuts rather than repeating the figure a third time. */}
+                  <p className="text-[11px] text-muted-foreground hidden xl:block">
+                    <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">Tab</kbd> next field
+                    <kbd className="px-1 py-0.5 bg-muted rounded text-[10px] ml-2">↵</kbd> new row
+                    <kbd className="px-1 py-0.5 bg-muted rounded text-[10px] ml-2">↑↓</kbd> move
+                  </p>
+                  {hasAnyAmount && (
+                    <div className="text-right xl:hidden">
+                      <div className="text-[10px] text-muted-foreground uppercase tracking-wider">Subtotal</div>
+                      <div className="text-sm font-semibold font-mono tabular-nums">{formatAmount(total)}</div>
+                    </div>
                   )}
-                >
-                  {formatAmount(total)}
                 </div>
               </td>
-              <td></td>
             </tr>
           </tfoot>
         </table>

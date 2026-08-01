@@ -1,6 +1,20 @@
+import "./factoryBilingualSchemaBridge.mjs";
 import { readFile } from "node:fs/promises";
 import process from "node:process";
 import pg from "pg";
+import superagent from "superagent";
+
+const XLSX_MIME =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+superagent.parse[XLSX_MIME] = (response, callback) => {
+  const chunks = [];
+  response.on("data", (chunk) => {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  });
+  response.on("end", () => callback(null, Buffer.concat(chunks)));
+  response.on("error", (error) => callback(error));
+};
 
 const INSTALL_KEY = Symbol.for("erp.supplier-company-scope-migration.applied");
 

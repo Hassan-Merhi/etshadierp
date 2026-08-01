@@ -46,6 +46,7 @@ export interface PendingAdvance {
 
 export interface PreviewWorkerRow {
   id: number;
+  employeeCode: string | null;
   name: string;
   position: string | null;
   base: number;

@@ -38,6 +38,8 @@ const IMPORT_PREFIXES = [
   "/api/import",
 ];
 
+const ARABIC_TRANSLATION_TEMPLATE_PATH = "/api/factory/bale-products/arabic-template";
+
 function posShiftPermission(method: string, path: string): OperationalPermissionRouteMatch | null {
   const normalizedMethod = method.toUpperCase();
   if (
@@ -78,11 +80,21 @@ function isImportRoute(method: string, path: string): boolean {
 
 function isBulkMaintenanceRoute(method: string, path: string): boolean {
   if (!isMutation(method)) return false;
-  return /(?:^|[-/])(repair|recalculate|rebuild|cleanup|backfill|reconcile|resync|fix)(?:[-/]|$)/.test(path);
+  return /(?:^|[-/])(repair|recalculate|rebuild|cleanup|backfill|reconcile|resync|fix)(?:[-/]|$)/.test(
+    path
+  );
 }
 
 function exportPermission(path: string): OperationalPermissionRouteMatch | null {
   const lower = path.toLowerCase();
+
+  if (lower === ARABIC_TRANSLATION_TEMPLATE_PATH) {
+    return {
+      operation: "excel-export",
+      permissionType: "export",
+      permissionKey: "exp_excel",
+    };
+  }
 
   if (lower === "/api/export" || lower.startsWith("/api/export/")) {
     return {

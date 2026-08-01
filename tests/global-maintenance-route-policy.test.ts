@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { canAccessGlobalMaintenanceRoute } from "../server/middleware/globalMaintenanceScope";
 import { classifyGlobalMaintenanceRoute } from "../server/services/security/globalMaintenanceRoutePolicy";
 
 describe("global maintenance route policy", () => {
@@ -17,7 +18,7 @@ describe("global maintenance route policy", () => {
     ).toEqual({ operation: "cleanup-orphaned-charges" });
   });
 
-  it("classifies every account migration route as Developer maintenance", () => {
+  it("classifies every account migration route", () => {
     expect(
       classifyGlobalMaintenanceRoute(
         "GET",
@@ -85,5 +86,23 @@ describe("global maintenance route policy", () => {
     expect(
       classifyGlobalMaintenanceRoute("DELETE", "/api/system/parent-company")
     ).toBeNull();
+  });
+});
+
+describe("global maintenance role scope", () => {
+  it("allows Admin and Developer roles to use account migration", () => {
+    const match = { operation: "account-migration" } as const;
+
+    expect(canAccessGlobalMaintenanceRoute(match, "Admin")).toBe(true);
+    expect(canAccessGlobalMaintenanceRoute(match, "Developer")).toBe(true);
+  });
+
+  it("keeps all other global maintenance operations Developer-only", () => {
+    const match = { operation: "schema-fix" } as const;
+
+    expect(canAccessGlobalMaintenanceRoute(match, "Developer")).toBe(true);
+    expect(canAccessGlobalMaintenanceRoute(match, "Admin")).toBe(false);
+    expect(canAccessGlobalMaintenanceRoute(match, "Normal User")).toBe(false);
+    expect(canAccessGlobalMaintenanceRoute(match, undefined)).toBe(false);
   });
 });

@@ -20,23 +20,28 @@ export type AuditAction =
   | "restore"
   | "repair"
   | "recalculate"
-  | "migrate";
+  | "migrate"
+  | "factory_bilingual_document_export"
+  | "factory_bilingual_snapshot_backfill";
 
 export type AuditChange = { old?: unknown; new?: unknown };
 export type AuditChanges = Record<string, AuditChange>;
 
 export interface AuditActor {
-  userId: string;
-  username: string;
+  userId?: string | number;
+  username?: string;
   companyId?: number | null;
 }
 
 export interface AuditEvent extends AuditActor {
   action: AuditAction;
-  tableName: string;
+  tableName?: string;
   recordId?: number | null;
   recordIdentifier?: string | null;
   changes?: AuditChanges | null;
+  entityType?: string;
+  entityId?: number | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface AuditExecutor {
@@ -120,9 +125,11 @@ export function buildAuditChanges(
 }
 
 export async function writeAuditEvent(event: AuditEvent, executor: AuditExecutor = db): Promise<void> {
-  const tableName = event.tableName.trim();
-  const userId = event.userId.trim();
-  const username = event.username.trim();
+  const tableName = String(event.tableName ?? event.entityType ?? "audit_event").trim();
+  const userId = String(event.userId ?? "system").trim();
+  const username = String(event.username ?? "system").trim();
+  const recordId = event.recordId ?? event.entityId ?? null;
+  const changes = event.changes ?? (event.metadata ? { metadata: { new: event.metadata } } : null);
 
   if (!tableName) throw new Error("Audit tableName is required");
   if (!userId) throw new Error("Audit userId is required");
@@ -134,9 +141,9 @@ export async function writeAuditEvent(event: AuditEvent, executor: AuditExecutor
     companyId: event.companyId ?? null,
     action: event.action,
     tableName,
-    recordId: event.recordId ?? null,
+    recordId,
     recordIdentifier: event.recordIdentifier?.trim() || null,
-    changes: sanitizeAuditChanges(event.changes),
+    changes: sanitizeAuditChanges(changes),
   };
 
   try {
@@ -147,7 +154,7 @@ export async function writeAuditEvent(event: AuditEvent, executor: AuditExecutor
       action: "write_failed",
       auditAction: event.action,
       tableName,
-      recordId: event.recordId ?? null,
+      recordId,
       companyId: event.companyId ?? null,
       userId,
       error: error instanceof Error ? error.message : String(error),

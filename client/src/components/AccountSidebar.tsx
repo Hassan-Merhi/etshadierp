@@ -77,6 +77,15 @@ export default function AccountSidebar({
   const listRef = useRef<HTMLDivElement>(null);
   const { formatAmount } = useCurrencyContext();
 
+  // Accounts already used by a line in this voucher. `useSidebarSync` floats these to the
+  // top of `filteredAccounts` while the search box is empty, so the boundary between the
+  // two groups is simply the first account that is not used.
+  const usedAccountKeys = new Set(
+    entries.filter((e) => (e?.accountId ?? 0) > 0).map((e) => `${e.accountType}:${e.accountId}`)
+  );
+  const isGrouped = !searchValue.trim() && usedAccountKeys.size > 0;
+  const usedCount = isGrouped ? filteredAccounts.filter((a) => usedAccountKeys.has(`${a.type}:${a.id}`)).length : 0;
+
   const handleAutoCreate = async () => {
     if (!onAutoCreateAccount) return;
     const trimmedName = searchValue.trim();
@@ -217,6 +226,18 @@ export default function AccountSidebar({
             disabled={isAutoCreating}
           />
         </div>
+
+        <div className="flex items-center justify-between gap-2 mt-2">
+          <p className="text-[11px] text-muted-foreground font-mono tabular-nums" data-testid="text-account-count">
+            {searchValue.trim()
+              ? `Showing ${filteredAccounts.length} of ${_accounts.length}`
+              : `${_accounts.length} accounts`}
+          </p>
+          <p className="text-[11px] text-muted-foreground hidden sm:block">
+            <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">↑↓</kbd> move{" "}
+            <kbd className="px-1 py-0.5 bg-muted rounded text-[10px] ml-1">↵</kbd> select
+          </p>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3" ref={listRef}>
@@ -256,44 +277,63 @@ export default function AccountSidebar({
               const isHighlighted = idx === highlightedIndex;
               const projectedBalance = getProjectedBalance(account);
               const hasProjection = projectedBalance !== (account.balance ?? 0);
+              const isUsed = isGrouped && usedAccountKeys.has(`${account.type}:${account.id}`);
+
+              // Group headings only appear in the unsearched browse list, where
+              // `useSidebarSync` has floated the voucher's own accounts to the front.
+              const heading = !isGrouped
+                ? null
+                : idx === 0
+                  ? "In this voucher"
+                  : idx === usedCount
+                    ? "All accounts"
+                    : null;
 
               return (
-                <button
-                  key={`${account.type}-${account.id}`}
-                  data-index={idx}
-                  onClick={() => onSelectAccount(account)}
-                  className={`w-full text-left px-2 py-2 rounded-md hover-elevate active-elevate-2 transition-colors ${
-                    isSelected ? "ring-2 ring-primary" : ""
-                  } ${isHighlighted ? "bg-accent" : ""}`}
-                  data-testid={`account-${idx}`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">
-                        {account.name || account.code || `${account.type}-${account.id}`}
-                      </div>
-                      {TYPE_BADGE[account.type] && (
-                        <span
-                          className={`inline-block text-[9px] font-medium px-1.5 py-0 rounded mt-0.5 ${TYPE_BADGE[account.type].cls}`}
-                        >
-                          {TYPE_BADGE[account.type].label}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-0.5">
-                      {hasProjection && (
-                        <div className="text-xs text-muted-foreground font-mono line-through">
-                          {formatBalance(account.balance)}
+                <div key={`${account.type}-${account.id}`}>
+                  {heading && (
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2 pt-2 pb-1">
+                      {heading}
+                    </p>
+                  )}
+                  <button
+                    data-index={idx}
+                    onClick={() => onSelectAccount(account)}
+                    className={`w-full text-left px-2 py-2 rounded-md hover-elevate active-elevate-2 transition-colors ${
+                      isSelected ? "ring-2 ring-primary" : ""
+                    } ${isHighlighted ? "bg-accent" : ""} ${
+                      isUsed ? "shadow-[inset_2px_0_0_hsl(var(--primary))]" : ""
+                    }`}
+                    data-testid={`account-${idx}`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium truncate">
+                          {account.name || account.code || `${account.type}-${account.id}`}
                         </div>
-                      )}
-                      <div
-                        className={`text-xs font-mono font-semibold flex-shrink-0 ${getBalanceColorClass(projectedBalance, account.type)}`}
-                      >
-                        {formatBalance(projectedBalance)}
+                        {TYPE_BADGE[account.type] && (
+                          <span
+                            className={`inline-block text-[9px] font-medium px-1.5 py-0 rounded mt-0.5 ${TYPE_BADGE[account.type].cls}`}
+                          >
+                            {TYPE_BADGE[account.type].label}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-0.5">
+                        {hasProjection && (
+                          <div className="text-xs text-muted-foreground font-mono tabular-nums line-through">
+                            {formatBalance(account.balance)}
+                          </div>
+                        )}
+                        <div
+                          className={`text-xs font-mono tabular-nums font-semibold flex-shrink-0 ${getBalanceColorClass(projectedBalance, account.type)}`}
+                        >
+                          {formatBalance(projectedBalance)}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </button>
+                  </button>
+                </div>
               );
             })
           )}

@@ -6,11 +6,11 @@ const guard = readFileSync("client/src/app/authenticatedAppRouteGuard.ts", "utf8
 
 describe("Factory refresh route preservation", () => {
   it("waits for company restoration before evaluating Factory route redirects", () => {
-    // The authenticated shell must block on company loading before it resolves
-    // any route decision, so a hard refresh on a Factory URL never redirects
-    // away while the active company is still being restored.
+    // Authentication is resolved by App.tsx before this shell mounts. This shell
+    // must still block on company loading before it resolves any route decision,
+    // so a hard refresh on a Factory URL never redirects mid-restoration.
     expect(app).toContain("const { selectedCompany, isLoading: companyLoading } = useCompany();");
-    expect(app).toContain("if (isLoading || companyLoading || !selectedCompany || !user) return <AppLoadingState />;");
+    expect(app).toContain("if (companyLoading || !selectedCompany) return <AppLoadingState />;");
 
     const companyGuard = app.indexOf("companyLoading || !selectedCompany");
     const routeResolution = app.indexOf("resolveAuthenticatedAppRoute({");
@@ -21,6 +21,6 @@ describe("Factory refresh route preservation", () => {
   it("classifies Factory routes and only redirects a wrong-company Factory URL", () => {
     expect(guard).toContain('const isFactoryRoute = currentLocation.startsWith("/factory/");');
     expect(guard).toContain("isFactoryRoute && !isFactoryCompany");
-expect(guard).toContain('decision = { kind: "redirect", to: "/" };');
+    expect(guard).toContain('decision = { kind: "redirect", to: "/" };');
   });
 });

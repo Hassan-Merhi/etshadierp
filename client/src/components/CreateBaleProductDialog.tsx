@@ -17,10 +17,12 @@ import type { FactoryCategory } from "@shared/schema";
 
 const formSchema = z.object({
   grade: z.string().min(1, "Grade is required"),
-  name: z.string().min(1, "Product name is required"),
+  name: z.string().min(1, "English product name is required"),
+  nameAr: z.string().optional(),
   categoryId: z.string().optional(),
   weightPerBaleKg: z.string().optional(),
   description: z.string().optional(),
+  descriptionAr: z.string().optional(),
   productionPrice: z.string().optional(),
   sellingPrice: z.string().optional(),
   labelDesignColor: z.string().optional(),
@@ -33,7 +35,7 @@ interface CreateBaleProductDialogProps {
   onClose?: () => void;
 }
 
-export function CreateBaleProductDialog({ open, onOpenChange, adminAuth, onClose }: CreateBaleProductDialogProps) {
+export function CreateBaleProductDialog({ open, onOpenChange, adminAuth }: CreateBaleProductDialogProps) {
   const { toast } = useToast();
   const { colors } = useLabelDesignColors();
 
@@ -46,9 +48,11 @@ export function CreateBaleProductDialog({ open, onOpenChange, adminAuth, onClose
     defaultValues: {
       grade: "",
       name: "",
+      nameAr: "",
       categoryId: "",
       weightPerBaleKg: "",
       description: "",
+      descriptionAr: "",
       productionPrice: "",
       sellingPrice: "",
       labelDesignColor: "",
@@ -57,55 +61,54 @@ export function CreateBaleProductDialog({ open, onOpenChange, adminAuth, onClose
 
   const createMutation = useMutation({
     mutationFn: async (data: z.infer<typeof formSchema>) => {
-      const body: any = { name: data.name.trim(), grade: data.grade };
-      if (data.categoryId && data.categoryId !== "none") body.categoryId = parseInt(data.categoryId);
+      const body: Record<string, unknown> = {
+        name: data.name.trim(),
+        nameEn: data.name.trim(),
+        nameAr: data.nameAr?.trim() || null,
+        descriptionEn: data.description?.trim() || null,
+        descriptionAr: data.descriptionAr?.trim() || null,
+        grade: data.grade,
+      };
+      if (data.categoryId && data.categoryId !== "none") body.categoryId = Number.parseInt(data.categoryId, 10);
       if (data.weightPerBaleKg) body.weightPerBaleKg = data.weightPerBaleKg;
-      if (data.description) body.description = data.description;
+      if (data.description) body.description = data.description.trim();
       if (data.productionPrice) body.productionPrice = data.productionPrice;
       if (data.sellingPrice) body.sellingPrice = data.sellingPrice;
       if (data.labelDesignColor) body.labelDesignColor = data.labelDesignColor;
       if (adminAuth) body.adminAuth = adminAuth;
+
       const response = await factoryApiRequest("POST", "/api/factory/bale-products", body);
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.message || "Failed to create product");
-      }
-      return await response.json();
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.message || "Failed to create product");
+      return payload;
     },
-    onSuccess: (product: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
+    onSuccess: (product: { name?: string; nameEn?: string; articleCode?: string }) => {
+      void queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
       toast({
-        title: "Product Created",
-        description: `"${product.name}" created with article code ${product.articleCode}`,
+        title: "Product created",
+        description: `"${product.nameEn || product.name || "Product"}" created with article code ${product.articleCode || "—"}`,
       });
       form.reset();
       onOpenChange(false);
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      if ((error as Error & { _handledGlobally?: boolean })._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
-  const onSubmit = (data: z.infer<typeof formSchema>) => {
-    createMutation.mutate(data);
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Bale Product</DialogTitle>
-          <DialogDescription>Select a grade to auto-generate the article code.</DialogDescription>
+          <DialogDescription>
+            Store English and Arabic on one product. Article code, weight, prices, stock, and costing remain language-neutral.
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
-            {/* Grade */}
+          <form onSubmit={form.handleSubmit((data) => createMutation.mutate(data))} className="space-y-4" noValidate>
             <FormField
               control={form.control}
               name="grade"
@@ -132,22 +135,35 @@ export function CreateBaleProductDialog({ open, onOpenChange, adminAuth, onClose
               )}
             />
 
-            {/* Product Name */}
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Product Name *</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="e.g., T-Shirt Mix Grade A" data-testid="input-name" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid gap-4 md:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Product Name — English *</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Men Bag Cream 20kg" data-testid="input-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="nameAr"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>اسم المنتج — العربية</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="حقيبة رجالية كريمي 20 كغ" dir="rtl" data-testid="input-name-ar" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-            {/* Category + Weight */}
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -164,10 +180,12 @@ export function CreateBaleProductDialog({ open, onOpenChange, adminAuth, onClose
                       <SelectContent>
                         <SelectItem value="none">Uncategorized</SelectItem>
                         {categories
-                          ?.filter((c) => c.isActive)
-                          .map((cat) => (
-                            <SelectItem key={cat.id} value={String(cat.id)}>
-                              {cat.name}
+                          ?.filter((category) => category.isActive)
+                          .map((category) => (
+                            <SelectItem key={category.id} value={String(category.id)}>
+                              {category.nameAr && category.nameAr !== category.name
+                                ? `${category.name} / ${category.nameAr}`
+                                : category.name}
                             </SelectItem>
                           ))}
                       </SelectContent>
@@ -176,7 +194,6 @@ export function CreateBaleProductDialog({ open, onOpenChange, adminAuth, onClose
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="weightPerBaleKg"
@@ -184,7 +201,7 @@ export function CreateBaleProductDialog({ open, onOpenChange, adminAuth, onClose
                   <FormItem>
                     <FormLabel>Weight/Bale (kg)</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="e.g., 45" type="number" step="0.01" data-testid="input-weight" />
+                      <Input {...field} placeholder="45" type="number" step="0.01" data-testid="input-weight" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -192,44 +209,28 @@ export function CreateBaleProductDialog({ open, onOpenChange, adminAuth, onClose
               />
             </div>
 
-            {/* Production Price + Selling Price */}
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="productionPrice"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Prod. Price</FormLabel>
+                    <FormLabel>Production Price</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="e.g., 80"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        data-testid="input-production-price"
-                      />
+                      <Input {...field} type="number" step="0.01" min="0" data-testid="input-production-price" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="sellingPrice"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Sell Price</FormLabel>
+                    <FormLabel>Selling Price</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="e.g., 120"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        data-testid="input-selling-price"
-                      />
+                      <Input {...field} type="number" step="0.01" min="0" data-testid="input-selling-price" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -237,22 +238,35 @@ export function CreateBaleProductDialog({ open, onOpenChange, adminAuth, onClose
               />
             </div>
 
-            {/* Description */}
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description (Optional)</FormLabel>
-                  <FormControl>
-                    <Textarea {...field} placeholder="Product details..." data-testid="input-description" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid gap-4 md:grid-cols-2">
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description — English</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} placeholder="Product details..." data-testid="input-description" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="descriptionAr"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>الوصف — العربية</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} placeholder="تفاصيل المنتج..." dir="rtl" data-testid="input-description-ar" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-            {/* Label Design Color */}
             <FormField
               control={form.control}
               name="labelDesignColor"
@@ -271,25 +285,18 @@ export function CreateBaleProductDialog({ open, onOpenChange, adminAuth, onClose
                     >
                       No Design
                     </button>
-                    {colors.map((opt) => (
+                    {colors.map((option) => (
                       <button
                         type="button"
-                        key={opt.value}
-                        data-testid={`button-label-color-${opt.value}`}
-                        onClick={() => field.onChange(opt.value)}
-                        className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-colors ${field.value === opt.value ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover-elevate"}`}
+                        key={option.value}
+                        data-testid={`button-label-color-${option.value}`}
+                        onClick={() => field.onChange(option.value)}
+                        className={`px-3 py-1.5 rounded-md border text-sm font-medium transition-colors ${field.value === option.value ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover-elevate"}`}
                       >
-                        {opt.label}
+                        {option.label}
                       </button>
                     ))}
                   </div>
-                  {field.value && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Labels will print with the{" "}
-                      <span className="font-medium">{colors.find((o) => o.value === field.value)?.label}</span> design
-                      automatically.
-                    </p>
-                  )}
                   <FormMessage />
                 </FormItem>
               )}

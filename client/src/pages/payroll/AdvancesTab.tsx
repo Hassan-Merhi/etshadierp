@@ -77,11 +77,12 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
   });
 
 
+  const workerDeductionsBase = appMode === "factory" ? "/api/factory/worker-deductions" : "/api/payroll/worker-deductions";
   const { data: workerDeductions = [], isLoading: deductionsLoading } = useQuery<any[]>({
-    queryKey: ["/api/factory/worker-deductions", selectedCompany?.id],
+    queryKey: [workerDeductionsBase, selectedCompany?.id],
     queryFn: async () => {
       if (!selectedCompany?.id) return [];
-      const res = await fetch(`/api/factory/worker-deductions?companyId=${selectedCompany.id}`, { credentials: "include" });
+      const res = await fetch(`${workerDeductionsBase}?companyId=${selectedCompany.id}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch worker deductions");
       return res.json();
     },
@@ -170,9 +171,11 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
     },
   });
 
+  const workerDeductionsWorkerBase = appMode === "factory" ? "/api/factory/workers" : "/api/payroll/workers";
+
   const addWorkerDeductionMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await modeApiRequest("POST", `/api/factory/workers/${data.workerId}/deductions`, {
+      return await modeApiRequest("POST", `${workerDeductionsWorkerBase}/${data.workerId}/deductions`, {
         amount: data.amount,
         reason: data.reason || null,
         deductionDate: data.deductionDate,
@@ -180,7 +183,7 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
     },
     onSuccess: () => {
       toast({ title: "Deduction added", description: "Worker deduction recorded successfully." });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/worker-deductions", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: [workerDeductionsBase, selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
       setAddWorkerDeductionDialogOpen(false);
       addWorkerDeductionForm.reset({
@@ -197,11 +200,11 @@ export function AdvancesTab({ cashAccounts = [] }: AdvancesTabProps) {
 
   const deleteWorkerDeductionMutation = useMutation({
     mutationFn: async ({ workerId, deductionId }: { workerId: number; deductionId: number }) => {
-      return await modeApiRequest("DELETE", `/api/factory/workers/${workerId}/deductions/${deductionId}`, undefined);
+      return await modeApiRequest("DELETE", `${workerDeductionsWorkerBase}/${workerId}/deductions/${deductionId}`, undefined);
     },
     onSuccess: () => {
       toast({ title: "Deleted", description: "Worker deduction deleted." });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/worker-deductions", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: [workerDeductionsBase, selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id] });
     },
     onError: (error: Error) => {

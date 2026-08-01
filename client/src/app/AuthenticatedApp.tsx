@@ -5,7 +5,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { usePresence } from "@/hooks/use-presence";
 import { useScreenFeed } from "@/hooks/use-screen-feed";
 import { useWsInvalidation } from "@/hooks/use-ws-invalidation";
-import { useAuthenticatedUser } from "./useAuthenticatedUser";
+import type { AuthenticatedUser } from "@/contracts/sessionContracts";
 import { useAppNavigation } from "./useAppNavigation";
 import { useAuthenticatedAppData } from "./useAuthenticatedAppData";
 import { resolveAuthenticatedAppRoute } from "./authenticatedAppRouteGuard";
@@ -16,17 +16,21 @@ import { PropertiesShell } from "./PropertiesShell";
 import { FactoryShell } from "./FactoryShell";
 import { ErpShell } from "./ErpShell";
 
-export function AuthenticatedApp() {
+interface AuthenticatedAppProps {
+  user: AuthenticatedUser;
+  handleLogout: () => Promise<void>;
+}
+
+export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) {
   const { selectedCompany, isLoading: companyLoading } = useCompany();
-  usePresence();
+  usePresence(true);
   useScreenFeed();
   useWsInvalidation();
   useDialogScrollFix();
 
   const [currentLocation] = useLocation();
-  const { user, isLoading, error, loadingTimedOut, handleLogout } = useAuthenticatedUser();
   const { showLeaveConfirm, setShowLeaveConfirm, handleGoBack, handleConfirmLeave } = useAppNavigation();
-  const isPOS = user?.role === "POS";
+  const isPOS = user.role === "POS";
 
   useEffect(() => {
     const main = document.getElementById("main-content");
@@ -39,12 +43,11 @@ export function AuthenticatedApp() {
   const { chatUnread, posImportEnabled, myAccess, myAccessLoading, myAccessError, factorySettings } =
     useAuthenticatedAppData({
       selectedCompanyId: selectedCompany?.id,
-      userPresent: !!user,
+      userPresent: true,
       isPOS,
     });
 
-  if (loadingTimedOut || (!isLoading && (error || !user))) return <Redirect to="/login" />;
-  if (isLoading || companyLoading || !selectedCompany || !user) return <AppLoadingState />;
+  if (companyLoading || !selectedCompany) return <AppLoadingState />;
 
   const isAdminOwner = user.role === "Admin" || user.role === "Owner" || user.role === "Developer";
   const routeState = resolveAuthenticatedAppRoute({

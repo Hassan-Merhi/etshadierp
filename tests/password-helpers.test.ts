@@ -20,6 +20,7 @@ describe("passwordHelpers", () => {
     const hash = CryptoJS.SHA256("correct horse battery staple").toString();
     expect(verifyLegacyPassword("correct horse battery staple", hash.toUpperCase())).toBe(true);
     expect(verifyLegacyPassword("wrong password", hash)).toBe(false);
+    expect(verifyLegacyPassword("anything", "")).toBe(false);
   });
 
   it("marks a successful legacy login for bcrypt migration", async () => {

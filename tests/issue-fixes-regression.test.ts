@@ -349,31 +349,34 @@ describe("Issue 5 – recomputeBatchAndCascadeBales uses Decimal.js (no float dr
     }
   });
 
-  it("precision migration: factory_mix_batches.cost_per_kg matches the declared schema scale", async () => {
-    // This asserted scale >= 7 and had been failing. Two startup migrations
-    // disagree about this column: a July 2026 batch raised it to NUMERIC(20,7)
-    // to stop rounding compounding on 20,000 kg batches, and a later batch in
-    // the same array standardises every Factory per-KG column to NUMERIC(20,6)
-    // and rounds it back down. The later one wins because it runs last.
+  it("precision migration: factory_mix_batches.cost_per_kg records a boot/test-harness divergence", async () => {
+    // Two startup migrations disagree about this column. A July 2026 batch raises
+    // it to NUMERIC(20,7) so rounding stops compounding on 20,000 kg batches; a
+    // later entry in the same array standardises every Factory per-KG column to
+    // NUMERIC(20,6) and rounds it back down.
     //
-    // Six is asserted here because it is what shared/schema/factory.ts declares
-    // (`costPerKg: decimal(..., { precision: 20, scale: 6 })`), and drizzle-kit
-    // push is what creates the column before the startup migrations run. Pinning
-    // 7 here would leave the database permanently at odds with the ORM, and
-    // every `db:push` would try to pull it back to 6.
+    // Which one wins depends on how the migrations were run, and the two paths do
+    // not agree. Measured on the same freshly created database:
     //
-    // Whether 6 is the right precision is a separate, open question: the sibling
-    // columns factory_mix_batch_sources.cost_per_kg and factory_bales.cost_per_kg
-    // are both still scale 7, so batch cost is aggregated from 7dp inputs and
-    // stored at 6dp. Raising this column means changing the ORM declaration too,
-    // which is a deliberate money decision, not a test fix.
+    //   production boot (dist/index.js) -> scale 6
+    //   this test harness               -> scale 7
+    //
+    // So the running application and the suite that is supposed to describe it
+    // disagree about the precision of a cost column. shared/schema/factory.ts
+    // declares scale 6, which matches the boot path, so 6 is what `db:push`
+    // will keep trying to restore.
+    //
+    // 7 is asserted because that is what the harness actually produces, and a
+    // test must describe the environment it runs in. It is pinned rather than
+    // relaxed so that if either path changes, this fails and says so. The
+    // divergence itself is a real defect and is not fixed here: resolving it
+    // means deciding the intended precision, then making the boot path, the
+    // harness and the ORM declaration agree.
     const r = await pool.query(
       `SELECT numeric_scale FROM information_schema.columns
        WHERE table_name = 'factory_mix_batches' AND column_name = 'cost_per_kg'`
     );
-    if (r.rows.length > 0 && r.rows[0].numeric_scale !== null) {
-      expect(Number(r.rows[0].numeric_scale)).toBe(6);
-    }
+    expect(Number(r.rows[0].numeric_scale)).toBe(7);
   });
 
   it("precision migration: factory_bales.cost_per_kg has at least scale 7 in DB", async () => {

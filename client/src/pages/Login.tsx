@@ -328,7 +328,7 @@ export default function Login() {
       };
 
   return (
-    <div className="flex flex-col xl:flex-row min-h-full xl:h-full xl:overflow-hidden">
+    <div className="flex min-h-screen min-h-[100dvh] flex-col xl:flex-row">
       {/* ══════════════════════════════════════════
           LEFT — Always-dark branding panel (desktop)
       ══════════════════════════════════════════ */}

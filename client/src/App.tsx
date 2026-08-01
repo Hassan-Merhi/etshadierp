@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useLocation, Switch, Route } from "wouter";
+import { Redirect, Switch, Route } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
@@ -21,6 +21,8 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import Login from "@/pages/Login";
 import { AuthenticatedApp } from "@/app/AuthenticatedApp";
+import { AppLoadingState } from "@/app/AppLoadingState";
+import { useAuthenticatedUser } from "@/app/useAuthenticatedUser";
 
 // ── Production-only update banner ─────────────────────────────────────────────
 // Polls /api/build-info every 5 minutes. When the build version changes it shows a
@@ -101,18 +103,14 @@ function UpdateBanner() {
   return null;
 }
 
-function AuthGatedUserNotesPanel() {
-  const [location] = useLocation();
+function AuthenticatedUserNotesPanel() {
   const { prefs } = useUserPreferences();
-  if (location === "/login") return null;
   if (prefs && prefs.showNotesPanel === false) return null;
   return <UserNotesPanel />;
 }
 
-function AuthGatedChatWidget() {
-  const [location] = useLocation();
+function AuthenticatedChatWidget() {
   const { prefs } = useUserPreferences();
-  if (location === "/login") return null;
   if (prefs && prefs.showChatWidget === false) return null;
   return <ChatWidget />;
 }
@@ -122,35 +120,53 @@ function ServerRestartWatcher() {
   return null;
 }
 
+/**
+ * The only entry point for protected UI.
+ *
+ * Nothing that can call an authenticated endpoint is mounted until /api/auth/me
+ * has positively confirmed the session. This prevents the login page and an
+ * expired-session refresh from firing dozens of protected requests in parallel.
+ */
+function AuthenticatedRoot() {
+  const { user, isLoading, error, loadingTimedOut, handleLogout } = useAuthenticatedUser();
+
+  if (loadingTimedOut || (!isLoading && (error || !user))) return <Redirect to="/login" />;
+  if (isLoading || !user) return <AppLoadingState />;
+
+  return (
+    <CompanyProvider>
+      <LocationProvider>
+        <DateFormatProvider>
+          <CurrencyProvider>
+            <CursorNavProvider>
+              <ServerRestartWatcher />
+              <AuthenticatedApp user={user} handleLogout={handleLogout} />
+              <AuthenticatedChatWidget />
+              <DateJumpDialog />
+              <AuthenticatedUserNotesPanel />
+              <KeyboardShortcuts />
+            </CursorNavProvider>
+          </CurrencyProvider>
+        </DateFormatProvider>
+      </LocationProvider>
+    </CompanyProvider>
+  );
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <ThemeProvider>
           <ConnectivityProvider>
-            <CompanyProvider>
-              <LocationProvider>
-                <DateFormatProvider>
-                  <CurrencyProvider>
-                    <CursorNavProvider>
-                      <ServerRestartWatcher />
-                      <Switch>
-                        <Route path="/login" component={Login} />
-                        <Route>
-                          <AuthenticatedApp />
-                        </Route>
-                      </Switch>
-                      <Toaster />
-                      <UpdateBanner />
-                      <AuthGatedChatWidget />
-                      <DateJumpDialog />
-                      <AuthGatedUserNotesPanel />
-                      <KeyboardShortcuts />
-                    </CursorNavProvider>
-                  </CurrencyProvider>
-                </DateFormatProvider>
-              </LocationProvider>
-            </CompanyProvider>
+            <Switch>
+              <Route path="/login" component={Login} />
+              <Route>
+                <AuthenticatedRoot />
+              </Route>
+            </Switch>
+            <Toaster />
+            <UpdateBanner />
           </ConnectivityProvider>
         </ThemeProvider>
       </TooltipProvider>

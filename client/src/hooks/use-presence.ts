@@ -6,7 +6,7 @@ const ROUTE_DEBOUNCE_MS = 10000; // 10 seconds
 
 type PresenceType = "route_change" | "heartbeat";
 
-export function usePresence() {
+export function usePresence(enabled = true) {
   const [location] = useLocation();
   const lastRouteRef = useRef(location);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -31,6 +31,8 @@ export function usePresence() {
   }, []);
 
   useEffect(() => {
+    if (!enabled) return;
+
     const now = Date.now();
     lastRouteRef.current = location;
 
@@ -38,9 +40,14 @@ export function usePresence() {
       lastSentAtRef.current = now;
       sendHeartbeat(location, "route_change");
     }
-  }, [location, sendHeartbeat]);
+  }, [enabled, location, sendHeartbeat]);
 
   useEffect(() => {
+    if (!enabled) {
+      isMountedRef.current = false;
+      return;
+    }
+
     isMountedRef.current = true;
 
     intervalRef.current = setInterval(() => {
@@ -73,9 +80,12 @@ export function usePresence() {
 
     return () => {
       isMountedRef.current = false;
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, [sendHeartbeat]);
+  }, [enabled, sendHeartbeat]);
 }

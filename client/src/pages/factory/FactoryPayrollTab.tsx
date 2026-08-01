@@ -14,7 +14,6 @@ import {Skeleton} from "@/components/ui/skeleton";
 import {useToast} from "@/hooks/use-toast";
 import {queryClient, apiRequest} from "@/lib/queryClient";
 import type {FactoryWorker} from "@shared/schema";
-
 import type {AttendanceEntry, CashAccount, PayrollGroup, PayrollRecord, PreviewWorkerRow} from "./factorypayrolltab/types";
 import {fmtDate} from "./factorypayrolltab/utils";
 import {BatchRow} from "./factorypayrolltab/components/BatchRow";
@@ -1076,68 +1075,56 @@ export default function FactoryPayrollTab() {
             <Button
               variant="outline"
               onClick={async () => {
-                const rows = previewRows.map((r) => {
-                  const mRate = parseFloat(transportOverrides[r.id] ?? r.transportMonthly.toFixed(2));
-                  const rHasAtt = r.presentDates.length > 0 || r.absentDates.length > 0 || r.halfDayDates.length > 0;
-                  const transportAmt =
-                    rHasAtt && r.totalWorkingDays > 0 ? (r.presentDays / r.totalWorkingDays) * mRate : mRate;
-                  const deductAmt = parseFloat(advanceOverrides[r.id] || "0");
-                  const salDed = r.pendingDeductions || 0;
-                  const net = r.base + r.bonus + transportAmt - deductAmt - salDed;
-                  return {
-                    Name: r.name,
-                    Position: r.position || "",
-                    "Present Days": r.presentDays,
-                    "Total Days": r.totalWorkingDays,
-                    "Absent Days": r.absentDays,
-                    "Base ($)": r.base.toFixed(2),
-                    "Bonus ($)": r.bonus.toFixed(2),
-                    "Transport/mo ($)": mRate.toFixed(2),
-                    "Transport Paid ($)": transportAmt.toFixed(2),
-                    "Salary Deduction ($)": salDed.toFixed(2),
-                    "Advance Deduction ($)": deductAmt.toFixed(2),
-                    "Net Pay ($)": net.toFixed(2),
-                  };
-                });
-                const totalNet = previewRows.reduce((s, r) => {
-                  const mRate = parseFloat(transportOverrides[r.id] ?? r.transportMonthly.toFixed(2));
-                  const rHasAtt = r.presentDates.length > 0 || r.absentDates.length > 0 || r.halfDayDates.length > 0;
-                  const transportAmt =
-                    rHasAtt && r.totalWorkingDays > 0 ? (r.presentDays / r.totalWorkingDays) * mRate : mRate;
-                  const deductAmt = parseFloat(advanceOverrides[r.id] || "0");
-                  const salDed = r.pendingDeductions || 0;
-                  return s + r.base + r.bonus + transportAmt - deductAmt - salDed;
-                }, 0);
-                rows.push({
-                  Name: "TOTAL",
-                  Position: "",
-                  "Present Days": "" as any,
-                  "Total Days": "" as any,
-                  "Absent Days": "" as any,
-                  "Base ($)": "",
-                  "Bonus ($)": "",
-                  "Transport/mo ($)": "",
-                  "Transport Paid ($)": "",
-                  "Salary Deduction ($)": "",
-                  "Advance Deduction ($)": "",
-                  "Net Pay ($)": totalNet.toFixed(2),
-                });
-                const ws = XLSX.utils.json_to_sheet(rows);
-                const colWidths = [
-                  { wch: 28 },
-                  { wch: 22 },
-                  { wch: 14 },
-                  { wch: 13 },
-                  { wch: 12 },
-                  { wch: 12 },
-                  { wch: 14 },
-                  { wch: 22 },
-                  { wch: 14 },
-                ];
-                ws["!cols"] = colWidths;
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, "Payroll");
-                await XLSX.writeFile(wb, `Payroll_${runForm.periodStart}_${runForm.periodEnd}.xlsx`);
+                try {
+                  const exportRows = previewRows.map((r) => {
+                    const mRate = parseFloat(transportOverrides[r.id] ?? r.transportMonthly.toFixed(2));
+                    const rHasAtt =
+                      r.presentDates.length > 0 || r.absentDates.length > 0 || r.halfDayDates.length > 0;
+                    const transportPaid =
+                      rHasAtt && r.totalWorkingDays > 0 ? (r.presentDays / r.totalWorkingDays) * mRate : mRate;
+                    const advanceDeduction = parseFloat(advanceOverrides[r.id] || "0");
+                    const salaryDeduction = r.pendingDeductions || 0;
+                    const net = r.base + r.bonus + transportPaid - advanceDeduction - salaryDeduction;
+                    return {
+                      employeeCode: r.employeeCode || null,
+                      name: r.name,
+                      position: r.position || null,
+                      presentDays: r.presentDays,
+                      totalWorkingDays: r.totalWorkingDays,
+                      absentDays: r.absentDays,
+                      base: r.base,
+                      bonus: r.bonus,
+                      transportMonthly: mRate,
+                      transportPaid,
+                      salaryDeduction,
+                      advanceDeduction,
+                      net,
+                    };
+                  });
+                  const resp = await fetch("/api/factory/payrolls/preview-excel", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({
+                      periodStart: runForm.periodStart,
+                      periodEnd: runForm.periodEnd,
+                      rows: exportRows,
+                    }),
+                  });
+                  if (!resp.ok) {
+                    const err = await resp.json().catch(() => ({}));
+                    throw new Error((err as any).message || "Export failed");
+                  }
+                  const blob = await resp.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `Payroll_${runForm.periodStart}_${runForm.periodEnd}.xlsx`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                } catch (err: any) {
+                  alert(err?.message || "Failed to export Excel");
+                }
               }}
               data-testid="button-export-payroll-excel"
             >

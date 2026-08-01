@@ -467,6 +467,84 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
     }
   });
 
+  // ─── Worker Deductions CRUD (ERP mirror — no factory guard) ─────────────────
+  // These duplicate the /api/factory/worker-deductions endpoints but live outside
+  // the factory middleware so ERP-mode users on the Payroll page can call them.
+
+  function getErpCompanyId(req: any): number | undefined {
+    return req.body?.companyId
+      ? parseInt(req.body.companyId)
+      : req.query?.companyId
+        ? parseInt(req.query.companyId as string)
+        : (req.session as any).currentCompanyId || (req.session as any).factoryCompanyId;
+  }
+
+  app.get("/api/payroll/worker-deductions", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getErpCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const rows = await db
+        .select({
+          id: factoryWorkerDeductions.id,
+          companyId: factoryWorkerDeductions.companyId,
+          workerId: factoryWorkerDeductions.workerId,
+          workerName: factoryWorkers.fullName,
+          amount: factoryWorkerDeductions.amount,
+          reason: factoryWorkerDeductions.reason,
+          deductionDate: factoryWorkerDeductions.deductionDate,
+          applied: factoryWorkerDeductions.applied,
+          payrollId: factoryWorkerDeductions.payrollId,
+          createdAt: factoryWorkerDeductions.createdAt,
+        })
+        .from(factoryWorkerDeductions)
+        .leftJoin(factoryWorkers, eq(factoryWorkerDeductions.workerId, factoryWorkers.id))
+        .where(eq(factoryWorkerDeductions.companyId, companyId))
+        .orderBy(desc(factoryWorkerDeductions.createdAt));
+      res.json(rows);
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
+  app.post("/api/payroll/workers/:id/deductions", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getErpCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const workerId = parseId(req.params.id);
+      if (workerId === null) return res.status(400).json({ message: "Invalid id" });
+      const { amount, reason, deductionDate } = req.body;
+      if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0)
+        return res.status(400).json({ message: "Amount must be a positive number" });
+      if (!deductionDate) return res.status(400).json({ message: "Deduction date is required" });
+      const [deduction] = await db
+        .insert(factoryWorkerDeductions)
+        .values({ companyId, workerId, amount: parseFloat(amount).toFixed(2), reason: reason || null, deductionDate, applied: false } as any)
+        .returning();
+      res.json(deduction);
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
+  app.delete("/api/payroll/workers/:workerId/deductions/:id", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = getErpCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const deductionId = parseId(req.params.id);
+      if (deductionId === null) return res.status(400).json({ message: "Invalid id" });
+      const [existing] = await db
+        .select()
+        .from(factoryWorkerDeductions)
+        .where(and(eq(factoryWorkerDeductions.id, deductionId), eq(factoryWorkerDeductions.companyId, companyId)));
+      if (!existing) return res.status(404).json({ message: "Deduction not found" });
+      if (existing.applied) return res.status(400).json({ message: "Cannot delete an already-applied deduction" });
+      await db.delete(factoryWorkerDeductions).where(eq(factoryWorkerDeductions.id, deductionId));
+      res.json({ message: "Deduction deleted" });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
   // ─── Worker Deductions CRUD ───────────────────────────────────────────────
 
   // GET /api/factory/worker-deductions - All deductions for company (joined with worker name)

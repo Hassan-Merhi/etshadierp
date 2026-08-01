@@ -12,6 +12,8 @@ import { registerRawStockDiagnosticRoutes } from "./raw-stock/rawStockDiagnostic
 import { postOffloadHistoricalReplayMiddleware } from "./raw-stock/postOffloadHistoricalReplayMiddleware";
 import { requirePostOffloadImpactPreview } from "./raw-stock/postOffloadImpactPreviewMiddleware";
 import { registerPostOffloadImpactPreviewRoutes } from "./raw-stock/postOffloadImpactPreviewRoutes";
+import { postOffloadReconciliationMiddleware } from "./raw-stock/postOffloadReconciliationMiddleware";
+import { registerPostOffloadPhase6SafetyRoutes } from "./raw-stock/postOffloadPhase6SafetyRoutes";
 
 const RAW_STOCK_REPAIR_PERMISSION = "factory.raw-stock.repair";
 
@@ -36,6 +38,11 @@ export function registerFactoryRawStockRoutes(app: Express) {
   // Refreshed clients bind CREATE requests to a signed, short-lived read-only
   // impact preview. Legacy callers remain compatible until they opt into v1.
   app.use("/api/factory/containers", requirePostOffloadImpactPreview);
+
+  // This outer response wrapper is registered before historical replay so it
+  // receives the replay result and then reconciles accounting, inventory,
+  // reporting refresh coverage, and exact undo availability.
+  app.use("/api/factory/containers", postOffloadReconciliationMiddleware);
 
   // After a successful post-offload CREATE/EDIT/UNDO/LEGACY_REBUILD transaction,
   // replay the affected supplier's exact historical cost timeline before sending
@@ -96,6 +103,7 @@ export function registerFactoryRawStockRoutes(app: Express) {
   registerRawStockCrudRoutes(app);
   registerRawStockOffloadRoutes(app);
   registerPostOffloadImpactPreviewRoutes(app);
+  registerPostOffloadPhase6SafetyRoutes(app);
   registerRawStockContainerRoutes(app);
   registerRawStockBalanceRoutes(app);
   registerRawStockRecalcRoutes(app);
