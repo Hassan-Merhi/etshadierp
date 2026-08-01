@@ -87,46 +87,6 @@ commands:
           command: node scripts/verify-ci-disposable-schema.mjs
 
 jobs:
-  phase4-format-apply:
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: Apply pinned Prettier formatting to Phase 4 files
-          command: |
-            node node_modules/prettier/bin/prettier.cjs --write \
-              client/src/components/FactoryArabicTranslationActions.tsx \
-              client/src/pages/factory/FactoryBalesHub.tsx \
-              server/routes/factory/factoryArabicTranslationRoutes.ts \
-              server/routes/factory/factoryBilingualCatalogRoutes.ts \
-              server/services/factoryArabicTranslationWorkbook.ts \
-              server/services/security/operationalPermissionRoutePolicy.ts \
-              tests/factory-arabic-translation-routes.test.ts \
-              tests/factory-arabic-translation-workbook.test.ts \
-              tests/operational-permission-route-policy.test.ts \
-              tests/ui/factory-arabic-translation-actions.test.tsx \
-              scripts/phase4-typecheck-scope.mjs
-            if git diff --quiet; then
-              echo "Phase 4 files are already formatted."
-              exit 0
-            fi
-            git config user.name "Hassan-Merhi"
-            git config user.email "actions@users.noreply.github.com"
-            git add \
-              client/src/components/FactoryArabicTranslationActions.tsx \
-              client/src/pages/factory/FactoryBalesHub.tsx \
-              server/routes/factory/factoryArabicTranslationRoutes.ts \
-              server/routes/factory/factoryBilingualCatalogRoutes.ts \
-              server/services/factoryArabicTranslationWorkbook.ts \
-              server/services/security/operationalPermissionRoutePolicy.ts \
-              tests/factory-arabic-translation-routes.test.ts \
-              tests/factory-arabic-translation-workbook.test.ts \
-              tests/operational-permission-route-policy.test.ts \
-              tests/ui/factory-arabic-translation-actions.test.tsx \
-              scripts/phase4-typecheck-scope.mjs
-            git commit -m "Format Phase 4 bilingual workbook files"
-            git push origin "HEAD:${CIRCLE_BRANCH}"
-
   static-build:
     executor: node22
     steps:
@@ -173,36 +133,16 @@ jobs:
           path: dist
           destination: production-build
 
-  phase4-format:
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: Phase 4 formatting diagnostic
-          command: |
-            node node_modules/prettier/bin/prettier.cjs --check \
-              client/src/components/FactoryArabicTranslationActions.tsx \
-              client/src/pages/factory/FactoryBalesHub.tsx \
-              server/routes/factory/factoryArabicTranslationRoutes.ts \
-              server/routes/factory/factoryBilingualCatalogRoutes.ts \
-              server/services/factoryArabicTranslationWorkbook.ts \
-              server/services/security/operationalPermissionRoutePolicy.ts \
-              tests/factory-arabic-translation-routes.test.ts \
-              tests/factory-arabic-translation-workbook.test.ts \
-              tests/operational-permission-route-policy.test.ts \
-              tests/ui/factory-arabic-translation-actions.test.tsx \
-              scripts/phase4-typecheck-scope.mjs
-
-  phase4-format-scope:
+  phase4-format-file:
     parameters:
-      targets:
+      target:
         type: string
     executor: node22
     steps:
       - install_dependencies
       - run:
-          name: Scoped Phase 4 formatting diagnostic
-          command: node node_modules/prettier/bin/prettier.cjs --check << parameters.targets >>
+          name: Check one Phase 4 file
+          command: node node_modules/prettier/bin/prettier.cjs --check << parameters.target >>
 
   phase4-typescript:
     executor: node22
@@ -252,9 +192,11 @@ jobs:
             tests/route-manifest.test.ts
             --maxWorkers=1 --no-file-parallelism
 
-  phase4-backend-scope:
+  phase4-backend-case:
     parameters:
       target:
+        type: string
+      test_name:
         type: string
     executor: node22-postgres
     steps:
@@ -262,10 +204,11 @@ jobs:
       - wait_for_postgres
       - prepare_postgres_schema
       - run:
-          name: Scoped Phase 4 backend diagnostic
+          name: Run one Phase 4 backend case
           command: >-
             node node_modules/vitest/vitest.mjs run
             << parameters.target >>
+            -t "<< parameters.test_name >>"
             --maxWorkers=1 --no-file-parallelism
 
   phase4-frontend:
@@ -304,62 +247,143 @@ jobs:
 workflows:
   full-erp-verification:
     jobs:
-      - phase4-format-apply
       - static-build
-      - phase4-format
-      - phase4-format-scope:
-          name: phase4-format-client
-          targets: >-
-            client/src/components/FactoryArabicTranslationActions.tsx
-            client/src/pages/factory/FactoryBalesHub.tsx
-      - phase4-format-scope:
-          name: phase4-format-server
-          targets: >-
-            server/routes/factory/factoryArabicTranslationRoutes.ts
-            server/routes/factory/factoryBilingualCatalogRoutes.ts
-            server/services/factoryArabicTranslationWorkbook.ts
-            server/services/security/operationalPermissionRoutePolicy.ts
-      - phase4-format-scope:
-          name: phase4-format-tests
-          targets: >-
-            tests/factory-arabic-translation-routes.test.ts
-            tests/factory-arabic-translation-workbook.test.ts
-            tests/operational-permission-route-policy.test.ts
-            tests/ui/factory-arabic-translation-actions.test.tsx
-      - phase4-format-scope:
-          name: phase4-format-script
-          targets: scripts/phase4-typecheck-scope.mjs
+      - phase4-format-file:
+          name: p4-fmt-actions
+          target: client/src/components/FactoryArabicTranslationActions.tsx
+      - phase4-format-file:
+          name: p4-fmt-hub
+          target: client/src/pages/factory/FactoryBalesHub.tsx
+      - phase4-format-file:
+          name: p4-fmt-routes
+          target: server/routes/factory/factoryArabicTranslationRoutes.ts
+      - phase4-format-file:
+          name: p4-fmt-catalog
+          target: server/routes/factory/factoryBilingualCatalogRoutes.ts
+      - phase4-format-file:
+          name: p4-fmt-workbook
+          target: server/services/factoryArabicTranslationWorkbook.ts
+      - phase4-format-file:
+          name: p4-fmt-policy
+          target: server/services/security/operationalPermissionRoutePolicy.ts
+      - phase4-format-file:
+          name: p4-fmt-route-tests
+          target: tests/factory-arabic-translation-routes.test.ts
+      - phase4-format-file:
+          name: p4-fmt-workbook-tests
+          target: tests/factory-arabic-translation-workbook.test.ts
+      - phase4-format-file:
+          name: p4-fmt-policy-tests
+          target: tests/operational-permission-route-policy.test.ts
+      - phase4-format-file:
+          name: p4-fmt-ui-tests
+          target: tests/ui/factory-arabic-translation-actions.test.tsx
+      - phase4-format-file:
+          name: p4-fmt-script
+          target: scripts/phase4-typecheck-scope.mjs
       - phase4-typescript
       - phase4-typescript-scope:
-          name: phase4-typescript-client
+          name: p4-ts-client
           targets: >-
             client/src/components/FactoryArabicTranslationActions.tsx
             client/src/pages/factory/FactoryBalesHub.tsx
       - phase4-typescript-scope:
-          name: phase4-typescript-routes
+          name: p4-ts-routes
           targets: >-
             server/routes/factory/factoryArabicTranslationRoutes.ts
             server/routes/factory/factoryBilingualCatalogRoutes.ts
       - phase4-typescript-scope:
-          name: phase4-typescript-workbook
+          name: p4-ts-workbook
           targets: server/services/factoryArabicTranslationWorkbook.ts
       - phase4-typescript-scope:
-          name: phase4-typescript-policy
+          name: p4-ts-policy
           targets: server/services/security/operationalPermissionRoutePolicy.ts
       - postgres-regression
       - phase4-backend
-      - phase4-backend-scope:
-          name: phase4-backend-workbook
+      - phase4-backend-case:
+          name: p4-wb-export
           target: tests/factory-arabic-translation-workbook.test.ts
-      - phase4-backend-scope:
-          name: phase4-backend-routes
+          test_name: exports the exact template columns
+      - phase4-backend-case:
+          name: p4-wb-roundtrip
+          target: tests/factory-arabic-translation-workbook.test.ts
+          test_name: round-trips article codes
+      - phase4-backend-case:
+          name: p4-wb-headers
+          target: tests/factory-arabic-translation-workbook.test.ts
+          test_name: rejects workbooks whose columns
+      - phase4-backend-case:
+          name: p4-wb-exact
+          target: tests/factory-arabic-translation-workbook.test.ts
+          test_name: matches by normalized exact article code only
+      - phase4-backend-case:
+          name: p4-wb-duplicates
+          target: tests/factory-arabic-translation-workbook.test.ts
+          test_name: blocks duplicate article codes
+      - phase4-backend-case:
+          name: p4-wb-ambiguous
+          target: tests/factory-arabic-translation-workbook.test.ts
+          test_name: blocks ambiguous normalized article codes
+      - phase4-backend-case:
+          name: p4-wb-category
+          target: tests/factory-arabic-translation-workbook.test.ts
+          test_name: blocks conflicting translations
+      - phase4-backend-case:
+          name: p4-wb-idempotent
+          target: tests/factory-arabic-translation-workbook.test.ts
+          test_name: is idempotent when translations already match
+      - phase4-backend-case:
+          name: p4-wb-fill
+          target: tests/factory-arabic-translation-workbook.test.ts
+          test_name: does not replace existing Arabic values
+      - phase4-backend-case:
+          name: p4-wb-unknown
+          target: tests/factory-arabic-translation-workbook.test.ts
+          test_name: reports unknown article codes
+      - phase4-backend-case:
+          name: p4-wb-empty
+          target: tests/factory-arabic-translation-workbook.test.ts
+          test_name: rejects empty translation rows
+      - phase4-backend-case:
+          name: p4-wb-token
+          target: tests/factory-arabic-translation-workbook.test.ts
+          test_name: changes the preview token
+      - phase4-backend-case:
+          name: p4-wb-errors
+          target: tests/factory-arabic-translation-workbook.test.ts
+          test_name: creates an error workbook
+      - phase4-backend-case:
+          name: p4-route-auth
           target: tests/factory-arabic-translation-routes.test.ts
-      - phase4-backend-scope:
-          name: phase4-backend-permission
-          target: tests/operational-permission-route-policy.test.ts
-      - phase4-backend-scope:
-          name: phase4-backend-manifest
-          target: tests/route-manifest.test.ts
+          test_name: keeps authentication in front
+      - phase4-backend-case:
+          name: p4-route-export
+          target: tests/factory-arabic-translation-routes.test.ts
+          test_name: exports a protected company-scoped
+      - phase4-backend-case:
+          name: p4-route-token
+          target: tests/factory-arabic-translation-routes.test.ts
+          test_name: requires a preview token
+      - phase4-backend-case:
+          name: p4-route-apply
+          target: tests/factory-arabic-translation-routes.test.ts
+          test_name: applies only Arabic fields
+      - phase4-backend-case:
+          name: p4-route-stale
+          target: tests/factory-arabic-translation-routes.test.ts
+          test_name: rejects a stale preview
+      - phase4-backend-case:
+          name: p4-route-duplicate
+          target: tests/factory-arabic-translation-routes.test.ts
+          test_name: blocks duplicate workbook article codes
+      - phase4-backend-case:
+          name: p4-route-rollback
+          target: tests/factory-arabic-translation-routes.test.ts
+          test_name: rolls product and category updates back
+      - phase4-backend-case:
+          name: p4-route-xlsx
+          target: tests/factory-arabic-translation-routes.test.ts
+          test_name: rejects non-xlsx uploads
       - phase4-frontend
       - security-readiness:
           requires:
