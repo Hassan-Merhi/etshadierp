@@ -197,7 +197,6 @@
       "server/routes/factory/employee-pos/employeeNetPositionRoutes.ts": 1775,
       "server/routes/factory/raw-stock/rawStockOffloadRoutes.ts": 1500,
       "server/routes/factory/suppliers/supplierStatementRoutes.ts": 950,
-      "server/routes/netProfitExcelRoute.ts": 1150,
       "server/routes/rental/_rentalShared.ts": 1175,
       "server/services/exportDataService.ts": 925,
       "server/services/exportExcelService.ts": 1150,
