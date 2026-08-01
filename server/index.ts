@@ -10,7 +10,7 @@ import { randomBytes } from "crypto";
 import { registerRoutes } from "./routes";
 import { blockViewOnlyWrites } from "./auth";
 import { setupWS } from "./wsServer";
-import { startScheduler, checkAndRecoverDailyExport } from "./services/schedulerService";
+import { startScheduler, checkAndRecoverDailyExport } from "./services/scheduler";
 import { setupVite, log } from "./vite";
 import type { User } from "@shared/schema";
 import { pool } from "./db";

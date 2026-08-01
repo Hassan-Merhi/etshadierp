@@ -1,4 +1,4 @@
-import { trackOneFactoryContainerById } from "../../../services/factoryContainerTrackingService";
+import { trackOneFactoryContainerById } from "../../../services/factory-container-tracking";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";

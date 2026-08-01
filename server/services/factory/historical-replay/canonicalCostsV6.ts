@@ -5,7 +5,7 @@ import type {
   ReplayQueryExecutor,
 } from "./types";
 import { numeric } from "./types";
-import { computeCanonicalCosts } from "./readModel";
+import { computeCanonicalCosts } from "./read-model";
 
 /**
  * Replay writes the container's persisted USD target columns. Container mismatch

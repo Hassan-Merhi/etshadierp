@@ -7,7 +7,7 @@ import {
 import {
   buildBatchConsumptionEvents,
   loadContainerUniverse,
-} from "./readModel";
+} from "./read-model";
 import { computeCanonicalCostsV6 } from "./canonicalCostsV6";
 import { previewHistoricalCostReplayWithExecutor } from "./securePreview";
 import { buildSelectedSupplierCorrectionPlan } from "./closure";

@@ -15,7 +15,7 @@ import {
   computeCanonicalCosts,
   loadContainerUniverse,
   previewHistoricalCostReplayWithExecutor,
-} from "./readModel";
+} from "./read-model";
 import { buildSelectedSupplierCorrectionPlan } from "./closure";
 export { captureReplaySnapshot } from "./scope";
 

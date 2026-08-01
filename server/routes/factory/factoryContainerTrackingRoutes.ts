@@ -15,7 +15,7 @@ import {
   getFactoryTrackingProgress,
   updateFactoryContainerTrackingSettings,
   isFactoryTrackingAtCapacity,
-} from "../../services/factoryContainerTrackingService";
+} from "../../services/factory-container-tracking";
 import {
   refreshFactoryContainerEta,
   refreshMultipleFactoryContainerEtas,

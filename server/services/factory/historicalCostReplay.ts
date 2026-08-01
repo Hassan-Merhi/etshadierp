@@ -12,7 +12,7 @@ export {
   sortEvents,
   replaySupplierTimeline,
   computeBatchCorrections,
-} from "./historical-replay/readModel";
+} from "./historical-replay/read-model";
 export {
   computeCanonicalCostsV6 as computeCanonicalCosts,
   normalizePreviewPersistedContainerTotals,

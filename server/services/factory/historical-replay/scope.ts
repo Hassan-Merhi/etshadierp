@@ -15,7 +15,7 @@ import {
   loadContainerUniverse,
   computeCanonicalCosts,
   computeBatchCorrections,
-} from "./readModel";
+} from "./read-model";
 
 export function computeReplayFingerprint(
   companyId: number,

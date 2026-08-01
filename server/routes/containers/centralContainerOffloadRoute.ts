@@ -10,7 +10,7 @@ import {
   ContainerOffloadLifecycleError,
   executeContainerOffloadLifecycle,
   type ContainerOffloadLifecycleMode,
-} from "../../services/containers/containerOffloadLifecycleService";
+} from "../../services/containers/offload-lifecycle";
 
 async function runCentralOffload(
   req: Request,

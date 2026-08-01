@@ -76,6 +76,7 @@
     "tests/factory-historical-replay-source-priority.test.ts",
     "tests/factory-insurance-company-isolation.test.ts",
     "tests/god-file-boundaries.test.ts",
+    "tests/report-endpoint-characterization.test.ts",
     "tests/route-manifest.test.ts",
     "tests/source-text-assertions.test.ts",
     "tests/startup-schema-integrity.test.ts",

@@ -4,7 +4,7 @@ import type {
   ReplayScopeInternal,
   ReplayWriteScope,
 } from "./types";
-import { buildBatchConsumptionEvents } from "./readModel";
+import { buildBatchConsumptionEvents } from "./read-model";
 import {
   buildExactHistoricalReplayScopeInternalFinal,
 } from "./exactScopeFinal";

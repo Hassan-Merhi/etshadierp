@@ -30,7 +30,7 @@ import {
 import { generateNetPositionExcel, generateMonthEnds } from "../helpers/generateNetPositionExcel";
 import { generateStockPdf } from "../helpers/generateStockPdf";
 import { sendExportEmail } from "../services/emailService";
-import { triggerDailyWhatsAppSendNow } from "../services/schedulerService";
+import { triggerDailyWhatsAppSendNow } from "../services/scheduler";
 import archiver from "archiver";
 import { getClientDate } from "../lib/dateUtils";
 

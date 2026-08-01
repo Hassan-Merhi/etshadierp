@@ -9,7 +9,7 @@ import type {
 } from "./types";
 import {
   previewHistoricalCostReplayWithExecutor as previewHistoricalCostReplayWithExecutorBase,
-} from "./readModel";
+} from "./read-model";
 import {
   loadReplayAuthoritativeInputDigest,
   type ReplayPreviewWithAuthoritativeDigest,
