@@ -92,6 +92,10 @@ describe("Factory Arabic workbook export diagnostics", () => {
     await expect(xmlProtection("C2")).resolves.toBe(false);
   });
 
+  it("diagnostic shared helper resolves", async () => {
+    await expect(isXlsxCellLocked(await createBuffer(), "A2")).resolves.toBeDefined();
+  });
+
   it("diagnostic shared helper reference lock", async () => {
     await expect(isXlsxCellLocked(await createBuffer(), "A2")).resolves.toBe(true);
   });
