@@ -125,6 +125,16 @@ function cellText(cell: ExcelJS.Cell): string {
   return "";
 }
 
+function setCellLocked(cell: ExcelJS.Cell, locked: boolean): void {
+  cell.style = {
+    ...cell.style,
+    protection: {
+      ...(cell.style.protection ?? {}),
+      locked,
+    },
+  };
+}
+
 function translationStatus(product: TranslationCatalogProduct): string {
   if (!clean(product.nameAr)) return "Missing Arabic Product Name";
   if (product.categoryId && !clean(product.categoryNameAr)) return "Missing Arabic Category";
@@ -244,9 +254,9 @@ export async function createArabicTranslationTemplate(products: TranslationCatal
     row.getCell(1).value = String(product.articleCode ?? "");
     for (const column of [3, 5, 6]) {
       row.getCell(column).alignment = { horizontal: "right", readingOrder: "rtl", wrapText: true };
-      row.getCell(column).protection = { locked: false };
+      setCellLocked(row.getCell(column), false);
     }
-    for (const column of [1, 2, 4, 7]) row.getCell(column).protection = { locked: true };
+    for (const column of [1, 2, 4, 7]) setCellLocked(row.getCell(column), true);
   }
 
   await sheet.protect("factory-arabic-template", {
