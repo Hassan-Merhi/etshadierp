@@ -13,6 +13,15 @@ export type AccountMigrationControlSnapshot = {
   }>;
 };
 
+export class AccountMigrationControlConflict extends Error {
+  readonly status = 409;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "AccountMigrationControlConflict";
+  }
+}
+
 export async function detachAccountMigrationControlReferences(
   tx: any,
   sourceCompanyId: number,
@@ -91,7 +100,7 @@ export async function assertDestinationControlReferencesAreClear(
     );
 
   if (roleRows.length > 0 || locationRows.length > 0) {
-    throw new Error(
+    throw new AccountMigrationControlConflict(
       "The migrated account is assigned to a destination-company user or POS location. Remove that assignment before undoing.",
     );
   }
@@ -108,7 +117,9 @@ export async function restoreAccountMigrationControlReferences(
       .from(userCompanyRoles)
       .where(eq(userCompanyRoles.id, role.roleId));
     if (!current || current.companyId !== sourceCompanyId || current.cashAccountId !== null) {
-      throw new Error(`Source-company user role ${role.roleId} changed after migration.`);
+      throw new AccountMigrationControlConflict(
+        `Source-company user role ${role.roleId} changed after migration.`,
+      );
     }
   }
 
@@ -128,7 +139,7 @@ export async function restoreAccountMigrationControlReferences(
       occupied.has(`${row.userId}:${row.companyId}:${row.locationId}`),
     );
     if (conflict) {
-      throw new Error(
+      throw new AccountMigrationControlConflict(
         `A POS cash mapping now exists for user ${conflict.userId} and location ${conflict.locationId}.`,
       );
     }
