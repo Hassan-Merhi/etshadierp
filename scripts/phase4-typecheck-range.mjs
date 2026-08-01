@@ -2,9 +2,10 @@ import path from "node:path";
 import process from "node:process";
 import ts from "typescript";
 
-const [target, startText, endText] = process.argv.slice(2);
+const [target, startText, endText, codeText] = process.argv.slice(2);
 const startLine = Number(startText);
 const endLine = Number(endText);
+const diagnosticCode = codeText ? Number(codeText) : null;
 const rootDir = process.cwd();
 const host = {
   getCanonicalFileName: (fileName) => fileName,
@@ -13,7 +14,7 @@ const host = {
 };
 
 if (!target || !Number.isInteger(startLine) || !Number.isInteger(endLine)) {
-  console.error("Usage: node scripts/phase4-typecheck-range.mjs <file> <start> <end>");
+  console.error("Usage: node scripts/phase4-typecheck-range.mjs <file> <start> <end> [code]");
   process.exit(2);
 }
 
@@ -27,11 +28,14 @@ const diagnostics = ts.getPreEmitDiagnostics(program).filter((diagnostic) => {
   const relative = path.relative(rootDir, diagnostic.file.fileName).replaceAll(path.sep, "/");
   if (relative !== target) return false;
   const line = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start).line + 1;
-  return line >= startLine && line <= endLine;
+  if (line < startLine || line > endLine) return false;
+  return diagnosticCode === null || diagnostic.code === diagnosticCode;
 });
 
 if (diagnostics.length > 0) {
   console.error(ts.formatDiagnosticsWithColorAndContext(diagnostics, host));
   process.exit(1);
 }
-console.log(`No diagnostics in ${target}:${startLine}-${endLine}`);
+console.log(
+  `No diagnostics${diagnosticCode === null ? "" : ` TS${diagnosticCode}`} in ${target}:${startLine}-${endLine}`
+);
