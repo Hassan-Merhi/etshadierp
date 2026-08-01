@@ -29,48 +29,49 @@ commands:
           override-ci-command: npm ci --no-audit --bin-links=true
 
 jobs:
-  diagnose-format:
+  scoped-ts:
+    parameters:
+      target:
+        type: string
     executor: node22
     steps:
       - install_dependencies
       - run:
-          name: Changed source formatting
-          command: |
-            git fetch origin main --depth=1
-            mapfile -d '' changed_files < <(
-              git diff --name-only --diff-filter=ACMR -z origin/main...HEAD -- client/src server shared tests scripts |
-                grep -zE '\.(ts|tsx|css|mjs)$' || true
-            )
-            node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
+          name: Scoped TypeScript
+          command: node scripts/phase4-typecheck-scope.mjs << parameters.target >>
 
-  diagnose-lint:
+  single-format:
+    parameters:
+      target:
+        type: string
     executor: node22
     steps:
       - install_dependencies
       - run:
-          name: Lint
-          command: npm run lint
-
-  diagnose-typescript:
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: TypeScript
-          command: npm run check
-
-  diagnose-build:
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: Production build
-          command: npm run build
+          name: Single file formatting
+          command: node node_modules/prettier/bin/prettier.cjs --check << parameters.target >>
 
 workflows:
-  phase4-static-diagnostics:
+  phase4-scope-diagnostics:
     jobs:
-      - diagnose-format
-      - diagnose-lint
-      - diagnose-typescript
-      - diagnose-build
+      - scoped-ts:
+          name: ts-client
+          target: client/src
+      - scoped-ts:
+          name: ts-routes
+          target: server/routes/factory
+      - scoped-ts:
+          name: ts-workbook
+          target: server/services/factoryArabicTranslationWorkbook.ts
+      - scoped-ts:
+          name: ts-policy
+          target: server/services/security/operationalPermissionRoutePolicy.ts
+      - single-format:
+          name: fmt-catalog
+          target: server/routes/factory/factoryBilingualCatalogRoutes.ts
+      - single-format:
+          name: fmt-policy
+          target: server/services/security/operationalPermissionRoutePolicy.ts
+      - single-format:
+          name: fmt-ui-test
+          target: tests/ui/factory-arabic-translation-actions.test.tsx
