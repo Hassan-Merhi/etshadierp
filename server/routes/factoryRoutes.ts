@@ -3,6 +3,7 @@ import { eq, and, or } from "drizzle-orm";
 import { companies, userCompanyRoles } from "@shared/schema";
 import { registerFactoryStockRoutes } from "./factory/factoryStockRoutes";
 import { registerFactorySuppliersRoutes } from "./factory/factorySuppliersRoutes";
+import { registerFactoryBilingualCatalogRoutes } from "./factory/factoryBilingualCatalogRoutes";
 import { registerFactoryProductsRoutes } from "./factory/factoryProductsRoutes";
 import { registerFactoryContainersRoutes } from "./factory/factoryContainersRoutes";
 import { registerFactoryBalesRoutes } from "./factory/factoryBalesRoutes";
@@ -208,6 +209,9 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
   registerFactoryStockRoutes(app);
   registerFactorySuppliersRoutes(app);
+  // Register bilingual GET handlers after canonical Factory company/permission
+  // middleware and the read microcache, but before the legacy English handlers.
+  registerFactoryBilingualCatalogRoutes(app);
   registerFactoryProductsRoutes(app);
   // Tracking routes registered BEFORE registerFactoryContainersRoutes: it defines
   // literal siblings (/refresh-etas, /eta-tracking-summary) under the same

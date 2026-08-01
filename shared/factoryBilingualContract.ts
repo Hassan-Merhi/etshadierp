@@ -25,6 +25,41 @@ export interface FactoryBilingualCategorySource {
   nameAr?: string | null;
 }
 
+export interface FactoryBilingualProductDisplaySource extends FactoryBilingualProductSource {
+  categoryName?: string | null;
+  categoryNameAr?: string | null;
+}
+
+export interface FactoryResolvedProductLanguage {
+  language: FactoryCatalogLanguage;
+  articleCode: string;
+  name: string;
+  categoryName: string;
+  description: string;
+}
+
+/** Additive response fields returned by bilingual Factory category GET APIs. */
+export interface FactoryBilingualCategoryApiExtension {
+  nameEn: string;
+  nameAr: string | null;
+  displayName: string;
+  language: FactoryCatalogLanguage;
+}
+
+/** Additive response fields returned by bilingual Factory product GET APIs. */
+export interface FactoryBilingualProductApiExtension {
+  nameEn: string;
+  nameAr: string | null;
+  descriptionEn: string | null;
+  descriptionAr: string | null;
+  categoryName: string | null;
+  categoryNameAr: string | null;
+  displayName: string;
+  displayDescription: string;
+  displayCategoryName: string;
+  language: FactoryCatalogLanguage;
+}
+
 export interface FactoryBilingualProductSnapshot {
   articleCode: string;
   productNameEn: string | null;
@@ -136,6 +171,41 @@ export function resolveFactoryCategoryName(
     },
     language
   );
+}
+
+/**
+ * Composite live-catalog resolver consumed by APIs, pages, selectors, and future
+ * exports. All surfaces must call this contract instead of reimplementing fallback.
+ */
+export function resolveFactoryProductLanguage(
+  product: FactoryBilingualProductDisplaySource,
+  language: FactoryCatalogLanguage
+): FactoryResolvedProductLanguage {
+  return {
+    language,
+    articleCode: normalizeFactoryArticleCode(product.articleCode),
+    name: resolveFactoryProductName(product, language),
+    categoryName: resolveFactoryCategoryName(
+      { name: product.categoryName, nameAr: product.categoryNameAr },
+      language,
+      product.articleCode
+    ),
+    description: resolveFactoryProductDescription(product, language),
+  };
+}
+
+/**
+ * Language-neutral search corpus for client-side consumers and tests. Server SQL
+ * queries use the same five fields directly so search behavior stays consistent.
+ */
+export function factorySearchValues(product: FactoryBilingualProductDisplaySource): string[] {
+  return [
+    normalizeFactoryArticleCode(product.articleCode),
+    cleanOptionalText(product.name),
+    cleanOptionalText(product.nameAr),
+    cleanOptionalText(product.categoryName),
+    cleanOptionalText(product.categoryNameAr),
+  ].filter((value): value is string => Boolean(value));
 }
 
 /**
