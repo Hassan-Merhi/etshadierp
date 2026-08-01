@@ -8,7 +8,9 @@ type BinaryParser = (
   callback: (error: Error | null, body?: Buffer) => void
 ) => void;
 
-const parsers = superagent.parse as Record<string, BinaryParser>;
+const parsers = (
+  superagent as unknown as { parse: Record<string, BinaryParser> }
+).parse;
 
 parsers[XLSX_MIME] = (response, callback) => {
   const chunks: Buffer[] = [];
