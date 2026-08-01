@@ -18,10 +18,3 @@ postcss.config.js
 capacitor.config.ts
 scripts/
 client/public/
-client/src/components/FactoryArabicTranslationActions.tsx
-client/src/pages/factory/FactoryBalesHub.tsx
-server/routes/factory/factoryArabicTranslationRoutes.ts
-server/services/factoryArabicTranslationWorkbook.ts
-tests/factory-arabic-translation-routes.test.ts
-tests/factory-arabic-translation-workbook.test.ts
-tests/operational-permission-route-policy.test.ts
