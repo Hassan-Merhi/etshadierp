@@ -1,5 +1,4 @@
 version: 2.1
-setup: true
 
 orbs:
   node: circleci/node@7.1.0
@@ -12,7 +11,7 @@ executors:
     working_directory: ~/project
 
 jobs:
-  encode-formatted-file:
+  format-and-push-phase4:
     executor: node22
     steps:
       - checkout
@@ -23,57 +22,42 @@ jobs:
           pkg-manager: npm
           override-ci-command: npm ci --no-audit --bin-links=true
       - run:
-          name: Format and continue with encoded statuses
+          name: Apply pinned formatting and push
           command: |
-            TARGET=tests/factory-arabic-translation-routes.test.ts
-            node node_modules/prettier/bin/prettier.cjs --write "$TARGET"
-            gzip -9c "$TARGET" | base64 -w0 | tr '+/' '-_' | tr -d '=' > /tmp/payload
-            python - <<'PY'
-            from pathlib import Path
-            payload = Path('/tmp/payload').read_text().strip()
-            chunks = [payload[i:i+180] for i in range(0, len(payload), 180)]
-            if len(chunks) > 28:
-                raise SystemExit(f'Encoded payload needs {len(chunks)} chunks; limit is 28')
-            lines = [
-                'version: 2.1',
-                'jobs:',
-                '  reveal:',
-                '    parameters:',
-                '      marker:',
-                '        type: string',
-                '    docker:',
-                '      - image: cimg/base:stable',
-                '    steps:',
-                '      - run: echo "<< parameters.marker >>"',
-                'workflows:',
-                '  reveal-formatted-file:',
-                '    jobs:',
-            ]
-            for index, chunk in enumerate(chunks):
-                marker = f'f{index:02d}_{chunk}'
-                lines.extend([
-                    '      - reveal:',
-                    f'          name: {marker}',
-                    f'          marker: {marker}',
-                ])
-            Path('/tmp/continue.yml').write_text('\n'.join(lines) + '\n')
-            print(f'Generated {len(chunks)} encoded status chunks')
-            PY
-            python - <<'PY'
-            import json, os
-            from pathlib import Path
-            Path('/tmp/continue-request.json').write_text(json.dumps({
-                'continuation-key': os.environ['CIRCLE_CONTINUATION_KEY'],
-                'configuration': Path('/tmp/continue.yml').read_text(),
-            }))
-            PY
-            curl --fail --silent --show-error \
-              --request POST \
-              --header 'Content-Type: application/json' \
-              --data-binary @/tmp/continue-request.json \
-              https://circleci.com/api/v2/pipeline/continue
+            node node_modules/prettier/bin/prettier.cjs --write \
+              client/src/components/FactoryArabicTranslationActions.tsx \
+              client/src/pages/factory/FactoryBalesHub.tsx \
+              server/routes/factory/factoryArabicTranslationRoutes.ts \
+              server/routes/factory/factoryBilingualCatalogRoutes.ts \
+              server/services/factoryArabicTranslationWorkbook.ts \
+              server/services/security/operationalPermissionRoutePolicy.ts \
+              tests/factory-arabic-translation-routes.test.ts \
+              tests/factory-arabic-translation-workbook.test.ts \
+              tests/operational-permission-route-policy.test.ts \
+              tests/ui/factory-arabic-translation-actions.test.tsx \
+              scripts/phase4-typecheck-scope.mjs
+            if git diff --quiet; then
+              echo "All Phase 4 files are already formatted."
+              exit 0
+            fi
+            git config user.name "Hassan-Merhi"
+            git config user.email "actions@users.noreply.github.com"
+            git add \
+              client/src/components/FactoryArabicTranslationActions.tsx \
+              client/src/pages/factory/FactoryBalesHub.tsx \
+              server/routes/factory/factoryArabicTranslationRoutes.ts \
+              server/routes/factory/factoryBilingualCatalogRoutes.ts \
+              server/services/factoryArabicTranslationWorkbook.ts \
+              server/services/security/operationalPermissionRoutePolicy.ts \
+              tests/factory-arabic-translation-routes.test.ts \
+              tests/factory-arabic-translation-workbook.test.ts \
+              tests/operational-permission-route-policy.test.ts \
+              tests/ui/factory-arabic-translation-actions.test.tsx \
+              scripts/phase4-typecheck-scope.mjs
+            git commit -m "Format Phase 4 bilingual workbook files"
+            git push origin HEAD:agent/phase-4-factory-arabic-excel-import
 
 workflows:
-  setup-format-extraction:
+  phase4-format-push:
     jobs:
-      - encode-formatted-file
+      - format-and-push-phase4
