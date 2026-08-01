@@ -41,8 +41,11 @@ const upload = multer({
       !file.mimetype ||
       file.mimetype === XLSX_MIME ||
       file.mimetype === "application/octet-stream";
-    const valid = validExtension && validMime;
-    callback(valid ? null : new Error("Only .xlsx files are supported"), valid);
+    if (!validExtension || !validMime) {
+      callback(new Error("Only .xlsx files are supported"));
+      return;
+    }
+    callback(null, true);
   },
 });
 const receiveArabicWorkbook = upload.single("file");
@@ -214,7 +217,7 @@ function sendWorkbook(
   res.setHeader("Content-Type", XLSX_MIME);
   res.setHeader(
     "Content-Disposition",
-    contentDisposition("attachment", fileName)
+    contentDisposition(fileName, "attachment")
   );
   res.setHeader("Cache-Control", "private, no-store");
   return res.send(workbook);
