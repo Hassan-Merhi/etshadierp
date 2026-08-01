@@ -17,6 +17,26 @@ executors:
       NODE_OPTIONS: --max-old-space-size=4096
       PORT: "5000"
 
+  node22-postgres:
+    docker:
+      - image: cimg/node:22.14
+        environment:
+          NODE_ENV: test
+          SESSION_SECRET: circleci-session-secret
+          CSRF_ENFORCE: "0"
+          ENABLE_SCHEDULERS: "false"
+          NODE_OPTIONS: --max-old-space-size=2048
+          PORT: "5000"
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+          PGSSLMODE: disable
+      - image: cimg/postgres:15.13
+        environment:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+    resource_class: medium+
+    working_directory: ~/project
+
 commands:
   install_dependencies:
     steps:
@@ -27,51 +47,127 @@ commands:
       - node/install-packages:
           pkg-manager: npm
           override-ci-command: npm ci --no-audit --bin-links=true
+      - run:
+          name: Dependency diagnostics
+          command: |
+            node --version
+            npm --version
+            npm config get bin-links
+            node -p "'TypeScript ' + require('typescript/package.json').version"
+            node -p "'jsdom ' + require('jsdom/package.json').version"
+            for binary in tsc vite eslint vitest; do
+              test -x "node_modules/.bin/$binary" || { echo "$binary is missing"; exit 1; }
+            done
+
+  wait_for_postgres:
+    steps:
+      - run:
+          name: Wait for PostgreSQL
+          command: |
+            for attempt in $(seq 1 60); do
+              if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then
+                echo "PostgreSQL is accepting connections."
+                exit 0
+              fi
+              sleep 1
+            done
+            echo "PostgreSQL did not become ready."
+            exit 1
 
 jobs:
-  phase4-format-config:
+  static-build:
     executor: node22
     steps:
       - install_dependencies
       - run:
-          name: Vitest config formatting
-          command: node node_modules/prettier/bin/prettier.cjs --check vitest.config.ts
-
-  phase4-lint:
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: Lint
-          command: npm run lint
-
-  phase4-typescript:
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: TypeScript
-          command: npm run check
-
-  phase4-build:
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: Production build and contracts
+          name: Verify lockfile and production dependencies
           command: |
             npm run verify:lockfile
             npm run verify:production-dependencies
-            npm run build
-            npm run verify:server-bundle
+      - run:
+          name: Check formatting for changed source files
+          command: |
+            git fetch origin main --depth=1
+            mapfile -d '' changed_files < <(
+              git diff --name-only --diff-filter=ACMR -z origin/main...HEAD -- client/src server shared tests scripts |
+                grep -zE '\.(ts|tsx|css|mjs)$' || true
+            )
+            if [ "${#changed_files[@]}" -eq 0 ]; then
+              echo "No changed source files require formatting checks."
+              exit 0
+            fi
+            printf 'Checking formatting for %s changed source file(s):\n' "${#changed_files[@]}"
+            printf ' - %s\n' "${changed_files[@]}"
+            node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
+      - run:
+          name: Lint
+          command: npm run lint
+      - run:
+          name: TypeScript
+          command: npm run check
+      - run:
+          name: Production build
+          command: npm run build
+      - run:
+          name: Verify server bundle
+          command: npm run verify:server-bundle
+      - run:
+          name: Repository safety contracts
+          command: |
             npm run verify:program1-observability
             npm run verify:final-production-readiness
             npm run verify:bandwidth
+      - store_artifacts:
+          path: dist
+          destination: production-build
+
+  postgres-regression:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - wait_for_postgres
+      - run:
+          name: Verify migration registry
+          command: node scripts/verify-migration-registry.mjs --json
+      - run:
+          name: Prepare disposable database schema
+          command: node node_modules/drizzle-kit/bin.cjs push --force
+      - run:
+          name: Verify disposable database schema
+          command: node scripts/verify-ci-disposable-schema.mjs
+      - run:
+          name: Backend tests
+          command: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
+      - run:
+          name: Frontend tests
+          command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
+
+  security-readiness:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - wait_for_postgres
+      - run:
+          name: Prepare disposable database schema
+          command: node node_modules/drizzle-kit/bin.cjs push --force
+      - run:
+          name: Critical dependency audit
+          command: npm audit --audit-level=critical
+      - run:
+          name: Production dependency verification
+          command: npm run verify:production-dependencies
+      - run:
+          name: Program 6 security checks
+          command: PROGRAM6_SKIP_TYPESCRIPT=1 npm run check:program-6-security
+      - run:
+          name: Final production readiness contract
+          command: npm run verify:final-production-readiness
 
 workflows:
-  phase4-static-diagnostics:
+  full-erp-verification:
     jobs:
-      - phase4-format-config
-      - phase4-lint
-      - phase4-typescript
-      - phase4-build
+      - static-build
+      - postgres-regression
+      - security-readiness:
+          requires:
+            - static-build
