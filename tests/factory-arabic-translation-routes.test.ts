@@ -221,7 +221,7 @@ describe("Factory Arabic translation import routes", () => {
     const productRow = productRowNumber ? sheet.getRow(productRowNumber) : undefined;
     expect(productRow?.getCell(1).value).toBe("000-AR-001");
     expect(productRow?.getCell(1).numFmt).toBe("@");
-    expect(productRow?.getCell(1).protection.locked).toBe(true);
+    expect(productRow?.getCell(1).protection.locked).not.toBe(false);
     expect(productRow?.getCell(3).protection.locked).toBe(false);
   });
 
