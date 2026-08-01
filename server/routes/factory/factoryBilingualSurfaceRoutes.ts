@@ -6,8 +6,8 @@ import { resolveFactoryBilingualSurfacePayload } from "../../services/factoryBil
 
 const LANGUAGE_COOKIE = "factory_catalog_language";
 const READ_SURFACE_PATTERNS = [
-  /^\/bales(?:\/|$)/, /^\/bale-products(?:\/|$)/, /^\/bale-transfers(?:\/|$)/, /^\/bale-ledger(?:\/|$)/,
-  /^\/categories(?:\/|$)/, /^\/barcode(?:\/|$)/, /^\/lookup(?:\/|$)/, /^\/daily-bale-scans(?:\/|$)/,
+  /^\/bales(?:\/|$)/, /^\/bale-transfers(?:\/|$)/, /^\/bale-ledger(?:\/|$)/,
+  /^\/barcode(?:\/|$)/, /^\/lookup(?:\/|$)/, /^\/daily-bale-scans(?:\/|$)/,
   /^\/ground-scan(?:\/|$)/, /^\/stock(?:\/|$)/, /^\/stock-entry(?:\/|$)/, /^\/location-inventory(?:\/|$)/,
   /^\/production(?:\/|$)/, /^\/pressing(?:\/|$)/, /^\/customer-proformas(?:\/|$)/, /^\/customer-orders(?:\/|$)/,
   /^\/customer-invoices(?:\/|$)/, /^\/invoices(?:\/|$)/, /^\/invoice-loading(?:\/|$)/, /^\/container-loading(?:\/|$)/,
@@ -32,7 +32,9 @@ function companyId(req: Request): number | null {
   return Number.isSafeInteger(value) && value > 0 ? value : null;
 }
 function isReadSurface(req: Request): boolean {
-  return req.method === "GET" && READ_SURFACE_PATTERNS.some((pattern) => pattern.test(req.path));
+  if (req.method !== "GET") return false;
+  if (req.query.legacy === "1") return false;
+  return READ_SURFACE_PATTERNS.some((pattern) => pattern.test(req.path));
 }
 function isPreservationPayload(req: Request): boolean {
   return /^\/(backup|offline|prepare|import)/.test(req.path);
