@@ -12,6 +12,7 @@ import {
   propagateFactoryArabicCatalogChange,
 } from "../../services/factoryBilingualSnapshotService";
 import { registerFactoryBilingualDocumentRoutes } from "./factoryBilingualDocumentRoutes";
+import { registerFactoryBilingualSurfaceRoutes } from "./factoryBilingualSurfaceRoutes";
 
 function getFactoryCompanyId(req: Request): number | null {
   const companyId = Number((req.session as any)?.factoryCompanyId);
@@ -85,6 +86,7 @@ function factoryBilingualSnapshotWriteMiddleware(
 
 export function registerFactoryBilingualSnapshotRoutes(app: Express): void {
   registerFactoryBilingualDocumentRoutes(app);
+  registerFactoryBilingualSurfaceRoutes(app);
   app.use("/api/factory", factoryBilingualSnapshotWriteMiddleware);
 
   app.get(
