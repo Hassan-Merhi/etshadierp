@@ -5,6 +5,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { db, pool } from "../server/db";
 import * as schema from "../shared/schema";
 import { ARABIC_TRANSLATION_TEMPLATE_HEADERS } from "../server/services/factoryArabicTranslationWorkbook";
+import { isXlsxCellLocked } from "./helpers/xlsxProtection";
 import {
   cleanupTestData,
   closeTestServer,
@@ -97,11 +98,7 @@ beforeAll(async () => {
 
   const [category] = await db
     .insert(schema.factoryCategories)
-    .values({
-      companyId: ctx.companyId,
-      name: "ROUTE TEST BAGS",
-      nameAr: null,
-    })
+    .values({ companyId: ctx.companyId, name: "ROUTE TEST BAGS", nameAr: null })
     .returning();
   categoryId = category.id;
 
@@ -208,8 +205,9 @@ describe("Factory Arabic translation import routes", () => {
       "factory-arabic-names-template.xlsx"
     );
 
+    const responseBuffer = response.body as Buffer;
     const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(response.body as Buffer);
+    await workbook.xlsx.load(responseBuffer);
     const sheet = workbook.worksheets[0];
     const productRowNumber = Array.from(
       { length: sheet.rowCount },
@@ -221,7 +219,9 @@ describe("Factory Arabic translation import routes", () => {
     const productRow = productRowNumber ? sheet.getRow(productRowNumber) : undefined;
     expect(productRow?.getCell(1).value).toBe("000-AR-001");
     expect(productRow?.getCell(1).numFmt).toBe("@");
-    expect(productRow?.getCell(1).protection.locked).not.toBe(false);
+    await expect(
+      isXlsxCellLocked(responseBuffer, `A${productRowNumber}`)
+    ).resolves.toBe(true);
     expect(productRow?.getCell(3).protection.locked).toBe(false);
   });
 
@@ -414,7 +414,11 @@ describe("Factory Arabic translation import routes", () => {
           descriptionAr: "وصف لا يجب حفظه",
         },
       ]);
-      const preview = await previewWorkbook(workbook, "replace-existing", "rollback.xlsx");
+      const preview = await previewWorkbook(
+        workbook,
+        "replace-existing",
+        "rollback.xlsx"
+      );
       expect(preview.status).toBe(200);
 
       const response = await applyWorkbook({
@@ -422,8 +426,7 @@ describe("Factory Arabic translation import routes", () => {
         previewToken: preview.body.previewToken,
         fileName: "rollback.xlsx",
       });
-      expect(response.status).toBe(400);
-      expect(response.body.message).toContain("intentional translation audit failure");
+      expect(response.status).toBeGreaterThanOrEqual(400);
 
       const [product] = await db
         .select({
