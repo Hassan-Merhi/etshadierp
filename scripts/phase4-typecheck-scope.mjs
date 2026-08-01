@@ -4,6 +4,11 @@ import ts from "typescript";
 
 const rootDir = process.cwd();
 const requestedPaths = process.argv.slice(2).map((entry) => entry.replaceAll("\\", "/"));
+const diagnosticHost = {
+  getCanonicalFileName: (fileName) => fileName,
+  getCurrentDirectory: () => rootDir,
+  getNewLine: () => ts.sys.newLine,
+};
 
 if (requestedPaths.length === 0) {
   console.error("Provide at least one repository-relative file or directory to inspect.");
@@ -44,11 +49,3 @@ if (relevantDiagnostics.length > 0) {
 }
 
 console.log(`No TypeScript diagnostics in: ${requestedPaths.join(", ")}`);
-
-function diagnosticHost() {
-  return {
-    getCanonicalFileName: (fileName) => fileName,
-    getCurrentDirectory: () => rootDir,
-    getNewLine: () => ts.sys.newLine,
-  };
-}
