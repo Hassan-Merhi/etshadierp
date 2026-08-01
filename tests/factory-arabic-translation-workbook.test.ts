@@ -10,6 +10,7 @@ import {
   previewArabicTranslationImport,
   type TranslationCatalogProduct,
 } from "../server/services/factoryArabicTranslationWorkbook";
+import { isXlsxCellLocked } from "./helpers/xlsxProtection";
 
 const products: TranslationCatalogProduct[] = [
   {
@@ -48,7 +49,7 @@ describe("Factory Arabic translation workbook", () => {
     ).toEqual([...ARABIC_TRANSLATION_TEMPLATE_HEADERS]);
     expect(sheet.getRow(2).getCell(1).numFmt).toBe("@");
     expect(sheet.getRow(2).getCell(1).value).toBe("00123");
-    expect(sheet.getRow(2).getCell(1).protection.locked).not.toBe(false);
+    await expect(isXlsxCellLocked(buffer, "A2")).resolves.toBe(true);
     expect(sheet.getRow(2).getCell(3).protection.locked).toBe(false);
   });
 
@@ -63,7 +64,9 @@ describe("Factory Arabic translation workbook", () => {
     const sheet = workbook.addWorksheet("Wrong");
     sheet.addRow(["Barcode", "Arabic"]);
     const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
-    await expect(parseArabicTranslationWorkbook(buffer)).rejects.toThrow("Workbook columns do not match");
+    await expect(parseArabicTranslationWorkbook(buffer)).rejects.toThrow(
+      "Workbook columns do not match"
+    );
   });
 
   it("matches by normalized exact article code only", () => {
@@ -257,7 +260,11 @@ describe("Factory Arabic translation workbook", () => {
         descriptionAr: "",
       },
     ];
-    const preview = previewArabicTranslationImport(rows, products, "replace-existing");
+    const preview = previewArabicTranslationImport(
+      rows,
+      products,
+      "replace-existing"
+    );
     const first = createArabicTranslationPreviewEnvelope({
       companyId: 10,
       mode: "replace-existing",
@@ -305,6 +312,8 @@ describe("Factory Arabic translation workbook", () => {
     await workbook.xlsx.load(buffer as any);
     const sheet = workbook.worksheets[0];
     expect(sheet.getRow(2).getCell(2).value).toBe("UNKNOWN");
-    expect(String(sheet.getRow(2).getCell(7).value)).toContain("Unknown article code");
+    expect(String(sheet.getRow(2).getCell(7).value)).toContain(
+      "Unknown article code"
+    );
   });
 });
