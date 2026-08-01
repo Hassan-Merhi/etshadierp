@@ -7,7 +7,7 @@ export default defineConfig({
     environment: "node",
     testTimeout: 30000,
     hookTimeout: 30000,
-    setupFiles: ["./server/supplierCompanyScopeBridge.mjs", "./tests/setupXlsxBinaryParser.cjs"],
+    setupFiles: ["./server/supplierCompanyScopeBridge.mjs"],
     include: ["tests/**/*.test.ts"],
     // The smoke sweep runs as its own invocation so that "an endpoint stopped
     // responding" is a separate CI signal: npm run test:smoke-sweep
