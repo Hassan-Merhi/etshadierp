@@ -87,6 +87,46 @@ commands:
           command: node scripts/verify-ci-disposable-schema.mjs
 
 jobs:
+  phase4-format-apply:
+    executor: node22
+    steps:
+      - install_dependencies
+      - run:
+          name: Apply pinned Prettier formatting to Phase 4 files
+          command: |
+            node node_modules/prettier/bin/prettier.cjs --write \
+              client/src/components/FactoryArabicTranslationActions.tsx \
+              client/src/pages/factory/FactoryBalesHub.tsx \
+              server/routes/factory/factoryArabicTranslationRoutes.ts \
+              server/routes/factory/factoryBilingualCatalogRoutes.ts \
+              server/services/factoryArabicTranslationWorkbook.ts \
+              server/services/security/operationalPermissionRoutePolicy.ts \
+              tests/factory-arabic-translation-routes.test.ts \
+              tests/factory-arabic-translation-workbook.test.ts \
+              tests/operational-permission-route-policy.test.ts \
+              tests/ui/factory-arabic-translation-actions.test.tsx \
+              scripts/phase4-typecheck-scope.mjs
+            if git diff --quiet; then
+              echo "Phase 4 files are already formatted."
+              exit 0
+            fi
+            git config user.name "Hassan-Merhi"
+            git config user.email "actions@users.noreply.github.com"
+            git add \
+              client/src/components/FactoryArabicTranslationActions.tsx \
+              client/src/pages/factory/FactoryBalesHub.tsx \
+              server/routes/factory/factoryArabicTranslationRoutes.ts \
+              server/routes/factory/factoryBilingualCatalogRoutes.ts \
+              server/services/factoryArabicTranslationWorkbook.ts \
+              server/services/security/operationalPermissionRoutePolicy.ts \
+              tests/factory-arabic-translation-routes.test.ts \
+              tests/factory-arabic-translation-workbook.test.ts \
+              tests/operational-permission-route-policy.test.ts \
+              tests/ui/factory-arabic-translation-actions.test.tsx \
+              scripts/phase4-typecheck-scope.mjs
+            git commit -m "Format Phase 4 bilingual workbook files"
+            git push origin "HEAD:${CIRCLE_BRANCH}"
+
   static-build:
     executor: node22
     steps:
@@ -264,6 +304,7 @@ jobs:
 workflows:
   full-erp-verification:
     jobs:
+      - phase4-format-apply
       - static-build
       - phase4-format
       - phase4-format-scope:
