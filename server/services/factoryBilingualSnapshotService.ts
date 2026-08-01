@@ -79,6 +79,7 @@ function referencedTables(item: FactoryBilingualSnapshotTarget): string[] {
 
 async function targetExists(item: FactoryBilingualSnapshotTarget, executor: typeof db = db): Promise<boolean> {
   const relations = referencedTables(item);
+  const dependencyArray = sql.raw(`ARRAY[${relations.map((relation) => `'${relation}'`).join(", ")}]::text[]`);
   const result = await executor.execute(sql`
     SELECT
       EXISTS (
@@ -87,7 +88,7 @@ async function targetExists(item: FactoryBilingualSnapshotTarget, executor: type
       ) AS target_column_present,
       NOT EXISTS (
         SELECT 1
-        FROM unnest(${relations}::text[]) AS dependency(table_name)
+        FROM unnest(${dependencyArray}) AS dependency(table_name)
         WHERE to_regclass('public.' || dependency.table_name) IS NULL
       ) AS dependencies_present
   `);
