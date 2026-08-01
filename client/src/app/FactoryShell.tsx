@@ -9,6 +9,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { DailyRateModal } from "@/components/DailyRateModal";
 import { FactorySidebar } from "@/components/FactorySidebar";
 import { FactoryRoutes } from "@/components/FactoryRoutes";
+import { FactoryCatalogLanguageSwitch } from "@/components/FactoryCatalogLanguageSwitch";
 import { HistoricalReplaySafetyPanel } from "@/components/HistoricalReplaySafetyPanel";
 import { HistoricalReplayNetEffectPanel } from "@/components/HistoricalReplayNetEffectPanel";
 import { AppTopBar } from "@/components/AppTopBar";
@@ -85,6 +86,7 @@ export function FactoryShell({
               }`}
             >
               <div className="w-full min-w-0 max-w-full [&_form]:min-w-0 [&_table]:w-full [&_[role=table]]:w-full [&_.overflow-x-auto]:overscroll-x-contain">
+                <FactoryCatalogLanguageSwitch />
                 <ErrorBoundary resetKey={`${currentLocation}:historical-replay-preview`}>
                   {isRawStockRecalculateRoute && (
                     <>
