@@ -139,6 +139,18 @@ export function PaymentReceiptTab({
   // Track whether the Pay From / Receive Into autocomplete is the active target
   const [payFromActive, setPayFromActive] = useState(false);
 
+  // Effective date is optional and rarely used — it stays behind a toggle until asked for,
+  // and reveals itself automatically when the voucher already carries one.
+  const [showEffectiveDate, setShowEffectiveDate] = useState<boolean>(Boolean(effectiveDate));
+
+  // Once an account is chosen the picker collapses into a summary card; "Change" reopens it.
+  const [editingSource, setEditingSource] = useState(false);
+
+  // Required-field warnings wait for a submit attempt or for the user to leave the field,
+  // so an untouched form never opens with an error on it.
+  const [payFromTouched, setPayFromTouched] = useState(false);
+  const showValidation = form.formState.isSubmitted || payFromTouched;
+
   const isPayment = activeTab === "payment";
 
   // Tab-specific styling / labels
@@ -180,6 +192,21 @@ export function PaymentReceiptTab({
   const missingAccount = paymentAccountId === 0;
   const missingEntries = validEntryCount === 0;
 
+  // Why Save is disabled, said out loud rather than left to a dead button.
+  const saveHint = missingAccount
+    ? `Select a ${accountLabel} account to save`
+    : total === 0
+      ? "Add at least one line with an amount"
+      : null;
+
+  // ⌘/Ctrl+Enter saves from anywhere in the form, matching the keyboard-first entry flow.
+  const handleFormKeyDown = (e: React.KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      if (!saveHint && !isPending) form.handleSubmit(onSubmit)();
+    }
+  };
+
   // Balance display helpers
   const balColor = (v: number) =>
     v < 0
@@ -206,6 +233,22 @@ export function PaymentReceiptTab({
     : isEditMode
       ? accountBalance - originalTotal + total
       : accountBalance + total;
+
+  // How much of the source account this voucher consumes, purely as a visual cue.
+  // Capped at 100% so a voucher larger than the balance simply fills the bar.
+  const meterPct = (() => {
+    if (total <= 0) return 0;
+    const capacity = Math.max(Math.abs(accountBalance), total);
+    return capacity > 0 ? Math.min(100, (total / capacity) * 100) : 0;
+  })();
+
+  // Initials for the source tile, e.g. "Access Cash" → "AC".
+  const accountInitials = paymentAccountName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .join("");
 
   // When the Pay From / Receive Into field is active, restrict the sidebar and autocomplete to
   // Cash / Bank / Loans ledger accounts + bank accounts only.
@@ -248,7 +291,12 @@ export function PaymentReceiptTab({
       <div className="flex-1 min-w-0">
         <Card>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col" noValidate>
+            <form
+              onSubmit={form.handleSubmit(onSubmit)}
+              onKeyDown={handleFormKeyDown}
+              className="flex flex-col"
+              noValidate
+            >
               {/* ── Compact header strip ── */}
               <div
                 className="relative flex items-center gap-2 px-4 py-3 border-b border-border/50 overflow-hidden flex-wrap rounded-t-lg"
@@ -297,7 +345,7 @@ export function PaymentReceiptTab({
                       <FormControl>
                         <Input
                           type="date"
-                          className="w-36"
+                          className="w-[9.5rem] h-8 text-xs"
                           value={
                             field.value instanceof Date
                               ? format(field.value, "yyyy-MM-dd")
@@ -316,20 +364,32 @@ export function PaymentReceiptTab({
                   )}
                 />
 
-                {/* Effective Date (optional) */}
-                {onEffectiveDateChange && (
-                  <div className="shrink-0 flex items-center gap-1.5">
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">Eff.</span>
-                    <Input
-                      type="date"
-                      className="w-36"
-                      value={effectiveDate || ""}
-                      onChange={(e) => onEffectiveDateChange(e.target.value)}
-                      data-testid="input-effective-date"
-                      title="Effective Date (optional — used for ledger/accounts)"
-                    />
-                  </div>
-                )}
+                {/* Effective Date — optional, revealed on demand */}
+                {onEffectiveDateChange &&
+                  (showEffectiveDate ? (
+                    <div className="shrink-0 flex items-center gap-1.5">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">Eff.</span>
+                      <Input
+                        type="date"
+                        className="w-[9.5rem] h-8 text-xs"
+                        value={effectiveDate || ""}
+                        onChange={(e) => onEffectiveDateChange(e.target.value)}
+                        data-testid="input-effective-date"
+                        title="Effective Date (optional — used for ledger/accounts)"
+                      />
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 shrink-0 text-xs text-muted-foreground"
+                      onClick={() => setShowEffectiveDate(true)}
+                      data-testid="button-show-effective-date"
+                    >
+                      + Effective date
+                    </Button>
+                  ))}
 
                 {/* Print */}
                 <Tooltip>
@@ -337,12 +397,12 @@ export function PaymentReceiptTab({
                     <span className={!canPrint ? "cursor-not-allowed" : ""}>
                       <Button
                         type="button"
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
                         disabled={!canPrint}
                         onClick={handlePrint}
                         data-testid="button-print"
-                        className={!canPrint ? "pointer-events-none" : ""}
+                        className={cn("h-8 text-muted-foreground", !canPrint && "pointer-events-none")}
                       >
                         <Printer className="h-4 w-4" />
                         <span className="hidden sm:inline ml-1.5">Print</span>
@@ -365,11 +425,11 @@ export function PaymentReceiptTab({
                           <DropdownMenuTrigger asChild>
                             <Button
                               type="button"
-                              variant="outline"
+                              variant="ghost"
                               size="sm"
                               disabled={!canExport}
                               data-testid="button-export"
-                              className={!canExport ? "pointer-events-none" : ""}
+                              className={cn("h-8 text-muted-foreground", !canExport && "pointer-events-none")}
                             >
                               <FileDown className="h-4 w-4" />
                               <span className="hidden sm:inline ml-1.5">Export</span>
@@ -416,79 +476,54 @@ export function PaymentReceiptTab({
 
               {/* ── Form fields ── */}
               <div className="p-4 sm:p-5 space-y-6">
-                {/* Account selector — full width */}
-                <FormField
-                  control={form.control}
-                  name="paymentAccountId"
-                  render={() => (
-                    <FormItem className="min-w-0">
-                      <FormLabel>{accountLabel}</FormLabel>
-                      <FormControl>
-                        <div className="w-full min-w-0">
-                          {/* Mobile: tappable card → opens Pay From sheet */}
-                          <div
-                            className="sm:hidden w-full rounded-md border bg-card px-3 py-2.5 flex items-center justify-between gap-2 cursor-pointer hover-elevate active-elevate-2 min-h-9"
-                            onClick={() => {
-                              setPayFromSearch("");
-                              setPayFromSheetOpen(true);
-                            }}
-                            data-testid={`${accountTestId}-mobile-card`}
-                          >
-                            <span
-                              className={cn(
-                                "text-sm truncate",
-                                paymentAccountId > 0 ? "font-medium" : "text-muted-foreground"
-                              )}
-                            >
-                              {paymentAccountId > 0 ? paymentAccountName : accountPlaceholder}
-                            </span>
-                            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                          </div>
-                          {/* Desktop: AccountAutocomplete */}
-                          <div
-                            className="hidden sm:block w-full min-w-0"
-                            onFocus={() => {
-                              setPayFromActive(true);
-                              onAccountPickerOpen?.();
-                            }}
-                          >
-                            <AccountAutocomplete
-                              value={
-                                paymentAccountId > 0
-                                  ? { type: paymentAccountType, id: paymentAccountId, name: paymentAccountName }
-                                  : null
-                              }
-                              onChange={(type, id, name) => {
-                                form.setValue("paymentAccountType", type);
-                                form.setValue("paymentAccountId", id);
-                                form.setValue("paymentAccountName", name);
-                              }}
-                              allAccounts={payFromAccounts ?? allAccounts}
-                              rowIndex={-1}
-                              placeholder={accountPlaceholder}
-                              testId={accountTestId}
-                              onSearchChange={onAccountSearchChange}
+                {/* ── Source account + running total ── */}
+                <div className="grid gap-3 lg:grid-cols-[1fr_minmax(170px,210px)]">
+                  {/* Selected-account summary card — the picker collapses into this */}
+                  {paymentAccountId > 0 && !editingSource && (
+                    <div
+                      className="flex items-center gap-3 rounded-lg border bg-muted/20 px-4 py-3 min-w-0"
+                      style={{ borderLeftColor: accentColor, borderLeftWidth: "3px" }}
+                      data-testid="card-selected-source"
+                    >
+                      <div
+                        className="hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-mono text-xs font-semibold"
+                        style={{ backgroundColor: `${accentColor}22`, color: accentColor }}
+                        aria-hidden="true"
+                      >
+                        {accountInitials}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          {accountLabel}
+                        </div>
+                        <div className="text-sm font-semibold truncate mt-0.5">{paymentAccountName}</div>
+
+                        {/* Consumption meter */}
+                        {total > 0 && (
+                          <div className="h-1 rounded-full bg-muted mt-2 overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-300"
+                              style={{ width: `${meterPct}%`, backgroundColor: accentColor }}
                             />
                           </div>
-                        </div>
-                      </FormControl>
+                        )}
 
-                      {/* Balance / projection display */}
-                      {paymentAccountId > 0 &&
-                        (accountCurrencyBalances && accountCurrencyBalances.length > 0 ? (
-                          <div className="flex flex-col gap-0.5 mt-1.5">
+                        {/* Balance / projection */}
+                        {accountCurrencyBalances && accountCurrencyBalances.length > 0 ? (
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
                             {accountCurrencyBalances.map(({ currency, balance }) => (
-                              <div key={currency} className="flex items-center gap-1.5 text-sm font-mono">
-                                <span className="text-muted-foreground text-xs">Bal:</span>
+                              <span key={currency} className="text-xs font-mono tabular-nums">
+                                <span className="text-muted-foreground">Bal </span>
                                 <span className={cn(balColor(balance))}>
                                   {fmtCurr(balance, currency)} {balance > 0 ? "CR" : balance < 0 ? "DR" : ""}
                                 </span>
-                              </div>
+                              </span>
                             ))}
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1.5 flex-wrap text-sm mt-1.5 font-mono">
-                            <span className="text-muted-foreground text-xs">Bal:</span>
+                          <div className="flex items-center gap-1.5 flex-wrap text-xs mt-1.5 font-mono tabular-nums">
+                            <span className="text-muted-foreground">Bal</span>
                             <span className={cn(balColor(accountBalance))}>{formatAmount(accountBalance)}</span>
                             {total > 0 && (
                               <>
@@ -496,16 +531,113 @@ export function PaymentReceiptTab({
                                 <span className={cn("font-semibold", balColor(projected))}>
                                   {formatAmount(projected)}
                                 </span>
-                                <span className="text-muted-foreground text-xs">after</span>
+                                <span className="text-muted-foreground">after</span>
                               </>
                             )}
                           </div>
-                        ))}
+                        )}
+                      </div>
 
-                      <FormMessage />
-                    </FormItem>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0 text-muted-foreground"
+                        onClick={() => setEditingSource(true)}
+                        data-testid="button-change-source"
+                      >
+                        Change
+                      </Button>
+                    </div>
                   )}
-                />
+
+                  {/* Account picker — shown until an account is chosen, or on "Change" */}
+                  <FormField
+                    control={form.control}
+                    name="paymentAccountId"
+                    render={() => (
+                      <FormItem
+                        className={cn("min-w-0", paymentAccountId > 0 && !editingSource && "hidden")}
+                        data-testid="field-source-picker"
+                      >
+                        <FormLabel>{accountLabel}</FormLabel>
+                        <FormControl>
+                          <div className="w-full min-w-0">
+                            {/* Mobile: tappable card → opens Pay From sheet */}
+                            <div
+                              className="sm:hidden w-full rounded-md border bg-card px-3 py-2.5 flex items-center justify-between gap-2 cursor-pointer hover-elevate active-elevate-2 min-h-9"
+                              onClick={() => {
+                                setPayFromSearch("");
+                                setPayFromSheetOpen(true);
+                              }}
+                              data-testid={`${accountTestId}-mobile-card`}
+                            >
+                              <span
+                                className={cn(
+                                  "text-sm truncate",
+                                  paymentAccountId > 0 ? "font-medium" : "text-muted-foreground"
+                                )}
+                              >
+                                {paymentAccountId > 0 ? paymentAccountName : accountPlaceholder}
+                              </span>
+                              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                            </div>
+                            {/* Desktop: AccountAutocomplete */}
+                            <div
+                              className="hidden sm:block w-full min-w-0"
+                              onFocus={() => {
+                                setPayFromActive(true);
+                                onAccountPickerOpen?.();
+                              }}
+                              onBlur={() => setPayFromTouched(true)}
+                            >
+                              <AccountAutocomplete
+                                value={
+                                  paymentAccountId > 0
+                                    ? { type: paymentAccountType, id: paymentAccountId, name: paymentAccountName }
+                                    : null
+                                }
+                                onChange={(type, id, name) => {
+                                  form.setValue("paymentAccountType", type);
+                                  form.setValue("paymentAccountId", id);
+                                  form.setValue("paymentAccountName", name);
+                                  setEditingSource(false);
+                                }}
+                                allAccounts={payFromAccounts ?? allAccounts}
+                                rowIndex={-1}
+                                placeholder={accountPlaceholder}
+                                testId={accountTestId}
+                                onSearchChange={onAccountSearchChange}
+                              />
+                            </div>
+                          </div>
+                        </FormControl>
+
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Running total — stated up front, not discovered at the bottom */}
+                  <div className="rounded-lg border bg-muted/20 px-4 py-3 flex flex-col justify-center">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {title.replace(" Voucher", "")} Total
+                    </span>
+                    <span
+                      className={cn(
+                        "text-2xl font-bold font-mono tabular-nums leading-tight mt-0.5",
+                        total === 0 && "text-muted-foreground"
+                      )}
+                      style={total > 0 ? { color: accentColor } : undefined}
+                      data-testid="text-hero-total"
+                    >
+                      {total > 0 ? formatAmount(total) : "—"}
+                    </span>
+                    <span className="text-xs text-muted-foreground mt-0.5 tabular-nums">
+                      {validEntryCount} {validEntryCount === 1 ? "line" : "lines"}
+                    </span>
+                  </div>
+                </div>
 
                 {/* ── Entries table ── */}
                 <VoucherEntriesTable
@@ -538,57 +670,23 @@ export function PaymentReceiptTab({
                   isAutoCreating={isAutoCreating}
                 />
 
-                {/* ── Summary / validation ── */}
-                <div
-                  className="rounded-r-lg border bg-muted/20 overflow-hidden"
-                  style={{ borderLeftColor: accentColor, borderLeftWidth: "3px" }}
-                >
-                  <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-                    {/* Left: stats + validation hints */}
-                    <div className="flex flex-wrap items-center gap-4">
-                      <div className="flex flex-col">
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                          Lines
-                        </span>
-                        <span className="text-sm font-semibold tabular-nums">{validEntryCount}</span>
+                {/* ── Validation — held back until the form has been touched or submitted ── */}
+                {showValidation && (missingAccount || missingEntries) && (
+                  <div className="flex flex-col gap-1" data-testid="voucher-validation">
+                    {missingAccount && (
+                      <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                        <span>{accountLabel} account is required</span>
                       </div>
-
-                      {(missingAccount || missingEntries) && (
-                        <div className="flex flex-col gap-0.5 justify-center">
-                          {missingAccount && (
-                            <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
-                              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                              <span>{accountLabel} account is required</span>
-                            </div>
-                          )}
-                          {!missingAccount && missingEntries && (
-                            <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
-                              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                              <span>Add at least one entry with an amount</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Right: large total */}
-                    <div className="flex flex-col items-end">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Total
-                      </span>
-                      <span
-                        className={cn(
-                          "text-xl font-bold tabular-nums leading-tight",
-                          total === 0 && "text-muted-foreground"
-                        )}
-                        style={total > 0 ? { color: accentColor } : undefined}
-                        data-testid="text-total-amount"
-                      >
-                        {total > 0 ? formatAmount(total) : "—"}
-                      </span>
-                    </div>
+                    )}
+                    {!missingAccount && missingEntries && (
+                      <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                        <span>Add at least one entry with an amount</span>
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
 
                 {/* ── Notes (collapsible) ── */}
                 <Collapsible open={notesOpen} onOpenChange={setNotesOpen}>
@@ -627,42 +725,86 @@ export function PaymentReceiptTab({
                   </CollapsibleContent>
                 </Collapsible>
 
-                {/* ── Optional toggle + Submit ── */}
-                <div className="flex items-center justify-between gap-4 pt-4 flex-wrap border-t border-border/50">
-                  <FormField
-                    control={form.control}
-                    name="optional"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center gap-3 space-y-0">
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            data-testid="checkbox-optional"
-                          />
-                        </FormControl>
-                        <div className="space-y-0.5 leading-none">
-                          <FormLabel className="cursor-pointer">Mark as Optional</FormLabel>
-                          <p className="text-xs text-muted-foreground">Excluded from required balance checks</p>
-                        </div>
-                      </FormItem>
-                    )}
-                  />
-                  <Button
-                    type="submit"
-                    size="default"
-                    className="w-full sm:w-auto"
-                    disabled={paymentAccountId === 0 || total === 0 || isPending}
-                    data-testid="button-save-voucher"
-                  >
-                    {isPending
-                      ? isEditMode
-                        ? "Updating…"
-                        : "Saving…"
-                      : isEditMode
-                        ? `Update Voucher${total > 0 ? ` · ${formatAmount(total)}` : ""}`
-                        : `Save Voucher${total > 0 ? ` · ${formatAmount(total)}` : ""}`}
-                  </Button>
+              </div>
+
+              {/* ── Action bar — the total stays with Save, pinned to the bottom of the card ── */}
+              <div className="sticky bottom-0 z-20 rounded-b-lg border-t bg-card/95 px-4 sm:px-5 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="flex items-center gap-5">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Lines
+                      </span>
+                      <span className="text-sm font-semibold font-mono tabular-nums">{validEntryCount}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Total
+                      </span>
+                      <span
+                        className={cn(
+                          "text-xl font-bold font-mono tabular-nums leading-tight",
+                          total === 0 && "text-muted-foreground"
+                        )}
+                        style={total > 0 ? { color: accentColor } : undefined}
+                        data-testid="text-total-amount"
+                      >
+                        {total > 0 ? formatAmount(total) : "—"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 flex-wrap justify-end flex-1 min-w-0">
+                    <FormField
+                      control={form.control}
+                      name="optional"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center gap-2 space-y-0">
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              data-testid="checkbox-optional"
+                            />
+                          </FormControl>
+                          <FormLabel
+                            className="cursor-pointer text-xs text-muted-foreground font-normal"
+                            title="Excluded from required balance checks"
+                          >
+                            Optional
+                          </FormLabel>
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="flex flex-col items-end gap-1 w-full sm:w-auto">
+                      <Button
+                        type="submit"
+                        size="default"
+                        className="w-full sm:w-auto"
+                        disabled={paymentAccountId === 0 || total === 0 || isPending}
+                        data-testid="button-save-voucher"
+                      >
+                        {isPending
+                          ? isEditMode
+                            ? "Updating…"
+                            : "Saving…"
+                          : isEditMode
+                            ? `Update Voucher${total > 0 ? ` · ${formatAmount(total)}` : ""}`
+                            : `Save Voucher${total > 0 ? ` · ${formatAmount(total)}` : ""}`}
+                      </Button>
+                      {saveHint ? (
+                        <span className="text-[11px] text-muted-foreground" data-testid="text-save-hint">
+                          {saveHint}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground hidden sm:block">
+                          <kbd className="px-1 py-0.5 bg-muted rounded text-[10px]">⌘</kbd>
+                          <kbd className="px-1 py-0.5 bg-muted rounded text-[10px] ml-1">↵</kbd> to save
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </form>
@@ -750,6 +892,8 @@ export function PaymentReceiptTab({
                       form.setValue("paymentAccountType", account.type);
                       form.setValue("paymentAccountId", account.id);
                       form.setValue("paymentAccountName", account.name);
+                      setEditingSource(false);
+                      setPayFromTouched(true);
                       setPayFromSheetOpen(false);
                     }}
                     data-testid={`pay-from-mobile-option-${account.id}`}
