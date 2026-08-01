@@ -62,23 +62,18 @@ function rowsFromResult(result: unknown): CatalogRecord[] {
 }
 async function loadCatalog(companyId: number, productIds: number[], articleCodes: string[]) {
   if (!productIds.length && !articleCodes.length) return { byId: new Map<number, CatalogRecord>(), byArticleCode: new Map<string, CatalogRecord>() };
-
   const productCondition = productIds.length
     ? sql`p.id IN (${sql.join(productIds.map((id) => sql`${id}`), sql`, `)})`
     : sql`FALSE`;
   const articleCondition = articleCodes.length
     ? sql`UPPER(BTRIM(COALESCE(p.article_code, ''))) IN (${sql.join(articleCodes.map((code) => sql`${code}`), sql`, `)})`
     : sql`FALSE`;
-
   const result = await db.execute(sql`
     SELECT p.id, p.article_code AS "articleCode", p.name, p.name_ar AS "nameAr",
       p.description, p.description_ar AS "descriptionAr", c.name AS "categoryName", c.name_ar AS "categoryNameAr"
     FROM factory_bale_products p
     LEFT JOIN factory_categories c ON c.id = p.category_id AND c.company_id = p.company_id AND c.deleted_at IS NULL
-    WHERE p.company_id = ${companyId} AND p.deleted_at IS NULL AND (
-      ${productCondition}
-      OR ${articleCondition}
-    )
+    WHERE p.company_id = ${companyId} AND p.deleted_at IS NULL AND (${productCondition} OR ${articleCondition})
   `);
   const byId = new Map<number, CatalogRecord>();
   const byArticleCode = new Map<string, CatalogRecord>();
@@ -96,7 +91,7 @@ function firstText(record: Record<string, unknown>, keys: string[]): string | nu
 function setIfPresent(record: Record<string, unknown>, key: string, value: string): void {
   if (Object.prototype.hasOwnProperty.call(record, key)) record[key] = value;
 }
-function localizeCategory(record: Record<string, unknown>, language: FactoryCatalogLanguage, mutate: boolean): void {
+function localizeCategory(record: Record<string, unknown>, language: FactoryCatalogLanguage): void {
   const english = clean(record.nameEn) ?? clean(record.name);
   const arabic = clean(record.nameAr);
   const display = resolveFactoryCategoryName({ name: english, nameAr: arabic }, language);
@@ -104,10 +99,10 @@ function localizeCategory(record: Record<string, unknown>, language: FactoryCata
   record.direction = language === "ar" ? "rtl" : "ltr";
   record.displayName = display;
   record.displayCategoryName = display;
-  if (mutate) record.name = display;
+  if (!record.nameEn && english) record.nameEn = english;
 }
 function localizeRecord(record: Record<string, unknown>, catalog: CatalogRecord | null, language: FactoryCatalogLanguage, options: ResolveOptions): void {
-  if (isCategoryRecord(record)) return localizeCategory(record, language, options.mutateLegacyDisplayFields);
+  if (isCategoryRecord(record)) return localizeCategory(record, language);
   const articleCode = objectArticleCode(record) || normalizeFactoryArticleCode(catalog?.articleCode);
   const englishSnapshot = firstText(record, ["productNameEn", "baleNameEn", "product_name_en", "bale_name_en", "productName", "baleName", "product_name", "bale_name"]);
   const arabicSnapshot = firstText(record, ["productNameAr", "baleNameAr", "product_name_ar", "bale_name_ar"]);
