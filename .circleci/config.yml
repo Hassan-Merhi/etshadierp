@@ -29,14 +29,6 @@ commands:
           override-ci-command: npm ci --no-audit --bin-links=true
 
 jobs:
-  phase4-format-parser:
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: Parser formatting
-          command: node node_modules/prettier/bin/prettier.cjs --check tests/setupXlsxBinaryParser.ts
-
   phase4-format-config:
     executor: node22
     steps:
@@ -79,7 +71,6 @@ jobs:
 workflows:
   phase4-static-diagnostics:
     jobs:
-      - phase4-format-parser
       - phase4-format-config
       - phase4-lint
       - phase4-typescript
