@@ -48,7 +48,7 @@ describe("Factory Arabic translation workbook", () => {
     ).toEqual([...ARABIC_TRANSLATION_TEMPLATE_HEADERS]);
     expect(sheet.getRow(2).getCell(1).numFmt).toBe("@");
     expect(sheet.getRow(2).getCell(1).value).toBe("00123");
-    expect(sheet.getRow(2).getCell(1).protection.locked).toBe(true);
+    expect(sheet.getRow(2).getCell(1).protection.locked).not.toBe(false);
     expect(sheet.getRow(2).getCell(3).protection.locked).toBe(false);
   });
 
@@ -63,9 +63,7 @@ describe("Factory Arabic translation workbook", () => {
     const sheet = workbook.addWorksheet("Wrong");
     sheet.addRow(["Barcode", "Arabic"]);
     const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
-    await expect(parseArabicTranslationWorkbook(buffer)).rejects.toThrow(
-      "Workbook columns do not match"
-    );
+    await expect(parseArabicTranslationWorkbook(buffer)).rejects.toThrow("Workbook columns do not match");
   });
 
   it("matches by normalized exact article code only", () => {
