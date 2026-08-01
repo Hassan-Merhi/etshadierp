@@ -11,7 +11,29 @@ import {
   resolveFactoryProductLanguage,
   type FactoryCatalogLanguage,
 } from "@shared/factoryBilingualContract";
+import {
+  mapFactoryLegacyProductEdit,
+  suppressUnchangedFactoryArabicFallbacks,
+} from "@shared/factoryBilingualCatalogPresentation";
 import { registerFactoryArabicTranslationRoutes } from "./factoryArabicTranslationRoutes";
+
+const LANGUAGE_COOKIE = "factory_catalog_language";
+
+function readCookie(header: unknown, name: string): string | null {
+  if (typeof header !== "string") return null;
+  for (const part of header.split(";")) {
+    const [key, ...value] = part.trim().split("=");
+    if (key === name) return decodeURIComponent(value.join("="));
+  }
+  return null;
+}
+
+function getRequestLanguage(req: any): FactoryCatalogLanguage {
+  return parseFactoryCatalogLanguage(
+    req.query?.lang ?? req.headers?.["x-factory-catalog-language"] ?? readCookie(req.headers?.cookie, LANGUAGE_COOKIE),
+    "en"
+  );
+}
 
 function getFactoryCompanyId(req: Request): number | null {
   const companyId = Number((req.session as any)?.factoryCompanyId);
@@ -36,29 +58,17 @@ function sendFactoryCompanyAccessError(res: any) {
 }
 
 async function sendCategories(req: any, res: any, companyId: number) {
-  const language = parseFactoryCatalogLanguage(req.query.lang);
+  const language = getRequestLanguage(req);
   const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
   const filters = [eq(factoryCategories.companyId, companyId), isNull(factoryCategories.deletedAt)];
-  if (query) {
-    filters.push(
-      or(
-        ilike(factoryCategories.name, `%${query}%`),
-        ilike(factoryCategories.nameAr, `%${query}%`)
-      )!
-    );
-  }
+  if (query) filters.push(or(ilike(factoryCategories.name, `%${query}%`), ilike(factoryCategories.nameAr, `%${query}%`))!);
 
-  const results = await db
-    .select()
-    .from(factoryCategories)
-    .where(and(...filters))
-    .orderBy(asc(factoryCategories.name));
-
+  const results = await db.select().from(factoryCategories).where(and(...filters)).orderBy(asc(factoryCategories.name));
   return res.json(results.map((category) => mapCategory(category, language)));
 }
 
 async function sendProducts(req: any, res: any, companyId: number) {
-  const language = parseFactoryCatalogLanguage(req.query.lang);
+  const language = getRequestLanguage(req);
   const query = typeof req.query.q === "string" ? req.query.q.trim() : "";
   const filters = [eq(factoryBaleProducts.companyId, companyId), isNull(factoryBaleProducts.deletedAt)];
   if (query) {
@@ -67,6 +77,8 @@ async function sendProducts(req: any, res: any, companyId: number) {
         ilike(factoryBaleProducts.articleCode, `%${query}%`),
         ilike(factoryBaleProducts.name, `%${query}%`),
         ilike(factoryBaleProducts.nameAr, `%${query}%`),
+        ilike(factoryBaleProducts.description, `%${query}%`),
+        ilike(factoryBaleProducts.descriptionAr, `%${query}%`),
         ilike(factoryCategories.name, `%${query}%`),
         ilike(factoryCategories.nameAr, `%${query}%`)
       )!
@@ -74,11 +86,7 @@ async function sendProducts(req: any, res: any, companyId: number) {
   }
 
   const rows = await db
-    .select({
-      product: factoryBaleProducts,
-      categoryName: factoryCategories.name,
-      categoryNameAr: factoryCategories.nameAr,
-    })
+    .select({ product: factoryBaleProducts, categoryName: factoryCategories.name, categoryNameAr: factoryCategories.nameAr })
     .from(factoryBaleProducts)
     .leftJoin(
       factoryCategories,
@@ -112,13 +120,9 @@ async function sendProducts(req: any, res: any, companyId: number) {
 }
 
 async function sendProductDetail(req: any, res: any, companyId: number, id: number) {
-  const language = parseFactoryCatalogLanguage(req.query.lang);
+  const language = getRequestLanguage(req);
   const [row] = await db
-    .select({
-      product: factoryBaleProducts,
-      categoryName: factoryCategories.name,
-      categoryNameAr: factoryCategories.nameAr,
-    })
+    .select({ product: factoryBaleProducts, categoryName: factoryCategories.name, categoryNameAr: factoryCategories.nameAr })
     .from(factoryBaleProducts)
     .leftJoin(
       factoryCategories,
@@ -132,15 +136,7 @@ async function sendProductDetail(req: any, res: any, companyId: number, id: numb
     .limit(1);
 
   if (!row) return res.status(404).json({ message: "Product not found" });
-  const resolved = resolveFactoryProductLanguage(
-    {
-      ...row.product,
-      categoryName: row.categoryName,
-      categoryNameAr: row.categoryNameAr,
-    },
-    language
-  );
-
+  const resolved = resolveFactoryProductLanguage({ ...row.product, categoryName: row.categoryName, categoryNameAr: row.categoryNameAr }, language);
   return res.json({
     ...row.product,
     nameEn: row.product.name,
@@ -156,8 +152,104 @@ async function sendProductDetail(req: any, res: any, companyId: number, id: numb
   });
 }
 
+async function applyDeferredProductArabic(
+  req: any,
+  payload: any,
+  deferred: { nameAr?: string | null; descriptionAr?: string | null },
+  suppressFallbacks: boolean
+) {
+  const current = payload?.product ?? payload;
+  const productId = Number(current?.id);
+  const companyId = getFactoryCompanyId(req);
+  if (!companyId || !Number.isSafeInteger(productId) || productId <= 0) return payload;
+
+  const safe = suppressFallbacks ? suppressUnchangedFactoryArabicFallbacks(deferred, current) : deferred;
+  if (safe.nameAr === undefined && safe.descriptionAr === undefined) return payload;
+
+  const update: Partial<typeof factoryBaleProducts.$inferInsert> = { updatedAt: new Date() };
+  if (safe.nameAr !== undefined) update.nameAr = safe.nameAr;
+  if (safe.descriptionAr !== undefined) update.descriptionAr = safe.descriptionAr;
+
+  const [product] = await db
+    .update(factoryBaleProducts)
+    .set(update)
+    .where(and(eq(factoryBaleProducts.id, productId), eq(factoryBaleProducts.companyId, companyId), isNull(factoryBaleProducts.deletedAt)))
+    .returning();
+  return product ? (payload?.product ? { ...payload, product } : product) : payload;
+}
+
+function prepareMutation(req: any, res: any, next: any) {
+  const method = req.method.toUpperCase();
+  const path = req.path;
+  const language = getRequestLanguage(req);
+  let productArabic: { nameAr?: string | null; descriptionAr?: string | null } = {};
+  let categoryNameAr: string | null | undefined;
+  let suppressFallbacks = false;
+
+  if (req.body && method === "POST" && path === "/bale-products") {
+    if (typeof req.body.nameEn === "string" && req.body.nameEn.trim()) req.body.name = req.body.nameEn.trim();
+    if (Object.prototype.hasOwnProperty.call(req.body, "nameAr")) productArabic.nameAr = typeof req.body.nameAr === "string" ? req.body.nameAr.trim() || null : null;
+    if (Object.prototype.hasOwnProperty.call(req.body, "descriptionAr")) productArabic.descriptionAr = typeof req.body.descriptionAr === "string" ? req.body.descriptionAr.trim() || null : null;
+    if (Object.prototype.hasOwnProperty.call(req.body, "descriptionEn")) req.body.description = typeof req.body.descriptionEn === "string" ? req.body.descriptionEn.trim() || null : null;
+    delete req.body.nameEn;
+    delete req.body.nameAr;
+    delete req.body.descriptionEn;
+    delete req.body.descriptionAr;
+  } else if (req.body && method === "PATCH" && /^\/bale-products\/\d+$/.test(path)) {
+    const mapped = mapFactoryLegacyProductEdit(req.body, language);
+    req.body = mapped.body;
+    productArabic = mapped.deferredArabic;
+    suppressFallbacks = language === "ar";
+  }
+
+  if (req.body && method === "POST" && path === "/categories" && Object.prototype.hasOwnProperty.call(req.body, "nameAr")) {
+    categoryNameAr = typeof req.body.nameAr === "string" ? req.body.nameAr.trim() || null : null;
+    delete req.body.nameAr;
+  } else if (req.body && method === "PATCH" && /^\/categories\/\d+$/.test(path)) {
+    if (Object.prototype.hasOwnProperty.call(req.body, "nameAr")) {
+      categoryNameAr = typeof req.body.nameAr === "string" ? req.body.nameAr.trim() || null : null;
+      delete req.body.nameAr;
+    } else if (language === "ar" && Object.prototype.hasOwnProperty.call(req.body, "name")) {
+      categoryNameAr = typeof req.body.name === "string" ? req.body.name.trim() || null : null;
+      delete req.body.name;
+    }
+  }
+
+  const needsProduct = productArabic.nameAr !== undefined || productArabic.descriptionAr !== undefined;
+  const needsCategory = categoryNameAr !== undefined;
+  if (!needsProduct && !needsCategory) return next();
+
+  const originalJson = res.json.bind(res);
+  res.json = ((payload: any) => {
+    void (async () => {
+      let output = payload;
+      if (needsProduct) output = await applyDeferredProductArabic(req, output, productArabic, suppressFallbacks);
+      if (needsCategory) {
+        const companyId = getFactoryCompanyId(req);
+        const categoryId = Number(output?.id);
+        if (companyId && Number.isSafeInteger(categoryId) && categoryId > 0) {
+          const [category] = await db
+            .update(factoryCategories)
+            .set({ nameAr: categoryNameAr, updatedAt: new Date() })
+            .where(and(eq(factoryCategories.id, categoryId), eq(factoryCategories.companyId, companyId), isNull(factoryCategories.deletedAt)))
+            .returning();
+          if (category) output = category;
+        }
+      }
+      originalJson(output);
+    })().catch((error) => {
+      logger.error("Factory bilingual catalog mutation mapping failed", { error, method, path });
+      if (!res.headersSent) res.status(500);
+      originalJson({ message: getErrorMessage(error) });
+    });
+    return res;
+  }) as typeof res.json;
+  return next();
+}
+
 async function factoryBilingualCatalogMiddleware(req: any, res: any, next: any) {
-  if (req.method !== "GET" || req.query.legacy === "1") return next();
+  if (req.method !== "GET") return prepareMutation(req, res, next);
+  if (req.query.legacy === "1") return next();
 
   const categoriesRequest = /^\/categories\/?$/.test(req.path);
   const productsRequest = /^\/bale-products\/?$/.test(req.path);
@@ -169,7 +261,6 @@ async function factoryBilingualCatalogMiddleware(req: any, res: any, next: any) 
     if (!companyId) return sendFactoryCompanyAccessError(res);
     if (categoriesRequest) return await sendCategories(req, res, companyId);
     if (productsRequest) return await sendProducts(req, res, companyId);
-
     const id = Number(productDetailMatch?.[1]);
     if (!Number.isSafeInteger(id) || id <= 0) return next();
     return await sendProductDetail(req, res, companyId, id);
@@ -179,11 +270,6 @@ async function factoryBilingualCatalogMiddleware(req: any, res: any, next: any) 
   }
 }
 
-/**
- * Intercepts the three existing catalog GET endpoints without adding duplicate
- * Express route registrations. Unmatched and explicit legacy requests continue
- * to the original Factory product/category handlers unchanged.
- */
 export function registerFactoryBilingualCatalogRoutes(app: Express) {
   registerFactoryArabicTranslationRoutes(app);
   app.use("/api/factory", requireAuth, factoryBilingualCatalogMiddleware);
