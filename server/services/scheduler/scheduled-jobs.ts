@@ -247,7 +247,7 @@ export function startScheduler() {
       const _t = Date.now();
       logger.info("cron containerTracking started", { module: "scheduler", action: "containerTracking" });
       try {
-        const { trackDueContainers } = await import("../containerTrackingService");
+        const { trackDueContainers } = await import("../container-tracking");
         await trackDueContainers();
       } catch (err: unknown) {
         logger.error("cron containerTracking (ERP) failed", {

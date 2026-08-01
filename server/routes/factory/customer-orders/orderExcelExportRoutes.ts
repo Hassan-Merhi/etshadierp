@@ -2,7 +2,7 @@ import { logAudit } from "../../helpers/auditHelpers";
 import { getErrorMessage, getErrorStack } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { contentDisposition } from "../../../lib/contentDisposition";
-import { trackOneContainerById } from "../../../services/containerTrackingService";
+import { trackOneContainerById } from "../../../services/container-tracking";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";
 import { getClientDate } from "../../../lib/dateUtils";

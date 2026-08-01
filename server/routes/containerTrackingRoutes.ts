@@ -24,7 +24,7 @@ import {
   get17trackUsageStats,
   getTrackingProgress,
   isTrackingAtCapacity,
-} from "../services/containerTrackingService";
+} from "../services/container-tracking";
 import { testConnection } from "../lib/parcelsAppClient";
 import { isConfigured as isMaerskConfigured } from "../lib/trackingProviders/maerskProvider";
 import {
