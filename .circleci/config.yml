@@ -29,49 +29,31 @@ commands:
           override-ci-command: npm ci --no-audit --bin-links=true
 
 jobs:
-  scoped-ts:
+  range-ts:
     parameters:
       target:
         type: string
+      start:
+        type: integer
+      end:
+        type: integer
     executor: node22
     steps:
       - install_dependencies
       - run:
-          name: Scoped TypeScript
-          command: node scripts/phase4-typecheck-scope.mjs << parameters.target >>
-
-  single-format:
-    parameters:
-      target:
-        type: string
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: Single file formatting
-          command: node node_modules/prettier/bin/prettier.cjs --check << parameters.target >>
+          name: TypeScript line range
+          command: node scripts/phase4-typecheck-range.mjs << parameters.target >> << parameters.start >> << parameters.end >>
 
 workflows:
-  phase4-scope-diagnostics:
+  phase4-range-diagnostics:
     jobs:
-      - scoped-ts:
-          name: ts-client
-          target: client/src
-      - scoped-ts:
-          name: ts-routes
-          target: server/routes/factory
-      - scoped-ts:
-          name: ts-workbook
-          target: server/services/factoryArabicTranslationWorkbook.ts
-      - scoped-ts:
-          name: ts-policy
-          target: server/services/security/operationalPermissionRoutePolicy.ts
-      - single-format:
-          name: fmt-catalog
-          target: server/routes/factory/factoryBilingualCatalogRoutes.ts
-      - single-format:
-          name: fmt-policy
-          target: server/services/security/operationalPermissionRoutePolicy.ts
-      - single-format:
-          name: fmt-ui-test
-          target: tests/ui/factory-arabic-translation-actions.test.tsx
+      - range-ts: { name: wb-1-100, target: server/services/factoryArabicTranslationWorkbook.ts, start: 1, end: 100 }
+      - range-ts: { name: wb-101-200, target: server/services/factoryArabicTranslationWorkbook.ts, start: 101, end: 200 }
+      - range-ts: { name: wb-201-300, target: server/services/factoryArabicTranslationWorkbook.ts, start: 201, end: 300 }
+      - range-ts: { name: wb-301-500, target: server/services/factoryArabicTranslationWorkbook.ts, start: 301, end: 500 }
+      - range-ts: { name: ar-1-150, target: server/routes/factory/factoryArabicTranslationRoutes.ts, start: 1, end: 150 }
+      - range-ts: { name: ar-151-300, target: server/routes/factory/factoryArabicTranslationRoutes.ts, start: 151, end: 300 }
+      - range-ts: { name: ar-301-450, target: server/routes/factory/factoryArabicTranslationRoutes.ts, start: 301, end: 450 }
+      - range-ts: { name: ar-451-650, target: server/routes/factory/factoryArabicTranslationRoutes.ts, start: 451, end: 650 }
+      - range-ts: { name: cat-1-150, target: server/routes/factory/factoryBilingualCatalogRoutes.ts, start: 1, end: 150 }
+      - range-ts: { name: cat-151-350, target: server/routes/factory/factoryBilingualCatalogRoutes.ts, start: 151, end: 350 }
