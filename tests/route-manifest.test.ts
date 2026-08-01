@@ -46,6 +46,25 @@ function describeDiff(label: string, expectedEntries: string[], actualEntries: s
   return lines.join("\n");
 }
 
+/**
+ * Subtract exactly one reviewed occurrence from the actual manifest.
+ *
+ * Some reviewed additions intentionally register a second handler for a route
+ * that already exists in the committed snapshot. Using Array.filter() removed
+ * both the baseline route and its reviewed duplicate, causing the ratchet to
+ * alternate between reporting the entry as added and removed. Treating the
+ * manifest as a multiset preserves the committed occurrence and removes only
+ * the one reviewed addition.
+ */
+function removeReviewedOccurrences(entries: string[], reviewedEntries: Set<string>): string[] {
+  const remaining = [...entries];
+  for (const reviewedEntry of reviewedEntries) {
+    const index = remaining.lastIndexOf(reviewedEntry);
+    if (index !== -1) remaining.splice(index, 1);
+  }
+  return remaining;
+}
+
 describe("route manifest", () => {
   beforeAll(async () => {
     actual = await buildManifest();
@@ -69,15 +88,21 @@ describe("route manifest", () => {
     const expected = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as SerializedRouteManifest;
     const reviewedRoutes = new Set(allowances.routeManifestAdditions);
     const reviewedMounts = new Set(allowances.routeManifestMountAdditions);
-    const routes = actual.routes.filter((entry) => !reviewedRoutes.has(entry));
-    const mounts = actual.middlewareMounts.filter((entry) => !reviewedMounts.has(entry));
+    const routes = removeReviewedOccurrences(actual.routes, reviewedRoutes);
+    const mounts = removeReviewedOccurrences(actual.middlewareMounts, reviewedMounts);
     expect(expected.formatVersion).toBe(ROUTE_MANIFEST_FORMAT_VERSION);
     const routeDiff = describeDiff("Routes", expected.routes, routes);
     expect(routeDiff, routeDiff).toBe("");
-    for (const addition of reviewedRoutes) expect(actual.routes.filter((entry) => entry === addition).length).toBe(1);
+    for (const addition of reviewedRoutes) {
+      const baselineCount = expected.routes.filter((entry) => entry === addition).length;
+      expect(actual.routes.filter((entry) => entry === addition).length).toBe(baselineCount + 1);
+    }
     const mountDiff = describeDiff("Middleware mounts", expected.middlewareMounts, mounts);
     expect(mountDiff, mountDiff).toBe("");
-    for (const addition of reviewedMounts) expect(actual.middlewareMounts.filter((entry) => entry === addition).length).toBe(1);
+    for (const addition of reviewedMounts) {
+      const baselineCount = expected.middlewareMounts.filter((entry) => entry === addition).length;
+      expect(actual.middlewareMounts.filter((entry) => entry === addition).length).toBe(baselineCount + 1);
+    }
     expect(actual.routeCount).toBe(expected.routeCount + reviewedRoutes.size);
     expect(actual.middlewareMountCount).toBe(expected.middlewareMountCount + reviewedMounts.size);
   });
