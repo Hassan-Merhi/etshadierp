@@ -6,6 +6,7 @@ import {
   createArabicTranslationTemplate,
   type TranslationCatalogProduct,
 } from "../server/services/factoryArabicTranslationWorkbook";
+import { isXlsxCellLocked } from "./helpers/xlsxProtection";
 
 const products: TranslationCatalogProduct[] = [
   {
@@ -17,6 +18,16 @@ const products: TranslationCatalogProduct[] = [
     descriptionAr: null,
     categoryName: "BAGS",
     categoryNameAr: null,
+  },
+  {
+    id: 2,
+    categoryId: 10,
+    articleCode: "ABC-2",
+    name: "BELT",
+    nameAr: "حزام",
+    descriptionAr: null,
+    categoryName: "BAGS",
+    categoryNameAr: "حقائب",
   },
 ];
 
@@ -79,5 +90,9 @@ describe("Factory Arabic workbook export diagnostics", () => {
 
   it("diagnostic XML Arabic cell unlock", async () => {
     await expect(xmlProtection("C2")).resolves.toBe(false);
+  });
+
+  it("diagnostic shared helper reference lock", async () => {
+    await expect(isXlsxCellLocked(await createBuffer(), "A2")).resolves.toBe(true);
   });
 });
