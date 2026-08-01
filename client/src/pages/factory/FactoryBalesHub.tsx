@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FactoryArabicTranslationActions } from "@/components/FactoryArabicTranslationActions";
 import BalesHistory from "./BalesHistory";
 import BarcodeLookup from "../BarcodeLookup";
-import BaleProducts from "../BaleProducts";
+import BaleProducts from "../BaleProductsBilingual";
 
 export default function FactoryBalesHub() {
   const hash = typeof window !== "undefined" ? window.location.hash.replace("#", "") : "";
@@ -48,38 +48,16 @@ export default function FactoryBalesHub() {
       <Tabs value={activeTab} onValueChange={handleTabChange} className="flex h-full flex-col">
         <div className="flex flex-shrink-0 items-end justify-between gap-4 overflow-x-auto border-b px-4 pt-3">
           <TabsList className="flex-nowrap">
-            <TabsTrigger value="history" data-testid="tab-bales-history">
-              Bales
-            </TabsTrigger>
-            {showBarcode && (
-              <TabsTrigger value="barcode" data-testid="tab-barcode-lookup">
-                Barcode Lookup
-              </TabsTrigger>
-            )}
-            <TabsTrigger value="products" data-testid="tab-bale-products">
-              Bale Products
-            </TabsTrigger>
+            <TabsTrigger value="history" data-testid="tab-bales-history">Bales</TabsTrigger>
+            {showBarcode && <TabsTrigger value="barcode" data-testid="tab-barcode-lookup">Barcode Lookup</TabsTrigger>}
+            <TabsTrigger value="products" data-testid="tab-bale-products">Bale Products</TabsTrigger>
           </TabsList>
-          {activeTab === "products" && (
-            <FactoryArabicTranslationActions className="pb-1" />
-          )}
+          {activeTab === "products" && <FactoryArabicTranslationActions className="pb-1" />}
         </div>
 
-        <TabsContent value="history" className="mt-0 flex-1 overflow-auto">
-          <div className="p-4">
-            <BalesHistory />
-          </div>
-        </TabsContent>
-
-        {showBarcode && (
-          <TabsContent value="barcode" className="mt-0 flex-1 overflow-auto">
-            <BarcodeLookup />
-          </TabsContent>
-        )}
-
-        <TabsContent value="products" className="mt-0 flex-1 overflow-auto">
-          <BaleProducts />
-        </TabsContent>
+        <TabsContent value="history" className="mt-0 flex-1 overflow-auto"><div className="p-4"><BalesHistory /></div></TabsContent>
+        {showBarcode && <TabsContent value="barcode" className="mt-0 flex-1 overflow-auto"><BarcodeLookup /></TabsContent>}
+        <TabsContent value="products" className="mt-0 flex-1 overflow-auto"><BaleProducts /></TabsContent>
       </Tabs>
     </div>
   );
