@@ -3,7 +3,7 @@
  *
  * Extracted verbatim from the former single-file rawStockRecalcRoutesLegacy.ts.
  */
-import {} from "../../../../services/factory/rawStockRecalc";
+import {} from "../../../../services/factory/raw-stock-recalc";
 import { pool } from "../../../../db";
 
 export const ADMIN_ROLES = ["Admin", "Developer"] as const;

@@ -32,7 +32,7 @@ import {
   verifyRepairToken,
   RepairTokenConfigurationError,
 } from "../server/services/factory/repairToken";
-import { loadRecalcFingerprintInputs, computeRecalcFingerprint } from "../server/services/factory/rawStockRecalc";
+import { loadRecalcFingerprintInputs, computeRecalcFingerprint } from "../server/services/factory/raw-stock-recalc";
 
 const TEST_PREFIX = "rmrepair2";
 

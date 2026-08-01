@@ -26,7 +26,7 @@
  */
 import { describe, it, expect } from "vitest";
 import Decimal from "decimal.js";
-import { computeCorrectContainerCost } from "../server/services/factory/rawStockRecalc";
+import { computeCorrectContainerCost } from "../server/services/factory/raw-stock-recalc";
 
 // ─── Builder helpers ──────────────────────────────────────────────────────────
 function makeContainer(opts: {

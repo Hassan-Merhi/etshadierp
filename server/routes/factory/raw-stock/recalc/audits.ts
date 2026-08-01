@@ -8,7 +8,7 @@ import type { Express } from "express";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { logger } from "../../../../lib/logger";
 import { requireAuth, requireRole } from "../../../../auth";
-import { getMixBatchSourceCostMismatchPreview, getFullAuditScan } from "../../../../services/factory/rawStockRecalc";
+import { getMixBatchSourceCostMismatchPreview, getFullAuditScan } from "../../../../services/factory/raw-stock-recalc";
 import { ADMIN_ROLES } from "./_helpers";
 
 export function registerRawStockRecalcAuditRoutes(app: Express) {

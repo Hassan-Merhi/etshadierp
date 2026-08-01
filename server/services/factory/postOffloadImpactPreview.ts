@@ -20,7 +20,7 @@ import {
 } from "./factoryCostingEngine";
 import { previewHistoricalCostReplayWithExecutor, type ReplayQueryExecutor } from "./historicalCostReplay";
 import { getAuthoritativeSupplierRemainingKg, getLockedSupplierRateReadOnly } from "./rawStockLockedRate";
-import { computeCorrectContainerCost } from "./rawStockRecalc";
+import { computeCorrectContainerCost } from "./raw-stock-recalc";
 import {
   ExpiredRepairTokenError,
   InvalidRepairTokenError,

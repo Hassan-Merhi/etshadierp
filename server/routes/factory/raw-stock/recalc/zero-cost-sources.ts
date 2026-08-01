@@ -11,7 +11,7 @@ import { requireAuth, requireRole } from "../../../../auth";
 import {
   getZeroCostMixBatchSourcesPreview,
   applyZeroCostMixBatchSourcesFix,
-} from "../../../../services/factory/rawStockRecalc";
+} from "../../../../services/factory/raw-stock-recalc";
 import { logAudit } from "../../../helpers/auditHelpers";
 import {
   signRepairToken,

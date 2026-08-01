@@ -13,7 +13,7 @@ import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import Decimal from "decimal.js";
 import { cascadeContainerCostChange } from "../../../services/factory/rawStockCostCascade";
-import { computeCorrectContainerCost } from "../../../services/factory/rawStockRecalc";
+import { computeCorrectContainerCost } from "../../../services/factory/raw-stock-recalc";
 import { getAuthoritativeSupplierRemainingKg } from "../../../services/factory/rawStockLockedRate";
 import { resolveStoredFxRate, resolveStoredFxRateOrThrow, UnresolvedExchangeRateError } from "../../../services/factory/currencyConversion";
 import {

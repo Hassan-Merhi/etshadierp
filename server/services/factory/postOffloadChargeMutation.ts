@@ -27,7 +27,7 @@ import {
   voucherEntries,
 } from "../../../shared/schema";
 import { cascadeContainerCostChange } from "./rawStockCostCascade";
-import { computeCorrectContainerCost } from "./rawStockRecalc";
+import { computeCorrectContainerCost } from "./raw-stock-recalc";
 import { getAuthoritativeSupplierRemainingKg } from "./rawStockLockedRate";
 import { writeDaybookEntry } from "../../routes/factory/_helpers";
 import { resolveStoredFxRateOrThrow } from "./currencyConversion";

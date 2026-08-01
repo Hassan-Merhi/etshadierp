@@ -25,7 +25,7 @@ import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from
 import { db, pool } from "../server/db";
 import { eq, and, sql } from "drizzle-orm";
 import * as schema from "../shared/schema";
-import { computeCorrectContainerCost } from "../server/services/factory/rawStockRecalc";
+import { computeCorrectContainerCost } from "../server/services/factory/raw-stock-recalc";
 
 const TEST_PREFIX = "partialoffload";
 

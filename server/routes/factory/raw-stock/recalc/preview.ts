@@ -14,7 +14,7 @@ import {
   loadRecalcFingerprintInputs,
   computeRecalcFingerprint,
   getAffectedMixBatchesPreview,
-} from "../../../../services/factory/rawStockRecalc";
+} from "../../../../services/factory/raw-stock-recalc";
 import { logAudit } from "../../../helpers/auditHelpers";
 import {
   signRepairToken,

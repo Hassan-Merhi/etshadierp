@@ -26,7 +26,7 @@ import {
   computeApplyAllDryRun,
   computeRecalcFingerprint,
   loadRecalcFingerprintInputs,
-} from "../server/services/factory/rawStockRecalc";
+} from "../server/services/factory/raw-stock-recalc";
 
 const TEST_PREFIX = "recalcaudit";
 
