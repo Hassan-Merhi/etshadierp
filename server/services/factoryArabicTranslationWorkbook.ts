@@ -88,10 +88,20 @@ export const ARABIC_TRANSLATION_TEMPLATE_HEADERS = [
 const MAX_WORKBOOK_ROWS = 50_000;
 const MAX_TRANSLATION_LENGTH = 2_000;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
+const RTL_FROZEN_VIEW: ExcelJS.WorksheetView = {
+  state: "frozen",
+  ySplit: 1,
+  rightToLeft: true,
+  activeCell: "A2",
+  showRuler: true,
+  showRowColHeaders: true,
+  showGridLines: true,
+  zoomScale: 100,
+  zoomScaleNormal: 100,
+};
 
 function clean(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  return String(value).trim();
+  return value === null || value === undefined ? "" : String(value).trim();
 }
 
 function cellText(cell: ExcelJS.Cell): string {
@@ -104,28 +114,18 @@ function cellText(cell: ExcelJS.Cell): string {
   const objectValue = value as Record<string, unknown>;
   if (Array.isArray(objectValue.richText)) {
     return objectValue.richText
-      .map((part) =>
-        typeof part === "object" && part
-          ? clean((part as Record<string, unknown>).text)
-          : ""
-      )
+      .map((part) => (typeof part === "object" && part ? clean((part as Record<string, unknown>).text) : ""))
       .join("")
       .trim();
   }
-  if (objectValue.result !== undefined && objectValue.result !== null) {
-    return clean(objectValue.result);
-  }
-  if (objectValue.text !== undefined && objectValue.text !== null) {
-    return clean(objectValue.text);
-  }
+  if (objectValue.result !== undefined && objectValue.result !== null) return clean(objectValue.result);
+  if (objectValue.text !== undefined && objectValue.text !== null) return clean(objectValue.text);
   return "";
 }
 
 function translationStatus(product: TranslationCatalogProduct): string {
   if (!clean(product.nameAr)) return "Missing Arabic Product Name";
-  if (product.categoryId && !clean(product.categoryNameAr)) {
-    return "Missing Arabic Category";
-  }
+  if (product.categoryId && !clean(product.categoryNameAr)) return "Missing Arabic Category";
   return "Complete";
 }
 
@@ -136,24 +136,17 @@ function selectedValue(
 ): string | null {
   const current = clean(currentValue);
   const supplied = clean(workbookValue);
-  if (mode === "fill-missing") return current || supplied || null;
-  return supplied || current || null;
+  return mode === "fill-missing" ? current || supplied || null : supplied || current || null;
 }
 
 function validateTranslation(value: string, label: string, reasons: string[]): void {
   if (!value) return;
-  if (value.length > MAX_TRANSLATION_LENGTH) {
-    reasons.push(`${label} exceeds ${MAX_TRANSLATION_LENGTH} characters`);
-  }
-  if (CONTROL_CHARACTER_PATTERN.test(value)) {
-    reasons.push(`${label} contains unsupported control characters`);
-  }
+  if (value.length > MAX_TRANSLATION_LENGTH) reasons.push(`${label} exceeds ${MAX_TRANSLATION_LENGTH} characters`);
+  if (CONTROL_CHARACTER_PATTERN.test(value)) reasons.push(`${label} contains unsupported control characters`);
 }
 
 function uniqueSorted(values: Iterable<string>): string[] {
-  return [...new Set(values)]
-    .filter(Boolean)
-    .sort((left, right) => left.localeCompare(right));
+  return [...new Set(values)].filter(Boolean).sort((left, right) => left.localeCompare(right));
 }
 
 function previewFingerprintPayload(input: {
@@ -195,9 +188,7 @@ export function createArabicTranslationPreviewToken(input: {
   workbookSha256: string;
   preview: TranslationPreview;
 }): string {
-  return createHash("sha256")
-    .update(JSON.stringify(previewFingerprintPayload(input)))
-    .digest("hex");
+  return createHash("sha256").update(JSON.stringify(previewFingerprintPayload(input))).digest("hex");
 }
 
 export function createArabicTranslationPreviewEnvelope(input: {
@@ -214,15 +205,11 @@ export function createArabicTranslationPreviewEnvelope(input: {
   };
 }
 
-export async function createArabicTranslationTemplate(
-  products: TranslationCatalogProduct[]
-): Promise<Buffer> {
+export async function createArabicTranslationTemplate(products: TranslationCatalogProduct[]): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "HMD ERP";
   workbook.created = new Date();
-  const sheet = workbook.addWorksheet("Arabic Names", {
-    views: [{ state: "frozen", ySplit: 1 }],
-  });
+  const sheet = workbook.addWorksheet("Arabic Names", { views: [{ ...RTL_FROZEN_VIEW }] });
 
   sheet.columns = [
     { header: ARABIC_TRANSLATION_TEMPLATE_HEADERS[0], key: "articleCode", width: 24 },
@@ -253,27 +240,11 @@ export async function createArabicTranslationTemplate(
     });
     row.getCell(1).numFmt = "@";
     row.getCell(1).value = String(product.articleCode ?? "");
-    row.getCell(3).alignment = {
-      horizontal: "right",
-      readingOrder: "rtl",
-      wrapText: true,
-    };
-    row.getCell(5).alignment = {
-      horizontal: "right",
-      readingOrder: "rtl",
-      wrapText: true,
-    };
-    row.getCell(6).alignment = {
-      horizontal: "right",
-      readingOrder: "rtl",
-      wrapText: true,
-    };
-    for (const column of [1, 2, 4, 7]) {
-      row.getCell(column).protection = { locked: true };
-    }
     for (const column of [3, 5, 6]) {
+      row.getCell(column).alignment = { horizontal: "right", readingOrder: "rtl", wrapText: true };
       row.getCell(column).protection = { locked: false };
     }
+    for (const column of [1, 2, 4, 7]) row.getCell(column).protection = { locked: true };
   }
 
   await sheet.protect("factory-arabic-template", {
@@ -285,9 +256,7 @@ export async function createArabicTranslationTemplate(
   return Buffer.from(await workbook.xlsx.writeBuffer());
 }
 
-export async function parseArabicTranslationWorkbook(
-  buffer: Buffer
-): Promise<TranslationWorkbookRow[]> {
+export async function parseArabicTranslationWorkbook(buffer: Buffer): Promise<TranslationWorkbookRow[]> {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer as any);
   const sheet = workbook.worksheets[0];
@@ -299,11 +268,7 @@ export async function parseArabicTranslationWorkbook(
   const actualHeaders = ARABIC_TRANSLATION_TEMPLATE_HEADERS.map((_, index) =>
     cellText(sheet.getRow(1).getCell(index + 1))
   );
-  if (
-    actualHeaders.some(
-      (value, index) => value !== ARABIC_TRANSLATION_TEMPLATE_HEADERS[index]
-    )
-  ) {
+  if (actualHeaders.some((value, index) => value !== ARABIC_TRANSLATION_TEMPLATE_HEADERS[index])) {
     throw new Error("Workbook columns do not match the Arabic translation template");
   }
 
@@ -329,38 +294,36 @@ export function previewArabicTranslationImport(
   for (const product of products) {
     const code = normalizeFactoryArticleCode(product.articleCode);
     if (!code) continue;
-    const matching = catalogByCode.get(code) ?? [];
-    matching.push(product);
-    catalogByCode.set(code, matching);
+    const matches = catalogByCode.get(code) ?? [];
+    matches.push(product);
+    catalogByCode.set(code, matches);
   }
 
   const codeCounts = new Map<string, number>();
-  for (const row of rows) {
-    if (!row.articleCode) continue;
-    codeCounts.set(row.articleCode, (codeCounts.get(row.articleCode) ?? 0) + 1);
+  for (const sourceRow of rows) {
+    const code = normalizeFactoryArticleCode(sourceRow.articleCode);
+    if (code) codeCounts.set(code, (codeCounts.get(code) ?? 0) + 1);
   }
 
   const categoryTargets = new Map<number, Set<string>>();
-  for (const row of rows) {
-    const matches = catalogByCode.get(row.articleCode) ?? [];
-    if (matches.length !== 1) continue;
+  for (const sourceRow of rows) {
+    const code = normalizeFactoryArticleCode(sourceRow.articleCode);
+    const matches = catalogByCode.get(code) ?? [];
+    if (matches.length !== 1 || !matches[0].categoryId) continue;
     const product = matches[0];
-    if (!product.categoryId) continue;
-    const target = selectedValue(product.categoryNameAr, row.categoryNameAr, mode);
+    const target = selectedValue(product.categoryNameAr, sourceRow.categoryNameAr, mode);
     if (!target) continue;
     const targets = categoryTargets.get(product.categoryId) ?? new Set<string>();
     targets.add(target);
     categoryTargets.set(product.categoryId, targets);
   }
   const conflictingCategoryIds = new Set(
-    [...categoryTargets]
-      .filter(([, targets]) => targets.size > 1)
-      .map(([categoryId]) => categoryId)
+    [...categoryTargets].filter(([, targets]) => targets.size > 1).map(([categoryId]) => categoryId)
   );
 
   const previewRows: TranslationPreviewRow[] = rows.map((sourceRow) => {
-    const row = {
-      ...sourceRow,
+    const row: TranslationWorkbookRow = {
+      rowNumber: sourceRow.rowNumber,
       articleCode: normalizeFactoryArticleCode(sourceRow.articleCode),
       productNameAr: clean(sourceRow.productNameAr),
       categoryNameAr: clean(sourceRow.categoryNameAr),
@@ -368,23 +331,18 @@ export function previewArabicTranslationImport(
     };
     const reasons: string[] = [];
     const matches = row.articleCode ? catalogByCode.get(row.articleCode) ?? [] : [];
-    const duplicateInFile =
-      Boolean(row.articleCode) && (codeCounts.get(row.articleCode) ?? 0) > 1;
+    const duplicateInFile = Boolean(row.articleCode) && (codeCounts.get(row.articleCode) ?? 0) > 1;
 
     if (!row.articleCode) reasons.push("Missing article code");
     if (duplicateInFile) reasons.push("Duplicate article code in workbook");
     if (row.articleCode && matches.length === 0) reasons.push("Unknown article code");
-    if (matches.length > 1) {
-      reasons.push("Article code matches multiple products in this company");
-    }
+    if (matches.length > 1) reasons.push("Article code matches multiple products in this company");
 
     const product = matches.length === 1 ? matches[0] : undefined;
     if (product?.categoryId && conflictingCategoryIds.has(product.categoryId)) {
       reasons.push("Conflicting Arabic category translations");
     }
-    if (!row.productNameAr && !row.categoryNameAr && !row.descriptionAr) {
-      reasons.push("No Arabic translation supplied");
-    }
+    if (!row.productNameAr && !row.categoryNameAr && !row.descriptionAr) reasons.push("No Arabic translation supplied");
     validateTranslation(row.productNameAr, "Arabic product name", reasons);
     validateTranslation(row.categoryNameAr, "Arabic category name", reasons);
     validateTranslation(row.descriptionAr, "Arabic description", reasons);
@@ -392,19 +350,12 @@ export function previewArabicTranslationImport(
     const currentProductNameAr = clean(product?.nameAr) || null;
     const currentCategoryNameAr = clean(product?.categoryNameAr) || null;
     const currentDescriptionAr = clean(product?.descriptionAr) || null;
-    const targetProductNameAr = product
-      ? selectedValue(product.nameAr, row.productNameAr, mode)
-      : null;
-    const targetCategoryNameAr = product
-      ? selectedValue(product.categoryNameAr, row.categoryNameAr, mode)
-      : null;
-    const targetDescriptionAr = product
-      ? selectedValue(product.descriptionAr, row.descriptionAr, mode)
-      : null;
+    const targetProductNameAr = product ? selectedValue(product.nameAr, row.productNameAr, mode) : null;
+    const targetCategoryNameAr = product ? selectedValue(product.categoryNameAr, row.categoryNameAr, mode) : null;
+    const targetDescriptionAr = product ? selectedValue(product.descriptionAr, row.descriptionAr, mode) : null;
     const changes = {
       productNameAr: Boolean(product) && targetProductNameAr !== currentProductNameAr,
-      categoryNameAr:
-        Boolean(product?.categoryId) && targetCategoryNameAr !== currentCategoryNameAr,
+      categoryNameAr: Boolean(product?.categoryId) && targetCategoryNameAr !== currentCategoryNameAr,
       descriptionAr: Boolean(product) && targetDescriptionAr !== currentDescriptionAr,
     };
 
@@ -412,14 +363,10 @@ export function previewArabicTranslationImport(
     if (duplicateInFile) status = "duplicate";
     else if (matches.length > 1) status = "ambiguous";
     else if (row.articleCode && matches.length === 0) status = "unknown";
-    else if (product?.categoryId && conflictingCategoryIds.has(product.categoryId)) {
-      status = "category-conflict";
-    } else if (reasons.length > 0) status = "invalid";
-    else if (changes.productNameAr || changes.categoryNameAr || changes.descriptionAr) {
-      status = "update";
-    } else {
-      status = "unchanged";
-    }
+    else if (product?.categoryId && conflictingCategoryIds.has(product.categoryId)) status = "category-conflict";
+    else if (reasons.length > 0) status = "invalid";
+    else if (changes.productNameAr || changes.categoryNameAr || changes.descriptionAr) status = "update";
+    else status = "unchanged";
 
     return {
       ...row,
@@ -438,20 +385,14 @@ export function previewArabicTranslationImport(
   });
 
   const updateRows = previewRows.filter((row) => row.status === "update");
-  const matchedProductIds = new Set(
-    previewRows.flatMap((row) => (row.productId ? [row.productId] : []))
-  );
+  const matchedProductIds = new Set(previewRows.flatMap((row) => (row.productId ? [row.productId] : [])));
   const productIdsToUpdate = new Set(
     updateRows.flatMap((row) =>
-      row.productId && (row.changes.productNameAr || row.changes.descriptionAr)
-        ? [row.productId]
-        : []
+      row.productId && (row.changes.productNameAr || row.changes.descriptionAr) ? [row.productId] : []
     )
   );
   const categoryIdsToUpdate = new Set(
-    updateRows.flatMap((row) =>
-      row.categoryId && row.changes.categoryNameAr ? [row.categoryId] : []
-    )
+    updateRows.flatMap((row) => (row.categoryId && row.changes.categoryNameAr ? [row.categoryId] : []))
   );
   const duplicateArticleCodes = uniqueSorted(
     [...codeCounts].filter(([, count]) => count > 1).map(([code]) => code)
@@ -462,10 +403,6 @@ export function previewArabicTranslationImport(
   const ambiguousArticleCodes = uniqueSorted(
     previewRows.filter((row) => row.status === "ambiguous").map((row) => row.articleCode)
   );
-  const blocked =
-    duplicateArticleCodes.length > 0 ||
-    conflictingCategoryIds.size > 0 ||
-    ambiguousArticleCodes.length > 0;
 
   return {
     totalRows: rows.length,
@@ -479,16 +416,15 @@ export function previewArabicTranslationImport(
     ambiguousArticleCodes,
     blankOrInvalidArabicNames: previewRows.filter((row) => row.status === "invalid").length,
     categoryConflicts: conflictingCategoryIds.size,
-    blocked,
+    blocked:
+      duplicateArticleCodes.length > 0 || conflictingCategoryIds.size > 0 || ambiguousArticleCodes.length > 0,
     rows: previewRows,
   };
 }
 
-export async function createArabicTranslationErrorWorkbook(
-  preview: TranslationPreview
-): Promise<Buffer> {
+export async function createArabicTranslationErrorWorkbook(preview: TranslationPreview): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet("Rejected Rows");
+  const sheet = workbook.addWorksheet("Rejected Rows", { views: [{ ...RTL_FROZEN_VIEW }] });
   sheet.columns = [
     { header: "Row", key: "rowNumber", width: 10 },
     { header: "Article Code / Barcode", key: "articleCode", width: 24 },
@@ -498,24 +434,14 @@ export async function createArabicTranslationErrorWorkbook(
     { header: "Status", key: "status", width: 22 },
     { header: "Reasons", key: "reasons", width: 60 },
   ];
-  sheet.views = [{ state: "frozen", ySplit: 1, rightToLeft: true }];
   sheet.getRow(1).font = { bold: true };
   sheet.getRow(1).alignment = { vertical: "middle", wrapText: true };
 
-  for (const row of preview.rows.filter(
-    (item) => !["update", "unchanged"].includes(item.status)
-  )) {
-    const excelRow = sheet.addRow({
-      ...row,
-      reasons: row.reasons.join("; "),
-    });
+  for (const row of preview.rows.filter((item) => !["update", "unchanged"].includes(item.status))) {
+    const excelRow = sheet.addRow({ ...row, reasons: row.reasons.join("; ") });
     excelRow.getCell(2).numFmt = "@";
     for (const column of [3, 4, 5, 7]) {
-      excelRow.getCell(column).alignment = {
-        horizontal: "right",
-        readingOrder: "rtl",
-        wrapText: true,
-      };
+      excelRow.getCell(column).alignment = { horizontal: "right", readingOrder: "rtl", wrapText: true };
     }
   }
   return Buffer.from(await workbook.xlsx.writeBuffer());
