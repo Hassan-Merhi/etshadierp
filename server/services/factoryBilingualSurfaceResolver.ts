@@ -62,14 +62,22 @@ function rowsFromResult(result: unknown): CatalogRecord[] {
 }
 async function loadCatalog(companyId: number, productIds: number[], articleCodes: string[]) {
   if (!productIds.length && !articleCodes.length) return { byId: new Map<number, CatalogRecord>(), byArticleCode: new Map<string, CatalogRecord>() };
+
+  const productCondition = productIds.length
+    ? sql`p.id IN (${sql.join(productIds.map((id) => sql`${id}`), sql`, `)})`
+    : sql`FALSE`;
+  const articleCondition = articleCodes.length
+    ? sql`UPPER(BTRIM(COALESCE(p.article_code, ''))) IN (${sql.join(articleCodes.map((code) => sql`${code}`), sql`, `)})`
+    : sql`FALSE`;
+
   const result = await db.execute(sql`
     SELECT p.id, p.article_code AS "articleCode", p.name, p.name_ar AS "nameAr",
       p.description, p.description_ar AS "descriptionAr", c.name AS "categoryName", c.name_ar AS "categoryNameAr"
     FROM factory_bale_products p
     LEFT JOIN factory_categories c ON c.id = p.category_id AND c.company_id = p.company_id AND c.deleted_at IS NULL
     WHERE p.company_id = ${companyId} AND p.deleted_at IS NULL AND (
-      p.id = ANY(${productIds.length ? productIds : [0]}::int[])
-      OR UPPER(BTRIM(COALESCE(p.article_code, ''))) = ANY(${articleCodes.length ? articleCodes : ["__NONE__"]}::text[])
+      ${productCondition}
+      OR ${articleCondition}
     )
   `);
   const byId = new Map<number, CatalogRecord>();
