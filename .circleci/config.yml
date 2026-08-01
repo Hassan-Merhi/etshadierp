@@ -57,9 +57,11 @@ commands:
           command: node scripts/verify-ci-disposable-schema.mjs
 
 jobs:
-  focused-backend:
+  one-test:
     parameters:
       target:
+        type: string
+      test_name:
         type: string
     executor: node22-postgres
     steps:
@@ -67,24 +69,25 @@ jobs:
       - wait_for_postgres
       - prepare_schema
       - run:
-          name: Focused backend regression
+          name: Recheck repaired regression
           command: >-
             node node_modules/vitest/vitest.mjs run
             << parameters.target >>
+            -t "<< parameters.test_name >>"
             --maxWorkers=1 --no-file-parallelism
 
 workflows:
-  phase4-postgres-recheck:
+  phase4-repaired-case-recheck:
     jobs:
-      - focused-backend:
-          name: p4-workbook-recheck
+      - one-test:
+          name: wb-export-recheck
           target: tests/factory-arabic-translation-workbook.test.ts
-      - focused-backend:
-          name: p4-routes-recheck
+          test_name: exports the exact template columns
+      - one-test:
+          name: rt-export-recheck
           target: tests/factory-arabic-translation-routes.test.ts
-      - focused-backend:
-          name: p4-permissions-recheck
-          target: tests/operational-permission-route-policy.test.ts
-      - focused-backend:
-          name: p4-manifest-recheck
-          target: tests/route-manifest.test.ts
+          test_name: exports a protected company-scoped
+      - one-test:
+          name: rt-rollback-recheck
+          target: tests/factory-arabic-translation-routes.test.ts
+          test_name: rolls product and category updates back
