@@ -21,12 +21,7 @@
     "GET /api/factory/customer-orders/:id/pending-export [requireAuth > loadingHandler]",
     "GET /api/factory/customer-orders/:id/loading-list [requireAuth > loadingHandler]",
     "GET /api/factory/bilingual-snapshots/diagnose [requireAuth > <anonymous> > <anonymous>]",
-    "POST /api/factory/bilingual-snapshots/backfill [requireAuth > <anonymous> > <anonymous>]",
-    "GET /api/factory/customer-orders/:id/export/excel [requireAuth > <anonymous>]",
-    "GET /api/factory/customer-orders/:id/export-excel [requireAuth > <anonymous>]",
-    "GET /api/factory/customer-orders/:id/export-pdf [requireAuth > <anonymous>]",
-    "POST /api/admin/account-migration/execute [requireAuth > <anonymous> > <anonymous>]",
-    "POST /api/admin/account-migration/undo [requireAuth > <anonymous> > <anonymous>]"
+    "POST /api/factory/bilingual-snapshots/backfill [requireAuth > <anonymous> > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
     "USE /api/factory/containers [postOffloadReconciliationMiddleware]",
@@ -37,7 +32,7 @@
     "additionalSourceCoupledTests": [
       "tests/factory-post-offload-phase5-reconciliation.test.ts",
       "tests/factory-post-offload-phase6-safety-repair.test.ts",
-      "tests/ui/authenticated-request-gating.test.tsx",
+      "tests/ui/authenticated-request-gating.test.ts",
       "tests/account-migration-control-reference-safety.test.ts",
       "tests/factory-bilingual-completion.test.ts",
       "tests/factory-bilingual-phase7-documents.test.ts",
