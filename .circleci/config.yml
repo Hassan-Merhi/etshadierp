@@ -82,3 +82,5 @@ workflows:
       - one-test: { name: wb-diag-value, test_name: diagnostic article code value }
       - one-test: { name: wb-diag-lock, test_name: diagnostic reference cell lock }
       - one-test: { name: wb-diag-unlock, test_name: diagnostic Arabic cell unlock }
+      - one-test: { name: wb-xml-lock, test_name: diagnostic XML reference cell lock }
+      - one-test: { name: wb-xml-unlock, test_name: diagnostic XML Arabic cell unlock }
