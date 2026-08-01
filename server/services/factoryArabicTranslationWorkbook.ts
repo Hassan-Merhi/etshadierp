@@ -113,7 +113,7 @@ function cellText(cell: ExcelJS.Cell): string {
   if (value instanceof Date) return value.toISOString();
   if (typeof value !== "object") return clean(value);
 
-  const objectValue = value as Record<string, unknown>;
+  const objectValue = value as unknown as Record<string, unknown>;
   if (Array.isArray(objectValue.richText)) {
     return objectValue.richText
       .map((part) => (typeof part === "object" && part ? clean((part as Record<string, unknown>).text) : ""))
@@ -311,13 +311,15 @@ export function previewArabicTranslationImport(
   for (const sourceRow of rows) {
     const code = normalizeFactoryArticleCode(sourceRow.articleCode);
     const matches = catalogByCode.get(code) ?? [];
-    if (matches.length !== 1 || !matches[0].categoryId) continue;
+    if (matches.length !== 1) continue;
     const product = matches[0];
+    const categoryId = product.categoryId;
+    if (!categoryId) continue;
     const target = selectedValue(product.categoryNameAr, sourceRow.categoryNameAr, mode);
     if (!target) continue;
-    const targets = categoryTargets.get(product.categoryId) ?? new Set<string>();
+    const targets = categoryTargets.get(categoryId) ?? new Set<string>();
     targets.add(target);
-    categoryTargets.set(product.categoryId, targets);
+    categoryTargets.set(categoryId, targets);
   }
   const conflictingCategoryIds = new Set(
     [...categoryTargets].filter(([, targets]) => targets.size > 1).map(([categoryId]) => categoryId)
