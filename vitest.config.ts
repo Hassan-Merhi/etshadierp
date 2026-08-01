@@ -13,12 +13,10 @@ export default defineConfig({
     // responding" is a separate CI signal: npm run test:smoke-sweep
     exclude: ["tests/ui/**", "tests/api-smoke-sweep.test.ts"],
     pool: "forks",
-    // Backend suites share one database and several process-global settings
-    // (notably system_settings.parentCompanyId). Running files in parallel lets
-    // one suite's fixture company be observed by another, which made results
-    // vary run to run. Vitest 4 moved fork options to the test root.
+    // Backend suites share one database, so files run serially. Keeping separate
+    // fork processes prevents process-global/module-cache state from leaking
+    // between suites and making route discovery nondeterministic.
     fileParallelism: false,
-    singleFork: true,
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary"],
