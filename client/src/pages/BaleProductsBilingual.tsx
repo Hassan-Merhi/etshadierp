@@ -1,21 +1,19 @@
 import { useEffect, useLayoutEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Languages, Plus, Search, X } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FactoryCatalogTranslationEditor } from "@/components/FactoryCatalogTranslationEditor";
+import { BaleProductArabicEditBridge } from "@/components/BaleProductArabicEditBridge";
+import { FACTORY_CATALOG_LANGUAGE_EVENT } from "@/components/FactoryCatalogLanguageSwitch";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useAppMode } from "@/contexts/AppModeContext";
 import type { FactoryCatalogLanguage } from "@shared/factoryBilingualContract";
-import {
-  persistFactoryCatalogLanguagePreference,
-  readFactoryCatalogLanguagePreference,
-} from "@/lib/factoryCatalogPreference";
+import { readFactoryCatalogLanguagePreference } from "@/lib/factoryCatalogPreference";
 import BaleProductsPage from "./BaleProducts";
 
 type TranslationFilter = "all" | "complete" | "missing-product" | "missing-category";
@@ -75,6 +73,8 @@ function CatalogFetchBoundary({
     };
 
     window.fetch = patchedFetch;
+    queryClient.removeQueries({ queryKey: ["/api/factory/bale-products"] });
+    queryClient.removeQueries({ queryKey: ["/api/factory/categories"] });
     setReady(true);
     return () => {
       if (window.fetch === patchedFetch) window.fetch = originalFetch;
@@ -103,12 +103,16 @@ export default function BaleProductsBilingual() {
   const isAdmin = ["Admin", "Owner", "Developer"].includes(currentUser?.role ?? "");
 
   useEffect(() => {
-    persistFactoryCatalogLanguagePreference(
-      language,
-      typeof window === "undefined" ? null : window.localStorage,
-      typeof document === "undefined" ? null : document
-    );
-  }, [language]);
+    const handleLanguageChange = (event: Event) => {
+      const next = (event as CustomEvent<FactoryCatalogLanguage>).detail;
+      if (next !== "en" && next !== "ar") return;
+      setLanguage(next);
+      queryClient.removeQueries({ queryKey: ["/api/factory/bale-products"] });
+      queryClient.removeQueries({ queryKey: ["/api/factory/categories"] });
+    };
+    window.addEventListener(FACTORY_CATALOG_LANGUAGE_EVENT, handleLanguageChange);
+    return () => window.removeEventListener(FACTORY_CATALOG_LANGUAGE_EVENT, handleLanguageChange);
+  }, []);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setRequestSearch(catalogSearch.trim()), 250);
@@ -143,11 +147,6 @@ export default function BaleProductsBilingual() {
       <div className="container mx-auto px-6 pt-6">
         <div className="rounded-xl border bg-card px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
-            <Languages className="h-4 w-4 text-muted-foreground" />
-            <div className="inline-flex rounded-md border p-0.5 bg-muted/30" role="group" aria-label="Catalog language">
-              <Button type="button" size="sm" variant={language === "en" ? "default" : "ghost"} className="h-7 rounded-sm px-3" onClick={() => setLanguage("en")} aria-pressed={language === "en"}>English</Button>
-              <Button type="button" size="sm" variant={language === "ar" ? "default" : "ghost"} className="h-7 rounded-sm px-3" onClick={() => setLanguage("ar")} aria-pressed={language === "ar"}>العربية</Button>
-            </div>
             <Select value={translationFilter} onValueChange={(value) => setTranslationFilter(value as TranslationFilter)}>
               <SelectTrigger className="h-8 w-56" data-testid="select-translation-status"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -164,13 +163,13 @@ export default function BaleProductsBilingual() {
               <Input value={catalogSearch} onChange={(event) => setCatalogSearch(event.target.value)} placeholder={language === "ar" ? "بحث بالعربي أو الإنجليزي أو الرمز..." : "Search English, Arabic, or article code..."} className="h-8 w-72 pl-8 pr-8 text-sm" dir="auto" />
               {catalogSearch && <button type="button" onClick={() => setCatalogSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"><X className="h-3.5 w-3.5" /></button>}
             </div>
-            {isAdmin && <FactoryCatalogTranslationEditor />}
             {isAdmin && <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => setCategoryDialogOpen(true)}><Plus className="h-3.5 w-3.5 mr-1.5" />{language === "ar" ? "فئة ثنائية اللغة" : "Bilingual category"}</Button>}
           </div>
         </div>
       </div>
 
       <CatalogFetchBoundary key={`${language}:${requestSearch}:${translationFilter}`} language={language} search={requestSearch} translationFilter={translationFilter} />
+      {isAdmin && <BaleProductArabicEditBridge />}
 
       <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
         <DialogContent className="max-w-lg" dir="ltr">
