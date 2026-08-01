@@ -1,3 +1,4 @@
+import "./factoryBilingualSchemaBridge.mjs";
 import { readFile } from "node:fs/promises";
 import process from "node:process";
 import pg from "pg";
