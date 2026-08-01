@@ -260,8 +260,12 @@ export async function createArabicTranslationTemplate(products: TranslationCatal
     row.getCell(1).value = String(product.articleCode ?? "");
     for (const column of [3, 5, 6]) {
       row.getCell(column).alignment = { horizontal: "right", readingOrder: "rtl", wrapText: true };
-      setCellLocked(row.getCell(column), false);
     }
+  }
+
+  for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber += 1) {
+    const row = sheet.getRow(rowNumber);
+    for (const column of [3, 5, 6]) setCellLocked(row.getCell(column), false);
     for (const column of [1, 2, 4, 7]) setCellLocked(row.getCell(column), true);
   }
 
