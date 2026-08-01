@@ -9,6 +9,8 @@ const LANGUAGE_COOKIE = "factory_catalog_language";
 const READ_SURFACE_PATTERNS = [
   /^\/bales(?:\/|$)/,
   /^\/bale-products(?:\/|$)/,
+  /^\/bale-transfers(?:\/|$)/,
+  /^\/bale-ledger(?:\/|$)/,
   /^\/categories(?:\/|$)/,
   /^\/barcode(?:\/|$)/,
   /^\/lookup(?:\/|$)/,
@@ -21,8 +23,10 @@ const READ_SURFACE_PATTERNS = [
   /^\/pressing(?:\/|$)/,
   /^\/customer-proformas(?:\/|$)/,
   /^\/customer-orders(?:\/|$)/,
+  /^\/customer-invoices(?:\/|$)/,
   /^\/invoices(?:\/|$)/,
   /^\/invoice-loading(?:\/|$)/,
+  /^\/container-loading(?:\/|$)/,
   /^\/dispatch(?:\/|$)/,
   /^\/stock-allocation(?:\/|$)/,
   /^\/bale-recode(?:\/|$)/,
@@ -111,4 +115,5 @@ function bilingualSurfaceMiddleware(req: Request, res: Response, next: NextFunct
 
 export function registerFactoryBilingualSurfaceRoutes(app: Express): void {
   app.use("/api/factory", bilingualSurfaceMiddleware);
+  app.use("/api", bilingualSurfaceMiddleware);
 }
