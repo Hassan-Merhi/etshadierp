@@ -724,7 +724,6 @@ export function PaymentReceiptTab({
                     />
                   </CollapsibleContent>
                 </Collapsible>
-
               </div>
 
               {/* ── Action bar — the total stays with Save, pinned to the bottom of the card ── */}

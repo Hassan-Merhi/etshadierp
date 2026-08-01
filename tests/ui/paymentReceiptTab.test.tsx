@@ -71,28 +71,28 @@ function Harness({ paymentAccountId = 0, entries = [] }: HarnessProps) {
   return (
     <TooltipProvider>
       <PaymentReceiptTab
-      form={form}
-      fieldArray={fieldArray}
-      entries={rows}
-      total={total}
-      paymentAccountId={paymentAccountId}
-      paymentAccountType={paymentAccountId > 0 ? "ledger" : ""}
-      paymentAccountName={paymentAccountId > 0 ? "Access Cash" : ""}
-      accountBalance={173.86}
-      allAccounts={ACCOUNTS as any}
-      sidebarAccounts={ACCOUNTS as any}
-      filteredSidebarAccounts={ACCOUNTS as any}
-      sidebarSearchValue=""
-      setSidebarSearchValue={vi.fn()}
-      sidebarHighlightedIndex={0}
-      setSidebarHighlightedIndex={vi.fn()}
-      selectedAccountId={null}
-      selectedAccountType={null}
-      handleSidebarAccountSelect={vi.fn()}
-      handleAmountCommit={vi.fn()}
-      handlePrint={vi.fn()}
-      onSubmit={vi.fn()}
-      activeTab="payment"
+        form={form}
+        fieldArray={fieldArray}
+        entries={rows}
+        total={total}
+        paymentAccountId={paymentAccountId}
+        paymentAccountType={paymentAccountId > 0 ? "ledger" : ""}
+        paymentAccountName={paymentAccountId > 0 ? "Access Cash" : ""}
+        accountBalance={173.86}
+        allAccounts={ACCOUNTS as any}
+        sidebarAccounts={ACCOUNTS as any}
+        filteredSidebarAccounts={ACCOUNTS as any}
+        sidebarSearchValue=""
+        setSidebarSearchValue={vi.fn()}
+        sidebarHighlightedIndex={0}
+        setSidebarHighlightedIndex={vi.fn()}
+        selectedAccountId={null}
+        selectedAccountType={null}
+        handleSidebarAccountSelect={vi.fn()}
+        handleAmountCommit={vi.fn()}
+        handlePrint={vi.fn()}
+        onSubmit={vi.fn()}
+        activeTab="payment"
         activeRowIndex={null}
         setActiveRowIndex={vi.fn()}
       />

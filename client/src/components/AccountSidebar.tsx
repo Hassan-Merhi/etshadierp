@@ -84,9 +84,7 @@ export default function AccountSidebar({
     entries.filter((e) => (e?.accountId ?? 0) > 0).map((e) => `${e.accountType}:${e.accountId}`)
   );
   const isGrouped = !searchValue.trim() && usedAccountKeys.size > 0;
-  const usedCount = isGrouped
-    ? filteredAccounts.filter((a) => usedAccountKeys.has(`${a.type}:${a.id}`)).length
-    : 0;
+  const usedCount = isGrouped ? filteredAccounts.filter((a) => usedAccountKeys.has(`${a.type}:${a.id}`)).length : 0;
 
   const handleAutoCreate = async () => {
     if (!onAutoCreateAccount) return;
