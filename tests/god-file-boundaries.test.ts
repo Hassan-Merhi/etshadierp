@@ -76,6 +76,6 @@ describe("repository-wide god-file architecture boundaries", () => {
     // limit. It exists to be driven down, so it is asserted as a ceiling and
     // should be lowered as the split phases land.
     expect(report.summary.grandfatheredFiles).toBeLessThanOrEqual(64);
-    expect(report.summary.grandfatheredExcessLines).toBeLessThanOrEqual(35799);
+    expect(report.summary.grandfatheredExcessLines).toBeLessThanOrEqual(35501);
   });
 });
