@@ -45,17 +45,25 @@ jobs:
           command: node scripts/phase4-typecheck-range.mjs << parameters.target >> << parameters.start >> << parameters.end >>
 
 workflows:
-  phase4-narrow-range-diagnostics:
+  phase4-exact-range-diagnostics:
     jobs:
-      - range-ts: { name: ar-1-50, target: server/routes/factory/factoryArabicTranslationRoutes.ts, start: 1, end: 50 }
-      - range-ts: { name: ar-51-100, target: server/routes/factory/factoryArabicTranslationRoutes.ts, start: 51, end: 100 }
-      - range-ts: { name: ar-101-150, target: server/routes/factory/factoryArabicTranslationRoutes.ts, start: 101, end: 150 }
-      - range-ts: { name: ar-151-200, target: server/routes/factory/factoryArabicTranslationRoutes.ts, start: 151, end: 200 }
-      - range-ts: { name: ar-201-250, target: server/routes/factory/factoryArabicTranslationRoutes.ts, start: 201, end: 250 }
-      - range-ts: { name: ar-251-300, target: server/routes/factory/factoryArabicTranslationRoutes.ts, start: 251, end: 300 }
-      - range-ts: { name: wb-101-150, target: server/services/factoryArabicTranslationWorkbook.ts, start: 101, end: 150 }
-      - range-ts: { name: wb-151-200, target: server/services/factoryArabicTranslationWorkbook.ts, start: 151, end: 200 }
-      - range-ts: { name: wb-301-350, target: server/services/factoryArabicTranslationWorkbook.ts, start: 301, end: 350 }
-      - range-ts: { name: wb-351-400, target: server/services/factoryArabicTranslationWorkbook.ts, start: 351, end: 400 }
-      - range-ts: { name: wb-401-450, target: server/services/factoryArabicTranslationWorkbook.ts, start: 401, end: 450 }
-      - range-ts: { name: wb-451-500, target: server/services/factoryArabicTranslationWorkbook.ts, start: 451, end: 500 }
+      - range-ts: { name: ar-1-10, target: server/routes/factory/factoryArabicTranslationRoutes.ts, start: 1, end: 10 }
+      - range-ts: { name: ar-11-20, target: server/routes/factory/factoryArabicTranslationRoutes.ts, start: 11, end: 20 }
+      - range-ts: { name: ar-21-30, target: server/routes/factory/factoryArabicTranslationRoutes.ts, start: 21, end: 30 }
+      - range-ts: { name: ar-31-40, target: server/routes/factory/factoryArabicTranslationRoutes.ts, start: 31, end: 40 }
+      - range-ts: { name: ar-41-50, target: server/routes/factory/factoryArabicTranslationRoutes.ts, start: 41, end: 50 }
+      - range-ts: { name: ar-201-210, target: server/routes/factory/factoryArabicTranslationRoutes.ts, start: 201, end: 210 }
+      - range-ts: { name: ar-211-220, target: server/routes/factory/factoryArabicTranslationRoutes.ts, start: 211, end: 220 }
+      - range-ts: { name: ar-221-230, target: server/routes/factory/factoryArabicTranslationRoutes.ts, start: 221, end: 230 }
+      - range-ts: { name: ar-231-240, target: server/routes/factory/factoryArabicTranslationRoutes.ts, start: 231, end: 240 }
+      - range-ts: { name: ar-241-250, target: server/routes/factory/factoryArabicTranslationRoutes.ts, start: 241, end: 250 }
+      - range-ts: { name: wb-101-110, target: server/services/factoryArabicTranslationWorkbook.ts, start: 101, end: 110 }
+      - range-ts: { name: wb-111-120, target: server/services/factoryArabicTranslationWorkbook.ts, start: 111, end: 120 }
+      - range-ts: { name: wb-121-130, target: server/services/factoryArabicTranslationWorkbook.ts, start: 121, end: 130 }
+      - range-ts: { name: wb-131-140, target: server/services/factoryArabicTranslationWorkbook.ts, start: 131, end: 140 }
+      - range-ts: { name: wb-141-150, target: server/services/factoryArabicTranslationWorkbook.ts, start: 141, end: 150 }
+      - range-ts: { name: wb-301-310, target: server/services/factoryArabicTranslationWorkbook.ts, start: 301, end: 310 }
+      - range-ts: { name: wb-311-320, target: server/services/factoryArabicTranslationWorkbook.ts, start: 311, end: 320 }
+      - range-ts: { name: wb-321-330, target: server/services/factoryArabicTranslationWorkbook.ts, start: 321, end: 330 }
+      - range-ts: { name: wb-331-340, target: server/services/factoryArabicTranslationWorkbook.ts, start: 331, end: 340 }
+      - range-ts: { name: wb-341-350, target: server/services/factoryArabicTranslationWorkbook.ts, start: 341, end: 350 }
