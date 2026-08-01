@@ -31,7 +31,10 @@
   "routeManifestMountAdditions": [
     "USE /api/factory/containers [postOffloadReconciliationMiddleware]",
     "USE /api/factory [requireAuth]",
-    "USE /api/factory [factoryBilingualCatalogMiddleware]"
+    "USE /api/factory [factoryBilingualCatalogMiddleware]",
+    "USE /api/factory [bilingualSurfaceMiddleware]",
+    "USE /api [bilingualSurfaceMiddleware]",
+    "USE /api/factory [factoryBilingualSnapshotWriteMiddleware]"
   ],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [
