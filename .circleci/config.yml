@@ -40,9 +40,7 @@ commands:
           name: Wait for PostgreSQL
           command: |
             for attempt in $(seq 1 60); do
-              if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then
-                exit 0
-              fi
+              if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then exit 0; fi
               sleep 1
             done
             exit 1
@@ -59,9 +57,11 @@ commands:
           command: node scripts/verify-ci-disposable-schema.mjs
 
 jobs:
-  focused-backend:
+  one-test:
     parameters:
       target:
+        type: string
+      test_name:
         type: string
     executor: node22-postgres
     steps:
@@ -69,24 +69,34 @@ jobs:
       - wait_for_postgres
       - prepare_schema
       - run:
-          name: Focused backend regression
+          name: One Phase 4 regression
           command: >-
             node node_modules/vitest/vitest.mjs run
             << parameters.target >>
+            -t "<< parameters.test_name >>"
             --maxWorkers=1 --no-file-parallelism
 
 workflows:
-  phase4-postgres-diagnostics:
+  phase4-test-case-diagnostics:
     jobs:
-      - focused-backend:
-          name: p4-workbook-tests
-          target: tests/factory-arabic-translation-workbook.test.ts
-      - focused-backend:
-          name: p4-route-tests
-          target: tests/factory-arabic-translation-routes.test.ts
-      - focused-backend:
-          name: p4-permission-tests
-          target: tests/operational-permission-route-policy.test.ts
-      - focused-backend:
-          name: p4-route-manifest
-          target: tests/route-manifest.test.ts
+      - one-test: { name: wb-export, target: tests/factory-arabic-translation-workbook.test.ts, test_name: exports the exact template columns }
+      - one-test: { name: wb-roundtrip, target: tests/factory-arabic-translation-workbook.test.ts, test_name: round-trips article codes }
+      - one-test: { name: wb-headers, target: tests/factory-arabic-translation-workbook.test.ts, test_name: rejects workbooks whose columns }
+      - one-test: { name: wb-exact, target: tests/factory-arabic-translation-workbook.test.ts, test_name: matches by normalized exact article code only }
+      - one-test: { name: wb-duplicates, target: tests/factory-arabic-translation-workbook.test.ts, test_name: blocks duplicate article codes }
+      - one-test: { name: wb-ambiguous, target: tests/factory-arabic-translation-workbook.test.ts, test_name: blocks ambiguous normalized article codes }
+      - one-test: { name: wb-category, target: tests/factory-arabic-translation-workbook.test.ts, test_name: blocks conflicting translations }
+      - one-test: { name: wb-idempotent, target: tests/factory-arabic-translation-workbook.test.ts, test_name: is idempotent when translations already match }
+      - one-test: { name: wb-fill, target: tests/factory-arabic-translation-workbook.test.ts, test_name: does not replace existing Arabic values }
+      - one-test: { name: wb-unknown, target: tests/factory-arabic-translation-workbook.test.ts, test_name: reports unknown article codes }
+      - one-test: { name: wb-empty, target: tests/factory-arabic-translation-workbook.test.ts, test_name: rejects empty translation rows }
+      - one-test: { name: wb-token, target: tests/factory-arabic-translation-workbook.test.ts, test_name: changes the preview token }
+      - one-test: { name: wb-error-file, target: tests/factory-arabic-translation-workbook.test.ts, test_name: creates an error workbook }
+      - one-test: { name: rt-auth, target: tests/factory-arabic-translation-routes.test.ts, test_name: keeps authentication in front }
+      - one-test: { name: rt-export, target: tests/factory-arabic-translation-routes.test.ts, test_name: exports a protected company-scoped }
+      - one-test: { name: rt-token, target: tests/factory-arabic-translation-routes.test.ts, test_name: requires a preview token }
+      - one-test: { name: rt-apply, target: tests/factory-arabic-translation-routes.test.ts, test_name: applies only Arabic fields }
+      - one-test: { name: rt-stale, target: tests/factory-arabic-translation-routes.test.ts, test_name: rejects a stale preview }
+      - one-test: { name: rt-duplicates, target: tests/factory-arabic-translation-routes.test.ts, test_name: blocks duplicate workbook article codes }
+      - one-test: { name: rt-rollback, target: tests/factory-arabic-translation-routes.test.ts, test_name: rolls product and category updates back }
+      - one-test: { name: rt-filetype, target: tests/factory-arabic-translation-routes.test.ts, test_name: rejects non-xlsx uploads }
