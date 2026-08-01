@@ -145,9 +145,6 @@ CREATE INDEX IF NOT EXISTS suppliers_company_idx
 CREATE UNIQUE INDEX IF NOT EXISTS suppliers_company_code_unique
   ON suppliers(company_id, code);
 
--- Soft-deleted raw-stock history must be able to coexist with the one active
--- row for a container. The old table constraint included deleted rows and made
--- that supported lifecycle impossible.
 ALTER TABLE factory_raw_stock
   DROP CONSTRAINT IF EXISTS factory_raw_stock_company_container_unique;
 
@@ -156,10 +153,10 @@ CREATE UNIQUE INDEX factory_raw_stock_company_container_unique
   ON factory_raw_stock(company_id, container_id)
   WHERE deleted_at IS NULL;
 
--- Older databases require total_weight_kg, while current insert paths derive it
--- after sources are attached. A zero default keeps staged mix-batch creation
--- valid without weakening the final calculated value.
 ALTER TABLE factory_mix_batches
-  ALTER COLUMN total_weight_kg SET DEFAULT 0;
+  ALTER COLUMN total_weight_kg SET DEFAULT 0,
+  ALTER COLUMN total_cost SET DEFAULT 0,
+  ALTER COLUMN cost_per_kg TYPE NUMERIC(20, 7)
+    USING cost_per_kg::NUMERIC(20, 7);
 
 COMMIT;
