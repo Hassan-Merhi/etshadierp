@@ -92,6 +92,10 @@ workflows:
           target: tests/factory-arabic-translation-routes.test.ts
           test_name: rolls product and category updates back
       - one-test:
-          name: wb-helper-recheck
+          name: wb-helper-resolves
+          target: tests/factory-arabic-translation-workbook-diagnostic.test.ts
+          test_name: diagnostic shared helper resolves
+      - one-test:
+          name: wb-helper-lock
           target: tests/factory-arabic-translation-workbook-diagnostic.test.ts
           test_name: diagnostic shared helper reference lock
