@@ -28,7 +28,7 @@ export type AuditChange = { old?: unknown; new?: unknown };
 export type AuditChanges = Record<string, AuditChange>;
 
 export interface AuditActor {
-  userId: string | number;
+  userId?: string | number;
   username: string;
   companyId?: number | null;
 }
@@ -119,7 +119,7 @@ export function buildAuditChanges(
 
 export async function writeAuditEvent(event: AuditEvent, executor: AuditExecutor = db): Promise<void> {
   const tableName = event.tableName.trim();
-  const userId = String(event.userId).trim();
+  const userId = String(event.userId ?? "system").trim();
   const username = event.username.trim();
 
   if (!tableName) throw new Error("Audit tableName is required");
