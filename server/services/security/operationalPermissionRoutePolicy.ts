@@ -40,10 +40,7 @@ const IMPORT_PREFIXES = [
 
 const ARABIC_TRANSLATION_TEMPLATE_PATH = "/api/factory/bale-products/arabic-template";
 
-function posShiftPermission(
-  method: string,
-  path: string
-): OperationalPermissionRouteMatch | null {
+function posShiftPermission(method: string, path: string): OperationalPermissionRouteMatch | null {
   const normalizedMethod = method.toUpperCase();
   if (
     normalizedMethod === "POST" &&
@@ -122,10 +119,7 @@ function exportPermission(path: string): OperationalPermissionRouteMatch | null 
       permissionKey: "exp_whatsapp_send",
     };
   }
-  if (
-    lower.includes("stock") &&
-    (lower.includes("export") || lower.includes("excel") || lower.includes("pdf"))
-  ) {
+  if (lower.includes("stock") && (lower.includes("export") || lower.includes("excel") || lower.includes("pdf"))) {
     return {
       operation: "stock-export",
       permissionType: "export",
@@ -146,11 +140,7 @@ function exportPermission(path: string): OperationalPermissionRouteMatch | null 
       permissionKey: "exp_print_invoice",
     };
   }
-  if (
-    lower.includes("backup") ||
-    lower.includes("daily-export") ||
-    lower.includes("data-export")
-  ) {
+  if (lower.includes("backup") || lower.includes("daily-export") || lower.includes("data-export")) {
     return {
       operation: "backup-export",
       permissionType: "export",
