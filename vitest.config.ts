@@ -9,7 +9,7 @@ export default defineConfig({
     hookTimeout: 30000,
     setupFiles: [
       "./server/supplierCompanyScopeBridge.mjs",
-      "./tests/setupXlsxBinaryParser.ts",
+      "./tests/setupXlsxBinaryParser.cjs",
     ],
     include: ["tests/**/*.test.ts"],
     // The smoke sweep runs as its own invocation so that "an endpoint stopped
