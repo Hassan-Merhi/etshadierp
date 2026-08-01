@@ -3,7 +3,6 @@ setup: true
 
 orbs:
   node: circleci/node@7.1.0
-  continuation: circleci/continuation@1.0.0
 
 executors:
   node22:
@@ -24,7 +23,7 @@ jobs:
           pkg-manager: npm
           override-ci-command: npm ci --no-audit --bin-links=true
       - run:
-          name: Format and encode route regression
+          name: Format and continue with encoded statuses
           command: |
             TARGET=tests/factory-arabic-translation-routes.test.ts
             node node_modules/prettier/bin/prettier.cjs --write "$TARGET"
@@ -60,8 +59,19 @@ jobs:
             Path('/tmp/continue.yml').write_text('\n'.join(lines) + '\n')
             print(f'Generated {len(chunks)} encoded status chunks')
             PY
-      - continuation/continue:
-          configuration_path: /tmp/continue.yml
+            python - <<'PY'
+            import json, os
+            from pathlib import Path
+            Path('/tmp/continue-request.json').write_text(json.dumps({
+                'continuation-key': os.environ['CIRCLE_CONTINUATION_KEY'],
+                'configuration': Path('/tmp/continue.yml').read_text(),
+            }))
+            PY
+            curl --fail --silent --show-error \
+              --request POST \
+              --header 'Content-Type: application/json' \
+              --data-binary @/tmp/continue-request.json \
+              https://circleci.com/api/v2/pipeline/continue
 
 workflows:
   setup-format-extraction:
