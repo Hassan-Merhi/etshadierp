@@ -411,7 +411,9 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
       const totalWorkerBaseSalary = parseFloat(String((workerAgg.rows[0] as any)?.totalWorkerBaseSalary ?? "0"));
       const totalWorkerTransport = parseFloat(String((workerAgg.rows[0] as any)?.totalWorkerTransport ?? "0"));
       const totalWorkerPaid = parseFloat(String((payrollAgg.rows[0] as any)?.totalWorkerPaid ?? "0"));
-      const totalEmployeeMonthlySalary = parseFloat(String((employeeAgg.rows[0] as any)?.totalEmployeeMonthlySalary ?? "0"));
+      const totalEmployeeMonthlySalary = parseFloat(
+        String((employeeAgg.rows[0] as any)?.totalEmployeeMonthlySalary ?? "0")
+      );
       const totalEmployeeBalance = parseFloat(String((employeeAgg.rows[0] as any)?.totalEmployeeBalance ?? "0"));
 
       // When breakdown is not requested, return lightweight summary only (no row-level data).

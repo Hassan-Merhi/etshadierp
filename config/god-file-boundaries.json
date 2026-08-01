@@ -194,7 +194,7 @@
       "server/chatService.ts": 2000,
       "server/index.ts": 1725,
       "server/routes/containers/containerFreightWriteRoutes.ts": 1400,
-      "server/routes/factory/employee-pos/employeeNetPositionRoutes.ts": 1775,
+      "server/routes/factory/employee-pos/employeeNetPositionRoutes.ts": 1475,
       "server/routes/factory/raw-stock/rawStockOffloadRoutes.ts": 1500,
       "server/routes/factory/suppliers/supplierStatementRoutes.ts": 950,
       "server/routes/rental/_rentalShared.ts": 1175,
