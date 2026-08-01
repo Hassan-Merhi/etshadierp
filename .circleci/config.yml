@@ -4,6 +4,19 @@ orbs:
   node: circleci/node@7.1.0
 
 executors:
+  node22:
+    docker:
+      - image: cimg/node:22.14
+    resource_class: medium+
+    working_directory: ~/project
+    environment:
+      NODE_ENV: test
+      SESSION_SECRET: circleci-session-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+      PORT: "5000"
+
   node22-postgres:
     docker:
       - image: cimg/node:22.14
@@ -34,18 +47,85 @@ commands:
       - node/install-packages:
           pkg-manager: npm
           override-ci-command: npm ci --no-audit --bin-links=true
+      - run:
+          name: Dependency diagnostics
+          command: |
+            node --version
+            npm --version
+            npm config get bin-links
+            node -p "'TypeScript ' + require('typescript/package.json').version"
+            node -p "'jsdom ' + require('jsdom/package.json').version"
+            for binary in tsc vite eslint vitest; do
+              test -x "node_modules/.bin/$binary" || { echo "$binary is missing"; exit 1; }
+            done
+
   wait_for_postgres:
     steps:
       - run:
           name: Wait for PostgreSQL
           command: |
             for attempt in $(seq 1 60); do
-              if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then exit 0; fi
+              if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then
+                echo "PostgreSQL is accepting connections."
+                exit 0
+              fi
               sleep 1
             done
+            echo "PostgreSQL did not become ready."
             exit 1
-  prepare_schema:
+
+jobs:
+  static-build:
+    executor: node22
     steps:
+      - install_dependencies
+      - run:
+          name: Verify lockfile and production dependencies
+          command: |
+            npm run verify:lockfile
+            npm run verify:production-dependencies
+      - run:
+          name: Check formatting for changed source files
+          command: |
+            git fetch origin main --depth=1
+            mapfile -d '' changed_files < <(
+              git diff --name-only --diff-filter=ACMR -z origin/main...HEAD -- client/src server shared tests scripts |
+                grep -zE '\.(ts|tsx|css|mjs)$' || true
+            )
+            if [ "${#changed_files[@]}" -eq 0 ]; then
+              echo "No changed source files require formatting checks."
+              exit 0
+            fi
+            printf 'Checking formatting for %s changed source file(s):\n' "${#changed_files[@]}"
+            printf ' - %s\n' "${changed_files[@]}"
+            node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
+      - run:
+          name: Lint
+          command: npm run lint
+      - run:
+          name: TypeScript
+          command: npm run check
+      - run:
+          name: Production build
+          command: npm run build
+      - run:
+          name: Verify server bundle
+          command: npm run verify:server-bundle
+      - run:
+          name: Repository safety contracts
+          command: |
+            npm run verify:program1-observability
+            npm run verify:final-production-readiness
+            npm run verify:bandwidth
+      - store_artifacts:
+          path: dist
+          destination: production-build
+
+  postgres-regression:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - wait_for_postgres
       - run:
           name: Verify migration registry
           command: node scripts/verify-migration-registry.mjs --json
@@ -55,47 +135,39 @@ commands:
       - run:
           name: Verify disposable database schema
           command: node scripts/verify-ci-disposable-schema.mjs
+      - run:
+          name: Backend tests
+          command: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
+      - run:
+          name: Frontend tests
+          command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
 
-jobs:
-  one-test:
-    parameters:
-      target:
-        type: string
-      test_name:
-        type: string
+  security-readiness:
     executor: node22-postgres
     steps:
       - install_dependencies
       - wait_for_postgres
-      - prepare_schema
       - run:
-          name: Recheck repaired regression
-          command: >-
-            node node_modules/vitest/vitest.mjs run
-            << parameters.target >>
-            -t "<< parameters.test_name >>"
-            --maxWorkers=1 --no-file-parallelism
+          name: Prepare disposable database schema
+          command: node node_modules/drizzle-kit/bin.cjs push --force
+      - run:
+          name: Critical dependency audit
+          command: npm audit --audit-level=critical
+      - run:
+          name: Production dependency verification
+          command: npm run verify:production-dependencies
+      - run:
+          name: Program 6 security checks
+          command: PROGRAM6_SKIP_TYPESCRIPT=1 npm run check:program-6-security
+      - run:
+          name: Final production readiness contract
+          command: npm run verify:final-production-readiness
 
 workflows:
-  phase4-repaired-case-recheck:
+  full-erp-verification:
     jobs:
-      - one-test:
-          name: wb-export-recheck
-          target: tests/factory-arabic-translation-workbook.test.ts
-          test_name: exports the exact template columns
-      - one-test:
-          name: rt-export-recheck
-          target: tests/factory-arabic-translation-routes.test.ts
-          test_name: exports a protected company-scoped
-      - one-test:
-          name: rt-rollback-recheck
-          target: tests/factory-arabic-translation-routes.test.ts
-          test_name: rolls product and category updates back
-      - one-test:
-          name: wb-helper-resolves
-          target: tests/factory-arabic-translation-workbook-diagnostic.test.ts
-          test_name: diagnostic shared helper resolves
-      - one-test:
-          name: wb-helper-lock
-          target: tests/factory-arabic-translation-workbook-diagnostic.test.ts
-          test_name: diagnostic shared helper reference lock
+      - static-build
+      - postgres-regression
+      - security-readiness:
+          requires:
+            - static-build
