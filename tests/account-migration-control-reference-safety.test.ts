@@ -19,9 +19,12 @@ describe("account migration POS control safety", () => {
   it("detaches source-company cash-account references before moving ledger accounts", () => {
     expect(controlReferences).toContain("set({ cashAccountId: null })");
     expect(controlReferences).toContain("delete(userLocationCashAccounts)");
-    expect(safeRoutes.indexOf("detachAccountMigrationControlReferences")).toBeLessThan(
-      safeRoutes.indexOf(".update(ledgerAccounts)"),
+    const detachCall = safeRoutes.indexOf(
+      "const controls = await detachAccountMigrationControlReferences",
     );
+    const accountMove = safeRoutes.indexOf(".update(ledgerAccounts)", detachCall);
+    expect(detachCall).toBeGreaterThan(-1);
+    expect(accountMove).toBeGreaterThan(detachCall);
   });
 
   it("persists the control snapshot and restores it during undo", () => {
