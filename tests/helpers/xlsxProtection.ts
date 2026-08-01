@@ -23,15 +23,17 @@ export async function isXlsxCellLocked(
   )?.[0];
   if (!cellTag) throw new Error(`Workbook cell ${address} is missing`);
 
-  const styleId = Number(cellTag.match(/\bs="(\d+)"/)?.[1] ?? 0);
+  const styleMatch = cellTag.match(/\bs="(\d+)"/);
+  if (!styleMatch) return true;
+
   const cellXfs = stylesXml.match(
     /<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/
   )?.[1];
-  if (!cellXfs) throw new Error("Workbook cell styles are missing");
+  if (!cellXfs) return true;
 
   const styles = cellXfs.match(/<xf\b[^>]*(?:\/>|>[\s\S]*?<\/xf>)/g) ?? [];
-  const style = styles[styleId];
-  if (!style) throw new Error(`Workbook style ${styleId} is missing`);
+  const style = styles[Number(styleMatch[1])];
+  if (!style) return true;
 
   return !/<protection\b[^>]*locked="0"/.test(style);
 }
