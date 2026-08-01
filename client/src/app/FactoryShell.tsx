@@ -10,6 +10,7 @@ import { DailyRateModal } from "@/components/DailyRateModal";
 import { FactorySidebar } from "@/components/FactorySidebar";
 import { FactoryRoutes } from "@/components/FactoryRoutes";
 import { FactoryCatalogLanguageSwitch } from "@/components/FactoryCatalogLanguageSwitch";
+import { FactoryBilingualDocumentActions } from "@/components/FactoryBilingualDocumentActions";
 import { HistoricalReplaySafetyPanel } from "@/components/HistoricalReplaySafetyPanel";
 import { HistoricalReplayNetEffectPanel } from "@/components/HistoricalReplayNetEffectPanel";
 import { AppTopBar } from "@/components/AppTopBar";
@@ -40,13 +41,7 @@ const factoryPosWorkspaceClasses = [
   "[&_[role=listbox]]:max-h-[min(24rem,70dvh)]",
 ].join(" ");
 
-export function FactoryShell({
-  user,
-  myAccess,
-  factoryDefaultPage,
-  handleLogout,
-  leaveConfirmDialog,
-}: FactoryShellProps) {
+export function FactoryShell({ user, myAccess, factoryDefaultPage, handleLogout, leaveConfirmDialog }: FactoryShellProps) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [currentLocation] = useLocation();
   const { selectedCompany } = useCompany();
@@ -55,9 +50,7 @@ export function FactoryShell({
 
   const style = { "--sidebar-width": "16rem", "--sidebar-width-icon": "3rem" };
   const isFactoryPosRoute = currentLocation === "/factory/pos" || currentLocation.startsWith("/factory/pos?");
-  const isRawStockRecalculateRoute =
-    currentLocation === "/factory/raw-stock/recalculate"
-    || currentLocation.startsWith("/factory/raw-stock/recalculate?");
+  const isRawStockRecalculateRoute = currentLocation === "/factory/raw-stock/recalculate" || currentLocation.startsWith("/factory/raw-stock/recalculate?");
   useMainContentFocus(currentLocation);
   useWorkspaceWheelScroll(factoryContainerRef);
   const hasAdminSearch = canUseAdminSearch(user);
@@ -70,49 +63,17 @@ export function FactoryShell({
           <FactorySidebar user={user} />
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <OfflineBanner />
-            <AppTopBar
-              accentColor={MODULE_ACCENT.factory}
-              user={{ username: user.username, role: user.role ?? "" }}
-              onLogout={handleLogout}
-              onSearchOpen={() => setPaletteOpen(true)}
-            />
-            <main
-              id="main-content"
-              tabIndex={-1}
-              aria-label={isFactoryPosRoute ? "Factory point of sale workspace" : "Factory and inventory workspace"}
-              data-pos-workspace={isFactoryPosRoute ? "true" : undefined}
-              className={`flex-1 overflow-y-auto overscroll-y-contain p-3 outline-none sm:p-6 ${
-                isFactoryPosRoute ? factoryPosWorkspaceClasses : ""
-              }`}
-            >
+            <AppTopBar accentColor={MODULE_ACCENT.factory} user={{ username: user.username, role: user.role ?? "" }} onLogout={handleLogout} onSearchOpen={() => setPaletteOpen(true)} />
+            <main id="main-content" tabIndex={-1} aria-label={isFactoryPosRoute ? "Factory point of sale workspace" : "Factory and inventory workspace"} data-pos-workspace={isFactoryPosRoute ? "true" : undefined} className={`flex-1 overflow-y-auto overscroll-y-contain p-3 outline-none sm:p-6 ${isFactoryPosRoute ? factoryPosWorkspaceClasses : ""}`}>
               <div className="w-full min-w-0 max-w-full [&_form]:min-w-0 [&_table]:w-full [&_[role=table]]:w-full [&_.overflow-x-auto]:overscroll-x-contain">
                 <FactoryCatalogLanguageSwitch />
+                <FactoryBilingualDocumentActions />
                 <ErrorBoundary resetKey={`${currentLocation}:historical-replay-preview`}>
-                  {isRawStockRecalculateRoute && (
-                    <>
-                      <HistoricalReplaySafetyPanel />
-                      <HistoricalReplayNetEffectPanel />
-                    </>
-                  )}
+                  {isRawStockRecalculateRoute && <><HistoricalReplaySafetyPanel /><HistoricalReplayNetEffectPanel /></>}
                 </ErrorBoundary>
                 <ErrorBoundary resetKey={currentLocation}>
-                  <Suspense
-                    fallback={
-                      <LoadingState
-                        title={isFactoryPosRoute ? "Loading factory point of sale" : "Loading factory workspace"}
-                        description={
-                          isFactoryPosRoute
-                            ? "Preparing the latest sale-entry workspace."
-                            : "Preparing the latest factory and inventory information."
-                        }
-                      />
-                    }
-                  >
-                    <FactoryRoutes
-                      user={user}
-                      myAccess={myAccess}
-                      factoryDefaultPage={factoryDefaultPage}
-                    />
+                  <Suspense fallback={<LoadingState title={isFactoryPosRoute ? "Loading factory point of sale" : "Loading factory workspace"} description={isFactoryPosRoute ? "Preparing the latest sale-entry workspace." : "Preparing the latest factory and inventory information."} />}>
+                    <FactoryRoutes user={user} myAccess={myAccess} factoryDefaultPage={factoryDefaultPage} />
                   </Suspense>
                 </ErrorBoundary>
               </div>
@@ -120,14 +81,7 @@ export function FactoryShell({
           </div>
         </div>
       </SidebarProvider>
-      <CommandPalette
-        open={paletteOpen}
-        onOpenChange={setPaletteOpen}
-        hasErpAccess={false}
-        hasFactoryAccess={true}
-        isAdminOwner={hasAdminSearch}
-        user={user}
-      />
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} hasErpAccess={false} hasFactoryAccess={true} isAdminOwner={hasAdminSearch} user={user} />
       {leaveConfirmDialog}
     </AppModeProvider>
   );
