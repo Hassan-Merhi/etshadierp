@@ -6,7 +6,7 @@ import {
   deleteRentalPaymentGroup,
   type RentalModule,
 } from "../../services/rental/rentalPaymentDeletionService";
-import { getCompanyId } from "./_rentalShared";
+import { getCompanyId } from "./shared";
 
 export function registerCentralRentalPaymentDeletionRoute(
   app: Express,

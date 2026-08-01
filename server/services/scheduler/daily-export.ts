@@ -2,7 +2,7 @@ import { getErrorMessage, getErrorStack } from "../../lib/httpHandlers";
 import archiver from "archiver";
 import { PassThrough } from "stream";
 import { logger } from "../../lib/logger";
-import { fetchAllCompanies } from "../exportDataService";
+import { fetchAllCompanies } from "../export-data";
 import { sendExportEmail } from "../emailService";
 import { pool } from "../../db";
 import { getWaSettings } from "../whatsappService";

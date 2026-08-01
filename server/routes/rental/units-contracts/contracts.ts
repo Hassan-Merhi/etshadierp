@@ -8,7 +8,7 @@ import type { RentalRoutesContext } from "./_helpers";
 import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
-import { getCompanyId, ensureMonthlyLedgerRows } from "../_rentalShared";
+import { getCompanyId, ensureMonthlyLedgerRows } from "../shared";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { z } from "zod";

@@ -3,7 +3,7 @@ import { getErrorMessage } from "../lib/httpHandlers";
 import { pool } from "../db";
 import { requireAuth, requireRole } from "../auth";
 import { logger } from "../lib/logger";
-import { fetchAllCompanies } from "../services/exportDataService";
+import { fetchAllCompanies } from "../services/export-data";
 import { sendExportEmail } from "../services/emailService";
 import { buildFullExportZip } from "../helpers/buildFullExportZip";
 import {

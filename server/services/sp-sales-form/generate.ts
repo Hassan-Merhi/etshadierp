@@ -1,137 +1,43 @@
 import ExcelJS from "exceljs";
-import { getErrorMessage } from "../lib/httpHandlers";
-import { logger } from "../lib/logger";
+import { getErrorMessage } from "../../lib/httpHandlers";
+import { logger } from "../../lib/logger";
 import path from "path";
 import fs from "fs";
-import { db } from "../db";
+import { db } from "../../db";
 import { sql } from "drizzle-orm";
 
-// ── Public interface ──────────────────────────────────────────────────────────
-
-export interface SpSalesFormParams {
-  companyId: number;
-  fromDate: string; // YYYY-MM-DD
-  toDate: string; // YYYY-MM-DD
-  supplierName?: string;
-  locationName?: string; // used in filename
-  locationId?: number; // optional; when provided, filters sales and opening stock to that location
-}
-
-// ── Internal types ────────────────────────────────────────────────────────────
-
-interface DaySales {
-  qty: number;
-  totalSales: number;
-  totalCost: number;
-  totalDeduction: number; // per-qty warehouse deduction from locations table
-}
-
-// ── Pure helpers ──────────────────────────────────────────────────────────────
-
-function pn(v: unknown): number {
-  const n = parseFloat(String(v ?? "0"));
-  return isNaN(n) ? 0 : n;
-}
-const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
-const r3 = (n: number) => Math.round((n + Number.EPSILON) * 1000) / 1000;
-
-/** YYYY-MM-DD → UTC midnight Date */
-function toUtcDate(s: string): Date {
-  const [y, m, d] = s.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d));
-}
-
-function addDays(d: Date, n: number): Date {
-  return new Date(d.getTime() + n * 86_400_000);
-}
-
-function dateStr(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-/**
- * Returns true if the cell holds an Excel formula (or a shared-formula reference).
- * ExcelJS represents master formula cells as { formula, result? }
- * and shared-formula slave cells as { sharedFormula: '<masterAddr>' }.
- * Both must be treated as formula cells so we never accidentally overwrite them
- * in contexts where we want to preserve the formula chain.
- */
-function isFormula(cell: ExcelJS.Cell): boolean {
-  if (cell.value === null || cell.value === undefined) return false;
-  if (typeof cell.value !== "object") return false;
-  const v = cell.value as unknown as Record<string, unknown>;
-  return "formula" in v || "sharedFormula" in v;
-}
-
-/**
- * Convert 1-based column number to Excel letter notation.
- * e.g. 1→A, 26→Z, 27→AA, 53→BA
- */
-function colLetter(n: number): string {
-  let s = "";
-  while (n > 0) {
-    n--;
-    s = String.fromCharCode(65 + (n % 26)) + s;
-    n = Math.floor(n / 26);
-  }
-  return s;
-}
-
-/**
- * Normalised lookup key: lowercase + collapse whitespace.
- * Used for case-insensitive, whitespace-tolerant item matching between
- * template display names and DB article codes / stock item names.
- */
-const nk = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
-
-/** Excel formula error strings we scan for after export. */
-const EXCEL_ERRORS = ["#REF!", "#DIV/0!", "#VALUE!", "#NAME?", "#N/A"];
-
-// ── Template column / row constants ──────────────────────────────────────────
-
-// ENTRY sheet
-const E_DATE_ROW = 3;
-const E_DATA_START = 5;
-// E_DATA_END is resolved dynamically from entryWs.rowCount after template load.
-// The template (55 Lubumbashi) has 173 rows; the old hardcoded 128 skipped items after that.
-const E_NAME_COL = 3; // C – display name (matches article_code / canonical stock code)
-const E_CODE_COL = 4; // D – optional system code override
-const E_OPENING_QTY_COL = 5;  // E – Opening Stock qty  (written directly; never rely on Costing SUMIFS)
-const E_COST_BAG_COL    = 6;  // F – Avg Cost per Bag   (written directly; also $F ref in profit formula)
-const E_DATE_START = 7; // G – first date block
-// Pattern per day d: baseCol = E_DATE_START + d*3
-//   baseCol   = Qty          (plain)
-//   baseCol+1 = Sale Price   (plain)
-//   baseCol+2 = Profit/Bag   (formula – see below)
-//
-// Template date capacity: days 0-17 → cols G(7)–BI(60).  After that:
-//   col 61 (BI+1) = empty separator
-//   col 62 (BJ)   = Closing Stock Qty
-//   col 63 (BK)   = Closing Stock Value
-// The "beyond range" clearing loops MUST stop before col 61 to avoid wiping
-// these fixed columns.
-const E_TEMPLATE_MAX_DAYS = 18; // number of date-day slots in this template
-const E_CLOSING_QTY_COL   = 62; // BJ – Closing Stock Qty  (written directly)
-const E_CLOSING_VAL_COL   = 63; // BK – Closing Stock Value (written directly)
-
-// Costing sheet
-const C_NAME_COL = 4; // D – item name (same as ENTRY col C)
-const C_QTY_COL = 5; // E – On Hand qty  (opening stock)
-const C_AVG_COL = 7; // G – Avg Cost (formula =H/E – we write 0 when qty=0 to prevent #DIV/0!)
-const C_VAL_COL = 8; // H – Asset value  (opening value)
-
-// Sales sheet
-const S_DATE_ROW = 1;
-const S_DATA_START = 2;
-const S_NAME_COL = 3; // C – item name
-const S_DATE_START = 6; // F – first date column
-// Sales date row structure (confirmed from template):
-//   F1 = plain date (day 0)
-//   G1 = {formula:"F1+1"}, H1 = {formula:"G1+1"}, ..., L1 = {formula:"K1+1"}  (days 1–6)
-//   M1 onward = plain stale dates (not chained)
-// We must write F1 (day 0) and clear ALL cells from dayCount onward, including formula cells.
-
-// ── Main export function ──────────────────────────────────────────────────────
+import {
+  C_AVG_COL,
+  C_NAME_COL,
+  C_QTY_COL,
+  C_VAL_COL,
+  DaySales,
+  EXCEL_ERRORS,
+  E_CLOSING_QTY_COL,
+  E_CLOSING_VAL_COL,
+  E_CODE_COL,
+  E_COST_BAG_COL,
+  E_DATA_START,
+  E_DATE_ROW,
+  E_DATE_START,
+  E_NAME_COL,
+  E_OPENING_QTY_COL,
+  E_TEMPLATE_MAX_DAYS,
+  S_DATA_START,
+  S_DATE_ROW,
+  S_DATE_START,
+  S_NAME_COL,
+  SpSalesFormParams,
+  addDays,
+  colLetter,
+  dateStr,
+  isFormula,
+  nk,
+  pn,
+  r2,
+  r3,
+  toUtcDate,
+} from "./layout";
 
 export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promise<Buffer> {
   logger.info("RUNNING NEW SP EXPORT FIX 2026-07-06 DIRECT ENTRY WRITE");
@@ -163,17 +69,17 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   if (dayCount > E_TEMPLATE_MAX_DAYS) {
     logger.warn(
       `[spSalesFormExport] WARNING: requested ${dayCount} days exceeds template ` +
-      `capacity (${E_TEMPLATE_MAX_DAYS} days). Export will be clamped to ` +
-      `${E_TEMPLATE_MAX_DAYS} days; data beyond ${dates[E_TEMPLATE_MAX_DAYS - 1]} is dropped.`
+        `capacity (${E_TEMPLATE_MAX_DAYS} days). Export will be clamped to ` +
+        `${E_TEMPLATE_MAX_DAYS} days; data beyond ${dates[E_TEMPLATE_MAX_DAYS - 1]} is dropped.`
     );
   }
 
   // ── Diagnostic log (confirms the server is running the latest code) ────────
   logger.info(
     `[spSalesFormExport] fromDate=${fromDate} toDate=${toDate} dayCount=${dayCount}` +
-    ` effectiveDayCount=${effectiveDayCount} locationId=${locationId ?? "none"}` +
-    ` firstClearedENTRYdateBlockCol=${E_DATE_START + effectiveDayCount * 3} (dayIndex=${effectiveDayCount})` +
-    ` firstClearedSalesDateCol=${S_DATE_START + effectiveDayCount}`
+      ` effectiveDayCount=${effectiveDayCount} locationId=${locationId ?? "none"}` +
+      ` firstClearedENTRYdateBlockCol=${E_DATE_START + effectiveDayCount * 3} (dayIndex=${effectiveDayCount})` +
+      ` firstClearedSalesDateCol=${S_DATE_START + effectiveDayCount}`
   );
 
   // ── DB queries ─────────────────────────────────────────────────────────────
@@ -288,9 +194,9 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     const dm = salesData.get(resolved)!;
     const prev = dm.get(dateKey) ?? { qty: 0, totalSales: 0, totalCost: 0, totalDeduction: 0 };
     dm.set(dateKey, {
-      qty:            prev.qty            + pn(r.qty),
-      totalSales:     prev.totalSales     + pn(r.total_sales),
-      totalCost:      prev.totalCost      + pn(r.total_cost),
+      qty: prev.qty + pn(r.qty),
+      totalSales: prev.totalSales + pn(r.total_sales),
+      totalCost: prev.totalCost + pn(r.total_cost),
       totalDeduction: prev.totalDeduction + pn(r.total_deduction),
     });
 
@@ -326,11 +232,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
    *   4. Direct hit on normalized key
    * Falls through all keys in order.
    */
-  function resolveFromMap<V>(
-    map: Map<string, V>,
-    alias: Map<string, string>,
-    ...keys: string[]
-  ): V | undefined {
+  function resolveFromMap<V>(map: Map<string, V>, alias: Map<string, string>, ...keys: string[]): V | undefined {
     for (const k of keys) {
       if (!k) continue;
       if (map.has(k)) return map.get(k);
@@ -423,8 +325,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
 
     if (displayName.startsWith("Total ") || displayName === "Inventory") continue;
 
-    const systemCode =
-      nameToSystemCode.get(displayName) ?? nameToSystemCode.get(nk(displayName)) ?? displayName;
+    const systemCode = nameToSystemCode.get(displayName) ?? nameToSystemCode.get(nk(displayName)) ?? displayName;
     const stock = getOpening(displayName, systemCode);
 
     const qtyCell = row.getCell(C_QTY_COL);
@@ -544,8 +445,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
 
       // (a) Data writing — item rows only (not "Total …").
       if (!displayName.startsWith("Total ")) {
-        const systemCode =
-          nameToSystemCode.get(displayName) ?? nameToSystemCode.get(nk(displayName)) ?? displayName;
+        const systemCode = nameToSystemCode.get(displayName) ?? nameToSystemCode.get(nk(displayName)) ?? displayName;
         const daySalesMap = getSalesMap(displayName, systemCode);
 
         for (let d = 0; d < effectiveDayCount; d++) {
@@ -554,7 +454,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
           // that must be replaced with the actual sale qty (or null).
           // The old `if (isFormula(cell)) continue` guard was wrong here.
           const ds = daySalesMap?.get(dates[d]);
-          cell.value = (ds && ds.qty > 0) ? r3(ds.qty) : null;
+          cell.value = ds && ds.qty > 0 ? r3(ds.qty) : null;
         }
       }
 
@@ -689,24 +589,24 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     // ── Date blocks ──────────────────────────────────────────────────────────
     let totalSoldInRange = 0;
     for (let d = 0; d < effectiveDayCount; d++) {
-      const baseCol    = E_DATE_START + d * 3;
-      const qtyCell    = row.getCell(baseCol);
-      const priceCell  = row.getCell(baseCol + 1);
+      const baseCol = E_DATE_START + d * 3;
+      const qtyCell = row.getCell(baseCol);
+      const priceCell = row.getCell(baseCol + 1);
       const profitCell = row.getCell(baseCol + 2);
 
       // Unconditional clear — data cells must never retain stale template formulas.
-      qtyCell.value    = null;
-      priceCell.value  = null;
+      qtyCell.value = null;
+      priceCell.value = null;
       profitCell.value = null;
 
       const ds = daySalesMap?.get(dates[d]);
       if (ds && ds.qty > 0) {
-        totalSoldInRange          += ds.qty;
-        const avgPrice             = ds.totalSales / ds.qty;
-        const deductionPerBag      = ds.totalDeduction / ds.qty;
-        const netProfitPB          = (ds.totalSales - ds.totalCost - ds.totalDeduction) / ds.qty;
+        totalSoldInRange += ds.qty;
+        const avgPrice = ds.totalSales / ds.qty;
+        const deductionPerBag = ds.totalDeduction / ds.qty;
+        const netProfitPB = (ds.totalSales - ds.totalCost - ds.totalDeduction) / ds.qty;
 
-        qtyCell.value   = r3(ds.qty);
+        qtyCell.value = r3(ds.qty);
         priceCell.value = r2(avgPrice);
 
         const qC = colLetter(baseCol);
@@ -725,7 +625,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     // immediately and must NOT be overwritten here.
     for (let d = effectiveDayCount; d < E_TEMPLATE_MAX_DAYS; d++) {
       const baseCol = E_DATE_START + d * 3;
-      row.getCell(baseCol).value     = null; // qty
+      row.getCell(baseCol).value = null; // qty
       row.getCell(baseCol + 1).value = null; // price
       row.getCell(baseCol + 2).value = null; // profit
     }
@@ -738,11 +638,11 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     // were sold.  This keeps downstream SUM/pivot formulas numeric.
     // When opening stock = 0 there is nothing to report — write null to leave
     // those cells blank (consistent with template expectation for new items).
-    const closingQty   = Math.max(0, stock.qty - totalSoldInRange);
+    const closingQty = Math.max(0, stock.qty - totalSoldInRange);
     const closingValue = r2(closingQty * stock.avgCost);
     if (stock.qty > 0) {
-      row.getCell(E_CLOSING_QTY_COL).value = r3(closingQty);  // 0 when fully sold
-      row.getCell(E_CLOSING_VAL_COL).value = closingValue;     // 0.00 when fully sold
+      row.getCell(E_CLOSING_QTY_COL).value = r3(closingQty); // 0 when fully sold
+      row.getCell(E_CLOSING_VAL_COL).value = closingValue; // 0.00 when fully sold
     } else {
       row.getCell(E_CLOSING_QTY_COL).value = null;
       row.getCell(E_CLOSING_VAL_COL).value = null;
@@ -763,8 +663,8 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   //   Costing=hidden, Sales=hidden, ENTRY=visible, Summary=visible,
   //   Ageing=VISIBLE (template has it visible — do NOT hide it), Summary-Itemwise=hidden
   // The old code incorrectly set Ageing to "hidden". Removed.
-  if (costingWs)  (costingWs  as any).state = "hidden";
-  if (salesWs)    (salesWs    as any).state = "hidden";
+  if (costingWs) (costingWs as any).state = "hidden";
+  if (salesWs) (salesWs as any).state = "hidden";
   if (summaryIWs) (summaryIWs as any).state = "hidden";
   // ENTRY, Summary, Ageing: leave as visible (template default)
 
@@ -787,9 +687,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     // (b) Capacity
     const salesCapacity = salesWs.columnCount - S_DATE_START + 1;
     if (dayCount > salesCapacity) {
-      mismatches.push(
-        `capacity: export=${dayCount} days, Sales only has ${salesCapacity} date columns (F1 onward)`
-      );
+      mismatches.push(`capacity: export=${dayCount} days, Sales only has ${salesCapacity} date columns (F1 onward)`);
     }
 
     // (c) First date cell in Sales row 1 vs fromDate
@@ -804,7 +702,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     if (firstDateWritten && firstDateWritten !== fromDate) {
       mismatches.push(
         `Sales!F1 date="${firstDateWritten}" does not match fromDate="${fromDate}"; ` +
-        `SUMIFS date range will be offset`
+          `SUMIFS date range will be offset`
       );
     }
 
@@ -812,7 +710,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     if (S_NAME_COL !== E_NAME_COL) {
       mismatches.push(
         `name column mismatch: Sales uses col ${S_NAME_COL}, ENTRY uses col ${E_NAME_COL}; ` +
-        `item lookup by row reference may fail`
+          `item lookup by row reference may fail`
       );
     }
 
@@ -827,7 +725,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
         if (!fmla.includes("Sales!")) {
           mismatches.push(
             `ENTRY!BM${r} formula "${fmla}" does not reference "Sales!" — ` +
-            `sheet may have been renamed or formula structure changed`
+              `sheet may have been renamed or formula structure changed`
           );
         }
         bmFormulaChecked = true;
@@ -835,13 +733,15 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
       }
     }
     if (!bmFormulaChecked) {
-      mismatches.push(`No BM formula found in ENTRY rows ${E_DATA_START}–${E_DATA_START + 5}; template may be missing Avg Monthly Sales column`);
+      mismatches.push(
+        `No BM formula found in ENTRY rows ${E_DATA_START}–${E_DATA_START + 5}; template may be missing Avg Monthly Sales column`
+      );
     }
 
     if (mismatches.length > 0) {
       logger.warn(
         `[spSalesFormExport] Sales alignment issues (${mismatches.length}):\n` +
-        mismatches.map((m, i) => `  ${i + 1}. ${m}`).join("\n")
+          mismatches.map((m, i) => `  ${i + 1}. ${m}`).join("\n")
       );
     } else {
       logger.info(
@@ -873,8 +773,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
       });
     }
 
-    const allErrors = Object.entries(errorsBySheet)
-      .flatMap(([, errs]) => errs);
+    const allErrors = Object.entries(errorsBySheet).flatMap(([, errs]) => errs);
     if (allErrors.length > 0) {
       logger.warn(`[spSalesFormExport] Formula errors detected (all sheets):`, { errors: allErrors });
     }
@@ -888,8 +787,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     const criticalErrors = criticalSheets.flatMap((s) => errorsBySheet[s] ?? []);
     if (criticalErrors.length > 0) {
       throw new Error(
-        `SP Sales Form export aborted — formula errors in critical sheets:\n` +
-        criticalErrors.slice(0, 20).join("\n")
+        `SP Sales Form export aborted — formula errors in critical sheets:\n` + criticalErrors.slice(0, 20).join("\n")
       );
     }
   } catch (scanErr: unknown) {

@@ -6,7 +6,7 @@
  * handler serves a request - config/route-manifest.json pins the result.
  */
 import type { Express } from "express";
-import type { RentalModule } from "../_rentalShared";
+import type { RentalModule } from "../shared";
 import type { RentalRoutesContext } from "./_helpers";
 import { registerRentalUnitsReadRoutes } from "./units-read";
 import { registerRentalUnitsWriteRoutes } from "./units-write";

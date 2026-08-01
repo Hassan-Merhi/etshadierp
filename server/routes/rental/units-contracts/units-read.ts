@@ -8,7 +8,7 @@ import type { RentalRoutesContext } from "./_helpers";
 import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
-import { getCompanyId, ensureMonthlyForCompany, postRentAccrualForCompany } from "../_rentalShared";
+import { getCompanyId, ensureMonthlyForCompany, postRentAccrualForCompany } from "../shared";
 import { postDueScheduledRentalPayments } from "../../../services/rental/rentalPaymentPostingService";
 import { getRentalBillingDay, getRentalPeriodDueDate } from "../../../services/rental/rentalPeriodService";
 import { getClientDate } from "../../../lib/dateUtils";

@@ -10,7 +10,7 @@ import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { buildSafeFilename, contentDisposition } from "../../../lib/contentDisposition";
 import type ExcelJS from "exceljs";
-import { getCompanyId, ensureMonthlyLedgerRows } from "../_rentalShared";
+import { getCompanyId, ensureMonthlyLedgerRows } from "../shared";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { eq, and, desc } from "drizzle-orm";

@@ -5,7 +5,7 @@
  */
 import { getRentalPeriodDueDate } from "../../../services/rental/rentalPeriodService";
 
-import type { RentalModule } from "../_rentalShared";
+import type { RentalModule } from "../shared";
 
 /**
  * The five arguments registerRentalUnitsContractsRoutes is called with, plus

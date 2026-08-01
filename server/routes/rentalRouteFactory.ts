@@ -8,8 +8,8 @@ import { registerRentalAccrualConfigRoutes } from "./rental/rentalAccrualConfigR
 import { runRentalReconciliation } from "../services/rental/rentalReconciliationService";
 import { requireAuth } from "../auth";
 import { getClientDate } from "../lib/dateUtils";
-import { getCompanyId } from "./rental/_rentalShared";
-export { ensureMonthlyForCompany, postRentAccrualForCompany } from "./rental/_rentalShared";
+import { getCompanyId } from "./rental/shared";
+export { ensureMonthlyForCompany, postRentAccrualForCompany } from "./rental/shared";
 
 type RentalModule = "PROPERTIES" | "ERP" | "FACTORY";
 

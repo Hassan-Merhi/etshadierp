@@ -4,7 +4,7 @@ import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { sql } from "drizzle-orm";
-import { generateSpSalesFormExcel } from "../../services/spSalesFormExport";
+import { generateSpSalesFormExcel } from "../../services/sp-sales-form";
 import { generateSpSalesFormExcelV2 } from "../../services/spSalesFormExportV2";
 import { requireSpCompany } from "./spHelpers";
 

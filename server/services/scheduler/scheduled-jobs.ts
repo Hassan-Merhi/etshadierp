@@ -2,7 +2,7 @@ import cron from "node-cron";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
-import { ensureMonthlyForCompany, postRentAccrualForCompany } from "../../routes/rental/_rentalShared";
+import { ensureMonthlyForCompany, postRentAccrualForCompany } from "../../routes/rental/shared";
 import { hasTodayExportSucceeded, isTodayExportRunning, runDailyExport } from "./daily-export";
 
 // Guards startScheduler against a double start. Declared here rather than in

@@ -1,18 +1,3 @@
-/**
- * postOffloadChargeMutation.ts
- * ────────────────────────────────────────────────────────────────────────────
- * Shared service that handles all mutations on factory_offload_additional_charges:
- *   CREATE  — insert a new charge, write accounting, cascade costs
- *   EDIT    — update an existing charge in-place, adjust accounting & costs
- *   UNDO    — soft-delete a charge, reverse accounting, cascade negative delta
- *   LEGACY_REBUILD — fix the supplier locked rate on a charge that was applied
- *                    with the old (pre-fix) formula, without touching accounting
- *
- * All methods MUST be called inside an existing Drizzle transaction (tx).
- * The pre-transaction work (FX resolution, getOrCreateLedgerAccount) is done
- * in the calling route before the transaction opens.
- */
-
 import Decimal from "decimal.js";
 import { and, eq, isNull, isNotNull, gt, sql } from "drizzle-orm";
 import {
@@ -25,275 +10,19 @@ import {
   factoryDaybookEntries,
   vouchers,
   voucherEntries,
-} from "../../../shared/schema";
-import { cascadeContainerCostChange } from "./rawStockCostCascade";
-import { computeCorrectContainerCost } from "./raw-stock-recalc";
-import { getAuthoritativeSupplierRemainingKg } from "./rawStockLockedRate";
-import { writeDaybookEntry } from "../../routes/factory/_helpers";
-import { resolveStoredFxRateOrThrow } from "./currencyConversion";
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-export interface AccountingContext {
-  /** The company that owns the voucher (may differ from factory company). */
-  voucherCompanyId: number;
-  /** ID of the "Factory Charges Payable" ledger account — 0 if no accounting. */
-  chargesPayableAcctId: number;
-}
-
-export interface PostOffloadChargeData {
-  description: string;
-  amount: number;
-  currencyCode: string;
-  fxRateToUsd: number;
-  fxRateConfirmed: boolean;
-  fxRateDate: string;
-  ledgerAccountId: number | null;
-  supplierId: number | null;
-}
-
-export interface PostOffloadMutationParams {
-  action: "CREATE" | "EDIT" | "UNDO" | "LEGACY_REBUILD";
-  companyId: number;
-  containerId: number;
-  txDate: string;
-  userId?: string;
-  // Required for EDIT / UNDO / LEGACY_REBUILD:
-  chargeId?: number;
-  expectedVersion?: number;
-  // Required for CREATE / EDIT:
-  chargeData?: PostOffloadChargeData;
-  // Required for LEGACY_REBUILD / UNDO when supplierLockedRateBefore IS NULL:
-  legacyBaselineRate?: number;
-  // Pre-computed accounting context (must be set for CREATE / EDIT with accounting):
-  accountingCtx?: AccountingContext;
-}
-
-export interface PostOffloadMutationResult {
-  chargeId: number;
-  action: string;
-  alreadyUndone?: boolean;
-  oldContainerCostPerKgUsd: number;
-  newContainerCostPerKgUsd: number;
-  supplierLockedRateBefore: string | null;
-  supplierLockedRateAfter: string | null;
-  supplierRemainingKg: number;
-  containerReceivedKg: number;
-  containerRemainingKg: number;
-  remainingFraction: string;
-  fullContainerValueDeltaUsd: string;
-  supplierInventoryValueDeltaUsd: string;
-  supplierValueBeforeUsd: string | null;
-  supplierValueAfterUsd: string | null;
-  cascadeResult: any;
-  reversalDaybookEntryId?: number | null;
-}
-
-// ─── Internal helpers ─────────────────────────────────────────────────────────
-
-/** Load commission + other-charge rows for canonical cost computation. */
-async function loadCostInputs(tx: any, companyId: number, containerId: number) {
-  const commissions = await tx
-    .select()
-    .from(factoryContainerCommissions)
-    .where(
-      and(eq(factoryContainerCommissions.containerId, containerId), eq(factoryContainerCommissions.companyId, companyId))
-    );
-  const commissionRecord = commissions.sort((a: any, b: any) => b.id - a.id)[0] || null;
-
-  const otherChargeRows = await tx
-    .select()
-    .from(factoryContainerOtherCharges)
-    .where(
-      and(
-        eq(factoryContainerOtherCharges.containerId, containerId),
-        eq(factoryContainerOtherCharges.companyId, companyId)
-      )
-    );
-
-  return { commissionRecord, otherChargeRows };
-}
-
-/** Load all active (non-deleted) additional-charge rows for this container. */
-async function loadActiveCharges(tx: any, companyId: number, containerId: number) {
-  return tx
-    .select()
-    .from(factoryOffloadAdditionalCharges)
-    .where(
-      and(
-        eq(factoryOffloadAdditionalCharges.containerId, containerId),
-        eq(factoryOffloadAdditionalCharges.companyId, companyId),
-        isNull(factoryOffloadAdditionalCharges.deletedAt)
-      )
-    );
-}
-
-/** Compute remaining-fraction from raw-stock rows. */
-async function computeRemainingFraction(tx: any, companyId: number, containerId: number) {
-  const rows = await tx
-    .select()
-    .from(factoryRawStock)
-    .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId)));
-
-  let dReceivedKg = new Decimal(0);
-  let dUsedKg = new Decimal(0);
-  for (const r of rows) {
-    dReceivedKg = dReceivedKg.plus(new Decimal(String(r.receivedKg || "0")));
-    dUsedKg = dUsedKg.plus(new Decimal(String(r.usedKg || "0")));
-  }
-  const dRemainingKg = Decimal.max(0, dReceivedKg.minus(dUsedKg));
-  const dFraction = dReceivedKg.gt(0)
-    ? Decimal.min(new Decimal(1), dRemainingKg.div(dReceivedKg))
-    : new Decimal(0);
-
-  return { dReceivedKg, dUsedKg, dRemainingKg, dFraction };
-}
-
-/**
- * When voucherId or daybookEntryId is null on an existing charge (legacy),
- * attempt to resolve them from accounting records by exact reference lookup.
- * Persists the resolved IDs on the charge row and returns the updated charge.
- * Throws if multiple ambiguous matches exist.
- */
-async function resolveLegacyPostOffloadAccountingLinks(
-  tx: any,
-  companyId: number,
-  containerId: number,
-  chargeRow: any
-) {
-  let { daybookEntryId, voucherId } = chargeRow;
-
-  // Resolve daybook entry
-  if (!daybookEntryId) {
-    const daybooks = await tx
-      .select({ id: factoryDaybookEntries.id })
-      .from(factoryDaybookEntries)
-      .where(
-        and(
-          eq(factoryDaybookEntries.companyId, companyId),
-          eq(factoryDaybookEntries.txType, "OTHER_CHARGE"),
-          eq(factoryDaybookEntries.referenceId, containerId),
-          sql`${factoryDaybookEntries.metaJson}::jsonb ->> 'sourceType' = 'POST_OFFLOAD_ADDITIONAL'`,
-          sql`(${factoryDaybookEntries.metaJson}::jsonb ->> 'chargeId')::int = ${chargeRow.id}`
-        )
-      );
-    if (daybooks.length === 1) {
-      daybookEntryId = daybooks[0].id;
-    } else if (daybooks.length > 1) {
-      throw new Error(
-        `Multiple daybook entries matched charge ${chargeRow.id} — manual review required before edit/undo.`
-      );
-    }
-  }
-
-  // Resolve voucher
-  if (!voucherId) {
-    const voucherRows = await tx
-      .select({ id: vouchers.id })
-      .from(vouchers)
-      .where(
-        and(
-          eq(vouchers.sourceModule, "FACTORY"),
-          isNull(vouchers.deletedAt),
-          sql`${vouchers.voucherNumber} LIKE ${"FACTORY-POC-" + containerId + "-" + chargeRow.id + "-%"}`
-        )
-      );
-    if (voucherRows.length === 1) {
-      voucherId = voucherRows[0].id;
-    } else if (voucherRows.length > 1) {
-      throw new Error(
-        `Multiple vouchers matched charge ${chargeRow.id} (pattern FACTORY-POC-${containerId}-${chargeRow.id}-%) — manual review required before edit/undo.`
-      );
-    }
-  }
-
-  // Persist resolved IDs if anything changed
-  if (daybookEntryId !== chargeRow.daybookEntryId || voucherId !== chargeRow.voucherId) {
-    await tx
-      .update(factoryOffloadAdditionalCharges)
-      .set({ daybookEntryId, voucherId })
-      .where(eq(factoryOffloadAdditionalCharges.id, chargeRow.id));
-    return { ...chargeRow, daybookEntryId, voucherId };
-  }
-
-  return chargeRow;
-}
-
-/**
- * Verify no later supplier-cost-changing event exists for the same supplier
- * (later containers offloaded, later active post-offload charges, later duty corrections).
- * Throws if a later event is found.
- */
-async function assertNoLaterSupplierCostEvents(
-  tx: any,
-  companyId: number,
-  supplierId: number,
-  afterDate: Date
-) {
-  // 1. Later offloaded container
-  const laterContainers = await tx
-    .select({ id: factoryContainers.id, containerNumber: factoryContainers.containerNumber })
-    .from(factoryContainers)
-    .where(
-      and(
-        eq(factoryContainers.companyId, companyId),
-        eq(factoryContainers.supplierId, supplierId),
-        eq(factoryContainers.status, "OFFLOADED"),
-        gt(factoryContainers.updatedAt, afterDate)
-      )
-    );
-  if (laterContainers.length > 0) {
-    throw new Error(
-      `Newer supplier cost events exist (offloaded container ${laterContainers[0].containerNumber}). ` +
-        "This legacy charge cannot be rebuilt automatically without replaying later supplier-rate events."
-    );
-  }
-
-  // 2. Later active post-offload charge for the same supplier (via container FK)
-  const laterCharges = await tx
-    .select({ id: factoryOffloadAdditionalCharges.id })
-    .from(factoryOffloadAdditionalCharges)
-    .innerJoin(factoryContainers, eq(factoryContainers.id, factoryOffloadAdditionalCharges.containerId))
-    .where(
-      and(
-        eq(factoryContainers.companyId, companyId),
-        eq(factoryContainers.supplierId, supplierId),
-        isNull(factoryOffloadAdditionalCharges.deletedAt),
-        gt(factoryOffloadAdditionalCharges.createdAt, afterDate)
-      )
-    );
-  if (laterCharges.length > 0) {
-    throw new Error(
-      "Newer supplier cost events exist (a later post-offload charge for this supplier). " +
-        "This legacy charge cannot be rebuilt automatically without replaying later supplier-rate events."
-    );
-  }
-}
-
-/** Update container landed totals (never touches purchase rate). */
-async function updateContainerCost(tx: any, containerId: number, next: any) {
-  await tx
-    .update(factoryContainers)
-    .set({
-      finalPayableAmount: String(next.totalCost),
-      ratePerKgUsd: String(next.costPerKgUsd),
-      finalPayableAmountUsd: String(next.totalUsd),
-      updatedAt: new Date(),
-    })
-    .where(eq(factoryContainers.id, containerId));
-}
-
-/** Capture supplier locked rate (FOR UPDATE lock). */
-async function getSupplierRateForUpdate(tx: any, companyId: number, supplierId: number) {
-  const [row] = await tx
-    .select({ rate: factorySuppliers.currentRawMaterialCostPerKgUsd })
-    .from(factorySuppliers)
-    .where(and(eq(factorySuppliers.id, supplierId), eq(factorySuppliers.companyId, companyId)))
-    .for("update");
-  return row?.rate ?? null;
-}
-
-// ─── Main export ──────────────────────────────────────────────────────────────
+} from "../../../../shared/schema";
+import { cascadeContainerCostChange } from "../rawStockCostCascade";
+import { computeCorrectContainerCost } from "../raw-stock-recalc";
+import { getAuthoritativeSupplierRemainingKg } from "../rawStockLockedRate";
+import { writeDaybookEntry } from "../../../routes/factory/_helpers";
+import {
+  assertNoLaterSupplierCostEvents,
+  getSupplierRateForUpdate,
+  resolveLegacyPostOffloadAccountingLinks,
+  updateContainerCost,
+} from "./legacy-links";
+import { computeRemainingFraction, loadActiveCharges, loadCostInputs } from "./loaders";
+import { PostOffloadMutationParams, PostOffloadMutationResult } from "./types";
 
 export async function applyPostOffloadChargeMutation(
   tx: any,
@@ -373,9 +102,7 @@ export async function applyPostOffloadChargeMutation(
     const dAuthKg = new Decimal(String(supplierRemainingKg));
     const dBaseRate = new Decimal(String(legacyBaselineRate));
 
-    const dNewRate = dAuthKg.gt(0)
-      ? dBaseRate.plus(dSupplierInventoryValueDeltaUsd.div(dAuthKg))
-      : dBaseRate;
+    const dNewRate = dAuthKg.gt(0) ? dBaseRate.plus(dSupplierInventoryValueDeltaUsd.div(dAuthKg)) : dBaseRate;
 
     // Set supplier locked rate directly
     await tx
@@ -665,7 +392,8 @@ export async function applyPostOffloadChargeMutation(
     const dFullDelta = dNewTotal.minus(dOldTotal);
     const dSupplierDelta = dFullDelta.times(dFraction);
 
-    const isLegacyUnknownBaseline = chargeRow.supplierLockedRateBefore === null && params.legacyBaselineRate !== undefined;
+    const isLegacyUnknownBaseline =
+      chargeRow.supplierLockedRateBefore === null && params.legacyBaselineRate !== undefined;
     let cascadeResult: any = null;
 
     // Update container cost
@@ -687,9 +415,7 @@ export async function applyPostOffloadChargeMutation(
         );
         const dSupplierInventoryValueDeltaUsd = chargeAmountUsd.times(dFraction);
         const dBaseRate = new Decimal(String(params.legacyBaselineRate));
-        const dNewRate = dAuthKg.gt(0)
-          ? dBaseRate.plus(dSupplierInventoryValueDeltaUsd.div(dAuthKg))
-          : dBaseRate;
+        const dNewRate = dAuthKg.gt(0) ? dBaseRate.plus(dSupplierInventoryValueDeltaUsd.div(dAuthKg)) : dBaseRate;
         await tx
           .update(factorySuppliers)
           .set({ currentRawMaterialCostPerKgUsd: Decimal.max(0, dNewRate).toFixed(8), updatedAt: new Date() })
@@ -736,9 +462,7 @@ export async function applyPostOffloadChargeMutation(
     let newDaybookEntryId = chargeRow.daybookEntryId;
     if (chargeRow.daybookEntryId) {
       const chargeAmountUsd =
-        chargeData.currencyCode === "USD"
-          ? chargeData.amount
-          : chargeData.amount * chargeData.fxRateToUsd;
+        chargeData.currencyCode === "USD" ? chargeData.amount : chargeData.amount * chargeData.fxRateToUsd;
       await tx
         .update(factoryDaybookEntries)
         .set({
@@ -782,15 +506,14 @@ export async function applyPostOffloadChargeMutation(
     if (chargeRow.voucherId) {
       if (!needsAccounting) {
         // Remove accounting: soft-delete the voucher
-        await tx
-          .update(vouchers)
-          .set({ deletedAt: new Date() })
-          .where(eq(vouchers.id, chargeRow.voucherId));
+        await tx.update(vouchers).set({ deletedAt: new Date() }).where(eq(vouchers.id, chargeRow.voucherId));
         newVoucherId = null;
       } else {
         // Update existing voucher header + recreate entries
-        const { voucherCompanyId, chargesPayableAcctId } =
-          accountingCtx || { voucherCompanyId: companyId, chargesPayableAcctId: 0 };
+        const { voucherCompanyId, chargesPayableAcctId } = accountingCtx || {
+          voucherCompanyId: companyId,
+          chargesPayableAcctId: 0,
+        };
         await tx
           .update(vouchers)
           .set({
@@ -1001,7 +724,8 @@ export async function applyPostOffloadChargeMutation(
       : null;
 
     let cascadeResult: any;
-    const isLegacyUnknownBaseline = chargeRow.supplierLockedRateBefore === null && params.legacyBaselineRate !== undefined;
+    const isLegacyUnknownBaseline =
+      chargeRow.supplierLockedRateBefore === null && params.legacyBaselineRate !== undefined;
 
     if (isLegacyUnknownBaseline && supplierId) {
       // Legacy undo: set supplier rate directly to the baseline (skip cascade supplier update)
@@ -1050,10 +774,7 @@ export async function applyPostOffloadChargeMutation(
 
     // Soft-delete linked voucher
     if (chargeRow.voucherId) {
-      await tx
-        .update(vouchers)
-        .set({ deletedAt: now })
-        .where(eq(vouchers.id, chargeRow.voucherId));
+      await tx.update(vouchers).set({ deletedAt: now }).where(eq(vouchers.id, chargeRow.voucherId));
     }
 
     // Create reversing daybook entry (avoid duplicate if already reversed)

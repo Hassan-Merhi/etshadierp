@@ -9,7 +9,7 @@ import {
   type TestContext,
 } from "./setup";
 import { pool } from "../server/db";
-import { generateSpSalesFormExcel } from "../server/services/spSalesFormExport";
+import { generateSpSalesFormExcel } from "../server/services/sp-sales-form";
 
 const TEST_PREFIX = "xlsxtest";
 

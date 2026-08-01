@@ -1,6 +1,6 @@
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { fetchAllCompanies } from "../exportDataService";
+import { fetchAllCompanies } from "../export-data";
 import { pool } from "../../db";
 import {} from "../whatsappService";
 import { buildFullExportZip } from "../../helpers/buildFullExportZip";

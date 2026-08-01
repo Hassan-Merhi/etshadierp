@@ -35,9 +35,9 @@ import {
 } from "@shared/schema";
 import { eq, and, sql, inArray, isNull } from "drizzle-orm";
 import Decimal from "decimal.js";
-import type { RentalModule } from "../../routes/rental/_rentalShared";
+import type { RentalModule } from "../../routes/rental/shared";
 import { normalizeVoucherEntryAmounts } from "../accounting/currencyAmounts";
-import { findOrCreateLedgerAccount, maybeRunAutoTransfer } from "../../routes/rental/_rentalShared";
+import { findOrCreateLedgerAccount, maybeRunAutoTransfer } from "../../routes/rental/shared";
 import {
   isRentalPeriodDue,
   getRentalBillingDay,

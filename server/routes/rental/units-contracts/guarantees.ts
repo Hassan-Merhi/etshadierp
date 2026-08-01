@@ -13,7 +13,7 @@ import {
   maybeRunAutoTransfer,
   ensureMonthlyLedgerRows,
   buildAllocations,
-} from "../_rentalShared";
+} from "../shared";
 import { getClientDate } from "../../../lib/dateUtils";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";

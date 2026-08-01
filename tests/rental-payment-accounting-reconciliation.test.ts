@@ -301,7 +301,7 @@ describe("Rental payment accounting and reconciliation", () => {
   });
 
   it("creates billing-day-aware monthly ledger rows", async () => {
-    const { ensureMonthlyLedgerRows } = await import("../server/routes/rental/_rentalShared");
+    const { ensureMonthlyLedgerRows } = await import("../server/routes/rental/shared");
     await ensureMonthlyLedgerRows(testContractId, todayStr());
     const rows = await q(
       "SELECT year, month FROM property_monthly_ledger WHERE contract_id = $1",

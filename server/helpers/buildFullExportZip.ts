@@ -1,6 +1,6 @@
 import archiver from "archiver";
 import type { Writable } from "stream";
-import { streamCompanyWorkbookDirect } from "../services/exportExcelService";
+import { streamCompanyWorkbookDirect } from "../services/export-excel";
 import { logger } from "../lib/logger";
 import { withHeavyExportSlot } from "../services/heavyExportCoordinator";
 

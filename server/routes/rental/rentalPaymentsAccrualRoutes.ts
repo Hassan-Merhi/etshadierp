@@ -11,7 +11,7 @@ import {
   ensureMonthlyForCompany,
   postRentAccrualForCompany,
   type RentalModule,
-} from "./_rentalShared";
+} from "./shared";
 import { postDueScheduledRentalPayments, createRentalPaymentGroup } from "../../services/rental/rentalPaymentPostingService";
 import { db, pool } from "../../db";
 import { getRentalBillingDay, getRentalPeriodDueDate } from "../../services/rental/rentalPeriodService";
