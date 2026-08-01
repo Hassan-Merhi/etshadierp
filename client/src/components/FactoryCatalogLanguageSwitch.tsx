@@ -8,6 +8,8 @@ import {
 } from "@/lib/factoryCatalogPreference";
 import { queryClient } from "@/lib/queryClient";
 
+export const FACTORY_CATALOG_LANGUAGE_EVENT = "factory-catalog-language-change";
+
 export function FactoryCatalogLanguageSwitch() {
   const [language, setLanguage] = useState<FactoryCatalogLanguage>(() =>
     readFactoryCatalogLanguagePreference(typeof window === "undefined" ? null : window.localStorage)
@@ -25,6 +27,7 @@ export function FactoryCatalogLanguageSwitch() {
     if (next === language) return;
     persistFactoryCatalogLanguagePreference(next, window.localStorage, document);
     setLanguage(next);
+    window.dispatchEvent(new CustomEvent<FactoryCatalogLanguage>(FACTORY_CATALOG_LANGUAGE_EVENT, { detail: next }));
     void queryClient.invalidateQueries({
       predicate: (query) => {
         const first = query.queryKey[0];
