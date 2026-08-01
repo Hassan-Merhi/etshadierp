@@ -15,7 +15,7 @@
     "GET /api/factory/net-position": {
       "status": 200,
       "shape": "{asOf,balanceOnTableValue,forUs,forUsTotal,inventoryValue,ledgerAssets,ledgerLiabilities,loadingOrders,loadingTotal,netPosition,netPositionLabel,onUs,onUsTotal,payrollPayable,pendingOrders,pendingTotal,rawMaterialValue,supplierLiabilities,supplierOverpayments,verifiedOrders,verifiedTotal}",
-      "hash": "29f0b834242af7af94c474e5f2558f1c1b7570dccb1124acccd143c07e366480"
+      "hash": "c00529935a1b91e0a878d0e099674c917fce5f570d8bf253880a1ffae8f2a0c9"
     },
     "GET /api/factory/suppliers/:supplierId/statement": {
       "status": 200,

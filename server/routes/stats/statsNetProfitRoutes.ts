@@ -107,6 +107,7 @@ import { classifyNetPositionAccounts, getAccountNetBalance, round2 } from "../..
 
 import { _getCached, _setCached } from "../../services/shared/ttlCache";
 import { computeRentalOutstanding } from "./netProfitRentalSection";
+import { computeStockInHand } from "./netProfitStockSection";
 
 export function registerStatsNetProfitRoutes(app: Express) {
   app.get("/api/stats/net-profit", requireAuth, requireNonPOS, async (req, res) => {
@@ -622,50 +623,18 @@ export function registerStatsNetProfitRoutes(app: Express) {
         }
       }
 
-      // ── ERP Stock In Hand — location inventory (weighted-average cost) ──
-      {
-        const activeLocationsData = await db
-          .select({ id: locations.id })
-          .from(locations)
-          .where(and(eq(locations.companyId, companyId), eq(locations.active, true), isNull(locations.deletedAt)))
-          .execute();
-        const activeLocationIds = activeLocationsData.map((l) => l.id);
-
-        let stockOnFloor = 0;
-        if (activeLocationIds.length > 0) {
-          if (toDate) {
-            const allHistorical = await Promise.all(
-              activeLocationIds.map((locId) => calculateHistoricalLocationInventory(locId, companyId, toDate))
-            );
-            for (const items of allHistorical) {
-              for (const inv of items) {
-                const qty = parseFloat(inv.quantity || "0");
-                const rate = parseFloat(inv.averageRate || "0");
-                if (qty > 0) stockOnFloor += qty * rate;
-              }
-            }
-          } else {
-            const inventoryData = await db
-              .select({ quantity: inventory.quantity, averageRate: inventory.averageRate })
-              .from(inventory)
-              .where(inArray(inventory.locationId, activeLocationIds))
-              .execute();
-            for (const inv of inventoryData) {
-              stockOnFloor += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
-            }
-          }
-        }
-        stockOnFloor = Math.round((stockOnFloor + Number.EPSILON) * 100) / 100;
-        if (stockOnFloor > 0) {
-          forUsTotal += stockOnFloor;
-          categoryTotals["asset_Stock In Hand"] = stockOnFloor;
-          forUsAccounts.push({
-            name: "Stock In Hand (Inventory)",
-            code: "COMPUTED",
-            value: stockOnFloor,
-            category: "Inventory",
-          });
-        }
+      // ERP Stock In Hand - location inventory at weighted-average cost,
+      // computed in ./netProfitStockSection.
+      const stockOnFloor = await computeStockInHand(companyId, toDate);
+      if (stockOnFloor > 0) {
+        forUsTotal += stockOnFloor;
+        categoryTotals["asset_Stock In Hand"] = stockOnFloor;
+        forUsAccounts.push({
+          name: "Stock In Hand (Inventory)",
+          code: "COMPUTED",
+          value: stockOnFloor,
+          category: "Inventory",
+        });
       }
 
       // Add Workers/Payroll - employee balances (salary payable only)

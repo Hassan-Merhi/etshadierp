@@ -37,6 +37,15 @@ const PIN_PATH = path.join(process.cwd(), "config/report-characterization.json")
 const shouldUpdate = process.env.UPDATE_REPORT_CHARACTERIZATION === "1";
 const REQUEST_TIMEOUT_MS = 30000;
 
+/**
+ * Every one of these handlers falls back to "today" for its as-of date, via
+ * getClientDate(req) or a query default. Left alone the pins would only hold
+ * within a single day and fail at the first midnight - which is exactly what
+ * happened while building them. getClientDate reads this header first, so
+ * sending it fixes the as-of date for the whole suite.
+ */
+const FIXED_CLIENT_DATE = "2030-12-31";
+
 interface PinnedEndpoint {
   /** Route file this endpoint is the whole of, for traceability. */
   sourceModule: string;
@@ -76,7 +85,7 @@ const ENDPOINTS: PinnedEndpoint[] = [
     fixture: "factory",
     method: "GET",
     path: "/api/factory/net-position",
-    query: "startDate=2020-01-01&endDate=2030-12-31",
+    query: `asOf=2030-12-31`,
   },
   {
     sourceModule: "server/routes/factory/suppliers/supplierStatementRoutes.ts",
@@ -203,7 +212,7 @@ async function captureWith(prefix: string, fixture: "erp" | "factory"): Promise<
       const resolved = endpoint.path.replace(":supplierId", String(supplierId));
       const url = endpoint.query ? `${resolved}?${endpoint.query}` : resolved;
 
-      let call = agent[endpoint.method === "GET" ? "get" : "post"](url);
+      let call = agent[endpoint.method === "GET" ? "get" : "post"](url).set("x-client-date", FIXED_CLIENT_DATE);
       if (endpoint.binary)
         call = call.buffer(true).parse((res, cb) => {
           const chunks: Buffer[] = [];
