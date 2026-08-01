@@ -57,9 +57,9 @@ commands:
           command: node scripts/verify-ci-disposable-schema.mjs
 
 jobs:
-  one-test:
+  focused-backend:
     parameters:
-      test_name:
+      target:
         type: string
     executor: node22-postgres
     steps:
@@ -67,20 +67,24 @@ jobs:
       - wait_for_postgres
       - prepare_schema
       - run:
-          name: Workbook assertion diagnostic
+          name: Focused backend regression
           command: >-
             node node_modules/vitest/vitest.mjs run
-            tests/factory-arabic-translation-workbook-diagnostic.test.ts
-            -t "<< parameters.test_name >>"
+            << parameters.target >>
             --maxWorkers=1 --no-file-parallelism
 
 workflows:
-  workbook-export-diagnostics:
+  phase4-postgres-recheck:
     jobs:
-      - one-test: { name: wb-diag-headers, test_name: diagnostic headers }
-      - one-test: { name: wb-diag-format, test_name: diagnostic article code text format }
-      - one-test: { name: wb-diag-value, test_name: diagnostic article code value }
-      - one-test: { name: wb-diag-lock, test_name: diagnostic reference cell lock }
-      - one-test: { name: wb-diag-unlock, test_name: diagnostic Arabic cell unlock }
-      - one-test: { name: wb-xml-lock, test_name: diagnostic XML reference cell lock }
-      - one-test: { name: wb-xml-unlock, test_name: diagnostic XML Arabic cell unlock }
+      - focused-backend:
+          name: p4-workbook-recheck
+          target: tests/factory-arabic-translation-workbook.test.ts
+      - focused-backend:
+          name: p4-routes-recheck
+          target: tests/factory-arabic-translation-routes.test.ts
+      - focused-backend:
+          name: p4-permissions-recheck
+          target: tests/operational-permission-route-policy.test.ts
+      - focused-backend:
+          name: p4-manifest-recheck
+          target: tests/route-manifest.test.ts
