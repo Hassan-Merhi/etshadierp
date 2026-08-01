@@ -15,6 +15,7 @@ export type AccountMigrationControlSnapshot = {
 
 export class AccountMigrationControlConflict extends Error {
   readonly status = 409;
+  readonly code = "23514";
 
   constructor(message: string) {
     super(message);
