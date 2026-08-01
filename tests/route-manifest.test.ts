@@ -47,22 +47,39 @@ function describeDiff(label: string, expectedEntries: string[], actualEntries: s
 }
 
 /**
- * Subtract exactly one reviewed occurrence from the actual manifest.
- *
- * Some reviewed additions intentionally register a second handler for a route
- * that already exists in the committed snapshot. Using Array.filter() removed
- * both the baseline route and its reviewed duplicate, causing the ratchet to
- * alternate between reporting the entry as added and removed. Treating the
- * manifest as a multiset preserves the committed occurrence and removes only
- * the one reviewed addition.
+ * Subtract exactly one reviewed occurrence while preserving the committed
+ * sequence. A reviewed route can be a duplicate of a route already present in
+ * the snapshot, so removing the first or last match blindly can retain the
+ * duplicate in the wrong position and create a false reorder failure.
  */
-function removeReviewedOccurrences(entries: string[], reviewedEntries: Set<string>): string[] {
-  const remaining = [...entries];
-  for (const reviewedEntry of reviewedEntries) {
-    const index = remaining.lastIndexOf(reviewedEntry);
-    if (index !== -1) remaining.splice(index, 1);
+function removeReviewedOccurrences(
+  entries: string[],
+  expectedEntries: string[],
+  reviewedEntries: Set<string>
+): string[] {
+  const remainingReviewed = new Map(
+    [...reviewedEntries].map((entry) => [entry, 1] as const)
+  );
+  const normalized: string[] = [];
+  let expectedIndex = 0;
+
+  for (const entry of entries) {
+    if (entry === expectedEntries[expectedIndex]) {
+      normalized.push(entry);
+      expectedIndex += 1;
+      continue;
+    }
+
+    const remaining = remainingReviewed.get(entry) ?? 0;
+    if (remaining > 0) {
+      remainingReviewed.set(entry, remaining - 1);
+      continue;
+    }
+
+    normalized.push(entry);
   }
-  return remaining;
+
+  return normalized;
 }
 
 describe("route manifest", () => {
@@ -88,8 +105,8 @@ describe("route manifest", () => {
     const expected = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as SerializedRouteManifest;
     const reviewedRoutes = new Set(allowances.routeManifestAdditions);
     const reviewedMounts = new Set(allowances.routeManifestMountAdditions);
-    const routes = removeReviewedOccurrences(actual.routes, reviewedRoutes);
-    const mounts = removeReviewedOccurrences(actual.middlewareMounts, reviewedMounts);
+    const routes = removeReviewedOccurrences(actual.routes, expected.routes, reviewedRoutes);
+    const mounts = removeReviewedOccurrences(actual.middlewareMounts, expected.middlewareMounts, reviewedMounts);
     expect(expected.formatVersion).toBe(ROUTE_MANIFEST_FORMAT_VERSION);
     const routeDiff = describeDiff("Routes", expected.routes, routes);
     expect(routeDiff, routeDiff).toBe("");
