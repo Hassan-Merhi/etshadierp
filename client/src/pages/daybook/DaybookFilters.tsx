@@ -2,7 +2,7 @@ import { Search, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
+import { PeriodFilter, PeriodFilterValue } from "@/components/ui/period-filter";
 
 interface DaybookFiltersProps {
   periodFilter: PeriodFilterValue;
@@ -39,7 +39,6 @@ export function DaybookFilters({
         <PeriodFilter
           value={periodFilter}
           onChange={setPeriodFilter}
-          hideCustomInputs
           data-testid="period-filter"
         />
 
