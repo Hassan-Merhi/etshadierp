@@ -31,6 +31,7 @@ function booleanValue(value: unknown): boolean {
 function shouldPopulateAfterWrite(req: Request): boolean {
   if (!["POST", "PATCH", "PUT"].includes(req.method)) return false;
   if (req.path.startsWith("/bilingual-snapshots/")) return false;
+  if (req.path.includes("/arabic-import/")) return false;
   return /^\/(bales|bale-products|customer-proformas|customer-orders|invoice-loading|invoice-loading-sessions|dispatch|factory-pos|bale-recode)/.test(
     req.path
   );
