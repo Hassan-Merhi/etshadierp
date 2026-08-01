@@ -91,3 +91,7 @@ workflows:
           name: rt-rollback-recheck
           target: tests/factory-arabic-translation-routes.test.ts
           test_name: rolls product and category updates back
+      - one-test:
+          name: wb-helper-recheck
+          target: tests/factory-arabic-translation-workbook-diagnostic.test.ts
+          test_name: diagnostic shared helper reference lock
