@@ -137,9 +137,7 @@ describe("WhatsApp popup — dialog testid present in source", () => {
 
 describe("Keyboard navigation infrastructure is intact", () => {
   it("keyboardHandlers.ts — handlePaymentKeyDown is exported", () => {
-    expect(src("client/src/pages/vouchers/keyboardHandlers.ts")).toContain(
-      "export function handlePaymentKeyDown"
-    );
+    expect(src("client/src/pages/vouchers/keyboardHandlers.ts")).toContain("export function handlePaymentKeyDown");
   });
 
   it("useGlobalScrollKeys.ts — isEditableTarget guard function is present (prevents scroll hijack)", () => {
@@ -151,15 +149,11 @@ describe("Keyboard navigation infrastructure is intact", () => {
   });
 
   it("CursorNavContext.tsx — CursorNavProvider exported", () => {
-    expect(src("client/src/contexts/CursorNavContext.tsx")).toContain(
-      "export function CursorNavProvider"
-    );
+    expect(src("client/src/contexts/CursorNavContext.tsx")).toContain("export function CursorNavProvider");
   });
 
   it("CursorNavContext.tsx — useCursorNav hook exported", () => {
-    expect(src("client/src/contexts/CursorNavContext.tsx")).toContain(
-      "export function useCursorNav"
-    );
+    expect(src("client/src/contexts/CursorNavContext.tsx")).toContain("export function useCursorNav");
   });
 
   it("CursorNavContext.tsx — registerCursorNav and clearCursorNav present", () => {
