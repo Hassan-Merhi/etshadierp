@@ -27,7 +27,12 @@ export interface FactoryBilingualSnapshotPlan {
 }
 
 const IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
-const target = (value: Omit<FactoryBilingualSnapshotTarget, "productIdExpression" | "articleCodeExpression"> & Partial<Pick<FactoryBilingualSnapshotTarget, "productIdExpression" | "articleCodeExpression">>): FactoryBilingualSnapshotTarget => ({
+const SQL_RELATION_REFERENCE = /\b(?:FROM|JOIN)\s+([a-z_][a-z0-9_]*)\b/gi;
+
+const target = (
+  value: Omit<FactoryBilingualSnapshotTarget, "productIdExpression" | "articleCodeExpression"> &
+    Partial<Pick<FactoryBilingualSnapshotTarget, "productIdExpression" | "articleCodeExpression">>,
+): FactoryBilingualSnapshotTarget => ({
   productIdExpression: "NULL",
   articleCodeExpression: "NULL",
   ...value,
@@ -53,14 +58,43 @@ function assertIdentifier(value: string): string {
   return value;
 }
 
+function referencedTables(item: FactoryBilingualSnapshotTarget): string[] {
+  const relations = new Set<string>([item.table, "factory_bale_products", "factory_categories"]);
+  const expressions = [
+    item.companyExpression,
+    item.productIdExpression,
+    item.articleCodeExpression,
+    item.finalizedExpression ?? "",
+  ];
+
+  for (const expression of expressions) {
+    SQL_RELATION_REFERENCE.lastIndex = 0;
+    for (let match = SQL_RELATION_REFERENCE.exec(expression); match; match = SQL_RELATION_REFERENCE.exec(expression)) {
+      relations.add(assertIdentifier(match[1]));
+    }
+  }
+
+  return [...relations];
+}
+
 async function targetExists(item: FactoryBilingualSnapshotTarget, executor: typeof db = db): Promise<boolean> {
+  const relations = referencedTables(item);
   const result = await executor.execute(sql`
-    SELECT EXISTS (
-      SELECT 1 FROM information_schema.columns
-      WHERE table_schema='public' AND table_name=${item.table} AND column_name=${item.arabicColumn}
-    ) AS present
+    SELECT
+      EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema='public' AND table_name=${item.table} AND column_name=${item.arabicColumn}
+      ) AS target_column_present,
+      NOT EXISTS (
+        SELECT 1
+        FROM unnest(${relations}::text[]) AS dependency(table_name)
+        WHERE to_regclass('public.' || dependency.table_name) IS NULL
+      ) AS dependencies_present
   `);
-  return Boolean((result.rows[0] as { present?: boolean } | undefined)?.present);
+  const row = result.rows[0] as
+    | { target_column_present?: boolean; dependencies_present?: boolean }
+    | undefined;
+  return Boolean(row?.target_column_present && row?.dependencies_present);
 }
 
 function resolverSql(item: FactoryBilingualSnapshotTarget): string {
