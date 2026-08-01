@@ -129,8 +129,8 @@ function setCellLocked(cell: ExcelJS.Cell, locked: boolean): void {
   cell.style = {
     ...cell.style,
     protection: {
-      ...(cell.style.protection ?? {}),
       locked,
+      hidden: false,
     },
   };
 }
@@ -232,6 +232,12 @@ export async function createArabicTranslationTemplate(products: TranslationCatal
     { header: ARABIC_TRANSLATION_TEMPLATE_HEADERS[5], key: "descriptionAr", width: 42 },
     { header: ARABIC_TRANSLATION_TEMPLATE_HEADERS[6], key: "status", width: 30 },
   ];
+  for (const column of [1, 2, 4, 7]) {
+    sheet.getColumn(column).protection = { locked: true, hidden: false };
+  }
+  for (const column of [3, 5, 6]) {
+    sheet.getColumn(column).protection = { locked: false, hidden: false };
+  }
   sheet.autoFilter = {
     from: { row: 1, column: 1 },
     to: { row: 1, column: ARABIC_TRANSLATION_TEMPLATE_HEADERS.length },
