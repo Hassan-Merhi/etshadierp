@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, NextFunction, Request, Response } from "express";
 import { sql } from "drizzle-orm";
 import { requireAuth } from "../../auth";
 import { db } from "../../db";
@@ -9,6 +9,7 @@ import { writeAuditEvent } from "../../services/audit/auditService";
 import {
   applyFactoryBilingualSnapshotBackfill,
   buildFactoryBilingualSnapshotPlan,
+  propagateFactoryArabicCatalogChange,
 } from "../../services/factoryBilingualSnapshotService";
 
 function getFactoryCompanyId(req: Request): number | null {
@@ -25,7 +26,65 @@ function booleanValue(value: unknown): boolean {
   return value === true || value === "true" || value === 1 || value === "1";
 }
 
+function shouldPopulateAfterWrite(req: Request): boolean {
+  if (!["POST", "PATCH", "PUT"].includes(req.method)) return false;
+  if (req.path.startsWith("/bilingual-snapshots/")) return false;
+  return /^\/(bales|bale-products|customer-proformas|customer-orders|invoice-loading|invoice-loading-sessions|dispatch|factory-pos|bale-recode)/.test(
+    req.path
+  );
+}
+
+async function populateAfterSuccessfulWrite(req: Request): Promise<void> {
+  const companyId = getFactoryCompanyId(req);
+  if (!companyId) return;
+
+  const productMatch = req.path.match(/^\/bale-products\/(\d+)/);
+  if (productMatch) {
+    const productId = Number(productMatch[1]);
+    if (Number.isSafeInteger(productId) && productId > 0) {
+      await propagateFactoryArabicCatalogChange(companyId, productId);
+      return;
+    }
+  }
+
+  await applyFactoryBilingualSnapshotBackfill(companyId, {
+    includeFinalized: false,
+    overwrite: false,
+  });
+}
+
+function factoryBilingualSnapshotWriteMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void {
+  if (!shouldPopulateAfterWrite(req)) {
+    next();
+    return;
+  }
+
+  const originalJson = res.json.bind(res);
+  res.json = ((payload: unknown) => {
+    if (res.statusCode < 200 || res.statusCode >= 300) return originalJson(payload);
+    void populateAfterSuccessfulWrite(req)
+      .then(() => originalJson(payload))
+      .catch((error) => {
+        logger.error("Failed to populate Factory bilingual snapshots after write", {
+          error,
+          method: req.method,
+          path: req.path,
+        });
+        if (!res.headersSent) res.status(500);
+        originalJson({ message: getErrorMessage(error) });
+      });
+    return res;
+  }) as typeof res.json;
+  next();
+}
+
 export function registerFactoryBilingualSnapshotRoutes(app: Express): void {
+  app.use("/api/factory", factoryBilingualSnapshotWriteMiddleware);
+
   app.get(
     "/api/factory/bilingual-snapshots/diagnose",
     requireAuth,
@@ -86,13 +145,7 @@ export function registerFactoryBilingualSnapshotRoutes(app: Express): void {
               entityId: companyId,
               companyId,
               userId: Number((req.session as any)?.userId) || undefined,
-              metadata: {
-                includeFinalized,
-                overwrite,
-                before,
-                applied,
-                after,
-              },
+              metadata: { includeFinalized, overwrite, before, applied, after },
             },
             tx as any
           );
