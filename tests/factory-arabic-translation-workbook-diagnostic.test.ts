@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import ExcelJS from "exceljs";
+import JSZip from "jszip";
 import {
   ARABIC_TRANSLATION_TEMPLATE_HEADERS,
   createArabicTranslationTemplate,
@@ -19,11 +20,27 @@ const products: TranslationCatalogProduct[] = [
   },
 ];
 
+async function createBuffer() {
+  return createArabicTranslationTemplate(products);
+}
+
 async function loadSheet() {
-  const buffer = await createArabicTranslationTemplate(products);
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer as any);
+  await workbook.xlsx.load((await createBuffer()) as any);
   return workbook.worksheets[0];
+}
+
+async function xmlProtection(address: string): Promise<boolean> {
+  const zip = await JSZip.loadAsync(await createBuffer());
+  const sheetXml = await zip.file("xl/worksheets/sheet1.xml")!.async("string");
+  const stylesXml = await zip.file("xl/styles.xml")!.async("string");
+  const cellTag = sheetXml.match(new RegExp(`<c\\b[^>]*\\br="${address}"[^>]*>`))?.[0];
+  expect(cellTag).toBeDefined();
+  const styleId = Number(cellTag?.match(/\bs="(\d+)"/)?.[1] ?? 0);
+  const cellXfs = stylesXml.match(/<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/)?.[1] ?? "";
+  const styles = cellXfs.match(/<xf\b[^>]*(?:\/>|>[\s\S]*?<\/xf>)/g) ?? [];
+  const style = styles[styleId] ?? "";
+  return !/<protection\b[^>]*locked="0"/.test(style);
 }
 
 describe("Factory Arabic workbook export diagnostics", () => {
@@ -54,5 +71,13 @@ describe("Factory Arabic workbook export diagnostics", () => {
   it("diagnostic Arabic cell unlock", async () => {
     const sheet = await loadSheet();
     expect(sheet.getRow(2).getCell(3).protection.locked).toBe(false);
+  });
+
+  it("diagnostic XML reference cell lock", async () => {
+    await expect(xmlProtection("A2")).resolves.toBe(true);
+  });
+
+  it("diagnostic XML Arabic cell unlock", async () => {
+    await expect(xmlProtection("C2")).resolves.toBe(false);
   });
 });
