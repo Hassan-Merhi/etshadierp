@@ -25,9 +25,19 @@ export function useSidebarSync({
   activeRowIndex,
   allAccounts,
 }: UseSidebarSyncProps) {
+  // Accounts already used by a voucher line — used to float them to the top of the
+  // browse list. Keyed as `type:id` so the two account namespaces never collide.
+  const usedAccountKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const entry of entries) {
+      if ((entry?.accountId ?? 0) > 0) keys.add(`${entry.accountType}:${entry.accountId}`);
+    }
+    return keys;
+  }, [entries]);
+
   const filteredSidebarAccounts = useMemo(() => {
     const searchLower = sidebarSearchValue.toLowerCase().trim();
-    return sidebarAccounts
+    const matches = sidebarAccounts
       .filter((acc) => {
         if (paymentAccountId > 0 && acc.id === paymentAccountId && acc.type === paymentAccountType) {
           return false;
@@ -38,7 +48,19 @@ export function useSidebarSync({
         );
       })
       .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-  }, [sidebarAccounts, sidebarSearchValue, paymentAccountId, paymentAccountType]);
+
+    // While the user is searching, order stays strictly alphabetical so that the
+    // highlighted-on-Enter account is exactly what it has always been. Only the
+    // unsearched browse list reorders, where nothing is being matched by typing.
+    if (searchLower || usedAccountKeys.size === 0) return matches;
+
+    const used: Account[] = [];
+    const rest: Account[] = [];
+    for (const acc of matches) {
+      (usedAccountKeys.has(`${acc.type}:${acc.id}`) ? used : rest).push(acc);
+    }
+    return used.concat(rest);
+  }, [sidebarAccounts, sidebarSearchValue, paymentAccountId, paymentAccountType, usedAccountKeys]);
 
   const activeRowAccountId =
     activeRowIndex !== null && entries[activeRowIndex] ? entries[activeRowIndex].accountId : null;
