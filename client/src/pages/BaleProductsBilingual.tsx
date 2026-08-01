@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FactoryCatalogTranslationEditor } from "@/components/FactoryCatalogTranslationEditor";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { getApiRequest } from "@/lib/factoryApi";
@@ -50,7 +51,6 @@ function CatalogFetchBoundary({
     const patchedFetch: typeof window.fetch = async (input, init) => {
       const requestMethod = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
       if (requestMethod !== "GET") return originalFetch(input, init);
-
       const rawUrl = typeof input === "string" || input instanceof URL ? input.toString() : input.url;
       const parsed = new URL(rawUrl, window.location.origin);
       const isRelative = rawUrl.startsWith("/");
@@ -71,7 +71,6 @@ function CatalogFetchBoundary({
         parsed.searchParams.set("lang", language);
         return originalFetch(isRelative ? `${parsed.pathname}${parsed.search}` : parsed.toString(), init);
       }
-
       return originalFetch(input, init);
     };
 
@@ -165,6 +164,7 @@ export default function BaleProductsBilingual() {
               <Input value={catalogSearch} onChange={(event) => setCatalogSearch(event.target.value)} placeholder={language === "ar" ? "بحث بالعربي أو الإنجليزي أو الرمز..." : "Search English, Arabic, or article code..."} className="h-8 w-72 pl-8 pr-8 text-sm" dir="auto" />
               {catalogSearch && <button type="button" onClick={() => setCatalogSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"><X className="h-3.5 w-3.5" /></button>}
             </div>
+            {isAdmin && <FactoryCatalogTranslationEditor />}
             {isAdmin && <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => setCategoryDialogOpen(true)}><Plus className="h-3.5 w-3.5 mr-1.5" />{language === "ar" ? "فئة ثنائية اللغة" : "Bilingual category"}</Button>}
           </div>
         </div>
