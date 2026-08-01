@@ -46,6 +46,42 @@ function describeDiff(label: string, expectedEntries: string[], actualEntries: s
   return lines.join("\n");
 }
 
+/**
+ * Subtract exactly one reviewed occurrence while preserving the committed
+ * sequence. A reviewed route can be a duplicate of a route already present in
+ * the snapshot, so removing the first or last match blindly can retain the
+ * duplicate in the wrong position and create a false reorder failure.
+ */
+function removeReviewedOccurrences(
+  entries: string[],
+  expectedEntries: string[],
+  reviewedEntries: Set<string>
+): string[] {
+  const remainingReviewed = new Map(
+    [...reviewedEntries].map((entry) => [entry, 1] as const)
+  );
+  const normalized: string[] = [];
+  let expectedIndex = 0;
+
+  for (const entry of entries) {
+    if (entry === expectedEntries[expectedIndex]) {
+      normalized.push(entry);
+      expectedIndex += 1;
+      continue;
+    }
+
+    const remaining = remainingReviewed.get(entry) ?? 0;
+    if (remaining > 0) {
+      remainingReviewed.set(entry, remaining - 1);
+      continue;
+    }
+
+    normalized.push(entry);
+  }
+
+  return normalized;
+}
+
 describe("route manifest", () => {
   beforeAll(async () => {
     actual = await buildManifest();
@@ -69,15 +105,21 @@ describe("route manifest", () => {
     const expected = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as SerializedRouteManifest;
     const reviewedRoutes = new Set(allowances.routeManifestAdditions);
     const reviewedMounts = new Set(allowances.routeManifestMountAdditions);
-    const routes = actual.routes.filter((entry) => !reviewedRoutes.has(entry));
-    const mounts = actual.middlewareMounts.filter((entry) => !reviewedMounts.has(entry));
+    const routes = removeReviewedOccurrences(actual.routes, expected.routes, reviewedRoutes);
+    const mounts = removeReviewedOccurrences(actual.middlewareMounts, expected.middlewareMounts, reviewedMounts);
     expect(expected.formatVersion).toBe(ROUTE_MANIFEST_FORMAT_VERSION);
     const routeDiff = describeDiff("Routes", expected.routes, routes);
     expect(routeDiff, routeDiff).toBe("");
-    for (const addition of reviewedRoutes) expect(actual.routes.filter((entry) => entry === addition).length).toBe(1);
+    for (const addition of reviewedRoutes) {
+      const baselineCount = expected.routes.filter((entry) => entry === addition).length;
+      expect(actual.routes.filter((entry) => entry === addition).length).toBe(baselineCount + 1);
+    }
     const mountDiff = describeDiff("Middleware mounts", expected.middlewareMounts, mounts);
     expect(mountDiff, mountDiff).toBe("");
-    for (const addition of reviewedMounts) expect(actual.middlewareMounts.filter((entry) => entry === addition).length).toBe(1);
+    for (const addition of reviewedMounts) {
+      const baselineCount = expected.middlewareMounts.filter((entry) => entry === addition).length;
+      expect(actual.middlewareMounts.filter((entry) => entry === addition).length).toBe(baselineCount + 1);
+    }
     expect(actual.routeCount).toBe(expected.routeCount + reviewedRoutes.size);
     expect(actual.middlewareMountCount).toBe(expected.middlewareMountCount + reviewedMounts.size);
   });

@@ -21,12 +21,20 @@
     "GET /api/factory/customer-orders/:id/pending-export [requireAuth > loadingHandler]",
     "GET /api/factory/customer-orders/:id/loading-list [requireAuth > loadingHandler]",
     "GET /api/factory/bilingual-snapshots/diagnose [requireAuth > <anonymous> > <anonymous>]",
-    "POST /api/factory/bilingual-snapshots/backfill [requireAuth > <anonymous> > <anonymous>]"
+    "POST /api/factory/bilingual-snapshots/backfill [requireAuth > <anonymous> > <anonymous>]",
+    "GET /api/factory/customer-orders/:id/export/excel [requireAuth > <anonymous>]",
+    "GET /api/factory/customer-orders/:id/export-excel [requireAuth > <anonymous>]",
+    "GET /api/factory/customer-orders/:id/export-pdf [requireAuth > <anonymous>]",
+    "POST /api/admin/account-migration/execute [requireAuth > <anonymous> > <anonymous>]",
+    "POST /api/admin/account-migration/undo [requireAuth > <anonymous> > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
     "USE /api/factory/containers [postOffloadReconciliationMiddleware]",
     "USE /api/factory [requireAuth]",
-    "USE /api/factory [factoryBilingualCatalogMiddleware]"
+    "USE /api/factory [factoryBilingualCatalogMiddleware]",
+    "USE /api/factory [bilingualSurfaceMiddleware]",
+    "USE /api [bilingualSurfaceMiddleware]",
+    "USE /api/factory [factoryBilingualSnapshotWriteMiddleware]"
   ],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [

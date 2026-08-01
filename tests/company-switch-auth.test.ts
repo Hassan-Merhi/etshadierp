@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
-import { db } from "../server/db";
+import { db, pool } from "../server/db";
 import * as schema from "../shared/schema";
 import {
   cleanupTestData,
@@ -43,8 +43,23 @@ beforeAll(async () => {
 }, 60000);
 
 afterAll(async () => {
-  await cleanupTestData(TEST_PREFIX);
   closeTestServer();
+
+  try {
+    await cleanupTestData(TEST_PREFIX);
+  } catch (error) {
+    // Login-history persistence is intentionally asynchronous. If its final row
+    // commits during teardown, the company FK can win the race against the
+    // shared cleanup helper. Once the server is closed, let that write settle,
+    // clear only this test's companies, and rerun the idempotent cleanup.
+    if (!String(error).includes("login_history_company_id_fkey")) throw error;
+
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    await pool.query("DELETE FROM login_history WHERE company_id = ANY($1::int[])", [
+      [ctx.companyId, secondCompanyId],
+    ]);
+    await cleanupTestData(TEST_PREFIX);
+  }
 }, 30000);
 
 describe("company switching authorization", () => {

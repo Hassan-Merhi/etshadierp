@@ -58,10 +58,6 @@ BEGIN
 END
 $$;
 
--- Compatibility guard for older internal insert paths that still use the legacy
--- Drizzle supplier definition. New company-aware routes always provide
--- company_id explicitly; legacy paths are assigned only to the configured
--- parent and fail closed when that owner cannot be resolved.
 CREATE OR REPLACE FUNCTION assign_supplier_company_id()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -148,5 +144,19 @@ CREATE INDEX IF NOT EXISTS suppliers_company_idx
 
 CREATE UNIQUE INDEX IF NOT EXISTS suppliers_company_code_unique
   ON suppliers(company_id, code);
+
+ALTER TABLE factory_raw_stock
+  DROP CONSTRAINT IF EXISTS factory_raw_stock_company_container_unique;
+
+DROP INDEX IF EXISTS factory_raw_stock_company_container_unique;
+CREATE UNIQUE INDEX factory_raw_stock_company_container_unique
+  ON factory_raw_stock(company_id, container_id)
+  WHERE deleted_at IS NULL;
+
+ALTER TABLE factory_mix_batches
+  ALTER COLUMN total_weight_kg SET DEFAULT 0,
+  ALTER COLUMN total_cost SET DEFAULT 0,
+  ALTER COLUMN cost_per_kg TYPE NUMERIC(20, 7)
+    USING cost_per_kg::NUMERIC(20, 7);
 
 COMMIT;
