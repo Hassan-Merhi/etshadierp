@@ -90,7 +90,9 @@ const MAX_TRANSLATION_LENGTH = 2_000;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
 const RTL_FROZEN_VIEW: ExcelJS.WorksheetView = {
   state: "frozen",
+  xSplit: 0,
   ySplit: 1,
+  topLeftCell: "A2",
   rightToLeft: true,
   activeCell: "A2",
   showRuler: true,
