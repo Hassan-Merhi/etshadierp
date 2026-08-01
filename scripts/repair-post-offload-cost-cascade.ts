@@ -36,7 +36,7 @@ import {
   factoryContainerCommissions,
   factorySuppliers,
 } from "@shared/schema";
-import { computeCorrectContainerCost } from "../server/services/factory/rawStockRecalc";
+import { computeCorrectContainerCost } from "../server/services/factory/raw-stock-recalc";
 import { cascadeContainerCostChange } from "../server/services/factory/rawStockCostCascade";
 
 // ─── CLI argument parsing ────────────────────────────────────────────────────
