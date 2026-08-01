@@ -32,14 +32,22 @@ export function StockMovementDialog({
   formatAmount,
   navigate,
 }: StockMovementDialogProps) {
-  const fmtN = (n: number, dec = 2) =>
-    n === 0 ? (
+  const toSafeNumber = (value: unknown): number => {
+    const parsed = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const fmtN = (value: unknown, dec = 2) => {
+    const n = toSafeNumber(value);
+    return n === 0 ? (
       <span className="text-muted-foreground/30">—</span>
     ) : (
       <>{n.toLocaleString(undefined, { minimumFractionDigits: dec, maximumFractionDigits: dec })}</>
     );
-  const fmtA = (n: number) =>
-    n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{formatAmount(n)}</>;
+  };
+  const fmtA = (value: unknown) => {
+    const n = toSafeNumber(value);
+    return n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{formatAmount(n)}</>;
+  };
 
   const { data: stockMovementData, isLoading: stockMovementLoading } = useQuery<any>({
     queryKey: stockMovementItem
