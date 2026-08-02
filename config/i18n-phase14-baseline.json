@@ -1,4 +1,33 @@
 {
-  "description": "One-way ceiling for candidate untranslated UI literals. This equals the measured PR #377 count from the I18n Audit workflow and may only be lowered as literals are migrated.",
-  "maxFindings": 9110
+  "schemaVersion": 2,
+  "detectorVersion": 3,
+  "policyDigest": "c26178dd9bc7d71d34976e5bb87aa946cc5d59e6db54b7415f9e363514809f8f",
+  "reviewedAt": "2026-08-02",
+  "reviewedHead": "74fe5bd7612cfae0e6a78f11cb37c787b7dcc560",
+  "description": "Reviewed untranslated-text ratchet. Actionable counts may only decrease unless the detector or policy is explicitly re-reviewed. Compatibility-covered labels and documented technical exclusions are reported separately and do not consume the unresolved backlog.",
+  "reviewedTotals": {
+    "candidates": 22429,
+    "actionable": 17923,
+    "excluded": 4506,
+    "compatibilityCovered": 3460,
+    "unclassified": 0
+  },
+  "maxActionable": 17923,
+  "modules": {
+    "accounting": { "maxActionable": 1929 },
+    "administration": { "maxActionable": 1344 },
+    "backend-messages": { "maxActionable": 621 },
+    "container-purchasing": { "maxActionable": 1081 },
+    "factory": { "maxActionable": 6944 },
+    "inventory-logistics": { "maxActionable": 1773 },
+    "other-client": { "maxActionable": 1101 },
+    "payroll": { "maxActionable": 730 },
+    "properties-rentals": { "maxActionable": 294 },
+    "reports-exports": { "maxActionable": 354 },
+    "sales-pos": { "maxActionable": 948 },
+    "shared-contracts": { "maxActionable": 8 },
+    "shared-ui": { "maxActionable": 527 },
+    "supplier-partner": { "maxActionable": 269 }
+  },
+  "maxUnclassified": 0
 }
