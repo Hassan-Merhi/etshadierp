@@ -53,6 +53,7 @@ export {
   type InsertFactoryPosSaleItem,
   type InsertFactoryV3LoadBale,
 } from "./factoryBilingualTables";
+export * from "./languagePreferences";
 export * from "./properties";
 export * from "./sp";
 export * from "./pos";
