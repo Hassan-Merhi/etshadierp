@@ -191,6 +191,12 @@
         "statements": 64,
         "functions": 52,
         "branches": 61
+      },
+      "client/src/pages/StockInSalesReport.tsx": {
+        "lines": 41,
+        "statements": 36,
+        "functions": 30,
+        "branches": 26
       }
     }
   }
