@@ -1,11 +1,10 @@
 import { useEffect } from "react";
-import { GlobalLanguageSwitch } from "@/components/GlobalLanguageSwitch";
 import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import { queryClient } from "@/lib/queryClient";
 
 /**
- * Compatibility mount for Factory layouts. The application now has one global
- * language source; this component no longer owns a separate Factory preference.
+ * Compatibility mount retained for existing Factory layouts. The visible
+ * selector is now the single application-wide switch rendered by App.tsx.
  */
 export function FactoryCatalogLanguageSwitch() {
   const { language } = useApplicationLanguage();
@@ -20,9 +19,5 @@ export function FactoryCatalogLanguageSwitch() {
     });
   }, [language]);
 
-  return (
-    <div className="mb-3" data-testid="factory-catalog-language-switch">
-      <GlobalLanguageSwitch embedded />
-    </div>
-  );
+  return null;
 }
