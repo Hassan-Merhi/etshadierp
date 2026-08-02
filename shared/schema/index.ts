@@ -53,16 +53,6 @@ export {
   type InsertFactoryPosSaleItem,
   type InsertFactoryV3LoadBale,
 } from "./factoryBilingualTables";
-export {
-  factoryBaleProducts as factoryTrilingualBaleProducts,
-  factoryCategories as factoryTrilingualCategories,
-  insertFactoryBaleProductSchema as insertFactoryTrilingualBaleProductSchema,
-  insertFactoryCategorySchema as insertFactoryTrilingualCategorySchema,
-  type FactoryBaleProduct as FactoryTrilingualBaleProduct,
-  type FactoryCategory as FactoryTrilingualCategory,
-  type InsertFactoryBaleProduct as InsertFactoryTrilingualBaleProduct,
-  type InsertFactoryCategory as InsertFactoryTrilingualCategory,
-} from "./factoryTrilingualCatalogTables";
 export * from "./languagePreferences";
 export * from "./properties";
 export * from "./sp";
