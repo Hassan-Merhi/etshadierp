@@ -26,8 +26,7 @@ describe("Phase 8D audit coverage", () => {
   it.each(UNAUDITED)("records %s as a known gap in admin audit coverage", (modulePath) => {
     expect(
       hasAwaitedAuditWrite(modulePath),
-      `${modulePath} now has awaited audit writes. Move it from UNAUDITED to AUDITED ` +
-        "so the gain is locked in."
+      `${modulePath} now has awaited audit writes. Move it from UNAUDITED to AUDITED ` + "so the gain is locked in."
     ).toBe(false);
   });
 

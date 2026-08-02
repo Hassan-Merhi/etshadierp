@@ -32,14 +32,8 @@ export {
   buildExactHistoricalReplayScope as buildHistoricalReplayScope,
   buildExactHistoricalReplayScopeInternal as buildHistoricalReplayScopeInternal,
 } from "./historical-replay/exactScope";
-export {
-  classifyReplayBalesForBatches,
-  classifyReplayBalesByIds,
-} from "./historical-replay/baleClassification";
-export {
-  computeReplayFingerprint,
-  loadReplayAuthoritativeInputDigest,
-} from "./historical-replay/fingerprint";
+export { classifyReplayBalesForBatches, classifyReplayBalesByIds } from "./historical-replay/baleClassification";
+export { computeReplayFingerprint, loadReplayAuthoritativeInputDigest } from "./historical-replay/fingerprint";
 export { captureReplaySnapshot } from "./historical-replay/scope";
 export {
   captureExactReplaySnapshot,

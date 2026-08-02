@@ -650,15 +650,15 @@ export default function ContainerVerification() {
                 </span>
               </div>
               <p className="text-xs text-muted-foreground mb-2">
-                A barcode is registered as an alias for one item, but that exact barcode is also the item's own
-                primary code for a different stock item. This can cause proforma and loaded quantities to be matched
-                to the wrong item. Fix the alias in Stock Item Aliases before trusting this report.
+                A barcode is registered as an alias for one item, but that exact barcode is also the item's own primary
+                code for a different stock item. This can cause proforma and loaded quantities to be matched to the
+                wrong item. Fix the alias in Stock Item Aliases before trusting this report.
               </p>
               <ul className="text-xs font-mono space-y-1">
                 {verificationResult.aliasConflicts.map((c, i) => (
                   <li key={i}>
-                    "{c.aliasCode}" is aliased to {c.aliasedToName} ({c.aliasedToCode}), but is also the primary code
-                    of {c.ownerName} ({c.ownerCode})
+                    "{c.aliasCode}" is aliased to {c.aliasedToName} ({c.aliasedToCode}), but is also the primary code of{" "}
+                    {c.ownerName} ({c.ownerCode})
                   </li>
                 ))}
               </ul>

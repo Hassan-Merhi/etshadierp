@@ -60,7 +60,14 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Location, PagedStockItemsResponse, StockCategory, StockGrade, StockGroup, StockItem } from "./stockitems/types";
+import type {
+  Location,
+  PagedStockItemsResponse,
+  StockCategory,
+  StockGrade,
+  StockGroup,
+  StockItem,
+} from "./stockitems/types";
 import { PAGE_SIZE } from "./stockitems/utils";
 // Note: excelHelper (ExcelJS) is imported lazily inside exportToExcel / exportSalesHistory
 // so the 1.3 MB ExcelJS bundle is not loaded on every page startup.

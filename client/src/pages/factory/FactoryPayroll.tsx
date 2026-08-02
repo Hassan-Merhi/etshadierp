@@ -257,7 +257,12 @@ export default function FactoryPayrollPage() {
 
   const handleMigrateCitySplit = async () => {
     if (!selectedCompanyId) return;
-    if (!window.confirm("This will split historical salary/bonus expense entries by city (Lubumbashi / Kolwezi). Run once only. Continue?")) return;
+    if (
+      !window.confirm(
+        "This will split historical salary/bonus expense entries by city (Lubumbashi / Kolwezi). Run once only. Continue?"
+      )
+    )
+      return;
     setMigrating(true);
     try {
       const res = await fetch("/api/factory/payroll/migrate-city-split", {

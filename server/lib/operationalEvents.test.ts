@@ -88,7 +88,7 @@ describe("operational event detection", () => {
         totalApiResponseBytes: 2_500_000,
         totalStaticAssetResponseBytes: 1_500_000,
         ranked,
-      }),
+      })
     );
   });
 

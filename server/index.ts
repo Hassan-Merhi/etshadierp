@@ -51,8 +51,7 @@ const app = express();
 //   1. They are already compressed internally (xlsx = ZIP) so gzip yields minimal savings.
 //   2. Routes set Content-Length to the uncompressed buffer size; if compression then
 //      shrinks the body, the browser sees a length mismatch and discards the download (0 B).
-const SKIP_COMPRESSION_RE =
-  /spreadsheet|zip|pdf|octet-stream|image\//i;
+const SKIP_COMPRESSION_RE = /spreadsheet|zip|pdf|octet-stream|image\//i;
 app.use(
   compression({
     filter: (req, res) => {
@@ -473,11 +472,7 @@ let migrationsDone = false;
     app.use(
       express.static(distPath, {
         setHeaders: (res, filePath) => {
-          if (
-            filePath.endsWith("index.html") ||
-            filePath.endsWith("sw.js") ||
-            filePath.endsWith("manifest.json")
-          ) {
+          if (filePath.endsWith("index.html") || filePath.endsWith("sw.js") || filePath.endsWith("manifest.json")) {
             // Never cache index.html, sw.js, or manifest — must always be fresh
             res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
             res.setHeader("Pragma", "no-cache");
@@ -594,9 +589,7 @@ END $mig$`;
             }
           } else if (isLockTimeout) {
             // Lock timeout — wait 5 s for in-flight queries to drain, then retry once
-            logger.warn(
-              `[Migration] Lock timeout — waiting 5s before retry... (${migration.trim().substring(0, 80)})`
-            );
+            logger.warn(`[Migration] Lock timeout — waiting 5s before retry... (${migration.trim().substring(0, 80)})`);
             await new Promise((r) => setTimeout(r, 5000));
             try {
               await migrationClient.query(safeMigration(migration));
@@ -834,9 +827,7 @@ END $mig$`;
           }
 
           if (targetYear === null || targetMonth === null) {
-            logger.warn(
-              `[RentalFix] No target slot found for contract=${row.contract_id} ledger=${row.id} — skipping`
-            );
+            logger.warn(`[RentalFix] No target slot found for contract=${row.contract_id} ledger=${row.id} — skipping`);
             continue;
           }
 
@@ -1250,7 +1241,9 @@ END $mig$`;
           RETURNING id
         `);
         if (memberBackfill.rowCount && memberBackfill.rowCount > 0) {
-          logger.info(`[InsuranceMemberBackfill] Created ${memberBackfill.rowCount} missing insurance_members row(s) from ledger accounts`);
+          logger.info(
+            `[InsuranceMemberBackfill] Created ${memberBackfill.rowCount} missing insurance_members row(s) from ledger accounts`
+          );
         }
       } catch (e: unknown) {
         logger.error("[InsuranceMemberBackfill] Error:", { error: getErrorMessage(e) });
@@ -1384,10 +1377,9 @@ END $mig$`;
           RETURNING id, reference_number
         `);
         if (r.rowCount && r.rowCount > 0) {
-          logger.info(
-            `[BaleStatusFix] Fixed ${r.rowCount} bale(s) with deletedAt set but status != DELETED`,
-            { detail: r.rows.map((x: any) => x.reference_number).join(", ") }
-          );
+          logger.info(`[BaleStatusFix] Fixed ${r.rowCount} bale(s) with deletedAt set but status != DELETED`, {
+            detail: r.rows.map((x: any) => x.reference_number).join(", "),
+          });
         }
       } catch (e: unknown) {
         logger.warn("[BaleStatusFix] Could not fix inconsistent bale statuses:", { error: getErrorMessage(e) });
@@ -1407,10 +1399,9 @@ END $mig$`;
           RETURNING id, run_type
         `);
         if (r.rowCount && r.rowCount > 0) {
-          logger.info(
-            `[ExportRun] Startup: marked ${r.rowCount} orphaned run(s) as failed`,
-            { detail: r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", ") }
-          );
+          logger.info(`[ExportRun] Startup: marked ${r.rowCount} orphaned run(s) as failed`, {
+            detail: r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", "),
+          });
         }
       } catch (e: unknown) {
         logger.warn("[ExportRun] Startup orphan-cleanup failed:", { error: getErrorMessage(e) });
@@ -1429,10 +1420,9 @@ END $mig$`;
           RETURNING id, run_type
         `);
         if (r.rowCount && r.rowCount > 0) {
-          logger.info(
-            `[ExportRun] Periodic: timed out ${r.rowCount} hung run(s)`,
-            { detail: r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", ") }
-          );
+          logger.info(`[ExportRun] Periodic: timed out ${r.rowCount} hung run(s)`, {
+            detail: r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", "),
+          });
         }
       } catch (e: unknown) {
         logger.warn("[ExportRun] Periodic hung-run cleanup failed:", { error: getErrorMessage(e) });
@@ -1707,7 +1697,9 @@ END $mig$`;
         try {
           await runMigrations();
         } catch (err: unknown) {
-          logger.error("Migration error (non-fatal — server will still start):", { error: getErrorMessage(err) ?? err });
+          logger.error("Migration error (non-fatal — server will still start):", {
+            error: getErrorMessage(err) ?? err,
+          });
           migrationsDone = true;
         }
       }

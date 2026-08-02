@@ -179,11 +179,9 @@ export function registerFactorySupplierCrudRoutes(app: Express) {
           .where(and(eq(factorySuppliers.id, id), eq(factorySuppliers.companyId, companyId)))
           .limit(1);
         if (sup?.parentId) {
-          return res
-            .status(400)
-            .json({
-              message: "A linked supplier (child) cannot be set as broker directly. Remove the parent link first.",
-            });
+          return res.status(400).json({
+            message: "A linked supplier (child) cannot be set as broker directly. Remove the parent link first.",
+          });
         }
       }
       const [updated] = await db

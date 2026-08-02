@@ -53,7 +53,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  } from "@/components/ui/alert-dialog";
+} from "@/components/ui/alert-dialog";
 
 import type { OrderDetail } from "./factoryinvoicedetail/types";
 export default function FactoryInvoiceDetail() {

@@ -138,10 +138,7 @@ import {
   factorySettings as fSettings,
   factoryDaybookEntries as fde,
 } from "@shared/schema";
-import {
-  normalizeVoucherEntryAmounts,
-  erpRateToDaybookFxRateToUsd,
-} from "../../services/accounting/currencyAmounts";
+import { normalizeVoucherEntryAmounts, erpRateToDaybookFxRateToUsd } from "../../services/accounting/currencyAmounts";
 
 /**
  * After saving a journal voucher, if it has a customer entry + a ledger account entry,
@@ -277,7 +274,12 @@ export function registerVoucherJournalRoutes(app: Express) {
     const _uid = req.session.userId;
     const _cid = req.session.currentCompanyId;
     try {
-      logger.info("journal voucher create started", { module: "vouchers", action: "createJournal", userId: _uid, companyId: _cid });
+      logger.info("journal voucher create started", {
+        module: "vouchers",
+        action: "createJournal",
+        userId: _uid,
+        companyId: _cid,
+      });
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -303,7 +305,7 @@ export function registerVoucherJournalRoutes(app: Express) {
       // totalDebits/totalCredits below are in the voucher's transaction currency (e.g. CFA).
       const vCurrency = (currency as string | undefined) || "USD";
       const vRateRaw = (exchangeRate as string | number | undefined) || null;
-      const cfaPerUsd = (vCurrency !== "USD" && vRateRaw) ? parseFloat(String(vRateRaw)) : 1;
+      const cfaPerUsd = vCurrency !== "USD" && vRateRaw ? parseFloat(String(vRateRaw)) : 1;
 
       // Calculate total debits and credits in transaction currency
       let totalDebits = 0;
@@ -325,8 +327,7 @@ export function registerVoucherJournalRoutes(app: Express) {
       // vouchers.totalAmount stores the historical base (USD) amount.
       // For CFA: baseTotalMax = max(totalDebits, totalCredits) / cfaPerUsd
       const baseTxMax = Math.max(totalDebits, totalCredits);
-      const baseTotalMax =
-        vCurrency !== "USD" && cfaPerUsd > 0 ? baseTxMax / cfaPerUsd : baseTxMax;
+      const baseTotalMax = vCurrency !== "USD" && cfaPerUsd > 0 ? baseTxMax / cfaPerUsd : baseTxMax;
 
       // Generate voucher number
       const voucherNumber = `JOURNAL-${Date.now()}`;
@@ -436,9 +437,7 @@ export function registerVoucherJournalRoutes(app: Express) {
           const daybookRateJ = result.voucher.exchangeRate ? parseFloat(result.voucher.exchangeRate) : 1;
           // Reconstruct the original CFA total: base × rate (TRANSACTION_PER_BASE).
           const daybookAmtCurrencyJ =
-            daybookCurrencyJ !== "USD" && daybookRateJ > 0
-              ? daybookBaseTotalJ * daybookRateJ
-              : daybookBaseTotalJ;
+            daybookCurrencyJ !== "USD" && daybookRateJ > 0 ? daybookBaseTotalJ * daybookRateJ : daybookBaseTotalJ;
           // factory_daybook_entries.fx_rate_to_usd expects USD-per-foreign-unit.
           // The ERP voucher stores CFA-per-USD, so we store the inverse.
           const daybookFxRateToUsdJ = erpRateToDaybookFxRateToUsd(daybookCurrencyJ, "USD", result.voucher.exchangeRate);
@@ -506,10 +505,24 @@ export function registerVoucherJournalRoutes(app: Express) {
       } catch {
         /* non-fatal */
       }
-      logger.info("journal voucher create succeeded", { module: "vouchers", action: "createJournal", userId: _uid, companyId: _cid, voucherId: result.voucher.id, durationMs: Date.now() - _t });
+      logger.info("journal voucher create succeeded", {
+        module: "vouchers",
+        action: "createJournal",
+        userId: _uid,
+        companyId: _cid,
+        voucherId: result.voucher.id,
+        durationMs: Date.now() - _t,
+      });
       res.json({ ...result, whatsapp: waJournalResult });
     } catch (error: unknown) {
-      logger.error("journal voucher create failed", { module: "vouchers", action: "createJournal", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
+      logger.error("journal voucher create failed", {
+        module: "vouchers",
+        action: "createJournal",
+        userId: _uid,
+        companyId: _cid,
+        durationMs: Date.now() - _t,
+        error,
+      });
       logger.error("Error creating journal voucher:", { error: error });
       res.status(500).json({ message: getErrorMessage(error) });
     }
@@ -521,7 +534,12 @@ export function registerVoucherJournalRoutes(app: Express) {
     const _uid = req.session.userId;
     const _cid = req.session.currentCompanyId;
     try {
-      logger.info("journal voucher update started", { module: "vouchers", action: "updateJournal", userId: _uid, companyId: _cid });
+      logger.info("journal voucher update started", {
+        module: "vouchers",
+        action: "updateJournal",
+        userId: _uid,
+        companyId: _cid,
+      });
       const voucherId = parseInt(req.params.id);
       if (isNaN(voucherId)) {
         return res.status(400).json({ message: "Invalid voucher ID" });
@@ -552,8 +570,7 @@ export function registerVoucherJournalRoutes(app: Express) {
       // currency/exchangeRate may not be sent on a PATCH (preserve existing values).
       const vCurrencyPatch = (currency as string | undefined) || "USD";
       const vRateRawPatch = (exchangeRate as string | number | undefined) || null;
-      const cfaPerUsdPatch =
-        (vCurrencyPatch !== "USD" && vRateRawPatch) ? parseFloat(String(vRateRawPatch)) : 1;
+      const cfaPerUsdPatch = vCurrencyPatch !== "USD" && vRateRawPatch ? parseFloat(String(vRateRawPatch)) : 1;
 
       // Calculate total debits and credits in transaction currency
       let totalDebits = 0;
@@ -575,9 +592,7 @@ export function registerVoucherJournalRoutes(app: Express) {
       // vouchers.totalAmount stores the historical base (USD) amount.
       const baseTxMaxPatch = Math.max(totalDebits, totalCredits);
       const baseTotalMaxPatch =
-        vCurrencyPatch !== "USD" && cfaPerUsdPatch > 0
-          ? baseTxMaxPatch / cfaPerUsdPatch
-          : baseTxMaxPatch;
+        vCurrencyPatch !== "USD" && cfaPerUsdPatch > 0 ? baseTxMaxPatch / cfaPerUsdPatch : baseTxMaxPatch;
 
       // Use database transaction for atomic operation
       const result = await db.transaction(async (tx) => {
@@ -817,10 +832,24 @@ export function registerVoucherJournalRoutes(app: Express) {
       } catch {
         /* non-fatal */
       }
-      logger.info("journal voucher update succeeded", { module: "vouchers", action: "updateJournal", userId: _uid, companyId: _cid, voucherId: result.voucher.id, durationMs: Date.now() - _t });
+      logger.info("journal voucher update succeeded", {
+        module: "vouchers",
+        action: "updateJournal",
+        userId: _uid,
+        companyId: _cid,
+        voucherId: result.voucher.id,
+        durationMs: Date.now() - _t,
+      });
       res.json({ voucher: result.voucher, entries: result.entries, whatsapp: waJournalPatch });
     } catch (error: unknown) {
-      logger.error("journal voucher update failed", { module: "vouchers", action: "updateJournal", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
+      logger.error("journal voucher update failed", {
+        module: "vouchers",
+        action: "updateJournal",
+        userId: _uid,
+        companyId: _cid,
+        durationMs: Date.now() - _t,
+        error,
+      });
       logger.error("Error updating journal voucher:", { error: error });
       res.status(500).json({ message: getErrorMessage(error) });
     }

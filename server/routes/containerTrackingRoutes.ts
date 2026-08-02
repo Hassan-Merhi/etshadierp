@@ -383,7 +383,12 @@ export function registerContainerTrackingRoutes(app: Express) {
           blocked: (r as any).blocked ?? false,
         });
       } catch (e: unknown) {
-        providersAttempted.push({ provider: "maersk_direct", success: false, etaFound: null, error: getErrorMessage(e) });
+        providersAttempted.push({
+          provider: "maersk_direct",
+          success: false,
+          etaFound: null,
+          error: getErrorMessage(e),
+        });
       }
     } else {
       providersAttempted.push({

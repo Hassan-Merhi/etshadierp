@@ -8,13 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
@@ -57,7 +51,14 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
 
-import type { ImportPreviewRow, Location, LocationSummaryResponse, OrderItem, QuantityPickerState, StockItemData } from "./stocktransferorder/types";
+import type {
+  ImportPreviewRow,
+  Location,
+  LocationSummaryResponse,
+  OrderItem,
+  QuantityPickerState,
+  StockItemData,
+} from "./stocktransferorder/types";
 import { DRAFT_KEY, SESSION_STATE_KEY, STORAGE_KEY } from "./stocktransferorder/utils";
 import { RevisionDialog } from "./stock-transfer-order/dialogs/RevisionDialog";
 import { ImportDialog } from "./stock-transfer-order/dialogs/ImportDialog";
@@ -2070,18 +2071,75 @@ export default function StockTransferOrder() {
       )}
 
       {/* ── Revision Note Dialog ── */}
-      <RevisionDialog computeRevisionItems={computeRevisionItems} confirmSaveAsRevision={confirmSaveAsRevision} isSavingRevision={isSavingRevision} revisionDialogOpen={revisionDialogOpen} revisionNote={revisionNote} revisions={revisions} setRevisionDialogOpen={setRevisionDialogOpen} setRevisionNote={setRevisionNote} />
+      <RevisionDialog
+        computeRevisionItems={computeRevisionItems}
+        confirmSaveAsRevision={confirmSaveAsRevision}
+        isSavingRevision={isSavingRevision}
+        revisionDialogOpen={revisionDialogOpen}
+        revisionNote={revisionNote}
+        revisions={revisions}
+        setRevisionDialogOpen={setRevisionDialogOpen}
+        setRevisionNote={setRevisionNote}
+      />
 
       {/* ── Excel Import Dialog ── */}
-      <ImportDialog applyImport={applyImport} downloadImportTemplate={downloadImportTemplate} exportPreviewExcel={exportPreviewExcel} exportPreviewPDF={exportPreviewPDF} handleImportFile={handleImportFile} importDialogOpen={importDialogOpen} importFileRef={importFileRef} importLoading={importLoading} importPreview={importPreview} setImportDialogOpen={setImportDialogOpen} setImportPreview={setImportPreview} />
+      <ImportDialog
+        applyImport={applyImport}
+        downloadImportTemplate={downloadImportTemplate}
+        exportPreviewExcel={exportPreviewExcel}
+        exportPreviewPDF={exportPreviewPDF}
+        handleImportFile={handleImportFile}
+        importDialogOpen={importDialogOpen}
+        importFileRef={importFileRef}
+        importLoading={importLoading}
+        importPreview={importPreview}
+        setImportDialogOpen={setImportDialogOpen}
+        setImportPreview={setImportPreview}
+      />
 
-      <QuantityPickerDialog editVoucherId={editVoucherId} handleAddToOrder={handleAddToOrder} pickerQuantity={pickerQuantity} quantityInputRef={quantityInputRef} quantityPicker={quantityPicker} setPickerQuantity={setPickerQuantity} setQuantityPicker={setQuantityPicker} />
+      <QuantityPickerDialog
+        editVoucherId={editVoucherId}
+        handleAddToOrder={handleAddToOrder}
+        pickerQuantity={pickerQuantity}
+        quantityInputRef={quantityInputRef}
+        quantityPicker={quantityPicker}
+        setPickerQuantity={setPickerQuantity}
+        setQuantityPicker={setQuantityPicker}
+      />
 
       {/* Stock Movement History Dialog */}
-      <HistoryDialog formatAmount={formatAmount} historyData={historyData} historyDialogOpen={historyDialogOpen} historyItem={historyItem} historyLoading={historyLoading} historyLocation={historyLocation} historyPeriod={historyPeriod} matrixRef={matrixRef} navigate={navigate} setDetailDirection={setDetailDirection} setDetailMonth={setDetailMonth} setDetailMonthName={setDetailMonthName} setDetailOpen={setDetailOpen} setDetailYear={setDetailYear} setHistoryDialogOpen={setHistoryDialogOpen} setHistoryPeriod={setHistoryPeriod} />
+      <HistoryDialog
+        formatAmount={formatAmount}
+        historyData={historyData}
+        historyDialogOpen={historyDialogOpen}
+        historyItem={historyItem}
+        historyLoading={historyLoading}
+        historyLocation={historyLocation}
+        historyPeriod={historyPeriod}
+        matrixRef={matrixRef}
+        navigate={navigate}
+        setDetailDirection={setDetailDirection}
+        setDetailMonth={setDetailMonth}
+        setDetailMonthName={setDetailMonthName}
+        setDetailOpen={setDetailOpen}
+        setDetailYear={setDetailYear}
+        setHistoryDialogOpen={setHistoryDialogOpen}
+        setHistoryPeriod={setHistoryPeriod}
+      />
 
       {/* ── Drill-down: individual transactions for a month ── */}
-      <DetailDialog detailData={detailData} detailDirection={detailDirection} detailLoading={detailLoading} detailMonthName={detailMonthName} detailOpen={detailOpen} detailYear={detailYear} formatAmount={formatAmount} historyItem={historyItem} historyLocation={historyLocation} setDetailOpen={setDetailOpen} />
+      <DetailDialog
+        detailData={detailData}
+        detailDirection={detailDirection}
+        detailLoading={detailLoading}
+        detailMonthName={detailMonthName}
+        detailOpen={detailOpen}
+        detailYear={detailYear}
+        formatAmount={formatAmount}
+        historyItem={historyItem}
+        historyLocation={historyLocation}
+        setDetailOpen={setDetailOpen}
+      />
     </div>
   );
 }

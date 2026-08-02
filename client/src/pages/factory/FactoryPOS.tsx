@@ -95,7 +95,11 @@ export default function FactoryPOS() {
     },
     enabled: !!locationId,
   });
-  const { data: ledgerAccounts } = useQuery<any[]>({ queryKey: ["/api/ledger-accounts?includeHidden=true"], staleTime: 60_000, refetchOnWindowFocus: false });
+  const { data: ledgerAccounts } = useQuery<any[]>({
+    queryKey: ["/api/ledger-accounts?includeHidden=true"],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
   const cashAccounts = (ledgerAccounts || []).filter((a: any) => a.accountType === "Cash");
   const { data: sales, isLoading: salesLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/pos/sales"],

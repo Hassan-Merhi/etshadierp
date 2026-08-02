@@ -200,7 +200,7 @@ export function registerOrderTrackingRoutes(app: Express) {
         .where(
           and(
             eq(factoryContainers.companyId, companyId),
-            inArray(sql`UPPER(TRIM(${factoryContainers.containerNumber}))`, containerNumbers),
+            inArray(sql`UPPER(TRIM(${factoryContainers.containerNumber}))`, containerNumbers)
           )
         );
 

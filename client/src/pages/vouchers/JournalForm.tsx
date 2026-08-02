@@ -46,7 +46,18 @@ import { Plus, X, Search, ChevronDown, FileDown, Loader2, CheckCircle, AlertTria
 import { utils, writeFile } from "@/lib/excelHelper";
 import { cn } from "@/lib/utils";
 
-import type { Account, BankAccount, Customer, Employee, FactorySupplierBasic, FixedAsset, JournalFormData, JournalFormProps, LedgerAccount, Supplier } from "./journalform/types";
+import type {
+  Account,
+  BankAccount,
+  Customer,
+  Employee,
+  FactorySupplierBasic,
+  FixedAsset,
+  JournalFormData,
+  JournalFormProps,
+  LedgerAccount,
+  Supplier,
+} from "./journalform/types";
 import { journalFormSchema } from "./journalform/utils";
 export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
   const { toast } = useToast();
@@ -374,10 +385,9 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
     // that should resolve it hasn't loaded yet (or loaded under the wrong company
     // key before selectedCompany was set).  Return without resetting or marking
     // hydrated so the effect retries when the correct data arrives.
-   const hasUnresolvedName = formEntries.some(
-  (e: JournalFormData["entries"][number]) =>
-    e.accountId > 0 && e.accountName === ""
-);
+    const hasUnresolvedName = formEntries.some(
+      (e: JournalFormData["entries"][number]) => e.accountId > 0 && e.accountName === ""
+    );
     if (hasUnresolvedName) return;
 
     journalForm.reset({
@@ -496,9 +506,10 @@ export function JournalForm({ voucherIdToEdit, isPOS }: JournalFormProps) {
 
   const sendWaStatementMutation = useMutation({
     mutationFn: async ({ accountId, month }: { accountId: number; month: string }) => {
-      const url = appMode === "factory"
-        ? `/api/factory/accounts/${accountId}/send-statement-whatsapp`
-        : `/api/accounts/${accountId}/send-statement-whatsapp`;
+      const url =
+        appMode === "factory"
+          ? `/api/factory/accounts/${accountId}/send-statement-whatsapp`
+          : `/api/accounts/${accountId}/send-statement-whatsapp`;
       const res = await modeApiRequest("POST", url, { month });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message || "Failed to send WhatsApp");

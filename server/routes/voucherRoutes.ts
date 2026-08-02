@@ -25,13 +25,7 @@ function registerVoucherDetailCompatibility(app: Express) {
     const sendJson = res.json.bind(res);
 
     res.json = ((body: unknown) => {
-      if (
-        body &&
-        typeof body === "object" &&
-        !Array.isArray(body) &&
-        "transferData" in body &&
-        !("transfer" in body)
-      ) {
+      if (body && typeof body === "object" && !Array.isArray(body) && "transferData" in body && !("transfer" in body)) {
         const voucherDetail = body as Record<string, unknown>;
         return sendJson({
           ...voucherDetail,

@@ -44,7 +44,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import type { BaleRemoval, Customer, Location, OrderBale, OrderDetail, Proforma } from "./factorycontainerloadingscan/types";
+import type {
+  BaleRemoval,
+  Customer,
+  Location,
+  OrderBale,
+  OrderDetail,
+  Proforma,
+} from "./factorycontainerloadingscan/types";
 export default function FactoryContainerLoadingScan() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -540,11 +547,19 @@ export default function FactoryContainerLoadingScan() {
         // When ignoreProforma is ON, always bypass the proforma check so the
         // first scan succeeds immediately (item still appears as "Not in Proforma"
         // in the comparison table — only the double-scan requirement is skipped).
-        allowBypassProforma: ignoreProforma ? true : (isBypassProforma || undefined),
+        allowBypassProforma: ignoreProforma ? true : isBypassProforma || undefined,
         allowBypassOverload: isBypassOverload || undefined,
       });
     },
-    [scanCode, orderId, selectedLocationId, pendingBypassBaleRef, pendingBypassOverloadRef, ignoreProforma, addBaleMutation]
+    [
+      scanCode,
+      orderId,
+      selectedLocationId,
+      pendingBypassBaleRef,
+      pendingBypassOverloadRef,
+      ignoreProforma,
+      addBaleMutation,
+    ]
   );
 
   const handleImportFile = useCallback(
@@ -716,7 +731,9 @@ export default function FactoryContainerLoadingScan() {
   const totalLines = proformaProgress.length;
 
   // Extra bales not in proforma
-  const proformaArticleCodes = new Set((Array.isArray(linkedProforma?.lines) ? linkedProforma!.lines : []).map((l) => l.articleCode));
+  const proformaArticleCodes = new Set(
+    (Array.isArray(linkedProforma?.lines) ? linkedProforma!.lines : []).map((l) => l.articleCode)
+  );
   const extraArticles = Object.keys(loadedByArticle).filter((code) => !proformaArticleCodes.has(code));
 
   const scanInputClass =
@@ -1227,22 +1244,27 @@ export default function FactoryContainerLoadingScan() {
                   </TableHeader>
                   <TableBody>
                     {extraArticles.map((code) => (
-                      <TableRow key={code} className="bg-orange-50 dark:bg-orange-950/40" data-testid={`row-extra-${code}`}>
+                      <TableRow
+                        key={code}
+                        className="bg-orange-50 dark:bg-orange-950/40"
+                        data-testid={`row-extra-${code}`}
+                      >
                         <TableCell className="text-xs font-mono py-1.5">{code}</TableCell>
                         <TableCell className="text-xs py-1.5 text-muted-foreground">
                           {groupedBalesMap[code]?.baleName || "—"}
                         </TableCell>
                         <TableCell className="text-xs text-right font-mono py-1.5 text-muted-foreground">0</TableCell>
-                        <TableCell className="text-xs text-right font-mono py-1.5">
-                          {loadedByArticle[code]}
-                        </TableCell>
+                        <TableCell className="text-xs text-right font-mono py-1.5">{loadedByArticle[code]}</TableCell>
                         <TableCell className="text-xs text-right font-mono py-1.5">
                           <span className="text-orange-600 dark:text-orange-400 font-medium">
                             +{loadedByArticle[code]}
                           </span>
                         </TableCell>
                         <TableCell className="py-1.5">
-                          <Badge variant="destructive" className="text-[10px] no-default-hover-elevate no-default-active-elevate">
+                          <Badge
+                            variant="destructive"
+                            className="text-[10px] no-default-hover-elevate no-default-active-elevate"
+                          >
                             Not in Proforma
                           </Badge>
                         </TableCell>
@@ -1263,11 +1285,7 @@ export default function FactoryContainerLoadingScan() {
                               ? "bg-green-50 dark:bg-green-950"
                               : "";
                         return (
-                          <TableRow
-                            key={line.id}
-                            className={rowClass}
-                            data-testid={`row-progress-${line.articleCode}`}
-                          >
+                          <TableRow key={line.id} className={rowClass} data-testid={`row-progress-${line.articleCode}`}>
                             <TableCell className="text-xs font-mono py-1.5">{line.articleCode}</TableCell>
                             <TableCell className="text-xs py-1.5">{line.productName}</TableCell>
                             <TableCell className="text-xs text-right font-mono py-1.5">{line.quantity}</TableCell>
@@ -1276,30 +1294,44 @@ export default function FactoryContainerLoadingScan() {
                               {remaining > 0 ? (
                                 <span className="text-red-600 dark:text-red-400 font-medium">{remaining}</span>
                               ) : remaining < 0 ? (
-                                <span className="text-green-600 dark:text-green-400 font-medium">+{Math.abs(remaining)}</span>
+                                <span className="text-green-600 dark:text-green-400 font-medium">
+                                  +{Math.abs(remaining)}
+                                </span>
                               ) : (
                                 <span className="text-muted-foreground">0</span>
                               )}
                             </TableCell>
                             <TableCell className="py-1.5">
                               {line.status === "fulfilled" && (
-                                <Badge variant="outline" className="text-[10px] text-green-700 dark:text-green-300 border-green-200 dark:border-green-800 no-default-hover-elevate no-default-active-elevate">
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] text-green-700 dark:text-green-300 border-green-200 dark:border-green-800 no-default-hover-elevate no-default-active-elevate"
+                                >
                                   <CheckCircle className="h-3 w-3 mr-1" />
                                   Match
                                 </Badge>
                               )}
                               {line.status === "overloaded" && (
-                                <Badge variant="outline" className="text-[10px] bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800 no-default-hover-elevate no-default-active-elevate">
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800 no-default-hover-elevate no-default-active-elevate"
+                                >
                                   Over Loaded
                                 </Badge>
                               )}
                               {line.status === "short" && (
-                                <Badge variant="outline" className="text-[10px] bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800 no-default-hover-elevate no-default-active-elevate">
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800 no-default-hover-elevate no-default-active-elevate"
+                                >
                                   Under Loaded
                                 </Badge>
                               )}
                               {line.status === "none" && (
-                                <Badge variant="outline" className="text-[10px] bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800 no-default-hover-elevate no-default-active-elevate">
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800 no-default-hover-elevate no-default-active-elevate"
+                                >
                                   Missing
                                 </Badge>
                               )}
@@ -1358,7 +1390,9 @@ export default function FactoryContainerLoadingScan() {
                           <TableCell className="text-xs font-mono py-1.5">{group.articleCode}</TableCell>
                           <TableCell className="text-xs py-1.5">{group.baleName}</TableCell>
                           <TableCell className="text-xs text-right font-mono py-1.5">{group.bales.length}</TableCell>
-                          <TableCell className="text-xs text-right font-mono py-1.5">{group.totalWeight.toFixed(1)}</TableCell>
+                          <TableCell className="text-xs text-right font-mono py-1.5">
+                            {group.totalWeight.toFixed(1)}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

@@ -1,29 +1,58 @@
-import {useState, useRef} from "react";
-import {useAdminOverride} from "@/hooks/use-admin-override";
-import {useDateFormat} from "@/contexts/DateFormatContext";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {useRoute, useLocation} from "wouter";
-import {useEscapeToParent} from "@/hooks/use-escape-to-parent";
-import {ArrowLeft, UserX, UserCheck, Upload, Package, DollarSign, CreditCard, Building, Phone, Calendar, FileText, FileImage, File, Trash2, Banknote, Plus, Loader2, RotateCcw, Wrench, Eye, Download} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter} from "@/components/ui/dialog";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Avatar, AvatarImage, AvatarFallback} from "@/components/ui/avatar";
-import {Skeleton} from "@/components/ui/skeleton";
-import {useToast} from "@/hooks/use-toast";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {factoryApiRequest} from "@/lib/factoryApi";
-import type {FactoryWorker, FactoryBale, FactoryWorkerDocument, FactoryWorkerAdvance} from "@shared/schema";
+import { useState, useRef } from "react";
+import { useAdminOverride } from "@/hooks/use-admin-override";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useRoute, useLocation } from "wouter";
+import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
+import {
+  ArrowLeft,
+  UserX,
+  UserCheck,
+  Upload,
+  Package,
+  DollarSign,
+  CreditCard,
+  Building,
+  Phone,
+  Calendar,
+  FileText,
+  FileImage,
+  File,
+  Trash2,
+  Banknote,
+  Plus,
+  Loader2,
+  RotateCcw,
+  Wrench,
+  Eye,
+  Download,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
+import type { FactoryWorker, FactoryBale, FactoryWorkerDocument, FactoryWorkerAdvance } from "@shared/schema";
 
-import type {CashAccount, PayrollRecord, WorkerStats, WorkerWithStats} from "./factoryworkerdetail/types";
-import {PAYROLL_STATUS, fmt, fmtNum, getAvatarColor, getInitials} from "./factoryworkerdetail/utils";
-import {AdvanceRow} from "./factoryworkerdetail/components/AdvanceRow";
+import type { CashAccount, PayrollRecord, WorkerStats, WorkerWithStats } from "./factoryworkerdetail/types";
+import { PAYROLL_STATUS, fmt, fmtNum, getAvatarColor, getInitials } from "./factoryworkerdetail/utils";
+import { AdvanceRow } from "./factoryworkerdetail/components/AdvanceRow";
 import { W1 } from "./factory-worker-detail/dialogs/W1";
 import { W2 } from "./factory-worker-detail/dialogs/W2";
 import { W3 } from "./factory-worker-detail/dialogs/W3";
@@ -1918,12 +1947,53 @@ export default function FactoryWorkerDetail() {
         </div>
       </div>
 
-      <W1 cashAccounts={cashAccounts} endCalculating={endCalculating} endCashAccountId={endCashAccountId} endEnd={endEnd} endOpen={endOpen} endResult={endResult} endStart={endStart} endStep={endStep} endSubmitting={endSubmitting} handleCalculate={handleCalculate} handleEndContract={handleEndContract} handleSkipAndEnd={handleSkipAndEnd} payrollBalance={payrollBalance} setEndCashAccountId={setEndCashAccountId} setEndEnd={setEndEnd} setEndOpen={setEndOpen} setEndResult={setEndResult} setEndStart={setEndStart} setEndStep={setEndStep} worker={worker} />
+      <W1
+        cashAccounts={cashAccounts}
+        endCalculating={endCalculating}
+        endCashAccountId={endCashAccountId}
+        endEnd={endEnd}
+        endOpen={endOpen}
+        endResult={endResult}
+        endStart={endStart}
+        endStep={endStep}
+        endSubmitting={endSubmitting}
+        handleCalculate={handleCalculate}
+        handleEndContract={handleEndContract}
+        handleSkipAndEnd={handleSkipAndEnd}
+        payrollBalance={payrollBalance}
+        setEndCashAccountId={setEndCashAccountId}
+        setEndEnd={setEndEnd}
+        setEndOpen={setEndOpen}
+        setEndResult={setEndResult}
+        setEndStart={setEndStart}
+        setEndStep={setEndStep}
+        worker={worker}
+      />
 
       {/* Fix Accounting Dialog */}
-      <W2 cashAccounts={cashAccounts} fixAcctCashId={fixAcctCashId} fixAcctMutation={fixAcctMutation} fixAcctOpen={fixAcctOpen} fixAcctTargetId={fixAcctTargetId} setFixAcctCashId={setFixAcctCashId} setFixAcctOpen={setFixAcctOpen} setFixAcctTargetId={setFixAcctTargetId} wrapAdminAction={wrapAdminAction} />
+      <W2
+        cashAccounts={cashAccounts}
+        fixAcctCashId={fixAcctCashId}
+        fixAcctMutation={fixAcctMutation}
+        fixAcctOpen={fixAcctOpen}
+        fixAcctTargetId={fixAcctTargetId}
+        setFixAcctCashId={setFixAcctCashId}
+        setFixAcctOpen={setFixAcctOpen}
+        setFixAcctTargetId={setFixAcctTargetId}
+        wrapAdminAction={wrapAdminAction}
+      />
 
-      <W3 cashAccounts={cashAccounts} markPaidMutation={markPaidMutation} payCashAccountId={payCashAccountId} payOpen={payOpen} payTargetId={payTargetId} setPayCashAccountId={setPayCashAccountId} setPayOpen={setPayOpen} setPayTargetId={setPayTargetId} wrapAdminAction={wrapAdminAction} />
+      <W3
+        cashAccounts={cashAccounts}
+        markPaidMutation={markPaidMutation}
+        payCashAccountId={payCashAccountId}
+        payOpen={payOpen}
+        payTargetId={payTargetId}
+        setPayCashAccountId={setPayCashAccountId}
+        setPayOpen={setPayOpen}
+        setPayTargetId={setPayTargetId}
+        wrapAdminAction={wrapAdminAction}
+      />
 
       {/* Image Viewer Dialog */}
       <W4 setViewingDoc={setViewingDoc} viewingDoc={viewingDoc} />
@@ -1969,7 +2039,12 @@ export default function FactoryWorkerDetail() {
         </DialogContent>
       </Dialog>
       {/* Payroll Detail Dialog */}
-      <W5 detailPayrollId={detailPayrollId} payrollDetail={payrollDetail} payrollDetailLoading={payrollDetailLoading} setDetailPayrollId={setDetailPayrollId} />
+      <W5
+        detailPayrollId={detailPayrollId}
+        payrollDetail={payrollDetail}
+        payrollDetailLoading={payrollDetailLoading}
+        setDetailPayrollId={setDetailPayrollId}
+      />
 
       {AdminDialog}
     </div>

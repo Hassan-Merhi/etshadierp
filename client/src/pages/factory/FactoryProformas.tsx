@@ -1320,18 +1320,76 @@ export default function FactoryProformas() {
         </DialogContent>
       </Dialog>
 
-      <D1 renameProformaMutation={renameProformaMutation} renameValue={renameValue} renamingProforma={renamingProforma} setRenameValue={setRenameValue} setRenamingProforma={setRenamingProforma} />
+      <D1
+        renameProformaMutation={renameProformaMutation}
+        renameValue={renameValue}
+        renamingProforma={renamingProforma}
+        setRenameValue={setRenameValue}
+        setRenamingProforma={setRenamingProforma}
+      />
 
       {/* ── Transfer Proforma Dialog ────────────────────────────────────── */}
-      <D2 customers={customers} setTransferProforma={setTransferProforma} setTransferTargetCustomerId={setTransferTargetCustomerId} transferProforma={transferProforma} transferProformaMutation={transferProformaMutation} transferTargetCustomerId={transferTargetCustomerId} />
+      <D2
+        customers={customers}
+        setTransferProforma={setTransferProforma}
+        setTransferTargetCustomerId={setTransferTargetCustomerId}
+        transferProforma={transferProforma}
+        transferProformaMutation={transferProformaMutation}
+        transferTargetCustomerId={transferTargetCustomerId}
+      />
 
-      <D3 addLineMode={addLineMode} addLineMutation={addLineMutation} allStockItems={allStockItems} catalogSearch={catalogSearch} catalogSelectedItem={catalogSelectedItem} handleAddLine={handleAddLine} isAddLineOpen={isAddLineOpen} newLine={newLine} priceListMap={priceListMap} setAddLineMode={setAddLineMode} setCatalogSearch={setCatalogSearch} setCatalogSelectedItem={setCatalogSelectedItem} setIsAddLineOpen={setIsAddLineOpen} setNewLine={setNewLine} />
+      <D3
+        addLineMode={addLineMode}
+        addLineMutation={addLineMutation}
+        allStockItems={allStockItems}
+        catalogSearch={catalogSearch}
+        catalogSelectedItem={catalogSelectedItem}
+        handleAddLine={handleAddLine}
+        isAddLineOpen={isAddLineOpen}
+        newLine={newLine}
+        priceListMap={priceListMap}
+        setAddLineMode={setAddLineMode}
+        setCatalogSearch={setCatalogSearch}
+        setCatalogSelectedItem={setCatalogSelectedItem}
+        setIsAddLineOpen={setIsAddLineOpen}
+        setNewLine={setNewLine}
+      />
 
-      <D4 editLineMutation={editLineMutation} editLineValues={editLineValues} editingLine={editingLine} handleEditLine={handleEditLine} setEditLineValues={setEditLineValues} setEditingLine={setEditingLine} />
-      <D5 createLoadingLocationId={createLoadingLocationId} createLoadingMutation={createLoadingMutation} createLoadingProforma={createLoadingProforma} locations={locations} setCreateLoadingLocationId={setCreateLoadingLocationId} setCreateLoadingProforma={setCreateLoadingProforma} />
+      <D4
+        editLineMutation={editLineMutation}
+        editLineValues={editLineValues}
+        editingLine={editingLine}
+        handleEditLine={handleEditLine}
+        setEditLineValues={setEditLineValues}
+        setEditingLine={setEditingLine}
+      />
+      <D5
+        createLoadingLocationId={createLoadingLocationId}
+        createLoadingMutation={createLoadingMutation}
+        createLoadingProforma={createLoadingProforma}
+        locations={locations}
+        setCreateLoadingLocationId={setCreateLoadingLocationId}
+        setCreateLoadingProforma={setCreateLoadingProforma}
+      />
 
       {/* ── Excel Import Dialog ──────────────────────────────────────────── */}
-      <D6 bulkImportMutation={bulkImportMutation} customerId={customerId} customers={customers} downloadProformaTemplate={downloadProformaTemplate} excelFileInputRef={excelFileInputRef} excelImportErrors={excelImportErrors} excelImportLines={excelImportLines} excelImportLoading={excelImportLoading} excelImportName={excelImportName} handleExcelFile={handleExcelFile} isExcelImportOpen={isExcelImportOpen} setExcelImportErrors={setExcelImportErrors} setExcelImportLines={setExcelImportLines} setExcelImportName={setExcelImportName} setIsExcelImportOpen={setIsExcelImportOpen} />
+      <D6
+        bulkImportMutation={bulkImportMutation}
+        customerId={customerId}
+        customers={customers}
+        downloadProformaTemplate={downloadProformaTemplate}
+        excelFileInputRef={excelFileInputRef}
+        excelImportErrors={excelImportErrors}
+        excelImportLines={excelImportLines}
+        excelImportLoading={excelImportLoading}
+        excelImportName={excelImportName}
+        handleExcelFile={handleExcelFile}
+        isExcelImportOpen={isExcelImportOpen}
+        setExcelImportErrors={setExcelImportErrors}
+        setExcelImportLines={setExcelImportLines}
+        setExcelImportName={setExcelImportName}
+        setIsExcelImportOpen={setIsExcelImportOpen}
+      />
 
       <DeleteConfirmDialog
         open={!!pendingDelete}

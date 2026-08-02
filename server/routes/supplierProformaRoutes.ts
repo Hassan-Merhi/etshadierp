@@ -313,7 +313,6 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
 
   registerContainerLoadedItemsRoutes(app, requireAuth);
 
-
   // ── Pretty Excel export for a single proforma ──────────────────────────────
   app.get("/api/suppliers/:supplierId/proformas/:proformaId/export-excel", requireAuth, async (req: any, res: any) => {
     try {

@@ -61,7 +61,15 @@ import {
 } from "@/lib/labelHtml";
 import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 
-import type { CategoryGroup, Customer, FactoryBaleProduct, Location, ProformaSelection, SortDir, SortField } from "./factorylocationinventory/types";
+import type {
+  CategoryGroup,
+  Customer,
+  FactoryBaleProduct,
+  Location,
+  ProformaSelection,
+  SortDir,
+  SortField,
+} from "./factorylocationinventory/types";
 import { applySortProducts, catColor, isSpecialFactoryCategory } from "./factorylocationinventory/utils";
 import { StatCard } from "./factorylocationinventory/components/StatCard";
 import { L1 } from "./factory-location-inventory/dialogs/L1";
@@ -910,7 +918,36 @@ export default function FactoryLocationInventory() {
   };
 
   const renderFinalizeDialog = () => (
-      <L1 bulkCreateMutation={bulkCreateMutation} createCustomerMutation={createCustomerMutation} customerSearch={customerSearch} editingProformaId={editingProformaId} filteredCustomers={filteredCustomers} finalizeOpen={finalizeOpen} formatAmount={formatAmount} grandTotal={grandTotal} handleCloseFinalizeDialog={handleCloseFinalizeDialog} handleExportExcel={handleExportExcel} handleExportPdf={handleExportPdf} handleSaveProforma={handleSaveProforma} newCustomerName={newCustomerName} proformaName={proformaName} removeFromFinalize={removeFromFinalize} replaceLinesMutation={replaceLinesMutation} savedProformaId={savedProformaId} selectedCustomerId={selectedCustomerId} selectedItems={selectedItems} setCustomerSearch={setCustomerSearch} setNewCustomerName={setNewCustomerName} setProformaName={setProformaName} setSelectedCustomerId={setSelectedCustomerId} setShowCreateCustomer={setShowCreateCustomer} showCreateCustomer={showCreateCustomer} totalSelectedBales={totalSelectedBales} updateFinalizePrice={updateFinalizePrice} updateFinalizeQty={updateFinalizeQty} />
+    <L1
+      bulkCreateMutation={bulkCreateMutation}
+      createCustomerMutation={createCustomerMutation}
+      customerSearch={customerSearch}
+      editingProformaId={editingProformaId}
+      filteredCustomers={filteredCustomers}
+      finalizeOpen={finalizeOpen}
+      formatAmount={formatAmount}
+      grandTotal={grandTotal}
+      handleCloseFinalizeDialog={handleCloseFinalizeDialog}
+      handleExportExcel={handleExportExcel}
+      handleExportPdf={handleExportPdf}
+      handleSaveProforma={handleSaveProforma}
+      newCustomerName={newCustomerName}
+      proformaName={proformaName}
+      removeFromFinalize={removeFromFinalize}
+      replaceLinesMutation={replaceLinesMutation}
+      savedProformaId={savedProformaId}
+      selectedCustomerId={selectedCustomerId}
+      selectedItems={selectedItems}
+      setCustomerSearch={setCustomerSearch}
+      setNewCustomerName={setNewCustomerName}
+      setProformaName={setProformaName}
+      setSelectedCustomerId={setSelectedCustomerId}
+      setShowCreateCustomer={setShowCreateCustomer}
+      showCreateCustomer={showCreateCustomer}
+      totalSelectedBales={totalSelectedBales}
+      updateFinalizePrice={updateFinalizePrice}
+      updateFinalizeQty={updateFinalizeQty}
+    />
   );
 
   // ─── View 1: Location list ────────────────────────────────────────────────
@@ -1006,7 +1043,14 @@ export default function FactoryLocationInventory() {
           </div>
         </div>
 
-      <L2 renameDialogOpen={renameDialogOpen} renameInput={renameInput} renameLocationMutation={renameLocationMutation} renamingLocation={renamingLocation} setRenameDialogOpen={setRenameDialogOpen} setRenameInput={setRenameInput} />
+        <L2
+          renameDialogOpen={renameDialogOpen}
+          renameInput={renameInput}
+          renameLocationMutation={renameLocationMutation}
+          renamingLocation={renamingLocation}
+          setRenameDialogOpen={setRenameDialogOpen}
+          setRenameInput={setRenameInput}
+        />
       </div>
     );
   }
@@ -1564,12 +1608,7 @@ export default function FactoryLocationInventory() {
           <div className="flex items-center gap-2 flex-wrap">
             <Popover>
               <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 h-8"
-                  data-testid="button-category-filter"
-                >
+                <Button variant="outline" size="sm" className="gap-1.5 h-8" data-testid="button-category-filter">
                   <ListFilter className="h-3.5 w-3.5" />
                   {categoryFilter.length === 0
                     ? "All Categories"
@@ -2057,9 +2096,34 @@ export default function FactoryLocationInventory() {
 
       <L3 overloadWarning={overloadWarning} setOverloadWarning={setOverloadWarning} />
 
-      <L4 deleteDialogOpen={deleteDialogOpen} deleteProduct={deleteProduct} deleteQty={deleteQty} deleteReason={deleteReason} deleteSupervisorPass={deleteSupervisorPass} deleteSupervisorUser={deleteSupervisorUser} removeBalesMutation={removeBalesMutation} selectedLocation={selectedLocation} setDeleteDialogOpen={setDeleteDialogOpen} setDeleteProduct={setDeleteProduct} setDeleteQty={setDeleteQty} setDeleteReason={setDeleteReason} setDeleteSupervisorPass={setDeleteSupervisorPass} setDeleteSupervisorUser={setDeleteSupervisorUser} />
+      <L4
+        deleteDialogOpen={deleteDialogOpen}
+        deleteProduct={deleteProduct}
+        deleteQty={deleteQty}
+        deleteReason={deleteReason}
+        deleteSupervisorPass={deleteSupervisorPass}
+        deleteSupervisorUser={deleteSupervisorUser}
+        removeBalesMutation={removeBalesMutation}
+        selectedLocation={selectedLocation}
+        setDeleteDialogOpen={setDeleteDialogOpen}
+        setDeleteProduct={setDeleteProduct}
+        setDeleteQty={setDeleteQty}
+        setDeleteReason={setDeleteReason}
+        setDeleteSupervisorPass={setDeleteSupervisorPass}
+        setDeleteSupervisorUser={setDeleteSupervisorUser}
+      />
 
-      <L5 handleDoPrint={handleDoPrint} reprintBales={reprintBales} reprintDialogOpen={reprintDialogOpen} reprintLoading={reprintLoading} reprintProduct={reprintProduct} selectedLocation={selectedLocation} setReprintBales={setReprintBales} setReprintDialogOpen={setReprintDialogOpen} setReprintProduct={setReprintProduct} />
+      <L5
+        handleDoPrint={handleDoPrint}
+        reprintBales={reprintBales}
+        reprintDialogOpen={reprintDialogOpen}
+        reprintLoading={reprintLoading}
+        reprintProduct={reprintProduct}
+        selectedLocation={selectedLocation}
+        setReprintBales={setReprintBales}
+        setReprintDialogOpen={setReprintDialogOpen}
+        setReprintProduct={setReprintProduct}
+      />
 
       <Dialog open={reprintDesignPickerOpen} onOpenChange={setReprintDesignPickerOpen}>
         <DialogContent className="max-w-sm">
@@ -2098,7 +2162,14 @@ export default function FactoryLocationInventory() {
         </DialogContent>
       </Dialog>
 
-      <L6 renameDialogOpen={renameDialogOpen} renameInput={renameInput} renameLocationMutation={renameLocationMutation} renamingLocation={renamingLocation} setRenameDialogOpen={setRenameDialogOpen} setRenameInput={setRenameInput} />
+      <L6
+        renameDialogOpen={renameDialogOpen}
+        renameInput={renameInput}
+        renameLocationMutation={renameLocationMutation}
+        renamingLocation={renamingLocation}
+        setRenameDialogOpen={setRenameDialogOpen}
+        setRenameInput={setRenameInput}
+      />
     </div>
   );
 }

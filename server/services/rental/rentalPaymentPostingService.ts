@@ -38,12 +38,7 @@ import Decimal from "decimal.js";
 import type { RentalModule } from "../../routes/rental/shared";
 import { normalizeVoucherEntryAmounts } from "../accounting/currencyAmounts";
 import { findOrCreateLedgerAccount, maybeRunAutoTransfer } from "../../routes/rental/shared";
-import {
-  isRentalPeriodDue,
-  getRentalBillingDay,
-  getRentalPeriodDueDate,
-  getDuePeriods,
-} from "./rentalPeriodService";
+import { isRentalPeriodDue, getRentalBillingDay, getRentalPeriodDueDate, getDuePeriods } from "./rentalPeriodService";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -197,9 +192,7 @@ export async function buildAllocationsForPayment(
     const expected = ledgerMap.get(`${ay}-${am}`) ?? rentalAmount;
     const posted = postedByMonth.get(`${ay}-${am}`) ?? 0;
     // For due months: outstanding = expected - posted; for prepaid: capacity = rentalAmount - posted
-    const capacity = isDue
-      ? Math.max(0, expected - posted)
-      : Math.max(0, rentalAmount - posted);
+    const capacity = isDue ? Math.max(0, expected - posted) : Math.max(0, rentalAmount - posted);
 
     if (capacity <= 0.005) {
       ay = am === 12 ? ay + 1 : ay;
@@ -256,9 +249,22 @@ async function postGroupCore(
   }
 ): Promise<number | null> {
   const {
-    companyId, module: mod, contract, unit, cashAccountId, allocs,
-    totalAmountStr, paymentDate, asOfDate, currency, exchangeRate, narration,
-    shopExpenseAccountName, incomeAccountName, isSharedPayment, groupId,
+    companyId,
+    module: mod,
+    contract,
+    unit,
+    cashAccountId,
+    allocs,
+    totalAmountStr,
+    paymentDate,
+    asOfDate,
+    currency,
+    exchangeRate,
+    narration,
+    shopExpenseAccountName,
+    incomeAccountName,
+    isSharedPayment,
+    groupId,
   } = opts;
 
   /** Normalize an entry for this payment's currency and rate. */
@@ -311,7 +317,7 @@ async function postGroupCore(
             .select({ accrualVoucherId: propertyMonthlyLedger.accrualVoucherId })
             .from(propertyMonthlyLedger)
             .where(eq(propertyMonthlyLedger.id, alloc.ledgerRowId));
-          wasAccrued = !!(lr?.accrualVoucherId);
+          wasAccrued = !!lr?.accrualVoucherId;
         }
         if (wasAccrued) {
           accrualAmt = accrualAmt.plus(chunk);
@@ -357,31 +363,37 @@ async function postGroupCore(
 
     if (accrualAmt.gt(0.005)) {
       const accPayId = await findOrCreateLedgerAccount(
-        tx, companyId, "Accrued Rent Payable", "Liability", "ACC-RENT-PAY"
+        tx,
+        companyId,
+        "Accrued Rent Payable",
+        "Liability",
+        "ACC-RENT-PAY"
       );
       payEntries.push({
-        voucherId: v.id, ledgerAccountId: accPayId,
-        ...normEntry(accrualAmt.toFixed(2), "0"), narration,
+        voucherId: v.id,
+        ledgerAccountId: accPayId,
+        ...normEntry(accrualAmt.toFixed(2), "0"),
+        narration,
       });
     }
 
     if (advanceAmt.gt(0.005)) {
-      const advId = await findOrCreateLedgerAccount(
-        tx, companyId, "Advance Rent Paid", "Asset", "ADV-RENT-PAID"
-      );
+      const advId = await findOrCreateLedgerAccount(tx, companyId, "Advance Rent Paid", "Asset", "ADV-RENT-PAID");
       payEntries.push({
-        voucherId: v.id, ledgerAccountId: advId,
-        ...normEntry(advanceAmt.toFixed(2), "0"), narration,
+        voucherId: v.id,
+        ledgerAccountId: advId,
+        ...normEntry(advanceAmt.toFixed(2), "0"),
+        narration,
       });
     }
 
     if (prepaidAmt.gt(0.005)) {
-      const prepId = await findOrCreateLedgerAccount(
-        tx, companyId, "Prepaid Rent", "Asset", "PREPAID-RENT"
-      );
+      const prepId = await findOrCreateLedgerAccount(tx, companyId, "Prepaid Rent", "Asset", "PREPAID-RENT");
       payEntries.push({
-        voucherId: v.id, ledgerAccountId: prepId,
-        ...normEntry(prepaidAmt.toFixed(2), "0"), narration,
+        voucherId: v.id,
+        ledgerAccountId: prepId,
+        ...normEntry(prepaidAmt.toFixed(2), "0"),
+        narration,
       });
     }
 
@@ -407,19 +419,25 @@ async function postGroupCore(
       recognitionVoucherId = rv.id;
 
       const expId = await findOrCreateLedgerAccount(
-        tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP"
+        tx,
+        companyId,
+        shopExpenseAccountName,
+        "Indirect Expense",
+        "SHOP-RENT-EXP"
       );
-      const advId = await findOrCreateLedgerAccount(
-        tx, companyId, "Advance Rent Paid", "Asset", "ADV-RENT-PAID"
-      );
+      const advId = await findOrCreateLedgerAccount(tx, companyId, "Advance Rent Paid", "Asset", "ADV-RENT-PAID");
       await tx.insert(voucherEntries).values([
         {
-          voucherId: rv.id, ledgerAccountId: expId,
-          ...normEntry(advanceAmt.toFixed(2), "0"), narration: recNarr,
+          voucherId: rv.id,
+          ledgerAccountId: expId,
+          ...normEntry(advanceAmt.toFixed(2), "0"),
+          narration: recNarr,
         },
         {
-          voucherId: rv.id, ledgerAccountId: advId,
-          ...normEntry("0", advanceAmt.toFixed(2)), narration: recNarr,
+          voucherId: rv.id,
+          ledgerAccountId: advId,
+          ...normEntry("0", advanceAmt.toFixed(2)),
+          narration: recNarr,
         },
       ]);
     }
@@ -453,14 +471,17 @@ async function postGroupCore(
   } else {
     // Landlord receipt: Dr Cash / Cr Rental Income [/ Cr Deferred Rent Revenue]
     const incomeAccountId = await findOrCreateLedgerAccount(
-      tx, companyId, incomeAccountName, "Income", "RENT-INC", "Indirect Income"
+      tx,
+      companyId,
+      incomeAccountName,
+      "Income",
+      "RENT-INC",
+      "Indirect Income"
     );
     const pd = new Date(paymentDate + "T00:00:00Z");
     const payYear = pd.getUTCFullYear();
     const payMonth = pd.getUTCMonth() + 1;
-    const futureAllocs = allocs.filter(
-      (a) => a.forYear > payYear || (a.forYear === payYear && a.forMonth > payMonth)
-    );
+    const futureAllocs = allocs.filter((a) => a.forYear > payYear || (a.forYear === payYear && a.forMonth > payMonth));
     const deferredChunk = futureAllocs.reduce((s, a) => s + Number(a.chunk), 0);
     const totalAmountNum = parseFloat(totalAmountStr);
     const earnedChunk = totalAmountNum - deferredChunk;
@@ -485,17 +506,25 @@ async function postGroupCore(
     ];
     if (earnedChunk > 0.005) {
       lEntries.push({
-        voucherId: v.id, ledgerAccountId: incomeAccountId,
-        ...normEntry("0", earnedChunk.toFixed(2)), narration,
+        voucherId: v.id,
+        ledgerAccountId: incomeAccountId,
+        ...normEntry("0", earnedChunk.toFixed(2)),
+        narration,
       });
     }
     if (deferredChunk > 0.005) {
       const deferredId = await findOrCreateLedgerAccount(
-        tx, companyId, "Deferred Rent Revenue", "Liability", "DEF-RENT-REV"
+        tx,
+        companyId,
+        "Deferred Rent Revenue",
+        "Liability",
+        "DEF-RENT-REV"
       );
       lEntries.push({
-        voucherId: v.id, ledgerAccountId: deferredId,
-        ...normEntry("0", deferredChunk.toFixed(2)), narration,
+        voucherId: v.id,
+        ledgerAccountId: deferredId,
+        ...normEntry("0", deferredChunk.toFixed(2)),
+        narration,
       });
       // Mark prepaid rows
       const futureIds = futureAllocs.map((a) => a.ledgerRowId).filter(Boolean) as number[];
@@ -527,9 +556,21 @@ export async function createRentalPaymentGroup(
   opts: RentalPaymentGroupOptions
 ): Promise<{ paymentGroupId: string; scheduled: boolean; payments: any[] }> {
   const {
-    companyId, contractCompanyId, module: mod, contract, unit,
-    cashAccountId, amount, paymentDate, clientDate, scheduleFuturePayment,
-    currency, exchangeRate, notes, shopExpenseAccountName, incomeAccountName,
+    companyId,
+    contractCompanyId,
+    module: mod,
+    contract,
+    unit,
+    cashAccountId,
+    amount,
+    paymentDate,
+    clientDate,
+    scheduleFuturePayment,
+    currency,
+    exchangeRate,
+    notes,
+    shopExpenseAccountName,
+    incomeAccountName,
     isSharedPayment,
   } = opts;
 
@@ -545,13 +586,17 @@ export async function createRentalPaymentGroup(
   const rentalAmountNum = parseFloat(contract.rentalAmount as string);
 
   // Find earliest outstanding month based on payment date
-  const { year: startY, month: startM } = await findEarliestOutstandingMonth(
-    contract.id, billingDay, paymentDate
-  );
+  const { year: startY, month: startM } = await findEarliestOutstandingMonth(contract.id, billingDay, paymentDate);
 
   // Build allocations
   const allocations = await buildAllocationsForPayment(
-    contract.id, startY, startM, totalAmountNum, rentalAmountNum, billingDay, paymentDate
+    contract.id,
+    startY,
+    startM,
+    totalAmountNum,
+    rentalAmountNum,
+    billingDay,
+    paymentDate
   );
 
   const paymentGroupId = `PG-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${contract.id}`;
@@ -612,10 +657,7 @@ export async function createRentalPaymentGroup(
           forMonth: alloc.month,
           currency: currency || "USD",
           exchangeRate: exchangeRate || "1",
-          notes:
-            allocations.length > 1
-              ? `${notes ? notes + " | " : ""}Split from ${amount} payment`
-              : (notes ?? null),
+          notes: allocations.length > 1 ? `${notes ? notes + " | " : ""}Split from ${amount} payment` : (notes ?? null),
           postingStatus: "SCHEDULED",
           paymentGroupId,
         } as any)
@@ -628,9 +670,20 @@ export async function createRentalPaymentGroup(
   // If payment is on or before clientDate: post immediately
   if (paymentDate <= clientDate) {
     await postScheduledGroup(
-      companyId, contractCompanyId, mod, contract, unit,
-      paymentGroupId, paymentDate, clientDate,
-      cashAccountId, currency, exchangeRate || "1", notes, shopExpenseAccountName, incomeAccountName,
+      companyId,
+      contractCompanyId,
+      mod,
+      contract,
+      unit,
+      paymentGroupId,
+      paymentDate,
+      clientDate,
+      cashAccountId,
+      currency,
+      exchangeRate || "1",
+      notes,
+      shopExpenseAccountName,
+      incomeAccountName,
       isSharedPayment ?? false
     );
 
@@ -692,36 +745,38 @@ export async function postDueScheduledRentalPayments(
       if (groupRows.length === 0) continue;
       const firstRow = groupRows[0];
 
-      const [contract] = await db
-        .select()
-        .from(propertyContracts)
-        .where(eq(propertyContracts.id, firstRow.contractId));
+      const [contract] = await db.select().from(propertyContracts).where(eq(propertyContracts.id, firstRow.contractId));
 
       const [unit] = contract
-        ? await db
-            .select()
-            .from(propertyUnits)
-            .where(eq(propertyUnits.id, contract.unitId))
+        ? await db.select().from(propertyUnits).where(eq(propertyUnits.id, contract.unitId))
         : [null];
 
-      const isShared = !!(contract?.linkedCompanyId);
+      const isShared = !!contract?.linkedCompanyId;
 
       // FIX #3 follow-up: contractCompanyId comes from the contract, not the payment row
       // (after fix #3 firstRow.companyId is the payer, not the contract owner)
       const didPost = await postScheduledGroup(
-        companyId, contract.companyId, module, contract, unit,
-        row.payment_group_id, row.payment_date, asOfDate,
-        row.cash_account_id, row.currency,
+        companyId,
+        contract.companyId,
+        module,
+        contract,
+        unit,
+        row.payment_group_id,
+        row.payment_date,
+        asOfDate,
+        row.cash_account_id,
+        row.currency,
         String((firstRow as any)?.exchangeRate || row.exchange_rate || "1"),
         firstRow.notes as string | null,
-        shopExpenseAccountName, incomeAccountName, isShared
+        shopExpenseAccountName,
+        incomeAccountName,
+        isShared
       );
       if (didPost) posted++;
     } catch (err: unknown) {
-      logger.error(
-        `[rentalPostingService] Failed to post group ${row.payment_group_id}:`,
-        { error: getErrorMessage(err).split("\n")[0] }
-      );
+      logger.error(`[rentalPostingService] Failed to post group ${row.payment_group_id}:`, {
+        error: getErrorMessage(err).split("\n")[0],
+      });
     }
   }
   return posted;
@@ -759,10 +814,7 @@ async function postScheduledGroup(
       .select()
       .from(propertyPayments)
       .where(
-        and(
-          eq(propertyPayments.paymentGroupId, groupId),
-          sql`${propertyPayments.postingStatus} = 'SCHEDULED'` as any
-        )
+        and(eq(propertyPayments.paymentGroupId, groupId), sql`${propertyPayments.postingStatus} = 'SCHEDULED'` as any)
       );
 
     if (groupRows.length === 0) return; // already posted
@@ -777,9 +829,7 @@ async function postScheduledGroup(
       ledgerRowId: r.ledgerRowId,
     }));
 
-    const unitLabel = unit
-      ? `${unit.locationGroup}/${unit.unitNumber}`
-      : `Unit#${groupRows[0].unitId}`;
+    const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${groupRows[0].unitId}`;
     const monthSpan =
       allocs.length > 1
         ? `${String(allocs[0].forMonth).padStart(2, "0")}/${allocs[0].forYear}–${String(allocs[allocs.length - 1].forMonth).padStart(2, "0")}/${allocs[allocs.length - 1].forYear}`
@@ -840,8 +890,14 @@ async function postScheduledGroup(
       const unitLabel = `${unit.locationGroup}/${unit.unitNumber}`;
       const totalAmount = groupRows.reduce((s, r) => s + parseFloat(r.amount as string), 0);
       await maybeRunAutoTransfer(
-        companyId, module, firstRow.cashAccountId,
-        new Decimal(totalAmount).toFixed(2), paymentDate, unitLabel, firstRow.id, notes ?? undefined
+        companyId,
+        module,
+        firstRow.cashAccountId,
+        new Decimal(totalAmount).toFixed(2),
+        paymentDate,
+        unitLabel,
+        firstRow.id,
+        notes ?? undefined
       );
     }
   } catch (e: unknown) {

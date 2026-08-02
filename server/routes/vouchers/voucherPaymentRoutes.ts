@@ -138,10 +138,7 @@ import {
   factorySettings as fSettings,
   factoryDaybookEntries as fde,
 } from "@shared/schema";
-import {
-  normalizeVoucherEntryAmounts,
-  erpRateToDaybookFxRateToUsd,
-} from "../../services/accounting/currencyAmounts";
+import { normalizeVoucherEntryAmounts, erpRateToDaybookFxRateToUsd } from "../../services/accounting/currencyAmounts";
 
 /**
  * After saving a journal voucher, if it has a customer entry + a ledger account entry,
@@ -191,7 +188,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
       // baseTotal is the historical base-currency (USD) equivalent stored on the voucher.
       const vCurrency = (currency as string | undefined) || "USD";
       const vRateRaw = (exchangeRate as string | number | undefined) || null;
-      const cfaPerUsd = (vCurrency !== "USD" && vRateRaw) ? parseFloat(String(vRateRaw)) : 1;
+      const cfaPerUsd = vCurrency !== "USD" && vRateRaw ? parseFloat(String(vRateRaw)) : 1;
       const transactionTotal = entries.reduce((sum: number, entry: any) => sum + parseFloat(entry.amount || "0"), 0);
       // For CFA vouchers: baseTotal = transactionTotal / cfaPerUsd (CFA ÷ rate = USD)
       // For USD vouchers: baseTotal = transactionTotal (no conversion)
@@ -482,9 +479,7 @@ export function registerVoucherPaymentRoutes(app: Express) {
           const daybookRate = result.voucher.exchangeRate ? parseFloat(result.voucher.exchangeRate) : 1;
           // Reconstruct the original CFA total: base × rate (TRANSACTION_PER_BASE).
           const daybookAmtCurrency =
-            daybookCurrency !== "USD" && daybookRate > 0
-              ? daybookBaseTotal * daybookRate
-              : daybookBaseTotal;
+            daybookCurrency !== "USD" && daybookRate > 0 ? daybookBaseTotal * daybookRate : daybookBaseTotal;
           // factory_daybook_entries.fx_rate_to_usd expects USD-per-foreign-unit.
           // The ERP voucher stores CFA-per-USD (TRANSACTION_PER_BASE), so we invert.
           const daybookFxRateToUsd = erpRateToDaybookFxRateToUsd(daybookCurrency, "USD", result.voucher.exchangeRate);
@@ -716,23 +711,31 @@ export function registerVoucherPaymentRoutes(app: Express) {
           });
 
           const mkDR = (acctField: any) => ({
-            voucherId: updatedVoucher.id, ...acctField,
-            debitAmount: normDR.debitAmount, creditAmount: normDR.creditAmount,
+            voucherId: updatedVoucher.id,
+            ...acctField,
+            debitAmount: normDR.debitAmount,
+            creditAmount: normDR.creditAmount,
             transactionCurrency: normDR.transactionCurrency,
             transactionDebitAmount: normDR.transactionDebitAmount,
             transactionCreditAmount: normDR.transactionCreditAmount,
-            baseDebitAmount: normDR.baseDebitAmount, baseCreditAmount: normDR.baseCreditAmount,
-            historicalExchangeRate: normDR.historicalExchangeRate, rateConvention: normDR.rateConvention,
+            baseDebitAmount: normDR.baseDebitAmount,
+            baseCreditAmount: normDR.baseCreditAmount,
+            historicalExchangeRate: normDR.historicalExchangeRate,
+            rateConvention: normDR.rateConvention,
             narration,
           });
           const mkCR = (acctField: any) => ({
-            voucherId: updatedVoucher.id, ...acctField,
-            debitAmount: normCR.debitAmount, creditAmount: normCR.creditAmount,
+            voucherId: updatedVoucher.id,
+            ...acctField,
+            debitAmount: normCR.debitAmount,
+            creditAmount: normCR.creditAmount,
             transactionCurrency: normCR.transactionCurrency,
             transactionDebitAmount: normCR.transactionDebitAmount,
             transactionCreditAmount: normCR.transactionCreditAmount,
-            baseDebitAmount: normCR.baseDebitAmount, baseCreditAmount: normCR.baseCreditAmount,
-            historicalExchangeRate: normCR.historicalExchangeRate, rateConvention: normCR.rateConvention,
+            baseDebitAmount: normCR.baseDebitAmount,
+            baseCreditAmount: normCR.baseCreditAmount,
+            historicalExchangeRate: normCR.historicalExchangeRate,
+            rateConvention: normCR.rateConvention,
             narration,
           });
 

@@ -29,7 +29,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
-import type { Location, MasterItem, MasterPriceListResponse, POSPriceListProps, PriceListItem } from "./pospricelist/types";
+import type {
+  Location,
+  MasterItem,
+  MasterPriceListResponse,
+  POSPriceListProps,
+  PriceListItem,
+} from "./pospricelist/types";
 import { ALL_LOCATIONS_ID, formatQty } from "./pospricelist/utils";
 export default function POSPriceList({ posUser }: POSPriceListProps) {
   const { formatAmount } = useCurrencyContext();

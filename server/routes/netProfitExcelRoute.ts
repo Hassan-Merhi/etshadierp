@@ -515,7 +515,14 @@ export function registerNetProfitExcelRoute(app: Express) {
       if (sortedMonths.length > 1) {
         // Summary sheet first (one column per month + grand total)
         const allBalances = computeBalancesFromEntries(allPeriodEntries);
-        const totalStats = computeStats(sheetCtx, allBalances, totalSalesAll, openingStockValue, closingStockValue, false);
+        const totalStats = computeStats(
+          sheetCtx,
+          allBalances,
+          totalSalesAll,
+          openingStockValue,
+          closingStockValue,
+          false
+        );
         const monthStatsList = sortedMonths.map((mk) => {
           const monthVIds = vouchersByMonth.get(mk)!;
           const monthEntries = monthVIds.flatMap((id) => entriesByVoucherId.get(id) || []);

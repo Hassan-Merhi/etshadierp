@@ -75,40 +75,43 @@ export default function FactoryInvoices() {
 
   // Using fetch+blob instead of window.open() ensures auth cookies are always sent,
   // and surfaces server errors as a toast instead of leaving the browser with a 0-byte file.
-  const downloadFromUrl = useCallback(async (url: string, fallbackName: string) => {
-    try {
-      const res = await fetch(url, { credentials: "include", cache: "no-store" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: res.statusText }));
-        toast({ title: "Download failed", description: err.message || res.statusText, variant: "destructive" });
-        return;
+  const downloadFromUrl = useCallback(
+    async (url: string, fallbackName: string) => {
+      try {
+        const res = await fetch(url, { credentials: "include", cache: "no-store" });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ message: res.statusText }));
+          toast({ title: "Download failed", description: err.message || res.statusText, variant: "destructive" });
+          return;
+        }
+        const blob = await res.blob();
+        if (blob.size === 0) {
+          toast({ title: "Download failed", description: "Server returned an empty file.", variant: "destructive" });
+          return;
+        }
+        const disposition = res.headers.get("Content-Disposition") || "";
+        // Handle both  filename*=UTF-8''encoded-name  and  filename="plain-name"
+        const starMatch = disposition.match(/filename\*=UTF-8''([^;\s]+)/i);
+        const plainMatch = disposition.match(/filename="([^"]+)"/i);
+        const rawName = starMatch ? starMatch[1] : plainMatch ? plainMatch[1] : null;
+        const fileName = rawName ? decodeURIComponent(rawName) : fallbackName;
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        // Delay cleanup so Chrome has time to consume the blob URL before it is revoked.
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(blobUrl);
+        }, 10000);
+      } catch (e: any) {
+        toast({ title: "Download failed", description: e.message || "Network error", variant: "destructive" });
       }
-      const blob = await res.blob();
-      if (blob.size === 0) {
-        toast({ title: "Download failed", description: "Server returned an empty file.", variant: "destructive" });
-        return;
-      }
-      const disposition = res.headers.get("Content-Disposition") || "";
-      // Handle both  filename*=UTF-8''encoded-name  and  filename="plain-name"
-      const starMatch = disposition.match(/filename\*=UTF-8''([^;\s]+)/i);
-      const plainMatch = disposition.match(/filename="([^"]+)"/i);
-      const rawName = starMatch ? starMatch[1] : plainMatch ? plainMatch[1] : null;
-      const fileName = rawName ? decodeURIComponent(rawName) : fallbackName;
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      // Delay cleanup so Chrome has time to consume the blob URL before it is revoked.
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(blobUrl);
-      }, 10000);
-    } catch (e: any) {
-      toast({ title: "Download failed", description: e.message || "Network error", variant: "destructive" });
-    }
-  }, [toast]);
+    },
+    [toast]
+  );
 
   const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
   const isAdmin = myAccess?.fullAccess === true;
@@ -248,10 +251,7 @@ export default function FactoryInvoices() {
   };
 
   // Per-order remaining: how many bales still needed to meet proforma target
-  const getRemainingBales = (order: {
-    proformaExpectedBales?: string;
-    totalQtyBales: number;
-  }): number => {
+  const getRemainingBales = (order: { proformaExpectedBales?: string; totalQtyBales: number }): number => {
     const expected = parseFloat(order.proformaExpectedBales || "0");
     if (expected <= 0) return 0;
     return Math.max(0, expected - (order.totalQtyBales || 0));
@@ -497,7 +497,8 @@ export default function FactoryInvoices() {
                     const isSingle = group.orders.length === 1;
                     const isExpanded = expandedCustomers.has(group.customerId);
                     const isDragging = dragIdxRef.current === groupIdx;
-                    const isDropTarget = dropIdx === groupIdx && dragIdxRef.current !== null && dragIdxRef.current !== groupIdx;
+                    const isDropTarget =
+                      dropIdx === groupIdx && dragIdxRef.current !== null && dragIdxRef.current !== groupIdx;
 
                     const renderOrderRow = (order: CustomerOrder, indented = false) => {
                       const remaining = getRemainingBales(order);
@@ -648,7 +649,10 @@ export default function FactoryInvoices() {
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem
                                     onClick={() =>
-                                      downloadFromUrl(`/api/factory/customer-orders/${order.id}/export/excel`, "invoice.xlsx")
+                                      downloadFromUrl(
+                                        `/api/factory/customer-orders/${order.id}/export/excel`,
+                                        "invoice.xlsx"
+                                      )
                                     }
                                     data-testid={`button-download-excel-${order.id}`}
                                   >
@@ -669,7 +673,10 @@ export default function FactoryInvoices() {
                                   </DropdownMenuItem>
                                   <DropdownMenuItem
                                     onClick={() =>
-                                      downloadFromUrl(`/api/factory/customer-orders/${order.id}/export-pdf`, "invoice.pdf")
+                                      downloadFromUrl(
+                                        `/api/factory/customer-orders/${order.id}/export-pdf`,
+                                        "invoice.pdf"
+                                      )
                                     }
                                     data-testid={`button-download-pdf-${order.id}`}
                                   >
@@ -729,9 +736,9 @@ export default function FactoryInvoices() {
                                       <AlertDialogTitle>Revert to Verified</AlertDialogTitle>
                                       <AlertDialogDescription>
                                         This will revert invoice {order.invoiceNumber} for {order.customerName} back to
-                                        Verified status. The invoice number will be voided, all bales will
-                                        return to stock, and the customer balance entry will be removed. This cannot be
-                                        done if any payment has been recorded against this invoice.
+                                        Verified status. The invoice number will be voided, all bales will return to
+                                        stock, and the customer balance entry will be removed. This cannot be done if
+                                        any payment has been recorded against this invoice.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>

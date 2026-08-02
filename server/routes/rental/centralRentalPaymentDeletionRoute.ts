@@ -2,17 +2,10 @@ import type { Express, Request, Response } from "express";
 import { requireAuth } from "../../auth";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import {
-  deleteRentalPaymentGroup,
-  type RentalModule,
-} from "../../services/rental/rentalPaymentDeletionService";
+import { deleteRentalPaymentGroup, type RentalModule } from "../../services/rental/rentalPaymentDeletionService";
 import { getCompanyId } from "./shared";
 
-export function registerCentralRentalPaymentDeletionRoute(
-  app: Express,
-  module: RentalModule,
-  urlPrefix: string
-): void {
+export function registerCentralRentalPaymentDeletionRoute(app: Express, module: RentalModule, urlPrefix: string): void {
   app.delete(`${urlPrefix}/payments/:id`, requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = Number(getCompanyId(req));

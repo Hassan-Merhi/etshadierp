@@ -28,7 +28,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { X, Plus, FileDown, ChevronDown, Search } from "lucide-react";
 
-import type { Location, StockAdjustmentFormData, StockAdjustmentFormProps, StockItem } from "./stockadjustmentform/types";
+import type {
+  Location,
+  StockAdjustmentFormData,
+  StockAdjustmentFormProps,
+  StockItem,
+} from "./stockadjustmentform/types";
 import { stockAdjustmentFormSchema } from "./stockadjustmentform/utils";
 export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProps) {
   const { toast } = useToast();

@@ -29,8 +29,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  } from "@/components/ui/dialog";
+import {} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,7 +51,7 @@ import {
   Plus,
   History,
   Search,
-  } from "lucide-react";
+} from "lucide-react";
 
 import type { Location, StockItem, StockTransferFormData, StockTransferFormProps } from "./stocktransferform/types";
 import { stockTransferFormSchema } from "./stocktransferform/utils";
@@ -2153,7 +2152,11 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       </Form>
 
       {/* Revision Approve Dialog */}
-      <S1 approveRevisionMutation={approveRevisionMutation} approveRevisionTarget={approveRevisionTarget} setApproveRevisionTarget={setApproveRevisionTarget} />
+      <S1
+        approveRevisionMutation={approveRevisionMutation}
+        approveRevisionTarget={approveRevisionTarget}
+        setApproveRevisionTarget={setApproveRevisionTarget}
+      />
 
       {/* Revision History Panel */}
       {voucherIdToEdit && stableTransferId && (
@@ -2286,10 +2289,43 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       )}
 
       {/* Transfer Revision Note Dialog */}
-      <S2 computeTransferRevisionItems={computeTransferRevisionItems} confirmTransferSaveAsRevision={confirmTransferSaveAsRevision} isTransferSavingRevision={isTransferSavingRevision} setTransferRevisionDialogOpen={setTransferRevisionDialogOpen} setTransferRevisionNote={setTransferRevisionNote} transferRevisionDialogOpen={transferRevisionDialogOpen} transferRevisionNote={transferRevisionNote} transferRevisions={transferRevisions} />
+      <S2
+        computeTransferRevisionItems={computeTransferRevisionItems}
+        confirmTransferSaveAsRevision={confirmTransferSaveAsRevision}
+        isTransferSavingRevision={isTransferSavingRevision}
+        setTransferRevisionDialogOpen={setTransferRevisionDialogOpen}
+        setTransferRevisionNote={setTransferRevisionNote}
+        transferRevisionDialogOpen={transferRevisionDialogOpen}
+        transferRevisionNote={transferRevisionNote}
+        transferRevisions={transferRevisions}
+      />
 
       {/* Stock Transfer Import Dialog */}
-      <S3 downloadImportTemplate={downloadImportTemplate} handleImportFileChange={handleImportFileChange} handleImportParse={handleImportParse} handleImportSubmit={handleImportSubmit} handleImportValidate={handleImportValidate} importDate={importDate} importDestLocation={importDestLocation} importDialogOpen={importDialogOpen} importFile={importFile} importHasErrors={importHasErrors} importIsValidated={importIsValidated} importMutation={importMutation} importNotes={importNotes} importParseMutation={importParseMutation} importPreview={importPreview} importValidItemsCount={importValidItemsCount} importValidateMutation={importValidateMutation} importValidationResult={importValidationResult} locations={locations} setImportDate={setImportDate} setImportDestLocation={setImportDestLocation} setImportDialogOpen={setImportDialogOpen} setImportNotes={setImportNotes} />
+      <S3
+        downloadImportTemplate={downloadImportTemplate}
+        handleImportFileChange={handleImportFileChange}
+        handleImportParse={handleImportParse}
+        handleImportSubmit={handleImportSubmit}
+        handleImportValidate={handleImportValidate}
+        importDate={importDate}
+        importDestLocation={importDestLocation}
+        importDialogOpen={importDialogOpen}
+        importFile={importFile}
+        importHasErrors={importHasErrors}
+        importIsValidated={importIsValidated}
+        importMutation={importMutation}
+        importNotes={importNotes}
+        importParseMutation={importParseMutation}
+        importPreview={importPreview}
+        importValidItemsCount={importValidItemsCount}
+        importValidateMutation={importValidateMutation}
+        importValidationResult={importValidationResult}
+        locations={locations}
+        setImportDate={setImportDate}
+        setImportDestLocation={setImportDestLocation}
+        setImportDialogOpen={setImportDialogOpen}
+        setImportNotes={setImportNotes}
+      />
 
       {/* Import Confirmation Dialog */}
       <AlertDialog open={importConfirmDialogOpen} onOpenChange={setImportConfirmDialogOpen}>

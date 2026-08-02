@@ -16,7 +16,6 @@ import { runDailyWhatsAppSend } from "./whatsapp-send";
 
 export const WHATSAPP_ATTACHMENT_LIMIT_MB = 15;
 
-
 export function getTodayLabel(): string {
   return new Date().toISOString().substring(0, 10);
 }

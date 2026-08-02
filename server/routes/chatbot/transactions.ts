@@ -107,11 +107,9 @@ export function registerChatbotTransactionRoutes(app: Express) {
           // AI-driven confirmation must never authorize negative inventory; that override
           // stays a manual, explicit user action on the normal stock transfer screen.
           if (qty > currentStock) {
-            return res
-              .status(400)
-              .json({
-                message: `Quantity ${qty} for stock item ${stockItemId} exceeds available stock (${currentStock})`,
-              });
+            return res.status(400).json({
+              message: `Quantity ${qty} for stock item ${stockItemId} exceeds available stock (${currentStock})`,
+            });
           }
         }
       }

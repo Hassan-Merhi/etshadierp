@@ -1,13 +1,5 @@
-import {
-  type ReplayQueryExecutor,
-  type ReplayScopeInternal,
-  type ReplaySummary,
-  type ReplayWriteScope,
-} from "./types";
-import {
-  buildBatchConsumptionEvents,
-  loadContainerUniverse,
-} from "./read-model";
+import { type ReplayQueryExecutor, type ReplayScopeInternal, type ReplaySummary, type ReplayWriteScope } from "./types";
+import { buildBatchConsumptionEvents, loadContainerUniverse } from "./read-model";
 import { computeCanonicalCostsV6 } from "./canonicalCostsV6";
 import { previewHistoricalCostReplayWithExecutor } from "./securePreview";
 import { buildSelectedSupplierCorrectionPlan } from "./closure";
@@ -141,11 +133,7 @@ export async function buildExactHistoricalReplayScopeInternalV6(params: {
   const safeSupplierIds = new Set(safeSupplierRows.map((supplier) => supplier.supplierId));
   if (safeSupplierIds.size === 0) return { ...emptyScope(), _fullPreview: fullPreview };
 
-  const { sourceInfos, batchInfoMap } = await buildBatchConsumptionEvents(
-    executor,
-    companyId,
-    safeSupplierIds
-  );
+  const { sourceInfos, batchInfoMap } = await buildBatchConsumptionEvents(executor, companyId, safeSupplierIds);
   const previewSourceById = new Map(fullPreview.sourceRows.map((source) => [source.sourceId, source]));
   const expectedRates = new Map<string, number>();
   for (const source of sourceInfos) {
@@ -180,10 +168,7 @@ export async function buildExactHistoricalReplayScopeInternalV6(params: {
     for (const correction of plan.changedBatchCorrections) {
       const batch = batchInfoMap.get(correction.batchId);
       if (batch && ["COMPLETED", "CLOSED"].includes(batch.status)) {
-        optionBlockedReasons.set(
-          correction.batchId,
-          "COMPLETED_BATCH_REQUIRES_INCLUDE_COMPLETED"
-        );
+        optionBlockedReasons.set(correction.batchId, "COMPLETED_BATCH_REQUIRES_INCLUDE_COMPLETED");
       }
     }
 
@@ -192,11 +177,11 @@ export async function buildExactHistoricalReplayScopeInternalV6(params: {
       expanded = false;
       for (const source of sourceInfos) {
         if (
-          source.pricingBasis === "BATCH"
-          && source.sourceBatchId != null
-          && optionBlockedReasons.has(source.sourceBatchId)
-          && plan.closureBatchIds.has(source.batchId)
-          && !optionBlockedReasons.has(source.batchId)
+          source.pricingBasis === "BATCH" &&
+          source.sourceBatchId != null &&
+          optionBlockedReasons.has(source.sourceBatchId) &&
+          plan.closureBatchIds.has(source.batchId) &&
+          !optionBlockedReasons.has(source.batchId)
         ) {
           optionBlockedReasons.set(source.batchId, "UPSTREAM_COMPLETED_BATCH_EXCLUDED");
           expanded = true;
@@ -216,9 +201,7 @@ export async function buildExactHistoricalReplayScopeInternalV6(params: {
   );
   const batchIdsToUpdate = sortNumbers(batchCorrections.map((correction) => correction.batchId));
   const sourceCorrections = new Map(
-    [...plan.sourceCorrections].filter(([, correction]) =>
-      eligibleClosureBatchIds.has(correction.batchId)
-    )
+    [...plan.sourceCorrections].filter(([, correction]) => eligibleClosureBatchIds.has(correction.batchId))
   );
   const sourceIdsToUpdate = sortNumbers([...sourceCorrections.keys()]);
 
@@ -227,8 +210,10 @@ export async function buildExactHistoricalReplayScopeInternalV6(params: {
       .filter((canonical) => {
         const supplierId = canonical.universe.container.supplierId;
         if (canonical.fxUnresolved || supplierId == null || !safeSupplierIds.has(supplierId)) return false;
-        return Math.abs(canonical.canonicalCostPerKgUsd - canonical.storedCostPerKgUsd) > 0.000001
-          || Math.abs(canonical.canonicalTotalUsd - canonical.storedTotalUsd) > 0.01;
+        return (
+          Math.abs(canonical.canonicalCostPerKgUsd - canonical.storedCostPerKgUsd) > 0.000001 ||
+          Math.abs(canonical.canonicalTotalUsd - canonical.storedTotalUsd) > 0.01
+        );
       })
       .map((canonical) => canonical.universe.container.id)
   );
@@ -257,11 +242,7 @@ export async function buildExactHistoricalReplayScopeInternalV6(params: {
     }
   }
 
-  const baleClassification = await classifyReplayBalesForBatches(
-    executor,
-    companyId,
-    batchIdsToUpdate
-  );
+  const baleClassification = await classifyReplayBalesForBatches(executor, companyId, batchIdsToUpdate);
   const availableBaleIdsToUpdate = baleClassification.availableIds;
   const finalizedBaleIdsToUpdate = baleClassification.finalizedIds;
 
@@ -296,9 +277,7 @@ export async function buildExactHistoricalReplayScopeInternalV6(params: {
       );
 
       const closureSourceIds = sortNumbers(
-        sourceInfos
-          .filter((source) => eligibleClosureBatchIds.has(source.batchId))
-          .map((source) => source.sourceId)
+        sourceInfos.filter((source) => eligibleClosureBatchIds.has(source.batchId)).map((source) => source.sourceId)
       );
       if (closureSourceIds.length > 0) {
         await executor.query(
@@ -328,10 +307,7 @@ export async function buildExactHistoricalReplayScopeInternalV6(params: {
     }
   }
 
-  const blockedByBatchId = new Map<
-    number,
-    { batchId: number; batchCode: string; reasons: Set<string> }
-  >();
+  const blockedByBatchId = new Map<number, { batchId: number; batchCode: string; reasons: Set<string> }>();
   for (const blocked of plan.blockedBatches) {
     if (!plan.closureBatchIds.has(blocked.batchId)) continue;
     blockedByBatchId.set(blocked.batchId, {

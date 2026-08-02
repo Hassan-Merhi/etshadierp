@@ -46,7 +46,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import type { ComparisonItem, FinalizePreview, OrderDetail, VerificationSummary } from "./factorypendinginvoiceverify/types";
+import type {
+  ComparisonItem,
+  FinalizePreview,
+  OrderDetail,
+  VerificationSummary,
+} from "./factorypendinginvoiceverify/types";
 import { fmtNum } from "./factorypendinginvoiceverify/utils";
 export default function FactoryPendingInvoiceVerify() {
   const { toast } = useToast();

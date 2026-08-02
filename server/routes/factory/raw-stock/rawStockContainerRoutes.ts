@@ -5,17 +5,18 @@ import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth, requireRole } from "../../../auth";
-import {
-  applyPostOffloadChargeMutation,
-  type AccountingContext,
-} from "../../../services/factory/post-offload-charge";
+import { applyPostOffloadChargeMutation, type AccountingContext } from "../../../services/factory/post-offload-charge";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import Decimal from "decimal.js";
 import { cascadeContainerCostChange } from "../../../services/factory/rawStockCostCascade";
 import { computeCorrectContainerCost } from "../../../services/factory/raw-stock-recalc";
 import { getAuthoritativeSupplierRemainingKg } from "../../../services/factory/rawStockLockedRate";
-import { resolveStoredFxRate, resolveStoredFxRateOrThrow, UnresolvedExchangeRateError } from "../../../services/factory/currencyConversion";
+import {
+  resolveStoredFxRate,
+  resolveStoredFxRateOrThrow,
+  UnresolvedExchangeRateError,
+} from "../../../services/factory/currencyConversion";
 import {
   writeDaybookEntry,
   getOrFetchFxRateToUsd,
@@ -148,7 +149,15 @@ async function resolvePostOffloadChargeFx(opts: {
   txDate: string;
   companyId: number;
 }): Promise<{ fxRateToUsd: number; fxRateConfirmed: boolean; fxRateDate: string }> {
-  const { chargeCcy, containerCcy, containerFxRate, containerFxRateDateOffload, containerFxConfirmed, txDate, companyId } = opts;
+  const {
+    chargeCcy,
+    containerCcy,
+    containerFxRate,
+    containerFxRateDateOffload,
+    containerFxConfirmed,
+    txDate,
+    companyId,
+  } = opts;
   if (chargeCcy === "USD") {
     return { fxRateToUsd: 1, fxRateConfirmed: true, fxRateDate: txDate };
   }
@@ -213,10 +222,7 @@ export function registerRawStockContainerRoutes(app: Express) {
 
         if (!lockedContainer) throw Object.assign(new Error("Container not found"), { status: 404 });
         if (lockedContainer.dutyStatus !== "PENDING") {
-          throw Object.assign(
-            new Error("Only containers with PENDING duty can be confirmed"),
-            { status: 400 }
-          );
+          throw Object.assign(new Error("Only containers with PENDING duty can be confirmed"), { status: 400 });
         }
 
         // 2. Load charges and commission inside the transaction.
@@ -251,11 +257,7 @@ export function registerRawStockContainerRoutes(app: Express) {
         };
 
         // 4. Compute new inclusive landed cost — pure computation, no db calls.
-        const next = computeCorrectContainerCost(
-          containerSnapshot as any,
-          additionalChargesRows,
-          commissionRecord
-        );
+        const next = computeCorrectContainerCost(containerSnapshot as any, additionalChargesRows, commissionRecord);
         if (next.fxUnresolved) {
           throw Object.assign(
             new Error(new UnresolvedExchangeRateError(lockedContainer.currencyCode || "USD").message),
@@ -419,7 +421,11 @@ export function registerRawStockContainerRoutes(app: Express) {
           );
           acctCtx = { voucherCompanyId, chargesPayableAcctId: cpAcctId };
         } else if (charge.supplierId) {
-          const cpAcctId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
+          const cpAcctId = await getOrCreateLedgerAccount(
+            companyId,
+            "FACTORY_CHARGES_PAYABLE",
+            "Factory Charges Payable"
+          );
           acctCtx = { voucherCompanyId: companyId, chargesPayableAcctId: cpAcctId };
         }
 
@@ -476,7 +482,16 @@ export function registerRawStockContainerRoutes(app: Express) {
         oldContainerCostPerKgUsd,
         newContainerCostPerKgUsd: r.newContainerCostPerKgUsd,
         oldContainerTotalUsd,
-        newContainerTotalUsd: parseFloat(String((await db.select({ v: factoryContainers.finalPayableAmountUsd }).from(factoryContainers).where(eq(factoryContainers.id, containerId)))[0]?.v || "0")),
+        newContainerTotalUsd: parseFloat(
+          String(
+            (
+              await db
+                .select({ v: factoryContainers.finalPayableAmountUsd })
+                .from(factoryContainers)
+                .where(eq(factoryContainers.id, containerId))
+            )[0]?.v || "0"
+          )
+        ),
         rawStockRowsUpdated: cascadeResult?.rawStockRowsUpdated ?? 0,
         supplierLockedRateOld: r.supplierLockedRateBefore ? parseFloat(r.supplierLockedRateBefore) : null,
         supplierLockedRateNew: r.supplierLockedRateAfter ? parseFloat(r.supplierLockedRateAfter) : null,
@@ -614,7 +629,11 @@ export function registerRawStockContainerRoutes(app: Express) {
           );
           acctCtx = { voucherCompanyId, chargesPayableAcctId: cpAcctId };
         } else if (supplierId) {
-          const cpAcctId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
+          const cpAcctId = await getOrCreateLedgerAccount(
+            companyId,
+            "FACTORY_CHARGES_PAYABLE",
+            "Factory Charges Payable"
+          );
           acctCtx = { voucherCompanyId: companyId, chargesPayableAcctId: cpAcctId };
         }
 
@@ -646,7 +665,8 @@ export function registerRawStockContainerRoutes(app: Express) {
             });
           });
         } catch (err: unknown) {
-          if ((err as { status?: number }).status === 409) return res.status(409).json({ message: getErrorMessage(err) });
+          if ((err as { status?: number }).status === 409)
+            return res.status(409).json({ message: getErrorMessage(err) });
           throw err;
         }
 
@@ -714,7 +734,8 @@ export function registerRawStockContainerRoutes(app: Express) {
             });
           });
         } catch (err: unknown) {
-          if ((err as { status?: number }).status === 409) return res.status(409).json({ message: getErrorMessage(err) });
+          if ((err as { status?: number }).status === 409)
+            return res.status(409).json({ message: getErrorMessage(err) });
           throw err;
         }
 
@@ -788,7 +809,8 @@ export function registerRawStockContainerRoutes(app: Express) {
             });
           });
         } catch (err: unknown) {
-          if ((err as { status?: number }).status === 409) return res.status(409).json({ message: getErrorMessage(err) });
+          if ((err as { status?: number }).status === 409)
+            return res.status(409).json({ message: getErrorMessage(err) });
           throw err;
         }
 

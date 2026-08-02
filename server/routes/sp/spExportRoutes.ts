@@ -132,9 +132,7 @@ export function registerSpExportRoutes(app: Express) {
       const to = (toDate as string).slice(5).replace("-", "");
       const safeLoc = locationName.replace(/[^a-zA-Z0-9 ]/g, "").trim();
       const safeCo = companyName.replace(/[^a-zA-Z0-9 ]/g, "").trim();
-      const filename = `${safeLoc} ${safeCo} system sales form ${from}-${to}.xlsx`
-        .replace(/\s+/g, " ")
-        .trim();
+      const filename = `${safeLoc} ${safeCo} system sales form ${from}-${to}.xlsx`.replace(/\s+/g, " ").trim();
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);

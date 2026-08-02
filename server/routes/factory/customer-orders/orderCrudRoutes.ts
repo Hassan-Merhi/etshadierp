@@ -712,9 +712,15 @@ export function registerOrderCrudRoutes(app: Express) {
         recordId: orderId,
         recordIdentifier: (order as any).orderNumber || `Order #${orderId}`,
         changes: {
-          ...(containerNumber !== undefined ? { containerNumber: { old: order.containerNumber ?? null, new: containerNumber } } : {}),
-          ...(destination !== undefined ? { destination: { old: (order as any).destination ?? null, new: destination || null } } : {}),
-          ...(shippingCompany !== undefined ? { shippingCompany: { old: (order as any).shippingCompany ?? null, new: shippingCompany } } : {}),
+          ...(containerNumber !== undefined
+            ? { containerNumber: { old: order.containerNumber ?? null, new: containerNumber } }
+            : {}),
+          ...(destination !== undefined
+            ? { destination: { old: (order as any).destination ?? null, new: destination || null } }
+            : {}),
+          ...(shippingCompany !== undefined
+            ? { shippingCompany: { old: (order as any).shippingCompany ?? null, new: shippingCompany } }
+            : {}),
         },
       });
       res.json(updated);

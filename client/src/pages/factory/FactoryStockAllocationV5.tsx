@@ -704,7 +704,10 @@ export default function FactoryStockAllocationV5() {
                 <div className="flex items-center gap-1 shrink-0">
                   {categoryFilter.length > 0 && (
                     <span
-                      onClick={(e) => { e.stopPropagation(); setCategoryFilter([]); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCategoryFilter([]);
+                      }}
                       className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/20 hover:bg-primary/30"
                     >
                       <X className="h-2.5 w-2.5" />
@@ -716,16 +719,20 @@ export default function FactoryStockAllocationV5() {
               {catDropOpen && (
                 <div className="absolute top-full left-0 z-50 mt-1.5 w-56 rounded-lg border bg-popover shadow-lg overflow-hidden">
                   <button
-                    onClick={() => setCategoryFilter(categoryFilter.length === allCategories.length ? [] : [...allCategories])}
+                    onClick={() =>
+                      setCategoryFilter(categoryFilter.length === allCategories.length ? [] : [...allCategories])
+                    }
                     className="flex w-full items-center gap-2.5 border-b px-3 py-2.5 text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                   >
-                    <div className={cn(
-                      "flex h-4 w-4 items-center justify-center rounded border transition-colors",
-                      categoryFilter.length === allCategories.length
-                        ? "border-primary bg-primary"
-                        : "border-input"
-                    )}>
-                      {categoryFilter.length === allCategories.length && <CheckCircle2 className="h-2.5 w-2.5 text-primary-foreground" />}
+                    <div
+                      className={cn(
+                        "flex h-4 w-4 items-center justify-center rounded border transition-colors",
+                        categoryFilter.length === allCategories.length ? "border-primary bg-primary" : "border-input"
+                      )}
+                    >
+                      {categoryFilter.length === allCategories.length && (
+                        <CheckCircle2 className="h-2.5 w-2.5 text-primary-foreground" />
+                      )}
                       {categoryFilter.length > 0 && categoryFilter.length < allCategories.length && (
                         <div className="h-1.5 w-1.5 rounded-sm bg-primary" />
                       )}
@@ -743,10 +750,12 @@ export default function FactoryStockAllocationV5() {
                           checked ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent"
                         )}
                       >
-                        <div className={cn(
-                          "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
-                          checked ? "border-primary bg-primary" : "border-input"
-                        )}>
+                        <div
+                          className={cn(
+                            "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
+                            checked ? "border-primary bg-primary" : "border-input"
+                          )}
+                        >
                           {checked && <CheckCircle2 className="h-2.5 w-2.5 text-primary-foreground" />}
                         </div>
                         {cat}
@@ -880,7 +889,9 @@ export default function FactoryStockAllocationV5() {
                 <th className="text-right px-3 pb-2.5 pt-0 font-medium border-b border-r whitespace-nowrap min-w-[140px] border-t-2 border-t-border">
                   Available Balance
                 </th>
-                <th className="text-center px-3 pb-2.5 pt-0 font-medium border-b whitespace-nowrap min-w-[70px] border-t-2 border-t-border">Detail</th>
+                <th className="text-center px-3 pb-2.5 pt-0 font-medium border-b whitespace-nowrap min-w-[70px] border-t-2 border-t-border">
+                  Detail
+                </th>
               </tr>
             </thead>
             <tbody>

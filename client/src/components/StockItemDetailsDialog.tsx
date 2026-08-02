@@ -15,7 +15,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Location as LocationType } from "@shared/schema";
 import { formatNumber } from "@/lib/formatNumber";
 
-import type { CodeAlias, StockCategory, StockGrade, StockGroup, StockItem, StockItemDetailsDialogProps, Transaction } from "./stockitemdetailsdialog/types";
+import type {
+  CodeAlias,
+  StockCategory,
+  StockGrade,
+  StockGroup,
+  StockItem,
+  StockItemDetailsDialogProps,
+  Transaction,
+} from "./stockitemdetailsdialog/types";
 export function StockItemDetailsDialog({
   open,
   onOpenChange,

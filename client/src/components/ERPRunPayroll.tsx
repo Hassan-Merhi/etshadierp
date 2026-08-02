@@ -52,7 +52,15 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useCompany } from "@/contexts/CompanyContext";
 
-import type { Employee, LedgerAccount, PayrollRun, PreviewItem, SalaryAdvance, WorkerDeductionRow, WorkerGroup } from "./erprunpayroll/types";
+import type {
+  Employee,
+  LedgerAccount,
+  PayrollRun,
+  PreviewItem,
+  SalaryAdvance,
+  WorkerDeductionRow,
+  WorkerGroup,
+} from "./erprunpayroll/types";
 import { getAvatarColor, getInitials } from "./erprunpayroll/utils";
 export default function ERPRunPayroll() {
   const { toast } = useToast();
@@ -225,7 +233,8 @@ export default function ERPRunPayroll() {
   function toggleWorker(id: number) {
     setSelectedWorkers((p) => {
       const n = new Set(p);
-      if (n.has(id)) n.delete(id); else n.add(id);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
       return n;
     });
   }
@@ -234,7 +243,8 @@ export default function ERPRunPayroll() {
     const allSel = visible.every((id) => selectedWorkers.has(id));
     setSelectedWorkers((p) => {
       const n = new Set(p);
-      if (allSel) visible.forEach((id) => n.delete(id)); else visible.forEach((id) => n.add(id));
+      if (allSel) visible.forEach((id) => n.delete(id));
+      else visible.forEach((id) => n.add(id));
       return n;
     });
   }
@@ -1287,13 +1297,25 @@ export default function ERPRunPayroll() {
             <AlertDialogTitle>Fix Old Expense Accounts?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm">
-                <p>This one-time fix will scan all historical payroll records and reclassify any that used old-style expense accounts:</p>
+                <p>
+                  This one-time fix will scan all historical payroll records and reclassify any that used old-style
+                  expense accounts:
+                </p>
                 <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
-                  <li><strong>Worker payroll runs</strong> — split "Salary Expense" into "Salary Expense - {"{Group}"}"</li>
-                  <li><strong>Employee salary deposits</strong> — move "Payroll Deposit Expense" → "Salary Expense - {"{Group}"}"</li>
-                  <li><strong>Employee bonuses</strong> — move "Salary Expense" (wrong) → "Bonus Expense - {"{Group}"}"</li>
+                  <li>
+                    <strong>Worker payroll runs</strong> — split "Salary Expense" into "Salary Expense - {"{Group}"}"
+                  </li>
+                  <li>
+                    <strong>Employee salary deposits</strong> — move "Payroll Deposit Expense" → "Salary Expense -{" "}
+                    {"{Group}"}"
+                  </li>
+                  <li>
+                    <strong>Employee bonuses</strong> — move "Salary Expense" (wrong) → "Bonus Expense - {"{Group}"}"
+                  </li>
                 </ul>
-                <p className="text-muted-foreground">Totals stay the same — only the expense account breakdown changes. Safe to run more than once.</p>
+                <p className="text-muted-foreground">
+                  Totals stay the same — only the expense account breakdown changes. Safe to run more than once.
+                </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1331,10 +1353,13 @@ export default function ERPRunPayroll() {
                     {/* Worker payroll runs */}
                     <div>
                       <p className="font-medium mb-1">Worker Payroll Runs</p>
-                      {migrateResult.total === 0 && <p className="text-muted-foreground">No paid payroll runs found.</p>}
+                      {migrateResult.total === 0 && (
+                        <p className="text-muted-foreground">No paid payroll runs found.</p>
+                      )}
                       {migrateResult.migrated > 0 && (
                         <p className="text-green-700 dark:text-green-400">
-                          <strong>{migrateResult.migrated}</strong> run{migrateResult.migrated !== 1 ? "s" : ""} updated to per-group expense accounts.
+                          <strong>{migrateResult.migrated}</strong> run{migrateResult.migrated !== 1 ? "s" : ""} updated
+                          to per-group expense accounts.
                         </p>
                       )}
                       {migrateResult.alreadyCorrect > 0 && (
@@ -1359,7 +1384,8 @@ export default function ERPRunPayroll() {
                       <p className="font-medium mb-1">Employee Salary Deposits</p>
                       {migrateResult.depositsMigrated > 0 ? (
                         <p className="text-green-700 dark:text-green-400">
-                          <strong>{migrateResult.depositsMigrated}</strong> deposit{migrateResult.depositsMigrated !== 1 ? "s" : ""} moved to correct expense accounts.
+                          <strong>{migrateResult.depositsMigrated}</strong> deposit
+                          {migrateResult.depositsMigrated !== 1 ? "s" : ""} moved to correct expense accounts.
                         </p>
                       ) : (
                         <p className="text-muted-foreground">
@@ -1375,7 +1401,9 @@ export default function ERPRunPayroll() {
                       <p className="font-medium mb-1">Employee Bonuses</p>
                       {migrateResult.bonusesMigrated > 0 ? (
                         <p className="text-green-700 dark:text-green-400">
-                          <strong>{migrateResult.bonusesMigrated}</strong> bonus{migrateResult.bonusesMigrated !== 1 ? "es" : ""} corrected — moved to per-group "Bonus Expense" accounts.
+                          <strong>{migrateResult.bonusesMigrated}</strong> bonus
+                          {migrateResult.bonusesMigrated !== 1 ? "es" : ""} corrected — moved to per-group "Bonus
+                          Expense" accounts.
                         </p>
                       ) : (
                         <p className="text-muted-foreground">

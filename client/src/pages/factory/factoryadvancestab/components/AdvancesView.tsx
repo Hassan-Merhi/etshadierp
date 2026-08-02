@@ -3,27 +3,51 @@
  *
  * Extracted from FactoryAdvancesTab.tsx during the Phase 4 god-file split.
  */
-import {useState, useMemo} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {useDateFormat} from "@/contexts/DateFormatContext";
-import {Plus, Trash2, Banknote, RotateCcw, BookOpen, Loader2, Users, CalendarDays, ChevronDown, SlidersHorizontal, SearchCheck} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Badge} from "@/components/ui/badge";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Checkbox} from "@/components/ui/checkbox";
-import {Textarea} from "@/components/ui/textarea";
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter} from "@/components/ui/dialog";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Skeleton} from "@/components/ui/skeleton";
-import {useToast} from "@/hooks/use-toast";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import type {FactoryWorker} from "@shared/schema";
+import { useState, useMemo } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import {
+  Plus,
+  Trash2,
+  Banknote,
+  RotateCcw,
+  BookOpen,
+  Loader2,
+  Users,
+  CalendarDays,
+  ChevronDown,
+  SlidersHorizontal,
+  SearchCheck,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { FactoryWorker } from "@shared/schema";
 
-import type {AdvanceRecord, CashAccount} from "../types";
-import {fmt} from "../utils";
+import type { AdvanceRecord, CashAccount } from "../types";
+import { fmt } from "../utils";
 
 import { AdvanceDialog } from "./../dialogs/AdvanceDialog";
 import { SettleDialog } from "./../dialogs/SettleDialog";
@@ -815,9 +839,29 @@ export function AdvancesView() {
         </Table>
       </div>
 
-      <AdvanceDialog bulkAmounts={bulkAmounts} bulkForm={bulkForm} bulkMutation={bulkMutation} bulkOpen={bulkOpen} bulkSelected={bulkSelected} cashAccounts={cashAccounts} setBulkAmounts={setBulkAmounts} setBulkForm={setBulkForm} setBulkOpen={setBulkOpen} setBulkSelected={setBulkSelected} workers={workers} />
+      <AdvanceDialog
+        bulkAmounts={bulkAmounts}
+        bulkForm={bulkForm}
+        bulkMutation={bulkMutation}
+        bulkOpen={bulkOpen}
+        bulkSelected={bulkSelected}
+        cashAccounts={cashAccounts}
+        setBulkAmounts={setBulkAmounts}
+        setBulkForm={setBulkForm}
+        setBulkOpen={setBulkOpen}
+        setBulkSelected={setBulkSelected}
+        workers={workers}
+      />
 
-      <SettleDialog addOpen={addOpen} cashAccounts={cashAccounts} createMutation={createMutation} form={form} setAddOpen={setAddOpen} setForm={setForm} workers={workers} />
+      <SettleDialog
+        addOpen={addOpen}
+        cashAccounts={cashAccounts}
+        createMutation={createMutation}
+        form={form}
+        setAddOpen={setAddOpen}
+        setForm={setForm}
+        workers={workers}
+      />
 
       <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent>
@@ -845,24 +889,84 @@ export function AdvancesView() {
       </Dialog>
 
       {/* Reverse Advance Dialog */}
-      <ConfirmDialog reverseMutation={reverseMutation} reverseTarget={reverseTarget} setReverseTarget={setReverseTarget} />
+      <ConfirmDialog
+        reverseMutation={reverseMutation}
+        reverseTarget={reverseTarget}
+        setReverseTarget={setReverseTarget}
+      />
 
       {/* ── Repayment Audit Dialog ── */}
-      <EditDialog auditCashBalance={auditCashBalance} auditData={auditData} auditLoading={auditLoading} cashAccounts={cashAccounts} formatDate={formatDate} refetchAudit={refetchAudit} repayAuditForm={repayAuditForm} repayAuditMutation={repayAuditMutation} repayAuditOpen={repayAuditOpen} setRepayAuditForm={setRepayAuditForm} setRepayAuditOpen={setRepayAuditOpen} />
+      <EditDialog
+        auditCashBalance={auditCashBalance}
+        auditData={auditData}
+        auditLoading={auditLoading}
+        cashAccounts={cashAccounts}
+        formatDate={formatDate}
+        refetchAudit={refetchAudit}
+        repayAuditForm={repayAuditForm}
+        repayAuditMutation={repayAuditMutation}
+        repayAuditOpen={repayAuditOpen}
+        setRepayAuditForm={setRepayAuditForm}
+        setRepayAuditOpen={setRepayAuditOpen}
+      />
 
       {/* ── Cash Account Adjustment Dialog ── */}
-      <HistoryDialog cashAccounts={cashAccounts} cashAdjForm={cashAdjForm} cashAdjMutation={cashAdjMutation} cashAdjOpen={cashAdjOpen} setCashAdjForm={setCashAdjForm} setCashAdjOpen={setCashAdjOpen} />
+      <HistoryDialog
+        cashAccounts={cashAccounts}
+        cashAdjForm={cashAdjForm}
+        cashAdjMutation={cashAdjMutation}
+        cashAdjOpen={cashAdjOpen}
+        setCashAdjForm={setCashAdjForm}
+        setCashAdjOpen={setCashAdjOpen}
+      />
 
       {/* ── Repay by Month Dialog ── */}
-      <DeductionDialog advances={advances} cashAccounts={cashAccounts} repayByMonthExpanded={repayByMonthExpanded} repayByMonthForm={repayByMonthForm} repayByMonthMutation={repayByMonthMutation} repayByMonthOpen={repayByMonthOpen} repayingMonth={repayingMonth} setConfirmRepay={setConfirmRepay} setRepayByMonthExpanded={setRepayByMonthExpanded} setRepayByMonthForm={setRepayByMonthForm} setRepayByMonthOpen={setRepayByMonthOpen} setRepayingMonth={setRepayingMonth} />
+      <DeductionDialog
+        advances={advances}
+        cashAccounts={cashAccounts}
+        repayByMonthExpanded={repayByMonthExpanded}
+        repayByMonthForm={repayByMonthForm}
+        repayByMonthMutation={repayByMonthMutation}
+        repayByMonthOpen={repayByMonthOpen}
+        repayingMonth={repayingMonth}
+        setConfirmRepay={setConfirmRepay}
+        setRepayByMonthExpanded={setRepayByMonthExpanded}
+        setRepayByMonthForm={setRepayByMonthForm}
+        setRepayByMonthOpen={setRepayByMonthOpen}
+        setRepayingMonth={setRepayingMonth}
+      />
 
       {/* ── Confirm Repay Dialog ── */}
-      <NoteDialog cashAccounts={cashAccounts} confirmRepay={confirmRepay} repayByMonthForm={repayByMonthForm} repayByMonthMutation={repayByMonthMutation} setConfirmRepay={setConfirmRepay} setRepayingMonth={setRepayingMonth} />
+      <NoteDialog
+        cashAccounts={cashAccounts}
+        confirmRepay={confirmRepay}
+        repayByMonthForm={repayByMonthForm}
+        repayByMonthMutation={repayByMonthMutation}
+        setConfirmRepay={setConfirmRepay}
+        setRepayingMonth={setRepayingMonth}
+      />
 
-      <BulkDialog cashAccounts={cashAccounts} formatDate={formatDate} postAccountingMutation={postAccountingMutation} postAccountingOpen={postAccountingOpen} postCashAccountId={postCashAccountId} setPostAccountingOpen={setPostAccountingOpen} setPostCashAccountId={setPostCashAccountId} unvouchered={unvouchered} unvoucheredLoading={unvoucheredLoading} />
+      <BulkDialog
+        cashAccounts={cashAccounts}
+        formatDate={formatDate}
+        postAccountingMutation={postAccountingMutation}
+        postAccountingOpen={postAccountingOpen}
+        postCashAccountId={postCashAccountId}
+        setPostAccountingOpen={setPostAccountingOpen}
+        setPostCashAccountId={setPostCashAccountId}
+        unvouchered={unvouchered}
+        unvoucheredLoading={unvoucheredLoading}
+      />
 
       {/* Reconcile confirmation dialog */}
-      <ExportDialog formatDate={formatDate} reconcileMutation={reconcileMutation} reconcileOpen={reconcileOpen} reconcilePreview={reconcilePreview} reconcilePreviewLoading={reconcilePreviewLoading} setReconcileOpen={setReconcileOpen} />
+      <ExportDialog
+        formatDate={formatDate}
+        reconcileMutation={reconcileMutation}
+        reconcileOpen={reconcileOpen}
+        reconcilePreview={reconcilePreview}
+        reconcilePreviewLoading={reconcilePreviewLoading}
+        setReconcileOpen={setReconcileOpen}
+      />
     </div>
   );
 }
