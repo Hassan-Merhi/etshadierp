@@ -10,6 +10,7 @@ import {
   type ApplicationLanguage,
 } from "@shared/applicationLanguageContract";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ApplicationInterfaceTranslator } from "@/components/ApplicationInterfaceTranslator";
 import {
   translateApplicationText,
   type ApplicationTranslationKey,
@@ -114,7 +115,12 @@ export function ApplicationLanguageProvider({ children }: { children: ReactNode 
     [language, preferenceMutation.isPending, setLanguage],
   );
 
-  return <ApplicationLanguageContext.Provider value={value}>{children}</ApplicationLanguageContext.Provider>;
+  return (
+    <ApplicationLanguageContext.Provider value={value}>
+      <ApplicationInterfaceTranslator language={language} />
+      {children}
+    </ApplicationLanguageContext.Provider>
+  );
 }
 
 export function useApplicationLanguage() {
