@@ -1,18 +1,18 @@
 {
   "schemaVersion": 2,
-  "detectorVersion": 4,
+  "detectorVersion": 5,
   "policyDigest": "c26178dd9bc7d71d34976e5bb87aa946cc5d59e6db54b7415f9e363514809f8f",
   "reviewedAt": "2026-08-02",
-  "reviewedHead": "6b1401b594a677007c9c775b6d99d6d8a324b5bb",
-  "description": "Reviewed untranslated-text ratchet after Phase 3 shared-interface conversion. Actionable counts may only decrease unless the detector or policy is explicitly re-reviewed. Compatibility-covered labels and documented technical exclusions are reported separately and do not consume the unresolved backlog.",
+  "reviewedHead": "307aebfc456dbe163172fb0d844d5e0025ae996b",
+  "description": "Reviewed untranslated-text ratchet after Phase 4 Supplier Partner conversion. Actionable counts may only decrease unless the detector or policy is explicitly re-reviewed. Compatibility-covered labels and documented technical exclusions are reported separately and do not consume the unresolved backlog.",
   "reviewedTotals": {
     "candidates": 22429,
-    "actionable": 16445,
-    "excluded": 5984,
-    "compatibilityCovered": 4928,
+    "actionable": 16184,
+    "excluded": 6245,
+    "compatibilityCovered": 5189,
     "unclassified": 0
   },
-  "maxActionable": 16445,
+  "maxActionable": 16184,
   "modules": {
     "accounting": { "maxActionable": 1768 },
     "administration": { "maxActionable": 1289 },
@@ -27,7 +27,7 @@
     "sales-pos": { "maxActionable": 884 },
     "shared-contracts": { "maxActionable": 5 },
     "shared-ui": { "maxActionable": 0 },
-    "supplier-partner": { "maxActionable": 261 }
+    "supplier-partner": { "maxActionable": 0 }
   },
   "maxUnclassified": 0
 }
