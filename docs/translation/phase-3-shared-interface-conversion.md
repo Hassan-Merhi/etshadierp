@@ -22,6 +22,8 @@ The Phase 2 audit reported 527 actionable shared-UI occurrences across 471 uniqu
 - the shared-UI actionable ratchet is reduced from 527 to 0;
 - the repository-wide actionable ceiling is reduced from 17,923 to 17,396.
 
+The reviewed catalog is divided into five focused source segments so navigation, workflow, offline/import and status copy can be reviewed without creating another translation god-file.
+
 ## Runtime behavior
 
 The Phase 3 catalog is an exact allowlist. The compatibility bridge can translate approved shared phrases even when a legacy component renders them in a plain `div` or `span`, while arbitrary text remains untouched.
