@@ -1,6 +1,9 @@
 import type { Express, Request } from "express";
 import { and, asc, eq, ilike, isNull, or } from "drizzle-orm";
-import { factoryBaleProducts, factoryCategories } from "@shared/schema";
+import {
+  factoryTrilingualBaleProducts as factoryBaleProducts,
+  factoryTrilingualCategories as factoryCategories,
+} from "@shared/schema";
 import { resolveFactoryCategoryName, resolveFactoryProductLanguage } from "@shared/factoryBilingualContract";
 import { requireAuth } from "../../auth";
 import { db } from "../../db";
@@ -159,7 +162,12 @@ export function registerFactoryFrenchCatalogReadRoutes(app: Express): void {
         .limit(1);
       if (!row) return res.status(404).json({ message: "Product not found" });
       const resolved = resolveFactoryProductLanguage(
-        { ...row.product, categoryName: row.categoryName, categoryNameAr: row.categoryNameAr, categoryNameFr: row.categoryNameFr },
+        {
+          ...row.product,
+          categoryName: row.categoryName,
+          categoryNameAr: row.categoryNameAr,
+          categoryNameFr: row.categoryNameFr,
+        },
         "fr",
       );
       return res.json({
