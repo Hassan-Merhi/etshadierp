@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, temp/pr-377-format-base]
 
 permissions:
   contents: write
@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   format-pr-377:
-    if: github.event_name == 'pull_request' && github.event.pull_request.number == 377
+    if: github.event_name == 'pull_request' && github.head_ref == 'agent/phases-1-4-global-trilingual-foundation'
     name: Format PR 377 files
     runs-on: ubuntu-latest
     steps:
