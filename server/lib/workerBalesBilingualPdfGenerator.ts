@@ -46,6 +46,16 @@ const COPY = {
     unassigned: "غير محدد",
     bales: "بالات",
   },
+  fr: {
+    title: "Rapport des balles des travailleurs",
+    reference: "Référence",
+    worker: "Travailleur",
+    product: "Produit",
+    weight: "Poids (kg)",
+    total: "Total",
+    unassigned: "Non attribué",
+    bales: "balles",
+  },
 } as const;
 
 function number(value: unknown): number {
@@ -64,8 +74,8 @@ export async function generateBilingualWorkerBalesPdf(
   const arabicFont = fontPath();
   const allBales = groups.flatMap((group) => group.bales ?? []);
   const rows = allBales.sort((a, b) =>
-    String(a.workerName ?? "").localeCompare(String(b.workerName ?? ""), rtl ? "ar" : "en") ||
-    String(a.productName ?? "").localeCompare(String(b.productName ?? ""), rtl ? "ar" : "en")
+    String(a.workerName ?? "").localeCompare(String(b.workerName ?? ""), rtl ? "ar" : language === "fr" ? "fr" : "en") ||
+    String(a.productName ?? "").localeCompare(String(b.productName ?? ""), rtl ? "ar" : language === "fr" ? "fr" : "en")
   );
 
   return new Promise((resolve, reject) => {
