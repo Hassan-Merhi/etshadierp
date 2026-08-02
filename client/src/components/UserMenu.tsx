@@ -55,10 +55,7 @@ export function UserMenu({ accentColor, user, onLogout }: UserMenuProps) {
             {getInitials(user.username)}
           </span>
           <span className="hidden min-w-0 items-center gap-2 md:flex">
-            <span
-              className="max-w-[8rem] truncate text-sm font-medium leading-none"
-              data-business-value="true"
-            >
+            <span className="max-w-[8rem] truncate text-sm font-medium leading-none" data-business-value="true">
               {user.username}
             </span>
             <span
