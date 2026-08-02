@@ -1,0 +1,35 @@
+name: Phase 1 Format Helper
+
+on:
+  push:
+    branches: [agent/phase-1-format-helper]
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Normalize Replit registry URLs for CI
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Format Phase 1 source
+        run: node node_modules/prettier/bin/prettier.cjs --write client/src/components/UserMenu.tsx
+
+      - name: Upload exact formatted source
+        uses: actions/upload-artifact@v7
+        with:
+          name: phase1-formatted-user-menu
+          path: client/src/components/UserMenu.tsx
+          if-no-files-found: error
+          retention-days: 1
