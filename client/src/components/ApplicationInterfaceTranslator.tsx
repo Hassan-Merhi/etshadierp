@@ -2,10 +2,7 @@ import { useEffect } from "react";
 import type { ApplicationLanguage } from "@shared/applicationLanguageContract";
 import { translateSharedInterfaceText } from "@/i18n/sharedInterfaceTranslations";
 import { translateAccountingDocumentText } from "@/i18n/accountingDocumentTranslations";
-import {
-  isPhase3SharedUiText,
-  translatePhase3SharedUiText,
-} from "@/i18n/sharedUiPhase3Translations";
+import { isPhase3SharedUiText, translatePhase3SharedUiText } from "@/i18n/sharedUiPhase3Translations";
 
 const EXCLUDED_SELECTOR = [
   "code",

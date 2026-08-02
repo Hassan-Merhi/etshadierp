@@ -109,7 +109,8 @@ const dynamicRules: readonly DynamicRule[] = [
     render: {
       en: ([count]) => `Please log in again. Your ${count} pending action(s) are saved and will sync after login.`,
       ar: ([count]) => `يرجى تسجيل الدخول مجددًا. تم حفظ ${count} إجراء معلّق وستتم مزامنته بعد تسجيل الدخول.`,
-      fr: ([count]) => `Veuillez vous reconnecter. Vos ${count} action(s) en attente sont enregistrées et seront synchronisées après connexion.`,
+      fr: ([count]) =>
+        `Veuillez vous reconnecter. Vos ${count} action(s) en attente sont enregistrées et seront synchronisées après connexion.`,
     },
   },
   {
@@ -189,14 +190,11 @@ export function isPhase3SharedUiText(value: string): boolean {
   if (!normalized) return false;
   if (exactEntryByVisibleText.has(normalized)) return true;
   return dynamicRules.some((rule) =>
-    (["en", "ar", "fr"] as const).some((language) => rule.patterns[language].test(normalized)),
+    (["en", "ar", "fr"] as const).some((language) => rule.patterns[language].test(normalized))
   );
 }
 
-export function translatePhase3SharedUiText(
-  value: string,
-  language: ApplicationLanguage,
-): string | null {
+export function translatePhase3SharedUiText(value: string, language: ApplicationLanguage): string | null {
   const leading = value.match(/^\s*/)?.[0] ?? "";
   const trailing = value.match(/\s*$/)?.[0] ?? "";
   const normalized = value.trim();
