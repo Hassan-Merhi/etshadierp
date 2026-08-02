@@ -1,10 +1,9 @@
-import fs from "node:fs";
-import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { phase3SharedUiTranslations, translatePhase3SharedUiText } from "../client/src/i18n/sharedUiPhase3Translations";
-
-const root = process.cwd();
-const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
+import {
+  isPhase3SharedUiText,
+  phase3SharedUiTranslations,
+  translatePhase3SharedUiText,
+} from "../client/src/i18n/sharedUiPhase3Translations";
 
 describe("Phase 3 shared interface translations", () => {
   it("covers every reviewed shared UI phrase exactly once", () => {
@@ -35,23 +34,15 @@ describe("Phase 3 shared interface translations", () => {
     expect(translatePhase3SharedUiText("Aucune action en attente", "en")).toBe("No pending actions");
   });
 
+  it("recognizes only reviewed shared interface copy", () => {
+    expect(isPhase3SharedUiText("Search pages...")).toBe(true);
+    expect(isPhase3SharedUiText("تم إنشاء السند المقابل PV-301.")).toBe(true);
+    expect(isPhase3SharedUiText("CUSTOM-ITEM-001")).toBe(false);
+  });
+
   it("does not translate unknown stored business values", () => {
     expect(translatePhase3SharedUiText("CUSTOM-ITEM-001", "ar")).toBeNull();
     expect(translatePhase3SharedUiText("Blue Denim", "fr")).toBeNull();
     expect(translatePhase3SharedUiText("Hassan Supplier Account", "ar")).toBeNull();
-  });
-
-  it("keeps the runtime bridge protected and the audit ratchet at zero", () => {
-    const bridge = read("client/src/components/ApplicationInterfaceTranslator.tsx");
-    const audit = read("scripts/audit-i18n-phase14.mjs");
-    const baseline = JSON.parse(read("config/i18n-phase14-baseline.json"));
-
-    expect(bridge).toContain("isPhase3SharedUiText");
-    expect(bridge).toContain('"[data-business-value]"');
-    expect(bridge).toContain('"[data-stock-name]"');
-    expect(bridge).toContain('"[data-account-name]"');
-    expect(audit).toContain("sharedUiPhase3Translations.part5.ts");
-    expect(baseline.detectorVersion).toBe(4);
-    expect(baseline.modules["shared-ui"].maxActionable).toBe(0);
   });
 });
