@@ -3,6 +3,8 @@ name: Phase 1 Format Helper
 on:
   push:
     branches: [agent/phase-1-format-helper]
+  pull_request:
+    branches: [main]
 
 jobs:
   format:
