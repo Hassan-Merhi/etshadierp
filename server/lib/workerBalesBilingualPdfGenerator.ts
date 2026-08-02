@@ -46,6 +46,16 @@ const COPY = {
     unassigned: "غير محدد",
     bales: "بالات",
   },
+  fr: {
+    title: "Rapport des balles des travailleurs",
+    reference: "Référence",
+    worker: "Travailleur",
+    product: "Produit",
+    weight: "Poids (kg)",
+    total: "Total",
+    unassigned: "Non attribué",
+    bales: "balles",
+  },
 } as const;
 
 function number(value: unknown): number {
@@ -63,9 +73,16 @@ export async function generateBilingualWorkerBalesPdf(
   const rtl = language === "ar";
   const arabicFont = fontPath();
   const allBales = groups.flatMap((group) => group.bales ?? []);
-  const rows = allBales.sort((a, b) =>
-    String(a.workerName ?? "").localeCompare(String(b.workerName ?? ""), rtl ? "ar" : "en") ||
-    String(a.productName ?? "").localeCompare(String(b.productName ?? ""), rtl ? "ar" : "en")
+  const rows = allBales.sort(
+    (a, b) =>
+      String(a.workerName ?? "").localeCompare(
+        String(b.workerName ?? ""),
+        rtl ? "ar" : language === "fr" ? "fr" : "en"
+      ) ||
+      String(a.productName ?? "").localeCompare(
+        String(b.productName ?? ""),
+        rtl ? "ar" : language === "fr" ? "fr" : "en"
+      )
   );
 
   return new Promise((resolve, reject) => {
@@ -127,13 +144,24 @@ export async function generateBilingualWorkerBalesPdf(
       doc.fillColor("#263238").fontSize(8.5);
       values.forEach((value, columnIndex) => {
         const valueAlign = columnIndex === 3 ? "right" : align;
-        const options = rtl && arabicFont
-          ? ({ width: columns[columnIndex] - 8, align: valueAlign, features: ["rtla", "arab"], lineBreak: false } as any)
-          : { width: columns[columnIndex] - 8, align: valueAlign, lineBreak: false };
+        const options =
+          rtl && arabicFont
+            ? ({
+                width: columns[columnIndex] - 8,
+                align: valueAlign,
+                features: ["rtla", "arab"],
+                lineBreak: false,
+              } as any)
+            : { width: columns[columnIndex] - 8, align: valueAlign, lineBreak: false };
         doc.text(String(value), cx + 4, y + 7, options);
         cx += columns[columnIndex];
       });
-      doc.moveTo(x, y + rowHeight).lineTo(x + pageWidth, y + rowHeight).strokeColor("#D9DEE7").lineWidth(0.3).stroke();
+      doc
+        .moveTo(x, y + rowHeight)
+        .lineTo(x + pageWidth, y + rowHeight)
+        .strokeColor("#D9DEE7")
+        .lineWidth(0.3)
+        .stroke();
       y += rowHeight;
     });
 

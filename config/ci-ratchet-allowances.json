@@ -25,7 +25,18 @@
     "GET /api/factory/customer-orders/:id/export-excel [requireAuth > <anonymous>]",
     "GET /api/factory/customer-orders/:id/export-pdf [requireAuth > <anonymous>]",
     "POST /api/admin/account-migration/execute [requireAuth > <anonymous> > <anonymous>]",
-    "POST /api/admin/account-migration/undo [requireAuth > <anonymous> > <anonymous>]"
+    "POST /api/admin/account-migration/undo [requireAuth > <anonymous> > <anonymous>]",
+    "GET /api/language-preference [requireAuth > <anonymous>]",
+    "PUT /api/language-preference [requireAuth > <anonymous>]",
+    "GET /api/factory/french-catalog [requireAuth > <anonymous>]",
+    "PATCH /api/factory/french-catalog/products/:id [requireAuth > <anonymous>]",
+    "PATCH /api/factory/french-catalog/categories/:id [requireAuth > <anonymous>]",
+    "GET /api/factory/french-catalog/template [requireAuth > <anonymous>]",
+    "POST /api/factory/french-catalog/import/preview [requireAuth > multerMiddleware > <anonymous>]",
+    "POST /api/factory/french-catalog/import/apply [requireAuth > <anonymous>]",
+    "GET /api/factory/categories [requireAuth > <anonymous>]",
+    "GET /api/factory/bale-products [requireAuth > <anonymous>]",
+    "GET /api/factory/bale-products/:id [requireAuth > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
     "USE /api/factory/containers [postOffloadReconciliationMiddleware]",
@@ -43,8 +54,13 @@
       "tests/account-migration-control-reference-safety.test.ts",
       "tests/factory-bilingual-completion.test.ts",
       "tests/factory-bilingual-phase7-documents.test.ts",
-      "tests/factory-bilingual-phase8-surfaces.test.ts"
+      "tests/factory-bilingual-phase8-surfaces.test.ts",
+      "tests/application-language-integration-contract.test.ts",
+      "tests/phases-8-5-6-trilingual-expansion.test.ts",
+      "tests/phases-12-9-11-module-surfaces.test.ts",
+      "tests/phases-10-7-13-trilingual-surfaces.test.ts",
+      "tests/phase14-i18n-release-gate.test.ts"
     ],
-    "maxAdditionalTextAssertions": 178
+    "maxAdditionalTextAssertions": 266
   }
 }

@@ -56,13 +56,20 @@ function CatalogFetchBoundary({
       if (parsed.pathname === "/api/factory/bale-products") {
         parsed.searchParams.set("lang", language);
         if (search) parsed.searchParams.set("q", search);
-        const response = await originalFetch(isRelative ? `${parsed.pathname}${parsed.search}` : parsed.toString(), init);
+        const response = await originalFetch(
+          isRelative ? `${parsed.pathname}${parsed.search}` : parsed.toString(),
+          init
+        );
         if (!response.ok || translationFilter === "all") return response;
         const products = (await response.clone().json()) as BilingualProduct[];
         const filtered = products.filter((product) => matchesTranslationFilter(product, translationFilter));
         const headers = new Headers(response.headers);
         headers.set("content-type", "application/json; charset=utf-8");
-        return new Response(JSON.stringify(filtered), { status: response.status, statusText: response.statusText, headers });
+        return new Response(JSON.stringify(filtered), {
+          status: response.status,
+          statusText: response.statusText,
+          headers,
+        });
       }
 
       if (parsed.pathname === "/api/factory/categories") {
@@ -105,7 +112,7 @@ export default function BaleProductsBilingual() {
   useEffect(() => {
     const handleLanguageChange = (event: Event) => {
       const next = (event as CustomEvent<FactoryCatalogLanguage>).detail;
-      if (next !== "en" && next !== "ar") return;
+      if (next !== "en" && next !== "ar" && next !== "fr") return;
       setLanguage(next);
       queryClient.removeQueries({ queryKey: ["/api/factory/bale-products"] });
       queryClient.removeQueries({ queryKey: ["/api/factory/categories"] });
@@ -147,8 +154,13 @@ export default function BaleProductsBilingual() {
       <div className="container mx-auto px-6 pt-6">
         <div className="rounded-xl border bg-card px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
-            <Select value={translationFilter} onValueChange={(value) => setTranslationFilter(value as TranslationFilter)}>
-              <SelectTrigger className="h-8 w-56" data-testid="select-translation-status"><SelectValue /></SelectTrigger>
+            <Select
+              value={translationFilter}
+              onValueChange={(value) => setTranslationFilter(value as TranslationFilter)}
+            >
+              <SelectTrigger className="h-8 w-56" data-testid="select-translation-status">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All translations</SelectItem>
                 <SelectItem value="complete">Complete</SelectItem>
@@ -160,24 +172,93 @@ export default function BaleProductsBilingual() {
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-              <Input value={catalogSearch} onChange={(event) => setCatalogSearch(event.target.value)} placeholder={language === "ar" ? "بحث بالعربي أو الإنجليزي أو الرمز..." : "Search English, Arabic, or article code..."} className="h-8 w-72 pl-8 pr-8 text-sm" dir="auto" />
-              {catalogSearch && <button type="button" onClick={() => setCatalogSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"><X className="h-3.5 w-3.5" /></button>}
+              <Input
+                value={catalogSearch}
+                onChange={(event) => setCatalogSearch(event.target.value)}
+                placeholder={
+                  language === "ar"
+                    ? "بحث بالعربي أو الإنجليزي أو الرمز..."
+                    : language === "fr"
+                      ? "Rechercher en français, anglais, arabe ou par code..."
+                      : "Search English, Arabic, or article code..."
+                }
+                className="h-8 w-72 pl-8 pr-8 text-sm"
+                dir="auto"
+              />
+              {catalogSearch && (
+                <button
+                  type="button"
+                  onClick={() => setCatalogSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </div>
-            {isAdmin && <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => setCategoryDialogOpen(true)}><Plus className="h-3.5 w-3.5 mr-1.5" />{language === "ar" ? "فئة ثنائية اللغة" : "Bilingual category"}</Button>}
+            {isAdmin && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8"
+                onClick={() => setCategoryDialogOpen(true)}
+              >
+                <Plus className="h-3.5 w-3.5 mr-1.5" />
+                {language === "ar"
+                  ? "فئة ثنائية اللغة"
+                  : language === "fr"
+                    ? "Catégorie multilingue"
+                    : "Bilingual category"}
+              </Button>
+            )}
           </div>
         </div>
       </div>
 
-      <CatalogFetchBoundary key={`${language}:${requestSearch}:${translationFilter}`} language={language} search={requestSearch} translationFilter={translationFilter} />
+      <CatalogFetchBoundary
+        key={`${language}:${requestSearch}:${translationFilter}`}
+        language={language}
+        search={requestSearch}
+        translationFilter={translationFilter}
+      />
       {isAdmin && <BaleProductArabicEditBridge />}
 
       <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
         <DialogContent className="max-w-lg" dir="ltr">
-          <DialogHeader><DialogTitle>Create bilingual category</DialogTitle><DialogDescription>English and Arabic are stored on one category record.</DialogDescription></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Create bilingual category</DialogTitle>
+            <DialogDescription>English and Arabic are stored on one category record.</DialogDescription>
+          </DialogHeader>
           <div className="space-y-4">
-            <div className="space-y-2"><Label htmlFor="category-name-en">Category name — English *</Label><Input id="category-name-en" value={categoryNameEn} onChange={(event) => setCategoryNameEn(event.target.value)} /></div>
-            <div className="space-y-2"><Label htmlFor="category-name-ar">اسم الفئة — العربية</Label><Input id="category-name-ar" value={categoryNameAr} onChange={(event) => setCategoryNameAr(event.target.value)} dir="rtl" /></div>
-            <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setCategoryDialogOpen(false)}>Cancel</Button><Button type="button" disabled={!categoryNameEn.trim() || createCategoryMutation.isPending} onClick={() => createCategoryMutation.mutate()}>{createCategoryMutation.isPending ? "Creating..." : "Create category"}</Button></div>
+            <div className="space-y-2">
+              <Label htmlFor="category-name-en">Category name — English *</Label>
+              <Input
+                id="category-name-en"
+                value={categoryNameEn}
+                onChange={(event) => setCategoryNameEn(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="category-name-ar">اسم الفئة — العربية</Label>
+              <Input
+                id="category-name-ar"
+                value={categoryNameAr}
+                onChange={(event) => setCategoryNameAr(event.target.value)}
+                dir="rtl"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setCategoryDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={!categoryNameEn.trim() || createCategoryMutation.isPending}
+                onClick={() => createCategoryMutation.mutate()}
+              >
+                {createCategoryMutation.isPending ? "Creating..." : "Create category"}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

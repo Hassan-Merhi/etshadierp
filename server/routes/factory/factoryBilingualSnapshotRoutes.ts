@@ -13,6 +13,7 @@ import {
 } from "../../services/factoryBilingualSnapshotService";
 import { registerFactoryBilingualDocumentRoutes } from "./factoryBilingualDocumentRoutes";
 import { registerFactoryBilingualSurfaceRoutes } from "./factoryBilingualSurfaceRoutes";
+import { registerFactoryFrenchCatalogReadRoutes } from "./factoryFrenchCatalogReadRoutes";
 
 function getFactoryCompanyId(req: Request): number | null {
   const companyId = Number((req.session as any)?.factoryCompanyId);
@@ -56,11 +57,7 @@ async function populateAfterSuccessfulWrite(req: Request): Promise<void> {
   });
 }
 
-function factoryBilingualSnapshotWriteMiddleware(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void {
+function factoryBilingualSnapshotWriteMiddleware(req: Request, res: Response, next: NextFunction): void {
   if (!shouldPopulateAfterWrite(req)) {
     next();
     return;
@@ -88,6 +85,7 @@ function factoryBilingualSnapshotWriteMiddleware(
 export function registerFactoryBilingualSnapshotRoutes(app: Express): void {
   registerFactoryBilingualDocumentRoutes(app);
   registerFactoryBilingualSurfaceRoutes(app);
+  registerFactoryFrenchCatalogReadRoutes(app);
   app.use("/api/factory", factoryBilingualSnapshotWriteMiddleware);
 
   app.get(
