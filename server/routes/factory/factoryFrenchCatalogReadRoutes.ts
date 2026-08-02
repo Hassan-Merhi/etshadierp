@@ -1,9 +1,6 @@
 import type { Express, Request } from "express";
 import { and, asc, eq, ilike, isNull, or } from "drizzle-orm";
-import {
-  factoryBaleProducts,
-  factoryCategories,
-} from "@shared/schema/factoryTrilingualCatalogTables";
+import { factoryBaleProducts, factoryCategories } from "@shared/schema/factoryTrilingualCatalogTables";
 import { resolveFactoryCategoryName, resolveFactoryProductLanguage } from "@shared/factoryBilingualContract";
 import { requireAuth } from "../../auth";
 import { db } from "../../db";

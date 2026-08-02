@@ -110,10 +110,13 @@ describe("factory bilingual bale catalog contract", () => {
       articleCode: "HMD10014",
       productNameEn: "MEN BAG CREME 20KG",
       productNameAr: "حقيبة رجالية",
+      productNameFr: null,
       categoryNameEn: "BAGS & BELTS",
       categoryNameAr: "حقائب وأحزمة",
+      categoryNameFr: null,
       descriptionEn: null,
       descriptionAr: "وصف",
+      descriptionFr: null,
     });
   });
 

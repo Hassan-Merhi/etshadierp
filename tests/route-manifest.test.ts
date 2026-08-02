@@ -21,8 +21,9 @@ const ALLOWANCES_PATH = path.join(process.cwd(), "config/ci-ratchet-allowances.j
 const shouldUpdate = process.env.UPDATE_ROUTE_MANIFEST === "1";
 const allowances = JSON.parse(fs.readFileSync(ALLOWANCES_PATH, "utf8")) as RatchetAllowances;
 
-// Six reviewed bilingual interceptor registrations intentionally call next().
-const MAX_SHADOWED_REGISTRATIONS = 148;
+// Reviewed bilingual and French catalog interceptor registrations intentionally
+// call next() so non-matching languages fall through to the canonical handler.
+const MAX_SHADOWED_REGISTRATIONS = 151;
 let actual: SerializedRouteManifest;
 
 async function buildManifest(): Promise<SerializedRouteManifest> {

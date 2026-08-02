@@ -24,6 +24,7 @@ describe("global application language integration", () => {
     expect(authRoutes).toContain("registerLanguagePreferenceRoutes(app)");
     expect(preferenceRoutes).toContain('app.get("/api/language-preference"');
     expect(preferenceRoutes).toContain('app.put("/api/language-preference"');
-    expect(preferenceRoutes).toContain("ON CONFLICT (user_id)");
+    expect(preferenceRoutes).toContain("onConflictDoUpdate");
+    expect(preferenceRoutes).toContain("target: userLanguagePreferences.userId");
   });
 });

@@ -22,14 +22,14 @@ describe("translation phases 8, 5 and 6", () => {
   });
 
   it("keeps shared interface translation exact and excludes business inputs", () => {
-    const bridge = read("client/src/i18n/SharedInterfaceTranslationBridge.tsx");
-    expect(bridge).toContain("shouldSkip");
-    expect(bridge).toContain('element.matches("input, textarea, [contenteditable=true]")');
-    expect(bridge).toContain("translateExactSharedLabel");
+    const bridge = read("client/src/components/ApplicationInterfaceTranslator.tsx");
+    expect(bridge).toContain("isProtected");
+    expect(bridge).toContain('"[data-business-value]"');
+    expect(bridge).toContain("translateApprovedInterfaceText");
   });
 
   it("provides French schema fields, routes, editor and Excel workflow", () => {
-    const migration = read("migrations/20260802_001_factory_french_catalog_and_snapshots.sql");
+    const migration = read("migrations/20260802_001_factory_french_catalog_snapshots.sql");
     const routes = read("server/routes/factory/factoryFrenchTranslationRoutes.ts");
     const manager = read("client/src/components/FactoryFrenchCatalogManager.tsx");
     expect(migration).toContain("name_fr");
