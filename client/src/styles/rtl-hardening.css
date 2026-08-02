@@ -1,0 +1,42 @@
+html[dir="rtl"] body {
+  direction: rtl;
+}
+
+html[dir="rtl"] [data-radix-popper-content-wrapper],
+html[dir="rtl"] [role="dialog"],
+html[dir="rtl"] [role="menu"],
+html[dir="rtl"] [role="listbox"] {
+  direction: rtl;
+  text-align: right;
+}
+
+html[dir="rtl"] input,
+html[dir="rtl"] textarea,
+html[dir="rtl"] select {
+  text-align: right;
+}
+
+html[dir="rtl"] [data-business-value],
+html[dir="rtl"] [data-article-code],
+html[dir="rtl"] [data-account-code],
+html[dir="rtl"] [data-container-number],
+html[dir="rtl"] [data-voucher-number],
+html[dir="rtl"] [dir="ltr"] {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: left;
+}
+
+html[dir="rtl"] table {
+  direction: rtl;
+}
+
+html[dir="rtl"] th,
+html[dir="rtl"] td {
+  text-align: right;
+}
+
+html[dir="rtl"] .lucide,
+html[dir="rtl"] svg {
+  flex-shrink: 0;
+}
