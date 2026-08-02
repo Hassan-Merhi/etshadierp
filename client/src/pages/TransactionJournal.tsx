@@ -28,12 +28,10 @@ import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/compon
 import {
   Search,
   Filter,
-  ExternalLink,
   Building2,
   RefreshCw,
   X,
   FileText,
-  Receipt,
   Factory,
   Eye,
   EyeOff,
@@ -42,110 +40,10 @@ import {
   ChevronRight,
 } from "lucide-react";
 
+import type { CompanyOption, JournalResponse, VoucherDetail } from "./transactionjournal/types";
+import { companyColor, fmtDate, formatAmount } from "./transactionjournal/utils";
+import { VoucherTypeBadge } from "./transactionjournal/components/VoucherTypeBadge";
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface JournalVoucher {
-  id: number;
-  companyId: number;
-  companyName: string;
-  voucherNumber: string;
-  voucherType: string;
-  voucherDate: string;
-  totalAmount: string;
-  currency: "USD" | "CFA";
-  optional: boolean;
-  description: string | null;
-  narration: string | null;
-  deletedAt: string | null;
-}
-
-interface SummaryRow {
-  companyId: number;
-  companyName: string;
-  currency: string;
-  voucherCount: number;
-  totalDebits: string | null;
-  totalCredits: string | null;
-}
-
-interface CompanyOption {
-  id: number;
-  name: string;
-}
-
-interface JournalResponse {
-  vouchers: JournalVoucher[];
-  total: number;
-  page: number;
-  totalPages: number;
-  summary: SummaryRow[];
-  companies: CompanyOption[];
-}
-
-interface VoucherEntry {
-  id: number;
-  ledgerAccountId: number | null;
-  customerId: number | null;
-  accountName: string | null;
-  debitAmount: string;
-  creditAmount: string;
-  narration: string | null;
-}
-
-interface VoucherDetail {
-  voucher: JournalVoucher;
-  entries: VoucherEntry[];
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatAmount(val: string | null | undefined) {
-  if (!val) return "—";
-  const n = parseFloat(val);
-  if (isNaN(n) || n === 0) return "—";
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function fmtDate(d: string) {
-  try {
-    return format(new Date(d), "dd MMM yyyy");
-  } catch {
-    return d;
-  }
-}
-
-const VOUCHER_TYPE_COLORS: Record<string, string> = {
-  Payment: "bg-red-100    text-red-800    dark:bg-red-900/30    dark:text-red-300",
-  Receipt: "bg-green-100  text-green-800  dark:bg-green-900/30  dark:text-green-300",
-  Journal: "bg-blue-100   text-blue-800   dark:bg-blue-900/30   dark:text-blue-300",
-  Sales: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
-  Purchase: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
-  Contra: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
-  "Credit Note": "bg-pink-100   text-pink-800   dark:bg-pink-900/30   dark:text-pink-300",
-  "Debit Note": "bg-rose-100   text-rose-800   dark:bg-rose-900/30   dark:text-rose-300",
-};
-
-function VoucherTypeBadge({ type }: { type: string }) {
-  const cls = VOUCHER_TYPE_COLORS[type] || "bg-muted text-muted-foreground";
-  return <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cls}`}>{type}</span>;
-}
-
-// ─── Company colour pill ───────────────────────────────────────────────────────
-
-const COMPANY_COLORS = [
-  "bg-sky-100     text-sky-800     dark:bg-sky-900/30     dark:text-sky-300",
-  "bg-violet-100  text-violet-800  dark:bg-violet-900/30  dark:text-violet-300",
-  "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
-  "bg-amber-100   text-amber-800   dark:bg-amber-900/30   dark:text-amber-300",
-  "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/30 dark:text-fuchsia-300",
-  "bg-teal-100    text-teal-800    dark:bg-teal-900/30    dark:text-teal-300",
-];
-
-function companyColor(id: number) {
-  return COMPANY_COLORS[id % COMPANY_COLORS.length];
-}
-
-// ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function TransactionJournal() {
   const [, setLocation] = useLocation();
@@ -1314,7 +1212,10 @@ export default function TransactionJournal() {
                   }
 
                   // ── STOCK TRANSFER ──────────────────────────────────────────────────
-                  if ((vtype === "Stock Transfer" || vtype === "StockTransfer" || vtype === "Transfer") && stockRows.length > 0) {
+                  if (
+                    (vtype === "Stock Transfer" || vtype === "StockTransfer" || vtype === "Transfer") &&
+                    stockRows.length > 0
+                  ) {
                     const grandTotal = stockRows.reduce((s, r) => s + parseFloat(r.totalAmount || "0"), 0);
                     const grandQty = stockRows.reduce((s, r) => s + parseFloat(r.quantity || "0"), 0);
                     return (
@@ -1468,10 +1369,7 @@ export default function TransactionJournal() {
                               <Button
                                 size="sm"
                                 onClick={() =>
-                                  openInCompany(
-                                    detailData.voucher.companyId,
-                                    `/containers/${po.containerId}`
-                                  )
+                                  openInCompany(detailData.voucher.companyId, `/containers/${po.containerId}`)
                                 }
                                 data-testid="button-open-po"
                               >
@@ -1497,10 +1395,7 @@ export default function TransactionJournal() {
                               variant="outline"
                               size="sm"
                               onClick={() =>
-                                openInCompany(
-                                  detailData.voucher.companyId,
-                                  `/purchase-orders/${po.id}/edit`
-                                )
+                                openInCompany(detailData.voucher.companyId, `/purchase-orders/${po.id}/edit`)
                               }
                               data-testid="button-edit-po"
                             >

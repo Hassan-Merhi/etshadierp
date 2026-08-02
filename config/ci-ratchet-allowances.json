@@ -1,7 +1,6 @@
 {
   "description": "Reviewed CI ratchet deltas for intentional functionality added before the architecture snapshots were refreshed. Every allowance is exact so unrelated growth or routes still fail.",
   "godFileLineCaps": {
-    "server/routes/payroll/payrollCoreRoutes.ts": 2127,
     "server/routes/payroll/workerStatsAdvancesRoutes.ts": 922,
     "server/services/factory/postOffloadPhase6Safety.ts": 927
   },

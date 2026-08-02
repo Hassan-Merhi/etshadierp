@@ -97,7 +97,10 @@ export function registerFactoryFxDiagnosticRoutes(app: Express) {
         // container — if that container is missing from the map, the charge/commission
         // row silently loses its real status (CLOSED/COMPLETED/OFFLOADED), which used to
         // let it slip past the manual-review classification below.
-        const allContainers = await db.select().from(factoryContainers).where(eq(factoryContainers.companyId, companyId));
+        const allContainers = await db
+          .select()
+          .from(factoryContainers)
+          .where(eq(factoryContainers.companyId, companyId));
         const containerById = new Map<number, any>(allContainers.map((c: any) => [c.id, c]));
         const nonUsdContainers = allContainers.filter((c: any) => c.currencyCode !== "USD");
 
@@ -196,7 +199,8 @@ export function registerFactoryFxDiagnosticRoutes(app: Express) {
         }
 
         // Group for the summary views the UI/report will actually want.
-        const bySupplier: Record<string, { supplierId: number | null; supplierName: string | null; count: number }> = {};
+        const bySupplier: Record<string, { supplierId: number | null; supplierName: string | null; count: number }> =
+          {};
         const byCurrency: Record<string, number> = {};
         const byStatus: Record<string, number> = {};
         const byContainer: Record<
@@ -206,7 +210,8 @@ export function registerFactoryFxDiagnosticRoutes(app: Express) {
 
         for (const row of unresolved) {
           const supKey = String(row.supplierId ?? "none");
-          if (!bySupplier[supKey]) bySupplier[supKey] = { supplierId: row.supplierId, supplierName: row.supplierName, count: 0 };
+          if (!bySupplier[supKey])
+            bySupplier[supKey] = { supplierId: row.supplierId, supplierName: row.supplierName, count: 0 };
           bySupplier[supKey].count++;
 
           byCurrency[row.currencyCode] = (byCurrency[row.currencyCode] || 0) + 1;
@@ -414,7 +419,9 @@ export function registerFactoryFxDiagnosticRoutes(app: Express) {
           return res.status(409).json({ message: error.message, code: "ALREADY_CONFIRMED" });
         }
         if (error instanceof RepairTokenConfigurationError) {
-          logger.error("Repair token configuration error (SESSION_SECRET missing/fallback in production):", { error: error.message });
+          logger.error("Repair token configuration error (SESSION_SECRET missing/fallback in production):", {
+            error: error.message,
+          });
           return res.status(500).json({ message: error.message, code: "REPAIR_TOKEN_MISCONFIGURED" });
         }
         logger.error("Error applying FX resolution repair:", { error: error });

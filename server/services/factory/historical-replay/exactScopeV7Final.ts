@@ -1,18 +1,9 @@
 import Decimal from "decimal.js";
-import type {
-  ReplayQueryExecutor,
-  ReplayScopeInternal,
-  ReplayWriteScope,
-} from "./types";
-import { buildBatchConsumptionEvents } from "./readModel";
-import {
-  buildExactHistoricalReplayScopeInternalFinal,
-} from "./exactScopeFinal";
+import type { ReplayQueryExecutor, ReplayScopeInternal, ReplayWriteScope } from "./types";
+import { buildBatchConsumptionEvents } from "./read-model";
+import { buildExactHistoricalReplayScopeInternalFinal } from "./exactScopeFinal";
 import { normalizeReplayWriteScope } from "./selectedScope";
-import {
-  connectedScopeIsComplete,
-  expandConnectedSupplierClosure,
-} from "./supplierClosureV7Final";
+import { connectedScopeIsComplete, expandConnectedSupplierClosure } from "./supplierClosureV7Final";
 import { previewHistoricalCostReplayWithExecutor } from "./securePreview";
 import { loadMissingSupplierTimelineRows } from "./missingSupplierTimelineV7";
 
@@ -30,9 +21,7 @@ function sorted(values: Iterable<number>): number[] {
 function assertPlannedCostArithmetic(scope: ReplayScopeInternal): void {
   const sourceCorrections = scope._sourceCorrections ?? new Map();
   for (const correction of sourceCorrections.values()) {
-    const expectedTotal = new Decimal(correction.weightKg)
-      .times(correction.expectedCostPerKg)
-      .toDecimalPlaces(6);
+    const expectedTotal = new Decimal(correction.weightKg).times(correction.expectedCostPerKg).toDecimalPlaces(6);
     if (expectedTotal.minus(correction.expectedTotalCost).abs().gt(0.01)) {
       throw safetyError("Historical Replay source arithmetic does not reconcile.", {
         sourceId: correction.sourceId,
@@ -62,9 +51,10 @@ function assertPlannedCostArithmetic(scope: ReplayScopeInternal): void {
     let totalWeight = new Decimal(0);
     let totalCost = new Decimal(0);
     for (const source of sources) {
-      const costPerKg = sourceCorrections.get(source.sourceId)?.expectedCostPerKg
-        ?? correction.correctedSourceCosts.get(source.sourceId)
-        ?? source.storedCostPerKg;
+      const costPerKg =
+        sourceCorrections.get(source.sourceId)?.expectedCostPerKg ??
+        correction.correctedSourceCosts.get(source.sourceId) ??
+        source.storedCostPerKg;
       totalWeight = totalWeight.plus(source.weightKg);
       totalCost = totalCost.plus(new Decimal(source.weightKg).times(costPerKg));
     }
@@ -79,8 +69,8 @@ function assertPlannedCostArithmetic(scope: ReplayScopeInternal): void {
     const expectedTotal = totalCost.toDecimalPlaces(6);
     const expectedRate = totalCost.div(totalWeight).toDecimalPlaces(6);
     if (
-      expectedTotal.minus(correction.expectedTotalCost).abs().gt(0.01)
-      || expectedRate.minus(correction.expectedCostPerKg).abs().gt(0.000001)
+      expectedTotal.minus(correction.expectedTotalCost).abs().gt(0.01) ||
+      expectedRate.minus(correction.expectedCostPerKg).abs().gt(0.000001)
     ) {
       throw safetyError("Historical Replay batch arithmetic does not reconcile.", {
         batchId: correction.batchId,
@@ -120,11 +110,7 @@ export async function buildExactHistoricalReplayScopeInternalV7Final(params: {
     throw safetyError("Historical Replay requires at least one selected supplier.");
   }
 
-  const { sourceInfos } = await buildBatchConsumptionEvents(
-    params.executor,
-    params.companyId,
-    new Set<number>()
-  );
+  const { sourceInfos } = await buildBatchConsumptionEvents(params.executor, params.companyId, new Set<number>());
 
   const closure = expandConnectedSupplierClosure(sourceInfos, params.selectedSupplierIds);
   if (!connectedScopeIsComplete(sourceInfos, closure)) {
@@ -145,31 +131,30 @@ export async function buildExactHistoricalReplayScopeInternalV7Final(params: {
     preview.supplierRows.map((row) => row.supplierId)
   );
   if (missingSupplierTimelineRows.length > 0) {
-    throw safetyError(
-      "Historical Replay found suppliers with raw-material evidence but no replay timeline.",
-      { missingSupplierTimelineRows }
-    );
+    throw safetyError("Historical Replay found suppliers with raw-material evidence but no replay timeline.", {
+      missingSupplierTimelineRows,
+    });
   }
 
   if (preview.financialImpact?.allSafetyGatesPassed !== true) {
-    throw safetyError(
-      "Historical Replay cannot prepare until every company-wide safety gate passes.",
-      {
-        safetyGateDetails: preview.financialImpact?.safetyGateDetails ?? null,
-        blockedBatches: preview.blockedBatches ?? [],
-        unclassifiedAdjustmentRows: preview.unclassifiedAdjustmentRows ?? [],
-      }
-    );
+    throw safetyError("Historical Replay cannot prepare until every company-wide safety gate passes.", {
+      safetyGateDetails: preview.financialImpact?.safetyGateDetails ?? null,
+      blockedBatches: preview.blockedBatches ?? [],
+      unclassifiedAdjustmentRows: preview.unclassifiedAdjustmentRows ?? [],
+    });
   }
 
   const previewBySupplierId = new Map(preview.supplierRows.map((row) => [row.supplierId, row]));
   const unsafeSuppliers = sorted(closure.supplierIds)
-    .map((supplierId) => previewBySupplierId.get(supplierId) ?? {
-      supplierId,
-      supplierName: `Supplier #${supplierId}`,
-      safeToRepair: false,
-      reasons: ["SUPPLIER_TIMELINE_UNAVAILABLE"],
-    })
+    .map(
+      (supplierId) =>
+        previewBySupplierId.get(supplierId) ?? {
+          supplierId,
+          supplierName: `Supplier #${supplierId}`,
+          safeToRepair: false,
+          reasons: ["SUPPLIER_TIMELINE_UNAVAILABLE"],
+        }
+    )
     .filter((row) => !row.safeToRepair)
     .map((row) => ({
       supplierId: row.supplierId,
@@ -192,17 +177,16 @@ export async function buildExactHistoricalReplayScopeInternalV7Final(params: {
   const expectedSupplierIds = sorted(closure.supplierIds);
   const actualSupplierIds = sorted(scope.supplierIds);
   if (JSON.stringify(expectedSupplierIds) !== JSON.stringify(actualSupplierIds)) {
-    throw safetyError(
-      "Historical Replay exact scope dropped a supplier from the connected closure.",
-      { expectedSupplierIds, actualSupplierIds }
-    );
+    throw safetyError("Historical Replay exact scope dropped a supplier from the connected closure.", {
+      expectedSupplierIds,
+      actualSupplierIds,
+    });
   }
 
   if (scope.blockedBatches.length > 0) {
-    throw safetyError(
-      "Historical Replay has blocked batches. Resolve every reason before preparing a token.",
-      { blockedBatches: scope.blockedBatches }
-    );
+    throw safetyError("Historical Replay has blocked batches. Resolve every reason before preparing a token.", {
+      blockedBatches: scope.blockedBatches,
+    });
   }
 
   assertPlannedCostArithmetic(scope);

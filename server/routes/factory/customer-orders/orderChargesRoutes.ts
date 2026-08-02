@@ -1,4 +1,4 @@
-import { trackOneContainerById } from "../../../services/containerTrackingService";
+import { trackOneContainerById } from "../../../services/container-tracking";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { parseId, parseOptionalId } from "../../../lib/parseId";

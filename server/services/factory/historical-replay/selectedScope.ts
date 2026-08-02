@@ -15,7 +15,7 @@ import {
   computeCanonicalCosts,
   loadContainerUniverse,
   previewHistoricalCostReplayWithExecutor,
-} from "./readModel";
+} from "./read-model";
 import { buildSelectedSupplierCorrectionPlan } from "./closure";
 export { captureReplaySnapshot } from "./scope";
 
@@ -50,12 +50,8 @@ export function normalizeReplayWriteScope(scope: ReplayWriteScope): ReplayWriteS
   };
 }
 
-export function replayWriteScopesEqual(
-  expected: ReplayWriteScope,
-  actual: ReplayWriteScope
-): boolean {
-  return JSON.stringify(normalizeReplayWriteScope(expected))
-    === JSON.stringify(normalizeReplayWriteScope(actual));
+export function replayWriteScopesEqual(expected: ReplayWriteScope, actual: ReplayWriteScope): boolean {
+  return JSON.stringify(normalizeReplayWriteScope(expected)) === JSON.stringify(normalizeReplayWriteScope(actual));
 }
 
 export function computeReplayFingerprint(
@@ -70,8 +66,8 @@ export function computeReplayFingerprint(
   const sourceIds = new Set(normalizedScope?.sourceIdsToUpdate ?? preview.sourceRows.map((row) => row.sourceId));
   const batchIds = new Set(normalizedScope?.batchIdsToUpdate ?? preview.batchRows.map((row) => row.batchId));
   const containerIds = new Set(
-    normalizedScope?.containerIdsToUpdate
-      ?? preview.containerRows
+    normalizedScope?.containerIdsToUpdate ??
+      preview.containerRows
         .filter((row) => selectedSupplierIds.includes(row.supplierId ?? -1))
         .map((row) => row.containerId)
   );
@@ -248,11 +244,7 @@ export async function buildHistoricalReplayScopeInternal(params: {
   const safeSupplierIds = new Set(safeSupplierRows.map((supplier) => supplier.supplierId));
   if (safeSupplierIds.size === 0) return { ...emptyScope(), _fullPreview: fullPreview };
 
-  const { sourceInfos, batchInfoMap } = await buildBatchConsumptionEvents(
-    executor,
-    companyId,
-    safeSupplierIds
-  );
+  const { sourceInfos, batchInfoMap } = await buildBatchConsumptionEvents(executor, companyId, safeSupplierIds);
   const previewSourceById = new Map(fullPreview.sourceRows.map((source) => [source.sourceId, source]));
   const expectedRates = new Map<string, number>();
   for (const source of sourceInfos) {
@@ -295,8 +287,7 @@ export async function buildHistoricalReplayScopeInternal(params: {
   );
   const batchIdsToUpdate = batchCorrections.map((correction) => correction.batchId);
   const sourceCorrections = new Map(
-    [...plan.sourceCorrections]
-      .filter(([, correction]) => eligibleClosureBatchIds.has(correction.batchId))
+    [...plan.sourceCorrections].filter(([, correction]) => eligibleClosureBatchIds.has(correction.batchId))
   );
   const sourceIdsToUpdate = [...sourceCorrections.keys()];
 
@@ -304,8 +295,10 @@ export async function buildHistoricalReplayScopeInternal(params: {
     .filter((canonical) => {
       const supplierId = canonical.universe.container.supplierId;
       if (canonical.fxUnresolved || supplierId == null || !safeSupplierIds.has(supplierId)) return false;
-      return Math.abs(canonical.canonicalCostPerKgUsd - canonical.storedCostPerKgUsd) > 0.000001
-        || Math.abs(canonical.canonicalTotalUsd - canonical.storedTotalUsd) > 0.01;
+      return (
+        Math.abs(canonical.canonicalCostPerKgUsd - canonical.storedCostPerKgUsd) > 0.000001 ||
+        Math.abs(canonical.canonicalTotalUsd - canonical.storedTotalUsd) > 0.01
+      );
     })
     .map((canonical) => canonical.universe.container.id);
 
@@ -454,8 +447,8 @@ export async function computeReplayWriteScope(
     containerIds: new Set(scope.containerIdsToUpdate),
     batchIdsToApply: new Set(scope.batchIdsToUpdate),
     sourceIds: new Set(scope.sourceIdsToUpdate),
-    baleCount: scope.availableBaleIdsToUpdate.length
-      + (opts.includeFinalizedBales ? scope.finalizedBaleIdsToUpdate.length : 0),
+    baleCount:
+      scope.availableBaleIdsToUpdate.length + (opts.includeFinalizedBales ? scope.finalizedBaleIdsToUpdate.length : 0),
   };
 }
 

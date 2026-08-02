@@ -60,56 +60,17 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import type {
+  Location,
+  PagedStockItemsResponse,
+  StockCategory,
+  StockGrade,
+  StockGroup,
+  StockItem,
+} from "./stockitems/types";
+import { PAGE_SIZE } from "./stockitems/utils";
 // Note: excelHelper (ExcelJS) is imported lazily inside exportToExcel / exportSalesHistory
 // so the 1.3 MB ExcelJS bundle is not loaded on every page startup.
-
-interface Location {
-  id: number;
-  code: string;
-  name: string;
-}
-
-interface StockItem {
-  id: number;
-  code: string;
-  name: string;
-  barcode: string | null;
-  uom: string;
-  stockGroupId: number | null;
-  gradeId: number | null;
-  categoryId: number | null;
-  sellingPrice: string;
-  active: boolean;
-  companyId: number;
-}
-
-interface StockGroup {
-  id: number;
-  code: string;
-  name: string;
-}
-
-interface StockGrade {
-  id: number;
-  name: string;
-  active: boolean;
-}
-
-interface StockCategory {
-  id: number;
-  name: string;
-  active: boolean;
-}
-
-interface PagedStockItemsResponse {
-  data: StockItem[];
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-}
-
-const PAGE_SIZE = 100;
 
 export default function StockItems() {
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });

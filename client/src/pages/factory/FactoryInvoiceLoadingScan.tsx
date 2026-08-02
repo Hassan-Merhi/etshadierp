@@ -42,95 +42,10 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 
+import type { LoadingSummaryResponse } from "./factoryinvoiceloadingscan/types";
+import { fmtTime } from "./factoryinvoiceloadingscan/utils";
+import { StatusBadge } from "./factoryinvoiceloadingscan/components/StatusBadge";
 // ── Types ──────────────────────────────────────────────────────────────────────
-
-interface InvoiceSummary {
-  id: number;
-  customerId: number;
-  invoiceNumber: string | null;
-  orderDate: string;
-  status: string;
-  totalQtyBales: number;
-  grandTotal: string;
-  containerNumber: string | null;
-  customerName: string | null;
-  customerCode: string | null;
-}
-
-interface LineSummary {
-  lineId: number;
-  articleCode: string;
-  productName: string;
-  invoiceQty: number;
-  invoiceWeight: number;
-  alreadyLoaded: number;
-  currentSessionLoaded: number;
-  remaining: number;
-  pricePerBale: string;
-}
-
-interface SessionSummary {
-  id: number;
-  status: string;
-  truckNo: string | null;
-  driverName: string | null;
-  notes: string | null;
-  startedAt: string;
-  completedAt: string | null;
-  cancelledAt: string | null;
-  createdByName: string | null;
-  totalBales: number;
-}
-
-interface InvoiceBale {
-  baleId: number;
-  baleReference: string;
-  articleCode: string | null;
-  productName: string | null;
-  weightKg: string;
-  loaded: boolean;
-  loadedSessionId: number | null;
-  loadedAt: string | null;
-}
-
-interface CurrentSessionBale {
-  id: number;
-  sessionId: number;
-  baleId: number;
-  baleReference: string;
-  articleCode: string | null;
-  productName: string | null;
-  weightKg: string;
-  scannedAt: string;
-  scannedByName: string | null;
-}
-
-interface LoadingSummaryResponse {
-  invoice: InvoiceSummary;
-  lines: LineSummary[];
-  totals: { invoiceBales: number; alreadyLoaded: number; remaining: number };
-  sessions: SessionSummary[];
-  invoiceBales: InvoiceBale[];
-  currentSessionBales: CurrentSessionBale[];
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-function StatusBadge({ status }: { status: string }) {
-  if (status === "OPEN")
-    return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">Open</Badge>;
-  if (status === "COMPLETED")
-    return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Completed</Badge>;
-  if (status === "CANCELLED") return <Badge variant="secondary">Cancelled</Badge>;
-  return <Badge variant="outline">{status}</Badge>;
-}
-
-function fmtTime(iso: string | null | undefined) {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleString();
-}
-
-// ── Main Page ──────────────────────────────────────────────────────────────────
 
 export default function FactoryInvoiceLoadingScan() {
   const [, navigate] = useLocation();

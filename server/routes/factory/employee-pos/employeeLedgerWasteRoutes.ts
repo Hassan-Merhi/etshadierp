@@ -5,7 +5,7 @@ import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
-import { buildBrokerStatement } from "../suppliers/supplierBrokerRoutes";
+import { buildBrokerStatement } from "../suppliers/broker";
 import { adjustInventory } from "../../../inventoryHelper";
 import {
   writeDaybookEntry,
@@ -130,8 +130,9 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // Load all relevant data
-      const [allBalesRaw, allProducts, allCategories, pendingOrderBaleIdsRaw, staleOrderBaleIdsRaw] = await Promise.all([
-        db.execute(sql`
+      const [allBalesRaw, allProducts, allCategories, pendingOrderBaleIdsRaw, staleOrderBaleIdsRaw] = await Promise.all(
+        [
+          db.execute(sql`
           SELECT
             fb.id,
             fb.product_id AS "productId",
@@ -153,38 +154,39 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
             OR fb.created_at >= NOW() - INTERVAL '90 days'
           )
         `),
-        db
-          .select({
-            id: factoryBaleProducts.id,
-            name: factoryBaleProducts.name,
-            articleCode: factoryBaleProducts.articleCode,
-            categoryId: factoryBaleProducts.categoryId,
-            productionPrice: factoryBaleProducts.productionPrice,
-          })
-          .from(factoryBaleProducts)
-          .where(eq(factoryBaleProducts.companyId, companyId)),
-        db
-          .select({ id: factoryCategories.id, name: factoryCategories.name })
-          .from(factoryCategories)
-          .where(eq(factoryCategories.companyId, companyId)),
-        // Bale IDs linked to orders currently in LOADING / PENDING_VERIFICATION / VERIFIED
-        db.execute(sql`
+          db
+            .select({
+              id: factoryBaleProducts.id,
+              name: factoryBaleProducts.name,
+              articleCode: factoryBaleProducts.articleCode,
+              categoryId: factoryBaleProducts.categoryId,
+              productionPrice: factoryBaleProducts.productionPrice,
+            })
+            .from(factoryBaleProducts)
+            .where(eq(factoryBaleProducts.companyId, companyId)),
+          db
+            .select({ id: factoryCategories.id, name: factoryCategories.name })
+            .from(factoryCategories)
+            .where(eq(factoryCategories.companyId, companyId)),
+          // Bale IDs linked to orders currently in LOADING / PENDING_VERIFICATION / VERIFIED
+          db.execute(sql`
           SELECT DISTINCT cob.bale_id AS "baleId"
           FROM customer_order_bales cob
           INNER JOIN customer_orders co ON co.id = cob.order_id
           WHERE co.company_id = ${companyId}
           AND co.status IN ('LOADING', 'PENDING_VERIFICATION', 'VERIFIED')
         `),
-        // Stale bale IDs: bale DB status was never updated after the order completed.
-        // These are physically gone — exclude from in-stock, matching Location Inventory logic.
-        db.execute(sql`
+          // Stale bale IDs: bale DB status was never updated after the order completed.
+          // These are physically gone — exclude from in-stock, matching Location Inventory logic.
+          db.execute(sql`
           SELECT DISTINCT cob.bale_id AS "baleId"
           FROM customer_order_bales cob
           INNER JOIN customer_orders co ON co.id = cob.order_id
           WHERE co.company_id = ${companyId}
           AND co.status IN ('FINALIZED', 'DISPATCHED', 'SOLD')
         `),
-      ]);
+        ]
+      );
 
       const allBales: any[] = Array.isArray(allBalesRaw) ? allBalesRaw : (allBalesRaw as any).rows || [];
       const pendingOrderBaleIds = new Set<number>(
@@ -195,10 +197,9 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       );
       // Bales physically gone but DB status not yet updated to SOLD/DISPATCHED
       const staleOrderBaleIds = new Set<number>(
-        (Array.isArray(staleOrderBaleIdsRaw)
-          ? staleOrderBaleIdsRaw
-          : (staleOrderBaleIdsRaw as any).rows || []
-        ).map((r: any) => Number(r.baleId))
+        (Array.isArray(staleOrderBaleIdsRaw) ? staleOrderBaleIdsRaw : (staleOrderBaleIdsRaw as any).rows || []).map(
+          (r: any) => Number(r.baleId)
+        )
       );
 
       // Identify waste categories (garbage or wiper)
@@ -398,8 +399,9 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
 
       const productId = productIdParam === "null" || productIdParam === undefined ? null : parseInt(productIdParam, 10);
 
-      const [allBalesRaw, allProducts, allCategories, pendingOrderBaleIdsRaw, staleOrderBaleIdsRaw] = await Promise.all([
-        db.execute(sql`
+      const [allBalesRaw, allProducts, allCategories, pendingOrderBaleIdsRaw, staleOrderBaleIdsRaw] = await Promise.all(
+        [
+          db.execute(sql`
           SELECT
             fb.id,
             fb.product_id AS "productId",
@@ -413,39 +415,41 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
           AND fb.status IN ('IN_STOCK', 'FINALIZED', 'SOLD', 'DISPATCHED', 'RESERVED_FOR_ORDER')
           AND (${productId === null} AND fb.product_id IS NULL OR fb.product_id = ${productId})
         `),
-        db
-          .select({
-            id: factoryBaleProducts.id,
-            categoryId: factoryBaleProducts.categoryId,
-            productionPrice: factoryBaleProducts.productionPrice,
-          })
-          .from(factoryBaleProducts)
-          .where(eq(factoryBaleProducts.companyId, companyId)),
-        db
-          .select({ id: factoryCategories.id, name: factoryCategories.name })
-          .from(factoryCategories)
-          .where(eq(factoryCategories.companyId, companyId)),
-        db.execute(sql`
+          db
+            .select({
+              id: factoryBaleProducts.id,
+              categoryId: factoryBaleProducts.categoryId,
+              productionPrice: factoryBaleProducts.productionPrice,
+            })
+            .from(factoryBaleProducts)
+            .where(eq(factoryBaleProducts.companyId, companyId)),
+          db
+            .select({ id: factoryCategories.id, name: factoryCategories.name })
+            .from(factoryCategories)
+            .where(eq(factoryCategories.companyId, companyId)),
+          db.execute(sql`
           SELECT DISTINCT cob.bale_id AS "baleId"
           FROM customer_order_bales cob
           INNER JOIN customer_orders co ON co.id = cob.order_id
           WHERE co.company_id = ${companyId}
           AND co.status IN ('LOADING', 'PENDING_VERIFICATION', 'VERIFIED')
         `),
-        db.execute(sql`
+          db.execute(sql`
           SELECT DISTINCT cob.bale_id AS "baleId"
           FROM customer_order_bales cob
           INNER JOIN customer_orders co ON co.id = cob.order_id
           WHERE co.company_id = ${companyId}
           AND co.status IN ('FINALIZED', 'DISPATCHED', 'SOLD')
         `),
-      ]);
+        ]
+      );
 
       const allBales: any[] = Array.isArray(allBalesRaw) ? allBalesRaw : (allBalesRaw as any).rows || [];
       const pendingOrderBaleIds = new Set<number>(
-        (Array.isArray(pendingOrderBaleIdsRaw) ? pendingOrderBaleIdsRaw : (pendingOrderBaleIdsRaw as any).rows || []).map(
-          (r: any) => Number(r.baleId)
-        )
+        (Array.isArray(pendingOrderBaleIdsRaw)
+          ? pendingOrderBaleIdsRaw
+          : (pendingOrderBaleIdsRaw as any).rows || []
+        ).map((r: any) => Number(r.baleId))
       );
       const staleOrderBaleIds = new Set<number>(
         (Array.isArray(staleOrderBaleIdsRaw) ? staleOrderBaleIdsRaw : (staleOrderBaleIdsRaw as any).rows || []).map(

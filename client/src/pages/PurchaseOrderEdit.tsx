@@ -10,107 +10,16 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/componen
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Loader2, Plus, Trash2, Save, Search, Check, ChevronsUpDown, RefreshCw } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, Trash2, Save, Search, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatCurrency } from "@/lib/formatNumber";
 import { PageHeader } from "@/components/PageHeader";
 import { useCompany } from "@/contexts/CompanyContext";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { cn } from "@/lib/utils";
 
-interface LineItem {
-  id?: number;
-  stockItemId: number | null;
-  itemName: string;
-  quantity: string;
-  rate: string;
-  lineTotal?: string;
-}
-
-interface StockItem {
-  id: number;
-  name: string;
-  code: string;
-}
-
-interface PurchaseOrder {
-  id: number;
-  poNumber: string;
-  supplierId: number;
-  supplierName: string;
-  supplierCode: string;
-  containerId: number;
-  containerNumber: string;
-  currency: string;
-  itemsTotal: string;
-  freight: string;
-  surcharge: string;
-  fumigation: string;
-  documentCharges: string;
-  discount: string;
-  otherCharges: string;
-  status: string;
-  items: LineItem[];
-  freightPaidBy?: string;
-  freightOwnAccountId?: number | null;
-  freightParentAccountId?: number | null;
-}
-
-function FreightAccountPicker({
-  value,
-  onValueChange,
-  accounts,
-}: {
-  value: string;
-  onValueChange: (value: string) => void;
-  accounts: Array<{ id: number; name: string }>;
-}) {
-  const [open, setOpen] = useState(false);
-  const selected = accounts.find((a) => a.id.toString() === value);
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className="w-full justify-between font-normal"
-          data-testid="button-freight-account"
-        >
-          {selected ? selected.name : "Select account..."}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-full p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Search accounts..." />
-          <CommandList>
-            <CommandEmpty>No account found.</CommandEmpty>
-            <CommandGroup>
-              {accounts.map((acct) => (
-                <CommandItem
-                  key={acct.id}
-                  value={acct.name}
-                  onSelect={() => {
-                    onValueChange(acct.id.toString());
-                    setOpen(false);
-                  }}
-                >
-                  <Check className={cn("mr-2 h-4 w-4", value === acct.id.toString() ? "opacity-100" : "opacity-0")} />
-                  {acct.name}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
+import type { LineItem, PurchaseOrder, StockItem } from "./purchaseorderedit/types";
+import { FreightAccountPicker } from "./purchaseorderedit/components/FreightAccountPicker";
 export default function PurchaseOrderEdit() {
   const [, params] = useRoute("/purchase-orders/:id/edit");
   const [, navigate] = useLocation();

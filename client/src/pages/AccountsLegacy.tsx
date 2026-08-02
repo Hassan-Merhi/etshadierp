@@ -2,20 +2,7 @@ import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
-import {
-  Plus,
-  Search,
-  Edit,
-  FileText,
-  ChevronsUpDown,
-  Check,
-  X,
-  ArrowRight,
-  TrendingUp,
-  TrendingDown,
-  Trash2,
-  Wrench,
-} from "lucide-react";
+import { Plus, Search, Edit, FileText, ChevronsUpDown, Check, X, ArrowRight, Trash2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
@@ -40,17 +27,11 @@ import { useEscapeBack } from "@/hooks/use-escape-back";
 import { getDefaultPeriodValue, PeriodFilterValue } from "@/components/ui/period-filter";
 import { useReactToPrint } from "react-to-print";
 
-import { Account, Transaction, GroupedVoucher, WaRule, WaChat, exportLabels } from "./accounts/accountTypes";
+import { Account, Transaction, WaRule, WaChat, exportLabels } from "./accounts/accountTypes";
 import { AccountDialogs } from "./accounts/AccountDialogs";
 import { AccountTable } from "./accounts/AccountTable";
 import { AccountStatementView } from "./accounts/AccountStatementView";
-import {
-  LedgerAccount,
-  BankAccount,
-  insertLedgerAccountSchema,
-  insertBankAccountSchema,
-  updateLedgerAccountSchema,
-} from "@shared/schema";
+import { LedgerAccount, BankAccount, insertBankAccountSchema, updateLedgerAccountSchema } from "@shared/schema";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -66,28 +47,7 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { useDebounce } from "@/hooks/use-debounce";
 
-// Maps a voucher's stored type to the vouchers-page tab that edits it.
-// Mirrors the mapping used in Daybook/OptionalVouchers; falls back to "payment".
-const VOUCHER_TYPE_TAB_MAP: Record<string, string> = {
-  PurchaseOrder: "purchase-order",
-  Payment: "payment",
-  Receipt: "receipt",
-  Journal: "journal",
-  Contra: "contra",
-  StockTransfer: "transferorder",
-  "Stock Transfer": "transferorder",
-  Transfer: "transfer",
-  "Credit Note": "credit-note",
-  "Debit Note": "credit-note",
-  Production: "adjustment",
-  Consumption: "adjustment",
-  Mixed: "adjustment",
-};
-
-function voucherTypeToTab(voucherType: string): string {
-  return VOUCHER_TYPE_TAB_MAP[voucherType] ?? "payment";
-}
-
+import { voucherTypeToTab } from "./accountslegacy/utils";
 export default function Accounts() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
@@ -355,7 +315,13 @@ export default function Accounts() {
   });
 
   // ─── WhatsApp rule state ─────────────────────────────────────────────────
-  const defaultWaRule: WaRule = { enabled: false, whatsappChatId: "", sendOnPayment: true, sendOnReceipt: true, sendOnJournal: true };
+  const defaultWaRule: WaRule = {
+    enabled: false,
+    whatsappChatId: "",
+    sendOnPayment: true,
+    sendOnReceipt: true,
+    sendOnJournal: true,
+  };
   const [waRuleDialogOpen, setWaRuleDialogOpen] = useState(false);
   const [waRuleDraft, setWaRuleDraft] = useState<WaRule>(defaultWaRule);
   const [waChatSearch, setWaChatSearch] = useState("");
@@ -416,15 +382,20 @@ export default function Accounts() {
 
   const sendWaStatementMutation = useMutation({
     mutationFn: async ({ accountId, month }: { accountId: number; month: string }) => {
-      const url = appMode === "factory"
-        ? `/api/factory/accounts/${accountId}/send-statement-whatsapp`
-        : `/api/accounts/${accountId}/send-statement-whatsapp`;
+      const url =
+        appMode === "factory"
+          ? `/api/factory/accounts/${accountId}/send-statement-whatsapp`
+          : `/api/accounts/${accountId}/send-statement-whatsapp`;
       const res = await apiRequest("POST", url, { month });
       if (!res.ok) throw new Error((await res.json()).message || "Send failed");
       return res.json();
     },
-    onSuccess: () => { toast({ title: "Statement sent to WhatsApp" }); },
-    onError: (err: any) => { toast({ title: "WhatsApp send failed", description: err?.message, variant: "destructive" }); },
+    onSuccess: () => {
+      toast({ title: "Statement sent to WhatsApp" });
+    },
+    onError: (err: any) => {
+      toast({ title: "WhatsApp send failed", description: err?.message, variant: "destructive" });
+    },
   });
 
   const printRef = useRef<HTMLDivElement>(null);
@@ -490,7 +461,11 @@ export default function Accounts() {
     enabled: !!selectedCompany,
   });
 
-  const { data: rawTransactionData, isLoading: transactionsLoading, error: transactionsQueryError } = useQuery<any>({
+  const {
+    data: rawTransactionData,
+    isLoading: transactionsLoading,
+    error: transactionsQueryError,
+  } = useQuery<any>({
     queryKey: selectedAccount
       ? [
           "account-statement",
@@ -517,10 +492,7 @@ export default function Accounts() {
       const response = await fetch(url, { credentials: "include" });
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(
-          payload?.message ||
-          `Failed to load account statement (${response.status})`
-        );
+        throw new Error(payload?.message || `Failed to load account statement (${response.status})`);
       }
       return payload;
     },
@@ -913,7 +885,9 @@ export default function Accounts() {
                     key={v.id}
                     data-testid={`button-voucher-result-${v.id}`}
                     className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
-                    onClick={() => navigate(`${modePrefix}/vouchers?edit=${v.id}&tab=${voucherTypeToTab(v.voucherType || "")}`)}
+                    onClick={() =>
+                      navigate(`${modePrefix}/vouchers?edit=${v.id}&tab=${voucherTypeToTab(v.voucherType || "")}`)
+                    }
                   >
                     <FileText className="w-4 h-4 shrink-0 text-muted-foreground" />
                     <div className="flex-1 min-w-0">
@@ -950,7 +924,11 @@ export default function Accounts() {
       <Dialog
         open={editDialogOpen}
         onOpenChange={(open) => {
-          if (!open) { setEditDialogOpen(false); setAlterSelectedAccount(null); editForm.reset(); }
+          if (!open) {
+            setEditDialogOpen(false);
+            setAlterSelectedAccount(null);
+            editForm.reset();
+          }
         }}
       >
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
@@ -959,7 +937,9 @@ export default function Accounts() {
               <Edit className="h-4 w-4 text-muted-foreground" />
               Edit Account
               {alterSelectedAccount && (
-                <span className="text-muted-foreground font-normal text-sm truncate">— {alterSelectedAccount.name}</span>
+                <span className="text-muted-foreground font-normal text-sm truncate">
+                  — {alterSelectedAccount.name}
+                </span>
               )}
             </DialogTitle>
           </DialogHeader>
@@ -976,155 +956,290 @@ export default function Accounts() {
                 {/* Code — read only */}
                 <div className="space-y-1.5">
                   <Label>Account Code</Label>
-                  <Input value={alterSelectedAccount.code} readOnly className="bg-muted font-mono text-sm" data-testid="input-alter-code" />
+                  <Input
+                    value={alterSelectedAccount.code}
+                    readOnly
+                    className="bg-muted font-mono text-sm"
+                    data-testid="input-alter-code"
+                  />
                 </div>
 
                 {/* Name */}
-                <FormField control={editForm.control} name="name" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Account Name</FormLabel>
-                    <FormControl><Input {...field} data-testid="input-alter-name" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
-                {/* Account Type */}
-                <FormField control={editForm.control} name="accountType" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Account Type</FormLabel>
-                    <Select onValueChange={(v) => { field.onChange(v); editForm.setValue("subType", ""); }} value={field.value || ""}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-alter-account-type"><SelectValue placeholder="Select type" /></SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {["Asset","Liability","Equity","Income","Expense","Bank","Cash","Indirect Expense","Direct Expense","Government Taxes","Loans","Duty Agent","Transporter Agent","Accounts Payable","Profit"].map((t) => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
-                {/* Sub Type */}
-                {["Income","Expense","Liability","Asset"].includes(alterAccountType || "") && (
-                  <FormField control={editForm.control} name="subType" render={({ field }) => {
-                    const subTypeOptions: Record<string, string[]> = {
-                      Income: ["Direct Income","Indirect Income"],
-                      Expense: ["Direct Expense","Indirect Expense"],
-                      Liability: ["Current Liability","Long-term Liability","Loans Payable","Output Tax","Tax Payable"],
-                      Asset: ["Current Asset","Fixed Asset","Input Tax","Tax Receivable"],
-                    };
-                    const opts = subTypeOptions[alterAccountType || ""] || [];
-                    return (
-                      <FormItem>
-                        <FormLabel>Sub Type</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value || ""}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-alter-sub-type"><SelectValue placeholder="Select sub type (optional)" /></SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {opts.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    );
-                  }} />
-                )}
-
-                {/* Opening Balance */}
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField control={editForm.control} name="openingBalance" render={({ field }) => (
+                <FormField
+                  control={editForm.control}
+                  name="name"
+                  render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Opening Balance</FormLabel>
+                      <FormLabel>Account Name</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} value={field.value ?? "0"} data-testid="input-alter-balance" />
+                        <Input {...field} data-testid="input-alter-name" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
-                  )} />
-                  <FormField control={editForm.control} name="openingBalanceSide" render={({ field }) => (
+                  )}
+                />
+
+                {/* Account Type */}
+                <FormField
+                  control={editForm.control}
+                  name="accountType"
+                  render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Balance Side</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || "Dr"}>
+                      <FormLabel>Account Type</FormLabel>
+                      <Select
+                        onValueChange={(v) => {
+                          field.onChange(v);
+                          editForm.setValue("subType", "");
+                        }}
+                        value={field.value || ""}
+                      >
                         <FormControl>
-                          <SelectTrigger data-testid="select-alter-balance-side"><SelectValue placeholder="Dr/Cr" /></SelectTrigger>
+                          <SelectTrigger data-testid="select-alter-account-type">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="Dr">Dr (Debit)</SelectItem>
-                          <SelectItem value="Cr">Cr (Credit)</SelectItem>
+                          {[
+                            "Asset",
+                            "Liability",
+                            "Equity",
+                            "Income",
+                            "Expense",
+                            "Bank",
+                            "Cash",
+                            "Indirect Expense",
+                            "Direct Expense",
+                            "Government Taxes",
+                            "Loans",
+                            "Duty Agent",
+                            "Transporter Agent",
+                            "Accounts Payable",
+                            "Profit",
+                          ].map((t) => (
+                            <SelectItem key={t} value={t}>
+                              {t}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
                     </FormItem>
-                  )} />
+                  )}
+                />
+
+                {/* Sub Type */}
+                {["Income", "Expense", "Liability", "Asset"].includes(alterAccountType || "") && (
+                  <FormField
+                    control={editForm.control}
+                    name="subType"
+                    render={({ field }) => {
+                      const subTypeOptions: Record<string, string[]> = {
+                        Income: ["Direct Income", "Indirect Income"],
+                        Expense: ["Direct Expense", "Indirect Expense"],
+                        Liability: [
+                          "Current Liability",
+                          "Long-term Liability",
+                          "Loans Payable",
+                          "Output Tax",
+                          "Tax Payable",
+                        ],
+                        Asset: ["Current Asset", "Fixed Asset", "Input Tax", "Tax Receivable"],
+                      };
+                      const opts = subTypeOptions[alterAccountType || ""] || [];
+                      return (
+                        <FormItem>
+                          <FormLabel>Sub Type</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-alter-sub-type">
+                                <SelectValue placeholder="Select sub type (optional)" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {opts.map((t) => (
+                                <SelectItem key={t} value={t}>
+                                  {t}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+                )}
+
+                {/* Opening Balance */}
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={editForm.control}
+                    name="openingBalance"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Opening Balance</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            {...field}
+                            value={field.value ?? "0"}
+                            data-testid="input-alter-balance"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={editForm.control}
+                    name="openingBalanceSide"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Balance Side</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || "Dr"}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-alter-balance-side">
+                              <SelectValue placeholder="Dr/Cr" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Dr">Dr (Debit)</SelectItem>
+                            <SelectItem value="Cr">Cr (Credit)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
 
                 {/* Parent Group */}
                 {alterSelectedAccount?.subType !== "Group" && (
-                  <FormField control={editForm.control} name="parentId" render={({ field }) => {
-                    const filteredGroups = groupOptions.filter((g: any) => g.id !== alterSelectedAccount?.accountId);
-                    const selectedGroup = filteredGroups.find((g: any) => g.id === field.value);
-                    return (
-                      <FormItem className="flex flex-col">
-                        <FormLabel>Parent Group</FormLabel>
-                        <Popover open={parentGroupOpen} onOpenChange={setParentGroupOpen}>
-                          <PopoverTrigger asChild>
-                            <FormControl>
-                              <Button variant="outline" role="combobox" className="w-full justify-between font-normal" data-testid="select-alter-parent-group">
-                                <span className="truncate">{selectedGroup ? selectedGroup.name : "— No group —"}</span>
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </FormControl>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[300px] p-0">
-                            <Command>
-                              <CommandInput placeholder="Search groups…" />
-                              <CommandEmpty>No groups found.</CommandEmpty>
-                              <CommandGroup>
-                                <CommandItem value="__none__" onSelect={() => { field.onChange(null); setParentGroupOpen(false); }}>
-                                  <Check className={cn("mr-2 h-4 w-4", field.value == null ? "opacity-100" : "opacity-0")} />
-                                  — No group —
-                                </CommandItem>
-                                {filteredGroups.map((g: any) => (
-                                  <CommandItem key={g.id} value={g.name} onSelect={() => { field.onChange(g.id); setParentGroupOpen(false); }}>
-                                    <Check className={cn("mr-2 h-4 w-4", field.value === g.id ? "opacity-100" : "opacity-0")} />
-                                    {g.name}
+                  <FormField
+                    control={editForm.control}
+                    name="parentId"
+                    render={({ field }) => {
+                      const filteredGroups = groupOptions.filter((g: any) => g.id !== alterSelectedAccount?.accountId);
+                      const selectedGroup = filteredGroups.find((g: any) => g.id === field.value);
+                      return (
+                        <FormItem className="flex flex-col">
+                          <FormLabel>Parent Group</FormLabel>
+                          <Popover open={parentGroupOpen} onOpenChange={setParentGroupOpen}>
+                            <PopoverTrigger asChild>
+                              <FormControl>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  className="w-full justify-between font-normal"
+                                  data-testid="select-alter-parent-group"
+                                >
+                                  <span className="truncate">
+                                    {selectedGroup ? selectedGroup.name : "— No group —"}
+                                  </span>
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[300px] p-0">
+                              <Command>
+                                <CommandInput placeholder="Search groups…" />
+                                <CommandEmpty>No groups found.</CommandEmpty>
+                                <CommandGroup>
+                                  <CommandItem
+                                    value="__none__"
+                                    onSelect={() => {
+                                      field.onChange(null);
+                                      setParentGroupOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn("mr-2 h-4 w-4", field.value == null ? "opacity-100" : "opacity-0")}
+                                    />
+                                    — No group —
                                   </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                      </FormItem>
-                    );
-                  }} />
+                                  {filteredGroups.map((g: any) => (
+                                    <CommandItem
+                                      key={g.id}
+                                      value={g.name}
+                                      onSelect={() => {
+                                        field.onChange(g.id);
+                                        setParentGroupOpen(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          field.value === g.id ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      {g.name}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
                 )}
 
                 {/* Active toggle */}
-                <FormField control={editForm.control} name="active" render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <FormLabel>Active Status</FormLabel>
-                      <p className="text-xs text-muted-foreground mt-0.5">Account is available for new entries</p>
-                    </div>
-                    <FormControl>
-                      <Switch checked={!!field.value} onCheckedChange={field.onChange} data-testid="switch-alter-active" />
-                    </FormControl>
-                  </FormItem>
-                )} />
+                <FormField
+                  control={editForm.control}
+                  name="active"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                      <div>
+                        <FormLabel>Active Status</FormLabel>
+                        <p className="text-xs text-muted-foreground mt-0.5">Account is available for new entries</p>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={!!field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="switch-alter-active"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
 
                 <div className="flex justify-between gap-2 pt-1">
-                  <Button type="button" variant="destructive" size="sm" onClick={() => setShowDeleteAccountConfirm(true)} disabled={deleteLedgerMutation.isPending} data-testid="button-alter-delete">
-                    <Trash2 className="w-3.5 h-3.5 mr-1.5" />Delete
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setShowDeleteAccountConfirm(true)}
+                    disabled={deleteLedgerMutation.isPending}
+                    data-testid="button-alter-delete"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                    Delete
                   </Button>
                   <div className="flex gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={() => { setEditDialogOpen(false); setAlterSelectedAccount(null); editForm.reset(); }} data-testid="button-alter-cancel">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setEditDialogOpen(false);
+                        setAlterSelectedAccount(null);
+                        editForm.reset();
+                      }}
+                      data-testid="button-alter-cancel"
+                    >
                       Cancel
                     </Button>
-                    <Button type="submit" size="sm" disabled={updateLedgerMutation.isPending} data-testid="button-alter-save">
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={updateLedgerMutation.isPending}
+                      data-testid="button-alter-save"
+                    >
                       {updateLedgerMutation.isPending ? "Saving…" : "Save Changes"}
                     </Button>
                   </div>
@@ -1140,8 +1255,8 @@ export default function Accounts() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete "{alterSelectedAccount?.name}"?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this ledger account. This cannot be undone.
-              Accounts with existing transactions or child accounts cannot be deleted.
+              This will permanently delete this ledger account. This cannot be undone. Accounts with existing
+              transactions or child accounts cannot be deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

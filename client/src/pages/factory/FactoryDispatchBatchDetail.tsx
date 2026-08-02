@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -49,114 +48,9 @@ import {
 } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 
-interface BatchDetail {
-  batch: {
-    id: number;
-    batchNumber: string;
-    batchDate: string;
-    status: string;
-    currency: string;
-    priceMode: string;
-    destination: string | null;
-    notes: string | null;
-    customerId: number;
-    proformaId: number | null;
-    finalOrderId: number | null;
-  };
-  customerName: string | null;
-  proforma: { id: number; name: string; status: string } | null;
-  proformaLines: { id: number; articleCode: string; productName: string; quantity: number; pricePerBale: string }[];
-  rides: {
-    id: number;
-    rideNumber: number;
-    truckPlate: string | null;
-    driverName: string | null;
-    destination: string | null;
-    notes: string | null;
-    status: string;
-    loadedAt: string | null;
-    dispatchedAt: string | null;
-    reopenedAt: string | null;
-    reopenReason: string | null;
-    createdBy: string | null;
-    createdAt: string;
-    baleCount: number | string;
-    totalWeightKg: string;
-    totalAmount: string;
-  }[];
-  articleTotals: {
-    articleCode: string;
-    productName: string;
-    scannedQty: number | string;
-    scannedWeightKg: string;
-    scannedAmount: string;
-  }[];
-  finalInvoice: { id: number; invoiceNumber: string | null; grandTotal: string } | null;
-}
-
-interface InvoicePreview {
-  batch: any;
-  customer: any;
-  proforma: any;
-  proformaProgress: {
-    articleCode: string;
-    productName: string;
-    proformaQty: number;
-    proformaPrice: string;
-    scannedQty: number;
-    remaining: number;
-    totalAmount: string;
-  }[];
-  rides: {
-    id: number;
-    rideNumber: number;
-    truckPlate: string | null;
-    status: string;
-    baleCount: number | string;
-    totalWeightKg: string;
-    totalAmount: string;
-  }[];
-  articleLines: {
-    articleCode: string;
-    productName: string;
-    qty: number | string;
-    totalWeightKg: string;
-    totalAmount: string;
-  }[];
-  totals: { totalBales: number | string; totalWeightKg: string; grandTotal: string };
-  loadingRides: number;
-  dispatchedRides: number;
-  canGenerate: boolean;
-  blockers: string[];
-}
-
-const RIDE_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  DRAFT: { label: "Draft", className: "bg-muted text-muted-foreground" },
-  LOADING: { label: "Loading", className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
-  DISPATCHED: { label: "Dispatched", className: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" },
-  COMPLETED: { label: "Completed", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
-  CANCELLED: { label: "Cancelled", className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
-};
-
-function RideStatusBadge({ status }: { status: string }) {
-  const cfg = RIDE_STATUS_CONFIG[status] || { label: status, className: "" };
-  return <Badge className={cfg.className}>{cfg.label}</Badge>;
-}
-
-const BATCH_STATUS_CONFIG = {
-  DRAFT: { label: "Draft", className: "bg-muted text-muted-foreground" },
-  LOADING: { label: "Loading", className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
-  DISPATCHED: { label: "Dispatched", className: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" },
-  INVOICED: { label: "Invoiced", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
-  CANCELLED: { label: "Cancelled", className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
-} as Record<string, { label: string; className: string }>;
-
-function fmt(n: number | string, decimals = 2) {
-  const v = typeof n === "string" ? parseFloat(n) : n;
-  if (isNaN(v)) return "0";
-  return v.toLocaleString(undefined, { maximumFractionDigits: decimals });
-}
-
+import type { BatchDetail, InvoicePreview } from "./factorydispatchbatchdetail/types";
+import { BATCH_STATUS_CONFIG, fmt } from "./factorydispatchbatchdetail/utils";
+import { RideStatusBadge } from "./factorydispatchbatchdetail/components/RideStatusBadge";
 export default function FactoryDispatchBatchDetail() {
   const [, navigate] = useLocation();
   const [, params] = useRoute("/factory/dispatch-batches/:id");

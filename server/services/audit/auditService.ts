@@ -109,8 +109,12 @@ export function buildAuditChanges(
   for (const key of keys) {
     const oldValue = before?.[key];
     const newValue = after?.[key];
-    if (JSON.stringify(sanitizeAuditValue(oldValue, key)) === JSON.stringify(sanitizeAuditValue(newValue, key)))
-      continue;
+    // Compare the raw values, not the sanitized ones. Sanitizing first made
+    // every redacted field compare equal to itself - "[REDACTED]" === -
+    // "[REDACTED]" - so a password or token change was dropped here and never
+    // reached the audit log at all. Redaction still happens, once, in the
+    // sanitizeAuditChanges call below.
+    if (JSON.stringify(oldValue) === JSON.stringify(newValue)) continue;
     changes[key] = {
       ...(before && Object.prototype.hasOwnProperty.call(before, key) ? { old: oldValue } : {}),
       ...(after && Object.prototype.hasOwnProperty.call(after, key) ? { new: newValue } : {}),

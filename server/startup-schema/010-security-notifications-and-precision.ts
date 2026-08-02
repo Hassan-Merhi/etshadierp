@@ -751,19 +751,31 @@ END $$`,
   `ALTER TABLE factory_container_receipts ADD CONSTRAINT fcr_container_fkey FOREIGN KEY (container_id) REFERENCES factory_containers(id) ON DELETE RESTRICT`,
   `CREATE UNIQUE INDEX IF NOT EXISTS factory_container_receipts_idempotency_idx ON factory_container_receipts(company_id, container_id, idempotency_key) WHERE idempotency_key IS NOT NULL`,
 
-  // -- Per-KG cost/rate/price column precision: upgrade to numeric(x,6) (July 2026) --
-  // Standardise every per-KG cost, rate, and price column in the Factory module
-  // to exactly 6 decimal places. Re-running on an already-upgraded column is safe:
-  // PostgreSQL silently accepts ALTER COLUMN TYPE to the same type, and
-  // ROUND(col::numeric, 6) is a no-op on values that are already 6-dp.
+  // -- Per-KG column precision (July 2026, cost columns raised to 7dp) --
+  // Rule: a *cost* per KG is 7 decimal places; a rate, price or commission the
+  // user types in stays at 6.
+  //
+  // This block previously rounded every per-KG column to 6dp, including
+  // factory_mix_batches.cost_per_kg — which an earlier block in this same array
+  // had just raised to NUMERIC(20,7). The two contradicted each other, so the
+  // column's real scale depended on which statement a given run reached last:
+  // application boot ended at 6, the test harness at 7, on the same database.
+  // Worse, `USING ROUND(col, 6)` is not a no-op in that direction - it discards
+  // the 7th decimal from stored values every time it runs.
+  //
+  // Cost columns are computed and then multiplied by tonne-scale weights, so a
+  // rounding error compounds; that was the reason for 7dp in the first place.
+  // Rates and prices are entered by hand and 6dp is plenty. Widening 6 -> 7
+  // cannot truncate an existing value, and ROUND(col, 7) is a genuine no-op on
+  // data that is already 7dp.
   `ALTER TABLE factory_containers ALTER COLUMN rate_per_kg TYPE numeric(20,6) USING ROUND(rate_per_kg::numeric, 6)`,
   `ALTER TABLE factory_containers ALTER COLUMN rate_per_kg_usd TYPE numeric(20,6) USING ROUND(rate_per_kg_usd::numeric, 6)`,
   // factory_raw_stock cost_per_kg / cost_per_kg_usd were incorrectly assumed to already be
   // scale-6 in the original migration batch — production still has NUMERIC(20,4). Upgrade now.
-  `ALTER TABLE factory_raw_stock ALTER COLUMN cost_per_kg TYPE numeric(20,6) USING ROUND(cost_per_kg::numeric, 6)`,
-  `ALTER TABLE factory_raw_stock ALTER COLUMN cost_per_kg_usd TYPE numeric(20,6) USING ROUND(cost_per_kg_usd::numeric, 6)`,
-  `ALTER TABLE factory_raw_material_adjustments ALTER COLUMN cost_per_kg TYPE numeric(20,6) USING ROUND(cost_per_kg::numeric, 6)`,
-  `ALTER TABLE factory_mix_batches ALTER COLUMN cost_per_kg TYPE numeric(20,6) USING ROUND(cost_per_kg::numeric, 6)`,
+  `ALTER TABLE factory_raw_stock ALTER COLUMN cost_per_kg TYPE numeric(20,7) USING ROUND(cost_per_kg::numeric, 7)`,
+  `ALTER TABLE factory_raw_stock ALTER COLUMN cost_per_kg_usd TYPE numeric(20,7) USING ROUND(cost_per_kg_usd::numeric, 7)`,
+  `ALTER TABLE factory_raw_material_adjustments ALTER COLUMN cost_per_kg TYPE numeric(20,7) USING ROUND(cost_per_kg::numeric, 7)`,
+  `ALTER TABLE factory_mix_batches ALTER COLUMN cost_per_kg TYPE numeric(20,7) USING ROUND(cost_per_kg::numeric, 7)`,
   `ALTER TABLE factory_container_commissions ALTER COLUMN commission_rate TYPE numeric(20,6) USING ROUND(commission_rate::numeric, 6)`,
   `ALTER TABLE customer_proforma_lines ALTER COLUMN price_per_kg TYPE numeric(20,6) USING ROUND(price_per_kg::numeric, 6)`,
   `ALTER TABLE customer_order_lines ALTER COLUMN price_per_kg TYPE numeric(20,6) USING ROUND(price_per_kg::numeric, 6)`,

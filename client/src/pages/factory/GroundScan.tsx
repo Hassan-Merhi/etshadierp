@@ -33,78 +33,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import * as XLSX from "@/lib/excelHelper";
 import { formatNumber } from "@/lib/formatNumber";
 
-interface StockLocation {
-  id: number;
-  name: string;
-  count: number;
-}
-
-interface ScannedBale {
-  refCode: string;
-  articleCode: string;
-  productName: string;
-  weightKg: number;
-  status: string;
-  isInLoadingOrder?: boolean;
-  scannedAt: Date;
-  dateBaleProduced: string | null;
-  workerName: string | null;
-}
-
-interface GroundScanItem {
-  id: number;
-  location_id: number | null;
-  reference_number: string;
-  article_code: string | null;
-  product_name: string | null;
-  weight_kg: string | null;
-  status: string | null;
-  is_in_loading_order: boolean;
-  scanned_at: string;
-  date_bale_produced: string | null;
-  worker_name: string | null;
-}
-
-function rowToScannedBale(r: GroundScanItem): ScannedBale {
-  return {
-    refCode: r.reference_number,
-    articleCode: r.article_code || "",
-    productName: r.product_name || "Unknown",
-    weightKg: parseFloat(r.weight_kg || "0"),
-    status: r.status || "",
-    isInLoadingOrder: r.is_in_loading_order,
-    scannedAt: new Date(r.scanned_at),
-    dateBaleProduced: r.date_bale_produced ?? null,
-    workerName: r.worker_name ?? null,
-  };
-}
-
-function StatusBadge({ status, isInLoadingOrder }: { status: string; isInLoadingOrder?: boolean }) {
-  const s = (status || "").toUpperCase();
-  if ((s === "IN_STOCK" || s === "LOADING" || s === "LOADED") && isInLoadingOrder)
-    return <Badge className="bg-amber-500 text-white border-0">Loading</Badge>;
-  if (s === "IN_STOCK") return <Badge className="bg-green-600 text-white border-0">In Stock</Badge>;
-  if (s === "LOADING" || s === "LOADED") return <Badge className="bg-amber-500 text-white border-0">Loading</Badge>;
-  if (s === "SOLD") return <Badge className="bg-red-600 text-white border-0">Sold</Badge>;
-  if (s === "RESERVED_FOR_ORDER") return <Badge className="bg-blue-600 text-white border-0">Reserved</Badge>;
-  if (s === "LABEL_PRINTED") return <Badge variant="outline">Label Printed</Badge>;
-  return <Badge variant="outline">{status}</Badge>;
-}
-
-const STORAGE_KEY = "ground_scan_bales";
-const LOCATION_KEY = "ground_scan_locationId";
-
-function loadLocalBales(): ScannedBale[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as (Omit<ScannedBale, "scannedAt"> & { scannedAt: string })[];
-    return parsed.map((b) => ({ ...b, scannedAt: new Date(b.scannedAt) }));
-  } catch {
-    return [];
-  }
-}
-
+import type { GroundScanItem, ScannedBale, StockLocation } from "./groundscan/types";
+import { LOCATION_KEY, STORAGE_KEY, loadLocalBales, rowToScannedBale } from "./groundscan/utils";
+import { StatusBadge } from "./groundscan/components/StatusBadge";
 export default function GroundScan() {
   const [scanInput, setScanInput] = useState("");
   const [scanning, setScanning] = useState(false);

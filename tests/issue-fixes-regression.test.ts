@@ -91,12 +91,7 @@ async function insertMixBatch(companyId: number, costPerKg: string, totalWeight:
   return r.rows[0].id as number;
 }
 
-async function insertMixBatchSource(
-  batchId: number,
-  containerId: number,
-  weightKg: string,
-  costPerKg: string
-) {
+async function insertMixBatchSource(batchId: number, containerId: number, weightKg: string, costPerKg: string) {
   const totalCost = new Decimal(weightKg).times(new Decimal(costPerKg)).toFixed(7);
   const r = await pool.query(
     `INSERT INTO factory_mix_batch_sources (mix_batch_id, container_id, weight_kg, cost_per_kg, total_cost, created_at)
@@ -138,9 +133,7 @@ describe("Issue 1 – SQL parameter placeholders in ledger queries", () => {
     // With the old ${params.length} bug the company filter was injected as a
     // literal number (e.g. "3") rather than a positional $3, causing a parse
     // error or wrong results.
-    const res = await agent
-      .get(`/api/accounts/${ctx.cashAccountId}/statement`)
-      .query({ companyId: ctx.companyId });
+    const res = await agent.get(`/api/accounts/${ctx.cashAccountId}/statement`).query({ companyId: ctx.companyId });
     // The query must not throw a 500 (broken SQL syntax).
     expect(res.status).not.toBe(500);
     // Any 200 or 400 means the SQL ran without a syntax error.
@@ -190,9 +183,7 @@ describe("Issue 2 – PATCH freight canonicalization preserves existing values o
 
   it("partial PATCH (changing notes only) does NOT clear freightSupplierId", async () => {
     // Simulate a partial PATCH that only sends unrelated fields.
-    const res = await agent
-      .patch(`/api/factory/containers/${containerId}`)
-      .send({ notes: "just a notes update" });
+    const res = await agent.patch(`/api/factory/containers/${containerId}`).send({ notes: "just a notes update" });
     // Should not be a 500 (bug would have tried to apply freight rules with undefined freight)
     expect(res.status).not.toBe(500);
     // After a partial patch that doesn't touch freight, freightSupplierId must not be cleared
@@ -358,14 +349,48 @@ describe("Issue 5 – recomputeBatchAndCascadeBales uses Decimal.js (no float dr
     }
   });
 
-  it("precision migration: factory_mix_batches.cost_per_kg has at least scale 7 in DB", async () => {
-    const r = await pool.query(
-      `SELECT numeric_scale FROM information_schema.columns
-       WHERE table_name = 'factory_mix_batches' AND column_name = 'cost_per_kg'`
-    );
-    if (r.rows.length > 0 && r.rows[0].numeric_scale !== null) {
-      expect(r.rows[0].numeric_scale).toBeGreaterThanOrEqual(7);
+  it("every Factory cost-per-KG column is 7dp, on whichever path built the database", async () => {
+    // This used to record a defect rather than assert a rule. Two entries in the
+    // same startup-migration array disagreed: one raised
+    // factory_mix_batches.cost_per_kg to NUMERIC(20,7), a later one rounded it
+    // back to NUMERIC(20,6) - and `USING ROUND(col, 6)` is not a no-op in that
+    // direction, it discarded the 7th decimal on every run. So the column's real
+    // scale depended on which statement a run reached last: application boot
+    // ended at 6, this harness at 7, on the same freshly created database.
+    //
+    // Resolved to 7 everywhere: costs are computed then multiplied by tonne-scale
+    // weights, so rounding compounds. Rates and prices a user types in are left
+    // at 6 and are deliberately not listed here.
+    //
+    // Asserted for all cost columns at once, because the bug was one table being
+    // missed while its siblings were updated.
+    const columns = [
+      ["factory_mix_batches", "cost_per_kg"],
+      ["factory_mix_batch_sources", "cost_per_kg"],
+      ["factory_bales", "cost_per_kg"],
+      ["factory_raw_stock", "cost_per_kg"],
+      ["factory_raw_stock", "cost_per_kg_usd"],
+      ["factory_raw_material_adjustments", "cost_per_kg"],
+    ] as const;
+
+    const scales: Record<string, number | null> = {};
+    for (const [table, column] of columns) {
+      const r = await pool.query(
+        `SELECT numeric_scale FROM information_schema.columns
+         WHERE table_name = $1 AND column_name = $2`,
+        [table, column]
+      );
+      scales[`${table}.${column}`] = r.rows.length ? Number(r.rows[0].numeric_scale) : null;
     }
+
+    expect(scales).toEqual({
+      "factory_mix_batches.cost_per_kg": 7,
+      "factory_mix_batch_sources.cost_per_kg": 7,
+      "factory_bales.cost_per_kg": 7,
+      "factory_raw_stock.cost_per_kg": 7,
+      "factory_raw_stock.cost_per_kg_usd": 7,
+      "factory_raw_material_adjustments.cost_per_kg": 7,
+    });
   });
 
   it("precision migration: factory_bales.cost_per_kg has at least scale 7 in DB", async () => {

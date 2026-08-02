@@ -7,7 +7,7 @@ import { db } from "../db";
 import { eq, and, inArray, ne } from "drizzle-orm";
 import ExcelJS from "exceljs";
 import { buildAliasMap, resolveBarcode } from "./helpers/proformaBarcodeHelpers";
-import { registerContainerLoadedItemsRoutes } from "./containerLoadedItemsRoutes";
+import { registerContainerLoadedItemsRoutes } from "./container-loaded-items";
 import {
   supplierProformas,
   supplierProformaLines,
@@ -312,7 +312,6 @@ export function registerSupplierProformaRoutes(app: Express, requireAuth: any) {
   });
 
   registerContainerLoadedItemsRoutes(app, requireAuth);
-
 
   // ── Pretty Excel export for a single proforma ──────────────────────────────
   app.get("/api/suppliers/:supplierId/proformas/:proformaId/export-excel", requireAuth, async (req: any, res: any) => {

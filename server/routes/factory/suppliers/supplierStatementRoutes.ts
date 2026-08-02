@@ -123,6 +123,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { buildBrokerStatement, isSupplierPaidFreight } from "./_supplierStatementHelpers";
+import { buildLinkedSupplierGroups } from "./linkedSupplierGroups";
 
 export function registerSupplierStatementRoutes(app: Express) {
   app.get("/api/factory/suppliers/:id/statement", requireAuth, async (req: any, res: any) => {
@@ -767,133 +768,9 @@ export function registerSupplierStatementRoutes(app: Express) {
         }));
       const totalObCommissions = obCommissions.reduce((sum: number, c: any) => sum + parseFloat(c.amountUsd || "0"), 0);
 
-      // Phase 2: Broker statement — aggregate linked suppliers if this is a broker
-      const linkedSuppliers = await db
-        .select({ id: factorySuppliers.id, name: factorySuppliers.name })
-        .from(factorySuppliers)
-        .where(and(eq(factorySuppliers.parentId, supplierId), eq(factorySuppliers.companyId, companyId)));
-
-      const linkedSupplierGroups: any[] = [];
-      for (const linked of linkedSuppliers) {
-        const linkedContainers = await db
-          .select()
-          .from(factoryContainers)
-          .where(and(eq(factoryContainers.companyId, companyId), eq(factoryContainers.supplierId, linked.id)))
-          .orderBy(factoryContainers.arrivalDate, factoryContainers.createdAt);
-
-        const linkedPayments = await db
-          .select()
-          .from(factorySupplierPayments)
-          .where(
-            and(eq(factorySupplierPayments.companyId, companyId), eq(factorySupplierPayments.supplierId, linked.id))
-          );
-
-        const linkedFxTransfers = await db
-          .select()
-          .from(factorySupplierFxTransfers)
-          .where(
-            and(
-              eq(factorySupplierFxTransfers.companyId, companyId),
-              sql`(${factorySupplierFxTransfers.fromSupplierId} = ${linked.id} OR ${factorySupplierFxTransfers.toSupplierId} = ${linked.id})`
-            )
-          );
-
-        const linkedByCurrency: Record<string, { containers: any[]; totalValue: number; totalCommission: number }> = {};
-        for (const c of linkedContainers) {
-          const kg = parseFloat((c as any).actualReceivedKg || c.totalKg || "0");
-          const rate = parseFloat(c.ratePerKg || "0");
-          const freight = parseFloat((c as any).freight || "0");
-          const cc = c.currencyCode || "USD";
-          // Use freightCurrencyCode directly (DB default is "USD", so AUD containers correctly separate USD freight)
-          const freightCc = (c as any).freightCurrencyCode || cc;
-          const freightSameCcy = freightCc === cc;
-          // Only include freight in this currency's value when it shares the container's currency
-          const value = kg * rate + (freightSameCcy ? freight : 0);
-          const cComms = commissions.filter((cm: any) => cm.containerId === c.id);
-          const totalComm = cComms.reduce((s: number, cm: any) => s + parseFloat(cm.commissionTotal || "0"), 0);
-          const commCc = (c as any).commissionCurrencyCode || "USD";
-          if (!linkedByCurrency[cc]) linkedByCurrency[cc] = { containers: [], totalValue: 0, totalCommission: 0 };
-          linkedByCurrency[cc].containers.push({
-            id: c.id,
-            containerNumber: c.containerNumber,
-            date: (c as any).arrivalDate || c.createdAt,
-            freight: freight.toFixed(2),
-            freightCurrencyCode: freightCc,
-            value: value.toFixed(2),
-            currencyCode: cc,
-            fxRateToUsd: (() => {
-              const { fxRate, looksSet } = resolveStoredFxRate(cc, c.fxRateToUsd, (c as any).fxRateConfirmed);
-              return looksSet ? String(fxRate) : "unresolved";
-            })(),
-            status: c.status,
-            commissionAmount: c.commissionAmount || "0",
-            commissionCurrencyCode: commCc,
-            commissionSupplierId: (c as any).commissionSupplierId || null,
-            commissionNotes: (c as any).commissionNotes || null,
-            notes: c.notes,
-          });
-          linkedByCurrency[cc].totalValue += value;
-          // Cross-currency freight (e.g. USD freight on an AUD container) belongs to the
-          // child supplier's own statement — NOT to the broker's linked-supplier view.
-          // Once the child transfers it via an FX transfer, it settles on the child's
-          // statement and disappears. The broker does not need to track it here.
-          // Commission goes into its own currency bucket
-          if (totalComm > 0) {
-            if (!linkedByCurrency[commCc])
-              linkedByCurrency[commCc] = { containers: [], totalValue: 0, totalCommission: 0 };
-            linkedByCurrency[commCc].totalCommission += totalComm;
-          }
-        }
-
-        const linkedPaidByCurrency: Record<string, number> = {};
-        for (const p of linkedPayments as any[]) {
-          const cc = p.currencyCode || "USD";
-          linkedPaidByCurrency[cc] = (linkedPaidByCurrency[cc] || 0) + parseFloat(p.amount || "0");
-        }
-        for (const t of linkedFxTransfers as any[]) {
-          if (t.fromSupplierId === linked.id) {
-            // Linked supplier sent funds out (FX Out) — counts as settled against their balance
-            const cc = t.fromCurrencyCode || "USD";
-            linkedPaidByCurrency[cc] = (linkedPaidByCurrency[cc] || 0) + parseFloat(t.fromAmount || "0");
-          }
-          if (t.toSupplierId === linked.id) {
-            // Linked supplier received USD back (e.g. round-trip return from broker) —
-            // reduces net-settled so the exposure is correctly restored.
-            linkedPaidByCurrency["USD"] = (linkedPaidByCurrency["USD"] || 0) - parseFloat(t.toAmountUsd || "0");
-          }
-        }
-
-        const linkedCurrencyGroups = Object.entries(linkedByCurrency).map(([cc, data]) => {
-          const paid = linkedPaidByCurrency[cc] || 0;
-          const netPayable = data.totalValue - data.totalCommission - paid;
-          return {
-            currencyCode: cc,
-            containers: data.containers,
-            totalValue: data.totalValue.toFixed(2),
-            totalCommission: data.totalCommission.toFixed(2),
-            totalPaid: paid.toFixed(2),
-            netPayable: netPayable.toFixed(2),
-            containerCount: data.containers.length,
-            lastActivity:
-              linkedContainers.length > 0
-                ? (linkedContainers[linkedContainers.length - 1] as any).arrivalDate ||
-                  linkedContainers[linkedContainers.length - 1].createdAt
-                : null,
-          };
-        });
-
-        linkedSupplierGroups.push({
-          supplierId: linked.id,
-          supplierName: linked.name,
-          containerCount: linkedContainers.length,
-          currencyGroups: linkedCurrencyGroups,
-          lastActivity:
-            linkedContainers.length > 0
-              ? (linkedContainers[linkedContainers.length - 1] as any).arrivalDate ||
-                linkedContainers[linkedContainers.length - 1].createdAt
-              : null,
-        });
-      }
+      // Phase 2: Broker statement - per-linked-supplier rollups, built in
+      // ./linkedSupplierGroups.
+      const linkedSupplierGroups = await buildLinkedSupplierGroups(supplierId, companyId, commissions);
 
       // ── Phase 1: Fetch per-container FX allocations ──────────────────────────
       const containerIds = containers.map((c: any) => c.id);

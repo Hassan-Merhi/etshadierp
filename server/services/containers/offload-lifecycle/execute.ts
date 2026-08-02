@@ -1,0 +1,305 @@
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { db } from "../../../db";
+import * as schema from "@shared/schema";
+
+import { postChargeVouchers } from "./charge-vouchers";
+import { reverseExistingOffload } from "./reverse";
+import { postSupplierPartnerJournals } from "./sp-journals";
+import {
+  ContainerOffloadLifecycleError,
+  ContainerOffloadLifecycleInput,
+  ContainerOffloadLifecycleResult,
+  amount,
+  buildItemMap,
+  positiveIds,
+} from "./types";
+
+export async function executeContainerOffloadLifecycle(
+  input: ContainerOffloadLifecycleInput
+): Promise<ContainerOffloadLifecycleResult> {
+  return db.transaction(async (tx: any) => {
+    const [container] = await tx
+      .select()
+      .from(schema.containers)
+      .where(and(eq(schema.containers.id, input.containerId), eq(schema.containers.companyId, input.companyId)))
+      .limit(1);
+
+    if (!container) {
+      throw new ContainerOffloadLifecycleError("Container not found", 404, "CONTAINER_NOT_FOUND");
+    }
+    if (input.mode === "replace-only" && container.status !== "OFFLOADED") {
+      throw new ContainerOffloadLifecycleError(
+        "Container must be offloaded before it can be edited.",
+        409,
+        "CONTAINER_NOT_OFFLOADED"
+      );
+    }
+    if (container.status !== "OTW" && container.status !== "OFFLOADED") {
+      throw new ContainerOffloadLifecycleError(
+        `Container status ${container.status} cannot be offloaded.`,
+        409,
+        "CONTAINER_NOT_OFFLOADABLE"
+      );
+    }
+
+    const [location] = await tx
+      .select()
+      .from(schema.locations)
+      .where(
+        and(
+          eq(schema.locations.id, input.locationId),
+          eq(schema.locations.companyId, input.companyId),
+          isNull(schema.locations.deletedAt)
+        )
+      )
+      .limit(1);
+    if (!location) {
+      throw new ContainerOffloadLifecycleError(
+        "Invalid destination location for the selected company.",
+        400,
+        "CONTAINER_OFFLOAD_LOCATION_INVALID"
+      );
+    }
+
+    const purchaseOrders = await tx
+      .select()
+      .from(schema.purchaseOrders)
+      .where(
+        and(
+          eq(schema.purchaseOrders.containerId, input.containerId),
+          eq(schema.purchaseOrders.companyId, input.companyId)
+        )
+      );
+    if (purchaseOrders.length === 0) {
+      throw new ContainerOffloadLifecycleError(
+        "Container has no purchase orders to offload.",
+        400,
+        "CONTAINER_OFFLOAD_NO_PURCHASE_ORDERS"
+      );
+    }
+
+    const poIds = purchaseOrders.map((po: typeof schema.purchaseOrders.$inferSelect) => po.id);
+    const lineItems = await tx
+      .select({
+        stockItemId: schema.poLineItems.stockItemId,
+        quantity: schema.poLineItems.quantity,
+        rate: schema.poLineItems.rate,
+      })
+      .from(schema.poLineItems)
+      .where(inArray(schema.poLineItems.poId, poIds));
+    if (lineItems.length === 0) {
+      throw new ContainerOffloadLifecycleError(
+        "Container purchase orders have no line items.",
+        400,
+        "CONTAINER_OFFLOAD_NO_LINE_ITEMS"
+      );
+    }
+
+    const existingOffloads = await tx
+      .select()
+      .from(schema.containerOffloads)
+      .where(eq(schema.containerOffloads.containerId, input.containerId))
+      .orderBy(desc(schema.containerOffloads.id))
+      .limit(2);
+    if (existingOffloads.length > 1) {
+      throw new ContainerOffloadLifecycleError(
+        "Multiple offload records exist for this container. Reconcile them before editing.",
+        409,
+        "CONTAINER_OFFLOAD_DUPLICATE_RECORDS"
+      );
+    }
+    const existingOffload = existingOffloads[0] ?? null;
+    const replacing = container.status === "OFFLOADED";
+    if (replacing && !existingOffload) {
+      throw new ContainerOffloadLifecycleError(
+        "The container is marked offloaded but its offload record is missing.",
+        409,
+        "CONTAINER_OFFLOAD_RECORD_MISSING"
+      );
+    }
+    if (!replacing && existingOffload) {
+      throw new ContainerOffloadLifecycleError(
+        "An offload record already exists while the container is marked OTW.",
+        409,
+        "CONTAINER_OFFLOAD_STATE_MISMATCH"
+      );
+    }
+
+    if (existingOffload) {
+      await reverseExistingOffload(tx, container, existingOffload, lineItems);
+    }
+
+    const itemMap = buildItemMap(lineItems);
+    const totalBales = [...itemMap.values()].reduce((sum, item) => sum + item.totalQuantity, 0);
+    if (totalBales <= 0) {
+      throw new ContainerOffloadLifecycleError(
+        "Container has no positive stock quantity to offload.",
+        400,
+        "CONTAINER_OFFLOAD_ZERO_QUANTITY"
+      );
+    }
+
+    const additionalCharges = input.additionalCharges ?? [];
+    const totalCharges =
+      amount(input.duties) +
+      amount(input.officeCharges) +
+      amount(input.transferCharges) +
+      amount(input.transportFees) +
+      additionalCharges.reduce((sum, charge) => sum + charge.amount, 0) +
+      amount(container.chargesTotal);
+    const additionalCostPerBale = Math.round((totalCharges / totalBales) * 100) / 100;
+    const roundingDifference = Math.round((totalCharges - additionalCostPerBale * totalBales) * 100) / 100;
+    const storedItems: Array<{ stockItemId: number; quantity: number; rate: number; totalValue: number }> = [];
+    const entries = [...itemMap.entries()];
+
+    const validCorrectionIds = new Set(itemMap.keys());
+    for (const correction of input.inventoryCostCorrections ?? []) {
+      if (correction.correctRate <= 0 || !validCorrectionIds.has(correction.stockItemId)) continue;
+      const correctionRows = await tx.execute(
+        sql`SELECT * FROM inventory WHERE location_id = ${input.locationId} AND stock_item_id = ${correction.stockItemId} FOR UPDATE`
+      );
+      const row = correctionRows.rows?.[0] ?? correctionRows[0];
+      if (!row) continue;
+      const existingQuantity = amount(row.quantity);
+      if (existingQuantity <= 0) continue;
+      await tx
+        .update(schema.inventory)
+        .set({
+          averageRate: correction.correctRate.toFixed(2),
+          totalValue: (existingQuantity * correction.correctRate).toFixed(2),
+          lastUpdated: new Date(),
+        })
+        .where(eq(schema.inventory.id, row.id));
+    }
+
+    for (let index = 0; index < entries.length; index += 1) {
+      const [stockItemId, item] = entries[index];
+      if (item.totalQuantity === 0) continue;
+      const originalRate = item.weightedRateSum / item.totalQuantity;
+      const newRate = originalRate + additionalCostPerBale;
+      let valueCents = Math.round(item.totalQuantity * newRate * 100);
+      if (index === entries.length - 1 && roundingDifference !== 0) {
+        valueCents += Math.round(roundingDifference * 100);
+      }
+      const offloadValue = valueCents / 100;
+      const adjustedRate = offloadValue / item.totalQuantity;
+      if (!Number.isFinite(adjustedRate)) {
+        throw new ContainerOffloadLifecycleError(
+          `Calculated rate is invalid for stock item ${stockItemId}.`,
+          409,
+          "CONTAINER_OFFLOAD_RATE_INVALID"
+        );
+      }
+
+      storedItems.push({
+        stockItemId,
+        quantity: item.totalQuantity,
+        rate: adjustedRate,
+        totalValue: offloadValue,
+      });
+
+      const inventoryRows = await tx.execute(
+        sql`SELECT * FROM inventory WHERE location_id = ${input.locationId} AND stock_item_id = ${stockItemId} FOR UPDATE`
+      );
+      const current = inventoryRows.rows?.[0] ?? inventoryRows[0];
+      if (current) {
+        const currentQuantity = amount(current.quantity);
+        const currentValue = amount(current.total_value);
+        const nextQuantity = currentQuantity + item.totalQuantity;
+        let nextValue: number;
+        if (nextQuantity === 0) {
+          nextValue = 0;
+        } else if (nextQuantity < 0) {
+          nextValue = nextQuantity * adjustedRate;
+        } else if (currentQuantity < 0) {
+          nextValue = nextQuantity * Math.max(adjustedRate, 0);
+        } else {
+          nextValue = currentValue + offloadValue;
+          if (nextValue < 0) nextValue = nextQuantity * Math.max(adjustedRate, 0);
+        }
+        const nextRate = nextQuantity > 0 ? nextValue / nextQuantity : adjustedRate;
+        if (!Number.isFinite(nextRate)) {
+          throw new ContainerOffloadLifecycleError(
+            `Calculated weighted rate is invalid for stock item ${stockItemId}.`,
+            409,
+            "CONTAINER_OFFLOAD_WEIGHTED_RATE_INVALID"
+          );
+        }
+        await tx
+          .update(schema.inventory)
+          .set({
+            quantity: nextQuantity.toString(),
+            averageRate: nextRate.toFixed(2),
+            totalValue: nextValue.toFixed(2),
+            lastUpdated: new Date(),
+          })
+          .where(eq(schema.inventory.id, current.id));
+      } else {
+        await tx.insert(schema.inventory).values({
+          companyId: input.companyId,
+          locationId: input.locationId,
+          stockItemId,
+          quantity: item.totalQuantity.toString(),
+          averageRate: adjustedRate.toFixed(2),
+          totalValue: offloadValue.toFixed(2),
+          lastUpdated: new Date(),
+        });
+      }
+    }
+
+    await tx
+      .update(schema.containers)
+      .set({
+        status: "OFFLOADED",
+        offloadDate: input.offloadDate,
+        dutyFee: amount(input.duties) > 0 ? input.duties : "0",
+      })
+      .where(eq(schema.containers.id, input.containerId));
+
+    for (const po of purchaseOrders) {
+      if (!po.voucherId) continue;
+      await tx
+        .update(schema.vouchers)
+        .set({ description: `Purchase Order ${po.poNumber} - Container ${container.containerNumber} (Offloaded)` })
+        .where(eq(schema.vouchers.id, po.voucherId));
+    }
+
+    await postChargeVouchers(tx, container, input.companyId, input);
+
+    const [offload] = await tx
+      .insert(schema.containerOffloads)
+      .values({
+        containerId: input.containerId,
+        locationId: input.locationId,
+        duties: input.duties,
+        officeCharges: input.officeCharges,
+        transferCharges: input.transferCharges,
+        transportFees: input.transportFees,
+        totalCharges: totalCharges.toFixed(2),
+        totalBales: totalBales.toFixed(3),
+        additionalCostPerBale: additionalCostPerBale.toFixed(2),
+        offloadedAt: new Date(`${input.offloadDate}T00:00:00.000Z`),
+      })
+      .returning();
+
+    for (const item of storedItems) {
+      await tx.insert(schema.containerOffloadItems).values({
+        offloadId: offload.id,
+        stockItemId: item.stockItemId,
+        quantity: item.quantity.toFixed(3),
+        rate: item.rate.toFixed(2),
+        totalValue: item.totalValue.toFixed(2),
+      });
+    }
+
+    await postSupplierPartnerJournals(tx, container, purchaseOrders, input);
+
+    return {
+      offload,
+      companyId: input.companyId,
+      locationId: input.locationId,
+      stockItemIds: positiveIds(storedItems.map((item) => item.stockItemId)),
+      replacedExistingOffload: replacing,
+    };
+  });
+}

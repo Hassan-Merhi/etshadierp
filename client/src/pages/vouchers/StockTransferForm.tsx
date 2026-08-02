@@ -1,15 +1,14 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { format } from "date-fns";
 import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useAppMode, useModePrefix } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
-import { queryClient, keyStartsWith } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
 import { utils, writeFile } from "@/lib/excelHelper";
 import { parseDateLocal } from "@/components/vouchers/PrintTemplate";
@@ -21,10 +20,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Card } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { EmptyState } from "@/components/ui/empty-state";
-import { cn } from "@/lib/utils";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
@@ -32,14 +29,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import {} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,7 +40,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   LayoutGrid,
   Upload,
@@ -61,50 +50,14 @@ import {
   X,
   Plus,
   History,
-  Loader2,
   Search,
-  CheckCircle,
-  XCircle,
-  Download,
-  FileSpreadsheet,
 } from "lucide-react";
 
-interface StockItem {
-  id: number;
-  code: string;
-  name: string;
-  uom: string;
-}
-interface Location {
-  id: number;
-  code?: string;
-  name: string;
-}
-
-const stockTransferEntrySchema = z.object({
-  sourceLocationId: z.coerce.number(),
-  sourceLocationName: z.string(),
-  stockItemId: z.coerce.number(),
-  stockItemCode: z.string().default(""),
-  stockItemName: z.string(),
-  quantity: z.string(),
-  rate: z.string(),
-});
-const stockTransferFormSchema = z.object({
-  voucherDate: z.date(),
-  destinationLocationId: z.number(),
-  entries: z.array(stockTransferEntrySchema),
-  notes: z.string().optional(),
-  optional: z.boolean().default(false),
-});
-type StockTransferFormData = z.infer<typeof stockTransferFormSchema>;
-
-interface StockTransferFormProps {
-  voucherIdToEdit: number | null;
-  isPOS: boolean;
-  posUser?: { assignedLocationId?: number };
-}
-
+import type { Location, StockItem, StockTransferFormData, StockTransferFormProps } from "./stocktransferform/types";
+import { stockTransferFormSchema } from "./stocktransferform/utils";
+import { ApproveRevisionDialog } from "./stock-transfer-form/dialogs/ApproveRevisionDialog";
+import { SaveAsRevisionDialog } from "./stock-transfer-form/dialogs/SaveAsRevisionDialog";
+import { ImportTransferExcelDialog } from "./stock-transfer-form/dialogs/ImportTransferExcelDialog";
 export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTransferFormProps) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
@@ -143,7 +96,6 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       return res.json();
     },
   });
-
 
   const { data: stockTransferToEdit } = useQuery({
     queryKey: ["/api/stock-transfers", voucherIdToEdit],
@@ -2200,83 +2152,11 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       </Form>
 
       {/* Revision Approve Dialog */}
-      <Dialog
-        open={!!approveRevisionTarget}
-        onOpenChange={(open) => {
-          if (!open) setApproveRevisionTarget(null);
-        }}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Approve Revision</DialogTitle>
-            <DialogDescription>
-              The following quantity changes will be applied to the transfer. This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          {approveRevisionTarget && (
-            <div className="table-responsive rounded-md border">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/40">
-                  <tr>
-                    <th className="text-left p-2 font-medium">Item</th>
-                    <th className="text-right p-2 font-medium">Was</th>
-                    <th className="text-right p-2 font-medium">Change</th>
-                    <th className="text-right p-2 font-medium">Now</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(approveRevisionTarget.items ?? [])
-                    .filter((item: any) => parseFloat(item.delta) !== 0)
-                    .map((item: any, idx: number) => {
-                      const delta = parseFloat(item.delta);
-                      return (
-                        <tr key={idx} className="border-t">
-                          <td className="p-2 font-medium">{item.stockItemName}</td>
-                          <td className="p-2 text-right font-mono text-muted-foreground">
-                            {formatNumber(parseFloat(item.originalQuantity), 0)}
-                          </td>
-                          <td
-                            className={`p-2 text-right font-mono font-semibold ${delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}
-                          >
-                            {delta > 0 ? "+" : ""}
-                            {formatNumber(delta, 0)}
-                          </td>
-                          <td className="p-2 text-right font-mono font-semibold">
-                            {formatNumber(parseFloat(item.newQuantity), 0)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setApproveRevisionTarget(null)}
-              data-testid="button-approve-revision-cancel"
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="default"
-              disabled={approveRevisionMutation.isPending}
-              onClick={() => approveRevisionTarget && approveRevisionMutation.mutate(approveRevisionTarget.id)}
-              data-testid="button-approve-revision-confirm"
-            >
-              {approveRevisionMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                  Applying…
-                </>
-              ) : (
-                "Approve & Apply"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ApproveRevisionDialog
+        approveRevisionMutation={approveRevisionMutation}
+        approveRevisionTarget={approveRevisionTarget}
+        setApproveRevisionTarget={setApproveRevisionTarget}
+      />
 
       {/* Revision History Panel */}
       {voucherIdToEdit && stableTransferId && (
@@ -2409,331 +2289,43 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       )}
 
       {/* Transfer Revision Note Dialog */}
-      <Dialog open={transferRevisionDialogOpen} onOpenChange={setTransferRevisionDialogOpen}>
-        <DialogContent className="sm:max-w-[420px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <GitBranch className="h-4 w-4" />
-              Save as Revision
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              This will update the transfer <strong>and</strong> record the changes as{" "}
-              <strong>Rev {transferRevisions.length + 1}</strong>.
-            </p>
-            {(() => {
-              const items = computeTransferRevisionItems();
-              return items.length === 0 ? (
-                <p className="text-sm status-warning rounded-md px-3 py-2">
-                  No differences detected compared to the saved transfer.
-                </p>
-              ) : (
-                <div className="border rounded-md overflow-hidden text-sm">
-                  <table className="w-full">
-                    <thead className="bg-muted/50">
-                      <tr>
-                        <th className="text-left p-2 font-medium">Item</th>
-                        <th className="text-right p-2 font-medium">Was</th>
-                        <th className="text-right p-2 font-medium">Change</th>
-                        <th className="text-right p-2 font-medium">Now</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {items.map((item, idx) => (
-                        <tr key={idx} className="border-t">
-                          <td className="p-2 font-medium truncate max-w-[120px]">{item.stockItemName}</td>
-                          <td className="p-2 text-right font-mono text-muted-foreground">
-                            {formatNumber(item.originalQuantity, 0)}
-                          </td>
-                          <td
-                            className={`p-2 text-right font-mono font-semibold ${item.delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}
-                          >
-                            {item.delta > 0 ? "+" : ""}
-                            {formatNumber(item.delta, 0)}
-                          </td>
-                          <td className="p-2 text-right font-mono">{formatNumber(item.newQuantity, 0)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              );
-            })()}
-            <div className="space-y-1.5">
-              <Label htmlFor="transfer-revision-note">Note (optional)</Label>
-              <Textarea
-                id="transfer-revision-note"
-                placeholder="Why was this revised? e.g. Shop sold 10 bales"
-                value={transferRevisionNote}
-                onChange={(e) => setTransferRevisionNote(e.target.value)}
-                rows={2}
-                data-testid="input-transfer-revision-note"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setTransferRevisionDialogOpen(false)}
-              disabled={isTransferSavingRevision}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={confirmTransferSaveAsRevision}
-              disabled={isTransferSavingRevision || computeTransferRevisionItems().length === 0}
-              data-testid="button-confirm-transfer-revision"
-            >
-              {isTransferSavingRevision ? "Saving..." : "Save Revision"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SaveAsRevisionDialog
+        computeTransferRevisionItems={computeTransferRevisionItems}
+        confirmTransferSaveAsRevision={confirmTransferSaveAsRevision}
+        isTransferSavingRevision={isTransferSavingRevision}
+        setTransferRevisionDialogOpen={setTransferRevisionDialogOpen}
+        setTransferRevisionNote={setTransferRevisionNote}
+        transferRevisionDialogOpen={transferRevisionDialogOpen}
+        transferRevisionNote={transferRevisionNote}
+        transferRevisions={transferRevisions}
+      />
 
       {/* Stock Transfer Import Dialog */}
-      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent className="w-[95vw] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5" />
-              Import Stock Transfer from Excel
-            </DialogTitle>
-            <DialogDescription>
-              Upload an Excel file with columns: Source Location, Barcode, Quantity. Each row can have a different
-              source location.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex-1 w-full sm:w-auto">
-                <Label htmlFor="import-file">Excel File</Label>
-                <Input
-                  id="import-file"
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={handleImportFileChange}
-                  className="mt-1"
-                  data-testid="input-import-file"
-                />
-                {importFile && <p className="text-sm text-muted-foreground mt-1">Selected: {importFile.name}</p>}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={downloadImportTemplate}
-                className="mt-6"
-                data-testid="button-download-import-template"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Template
-              </Button>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <Label htmlFor="import-dest-location">Destination Location</Label>
-                <Select value={importDestLocation} onValueChange={setImportDestLocation}>
-                  <SelectTrigger id="import-dest-location" className="mt-1" data-testid="select-import-dest-location">
-                    <SelectValue placeholder="Select destination..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[...locations]
-                      .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
-                      .map((location) => (
-                        <SelectItem key={location.id} value={location.id.toString()}>
-                          {location.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="import-date">Transfer Date</Label>
-                <Input
-                  id="import-date"
-                  type="date"
-                  value={importDate}
-                  onChange={(e) => setImportDate(e.target.value)}
-                  className="mt-1"
-                  data-testid="input-import-date"
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="import-notes">Notes (Optional)</Label>
-              <Textarea
-                id="import-notes"
-                value={importNotes}
-                onChange={(e) => setImportNotes(e.target.value)}
-                placeholder="Optional notes for this transfer..."
-                rows={2}
-                className="mt-1"
-                data-testid="input-import-notes"
-              />
-            </div>
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                onClick={handleImportParse}
-                disabled={!importFile || importParseMutation.isPending}
-                variant="outline"
-                data-testid="button-import-parse"
-              >
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                {importParseMutation.isPending ? "Parsing..." : "Parse File"}
-              </Button>
-              <Button
-                onClick={handleImportValidate}
-                disabled={!importPreview || !importDestLocation || importValidateMutation.isPending}
-                variant="outline"
-                data-testid="button-import-validate"
-              >
-                {importIsValidated ? (
-                  importHasErrors ? (
-                    <XCircle className="h-4 w-4 mr-2 text-destructive" />
-                  ) : (
-                    <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
-                  )
-                ) : null}
-                {importValidateMutation.isPending ? "Validating..." : "Validate"}
-              </Button>
-              <Button
-                onClick={handleImportSubmit}
-                disabled={!importIsValidated || importMutation.isPending}
-                data-testid="button-import-submit"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                {importMutation.isPending
-                  ? "Importing..."
-                  : importHasErrors
-                    ? `Import Transfer (${importValidItemsCount} valid)`
-                    : "Import Transfer"}
-              </Button>
-            </div>
-            {importValidationResult?.errors && importValidationResult.errors.length > 0 && (
-              <div className="p-3 border border-destructive rounded-md bg-destructive/10">
-                <p className="font-medium text-destructive mb-2">Validation Errors:</p>
-                <ul className="list-disc list-inside space-y-1">
-                  {importValidationResult.errors.map((error: string, index: number) => (
-                    <li key={index} className="text-sm text-destructive">
-                      {error}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {importPreview && (
-              <div className="border rounded-md">
-                <div className="p-3 border-b bg-muted/50">
-                  <p className="font-medium">Preview ({importPreview.items.length} items)</p>
-                </div>
-                <div className="hidden sm:block max-h-60 overflow-y-auto overflow-x-auto">
-                  <Table>
-                    <TableHeader className="sticky top-0 z-20 bg-background">
-                      <TableRow>
-                        <TableHead className="sticky left-0 bg-muted z-10">Source Location</TableHead>
-                        <TableHead>Barcode</TableHead>
-                        <TableHead>Item Name</TableHead>
-                        <TableHead className="text-right">Quantity</TableHead>
-                        <TableHead className="text-right">Available</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {importPreview.items.map((item: any, index: number) => {
-                        const validation = importValidationResult?.validatedItems?.[index];
-                        const hasError = validation?.error;
-                        return (
-                          <TableRow
-                            key={index}
-                            className={hasError ? "bg-destructive/10" : ""}
-                            data-testid={`import-preview-row-${index}`}
-                          >
-                            <TableCell className="sticky left-0 bg-background z-10">
-                              {item.sourceLocation || "-"}
-                            </TableCell>
-                            <TableCell className="font-mono">{item.barcode}</TableCell>
-                            <TableCell>
-                              {validation?.stockItemName || (
-                                <span className="text-muted-foreground italic">Unknown</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right">{item.quantity}</TableCell>
-                            <TableCell className="text-right">
-                              {validation?.currentStock !== undefined ? formatNumber(validation.currentStock) : "-"}
-                            </TableCell>
-                            <TableCell>
-                              {validation ? (
-                                hasError ? (
-                                  <div className="flex items-center gap-1 text-destructive">
-                                    <XCircle className="h-4 w-4" />
-                                    <span className="text-sm">{validation.error}</span>
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center gap-1 text-green-600">
-                                    <CheckCircle className="h-4 w-4" />
-                                    <span className="text-sm">OK</span>
-                                  </div>
-                                )
-                              ) : (
-                                <span className="text-sm text-muted-foreground">Not validated</span>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-                <div className="sm:hidden max-h-60 overflow-y-auto p-2 space-y-2">
-                  {importPreview.items.map((item: any, index: number) => {
-                    const validation = importValidationResult?.validatedItems?.[index];
-                    const hasError = validation?.error;
-                    return (
-                      <div
-                        key={index}
-                        className={cn(
-                          "p-3 rounded-md border text-sm space-y-1",
-                          hasError ? "bg-destructive/10 border-destructive/30" : "bg-background"
-                        )}
-                        data-testid={`import-preview-card-${index}`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-medium truncate">
-                            {validation?.stockItemName || <span className="text-muted-foreground italic">Unknown</span>}
-                          </span>
-                          {validation ? (
-                            hasError ? (
-                              <XCircle className="h-4 w-4 text-destructive shrink-0" />
-                            ) : (
-                              <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
-                            )
-                          ) : null}
-                        </div>
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                          <span>Source: {item.sourceLocation || "-"}</span>
-                          <span className="font-mono">Code: {item.barcode}</span>
-                        </div>
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                          <span>
-                            Qty: <span className="font-mono">{item.quantity}</span>
-                          </span>
-                          <span>
-                            Avail:{" "}
-                            <span className="font-mono">
-                              {validation?.currentStock !== undefined ? formatNumber(validation.currentStock) : "-"}
-                            </span>
-                          </span>
-                        </div>
-                        {hasError && <div className="text-xs text-destructive">{validation.error}</div>}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ImportTransferExcelDialog
+        downloadImportTemplate={downloadImportTemplate}
+        handleImportFileChange={handleImportFileChange}
+        handleImportParse={handleImportParse}
+        handleImportSubmit={handleImportSubmit}
+        handleImportValidate={handleImportValidate}
+        importDate={importDate}
+        importDestLocation={importDestLocation}
+        importDialogOpen={importDialogOpen}
+        importFile={importFile}
+        importHasErrors={importHasErrors}
+        importIsValidated={importIsValidated}
+        importMutation={importMutation}
+        importNotes={importNotes}
+        importParseMutation={importParseMutation}
+        importPreview={importPreview}
+        importValidItemsCount={importValidItemsCount}
+        importValidateMutation={importValidateMutation}
+        importValidationResult={importValidationResult}
+        locations={locations}
+        setImportDate={setImportDate}
+        setImportDestLocation={setImportDestLocation}
+        setImportDialogOpen={setImportDialogOpen}
+        setImportNotes={setImportNotes}
+      />
 
       {/* Import Confirmation Dialog */}
       <AlertDialog open={importConfirmDialogOpen} onOpenChange={setImportConfirmDialogOpen}>

@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { registerRentalUnitsContractsRoutes } from "./rentalUnitsContractsRoutes";
+import { registerRentalUnitsContractsRoutes } from "./units-contracts";
 import { registerCentralRentalPaymentDeletionRoute } from "./centralRentalPaymentDeletionRoute";
 import { registerRentalPaymentsAccrualRoutes } from "./rentalPaymentsAccrualRoutes";
 import { registerRentalAccrualConfigRoutes } from "./rentalAccrualConfigRoutes";

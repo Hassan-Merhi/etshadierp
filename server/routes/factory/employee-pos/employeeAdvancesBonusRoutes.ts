@@ -4,7 +4,7 @@ import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
-import { buildBrokerStatement } from "../suppliers/supplierBrokerRoutes";
+import { buildBrokerStatement } from "../suppliers/broker";
 import { adjustInventory } from "../../../inventoryHelper";
 import {
   writeDaybookEntry,
@@ -470,7 +470,14 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
         const nextCode = String(((maxCode.rows[0] as any)?.m || 0) + 1);
         [expAcc] = await db
           .insert(ledgerAccounts)
-          .values({ companyId, code: nextCode, name: accName, accountType: "Expense", active: true, openingBalance: "0" })
+          .values({
+            companyId,
+            code: nextCode,
+            name: accName,
+            accountType: "Expense",
+            active: true,
+            openingBalance: "0",
+          })
           .returning({ id: ledgerAccounts.id });
       }
 

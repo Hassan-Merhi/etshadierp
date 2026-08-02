@@ -1,6 +1,6 @@
 import type { Express } from "express";
-import { registerDeletedItemsRoutes } from "./deletedItemsRoutes";
-import { registerAdminRepairRoutes } from "./adminRepairRoutes";
+import { registerDeletedItemsRoutes } from "./deleted-items";
+import { registerAdminRepairRoutes } from "./repair";
 import { registerAdminPoFixRoutes } from "./adminPoFixRoutes";
 
 export function registerDataToolsRoutes(app: Express) {

@@ -29,9 +29,7 @@ function applyCurrentCashTranslation(payload: any, summaries: CashBankCurrencySu
   if (!payload?.forUs || !payload?.onUs) return payload;
 
   const resolved = summaries.filter((row) => row.currentTranslatedBaseBalance !== null);
-  const resolvedLedgerIds = new Set(
-    resolved.filter((row) => row.accountKind === "ledger").map((row) => row.id),
-  );
+  const resolvedLedgerIds = new Set(resolved.filter((row) => row.accountKind === "ledger").map((row) => row.id));
 
   const oldForUsAccounts = Array.isArray(payload.forUs.accounts) ? payload.forUs.accounts : [];
   const oldOnUsAccounts = Array.isArray(payload.onUs.accounts) ? payload.onUs.accounts : [];
@@ -134,47 +132,37 @@ export function registerStatsMultiCurrencyRoutes(app: Express) {
     return next();
   });
 
-  app.get(
-    "/api/accounts/multi-currency/cash-bank-revaluation",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        const companyId = req.session.currentCompanyId;
-        if (!companyId) return res.status(400).json({ message: "No company selected" });
-        return res.json(await getCashBankRevaluation(companyId));
-      } catch (error: unknown) {
-        logger.error("Multi-currency cash/bank revaluation failed:", { error: error });
-        return res.status(500).json({ message: getErrorMessage(error) });
+  app.get("/api/accounts/multi-currency/cash-bank-revaluation", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      return res.json(await getCashBankRevaluation(companyId));
+    } catch (error: unknown) {
+      logger.error("Multi-currency cash/bank revaluation failed:", { error: error });
+      return res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
+  app.get("/api/accounts/multi-currency/:kind/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const kind = req.params.kind;
+      if (kind !== "ledger" && kind !== "bank") {
+        return res.status(400).json({ message: "Account kind must be ledger or bank" });
       }
-    },
-  );
-
-  app.get(
-    "/api/accounts/multi-currency/:kind/:id",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        const companyId = req.session.currentCompanyId;
-        if (!companyId) return res.status(400).json({ message: "No company selected" });
-
-        const kind = req.params.kind;
-        if (kind !== "ledger" && kind !== "bank") {
-          return res.status(400).json({ message: "Account kind must be ledger or bank" });
-        }
-        const accountId = Number.parseInt(req.params.id, 10);
-        if (!Number.isInteger(accountId) || accountId <= 0) {
-          return res.status(400).json({ message: "Invalid account ID" });
-        }
-
-        const summary = await getCashBankAccountSummary(companyId, kind, accountId);
-        if (!summary) return res.status(404).json({ message: "Cash/bank account not found" });
-        return res.json(summary);
-      } catch (error: unknown) {
-        logger.error("Multi-currency account summary failed:", { error: error });
-        return res.status(500).json({ message: getErrorMessage(error) });
+      const accountId = Number.parseInt(req.params.id, 10);
+      if (!Number.isInteger(accountId) || accountId <= 0) {
+        return res.status(400).json({ message: "Invalid account ID" });
       }
-    },
-  );
+
+      const summary = await getCashBankAccountSummary(companyId, kind, accountId);
+      if (!summary) return res.status(404).json({ message: "Cash/bank account not found" });
+      return res.json(summary);
+    } catch (error: unknown) {
+      logger.error("Multi-currency account summary failed:", { error: error });
+      return res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
 }

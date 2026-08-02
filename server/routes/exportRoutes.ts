@@ -3,7 +3,7 @@ import { getErrorMessage } from "../lib/httpHandlers";
 import { pool } from "../db";
 import { requireAuth, requireRole } from "../auth";
 import { logger } from "../lib/logger";
-import { fetchAllCompanies } from "../services/exportDataService";
+import { fetchAllCompanies } from "../services/export-data";
 import { sendExportEmail } from "../services/emailService";
 import { buildFullExportZip } from "../helpers/buildFullExportZip";
 import {
@@ -15,10 +15,7 @@ import {
   failJob,
   releaseJobArchive,
 } from "../services/exportJobManager";
-import {
-  createTemporaryExportArchive,
-  streamTemporaryExportArchive,
-} from "../helpers/temporaryExportArchive";
+import { createTemporaryExportArchive, streamTemporaryExportArchive } from "../helpers/temporaryExportArchive";
 import { retryAsync, isEmailConfigError } from "../helpers/retryAsync";
 import { createExportRun, updateExportRun, finishExportRun } from "../helpers/exportRunTracker";
 
@@ -296,9 +293,10 @@ export function registerExportRoutes(app: Express) {
           error: err,
         });
         failJob(job, getErrorMessage(err) || "Unexpected error");
-        await finishExportRun(runId, { status: "failed", skippedReason: getErrorMessage(err) || "Unexpected error" }).catch(
-          () => {}
-        );
+        await finishExportRun(runId, {
+          status: "failed",
+          skippedReason: getErrorMessage(err) || "Unexpected error",
+        }).catch(() => {});
       }
     })();
   });

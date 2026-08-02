@@ -1,11 +1,16 @@
 # God-file split program
 
-The repository carries 136 files of 1,000+ lines, about 222,000 lines or 38% of
-the TypeScript source. This document describes the program for splitting them
-and — more importantly — the safety harness that makes those splits verifiable
-rather than hopeful.
+The repository carried 136 files of 1,000+ lines when this started — about
+222,000 lines, or 38% of the TypeScript source. This document describes the
+program for splitting them and, more importantly, the safety harness that makes
+those splits verifiable rather than hopeful.
 
-Phases 0, 1 and 2 are complete. Phases 3 and 4 are in progress.
+Phases 0, 1 and 2 are complete. Phases 3 and 4 are in progress; 3b and 5 have
+not been started.
+
+**Backlog: 139 files, 74,858 lines over the limit** (from 162 and 102,337).
+`npm run audit:god-files` prints the current figure; the ceiling is asserted in
+`tests/god-file-boundaries.test.ts` and is lowered with each split.
 
 ## Why a harness came first
 
@@ -138,17 +143,75 @@ npm run audit:god-files
 
 | Phase | Scope | Notes |
 |---|---|---|
-| 1 | ~~`server/startupSchema.ts`~~ | **Done.** Split into ten parts under `server/startup-schema/`, largest 772 lines. Order preserved and proven by a sha256 pin of the assembled array in `tests/startup-schema-integrity.test.ts`. |
+| 1 | ~~`server/startupSchema.ts`~~ | **Done.** Ten parts under `server/startup-schema/`, largest 772 lines. Order proven by a sha256 pin in `tests/startup-schema-integrity.test.ts`. |
 | 2 | ~~Delete before splitting~~ | **Done, and the premise was wrong** — see below. No file was deletable; three dead *handlers* (349 lines) were removed instead. |
-| 3 | Route monoliths (~71 files) | **In progress.** Split by URL prefix into a directory with an `index.ts` barrel. `gitRoutes.ts` (1,969) and `spMigrationRoutes.ts` (2,349) done. |
-| 4 | Page components (~63 files) | **In progress.** Extract types, then pure helpers, then sub-components, then hooks — strictly safest first. `FactoryDaybook.tsx` (3,228) done. |
-| 5 | `shared/schema/*.ts` | Highest blast radius, lowest urgency. Barrel must preserve every export name. |
+| 3 | Route monoliths | **Nearly done — 6 files and 4,050 lines remain.** Every file whose bulk is a *run of endpoints* has been split. What is left is six files whose bulk is a single handler; see "Where Phase 3 stops" below. |
+| 3b | Services, storage, `server/index.ts` | **Not started** — 16 files, 7,227 lines. Not routes, so the manifest does not cover them. |
+| 4 | Page components | **Stalled by design — 54 files, 31,109 lines.** Every compiler-verifiable seam has been taken; the rest is component-boundary design. |
+| 5 | `shared/schema/*.ts` | **Not started** — 2 files, 3,622 lines. Highest blast radius, lowest urgency. Barrel must preserve every export name. |
 | 6 | Tighten the ratchet | Lower `softMaxLines` as the backlog empties. |
+| — | Oversized test files | **Not started** — 4 files, 1,207 lines. Unassigned in the original plan but ratcheted like everything else, so they block reaching zero. |
 
-The backlog started at 162 files and 102,337 excess lines. It now stands at
-159 files and 94,307.
+The backlog started at **162 files and 102,337 excess lines**. It now stands at
+**82 files and 45,684** — 55% cleared.
 
-Phases 3 and 4 touch disjoint trees and can run in parallel.
+### Where Phase 3 stops
+
+The route splits were safe because `config/route-manifest.json` is regenerated
+and compared byte for byte after every one: same methods, same paths, same guard
+chains, same registration order. That is a real proof, and it is why 60 files
+could be split quickly and without incident.
+
+Six route files remain, and the manifest cannot carry them:
+
+| File | Lines | Endpoints | Largest handler |
+|---|---|---|---|
+| `factory/employee-pos/employeeNetPositionRoutes.ts` | 1,755 | 1 | 1,623 |
+| `factory/raw-stock/rawStockOffloadRoutes.ts` | 1,496 | 2 | 972 |
+| `containers/containerFreightWriteRoutes.ts` | 1,380 | 3 | 1,156 |
+| `netProfitExcelRoute.ts` | 1,131 | 1 | 1,007 |
+| `stats/statsNetProfitRoutes.ts` | 1,104 | 1 | 993 |
+| `factory/suppliers/supplierStatementRoutes.ts` | 1,053 | 1 | 925 |
+
+In each, the file *is* one handler. Reducing them means extracting logic from
+inside that handler, and the manifest says nothing about whether extracted logic
+still computes the same numbers — it only proves the route is still registered.
+Only tests can carry that, and the coverage is thin exactly where the risk is
+highest:
+
+- `GET /api/reports/net-profit-excel`, `GET /api/factory/suppliers/:id/statement`
+  and `PATCH /api/purchase-orders/:id` have **no test referencing them at all**.
+- The parameterless GETs among them are reached by the smoke sweep, but the
+  sweep asserts only "does not return 5xx" — not that the figures are unchanged.
+
+These are net-profit, supplier-statement and purchase-order handlers: a silent
+arithmetic change is the worst failure mode this codebase has. So the next step
+is **characterization tests first** — pin each endpoint's current response for a
+seeded fixture, then extract against that pin, exactly as Phase 0 pinned the
+route manifest before any route was touched. Splitting them without that pin
+trades a readability win for an unverifiable risk to money figures, which is a
+bad trade.
+
+Phases 3b and 4 touch disjoint trees and can run in parallel.
+
+
+
+### Where to go next
+
+**Phase 3 is the best remaining value.** It is the largest block of lines, the
+recipe is proven twice, and the route manifest verifies each split byte for
+byte, so there are no design decisions to make. The factory cluster is most of
+it: `factoryBalesRoutes.ts` (3,437) and `factoryDocsUsersRoutes.ts` (3,375)
+alone are 5,000 lines over the limit.
+
+**Phase 4's remainder is not mechanical, and that is the important caveat.**
+Every compiler-verifiable seam in the client tree has been taken. What is left
+in those 54 files is a single component with one very large JSX return.
+Reducing them means deciding where component boundaries belong in a screen and
+threading twenty or thirty pieces of state through each new boundary — design
+work that neither the type-checker nor the render tests can confirm is right.
+`AnalyticsLegacy.tsx` (2,695) is the clearest example: it contains no dialogs,
+sheets or other self-contained blocks at all.
 
 ## Phase 2 — what the evidence actually showed
 
@@ -264,22 +327,78 @@ Two things worth carrying forward:
   `entry-views/`, taking the modal to 766. Those branches declared no hooks, so
   each was a straight move behind a props boundary.
 
+### Scaling that recipe, and where it stops
+
+Doing sixty more pages by hand was not realistic, so two throwaway tools were
+written (they live outside the repo, in the session scratchpad — the value is in
+what they taught, not in keeping them):
+
+- a **top-level extractor** that moves whole declarations — types, pure helpers,
+  context, named sub-components — and rewires the import graph;
+- a **JSX-block extractor** that lifts a self-contained `<Dialog>` or `<Sheet>`
+  into its own component and discovers the props it needs by asking `tsc` which
+  names it cannot find, rather than guessing.
+
+Both were run across the client tree. Between them they moved roughly 22,000
+lines, and twenty files dropped under the limit outright — `FactoryImport`
+1,403 → 51, `FactoryAdvancesTab` 2,760 → 61, `AccountingCreate` 1,173 → 115,
+`PropertyRentalPage` 3,355 → 610.
+
+Every bug either tool had surfaced as a compiler error, never as silently wrong
+code. Worth knowing if similar tooling is written again:
+
+- a leading-comment scan that started one line early captured the previous
+  declaration's closing brace;
+- a generated module imported the symbols it defined itself;
+- `async function` declarations were invisible to the scanner, so their bodies
+  were swallowed by the preceding declaration;
+- `import * as NS` bound the name as `"as NS"`;
+- relative specifiers must be **resolved** against the new file's directory, not
+  adjusted by a guessed nesting depth;
+- an interface declared *inside* a component gets reported as a missing name and
+  will be passed as a prop unless type names are filtered out;
+- typing props as `any` destroys inference inside callbacks, so `Array.from(set)`
+  degrades to `unknown[]`;
+- an import trimmer must anchor on word boundaries, or removing an unused `X`
+  will match the `X` inside `UserX`.
+
+**Two process mistakes are worth repeating out loud.** Running Prettier across
+the touched pages rewrote files that had never been formatted, adding 294 lines
+of pure noise to `AccountsLegacy.tsx` and pushing two files past their caps with
+nothing actually added; that batch was reverted and redone formatting only
+generated files. And extracting `FactoryAdvancesTab`'s bulk into a single
+2,147-line `AdvancesView` **relocated** a god file rather than splitting one — it
+was baselined explicitly rather than hidden, and cleared in a later pass by
+extracting its nine dialogs.
+
+**Where this stops.** The mechanical seams in the client tree are now exhausted.
+The 54 files that remain are each a single component with one large JSX return;
+what is left is deciding where component boundaries belong and threading state
+across them. That is design work, and neither `tsc` nor a render smoke test can
+confirm it was done correctly — which is precisely why it was not attempted
+blind.
+
 ## A note on scope
 
-Of the 136 files over 1,000 lines, the 76 in the 1,000–1,499 band are mostly
-large but coherent — a 1,200-line route module with 15 related endpoints is a
-module, not a god file. Splitting those is churn with real regression risk and
-little gain. The 60 files at 1,500+ lines, plus the Phase 2 deletions, address
-~135,000 lines and cover every genuine god file.
+Not every file over the limit is worth splitting. A 1,200-line route module with
+fifteen related endpoints is a module, not a god file, and breaking it up is
+churn with real regression risk and little gain. The recommendation is to target
+files at **1,500 lines and above** and leave the 900–1,499 band alone — the size
+ratchet already stops those growing, which is most of the benefit.
+
+Judged that way the remaining work is considerably smaller than the raw 139-file
+count suggests, and it is concentrated in Phase 3, where the route manifest makes
+each split provable.
 
 ## Observations recorded while building the harness
 
 These were surfaced by the harness and are not yet acted on:
 
-- **131 method+path combinations are registered more than once** (145 shadowed
-  registrations). Some are deliberate interceptor chains that call `next()`;
-  others are the dead duplicates noted in the code's own comments. The manifest
-  makes them enumerable.
+- **130 method+path combinations are registered more than once** (142 shadowed
+  registrations, down from 145 after Phase 2). Some are deliberate interceptor
+  chains that call `next()`; others are dead duplicates. The manifest makes them
+  enumerable, and `MAX_SHADOWED_REGISTRATIONS` in `tests/route-manifest.test.ts`
+  stops the number rising.
 - **`GET /api/production-bales/next-barcode` writes** — it allocates a
   `bale_sequences` row on read. Found because test cleanup began failing on a
   foreign key after a read-only sweep.
@@ -295,3 +414,23 @@ These were surfaced by the harness and are not yet acted on:
   `fileParallelism: false` serialises the files. The suite now produces
   byte-identical results across runs, at 378s instead of 165s — a cost worth
   paying, since a suite that fails randomly cannot certify a refactor.
+- **CI on `main` was red before this work started, and is now green.** Seven
+  backend tests failed deterministically, plus the frontend coverage gate. Five
+  were one fixture bug (`factory_mix_batches.total_weight_kg` and `total_cost`
+  are NOT NULL with no default, and were omitted). One asserted a state the
+  schema forbids and the app cannot produce. One encoded a genuine contradiction
+  between two startup migrations, described below. Coverage was lifted past its
+  thresholds rather than the thresholds lowered.
+
+- **One open money question, deliberately not decided.** Two migrations disagree
+  about `factory_mix_batches.cost_per_kg`: a July 2026 batch raises it to
+  `NUMERIC(20,7)` to stop rounding compounding on 20,000 kg batches, and a later
+  batch in the same array standardises Factory per-KG columns to `NUMERIC(20,6)`
+  and rounds it back down. The later one wins, and `shared/schema/factory.ts`
+  agrees with it, so 6 is what the tests now assert. But the sibling columns
+  `factory_mix_batch_sources.cost_per_kg` and `factory_bales.cost_per_kg` are
+  both still scale 7 — batch cost is aggregated from 7dp inputs and stored at
+  6dp. Whether that is correct is a decision for someone who owns the numbers.
+
+The backend suite is now the signal it should be: 1,967 passing, zero failures,
+byte-identical across runs. A successor can trust a red build again.

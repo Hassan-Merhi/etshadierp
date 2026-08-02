@@ -13,9 +13,9 @@ import { registerCentralJournalCreateRoute } from "./vouchers/centralJournalCrea
 import { registerCentralJournalLifecycleRoutes } from "./vouchers/centralJournalLifecycleRoute";
 import { registerCentralStockTransferDeleteRoutes } from "./vouchers/centralStockTransferDeleteRoute";
 import { registerVoucherJournalRoutes } from "./vouchers/voucherJournalRoutes";
-import { registerVoucherSalesUpdateRoutes } from "./vouchers/voucherSalesUpdateRoutes";
+import { registerVoucherSalesUpdateRoutes } from "./vouchers/sales-update";
 import { registerVoucherPurchaseUpdateRoutes } from "./vouchers/voucherPurchaseUpdateRoutes";
-import { registerVoucherTransferRoutes } from "./vouchers/voucherTransferRoutes";
+import { registerVoucherTransferRoutes } from "./vouchers/transfer";
 import { registerSmartTransferPreviewRoutes } from "./vouchers/smartTransferPreviewRoutes";
 import { registerStockTransferLifecycleRoutes } from "./vouchers/stockTransferLifecycleRoutes";
 import { registerStockTransferRevisionLifecycleRoutes } from "./vouchers/stockTransferRevisionLifecycleRoutes";
@@ -25,13 +25,7 @@ function registerVoucherDetailCompatibility(app: Express) {
     const sendJson = res.json.bind(res);
 
     res.json = ((body: unknown) => {
-      if (
-        body &&
-        typeof body === "object" &&
-        !Array.isArray(body) &&
-        "transferData" in body &&
-        !("transfer" in body)
-      ) {
+      if (body && typeof body === "object" && !Array.isArray(body) && "transferData" in body && !("transfer" in body)) {
         const voucherDetail = body as Record<string, unknown>;
         return sendJson({
           ...voucherDetail,

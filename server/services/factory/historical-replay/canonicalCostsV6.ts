@@ -5,7 +5,7 @@ import type {
   ReplayQueryExecutor,
 } from "./types";
 import { numeric } from "./types";
-import { computeCanonicalCosts } from "./readModel";
+import { computeCanonicalCosts } from "./read-model";
 
 /**
  * Replay writes the container's persisted USD target columns. Container mismatch
@@ -46,10 +46,13 @@ export async function normalizePreviewPersistedContainerTotals(
     [companyId, containerIds]
   );
   const persistedById = new Map(
-    result.rows.map((row) => [row.id, {
-      rate: numeric(row.rate_per_kg_usd),
-      total: numeric(row.final_payable_amount_usd),
-    }])
+    result.rows.map((row) => [
+      row.id,
+      {
+        rate: numeric(row.rate_per_kg_usd),
+        total: numeric(row.final_payable_amount_usd),
+      },
+    ])
   );
   const containerRows = preview.containerRows.map((row) => {
     const persisted = persistedById.get(row.containerId);
@@ -65,12 +68,11 @@ export async function normalizePreviewPersistedContainerTotals(
     containerRows,
     summary: {
       ...preview.summary,
-      canonicalContainerMismatches: containerRows.filter((row) =>
-        row.safeToRepair
-        && (
-          Math.abs(row.canonicalCostPerKgUsd - row.storedCostPerKgUsd) > 0.000001
-          || Math.abs(row.canonicalTotalUsd - row.storedTotalUsd) > 0.01
-        )
+      canonicalContainerMismatches: containerRows.filter(
+        (row) =>
+          row.safeToRepair &&
+          (Math.abs(row.canonicalCostPerKgUsd - row.storedCostPerKgUsd) > 0.000001 ||
+            Math.abs(row.canonicalTotalUsd - row.storedTotalUsd) > 0.01)
       ).length,
     },
   };

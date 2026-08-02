@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const writeAuditEventMock = vi.fn();
+// Hoisted so the vi.mock factory below - which vitest lifts above this line -
+// can close over it.
+const writeAuditEventMock = vi.hoisted(() => vi.fn());
 
 vi.mock("../../services/audit", () => ({
   writeAuditEvent: writeAuditEventMock,

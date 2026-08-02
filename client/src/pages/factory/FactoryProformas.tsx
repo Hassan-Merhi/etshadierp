@@ -1,6 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
@@ -8,7 +7,7 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -19,17 +18,11 @@ import {
   Star,
   Pencil,
   FileText,
-  LayoutGrid,
   Download,
-  RefreshCw,
   Search,
-  BookOpen,
-  PenLine,
   Truck,
   ArrowRightLeft,
   Upload,
-  AlertCircle,
-  Layers,
   BookmarkCheck,
   ChevronDown,
   ChevronRight,
@@ -45,53 +38,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { read as readExcel, utils as excelUtils, writeFile as writeExcel } from "@/lib/excelHelper";
-import { PageHeader } from "@/components/PageHeader";
 
-interface ProformaLine {
-  id: number;
-  proformaId: number;
-  articleCode: string;
-  productName: string;
-  quantity: number;
-  pricePerBale: string;
-  weightPerBaleKg?: string | null;
-  pricingMode?: string | null;
-  pricePerKg?: string | null;
-}
-
-function effectivePricePerBale(line: ProformaLine): number {
-  if (line.pricingMode === "per_kg" && line.pricePerKg && line.weightPerBaleKg) {
-    const kg = parseFloat(line.weightPerBaleKg);
-    const pkk = parseFloat(line.pricePerKg);
-    if (kg > 0 && pkk > 0) return kg * pkk;
-  }
-  return parseFloat(line.pricePerBale) || 0;
-}
-
-interface Proforma {
-  id: number;
-  customerId: number;
-  companyId: number;
-  name: string;
-  isActive: boolean;
-  createdAt: string | null;
-  updatedAt: string | null;
-  lines: ProformaLine[];
-}
-
-interface Customer {
-  id: number;
-  legalName: string;
-  balance: number;
-  balanceSide: string;
-}
-
+import type { Customer, Proforma, ProformaLine } from "./factoryproformas/types";
+import { effectivePricePerBale } from "./factoryproformas/utils";
+import { RenameProformaDialog } from "./factory-proformas/dialogs/RenameProformaDialog";
+import { TransferProformaDialog } from "./factory-proformas/dialogs/TransferProformaDialog";
+import { AddPriceLineDialog } from "./factory-proformas/dialogs/AddPriceLineDialog";
+import { EditPriceLineDialog } from "./factory-proformas/dialogs/EditPriceLineDialog";
+import { CreatePendingLoadingDialog } from "./factory-proformas/dialogs/CreatePendingLoadingDialog";
+import { ImportProformaExcelDialog } from "./factory-proformas/dialogs/ImportProformaExcelDialog";
 export default function FactoryProformas() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
@@ -1361,702 +1320,76 @@ export default function FactoryProformas() {
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={!!renamingProforma}
-        onOpenChange={(open) => {
-          if (!open) {
-            setRenamingProforma(null);
-            setRenameValue("");
-          }
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Rename Proforma</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <label className="text-sm font-medium mb-1 block">New Name</label>
-              <Input
-                value={renameValue}
-                onChange={(e) => setRenameValue(e.target.value)}
-                placeholder="e.g. Summer 2024 Pricing"
-                data-testid="input-rename-proforma"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && renameValue.trim() && renameValue.trim() !== renamingProforma?.name) {
-                    renameProformaMutation.mutate({ id: renamingProforma!.id, name: renameValue.trim() });
-                  }
-                }}
-              />
-            </div>
-            <div className="flex justify-end gap-3">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setRenamingProforma(null);
-                  setRenameValue("");
-                }}
-                data-testid="button-cancel-rename"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => renameProformaMutation.mutate({ id: renamingProforma!.id, name: renameValue.trim() })}
-                disabled={
-                  renameProformaMutation.isPending ||
-                  !renameValue.trim() ||
-                  renameValue.trim() === renamingProforma?.name
-                }
-                data-testid="button-submit-rename"
-              >
-                {renameProformaMutation.isPending ? "Saving..." : "Save"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <RenameProformaDialog
+        renameProformaMutation={renameProformaMutation}
+        renameValue={renameValue}
+        renamingProforma={renamingProforma}
+        setRenameValue={setRenameValue}
+        setRenamingProforma={setRenamingProforma}
+      />
 
       {/* ── Transfer Proforma Dialog ────────────────────────────────────── */}
-      <Dialog
-        open={!!transferProforma}
-        onOpenChange={(open) => {
-          if (!open) {
-            setTransferProforma(null);
-            setTransferTargetCustomerId("");
-          }
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Transfer Proforma</DialogTitle>
-            <DialogDescription>
-              Move <strong>{transferProforma?.name}</strong> to a different customer. All lines and reservations will be
-              moved with it.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <label className="text-sm font-medium mb-1 block">Current Customer</label>
-              <p className="text-sm text-muted-foreground">
-                {customers.find((c: Customer) => c.id === transferProforma?.customerId)?.legalName ?? "—"}
-              </p>
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Transfer To</label>
-              <Select value={transferTargetCustomerId} onValueChange={setTransferTargetCustomerId}>
-                <SelectTrigger data-testid="select-transfer-customer">
-                  <SelectValue placeholder="Select customer..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers
-                    .filter((c: Customer) => c.id !== transferProforma?.customerId)
-                    .map((c: Customer) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.legalName}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setTransferProforma(null);
-                  setTransferTargetCustomerId("");
-                }}
-                data-testid="button-cancel-transfer"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  if (!transferProforma || !transferTargetCustomerId) return;
-                  transferProformaMutation.mutate({
-                    id: transferProforma.id,
-                    targetCustomerId: parseInt(transferTargetCustomerId),
-                  });
-                }}
-                disabled={!transferTargetCustomerId || transferProformaMutation.isPending}
-                data-testid="button-confirm-transfer"
-              >
-                {transferProformaMutation.isPending ? "Transferring..." : "Transfer"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <TransferProformaDialog
+        customers={customers}
+        setTransferProforma={setTransferProforma}
+        setTransferTargetCustomerId={setTransferTargetCustomerId}
+        transferProforma={transferProforma}
+        transferProformaMutation={transferProformaMutation}
+        transferTargetCustomerId={transferTargetCustomerId}
+      />
 
-      <Dialog
-        open={isAddLineOpen}
-        onOpenChange={(open) => {
-          setIsAddLineOpen(open);
-          if (!open) {
-            setCatalogSelectedItem(null);
-            setCatalogSearch("");
-          }
-        }}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Add Price Line</DialogTitle>
-          </DialogHeader>
+      <AddPriceLineDialog
+        addLineMode={addLineMode}
+        addLineMutation={addLineMutation}
+        allStockItems={allStockItems}
+        catalogSearch={catalogSearch}
+        catalogSelectedItem={catalogSelectedItem}
+        handleAddLine={handleAddLine}
+        isAddLineOpen={isAddLineOpen}
+        newLine={newLine}
+        priceListMap={priceListMap}
+        setAddLineMode={setAddLineMode}
+        setCatalogSearch={setCatalogSearch}
+        setCatalogSelectedItem={setCatalogSelectedItem}
+        setIsAddLineOpen={setIsAddLineOpen}
+        setNewLine={setNewLine}
+      />
 
-          {/* Mode toggle */}
-          <div className="flex rounded-md border overflow-hidden w-full">
-            <button
-              className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium transition-colors ${addLineMode === "catalog" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover-elevate"}`}
-              onClick={() => {
-                setAddLineMode("catalog");
-                setCatalogSelectedItem(null);
-                setCatalogSearch("");
-                setNewLine({
-                  articleCode: "",
-                  productName: "",
-                  quantity: newLine.quantity,
-                  pricePerBale: newLine.pricePerBale,
-                });
-              }}
-              data-testid="button-mode-catalog"
-            >
-              <BookOpen className="h-4 w-4" />
-              From Catalog
-            </button>
-            <button
-              className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium transition-colors ${addLineMode === "manual" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover-elevate"}`}
-              onClick={() => {
-                setAddLineMode("manual");
-                setCatalogSelectedItem(null);
-                setNewLine({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
-              }}
-              data-testid="button-mode-manual"
-            >
-              <PenLine className="h-4 w-4" />
-              Manual Entry
-            </button>
-          </div>
-
-          <div className="space-y-4 py-1">
-            {addLineMode === "catalog" ? (
-              <>
-                {/* Item picker */}
-                {!catalogSelectedItem ? (
-                  <div className="space-y-2">
-                    <div className="relative">
-                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Search by name or article code..."
-                        value={catalogSearch}
-                        onChange={(e) => setCatalogSearch(e.target.value)}
-                        className="pl-8"
-                        autoFocus
-                        data-testid="input-catalog-search"
-                      />
-                    </div>
-                    <div className="border rounded-md overflow-hidden max-h-64 overflow-y-auto">
-                      {allStockItems.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-6">Loading items...</p>
-                      ) : (
-                        (() => {
-                          const q = catalogSearch.toLowerCase().trim();
-                          const filtered = q
-                            ? allStockItems.filter(
-                                (item: any) =>
-                                  item.name?.toLowerCase().includes(q) || item.code?.toLowerCase().includes(q)
-                              )
-                            : allStockItems;
-                          if (filtered.length === 0)
-                            return (
-                              <p className="text-sm text-muted-foreground text-center py-6">
-                                No items match "{catalogSearch}"
-                              </p>
-                            );
-                          return filtered.map((item: any) => (
-                            <button
-                              key={item.id}
-                              className="w-full flex items-center justify-between px-3 py-2.5 text-left hover-elevate border-b last:border-b-0"
-                              onClick={() => {
-                                setCatalogSelectedItem(item);
-                                setNewLine((prev) => ({
-                                  ...prev,
-                                  articleCode: item.code || "",
-                                  productName: item.name || "",
-                                  pricePerBale: item.code && priceListMap[item.code] ? priceListMap[item.code] : "",
-                                }));
-                              }}
-                              data-testid={`button-catalog-item-${item.id}`}
-                            >
-                              <div>
-                                <p className="text-sm font-medium">{item.name}</p>
-                                {item.code && <p className="text-xs text-muted-foreground font-mono">{item.code}</p>}
-                              </div>
-                              <div className="flex items-center gap-2 ml-2 shrink-0">
-                                {item.code && priceListMap[item.code] && (
-                                  <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                                    ${parseFloat(priceListMap[item.code]).toFixed(2)}
-                                  </span>
-                                )}
-                                {item.stockGroup?.name && (
-                                  <span className="text-xs text-muted-foreground">{item.stockGroup.name}</span>
-                                )}
-                              </div>
-                            </button>
-                          ));
-                        })()
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground">{allStockItems.length} items in catalog</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {/* Selected item chip with change button */}
-                    <div className="flex items-center gap-2 p-3 rounded-md bg-muted">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold truncate">{catalogSelectedItem.name}</p>
-                        {catalogSelectedItem.code && (
-                          <p className="text-xs text-muted-foreground font-mono">{catalogSelectedItem.code}</p>
-                        )}
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          setCatalogSelectedItem(null);
-                          setCatalogSearch("");
-                          setNewLine((prev) => ({
-                            ...prev,
-                            articleCode: "",
-                            productName: "",
-                            quantity: "",
-                            pricePerBale: "",
-                          }));
-                        }}
-                        data-testid="button-change-item"
-                      >
-                        Change
-                      </Button>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Quantity</label>
-                        <Input
-                          type="number"
-                          placeholder="e.g. 10"
-                          value={newLine.quantity}
-                          onChange={(e) => setNewLine({ ...newLine, quantity: e.target.value })}
-                          onKeyDown={(e) => {
-                            if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
-                          }}
-                          autoFocus
-                          data-testid="input-line-quantity"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Price per Bale</label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="e.g. 45.00"
-                          value={newLine.pricePerBale}
-                          onChange={(e) => setNewLine({ ...newLine, pricePerBale: e.target.value })}
-                          onKeyDown={(e) => {
-                            if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
-                          }}
-                          data-testid="input-line-price"
-                        />
-                        {catalogSelectedItem?.code && priceListMap[catalogSelectedItem.code] && (
-                          <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
-                            Auto-filled from price list — you can override
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              /* Manual mode — existing form */
-              <>
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Article Code</label>
-                  <Input
-                    placeholder="e.g. 101"
-                    value={newLine.articleCode}
-                    onChange={(e) => setNewLine({ ...newLine, articleCode: e.target.value })}
-                    data-testid="input-line-article-code"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium mb-1 block">Product Name</label>
-                  <Input
-                    placeholder="e.g. Mixed Cotton"
-                    value={newLine.productName}
-                    onChange={(e) => setNewLine({ ...newLine, productName: e.target.value })}
-                    data-testid="input-line-product-name"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Quantity</label>
-                    <Input
-                      type="number"
-                      value={newLine.quantity}
-                      onChange={(e) => setNewLine({ ...newLine, quantity: e.target.value })}
-                      onKeyDown={(e) => {
-                        if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
-                      }}
-                      data-testid="input-line-quantity"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Price per Bale</label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={newLine.pricePerBale}
-                      onChange={(e) => setNewLine({ ...newLine, pricePerBale: e.target.value })}
-                      onKeyDown={(e) => {
-                        if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
-                      }}
-                      data-testid="input-line-price"
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-
-            <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={() => setIsAddLineOpen(false)} data-testid="button-cancel-add-line">
-                Cancel
-              </Button>
-              <Button
-                onClick={handleAddLine}
-                disabled={
-                  !newLine.articleCode ||
-                  !newLine.productName ||
-                  !newLine.quantity ||
-                  !newLine.pricePerBale ||
-                  addLineMutation.isPending ||
-                  (addLineMode === "catalog" && !catalogSelectedItem)
-                }
-                data-testid="button-confirm-add-line"
-              >
-                {addLineMutation.isPending ? "Adding..." : "Add Line"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!editingLine} onOpenChange={(open) => !open && setEditingLine(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Price Line</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="bg-muted p-3 rounded-md mb-2">
-              <p className="text-sm font-semibold">{editingLine?.articleCode}</p>
-              <p className="text-xs text-muted-foreground">{editingLine?.productName}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-1 block">Product Name</label>
-              <Input
-                value={editLineValues.productName}
-                onChange={(e) => setEditLineValues({ ...editLineValues, productName: e.target.value })}
-                data-testid="input-edit-line-product-name"
-              />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="text-sm font-medium mb-1 block">Quantity</label>
-                <Input
-                  type="number"
-                  value={editLineValues.quantity}
-                  onChange={(e) => setEditLineValues({ ...editLineValues, quantity: e.target.value })}
-                  onKeyDown={(e) => {
-                    if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
-                  }}
-                  data-testid="input-edit-line-quantity"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">Price per Bale</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={editLineValues.pricePerBale}
-                  onChange={(e) => setEditLineValues({ ...editLineValues, pricePerBale: e.target.value })}
-                  onKeyDown={(e) => {
-                    if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
-                  }}
-                  data-testid="input-edit-line-price"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-1 block">KG / Bale</label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder="e.g. 97"
-                  value={editLineValues.weightPerBaleKg}
-                  onChange={(e) => setEditLineValues({ ...editLineValues, weightPerBaleKg: e.target.value })}
-                  onKeyDown={(e) => {
-                    if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
-                  }}
-                  data-testid="input-edit-line-weight"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={() => setEditingLine(null)} data-testid="button-cancel-edit-line">
-                Cancel
-              </Button>
-              <Button
-                onClick={handleEditLine}
-                disabled={!editLineValues.pricePerBale || !editLineValues.quantity || editLineMutation.isPending}
-                data-testid="button-confirm-edit-line"
-              >
-                Save Changes
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={!!createLoadingProforma}
-        onOpenChange={(open) => {
-          if (!open) {
-            setCreateLoadingProforma(null);
-            setCreateLoadingLocationId("");
-          }
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Create Pending Loading</DialogTitle>
-            <DialogDescription>
-              A new loading will be created from <strong>{createLoadingProforma?.name}</strong>. Bales matching each
-              proforma line will be automatically reserved from the selected location.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div>
-              <Label className="text-sm font-medium mb-1 block">Warehouse Location</Label>
-              <Select value={createLoadingLocationId} onValueChange={setCreateLoadingLocationId}>
-                <SelectTrigger data-testid="select-loading-location">
-                  <SelectValue placeholder="Select a location..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {locations.map((loc) => (
-                    <SelectItem key={loc.id} value={loc.id.toString()} data-testid={`select-location-option-${loc.id}`}>
-                      {loc.name} {loc.code ? `(${loc.code})` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setCreateLoadingProforma(null);
-                setCreateLoadingLocationId("");
-              }}
-              data-testid="button-cancel-create-loading"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (!createLoadingProforma || !createLoadingLocationId) return;
-                createLoadingMutation.mutate({
-                  proformaId: createLoadingProforma.id,
-                  locationId: createLoadingLocationId,
-                });
-              }}
-              disabled={!createLoadingLocationId || createLoadingMutation.isPending}
-              data-testid="button-confirm-create-loading"
-            >
-              {createLoadingMutation.isPending ? "Creating..." : "Create Loading"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <EditPriceLineDialog
+        editLineMutation={editLineMutation}
+        editLineValues={editLineValues}
+        editingLine={editingLine}
+        handleEditLine={handleEditLine}
+        setEditLineValues={setEditLineValues}
+        setEditingLine={setEditingLine}
+      />
+      <CreatePendingLoadingDialog
+        createLoadingLocationId={createLoadingLocationId}
+        createLoadingMutation={createLoadingMutation}
+        createLoadingProforma={createLoadingProforma}
+        locations={locations}
+        setCreateLoadingLocationId={setCreateLoadingLocationId}
+        setCreateLoadingProforma={setCreateLoadingProforma}
+      />
 
       {/* ── Excel Import Dialog ──────────────────────────────────────────── */}
-      <Dialog
-        open={isExcelImportOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            setIsExcelImportOpen(false);
-            setExcelImportLines([]);
-            setExcelImportErrors([]);
-            if (excelFileInputRef.current) excelFileInputRef.current.value = "";
-          }
-        }}
-      >
-        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Import Proforma from Excel</DialogTitle>
-            <DialogDescription>
-              Upload an Excel file (.xlsx) with columns: <strong>Article Code</strong>, <strong>Product Name</strong>,{" "}
-              <strong>Quantity</strong>, <strong>Price Per Bale</strong>. Column names are flexible — any common
-              variation is detected automatically.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto space-y-4 py-2 pr-1">
-            {/* Customer info */}
-            <div className="flex items-center gap-2 p-3 rounded-md bg-muted">
-              <div>
-                <p className="text-xs text-muted-foreground">Customer</p>
-                <p className="text-sm font-medium">
-                  {customers.find((c: Customer) => c.id === customerId)?.legalName ?? "—"}
-                </p>
-              </div>
-            </div>
-
-            {/* Proforma name */}
-            <div>
-              <Label className="text-sm font-medium mb-1 block">Proforma Name</Label>
-              <Input
-                placeholder="e.g. Summer 2024 Pricing"
-                value={excelImportName}
-                onChange={(e) => setExcelImportName(e.target.value)}
-                data-testid="input-excel-import-name"
-              />
-            </div>
-
-            {/* File upload */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <Label className="text-sm font-medium">Excel File (.xlsx)</Label>
-                <button
-                  type="button"
-                  onClick={downloadProformaTemplate}
-                  className="text-xs text-primary underline-offset-2 hover:underline flex items-center gap-1"
-                  data-testid="button-download-template"
-                >
-                  <Download className="h-3 w-3" />
-                  Download template
-                </button>
-              </div>
-              <div
-                className="border-2 border-dashed rounded-md p-6 text-center cursor-pointer hover-elevate transition-colors"
-                onClick={() => excelFileInputRef.current?.click()}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const file = e.dataTransfer.files[0];
-                  if (file) handleExcelFile(file);
-                }}
-                data-testid="dropzone-excel-import"
-              >
-                <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  {excelImportLoading ? "Reading file…" : "Click or drag & drop an Excel file here"}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">Supports .xlsx format</p>
-              </div>
-              <input
-                ref={excelFileInputRef}
-                type="file"
-                accept=".xlsx,.xls"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) handleExcelFile(f);
-                }}
-                data-testid="input-file-excel"
-              />
-            </div>
-
-            {/* Parse errors */}
-            {excelImportErrors.length > 0 && (
-              <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3 space-y-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <AlertCircle className="h-4 w-4 text-destructive shrink-0" />
-                  <p className="text-sm font-medium text-destructive">
-                    {excelImportLines.length > 0 ? "Some rows were skipped:" : "Could not parse file:"}
-                  </p>
-                </div>
-                {excelImportErrors.map((err, i) => (
-                  <p key={i} className="text-xs text-muted-foreground pl-6">
-                    {err}
-                  </p>
-                ))}
-              </div>
-            )}
-
-            {/* Preview table */}
-            {excelImportLines.length > 0 && (
-              <div>
-                <p className="text-sm font-medium mb-2">
-                  Preview — {excelImportLines.length} row{excelImportLines.length !== 1 ? "s" : ""} ready to import
-                </p>
-                <div className="border rounded-md overflow-hidden">
-                  <div className="overflow-x-auto max-h-64 overflow-y-auto">
-                    <Table>
-                      <TableHeader className="sticky top-0 z-30 bg-background">
-                        <TableRow>
-                          <TableHead className="text-xs">Article Code</TableHead>
-                          <TableHead className="text-xs">Product Name</TableHead>
-                          <TableHead className="text-xs text-right">Qty</TableHead>
-                          <TableHead className="text-xs text-right">Price/Bale</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {excelImportLines.map((row, i) => (
-                          <TableRow key={i} data-testid={`row-excel-preview-${i}`}>
-                            <TableCell className="font-mono text-xs py-1.5">{row.articleCode}</TableCell>
-                            <TableCell className="text-xs py-1.5">{row.productName}</TableCell>
-                            <TableCell className="text-right font-mono text-xs py-1.5">{row.quantity}</TableCell>
-                            <TableCell className="text-right font-mono text-xs py-1.5">
-                              {parseFloat(row.pricePerBale) > 0 ? parseFloat(row.pricePerBale).toFixed(2) : "—"}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter className="pt-4 border-t">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsExcelImportOpen(false);
-                setExcelImportLines([]);
-                setExcelImportErrors([]);
-                if (excelFileInputRef.current) excelFileInputRef.current.value = "";
-              }}
-              data-testid="button-cancel-excel-import"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (!customerId || !excelImportName.trim() || excelImportLines.length === 0) return;
-                bulkImportMutation.mutate({
-                  customerId,
-                  name: excelImportName.trim(),
-                  isActive: false,
-                  lines: excelImportLines,
-                });
-              }}
-              disabled={!excelImportName.trim() || excelImportLines.length === 0 || bulkImportMutation.isPending}
-              data-testid="button-confirm-excel-import"
-            >
-              {bulkImportMutation.isPending ? "Creating…" : `Create Proforma (${excelImportLines.length} lines)`}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ImportProformaExcelDialog
+        bulkImportMutation={bulkImportMutation}
+        customerId={customerId}
+        customers={customers}
+        downloadProformaTemplate={downloadProformaTemplate}
+        excelFileInputRef={excelFileInputRef}
+        excelImportErrors={excelImportErrors}
+        excelImportLines={excelImportLines}
+        excelImportLoading={excelImportLoading}
+        excelImportName={excelImportName}
+        handleExcelFile={handleExcelFile}
+        isExcelImportOpen={isExcelImportOpen}
+        setExcelImportErrors={setExcelImportErrors}
+        setExcelImportLines={setExcelImportLines}
+        setExcelImportName={setExcelImportName}
+        setIsExcelImportOpen={setIsExcelImportOpen}
+      />
 
       <DeleteConfirmDialog
         open={!!pendingDelete}

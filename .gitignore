@@ -42,3 +42,6 @@ artifacts/bandwidth-smoke/
 
 # User-uploaded content (runtime data, not source)
 uploads/
+
+# Test coverage output
+coverage/

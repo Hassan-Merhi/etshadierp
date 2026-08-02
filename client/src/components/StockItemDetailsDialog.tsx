@@ -9,74 +9,21 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Edit, Save, X, Package, Plus, Trash2, ExternalLink, BarChart3 } from "lucide-react";
-import { format } from "date-fns";
+import { Edit, Save, X, Package, Plus, Trash2, ExternalLink } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Location as LocationType } from "@shared/schema";
 import { formatNumber } from "@/lib/formatNumber";
 
-interface StockItemDetailsDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  stockItemId: number;
-  stockItemName: string;
-}
-
-interface StockItem {
-  id: number;
-  code: string;
-  name: string;
-  barcode: string | null;
-  uom: string;
-  stockGroupId: number | null;
-  gradeId: number | null;
-  categoryId: number | null;
-  sellingPrice: string;
-  active: boolean;
-}
-
-interface StockGroup {
-  id: number;
-  code: string;
-  name: string;
-}
-
-interface StockGrade {
-  id: number;
-  name: string;
-  active: boolean;
-}
-
-interface StockCategory {
-  id: number;
-  name: string;
-  active: boolean;
-}
-
-interface Transaction {
-  id: number;
-  type: "transfer" | "adjustment";
-  voucherId: number;
-  voucherNumber: string;
-  voucherDate: string;
-  quantity: string;
-  rate: string;
-  totalAmount: string;
-  stockItemId: number;
-  notes: string | null;
-}
-
-interface CodeAlias {
-  id: number;
-  stockItemId: number;
-  companyId: number;
-  aliasCode: string;
-  description: string | null;
-  createdAt: string;
-}
-
+import type {
+  CodeAlias,
+  StockCategory,
+  StockGrade,
+  StockGroup,
+  StockItem,
+  StockItemDetailsDialogProps,
+  Transaction,
+} from "./stockitemdetailsdialog/types";
 export function StockItemDetailsDialog({
   open,
   onOpenChange,
