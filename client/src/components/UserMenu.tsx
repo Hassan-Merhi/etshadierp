@@ -1,8 +1,5 @@
 import { ChevronDown, Languages, LogOut } from "lucide-react";
-import {
-  parseApplicationLanguage,
-  type ApplicationLanguage,
-} from "@shared/applicationLanguageContract";
+import { parseApplicationLanguage, type ApplicationLanguage } from "@shared/applicationLanguageContract";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
