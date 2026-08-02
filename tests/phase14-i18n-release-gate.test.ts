@@ -12,12 +12,27 @@ describe("Phase 14 trilingual release gate", () => {
     expect(css).toContain("[data-account-code]");
   });
 
-  it("keeps an executable untranslated-text audit and ratchet baseline", () => {
+  it("keeps a classified audit and reviewed per-module ratchet", () => {
     const audit = fs.readFileSync("scripts/audit-i18n-phase14.mjs", "utf8");
+    const classifier = fs.readFileSync("scripts/verify-i18n-audit-classifier.mjs", "utf8");
+    const policy = JSON.parse(fs.readFileSync("config/i18n-audit-policy.json", "utf8"));
     const baseline = JSON.parse(fs.readFileSync("config/i18n-phase14-baseline.json", "utf8"));
-    expect(audit).toContain("Untranslated-text candidates increased");
+    const workflow = fs.readFileSync(".github/workflows/i18n-audit.yml", "utf8");
+
+    expect(audit).toContain("compatibility-covered");
+    expect(audit).toContain("enforceBaseline");
     expect(audit).toContain("process.exit(1)");
-    expect(baseline.maxFindings).toBeGreaterThan(0);
+    expect(classifier).toContain("I18n audit classifier contract verified");
+    expect(policy.ignoredPathRules.every((rule: { reason?: string }) => Boolean(rule.reason))).toBe(true);
+    expect(baseline.schemaVersion).toBe(2);
+    expect(baseline.detectorVersion).toBe(3);
+    expect(baseline.maxActionable).toBe(17923);
+    expect(baseline.maxUnclassified).toBe(0);
+    expect(Object.keys(baseline.modules)).toHaveLength(14);
+    expect(workflow).toContain("verify-i18n-audit-classifier.mjs");
+    expect(workflow).toContain("--json-out");
+    expect(workflow).toContain("actions/upload-artifact@v7");
+    expect(workflow).not.toContain("--no-enforce");
   });
 
   it("preserves business identifiers while translating interface attributes", () => {
