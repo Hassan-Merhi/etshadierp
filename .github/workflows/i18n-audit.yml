@@ -2,7 +2,7 @@ name: I18n Audit
 
 on:
   push:
-    branches: [main, agent/phase-2-i18n-audit-cleanup]
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -18,18 +18,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Generate classified untranslated-text report
+      - name: Verify audit classifier contract
+        run: node scripts/verify-i18n-audit-classifier.mjs
+
+      - name: Enforce reviewed untranslated-text ratchet
         run: |
           node scripts/audit-i18n-phase14.mjs \
-            --no-enforce \
             --json-out artifacts/i18n-audit/report.json \
-            --markdown-out artifacts/i18n-audit/report.md \
-            --suggested-baseline-out artifacts/i18n-audit/suggested-baseline.json
+            --markdown-out artifacts/i18n-audit/report.md
+          cat artifacts/i18n-audit/report.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload classified audit report
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: classified-i18n-audit
           path: artifacts/i18n-audit
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
