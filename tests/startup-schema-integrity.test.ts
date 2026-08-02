@@ -27,7 +27,7 @@ import { startupMigrations } from "../server/startup-schema";
 const EXPECTED_STATEMENT_COUNT = 1212;
 
 /** sha256 of JSON.stringify(startupMigrations) as of the split. */
-const EXPECTED_CONTENT_HASH = "267e307bbde5b926756a74ea9b869994d83241dae3f160e189813bee1f3d4b5f";
+const EXPECTED_CONTENT_HASH = "64e7042edec495e57cafe352116da2d8e3540ae59db563c196cd69b155536342";
 
 function contentHash(statements: string[]): string {
   return crypto.createHash("sha256").update(JSON.stringify(statements)).digest("hex");

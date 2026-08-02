@@ -18,7 +18,7 @@
  */
 // DATABASE_URL must be set in the environment before running this script.
 // Example: DATABASE_URL="$RENDER_DATABASE_URL" npx tsx scripts/audit-repair-all-raw-material-costs.ts --company-id=1
-import { getFullAuditScan, applyRawStockRecalc, getMixBatchSourceCostMismatchPreview, applyZeroCostMixBatchSourcesFix } from "../server/services/factory/rawStockRecalc";
+import { getFullAuditScan, applyRawStockRecalc, getMixBatchSourceCostMismatchPreview, applyZeroCostMixBatchSourcesFix } from "../server/services/factory/raw-stock-recalc";
 
 const args = process.argv.slice(2);
 const doRepair = args.includes("--repair");

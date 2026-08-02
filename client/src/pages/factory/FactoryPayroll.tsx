@@ -29,79 +29,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 
-interface PayrollRecord {
-  id: number;
-  companyId: number;
-  workerId: number;
-  periodStart: string;
-  periodEnd: string;
-  baseSalary: string;
-  baleEarnings: string;
-  kgEarnings: string;
-  overtimePay: string;
-  bonuses: string;
-  deductions: string;
-  advances: string;
-  netSalary: string;
-  balesCount: number;
-  kgProcessed: string;
-  overtimeHours: string;
-  status: string;
-  notes: string | null;
-  workerName: string;
-  workerCode: string;
-  workerPosition: string;
-  workerSalaryType: string;
-  workerDepartment: string;
-}
-
-interface Company {
-  id: number;
-  code: string;
-  name: string;
-}
-
-function getStatusBadge(status: string) {
-  switch (status) {
-    case "DRAFT":
-      return (
-        <Badge
-          variant="outline"
-          className="bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-          data-testid={`badge-status-${status}`}
-        >
-          DRAFT
-        </Badge>
-      );
-    case "APPROVED":
-      return (
-        <Badge
-          variant="secondary"
-          className="bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-          data-testid={`badge-status-${status}`}
-        >
-          APPROVED
-        </Badge>
-      );
-    case "PAID":
-      return (
-        <Badge
-          variant="secondary"
-          className="bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-          data-testid={`badge-status-${status}`}
-        >
-          PAID
-        </Badge>
-      );
-    default:
-      return (
-        <Badge variant="outline" data-testid={`badge-status-${status}`}>
-          {status}
-        </Badge>
-      );
-  }
-}
-
+import type { Company, PayrollRecord } from "./factorypayroll/types";
+import { getStatusBadge } from "./factorypayroll/utils";
 export default function FactoryPayrollPage() {
   const { toast } = useToast();
   const today = new Date().toLocaleDateString("en-CA");
@@ -328,7 +257,12 @@ export default function FactoryPayrollPage() {
 
   const handleMigrateCitySplit = async () => {
     if (!selectedCompanyId) return;
-    if (!window.confirm("This will split historical salary/bonus expense entries by city (Lubumbashi / Kolwezi). Run once only. Continue?")) return;
+    if (
+      !window.confirm(
+        "This will split historical salary/bonus expense entries by city (Lubumbashi / Kolwezi). Run once only. Continue?"
+      )
+    )
+      return;
     setMigrating(true);
     try {
       const res = await fetch("/api/factory/payroll/migrate-city-split", {

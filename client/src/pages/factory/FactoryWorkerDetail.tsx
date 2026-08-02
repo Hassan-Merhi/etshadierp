@@ -1,29 +1,63 @@
-import {useState, useRef} from "react";
-import {useAdminOverride} from "@/hooks/use-admin-override";
-import {useDateFormat} from "@/contexts/DateFormatContext";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {useRoute, useLocation} from "wouter";
-import {useEscapeToParent} from "@/hooks/use-escape-to-parent";
-import {ArrowLeft, Upload, UserX, UserCheck, Package, DollarSign, Calculator, X, CreditCard, Building, Phone, Calendar, FileText, FileImage, File, Trash2, Banknote, Plus, Loader2, RotateCcw, Wrench, Eye, Download} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter} from "@/components/ui/dialog";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Avatar, AvatarImage, AvatarFallback} from "@/components/ui/avatar";
-import {Skeleton} from "@/components/ui/skeleton";
-import {useToast} from "@/hooks/use-toast";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {factoryApiRequest} from "@/lib/factoryApi";
-import type {FactoryWorker, FactoryBale, FactoryWorkerDocument, FactoryWorkerAdvance} from "@shared/schema";
+import { useState, useRef } from "react";
+import { useAdminOverride } from "@/hooks/use-admin-override";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useRoute, useLocation } from "wouter";
+import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
+import {
+  ArrowLeft,
+  UserX,
+  UserCheck,
+  Upload,
+  Package,
+  DollarSign,
+  CreditCard,
+  Building,
+  Phone,
+  Calendar,
+  FileText,
+  FileImage,
+  File,
+  Trash2,
+  Banknote,
+  Plus,
+  Loader2,
+  RotateCcw,
+  Wrench,
+  Eye,
+  Download,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
+import type { FactoryWorker, FactoryBale, FactoryWorkerDocument, FactoryWorkerAdvance } from "@shared/schema";
 
-import type {CashAccount, PayrollRecord, WorkerStats, WorkerWithStats} from "./factoryworkerdetail/types";
-import {PAYROLL_STATUS, fmt, fmtNum, getAvatarColor, getInitials} from "./factoryworkerdetail/utils";
-import {AdvanceRow} from "./factoryworkerdetail/components/AdvanceRow";
+import type { CashAccount, PayrollRecord, WorkerStats, WorkerWithStats } from "./factoryworkerdetail/types";
+import { PAYROLL_STATUS, fmt, fmtNum, getAvatarColor, getInitials } from "./factoryworkerdetail/utils";
+import { AdvanceRow } from "./factoryworkerdetail/components/AdvanceRow";
+import { EndContractDialog } from "./factory-worker-detail/dialogs/EndContractDialog";
+import { GenerateMissingAccountingEntryDialog } from "./factory-worker-detail/dialogs/GenerateMissingAccountingEntryDialog";
+import { MarkPayrollPaidDialog } from "./factory-worker-detail/dialogs/MarkPayrollPaidDialog";
+import { DocumentPreviewDialog } from "./factory-worker-detail/dialogs/DocumentPreviewDialog";
+import { PayrollDetailDialog } from "./factory-worker-detail/dialogs/PayrollDetailDialog";
 export default function FactoryWorkerDetail() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const [, navigate] = useLocation();
@@ -1913,335 +1947,56 @@ export default function FactoryWorkerDetail() {
         </div>
       </div>
 
-      <Dialog
-        open={endOpen}
-        onOpenChange={(open) => {
-          if (!open) setEndOpen(false);
-        }}
-      >
-        <DialogContent data-testid="dialog-end-contract">
-          <DialogHeader>
-            <DialogTitle>End Contract — {worker.fullName}</DialogTitle>
-            <DialogDescription>
-              {endStep === 1
-                ? "Set the settlement period to calculate the final balance."
-                : "Review the settlement and choose payment."}
-            </DialogDescription>
-          </DialogHeader>
-
-          {endStep === 1 && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Period Start</Label>
-                  <Input
-                    type="date"
-                    value={endStart}
-                    onChange={(e) => setEndStart(e.target.value)}
-                    data-testid="input-end-start"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Period End</Label>
-                  <Input
-                    type="date"
-                    value={endEnd}
-                    onChange={(e) => setEndEnd(e.target.value)}
-                    data-testid="input-end-end"
-                  />
-                </div>
-              </div>
-              <Button
-                onClick={handleCalculate}
-                disabled={endCalculating || !endStart || !endEnd}
-                className="w-full"
-                data-testid="button-calculate"
-              >
-                <Calculator className="h-4 w-4 mr-2" />
-                {endCalculating ? "Calculating..." : "Calculate Settlement"}
-              </Button>
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">or</span>
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                onClick={handleSkipAndEnd}
-                disabled={endSubmitting}
-                className="w-full text-muted-foreground"
-                data-testid="button-skip-end-contract"
-              >
-                <UserX className="h-4 w-4 mr-2" />
-                {endSubmitting ? "Ending..." : "End Contract Without Payment"}
-              </Button>
-              <p className="text-xs text-muted-foreground text-center">
-                Immediately deactivates the worker. No settlement payroll is created.
-              </p>
-            </div>
-          )}
-
-          {endStep === 2 && endResult && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-md border p-3 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Earned</p>
-                  <p className="font-semibold text-sm" data-testid="text-earned">
-                    ${fmtNum(endResult.earned)}
-                  </p>
-                </div>
-                <div className="rounded-md border p-3 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Already Paid</p>
-                  <p className="font-semibold text-sm" data-testid="text-paid">
-                    ${fmtNum(endResult.paid)}
-                  </p>
-                </div>
-                <div
-                  className={`rounded-md border p-3 text-center ${parseFloat(endResult.advances) > 0 ? "border-orange-300 bg-orange-50 dark:bg-orange-900/20" : ""}`}
-                >
-                  <p className="text-xs text-muted-foreground mb-1">Advances</p>
-                  <p className="font-semibold text-sm" data-testid="text-advances">
-                    ${fmtNum(endResult.advances)}
-                  </p>
-                </div>
-                <div
-                  className={`rounded-md border p-3 text-center ${payrollBalance > 0 ? "border-amber-300 bg-amber-50 dark:bg-amber-900/20" : "border-green-300 bg-green-50 dark:bg-green-900/20"}`}
-                >
-                  <p className="text-xs text-muted-foreground mb-1">Balance</p>
-                  <p className="font-semibold text-sm" data-testid="text-balance">
-                    ${fmtNum(endResult.balance)}
-                  </p>
-                </div>
-              </div>
-              {payrollBalance > 0 && (
-                <div className="space-y-1">
-                  <Label className="text-xs">Cash Account (Pay Now)</Label>
-                  <Select value={endCashAccountId} onValueChange={setEndCashAccountId}>
-                    <SelectTrigger data-testid="select-cash-account">
-                      <SelectValue placeholder="Select account..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {cashAccounts?.map((a) => (
-                        <SelectItem key={a.id} value={String(a.id)}>
-                          {a.name} ({a.code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => {
-                    setEndStep(1);
-                    setEndResult(null);
-                  }}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-                {payrollBalance > 0 ? (
-                  <>
-                    <Button
-                      className="flex-1"
-                      onClick={() => handleEndContract(true)}
-                      disabled={endSubmitting || !endCashAccountId}
-                      data-testid="button-pay-now"
-                    >
-                      {endSubmitting ? "Processing..." : `Pay Now $${fmtNum(endResult.balance)}`}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => handleEndContract(false)}
-                      disabled={endSubmitting}
-                      data-testid="button-pay-later"
-                    >
-                      Pay Later — End Contract
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    className="flex-1"
-                    onClick={() => handleEndContract(false)}
-                    disabled={endSubmitting}
-                    data-testid="button-end-confirm"
-                  >
-                    {endSubmitting ? "Processing..." : "End Contract"}
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <EndContractDialog
+        cashAccounts={cashAccounts}
+        endCalculating={endCalculating}
+        endCashAccountId={endCashAccountId}
+        endEnd={endEnd}
+        endOpen={endOpen}
+        endResult={endResult}
+        endStart={endStart}
+        endStep={endStep}
+        endSubmitting={endSubmitting}
+        handleCalculate={handleCalculate}
+        handleEndContract={handleEndContract}
+        handleSkipAndEnd={handleSkipAndEnd}
+        payrollBalance={payrollBalance}
+        setEndCashAccountId={setEndCashAccountId}
+        setEndEnd={setEndEnd}
+        setEndOpen={setEndOpen}
+        setEndResult={setEndResult}
+        setEndStart={setEndStart}
+        setEndStep={setEndStep}
+        worker={worker}
+      />
 
       {/* Fix Accounting Dialog */}
-      <Dialog
-        open={fixAcctOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            setFixAcctOpen(false);
-            setFixAcctTargetId(null);
-            setFixAcctCashId("");
-          }
-        }}
-      >
-        <DialogContent data-testid="dialog-fix-acct">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Wrench className="h-4 w-4 text-amber-500" />
-              Generate Missing Accounting Entry
-            </DialogTitle>
-            <DialogDescription>
-              This payroll was marked paid without a cash account. Select an account to create the missing payment
-              voucher.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Cash Account</Label>
-              <Select value={fixAcctCashId} onValueChange={setFixAcctCashId}>
-                <SelectTrigger data-testid="select-fix-acct-cash">
-                  <SelectValue placeholder="Select account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {cashAccounts?.map((a) => (
-                    <SelectItem key={a.id} value={String(a.id)}>
-                      {a.name} ({a.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setFixAcctOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() =>
-                wrapAdminAction(
-                  () => fixAcctTargetId && fixAcctMutation.mutate({ id: fixAcctTargetId, cashId: fixAcctCashId }),
-                  "Generate Entry"
-                )
-              }
-              disabled={fixAcctMutation.isPending || !fixAcctCashId}
-              data-testid="button-confirm-fix-acct"
-            >
-              {fixAcctMutation.isPending ? "Generating..." : "Generate Entry"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <GenerateMissingAccountingEntryDialog
+        cashAccounts={cashAccounts}
+        fixAcctCashId={fixAcctCashId}
+        fixAcctMutation={fixAcctMutation}
+        fixAcctOpen={fixAcctOpen}
+        fixAcctTargetId={fixAcctTargetId}
+        setFixAcctCashId={setFixAcctCashId}
+        setFixAcctOpen={setFixAcctOpen}
+        setFixAcctTargetId={setFixAcctTargetId}
+        wrapAdminAction={wrapAdminAction}
+      />
 
-      <Dialog
-        open={payOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            setPayOpen(false);
-            setPayTargetId(null);
-          }
-        }}
-      >
-        <DialogContent data-testid="dialog-pay-payroll">
-          <DialogHeader>
-            <DialogTitle>Mark Payroll as Paid</DialogTitle>
-            <DialogDescription>Select a cash account to record this payment.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Cash Account</Label>
-              <Select value={payCashAccountId} onValueChange={setPayCashAccountId}>
-                <SelectTrigger data-testid="select-pay-cash">
-                  <SelectValue placeholder="Select account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {cashAccounts?.map((a) => (
-                    <SelectItem key={a.id} value={String(a.id)}>
-                      {a.name} ({a.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setPayOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() =>
-                wrapAdminAction(
-                  () => payTargetId && markPaidMutation.mutate({ id: payTargetId, cashId: payCashAccountId }),
-                  "Confirm Payment"
-                )
-              }
-              disabled={markPaidMutation.isPending}
-              data-testid="button-confirm-pay"
-            >
-              {markPaidMutation.isPending ? "Saving..." : "Confirm Payment"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MarkPayrollPaidDialog
+        cashAccounts={cashAccounts}
+        markPaidMutation={markPaidMutation}
+        payCashAccountId={payCashAccountId}
+        payOpen={payOpen}
+        payTargetId={payTargetId}
+        setPayCashAccountId={setPayCashAccountId}
+        setPayOpen={setPayOpen}
+        setPayTargetId={setPayTargetId}
+        wrapAdminAction={wrapAdminAction}
+      />
 
       {/* Image Viewer Dialog */}
-      <Dialog
-        open={viewingDoc !== null}
-        onOpenChange={(open) => {
-          if (!open) setViewingDoc(null);
-        }}
-      >
-        <DialogContent className="max-w-4xl p-2" data-testid="dialog-view-doc">
-          <DialogHeader className="px-3 pt-2 pb-1">
-            <DialogTitle className="text-sm font-medium flex items-center gap-2 truncate">
-              <FileImage className="h-4 w-4 shrink-0 text-muted-foreground" />
-              {viewingDoc?.originalName}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex items-center justify-center bg-muted/30 rounded-md overflow-hidden min-h-64 max-h-[70vh]">
-            {viewingDoc && (
-              <img
-                src={viewingDoc.fileUrl}
-                alt={viewingDoc.originalName}
-                className="max-w-full max-h-[70vh] object-contain"
-                data-testid="img-doc-preview"
-              />
-            )}
-          </div>
-          <div className="flex justify-between items-center px-1 pb-1">
-            <p className="text-xs text-muted-foreground">
-              {viewingDoc?.fileSize ? `${(viewingDoc.fileSize / 1024).toFixed(1)} KB` : ""}
-            </p>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  if (viewingDoc) {
-                    const a = document.createElement("a");
-                    a.href = viewingDoc.fileUrl;
-                    a.download = viewingDoc.originalName;
-                    a.click();
-                  }
-                }}
-                data-testid="button-download-viewing-doc"
-              >
-                <Download className="h-3.5 w-3.5 mr-1.5" />
-                Download
-              </Button>
-              <Button size="sm" onClick={() => setViewingDoc(null)} data-testid="button-close-doc-viewer">
-                Close
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <DocumentPreviewDialog setViewingDoc={setViewingDoc} viewingDoc={viewingDoc} />
 
       {/* Delete Document Confirmation */}
       <Dialog
@@ -2284,218 +2039,12 @@ export default function FactoryWorkerDetail() {
         </DialogContent>
       </Dialog>
       {/* Payroll Detail Dialog */}
-      <Dialog
-        open={detailPayrollId !== null}
-        onOpenChange={(open) => {
-          if (!open) setDetailPayrollId(null);
-        }}
-      >
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Payroll Detail
-              {payrollDetail && (
-                <span className="text-sm font-normal text-muted-foreground ml-1">
-                  {payrollDetail.payroll.periodStart?.slice(0, 10)} – {payrollDetail.payroll.periodEnd?.slice(0, 10)}
-                </span>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-
-          {payrollDetailLoading ? (
-            <div className="space-y-2 py-4">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-8 w-full" />
-              ))}
-            </div>
-          ) : payrollDetail ? (
-            <div className="space-y-5">
-              {/* Pay Breakdown */}
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                  Pay Breakdown
-                </p>
-                <div className="rounded-md border divide-y text-sm">
-                  {[
-                    { label: "Base Salary", value: payrollDetail.payroll.baseSalary, className: "" },
-                    {
-                      label: "Transport Allowance",
-                      value: (payrollDetail.payroll as any).transport || "0",
-                      className: "",
-                    },
-                    {
-                      label: "Bonuses",
-                      value: payrollDetail.payroll.bonuses,
-                      className: "text-green-700 dark:text-green-400",
-                    },
-                    { label: "Overtime Pay", value: (payrollDetail.payroll as any).overtimePay || "0", className: "" },
-                    {
-                      label: "Advances Deducted",
-                      value: payrollDetail.payroll.advances,
-                      className: "text-red-700 dark:text-red-400",
-                    },
-                    {
-                      label: "Other Deductions",
-                      value: (payrollDetail.payroll as any).deductions || "0",
-                      className: "text-red-700 dark:text-red-400",
-                    },
-                  ].map(({ label, value, className }) => (
-                    <div key={label} className="flex justify-between items-center px-3 py-2">
-                      <span className="text-muted-foreground">{label}</span>
-                      <span className={`font-mono font-medium ${className}`}>${fmtNum(value)}</span>
-                    </div>
-                  ))}
-                  <div className="flex justify-between items-center px-3 py-2.5 bg-muted/40 font-semibold">
-                    <span>Net Salary</span>
-                    <span className="font-mono text-base">${fmtNum(payrollDetail.payroll.netSalary)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Attendance Summary */}
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                  Attendance Summary
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {[
-                    {
-                      label: "Present Days",
-                      value: parseFloat((payrollDetail.payroll as any).presentDays || "0"),
-                      color: "text-green-700 dark:text-green-400",
-                    },
-                    {
-                      label: "Absent Days",
-                      value: parseFloat((payrollDetail.payroll as any).absentDays || "0"),
-                      color: "text-red-700 dark:text-red-400",
-                    },
-                    { label: "Working Days", value: (payrollDetail.payroll as any).totalWorkingDays || 0, color: "" },
-                  ].map(({ label, value, color }) => (
-                    <Card key={label}>
-                      <CardContent className="p-3 text-center">
-                        <p className={`text-xl font-bold ${color}`}>{value}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-
-              {/* Per-day Attendance */}
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                  Daily Attendance
-                  {payrollDetail.attendance.length > 0 && (
-                    <span className="ml-2 normal-case font-normal">({payrollDetail.attendance.length} records)</span>
-                  )}
-                </p>
-                {payrollDetail.attendance.length === 0 ? (
-                  <div className="rounded-md border px-4 py-6 text-center text-sm text-muted-foreground">
-                    No attendance records for this period. Salary was calculated by calendar days.
-                  </div>
-                ) : (
-                  <div className="rounded-md border overflow-hidden">
-                    <Table>
-                      <TableHeader className="sticky top-0 z-30 bg-background">
-                        <TableRow>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Day</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Shift</TableHead>
-                          <TableHead>Notes</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {payrollDetail.attendance.map((att) => {
-                          const d = new Date(att.attendanceDate + "T00:00:00");
-                          const dayName = d.toLocaleDateString("en-US", { weekday: "short" });
-                          const statusColors: Record<string, string> = {
-                            Present: "text-green-700 dark:text-green-400",
-                            Late: "text-amber-700 dark:text-amber-400",
-                            "Half Day": "text-blue-700 dark:text-blue-400",
-                            Absent: "text-red-700 dark:text-red-400",
-                          };
-                          return (
-                            <TableRow key={att.id} data-testid={`row-detail-att-${att.id}`}>
-                              <TableCell className="text-sm font-mono">{att.attendanceDate}</TableCell>
-                              <TableCell className="text-sm text-muted-foreground">{dayName}</TableCell>
-                              <TableCell>
-                                <span className={`text-sm font-medium ${statusColors[att.status] || ""}`}>
-                                  {att.status}
-                                </span>
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">{att.shift || "—"}</TableCell>
-                              <TableCell className="text-sm text-muted-foreground">{att.notes || "—"}</TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </div>
-
-              {/* Extra stats (bales / kg / overtime) */}
-              {(parseFloat((payrollDetail.payroll as any).balesCount || "0") > 0 ||
-                parseFloat((payrollDetail.payroll as any).kgProcessed || "0") > 0 ||
-                parseFloat((payrollDetail.payroll as any).overtimeHours || "0") > 0) && (
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Production</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {parseFloat((payrollDetail.payroll as any).balesCount || "0") > 0 && (
-                      <Card>
-                        <CardContent className="p-3 text-center">
-                          <p className="text-xl font-bold">{(payrollDetail.payroll as any).balesCount}</p>
-                          <p className="text-xs text-muted-foreground">Bales</p>
-                        </CardContent>
-                      </Card>
-                    )}
-                    {parseFloat((payrollDetail.payroll as any).kgProcessed || "0") > 0 && (
-                      <Card>
-                        <CardContent className="p-3 text-center">
-                          <p className="text-xl font-bold">
-                            {parseFloat((payrollDetail.payroll as any).kgProcessed || "0").toFixed(1)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">KG</p>
-                        </CardContent>
-                      </Card>
-                    )}
-                    {parseFloat((payrollDetail.payroll as any).overtimeHours || "0") > 0 && (
-                      <Card>
-                        <CardContent className="p-3 text-center">
-                          <p className="text-xl font-bold">
-                            {parseFloat((payrollDetail.payroll as any).overtimeHours || "0").toFixed(1)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">OT Hours</p>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Notes */}
-              {payrollDetail.payroll.notes && (
-                <div className="rounded-md bg-muted/40 px-3 py-2 text-sm">
-                  <span className="text-muted-foreground text-xs font-medium">Notes: </span>
-                  {payrollDetail.payroll.notes}
-                </div>
-              )}
-            </div>
-          ) : null}
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setDetailPayrollId(null)}
-              data-testid="button-close-payroll-detail"
-            >
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <PayrollDetailDialog
+        detailPayrollId={detailPayrollId}
+        payrollDetail={payrollDetail}
+        payrollDetailLoading={payrollDetailLoading}
+        setDetailPayrollId={setDetailPayrollId}
+      />
 
       {AdminDialog}
     </div>

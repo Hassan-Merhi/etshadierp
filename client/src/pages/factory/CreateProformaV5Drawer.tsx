@@ -25,68 +25,8 @@ import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-const DRAFT_KEY = "create-proforma-v5-draft";
-
-interface ArticleRow {
-  articleCode: string;
-  productName: string;
-  stockAvailable: number;
-  totalLoaded: number;
-  expectedToLoad: number;
-  freeToPromise: number;
-}
-
-interface FactoryCustomer {
-  id: number;
-  legalName: string;
-}
-interface BaleProduct {
-  id: number;
-  code: string;
-  articleCode: string | null;
-  weightPerBaleKg: string | null;
-  sellingPrice: string | null;
-  productionPrice: string | null;
-}
-
-interface Props {
-  open: boolean;
-  onClose: () => void;
-  articleRows: ArticleRow[];
-  onSuccess: () => void;
-}
-
-interface Draft {
-  customerId: string;
-  proformaName: string;
-  isActive: boolean;
-  quantities: Record<string, string>;
-  sellingPrices: Record<string, string>;
-  sendToLoading: boolean;
-  containerCount: string;
-  containerNames: string[];
-  savedAt: number;
-}
-
-function loadDraft(): Draft | null {
-  try {
-    const raw = localStorage.getItem(DRAFT_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-}
-function saveDraft(d: Draft) {
-  try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, savedAt: Date.now() }));
-  } catch {}
-}
-function clearDraft() {
-  try {
-    localStorage.removeItem(DRAFT_KEY);
-  } catch {}
-}
-
+import type { ArticleRow, BaleProduct, Draft, FactoryCustomer, Props } from "./createproformav5drawer/types";
+import { clearDraft, loadDraft, saveDraft } from "./createproformav5drawer/utils";
 export default function CreateProformaV5Drawer({ open, onClose, articleRows, onSuccess }: Props) {
   const { toast } = useToast();
   const qc = useQueryClient();

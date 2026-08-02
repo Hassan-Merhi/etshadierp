@@ -35,77 +35,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { utils, writeFile, readFile, ExcelJS } from "@/lib/excelHelper";
+import { writeFile, ExcelJS } from "@/lib/excelHelper";
 import { format, parseISO, startOfDay, startOfMonth, startOfYear, addDays } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { formatNumber } from "@/lib/formatNumber";
 
-interface SalesReportItem {
-  id: number;
-  voucherId: number;
-  voucherNumber: string;
-  voucherDate: string;
-  locationId: number | null;
-  locationName: string | null;
-  stockItemId: number;
-  stockItemCode: string;
-  stockItemName: string;
-  quantity: string;
-  actualSellingPrice: string;
-  configuredSellingPrice: string;
-  costPrice: string;
-  totalSales: string;
-  totalCost: string;
-  totalConfiguredCost: number;
-  costProfit: string;
-  costProfitPercentage: number;
-  configuredProfit: number;
-  configuredProfitPercentage: number;
-  isCreditSale?: boolean;
-  createdAt: string;
-  // Multi-company fields (only present in all-companies view)
-  companyId?: number;
-  companyCode?: string;
-  companyName?: string;
-}
-
-interface DailySummary {
-  date: string; // compound key used for grouping (may have "-credit" suffix)
-  dateKey: string; // clean date key for API queries (no suffix)
-  displayDate: string;
-  totalSales: number;
-  totalCost: number;
-  totalConfiguredCost: number;
-  costProfit: number;
-  configuredProfit: number;
-  itemCount: number;
-  totalQty: number;
-  isCreditSale: boolean;
-  hasMixedSales: boolean; // true when credit + normal are merged together
-  items: SalesReportItem[];
-}
-
-type GroupingType = "daily" | "monthly" | "yearly";
-type ProfitFilter = "all" | "positive" | "negative";
-
-// Format number with commas, remove .00 if whole - handles string inputs
-const formatNumericValue = (value: string | number): string => {
-  const num = typeof value === "string" ? parseFloat(value) : value;
-  if (isNaN(num)) return "0";
-  return formatNumber(num);
-};
-
-// For backwards compatibility
-const formatSmartNumber = (value: string | number | null | undefined) => {
-  if (value == null) return "0";
-  const num = typeof value === "string" ? parseFloat(value) : value;
-  if (isNaN(num)) return "0";
-  return num % 1 === 0
-    ? num.toLocaleString("en-US")
-    : num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};
-
+import type { DailySummary, GroupingType, ProfitFilter, SalesReportItem } from "./salesreportlegacy/types";
 export default function SalesReport() {
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("today"));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));

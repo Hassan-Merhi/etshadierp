@@ -1,7 +1,6 @@
 import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { PageHeader } from "@/components/PageHeader";
 import {
   Plus,
   Pencil,
@@ -60,83 +59,8 @@ import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import type { FactoryWorker, FactoryWorkerCategory } from "@shared/schema";
 
-interface CashAccount {
-  id: number;
-  name: string;
-  code: string;
-}
-
-const emptyForm = {
-  fullName: "",
-  fatherName: "",
-  motherName: "",
-  nationalId: "",
-  passportNumber: "",
-  dateOfBirth: "",
-  gender: "",
-  nationality: "",
-  maritalStatus: "",
-  numberOfChildren: 0,
-  phone1: "",
-  phone2: "",
-  emergencyContactName: "",
-  emergencyContactPhone: "",
-  address: "",
-  city: "",
-  country: "",
-  position: "",
-  department: "",
-  dateJoined: "",
-  contractStartDate: "",
-  contractEndDate: "",
-  salaryType: "Monthly",
-  baseSalary: "",
-  perBaleRate: "",
-  perKgRate: "",
-  overtimeRate: "",
-  shiftType: "",
-  payFrequency: "Monthly",
-  hourlyRate: "",
-  weeklySalary: "",
-  biWeeklySalary: "",
-  transportAllowance: "",
-  visaNumber: "",
-  visaExpiry: "",
-  workPermitNumber: "",
-  workPermitExpiry: "",
-  residentialPermit: "",
-  residentialPermitExpiry: "",
-  bankName: "",
-  bankAccountNumber: "",
-  paymentMethod: "Cash",
-  notes: "",
-};
-
-const AVATAR_COLORS = [
-  "bg-blue-100 text-blue-700",
-  "bg-purple-100 text-purple-700",
-  "bg-emerald-100 text-emerald-700",
-  "bg-amber-100 text-amber-700",
-  "bg-rose-100 text-rose-700",
-  "bg-cyan-100 text-cyan-700",
-];
-
-function getAvatarColor(name: string) {
-  let hash = 0;
-  for (const c of name) hash = c.charCodeAt(0) + ((hash << 5) - hash);
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
-
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase();
-}
-
+import type { CashAccount } from "./factoryworkers/types";
+import { emptyForm, getAvatarColor, getInitials } from "./factoryworkers/utils";
 export default function FactoryWorkers() {
   const { data: settings } = useQuery<any>({
     queryKey: ["/api/factory/settings"],
@@ -160,13 +84,13 @@ export default function FactoryWorkers() {
 
   // ── Column filters ──────────────────────────────────────────────────────
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [positionFilter, setPositionFilter]     = useState("all");
-  const [locationFilter, setLocationFilter]     = useState("all");
+  const [positionFilter, setPositionFilter] = useState("all");
+  const [locationFilter, setLocationFilter] = useState("all");
   const [nationalityFilter, setNationalityFilter] = useState("all");
   const [salaryTypeFilter, setSalaryTypeFilter] = useState("all");
   const [salaryRangeFilter, setSalaryRangeFilter] = useState("all"); // all | 0-500 | 500-1000 | 1000-2000 | 2000-5000 | 5000+
-  const [transportFilter, setTransportFilter]   = useState("all"); // all | has | none
-  const [advanceFilter, setAdvanceFilter]       = useState("all"); // all | has | none
+  const [transportFilter, setTransportFilter] = useState("all"); // all | has | none
+  const [advanceFilter, setAdvanceFilter] = useState("all"); // all | has | none
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editingWorker, setEditingWorker] = useState<FactoryWorker | null>(null);
@@ -229,19 +153,28 @@ export default function FactoryWorkers() {
   });
 
   // ── Amount due till today (calendar proration minus recorded absences) ─────
-  const { data: amountDue = {} } = useQuery<Record<number, {
-    periodStart: string; periodEnd: string;
-    base: number; transport: number;
-    absenceDeducted: number; advanceDeducted: number; net: number;
-    lastPaidThrough: string | null;
-  }>>({
+  const { data: amountDue = {} } = useQuery<
+    Record<
+      number,
+      {
+        periodStart: string;
+        periodEnd: string;
+        base: number;
+        transport: number;
+        absenceDeducted: number;
+        advanceDeducted: number;
+        net: number;
+        lastPaidThrough: string | null;
+      }
+    >
+  >({
     queryKey: ["/api/factory/workers/amount-due"],
     queryFn: async () => {
       const res = await fetch("/api/factory/workers/amount-due", { credentials: "include" });
       if (!res.ok) return {};
       return res.json();
     },
-    staleTime: 2 * 60 * 1000,       // 2 min — fresh enough, won't flicker while typing
+    staleTime: 2 * 60 * 1000, // 2 min — fresh enough, won't flicker while typing
     refetchOnWindowFocus: false,
   });
 
@@ -556,18 +489,25 @@ export default function FactoryWorkers() {
   }
 
   // Unique option lists derived from the full worker roster
-  const uniquePositions = useMemo(() =>
-    [...new Set((workers ?? []).map((w) => w.position).filter(Boolean))].sort() as string[],
-    [workers]);
-  const uniqueLocations = useMemo(() =>
-    [...new Set((workers ?? []).map((w) => (w as any).city || (w as any).country).filter(Boolean))].sort() as string[],
-    [workers]);
-  const uniqueNationalities = useMemo(() =>
-    [...new Set((workers ?? []).map((w) => w.nationality).filter(Boolean))].sort() as string[],
-    [workers]);
-  const uniqueSalaryTypes = useMemo(() =>
-    [...new Set((workers ?? []).map((w) => w.salaryType).filter(Boolean))].sort() as string[],
-    [workers]);
+  const uniquePositions = useMemo(
+    () => [...new Set((workers ?? []).map((w) => w.position).filter(Boolean))].sort() as string[],
+    [workers]
+  );
+  const uniqueLocations = useMemo(
+    () =>
+      [
+        ...new Set((workers ?? []).map((w) => (w as any).city || (w as any).country).filter(Boolean)),
+      ].sort() as string[],
+    [workers]
+  );
+  const uniqueNationalities = useMemo(
+    () => [...new Set((workers ?? []).map((w) => w.nationality).filter(Boolean))].sort() as string[],
+    [workers]
+  );
+  const uniqueSalaryTypes = useMemo(
+    () => [...new Set((workers ?? []).map((w) => w.salaryType).filter(Boolean))].sort() as string[],
+    [workers]
+  );
 
   const activeFilterCount = [
     positionFilter !== "all",
@@ -636,13 +576,28 @@ export default function FactoryWorkers() {
         if (transportFilter === "has" && !(parseFloat((w as any).transportAllowance || "0") > 0)) return false;
         if (transportFilter === "none" && parseFloat((w as any).transportAllowance || "0") > 0) return false;
 
-        if (advanceFilter === "has" && !((w as any).pendingAdvanceBalance > 0 || parseFloat((w as any).pendingAdvanceBalance || "0") > 0)) return false;
+        if (
+          advanceFilter === "has" &&
+          !((w as any).pendingAdvanceBalance > 0 || parseFloat((w as any).pendingAdvanceBalance || "0") > 0)
+        )
+          return false;
         if (advanceFilter === "none" && parseFloat((w as any).pendingAdvanceBalance || "0") > 0) return false;
 
         return true;
       })
       .sort((a, b) => parseCodeNumber(a.employeeCode) - parseCodeNumber(b.employeeCode));
-  }, [workers, statusFilter, searchQuery, positionFilter, locationFilter, nationalityFilter, salaryTypeFilter, salaryRangeFilter, transportFilter, advanceFilter]);
+  }, [
+    workers,
+    statusFilter,
+    searchQuery,
+    positionFilter,
+    locationFilter,
+    nationalityFilter,
+    salaryTypeFilter,
+    salaryRangeFilter,
+    transportFilter,
+    advanceFilter,
+  ]);
 
   const activeCount = workers?.filter((w) => w.active).length ?? 0;
   const inactiveCount = workers?.filter((w) => !w.active).length ?? 0;
@@ -815,7 +770,10 @@ export default function FactoryWorkers() {
                       {formData.nationality.trim() ? (
                         <button
                           className="flex items-center gap-2 px-3 py-2 text-sm w-full hover-elevate text-left"
-                          onClick={() => { updateField("nationality", formData.nationality.trim()); setNationalityOpen(false); }}
+                          onClick={() => {
+                            updateField("nationality", formData.nationality.trim());
+                            setNationalityOpen(false);
+                          }}
                           data-testid="btn-create-nationality"
                         >
                           <PlusCircle className="h-4 w-4 text-primary" />
@@ -830,9 +788,14 @@ export default function FactoryWorkers() {
                         <CommandItem
                           key={nat}
                           value={nat}
-                          onSelect={() => { updateField("nationality", nat); setNationalityOpen(false); }}
+                          onSelect={() => {
+                            updateField("nationality", nat);
+                            setNationalityOpen(false);
+                          }}
                         >
-                          <Check className={`mr-2 h-4 w-4 ${formData.nationality === nat ? "opacity-100" : "opacity-0"}`} />
+                          <Check
+                            className={`mr-2 h-4 w-4 ${formData.nationality === nat ? "opacity-100" : "opacity-0"}`}
+                          />
                           {nat}
                         </CommandItem>
                       ))}
@@ -1144,15 +1107,19 @@ export default function FactoryWorkers() {
   const balance = endResult ? parseFloat(endResult.balance) : 0;
 
   const totalSalary = (workers ?? []).filter((w) => w.active).reduce((s, w) => s + parseFloat(w.baseSalary || "0"), 0);
-  const totalTransport = (workers ?? []).filter((w) => w.active).reduce((s, w) => s + parseFloat((w as any).transportAllowance || "0"), 0);
+  const totalTransport = (workers ?? [])
+    .filter((w) => w.active)
+    .reduce((s, w) => s + parseFloat((w as any).transportAllowance || "0"), 0);
   const totalAdvances = (workers ?? []).reduce((s, w) => s + parseFloat((w as any).pendingAdvanceBalance || "0"), 0);
   const totalDueToday = Object.values(amountDue).reduce((s, d) => s + (d.net > 0 ? d.net : 0), 0);
   // Total Remaining = sum of the "DUE − ADV" column: Due Today minus pending advance for each active worker
-  const totalRemainingToBePaid = (workers ?? []).filter((w) => w.active).reduce((s, w) => {
-    const dueNet  = amountDue[w.id]?.net ?? 0;
-    const advance = parseFloat((w as any).pendingAdvanceBalance || "0");
-    return s + (dueNet - advance);
-  }, 0);
+  const totalRemainingToBePaid = (workers ?? [])
+    .filter((w) => w.active)
+    .reduce((s, w) => {
+      const dueNet = amountDue[w.id]?.net ?? 0;
+      const advance = parseFloat((w as any).pendingAdvanceBalance || "0");
+      return s + (dueNet - advance);
+    }, 0);
 
   return (
     <div className="space-y-5">
@@ -1229,7 +1196,11 @@ export default function FactoryWorkers() {
                   <WalletCards className="h-4 w-4 text-violet-500" />
                   <span className="text-muted-foreground">Total Remaining</span>
                   <span className="font-semibold font-mono text-violet-600 dark:text-violet-400">
-                    ${totalRemainingToBePaid.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    $
+                    {totalRemainingToBePaid.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </span>
                 </div>
               </>
@@ -1333,7 +1304,9 @@ export default function FactoryWorkers() {
             <div className="rounded-xl border bg-muted/30 p-4 flex flex-wrap gap-4">
               {/* Position */}
               <div className="flex flex-col gap-1 min-w-[150px]">
-                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Position</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Position
+                </label>
                 <Select value={positionFilter} onValueChange={setPositionFilter}>
                   <SelectTrigger className="h-8 text-sm bg-background">
                     <SelectValue placeholder="All" />
@@ -1341,7 +1314,9 @@ export default function FactoryWorkers() {
                   <SelectContent>
                     <SelectItem value="all">All positions</SelectItem>
                     {uniquePositions.map((p) => (
-                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1349,7 +1324,9 @@ export default function FactoryWorkers() {
 
               {/* Location */}
               <div className="flex flex-col gap-1 min-w-[150px]">
-                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Location</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Location
+                </label>
                 <Select value={locationFilter} onValueChange={setLocationFilter}>
                   <SelectTrigger className="h-8 text-sm bg-background">
                     <SelectValue placeholder="All" />
@@ -1357,7 +1334,9 @@ export default function FactoryWorkers() {
                   <SelectContent>
                     <SelectItem value="all">All locations</SelectItem>
                     {uniqueLocations.map((l) => (
-                      <SelectItem key={l} value={l}>{l}</SelectItem>
+                      <SelectItem key={l} value={l}>
+                        {l}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1365,7 +1344,9 @@ export default function FactoryWorkers() {
 
               {/* Salary type */}
               <div className="flex flex-col gap-1 min-w-[150px]">
-                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Salary Type</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Salary Type
+                </label>
                 <Select value={salaryTypeFilter} onValueChange={setSalaryTypeFilter}>
                   <SelectTrigger className="h-8 text-sm bg-background">
                     <SelectValue placeholder="All" />
@@ -1373,7 +1354,9 @@ export default function FactoryWorkers() {
                   <SelectContent>
                     <SelectItem value="all">All types</SelectItem>
                     {uniqueSalaryTypes.map((t) => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1381,7 +1364,9 @@ export default function FactoryWorkers() {
 
               {/* Nationality */}
               <div className="flex flex-col gap-1 min-w-[150px]">
-                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Nationality</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Nationality
+                </label>
                 <Select value={nationalityFilter} onValueChange={setNationalityFilter}>
                   <SelectTrigger className="h-8 text-sm bg-background">
                     <SelectValue placeholder="All" />
@@ -1389,7 +1374,9 @@ export default function FactoryWorkers() {
                   <SelectContent>
                     <SelectItem value="all">All nationalities</SelectItem>
                     {uniqueNationalities.map((n) => (
-                      <SelectItem key={n} value={n}>{n}</SelectItem>
+                      <SelectItem key={n} value={n}>
+                        {n}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -1397,7 +1384,9 @@ export default function FactoryWorkers() {
 
               {/* Salary range */}
               <div className="flex flex-col gap-1 min-w-[160px]">
-                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Salary Range</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Salary Range
+                </label>
                 <Select value={salaryRangeFilter} onValueChange={setSalaryRangeFilter}>
                   <SelectTrigger className="h-8 text-sm bg-background">
                     <SelectValue placeholder="All" />
@@ -1415,7 +1404,9 @@ export default function FactoryWorkers() {
 
               {/* Transport */}
               <div className="flex flex-col gap-1 min-w-[150px]">
-                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Transport</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Transport
+                </label>
                 <Select value={transportFilter} onValueChange={setTransportFilter}>
                   <SelectTrigger className="h-8 text-sm bg-background">
                     <SelectValue placeholder="All" />
@@ -1430,7 +1421,9 @@ export default function FactoryWorkers() {
 
               {/* Advance status */}
               <div className="flex flex-col gap-1 min-w-[150px]">
-                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Advance</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Advance
+                </label>
                 <Select value={advanceFilter} onValueChange={setAdvanceFilter}>
                   <SelectTrigger className="h-8 text-sm bg-background">
                     <SelectValue placeholder="All" />
@@ -1451,43 +1444,65 @@ export default function FactoryWorkers() {
               {positionFilter !== "all" && (
                 <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 font-medium">
                   Position: {positionFilter}
-                  <button onClick={() => setPositionFilter("all")} className="hover:opacity-70"><X className="h-3 w-3" /></button>
+                  <button onClick={() => setPositionFilter("all")} className="hover:opacity-70">
+                    <X className="h-3 w-3" />
+                  </button>
                 </span>
               )}
               {locationFilter !== "all" && (
                 <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 font-medium">
                   Location: {locationFilter}
-                  <button onClick={() => setLocationFilter("all")} className="hover:opacity-70"><X className="h-3 w-3" /></button>
+                  <button onClick={() => setLocationFilter("all")} className="hover:opacity-70">
+                    <X className="h-3 w-3" />
+                  </button>
                 </span>
               )}
               {nationalityFilter !== "all" && (
                 <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 font-medium">
                   Nationality: {nationalityFilter}
-                  <button onClick={() => setNationalityFilter("all")} className="hover:opacity-70"><X className="h-3 w-3" /></button>
+                  <button onClick={() => setNationalityFilter("all")} className="hover:opacity-70">
+                    <X className="h-3 w-3" />
+                  </button>
                 </span>
               )}
               {salaryTypeFilter !== "all" && (
                 <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 font-medium">
                   Type: {salaryTypeFilter}
-                  <button onClick={() => setSalaryTypeFilter("all")} className="hover:opacity-70"><X className="h-3 w-3" /></button>
+                  <button onClick={() => setSalaryTypeFilter("all")} className="hover:opacity-70">
+                    <X className="h-3 w-3" />
+                  </button>
                 </span>
               )}
               {salaryRangeFilter !== "all" && (
                 <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 font-medium">
-                  {({ "0-500": "Salary: Under $500", "500-1000": "Salary: $500 – under $1,000", "1000-2000": "Salary: $1,000 – under $2,000", "2000-5000": "Salary: $2,000 – under $5,000", "5000+": "Salary: $5,000 and above" } as Record<string,string>)[salaryRangeFilter] ?? `Salary: ${salaryRangeFilter}`}
-                  <button onClick={() => setSalaryRangeFilter("all")} className="hover:opacity-70"><X className="h-3 w-3" /></button>
+                  {(
+                    {
+                      "0-500": "Salary: Under $500",
+                      "500-1000": "Salary: $500 – under $1,000",
+                      "1000-2000": "Salary: $1,000 – under $2,000",
+                      "2000-5000": "Salary: $2,000 – under $5,000",
+                      "5000+": "Salary: $5,000 and above",
+                    } as Record<string, string>
+                  )[salaryRangeFilter] ?? `Salary: ${salaryRangeFilter}`}
+                  <button onClick={() => setSalaryRangeFilter("all")} className="hover:opacity-70">
+                    <X className="h-3 w-3" />
+                  </button>
                 </span>
               )}
               {transportFilter !== "all" && (
                 <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 font-medium">
                   {transportFilter === "has" ? "Has transport" : "No transport"}
-                  <button onClick={() => setTransportFilter("all")} className="hover:opacity-70"><X className="h-3 w-3" /></button>
+                  <button onClick={() => setTransportFilter("all")} className="hover:opacity-70">
+                    <X className="h-3 w-3" />
+                  </button>
                 </span>
               )}
               {advanceFilter !== "all" && (
                 <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary rounded-full px-2.5 py-1 font-medium">
                   {advanceFilter === "has" ? "Has advance" : "No advance"}
-                  <button onClick={() => setAdvanceFilter("all")} className="hover:opacity-70"><X className="h-3 w-3" /></button>
+                  <button onClick={() => setAdvanceFilter("all")} className="hover:opacity-70">
+                    <X className="h-3 w-3" />
+                  </button>
                 </span>
               )}
               <span className="text-xs text-muted-foreground self-center">
@@ -1541,21 +1556,33 @@ export default function FactoryWorkers() {
                 {isLoading ? (
                   [...Array(6)].map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell className="pl-3 pr-1"><Skeleton className="h-4 w-5 mx-auto" /></TableCell>
+                      <TableCell className="pl-3 pr-1">
+                        <Skeleton className="h-4 w-5 mx-auto" />
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Skeleton className="h-8 w-8 rounded-full shrink-0" />
                           <Skeleton className="h-4 w-32" />
                         </div>
                       </TableCell>
-                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-14 ml-auto" /></TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-20" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-16" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-16" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-14 ml-auto" />
+                      </TableCell>
                       <TableCell></TableCell>
                       <TableCell></TableCell>
                       <TableCell></TableCell>
-                      <TableCell><Skeleton className="h-5 w-12 rounded-full" /></TableCell>
+                      <TableCell>
+                        <Skeleton className="h-5 w-12 rounded-full" />
+                      </TableCell>
                       <TableCell></TableCell>
                     </TableRow>
                   ))
@@ -1616,7 +1643,10 @@ export default function FactoryWorkers() {
                                 {worker.employeeCode}
                               </span>
                             )}
-                            <span className="font-medium text-sm leading-snug break-words" data-testid={`text-name-${worker.id}`}>
+                            <span
+                              className="font-medium text-sm leading-snug break-words"
+                              data-testid={`text-name-${worker.id}`}
+                            >
                               {worker.fullName}
                             </span>
                           </div>
@@ -1626,14 +1656,18 @@ export default function FactoryWorkers() {
                         {worker.position || <span className="text-muted-foreground/40">—</span>}
                       </TableCell>
                       <TableCell className="py-3 text-sm text-muted-foreground truncate">
-                        {worker.nationality
-                          ? <span>{worker.nationality}</span>
-                          : <span className="text-muted-foreground/40">—</span>}
+                        {worker.nationality ? (
+                          <span>{worker.nationality}</span>
+                        ) : (
+                          <span className="text-muted-foreground/40">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="py-3 text-sm text-muted-foreground truncate">
-                        {(worker as any).city || (worker as any).country
-                          ? <span>{(worker as any).city || (worker as any).country}</span>
-                          : <span className="text-muted-foreground/40">—</span>}
+                        {(worker as any).city || (worker as any).country ? (
+                          <span>{(worker as any).city || (worker as any).country}</span>
+                        ) : (
+                          <span className="text-muted-foreground/40">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground">
                         {worker.baseSalary ? (
@@ -1675,9 +1709,7 @@ export default function FactoryWorkers() {
                                   className={[
                                     "flex items-center gap-1 ml-auto rounded px-1.5 py-0.5 transition-colors",
                                     "hover:bg-muted/60 cursor-pointer select-none",
-                                    due.net > 0
-                                      ? "text-emerald-600 dark:text-emerald-400"
-                                      : "text-muted-foreground/50",
+                                    due.net > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/50",
                                   ].join(" ")}
                                 >
                                   {due.net > 0 ? fmt(due.net) : "Paid up"}
@@ -1717,7 +1749,9 @@ export default function FactoryWorkers() {
                                   )}
                                   <div className="flex justify-between border-t pt-1.5 font-semibold">
                                     <span>Net due</span>
-                                    <span className={`font-mono ${due.net > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+                                    <span
+                                      className={`font-mono ${due.net > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
+                                    >
                                       {fmt(due.net)}
                                     </span>
                                   </div>
@@ -1741,7 +1775,15 @@ export default function FactoryWorkers() {
                           const fmt = (n: number) =>
                             n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                           return (
-                            <span className={diff > 0 ? "text-emerald-600 dark:text-emerald-400" : diff < 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground/40"}>
+                            <span
+                              className={
+                                diff > 0
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : diff < 0
+                                    ? "text-amber-600 dark:text-amber-400"
+                                    : "text-muted-foreground/40"
+                              }
+                            >
                               {diff >= 0 ? "" : "−"}${fmt(Math.abs(diff))}
                             </span>
                           );

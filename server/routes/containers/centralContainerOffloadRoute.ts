@@ -10,13 +10,9 @@ import {
   ContainerOffloadLifecycleError,
   executeContainerOffloadLifecycle,
   type ContainerOffloadLifecycleMode,
-} from "../../services/containers/containerOffloadLifecycleService";
+} from "../../services/containers/offload-lifecycle";
 
-async function runCentralOffload(
-  req: Request,
-  res: Response,
-  mode: ContainerOffloadLifecycleMode
-): Promise<void> {
+async function runCentralOffload(req: Request, res: Response, mode: ContainerOffloadLifecycleMode): Promise<void> {
   const startedAt = Date.now();
   const companyId = Number((req.session as any)?.currentCompanyId);
   const containerId = parseId(req.params.id);

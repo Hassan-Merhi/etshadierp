@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const poolState = {
+// Hoisted so the vi.mock factory below - which vitest lifts above this line -
+// can close over it.
+const poolState = vi.hoisted(() => ({
   options: { max: 10 },
   totalCount: 6,
   idleCount: 2,
   waitingCount: 0,
-};
+}));
 
 vi.mock("../db", () => ({
   pool: poolState,

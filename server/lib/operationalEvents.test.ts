@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const loggerMock = {
+// vi.mock factories are hoisted above this file's body, so the mock they close
+// over has to be created by vi.hoisted or it is still in the temporal dead zone
+// when the factory runs.
+const loggerMock = vi.hoisted(() => ({
   info: vi.fn(),
   warn: vi.fn(),
   error: vi.fn(),
-};
+}));
 
 vi.mock("./logger", () => ({
   logger: loggerMock,
@@ -85,7 +88,7 @@ describe("operational event detection", () => {
         totalApiResponseBytes: 2_500_000,
         totalStaticAssetResponseBytes: 1_500_000,
         ranked,
-      }),
+      })
     );
   });
 

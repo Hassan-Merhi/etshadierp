@@ -5,7 +5,7 @@ import { registerHistoricalReplayPhase6GuardRoutes } from "./historicalReplayPha
 import { registerHistoricalReplayPhase8ReadinessRoutes } from "./historicalReplayPhase8ReadinessRoutes";
 import { registerHistoricalReplayPhase8VerificationRoutes } from "./historicalReplayPhase8VerificationRoutes";
 import { registerHistoricalReplayRoutesV4 } from "./historicalReplayRoutesV4";
-import { registerRawStockRecalcRoutes as registerPreservedRawStockRecalcRoutes } from "./rawStockRecalcRoutesLegacy";
+import { registerRawStockRecalcRoutes as registerPreservedRawStockRecalcRoutes } from "./recalc";
 
 /**
  * The preserved legacy module still contains an old route-registration-time
@@ -19,10 +19,7 @@ function registerLegacyRawStockRecalcRoutes(app: Express): void {
   const originalQuery = mutablePool.query;
   mutablePool.query = function guardedRegistrationQuery(...args: any[]) {
     const sqlText = typeof args[0] === "string" ? args[0] : args[0]?.text;
-    if (
-      typeof sqlText === "string"
-      && /CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+factory_recalc_undo_log/i.test(sqlText)
-    ) {
+    if (typeof sqlText === "string" && /CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+factory_recalc_undo_log/i.test(sqlText)) {
       return Promise.resolve({ rows: [], rowCount: 0 });
     }
     return originalQuery.apply(this, args);

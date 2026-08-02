@@ -1,9 +1,9 @@
 import type { Express } from "express";
-import { registerPayrollCoreRoutes } from "./payroll/payrollCoreRoutes";
+import { registerPayrollCoreRoutes } from "./payroll/core";
 import { registerWorkerStatsAdvancesRoutes } from "./payroll/workerStatsAdvancesRoutes";
 import { registerAdvanceManagementRoutes } from "./payroll/advanceManagementRoutes";
-import { registerAdvanceAccountingRoutes } from "./payroll/advanceAccountingRoutes";
-import { registerWorkerStatementRoutes } from "./payroll/workerStatementRoutes";
+import { registerAdvanceAccountingRoutes } from "./payroll/advance-accounting";
+import { registerWorkerStatementRoutes } from "./payroll/worker-statement";
 
 export function registerFactoryWorkerPayrollRoutes(app: Express) {
   registerPayrollCoreRoutes(app);

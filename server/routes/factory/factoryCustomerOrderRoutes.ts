@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { registerOrderCrudRoutes } from "./customer-orders/orderCrudRoutes";
-import { registerBaleScanningRoutes } from "./customer-orders/baleScanningRoutes";
+import { registerBaleScanningRoutes } from "./customer-orders/bale-scanning";
 import { registerOrderChargesRoutes } from "./customer-orders/orderChargesRoutes";
 import { registerOrderStatusRoutes } from "./customer-orders/orderStatusRoutes";
 import { registerOrderPricingRoutes } from "./customer-orders/orderPricingRoutes";

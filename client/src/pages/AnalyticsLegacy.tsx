@@ -1,31 +1,70 @@
-import {useState, useEffect, useRef, Fragment} from "react";
-import {useEscapeBack} from "@/hooks/use-escape-back";
-import {useQuery} from "@tanstack/react-query";
-import {useDateFormat} from "@/contexts/DateFormatContext";
-import {useLocation} from "wouter";
-import {useCompany} from "@/contexts/CompanyContext";
-import {useCurrencyContext} from "@/contexts/CurrencyContext";
-import {Card, CardContent} from "@/components/ui/card";
-import {Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Skeleton} from "@/components/ui/skeleton";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
-import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {DatePickerInput} from "@/components/ui/date-picker-input";
-import {PeriodFilter, PeriodFilterValue, getDefaultPeriodValue} from "@/components/ui/period-filter";
-import {useDateJump} from "@/hooks/use-date-jump";
-import {PageHeader} from "@/components/PageHeader";
-import {TrendingDown, DollarSign, Wallet, Package, FileText, ChevronRight, ChevronDown, BarChart3, ShoppingCart, Container as ContainerIcon, Landmark, Check, type LucideIcon} from "lucide-react";
-import {EmptyState} from "@/components/ui/empty-state";
-import {useToast} from "@/hooks/use-toast";
-import {formatNumber, drCrClass} from "@/lib/formatNumber";
-import {useAppMode} from "@/contexts/AppModeContext";
-import {getApiRequest} from "@/lib/factoryApi";
+import { useState, useEffect, useRef, Fragment } from "react";
+import { useEscapeBack } from "@/hooks/use-escape-back";
+import { useQuery } from "@tanstack/react-query";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useLocation } from "wouter";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
+import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
+import { useDateJump } from "@/hooks/use-date-jump";
+import { PageHeader } from "@/components/PageHeader";
+import {
+  TrendingDown,
+  DollarSign,
+  Wallet,
+  Package,
+  FileText,
+  ChevronRight,
+  ChevronDown,
+  BarChart3,
+  ShoppingCart,
+  Container as ContainerIcon,
+  Landmark,
+  Check,
+  type LucideIcon,
+} from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { useToast } from "@/hooks/use-toast";
+import { formatNumber, drCrClass } from "@/lib/formatNumber";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 
-import type {Account, ContainerData, Location, LocationSales, NetProfitAccount, NetProfitStatementData, OpeningStockItemsData, OpeningStockSummaryData, POSTransaction, ReportContainer, StockGroup, StockMovementData, Supplier} from "./analyticslegacy/types";
+import type {
+  Account,
+  ContainerData,
+  Location,
+  LocationSales,
+  NetProfitAccount,
+  NetProfitStatementData,
+  OpeningStockItemsData,
+  OpeningStockSummaryData,
+  POSTransaction,
+  ReportContainer,
+  StockGroup,
+  StockMovementData,
+  Supplier,
+} from "./analyticslegacy/types";
+import {
+  calculateAbsoluteTotal,
+  calculateChildrenTotal,
+  calculatePLTotal,
+  calculateTotal,
+  formatCurrency,
+  formatSmartCurrency,
+  groupAccountsByParent,
+  parseBalance,
+  signedBalance,
+} from "./analyticslegacy/accountMath";
 export default function Analytics() {
   const { formatDisplayDate } = useDateFormat();
   const appMode = useAppMode();
@@ -451,124 +490,6 @@ export default function Analytics() {
       newExpanded.add(accountId);
     }
     setExpandedAccounts(newExpanded);
-  };
-
-  const groupAccountsByParent = (accountList: Account[]) => {
-    const accountIdsInList = new Set(accountList.map((acc) => acc.accountId));
-    const parentAccounts: Account[] = [];
-    const childAccounts: Account[] = [];
-
-    accountList.forEach((acc) => {
-      if (!acc.parentId || !accountIdsInList.has(acc.parentId)) {
-        parentAccounts.push(acc);
-      } else {
-        childAccounts.push(acc);
-      }
-    });
-
-    const accountMap = new Map<number, Account[]>();
-    childAccounts.forEach((child) => {
-      const parentId = child.parentId!;
-      if (!accountMap.has(parentId)) {
-        accountMap.set(parentId, []);
-      }
-      accountMap.get(parentId)!.push(child);
-    });
-
-    return { parentAccounts, accountMap };
-  };
-
-  const parseBalance = (balance: number | string): number => {
-    if (typeof balance === "string") {
-      return parseFloat(balance) || 0;
-    }
-    return balance || 0;
-  };
-
-  const calculateChildrenTotal = (parentAccountId: number, accountMap: Map<number, Account[]>) => {
-    const children = accountMap.get(parentAccountId) || [];
-    return children.reduce((sum, acc) => sum + parseBalance(acc.balance), 0);
-  };
-
-  // Returns a signed balance: Cr = positive, Dr = negative
-  const signedBalance = (acc: Account) =>
-    acc.balanceSide === "Cr" ? parseBalance(acc.balance) : -parseBalance(acc.balance);
-
-  const calculateTotal = (accountList: Account[]) => {
-    // Get all account IDs that are present in this list
-    const accountIds = new Set(accountList.map((acc) => acc.accountId));
-
-    // Get all account IDs that are parents (have children in this list)
-    const parentAccountIds = new Set(accountList.filter((acc) => acc.parentId).map((acc) => acc.parentId!));
-
-    // For parent accounts that have children in the list, sum their children only (not the parent)
-    // For accounts without children, include the account itself
-    // For child accounts whose parent is also in the list, skip them (they're counted via their parent's children total)
-    let total = 0;
-
-    accountList.forEach((acc) => {
-      const hasChildrenInList = parentAccountIds.has(acc.accountId);
-      const isChildOfParentInList = acc.parentId && accountIds.has(acc.parentId);
-
-      if (hasChildrenInList) {
-        // This is a parent with children - count the children's total (not the parent's balance)
-        const children = accountList.filter((child) => child.parentId === acc.accountId);
-        total += children.reduce((sum, child) => sum + signedBalance(child), 0);
-      } else if (!isChildOfParentInList) {
-        // This is a standalone account (not a child of something in the list) - count its balance
-        total += signedBalance(acc);
-      }
-      // If it's a child of a parent in the list, don't count it separately (already counted via parent)
-    });
-
-    return total;
-  };
-
-  // Absolute total: sums displayed (absolute) balances with hierarchical deduplication.
-  // Used for Cash, Loans/Banks, Assets, Liabilities sections so the footer total
-  // always equals the sum of what is shown in each individual row.
-  const calculateAbsoluteTotal = (accountList: Account[]) => {
-    const accountIds = new Set(accountList.map((acc) => acc.accountId));
-    const parentAccountIds = new Set(accountList.filter((acc) => acc.parentId).map((acc) => acc.parentId!));
-    let total = 0;
-    accountList.forEach((acc) => {
-      const hasChildrenInList = parentAccountIds.has(acc.accountId);
-      const isChildOfParentInList = acc.parentId && accountIds.has(acc.parentId);
-      if (hasChildrenInList) {
-        const children = accountList.filter((child) => child.parentId === acc.accountId);
-        total += children.reduce((sum, child) => sum + parseBalance(child.balance), 0);
-      } else if (!isChildOfParentInList) {
-        total += parseBalance(acc.balance);
-      }
-    });
-    return total;
-  };
-
-  const calculatePLTotal = (accountList: Account[]) => {
-    return accountList.reduce((sum, acc) => {
-      const balance = parseBalance(acc.balance);
-      const amount = acc.balanceSide === "Cr" ? balance : -balance;
-      return sum + amount;
-    }, 0);
-  };
-
-  const formatCurrency = (value: number) => {
-    const isWhole = Math.abs(value) % 1 === 0;
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: isWhole ? 0 : 2,
-      maximumFractionDigits: 2,
-    }).format(Math.abs(value));
-  };
-
-  const formatSmartCurrency = (value: number): string => {
-    const absValue = Math.abs(value);
-    const isWholeNumber = absValue % 1 === 0;
-    if (isWholeNumber) {
-      return "$" + absValue.toLocaleString("en-US", { maximumFractionDigits: 0 });
-    }
-    return "$" + absValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
   // Filter accounts - Cash accounts are ledger accounts with accountType="Cash"

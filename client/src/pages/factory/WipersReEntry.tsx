@@ -8,7 +8,6 @@ import {
   Plus,
   Minus,
   Printer,
-  Download,
   Package,
   ChevronDown,
   ChevronUp,
@@ -54,41 +53,8 @@ import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
 import * as XLSX from "@/lib/excelHelper";
 
-interface CartItem {
-  productId: number;
-  product: FactoryBaleProduct;
-  qty: number;
-  weightPerBaleKg: number;
-  finalizedBy: number | null;
-}
-
-interface CreatedBale {
-  id: number;
-  referenceNumber: string;
-  productName: string | null;
-  articleCode: string | null;
-  weightKg: string;
-  stockEntryDate: string | null;
-}
-
-function isWipers(product: FactoryBaleProduct, categories: FactoryCategory[]): boolean {
-  const cat = categories.find((c) => c.id === product.categoryId);
-  const catName = cat?.name?.toLowerCase() || "";
-  const prodName = product.name?.toLowerCase() || "";
-  return (
-    catName.includes("wiper") ||
-    prodName.includes("wiper") ||
-    catName.includes("garbage") ||
-    prodName.includes("garbage")
-  );
-}
-
-function isWipersBale(bale: any): boolean {
-  const cat = (bale.bale?.category || bale.category || "").toLowerCase();
-  const name = (bale.bale?.productName || bale.productName || "").toLowerCase();
-  return cat.includes("wiper") || name.includes("wiper") || cat.includes("garbage") || name.includes("garbage");
-}
-
+import type { CartItem, CreatedBale } from "./wipersreentry/types";
+import { isWipers, isWipersBale } from "./wipersreentry/utils";
 export default function WipersReEntry() {
   const [, navigate] = useLocation();
   const { toast } = useToast();

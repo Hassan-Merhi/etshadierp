@@ -1,15 +1,15 @@
 import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
-import { registerRentalUnitsContractsRoutes } from "./rental/rentalUnitsContractsRoutes";
+import { registerRentalUnitsContractsRoutes } from "./rental/units-contracts";
 import { registerCentralRentalPaymentDeletionRoute } from "./rental/centralRentalPaymentDeletionRoute";
 import { registerRentalPaymentsAccrualRoutes } from "./rental/rentalPaymentsAccrualRoutes";
 import { registerRentalAccrualConfigRoutes } from "./rental/rentalAccrualConfigRoutes";
 import { runRentalReconciliation } from "../services/rental/rentalReconciliationService";
 import { requireAuth } from "../auth";
 import { getClientDate } from "../lib/dateUtils";
-import { getCompanyId } from "./rental/_rentalShared";
-export { ensureMonthlyForCompany, postRentAccrualForCompany } from "./rental/_rentalShared";
+import { getCompanyId } from "./rental/shared";
+export { ensureMonthlyForCompany, postRentAccrualForCompany } from "./rental/shared";
 
 type RentalModule = "PROPERTIES" | "ERP" | "FACTORY";
 
@@ -18,7 +18,7 @@ export function registerRentalRoutes(
   module: RentalModule,
   urlPrefix: string,
   incomeAccountName: string,
-  shopExpenseAccountName: string = "Rent Expense - Shops",
+  shopExpenseAccountName: string = "Rent Expense - Shops"
 ) {
   registerRentalUnitsContractsRoutes(app, module, urlPrefix, incomeAccountName, shopExpenseAccountName);
   // The central route owns DELETE /payments/:id. Registration order keeps the

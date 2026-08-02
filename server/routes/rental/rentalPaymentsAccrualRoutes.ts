@@ -11,8 +11,11 @@ import {
   ensureMonthlyForCompany,
   postRentAccrualForCompany,
   type RentalModule,
-} from "./_rentalShared";
-import { postDueScheduledRentalPayments, createRentalPaymentGroup } from "../../services/rental/rentalPaymentPostingService";
+} from "./shared";
+import {
+  postDueScheduledRentalPayments,
+  createRentalPaymentGroup,
+} from "../../services/rental/rentalPaymentPostingService";
 import { db, pool } from "../../db";
 import { getRentalBillingDay, getRentalPeriodDueDate } from "../../services/rental/rentalPeriodService";
 import { requireAuth } from "../../auth";
@@ -357,7 +360,10 @@ export function registerRentalPaymentsAccrualRoutes(
             );
           if (sharedContract) {
             const [ownerUnit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, unitId));
-            if (ownerUnit) { unit = ownerUnit; isShared = true; }
+            if (ownerUnit) {
+              unit = ownerUnit;
+              isShared = true;
+            }
           }
         } catch (sharedErr: unknown) {
           logger.warn(`${tag} shared-detail skipped:`, { error: getErrorMessage(sharedErr).split("\n")[0] });
@@ -555,10 +561,7 @@ export function registerRentalPaymentsAccrualRoutes(
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const statusFilter = req.query.status as string | undefined;
-      const conditions: any[] = [
-        eq(propertyPayments.companyId, companyId),
-        eq(propertyPayments.module, module),
-      ];
+      const conditions: any[] = [eq(propertyPayments.companyId, companyId), eq(propertyPayments.module, module)];
       if (statusFilter) {
         conditions.push(sql`${(propertyPayments as any).postingStatus} = ${statusFilter}`);
       }
@@ -671,17 +674,20 @@ export function registerRentalPaymentsAccrualRoutes(
         .orderBy(propertyPayments.paymentDate, propertyPayments.contractId);
 
       // Group by paymentGroupId
-      const groups = new Map<string, {
-        paymentGroupId: string;
-        contractId: number;
-        unitId: number;
-        paymentDate: string;
-        currency: string;
-        notes: string | null;
-        cashAccountId: number | null;
-        totalAmount: number;
-        allocations: Array<{ id: number; year: number; month: number; amount: string }>;
-      }>();
+      const groups = new Map<
+        string,
+        {
+          paymentGroupId: string;
+          contractId: number;
+          unitId: number;
+          paymentDate: string;
+          currency: string;
+          notes: string | null;
+          cashAccountId: number | null;
+          totalAmount: number;
+          allocations: Array<{ id: number; year: number; month: number; amount: string }>;
+        }
+      >();
 
       for (const row of rows) {
         const gid = row.paymentGroupId ?? `no-group-${row.id}`;
@@ -743,7 +749,8 @@ export function registerRentalPaymentsAccrualRoutes(
         )
         .returning({ id: propertyPayments.id });
 
-      if (deleted.length === 0) return res.status(404).json({ message: "Scheduled payment group not found or already posted" });
+      if (deleted.length === 0)
+        return res.status(404).json({ message: "Scheduled payment group not found or already posted" });
       res.json({ cancelled: deleted.length, groupId });
     } catch (e: unknown) {
       res.status(500).json({ message: getErrorMessage(e) });

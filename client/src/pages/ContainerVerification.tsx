@@ -5,11 +5,9 @@ import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
@@ -23,10 +21,8 @@ import {
   Save,
   X,
   AlertTriangle,
-  CheckCircle2,
   ArrowUpRight,
   ArrowDownRight,
-  MinusCircle,
   DollarSign,
   RefreshCw,
   List,
@@ -35,51 +31,7 @@ import {
 import * as XLSX from "@/lib/excelHelper";
 import { PageHeader } from "@/components/PageHeader";
 
-interface LoadedItem {
-  id: number;
-  containerId: number;
-  barcode: string;
-  itemName: string | null;
-  qty: number;
-  weightPerBale: string | null;
-  pricePerBale: string | null;
-}
-
-interface ComparisonItem {
-  barcode: string;
-  itemName: string;
-  expectedQty: number;
-  loadedQty: number;
-  expectedWeightPerBale: number;
-  loadedWeightPerBale: number;
-  expectedWeightTotal: number;
-  loadedWeightTotal: number;
-  expectedPricePerBale: number;
-  loadedPricePerBale: number;
-  expectedTotalValue: number;
-  loadedTotalValue: number;
-  statusQty: string;
-  priceStatus: string;
-  priceDiffPerBale: number;
-  totalPriceDiff: number;
-}
-
-interface AliasConflict {
-  aliasCode: string;
-  aliasedToCode: string;
-  aliasedToName: string;
-  ownerCode: string;
-  ownerName: string;
-}
-
-interface VerificationResult {
-  proforma: { id: number; reference: string };
-  containerId: number;
-  supplierId: number;
-  comparison: ComparisonItem[];
-  aliasConflicts?: AliasConflict[];
-}
-
+import type { LoadedItem, VerificationResult } from "./containerverification/types";
 export default function ContainerVerification() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -698,15 +650,15 @@ export default function ContainerVerification() {
                 </span>
               </div>
               <p className="text-xs text-muted-foreground mb-2">
-                A barcode is registered as an alias for one item, but that exact barcode is also the item's own
-                primary code for a different stock item. This can cause proforma and loaded quantities to be matched
-                to the wrong item. Fix the alias in Stock Item Aliases before trusting this report.
+                A barcode is registered as an alias for one item, but that exact barcode is also the item's own primary
+                code for a different stock item. This can cause proforma and loaded quantities to be matched to the
+                wrong item. Fix the alias in Stock Item Aliases before trusting this report.
               </p>
               <ul className="text-xs font-mono space-y-1">
                 {verificationResult.aliasConflicts.map((c, i) => (
                   <li key={i}>
-                    "{c.aliasCode}" is aliased to {c.aliasedToName} ({c.aliasedToCode}), but is also the primary code
-                    of {c.ownerName} ({c.ownerCode})
+                    "{c.aliasCode}" is aliased to {c.aliasedToName} ({c.aliasedToCode}), but is also the primary code of{" "}
+                    {c.ownerName} ({c.ownerCode})
                   </li>
                 ))}
               </ul>

@@ -127,7 +127,7 @@ import { classifyNetPositionAccounts, getAccountNetBalance } from "../../netPosi
 import path from "path";
 import fs from "fs";
 
-import { registerVoucherEntryRoutes } from "../voucherEntryRoutes";
+import { registerVoucherEntryRoutes } from "../voucher-entries";
 import { normalizeVoucherEntryAmounts } from "../../services/accounting/currencyAmounts";
 import { recalculateOrderTotals } from "../factory/_helpers";
 import {
@@ -167,7 +167,12 @@ export function registerVoucherCreateRoutes(app: Express) {
     const _t = Date.now();
     const _uid = (req as any).user?.id;
     const _cid = req.session.currentCompanyId;
-    logger.info("Voucher with-entries create started", { module: "vouchers", action: "createWithEntries", userId: _uid, companyId: _cid });
+    logger.info("Voucher with-entries create started", {
+      module: "vouchers",
+      action: "createWithEntries",
+      userId: _uid,
+      companyId: _cid,
+    });
     try {
       const { voucher, entries } = req.body;
 
@@ -198,9 +203,11 @@ export function registerVoucherCreateRoutes(app: Express) {
       // Fall back to the current company rate (legacy USD-only path).
       const voucherCurrency: string = (voucher.currency as string | undefined) || "USD";
       const voucherHistoricalRate: string | null =
-        voucher.exchangeRate != null ? String(voucher.exchangeRate)
-        : exchangeRate != null ? String(exchangeRate)
-        : null;
+        voucher.exchangeRate != null
+          ? String(voucher.exchangeRate)
+          : exchangeRate != null
+            ? String(exchangeRate)
+            : null;
 
       // Create voucher + all entries atomically inside a single transaction.
       // Any thrown error automatically rolls back both the voucher row and
@@ -370,10 +377,24 @@ export function registerVoucherCreateRoutes(app: Express) {
         createdEntries.map((e) => e.ledgerAccountId)
       ).catch(() => {});
 
-      logger.info("Voucher with-entries create succeeded", { module: "vouchers", action: "createWithEntries", userId: _uid, companyId: _cid, voucherId: createdVoucher.id, durationMs: Date.now() - _t });
+      logger.info("Voucher with-entries create succeeded", {
+        module: "vouchers",
+        action: "createWithEntries",
+        userId: _uid,
+        companyId: _cid,
+        voucherId: createdVoucher.id,
+        durationMs: Date.now() - _t,
+      });
       res.json(result);
     } catch (error: unknown) {
-      logger.error("Voucher with-entries create failed", { module: "vouchers", action: "createWithEntries", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
+      logger.error("Voucher with-entries create failed", {
+        module: "vouchers",
+        action: "createWithEntries",
+        userId: _uid,
+        companyId: _cid,
+        durationMs: Date.now() - _t,
+        error,
+      });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });

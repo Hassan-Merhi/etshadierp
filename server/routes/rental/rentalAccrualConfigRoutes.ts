@@ -10,7 +10,7 @@ import {
   ensureMonthlyForCompany,
   postRentAccrualForCompany,
   type RentalModule,
-} from "./_rentalShared";
+} from "./shared";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { z } from "zod";

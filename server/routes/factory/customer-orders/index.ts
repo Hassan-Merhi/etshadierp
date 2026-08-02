@@ -1,5 +1,5 @@
 export { registerOrderCrudRoutes } from "./orderCrudRoutes";
-export { registerBaleScanningRoutes } from "./baleScanningRoutes";
+export { registerBaleScanningRoutes } from "./bale-scanning";
 export { registerOrderChargesRoutes } from "./orderChargesRoutes";
 export { registerOrderStatusRoutes } from "./orderStatusRoutes";
 export { registerOrderPricingRoutes } from "./orderPricingRoutes";

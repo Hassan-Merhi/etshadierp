@@ -2,7 +2,7 @@ import { logAudit } from "../../helpers/auditHelpers";
 import { getErrorMessage, getErrorStack } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { contentDisposition } from "../../../lib/contentDisposition";
-import { trackOneContainerById } from "../../../services/containerTrackingService";
+import { trackOneContainerById } from "../../../services/container-tracking";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";
 import { getClientDate } from "../../../lib/dateUtils";
@@ -201,7 +201,10 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
 
   // Sanitize helpers — used throughout to prevent NaN/null/undefined reaching ExcelJS cells.
   const safeStr = (v: any): string => (v == null ? "" : String(v));
-  const safeNum = (v: any): number => { const n = Number(v); return isFinite(n) ? n : 0; };
+  const safeNum = (v: any): number => {
+    const n = Number(v);
+    return isFinite(n) ? n : 0;
+  };
 
   logger.info(`[ExcelExport] orderId=${orderId} companyId=${companyId} stage=started`);
 
@@ -224,9 +227,15 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
   const LIGHT_GRAY = "FFF5F5F5";
   const WHITE = "FFFFFFFF";
 
-  const merge = (r: number, c1: number, c2: number) => { try { sheet.mergeCells(r, c1, r, c2); } catch {} };
+  const merge = (r: number, c1: number, c2: number) => {
+    try {
+      sheet.mergeCells(r, c1, r, c2);
+    } catch {}
+  };
   const setFill = (cell: any, argb: string) => {
-    try { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } }; } catch {}
+    try {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
+    } catch {}
   };
   const setBorder = (row: any) => {
     try {
@@ -243,7 +252,12 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
 
   // Currency formatting
   const currencySymbolMap: Record<string, string> = {
-    USD: "$", GBP: "£", EUR: "€", CFA: "CFA", XOF: "CFA", XAF: "CFA",
+    USD: "$",
+    GBP: "£",
+    EUR: "€",
+    CFA: "CFA",
+    XOF: "CFA",
+    XAF: "CFA",
   };
   const currSym = currencySymbolMap[(params.baseCurrency || "USD").toUpperCase()] ?? params.baseCurrency;
   const fmtMoney = (n: number) => {
@@ -307,7 +321,12 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
   const anyPerKg = params.lines.some((l) => l.pricingMode === "per_kg");
   const unitPriceLabel = anyPerKg ? "Price/KG" : "Price/Bale";
   const hdrRow = sheet.addRow([
-    "#", "Article Code", "Product", "Qty", "Wt/Bale", "Total Wt",
+    "#",
+    "Article Code",
+    "Product",
+    "Qty",
+    "Wt/Bale",
+    "Total Wt",
     ...(hideSelling ? [] : [unitPriceLabel, "Total"]),
   ]);
   hdrRow.height = 24;
@@ -327,17 +346,21 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
 
   // ── Data rows ──
   logger.info(`[ExcelExport] orderId=${orderId} stage=writing-rows count=${params.lines.length}`);
-  let totalQty = 0, totalWtAll = 0, totalAll = 0;
+  let totalQty = 0,
+    totalWtAll = 0,
+    totalAll = 0;
   params.lines.forEach((g, idx) => {
-    const qty   = safeNum(g.qty);
-    const wt    = safeNum(g.totalWt);
-    const tot   = safeNum(g.total);
-    totalQty    += qty;
-    totalWtAll  += wt;
-    totalAll    += tot;
+    const qty = safeNum(g.qty);
+    const wt = safeNum(g.totalWt);
+    const tot = safeNum(g.total);
+    totalQty += qty;
+    totalWtAll += wt;
+    totalAll += tot;
     const unitPrice =
       g.pricingMode === "per_kg"
-        ? (safeNum(g.totalWt) > 0 ? tot / safeNum(g.totalWt) : safeNum(g.pricePerKg))
+        ? safeNum(g.totalWt) > 0
+          ? tot / safeNum(g.totalWt)
+          : safeNum(g.pricePerKg)
         : safeNum(g.pricePerBale);
     const rowCells: any[] = [
       idx + 1,
@@ -354,7 +377,9 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
     const dr = sheet.addRow(rowCells);
     dr.height = 20;
     try {
-      dr.eachCell((cell: any) => { cell.font = { size: 11 }; });
+      dr.eachCell((cell: any) => {
+        cell.font = { size: 11 };
+      });
       if (idx % 2 === 1) {
         dr.eachCell((cell: any) => setFill(cell, LIGHT_GRAY));
       }
@@ -395,15 +420,17 @@ async function buildInvoiceWorkbookBuffer(params: InvoiceWorkbookParams): Promis
   // ── Financial summary (optional — failure here must NOT abort the export) ──
   if (!hideSelling && !noCharges) {
     try {
-      const subtotal         = safeNum(parseFloat(params.subtotalBales     || "0"));
-      const freight          = safeNum(parseFloat(params.freightAmount      || "0"));
+      const subtotal = safeNum(parseFloat(params.subtotalBales || "0"));
+      const freight = safeNum(parseFloat(params.freightAmount || "0"));
       const otherChargesTotal = safeNum(parseFloat(params.otherChargesTotal || "0"));
-      const grandTotal       = safeNum(parseFloat(params.grandTotal         || "0"));
+      const grandTotal = safeNum(parseFloat(params.grandTotal || "0"));
 
       const otherChargeLines = params.charges.filter((ch) => ch.chargeType !== "FREIGHT");
       const chargeRows: [string, number][] =
         otherChargeLines.length > 0
-          ? otherChargeLines.map((ch) => [safeStr(ch.name) || "Charge", safeNum(parseFloat(ch.amount || "0"))] as [string, number])
+          ? otherChargeLines.map(
+              (ch) => [safeStr(ch.name) || "Charge", safeNum(parseFloat(ch.amount || "0"))] as [string, number]
+            )
           : otherChargesTotal > 0
             ? [["Other Charges", otherChargesTotal]]
             : [];
@@ -640,7 +667,10 @@ export function registerOrderExcelExportRoutes(app: Express) {
       res.end(xlsBuffer);
       logger.info(`[ExcelExport] orderId=${orderId} stage=response-sent bytes=${xlsBuffer.length}`);
     } catch (error: unknown) {
-      logger.error(`[ExcelExport] /export/excel failed:`, { error: getErrorMessage(error), stack: getErrorStack(error) });
+      logger.error(`[ExcelExport] /export/excel failed:`, {
+        error: getErrorMessage(error),
+        stack: getErrorStack(error),
+      });
       if (!res.headersSent) res.status(500).json({ message: getErrorMessage(error) });
     }
   });
@@ -777,7 +807,10 @@ export function registerOrderExcelExportRoutes(app: Express) {
       res.end(xlsBuffer);
       logger.info(`[ExcelExport] orderId=${orderId} stage=response-sent bytes=${xlsBuffer.length}`);
     } catch (error: unknown) {
-      logger.error(`[ExcelExport] /export-excel failed:`, { error: getErrorMessage(error), stack: getErrorStack(error) });
+      logger.error(`[ExcelExport] /export-excel failed:`, {
+        error: getErrorMessage(error),
+        stack: getErrorStack(error),
+      });
       if (!res.headersSent) {
         res.status(500).json({ message: getErrorMessage(error) });
       }

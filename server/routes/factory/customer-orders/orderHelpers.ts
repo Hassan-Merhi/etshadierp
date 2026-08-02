@@ -1,4 +1,4 @@
-import { trackOneContainerById } from "../../../services/containerTrackingService";
+import { trackOneContainerById } from "../../../services/container-tracking";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { dispatchNotification } from "../../../lib/notificationService";
 import { getClientDate } from "../../../lib/dateUtils";

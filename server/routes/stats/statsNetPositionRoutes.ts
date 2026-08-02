@@ -3,107 +3,12 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db, pool } from "../../db";
 import { storage } from "../../storage";
-import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
-import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory } from "../_helpers";
+import { requireAuth, requireNonPOS } from "../../auth";
+import { logAudit, calculateHistoricalLocationInventory } from "../_helpers";
 import { getClientDate } from "../../lib/dateUtils";
-import {
-  inventory,
-  stockItems,
-  stockGroups,
-  stockTransferVouchers,
-  stockTransferItems,
-  stockAdjustmentVouchers,
-  stockAdjustmentItems,
-  containers,
-  containerOffloads,
-  containerOffloadItems,
-  bankAccounts,
-  fixedAssets,
-  ledgerAccounts,
-  insertLedgerAccountSchema,
-  insertStockGroupSchema,
-  insertStockItemSchema,
-  insertContainerSchema,
-  insertStockTransferVoucherSchema,
-  insertStockAdjustmentVoucherSchema,
-  updateStockTransferSchema,
-  updateStockAdjustmentSchema,
-  vouchers,
-  voucherEntries,
-  salesItems,
-  suppliers,
-  customers,
-  customerBalances,
-  employees,
-  locations,
-  userLocations,
-  userCompanyRoles,
-  companies,
-  auditLog,
-  users,
-  FEATURE_KEYS,
-  companySettings,
-  purchaseOrders,
-  poLineItems,
-  interCompanyTransfers,
-  insertInterCompanyTransferSchema,
-  insertContainerSaleSchema,
-  containerSales,
-  insertUserPreferencesSchema,
-  userPreferences,
-  insertDraftPosSaleSchema,
-  InsertDraftPosSale,
-  insertSalaryAdvanceSchema,
-  insertSalaryAdvanceDeductionSchema,
-  salaryAdvances,
-  salaryAdvanceDeductions,
-  fiscalPeriodClosures,
-  wasteDispatches,
-  wasteDispatchItems,
-  dashboardCashAccounts,
-  dashboardPayableAccounts,
-  dashboardAccountSelections,
-  insertDashboardCashAccountSchema,
-  insertDashboardPayableAccountSchema,
-  insertDashboardAccountSelectionSchema,
-  creditNoteItems,
-  pendingBarcodes,
-  insertPendingBarcodeSchema,
-  bales,
-  baleProducts,
-  baleProductCategories,
-  storedFiles,
-  stockItemLocationPrices,
-  exchangeRates,
-  factoryWorkerAdvances,
-  propertyContracts,
-  propertyMonthlyLedger,
-  propertyPayments,
-} from "@shared/schema";
-import {
-  eq,
-  and,
-  or,
-  desc,
-  asc,
-  lt,
-  gt,
-  ne,
-  inArray,
-  sql,
-  isNull,
-  isNotNull,
-  not,
-  gte,
-  lte,
-  like,
-  ilike,
-} from "drizzle-orm";
-import { format } from "date-fns";
-import { z } from "zod";
-import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../../excelHelper";
-import { adjustInventory, reverseInventoryByExactValue } from "../../inventoryHelper";
-import { classifyNetPositionAccounts, getAccountNetBalance, round2 } from "../../netPositionHelper";
+import { inventory, containers, vouchers, suppliers, locations, factoryWorkerAdvances } from "@shared/schema";
+import { eq, and, or, inArray, sql, isNull, lte } from "drizzle-orm";
+import { classifyNetPositionAccounts, round2 } from "../../netPositionHelper";
 
 import { _getCached, _setCached } from "../../services/shared/ttlCache";
 
@@ -145,7 +50,12 @@ export function registerStatsNetPositionRoutes(app: Express) {
       const _npExcelDateClause = toDate ? "AND v.voucher_date <= $2" : "";
 
       const [companyEntriesRaw, ledgerAccEntriesRaw] = await Promise.all([
-        pool.query<{ ledger_account_id: string; supplier_id: string | null; debit_amount: string; credit_amount: string }>(
+        pool.query<{
+          ledger_account_id: string;
+          supplier_id: string | null;
+          debit_amount: string;
+          credit_amount: string;
+        }>(
           `SELECT ve.ledger_account_id,
                   ve.supplier_id,
                   COALESCE(ve.base_debit_amount,  ve.debit_amount)  AS debit_amount,
@@ -156,7 +66,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
              AND v.optional   = false
              AND v.deleted_at IS NULL
              ${_npExcelDateClause}`,
-          _npExcelParams,
+          _npExcelParams
         ),
         pool.query<{ ledger_account_id: string; debit_amount: string; credit_amount: string }>(
           `SELECT ve.ledger_account_id,
@@ -169,7 +79,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
              AND v.optional    = false
              AND v.deleted_at IS NULL
              ${_npExcelDateClause}`,
-          _npExcelParams,
+          _npExcelParams
         ),
       ]);
 

@@ -11,9 +11,6 @@ import {
   Truck,
   FlaskConical,
   CheckCircle2,
-  AlertCircle,
-  XCircle,
-  ArchiveX,
   Ship,
   FileText,
   User2,
@@ -47,42 +44,9 @@ import { useAdminOverride } from "@/hooks/use-admin-override";
 import type { BaleProduct, BaleLabelPrint } from "@shared/schema";
 import { BaleWeightEditDialog, type WeightEditBale } from "@/components/BaleWeightEditDialog";
 
-function BaleStatusBadge({ status }: { status: string }) {
-  const map: Record<
-    string,
-    { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: any }
-  > = {
-    IN_STOCK: { label: "In Stock", variant: "default", icon: CheckCircle2 },
-    SOLD: { label: "Sold", variant: "secondary", icon: ArchiveX },
-    FINALIZED: { label: "Finalized", variant: "secondary", icon: CheckCircle2 },
-    DISPATCHED: { label: "Dispatched", variant: "secondary", icon: XCircle },
-    DELETED: { label: "Deleted", variant: "destructive", icon: XCircle },
-    REMOVED: { label: "Deleted", variant: "destructive", icon: XCircle },
-    PENDING_PRESSING: { label: "Pending Pressing", variant: "outline", icon: AlertCircle },
-  };
-  const info = map[status] || { label: status, variant: "outline" as const, icon: AlertCircle };
-  const Icon = info.icon;
-  return (
-    <Badge variant={info.variant} className="gap-1" data-testid="badge-bale-status">
-      <Icon className="h-3 w-3" />
-      {info.label}
-    </Badge>
-  );
-}
-
-function InfoRow({ label, value, mono = false }: { label: string; value: React.ReactNode; mono?: boolean }) {
-  return (
-    <div>
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p className={`font-medium ${mono ? "font-mono" : ""}`}>
-        {value ?? <span className="text-muted-foreground">N/A</span>}
-      </p>
-    </div>
-  );
-}
-
-type SearchMode = "reference" | "article";
-
+import type { SearchMode } from "./barcodelookup/types";
+import { BaleStatusBadge } from "./barcodelookup/components/BaleStatusBadge";
+import { InfoRow } from "./barcodelookup/components/InfoRow";
 export default function BarcodeLookup() {
   const [searchMode, setSearchMode] = useState<SearchMode>("reference");
   const [searchValue, setSearchValue] = useState("");
@@ -578,7 +542,7 @@ export default function BarcodeLookup() {
       {/* ── ARTICLE LOOKUP ── */}
       {articleResult && (
         <div className="space-y-4">
-          {(articleResult.product || articleResult.labelPrints.length > 0) ? (
+          {articleResult.product || articleResult.labelPrints.length > 0 ? (
             <div className="rounded-xl border overflow-hidden">
               {/* Product header — shown if a matching product was found */}
               {articleResult.product ? (
@@ -586,7 +550,10 @@ export default function BarcodeLookup() {
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4 text-muted-foreground shrink-0" />
                     <span className="font-bold text-base">{(articleResult.product as any).name}</span>
-                    <Badge variant={(articleResult.product as any).active ? "default" : "secondary"} className="text-xs">
+                    <Badge
+                      variant={(articleResult.product as any).active ? "default" : "secondary"}
+                      className="text-xs"
+                    >
                       {(articleResult.product as any).active ? "Active" : "Inactive"}
                     </Badge>
                   </div>
@@ -599,7 +566,9 @@ export default function BarcodeLookup() {
                     </div>
                     <div>
                       <span className="text-xs text-muted-foreground uppercase tracking-wide mr-1.5">References</span>
-                      <span className="font-semibold font-mono">{articleResult.labelPrints.length.toLocaleString()}</span>
+                      <span className="font-semibold font-mono">
+                        {articleResult.labelPrints.length.toLocaleString()}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -609,12 +578,16 @@ export default function BarcodeLookup() {
                   <div className="flex items-center gap-2">
                     <Package className="h-4 w-4 text-muted-foreground shrink-0" />
                     <span className="font-bold text-base font-mono">{searchValue}</span>
-                    <Badge variant="outline" className="text-xs">Unregistered Product</Badge>
+                    <Badge variant="outline" className="text-xs">
+                      Unregistered Product
+                    </Badge>
                   </div>
                   <div className="flex items-center gap-4 text-sm">
                     <div>
                       <span className="text-xs text-muted-foreground uppercase tracking-wide mr-1.5">References</span>
-                      <span className="font-semibold font-mono">{articleResult.labelPrints.length.toLocaleString()}</span>
+                      <span className="font-semibold font-mono">
+                        {articleResult.labelPrints.length.toLocaleString()}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -810,7 +783,9 @@ export default function BarcodeLookup() {
                     <div>
                       <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Product Name</p>
                       <p className="font-semibold" data-testid="text-bale-product-name">
-                        {(referenceResult.baleInfo as any)?.productName || (referenceResult.product as any)?.name || "—"}
+                        {(referenceResult.baleInfo as any)?.productName ||
+                          (referenceResult.product as any)?.name ||
+                          "—"}
                       </p>
                       <p
                         className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1"
@@ -848,7 +823,14 @@ export default function BarcodeLookup() {
                       {referenceResult.baleInfo ? (
                         <button
                           className="group flex items-center gap-1.5 hover:text-foreground"
-                          onClick={() => referenceResult.baleInfo && setWeightEditBale({ id: referenceResult.baleInfo.id, referenceNumber: referenceResult.labelPrint?.referenceNumber || "", weightKg: referenceResult.baleInfo.weightKg })}
+                          onClick={() =>
+                            referenceResult.baleInfo &&
+                            setWeightEditBale({
+                              id: referenceResult.baleInfo.id,
+                              referenceNumber: referenceResult.labelPrint?.referenceNumber || "",
+                              weightKg: referenceResult.baleInfo.weightKg,
+                            })
+                          }
                           title="Correct weight"
                         >
                           <span className="font-bold font-mono text-base">

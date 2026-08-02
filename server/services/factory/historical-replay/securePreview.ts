@@ -7,13 +7,8 @@ import type {
   ReplaySafetyGateDetails,
   ReplayUnclassifiedAdjustmentRow,
 } from "./types";
-import {
-  previewHistoricalCostReplayWithExecutor as previewHistoricalCostReplayWithExecutorBase,
-} from "./readModel";
-import {
-  loadReplayAuthoritativeInputDigest,
-  type ReplayPreviewWithAuthoritativeDigest,
-} from "./fingerprint";
+import { previewHistoricalCostReplayWithExecutor as previewHistoricalCostReplayWithExecutorBase } from "./read-model";
+import { loadReplayAuthoritativeInputDigest, type ReplayPreviewWithAuthoritativeDigest } from "./fingerprint";
 import { normalizePreviewPersistedContainerTotals } from "./canonicalCostsV6";
 import {
   applyReceiptAdjustmentAmbiguityBlocks,
@@ -151,10 +146,7 @@ async function loadV7SafetyState(
     ),
   ]);
 
-  const blockedByBatchId = new Map<
-    number,
-    { batchId: number; batchCode: string; reasons: Set<string> }
-  >();
+  const blockedByBatchId = new Map<number, { batchId: number; batchCode: string; reasons: Set<string> }>();
 
   let unresolvedInventorySupplierSources = 0;
   const previewSupplierIds = new Set(preview.supplierRows.map((row) => row.supplierId));
@@ -178,12 +170,7 @@ async function loadV7SafetyState(
       addBlockedReason(blockedByBatchId, row.batch_id, row.batch_code, "INVENTORY_SUPPLIER_UNRESOLVED");
     } else if (!previewSupplierIds.has(row.inventory_supplier_id)) {
       incompleteBatchIds.add(row.batch_id);
-      addBlockedReason(
-        blockedByBatchId,
-        row.batch_id,
-        row.batch_code,
-        "MIXED_BATCH_SUPPLIER_SCOPE_INCOMPLETE"
-      );
+      addBlockedReason(blockedByBatchId, row.batch_id, row.batch_code, "MIXED_BATCH_SUPPLIER_SCOPE_INCOMPLETE");
     }
 
     if (row.supplier_id == null && row.container_id == null) {
@@ -248,10 +235,7 @@ async function loadV7SafetyState(
   };
 }
 
-async function computeManualRawMaterialAsset(
-  executor: ReplayQueryExecutor,
-  companyId: number
-): Promise<number> {
+async function computeManualRawMaterialAsset(executor: ReplayQueryExecutor, companyId: number): Promise<number> {
   const [rawResult, adjustmentResult] = await Promise.all([
     executor.query<{ remaining_value_usd: string }>(
       `SELECT COALESCE(SUM(
@@ -312,16 +296,18 @@ async function computeManualRawMaterialAsset(
 }
 
 function allSafetyGatesPassed(details: ReplaySafetyGateDetails): boolean {
-  return details.unresolvedInventorySupplierSources === 0
-    && details.unclassifiedValuedAdjustments === 0
-    && details.unresolvedFx === 0
-    && details.missingDates === 0
-    && details.quantityTimelineMismatches === 0
-    && details.ambiguousEventOrdering === 0
-    && details.incompleteMixedBatchSupplierScopes === 0
-    && details.missingSupplierTimelines === 0
-    && details.blockedBatches === 0
-    && details.scanCoverageError === false;
+  return (
+    details.unresolvedInventorySupplierSources === 0 &&
+    details.unclassifiedValuedAdjustments === 0 &&
+    details.unresolvedFx === 0 &&
+    details.missingDates === 0 &&
+    details.quantityTimelineMismatches === 0 &&
+    details.ambiguousEventOrdering === 0 &&
+    details.incompleteMixedBatchSupplierScopes === 0 &&
+    details.missingSupplierTimelines === 0 &&
+    details.blockedBatches === 0 &&
+    details.scanCoverageError === false
+  );
 }
 
 export async function previewHistoricalCostReplayWithExecutor(
@@ -333,28 +319,17 @@ export async function previewHistoricalCostReplayWithExecutor(
     loadReplayAuthoritativeInputDigest(executor, companyId),
     findReceiptAdjustmentAmbiguitySupplierIds(executor, companyId),
   ]);
-  const persistedTargetPreview = await normalizePreviewPersistedContainerTotals(
-    executor,
-    companyId,
-    basePreview
-  );
-  const preview = applyReceiptAdjustmentAmbiguityBlocks(
-    persistedTargetPreview,
-    ambiguousSupplierIds
-  );
+  const persistedTargetPreview = await normalizePreviewPersistedContainerTotals(executor, companyId, basePreview);
+  const preview = applyReceiptAdjustmentAmbiguityBlocks(persistedTargetPreview, ambiguousSupplierIds);
 
   const [safety, manualRawMaterialAsset] = await Promise.all([
     loadV7SafetyState(executor, companyId, preview),
     computeManualRawMaterialAsset(executor, companyId),
   ]);
-  preview.summary.unresolvedInventorySupplierSources =
-    safety.gateDetails.unresolvedInventorySupplierSources;
-  preview.summary.unclassifiedValuedAdjustments =
-    safety.gateDetails.unclassifiedValuedAdjustments;
-  preview.summary.incompleteMixedBatchSupplierScopes =
-    safety.gateDetails.incompleteMixedBatchSupplierScopes;
-  preview.summary.missingSupplierTimelines =
-    safety.gateDetails.missingSupplierTimelines;
+  preview.summary.unresolvedInventorySupplierSources = safety.gateDetails.unresolvedInventorySupplierSources;
+  preview.summary.unclassifiedValuedAdjustments = safety.gateDetails.unclassifiedValuedAdjustments;
+  preview.summary.incompleteMixedBatchSupplierScopes = safety.gateDetails.incompleteMixedBatchSupplierScopes;
+  preview.summary.missingSupplierTimelines = safety.gateDetails.missingSupplierTimelines;
   preview.summary.blockedBatches = safety.gateDetails.blockedBatches;
   preview.blockedBatches = safety.blockedBatches;
   preview.unclassifiedAdjustmentRows = safety.unclassifiedAdjustmentRows;
@@ -379,28 +354,13 @@ export async function previewHistoricalCostReplayWithExecutor(
         endingExpectedRate: row.endingExpectedRate,
         currentValue,
         projectedValue,
-        valueDifference: new Decimal(projectedValue)
-          .minus(currentValue)
-          .toDecimalPlaces(2)
-          .toNumber(),
+        valueDifference: new Decimal(projectedValue).minus(currentValue).toDecimalPlaces(2).toNumber(),
       };
     });
-    const currentSupplierAsset = supplierImpacts.reduce(
-      (sum, row) => sum.plus(row.currentValue),
-      new Decimal(0)
-    );
-    const projectedSupplierAsset = supplierImpacts.reduce(
-      (sum, row) => sum.plus(row.projectedValue),
-      new Decimal(0)
-    );
-    const currentRawMaterialAsset = currentSupplierAsset
-      .plus(manualRawMaterialAsset)
-      .toDecimalPlaces(2)
-      .toNumber();
-    const projectedRawMaterialAsset = projectedSupplierAsset
-      .plus(manualRawMaterialAsset)
-      .toDecimalPlaces(2)
-      .toNumber();
+    const currentSupplierAsset = supplierImpacts.reduce((sum, row) => sum.plus(row.currentValue), new Decimal(0));
+    const projectedSupplierAsset = supplierImpacts.reduce((sum, row) => sum.plus(row.projectedValue), new Decimal(0));
+    const currentRawMaterialAsset = currentSupplierAsset.plus(manualRawMaterialAsset).toDecimalPlaces(2).toNumber();
+    const projectedRawMaterialAsset = projectedSupplierAsset.plus(manualRawMaterialAsset).toDecimalPlaces(2).toNumber();
     const rawMaterialDifference = new Decimal(projectedRawMaterialAsset)
       .minus(currentRawMaterialAsset)
       .toDecimalPlaces(2)
@@ -414,9 +374,10 @@ export async function previewHistoricalCostReplayWithExecutor(
     preview.financialImpact.allSafetyGatesPassed = allSafetyGatesPassed(safety.gateDetails);
     preview.financialImpact.otherLedgerEffect = 0;
     if (preview.financialImpact.currentNetPosition != null) {
-      preview.financialImpact.projectedNetPosition = new Decimal(
-        preview.financialImpact.currentNetPosition
-      ).plus(rawMaterialDifference).toDecimalPlaces(2).toNumber();
+      preview.financialImpact.projectedNetPosition = new Decimal(preview.financialImpact.currentNetPosition)
+        .plus(rawMaterialDifference)
+        .toDecimalPlaces(2)
+        .toNumber();
     }
   }
 
@@ -426,8 +387,6 @@ export async function previewHistoricalCostReplayWithExecutor(
   });
 }
 
-export async function previewHistoricalCostReplay(
-  companyId: number
-): Promise<ReplayPreviewWithAuthoritativeDigest> {
+export async function previewHistoricalCostReplay(companyId: number): Promise<ReplayPreviewWithAuthoritativeDigest> {
   return previewHistoricalCostReplayWithExecutor(pool as ReplayQueryExecutor, companyId);
 }

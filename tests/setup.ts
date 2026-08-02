@@ -35,18 +35,14 @@ function stableTestCompanyCode(prefix: string): string {
     .toUpperCase()
     .slice(0, 4)
     .padEnd(4, "X");
-  const suffix = (hash >>> 0)
-    .toString(16)
-    .toUpperCase()
-    .padStart(8, "0")
-    .slice(-4);
+  const suffix = (hash >>> 0).toString(16).toUpperCase().padStart(8, "0").slice(-4);
   return `${base}${suffix}`;
 }
 
 function testCompanyType(prefix: string): "erp" | "factory" {
   // Factory export integration tests must exercise the same authorized factory
   // company resolution used in production. Ordinary ERP/POS tests remain ERP.
-  return prefix === "xlsexp" ? "factory" : "erp";
+  return prefix === "xlsexp" || prefix === "charfact" ? "factory" : "erp";
 }
 
 export async function setupTestApp(): Promise<express.Express> {
@@ -60,7 +56,7 @@ export async function setupTestApp(): Promise<express.Express> {
       resave: false,
       saveUninitialized: false,
       cookie: { secure: false, httpOnly: true, maxAge: 30 * 60 * 1000 },
-    }),
+    })
   );
 
   const server = await registerRoutes(app);
@@ -88,21 +84,19 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     await db
       .delete(schema.stockTransferItems)
       .where(
-        sql`${schema.stockTransferItems.transferId} IN (SELECT stv.id FROM stock_transfer_vouchers stv JOIN vouchers v ON stv.voucher_id = v.id WHERE v.company_id = ${company.id})`,
+        sql`${schema.stockTransferItems.transferId} IN (SELECT stv.id FROM stock_transfer_vouchers stv JOIN vouchers v ON stv.voucher_id = v.id WHERE v.company_id = ${company.id})`
       );
     await db
       .delete(schema.stockTransferVouchers)
       .where(
-        sql`${schema.stockTransferVouchers.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`,
+        sql`${schema.stockTransferVouchers.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`
       );
     await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, company.id));
     await db.delete(schema.stockItems).where(eq(schema.stockItems.companyId, company.id));
     await db.delete(schema.stockGroups).where(eq(schema.stockGroups.companyId, company.id));
     await db.delete(schema.locations).where(eq(schema.locations.companyId, company.id));
     await db.delete(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.companyId, company.id));
-    await db
-      .delete(schema.userSecurityPermissions)
-      .where(eq(schema.userSecurityPermissions.companyId, company.id));
+    await db.delete(schema.userSecurityPermissions).where(eq(schema.userSecurityPermissions.companyId, company.id));
     await db.delete(schema.userCompanyRoles).where(eq(schema.userCompanyRoles.companyId, company.id));
     await db.delete(schema.userLocations).where(eq(schema.userLocations.companyId, company.id));
 
@@ -117,7 +111,7 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     await pool.query("DELETE FROM factory_bales WHERE company_id = $1", [company.id]);
     await pool.query(
       "DELETE FROM factory_mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM factory_mix_batches WHERE company_id = $1)",
-      [company.id],
+      [company.id]
     );
     await pool.query("DELETE FROM factory_mix_batches WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_raw_stock WHERE company_id = $1", [company.id]);
@@ -197,7 +191,7 @@ export async function seedTestData(prefix: string): Promise<TestContext> {
   await pool.query(
     `INSERT INTO system_settings (key, value) VALUES ('parentCompanyId', $1)
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
-    [String(company.id)],
+    [String(company.id)]
   );
 
   await db.insert(schema.userCompanyRoles).values({
@@ -212,7 +206,7 @@ export async function seedTestData(prefix: string): Promise<TestContext> {
       companyId: company.id,
       permission,
       grantedBy: user.id,
-    })),
+    }))
   );
 
   const [location1] = await db

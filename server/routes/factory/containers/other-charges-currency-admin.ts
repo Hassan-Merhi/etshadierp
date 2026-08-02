@@ -1,0 +1,262 @@
+/**
+ * factoryContainersRoutes: FactoryContainerOtherChargesCurrencyAdmin endpoints.
+ *
+ * Registered by ./index.ts in the original order; Express resolves
+ * first-match, so that order is behaviour.
+ */
+import type { Express } from "express";
+import { getErrorMessage } from "../../../lib/httpHandlers";
+import { getClientDate } from "../../../lib/dateUtils";
+import { logger } from "../../../lib/logger";
+import { db } from "../../../db";
+import { requireAuth } from "../../../auth";
+import { getOrCreateLedgerAccount } from "../_helpers";
+import {
+  factoryContainers,
+  voucherEntries,
+  factoryDaybookEntries,
+  factoryContainerOtherCharges,
+  vouchers,
+} from "@shared/schema";
+import { eq, and, sql, inArray, ilike, ne } from "drizzle-orm";
+import { normFactoryEntry } from "./_helpers";
+
+export function registerFactoryContainerOtherChargesCurrencyAdminRoutes(app: Express) {
+  // ───────────────────────────────────────────────
+  // 4b-admin. Fix Other Charges Currency (Admin)
+  // ───────────────────────────────────────────────
+
+  // Preview: list containers that have other charges NOT in USD
+  app.get("/api/factory/admin/other-charges-currency-preview", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      // Find containers where:
+      // 1. other_charges > 0 with a supplier attributed
+      // 2. No override yet (other_charges_currency_code IS NULL)
+      // 3. Container itself is non-USD (so charges are being displayed in wrong currency)
+      // This covers the case where offload set other_charges using the container's EUR currency
+      const nonUsdContainerCharges = await db
+        .select({
+          id: factoryContainers.id,
+          containerNumber: factoryContainers.containerNumber,
+          otherCharges: factoryContainers.otherCharges,
+          currencyCode: factoryContainers.currencyCode,
+          otherChargesSupplierId: factoryContainers.otherChargesSupplierId,
+        })
+        .from(factoryContainers)
+        .where(
+          and(
+            eq(factoryContainers.companyId, companyId),
+            sql`${factoryContainers.otherCharges}::numeric > 0`,
+            sql`${factoryContainers.otherChargesSupplierId} IS NOT NULL`,
+            sql`(other_charges_currency_code IS NULL OR other_charges_currency_code != 'USD')`,
+            ne(factoryContainers.currencyCode, "USD")
+          )
+        )
+        .orderBy(factoryContainers.containerNumber);
+
+      // Also find multi-row charges in factoryContainerOtherCharges table with non-USD currency
+      const nonUsdTableCharges = await db
+        .select({
+          id: factoryContainerOtherCharges.id,
+          containerId: factoryContainerOtherCharges.containerId,
+          description: factoryContainerOtherCharges.description,
+          amount: factoryContainerOtherCharges.amount,
+          currencyCode: factoryContainerOtherCharges.currencyCode,
+          containerNumber: factoryContainers.containerNumber,
+        })
+        .from(factoryContainerOtherCharges)
+        .leftJoin(factoryContainers, eq(factoryContainers.id, factoryContainerOtherCharges.containerId))
+        .where(
+          and(
+            eq(factoryContainerOtherCharges.companyId, companyId),
+            ne(factoryContainerOtherCharges.currencyCode, "USD")
+          )
+        );
+
+      const grouped = new Map<
+        number,
+        { containerId: number; containerNumber: string; currentCurrency: string; amount: string; charges: any[] }
+      >();
+
+      for (const row of nonUsdContainerCharges as any[]) {
+        grouped.set(row.id, {
+          containerId: row.id,
+          containerNumber: row.containerNumber,
+          currentCurrency: row.currencyCode,
+          amount: row.otherCharges,
+          charges: [
+            { description: "Container Other Charges", amount: row.otherCharges, currencyCode: row.currencyCode },
+          ],
+        });
+      }
+      for (const row of nonUsdTableCharges as any[]) {
+        if (!grouped.has(row.containerId)) {
+          grouped.set(row.containerId, {
+            containerId: row.containerId,
+            containerNumber: row.containerNumber || String(row.containerId),
+            currentCurrency: row.currencyCode,
+            amount: "0",
+            charges: [],
+          });
+        }
+        grouped.get(row.containerId)!.charges.push({
+          id: row.id,
+          description: row.description,
+          amount: row.amount,
+          currencyCode: row.currencyCode,
+        });
+      }
+
+      res.json({ containers: Array.from(grouped.values()) });
+    } catch (error: unknown) {
+      logger.error("Error previewing other charges currency:", { error: error });
+      res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
+  // Apply: fix other charges to USD — updates container otherChargesCurrencyCode and daybook entries
+  app.post("/api/factory/admin/fix-other-charges-currency", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const { containerIds } = req.body as { containerIds: number[] };
+      if (!Array.isArray(containerIds) || containerIds.length === 0) {
+        return res.status(400).json({ message: "No container IDs provided" });
+      }
+
+      let fixed = 0;
+
+      for (const containerId of containerIds) {
+        // 1. Set other_charges_currency_code = "USD" on the container
+        await db.execute(
+          sql`UPDATE factory_containers SET other_charges_currency_code = 'USD' WHERE id = ${containerId} AND company_id = ${companyId}`
+        );
+
+        // 2. Fix the factory daybook OTHER_CHARGE entry for this container
+        //    (change currency from EUR/other to USD, set amount_usd = amount_currency, fx_rate = 1)
+        await db
+          .update(factoryDaybookEntries)
+          .set({
+            currencyCode: "USD",
+            fxRateToUsd: "1",
+            amountUsd: sql`${factoryDaybookEntries.amountCurrency}`,
+          })
+          .where(
+            and(
+              eq(factoryDaybookEntries.companyId, companyId),
+              eq(factoryDaybookEntries.txType, "OTHER_CHARGE"),
+              eq(factoryDaybookEntries.referenceId, containerId),
+              ne(factoryDaybookEntries.currencyCode, "USD")
+            )
+          );
+
+        // 3. Also fix multi-row charges in factoryContainerOtherCharges if any exist
+        const tableCharges = await db
+          .select()
+          .from(factoryContainerOtherCharges)
+          .where(
+            and(
+              eq(factoryContainerOtherCharges.containerId, containerId),
+              eq(factoryContainerOtherCharges.companyId, companyId),
+              ne(factoryContainerOtherCharges.currencyCode, "USD")
+            )
+          );
+
+        if (tableCharges.length > 0) {
+          await db
+            .update(factoryContainerOtherCharges)
+            .set({ currencyCode: "USD" })
+            .where(
+              and(
+                eq(factoryContainerOtherCharges.containerId, containerId),
+                eq(factoryContainerOtherCharges.companyId, companyId)
+              )
+            );
+
+          // Void and re-post FACTORY-OC vouchers in USD
+          const ocPrefix = `FACTORY-OC-${containerId}-%`;
+          const existingVouchers = await db
+            .select({ id: vouchers.id })
+            .from(vouchers)
+            .where(
+              and(
+                eq(vouchers.companyId, companyId),
+                eq(vouchers.sourceModule, "FACTORY"),
+                ilike(vouchers.voucherNumber, ocPrefix)
+              )
+            );
+          if (existingVouchers.length > 0) {
+            const vIds = existingVouchers.map((v) => v.id);
+            await db.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
+            await db.delete(vouchers).where(inArray(vouchers.id, vIds));
+          }
+
+          const [container] = await db
+            .select({
+              containerNumber: factoryContainers.containerNumber,
+              arrivalDate: factoryContainers.arrivalDate,
+              createdAt: factoryContainers.createdAt,
+            })
+            .from(factoryContainers)
+            .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
+
+          if (container) {
+            const today = getClientDate(req);
+            const containerCreatedDate = container.createdAt
+              ? new Date(container.createdAt).toISOString().slice(0, 10)
+              : today;
+            const voucherDate = container.arrivalDate || containerCreatedDate;
+            const payableAccId = await getOrCreateLedgerAccount(
+              companyId,
+              "FACTORY_CHARGES_PAYABLE",
+              "Factory Charges Payable"
+            );
+            for (const charge of tableCharges) {
+              const chargeAmt = parseFloat(charge.amount || "0");
+              if (chargeAmt <= 0 || !charge.ledgerAccountId) continue;
+              const ocVoucherNum = `FACTORY-OC-${containerId}-${charge.id}-${Date.now()}`;
+              const [ocVoucher] = await db
+                .insert(vouchers)
+                .values({
+                  companyId,
+                  voucherType: "Journal",
+                  voucherNumber: ocVoucherNum,
+                  voucherDate,
+                  description: `${charge.description} - container ${container.containerNumber}`,
+                  totalAmount: String(chargeAmt),
+                  currency: "USD",
+                  exchangeRate: "1",
+                  sourceModule: "FACTORY",
+                })
+                .returning();
+              // This admin-fix endpoint re-creates in USD (currency: "USD", exchangeRate: "1")
+              await db.insert(voucherEntries).values({
+                voucherId: ocVoucher.id,
+                ledgerAccountId: payableAccId,
+                ...normFactoryEntry("USD", String(chargeAmt), "0", null),
+                narration: `${charge.description} payable`,
+              });
+              await db.insert(voucherEntries).values({
+                voucherId: ocVoucher.id,
+                ledgerAccountId: charge.ledgerAccountId,
+                ...normFactoryEntry("USD", "0", String(chargeAmt), null),
+                narration: `${charge.description}`,
+              });
+            }
+          }
+        }
+
+        fixed++;
+      }
+
+      res.json({ fixed });
+    } catch (error: unknown) {
+      logger.error("Error fixing other charges currency:", { error: error });
+      res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+}

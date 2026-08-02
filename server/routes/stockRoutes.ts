@@ -1,8 +1,8 @@
 import type { Express } from "express";
 import { registerStockLightRoutes } from "./stock/stockLightRoutes";
-import { registerStockGroupsItemsRoutes } from "./stock/stockGroupsItemsRoutes";
-import { registerStockTransferAdjRoutes } from "./stock/stockTransferAdjRoutes";
-import { registerStockMergeRoutes } from "./stock/stockMergeRoutes";
+import { registerStockGroupsItemsRoutes } from "./stock/groups-items";
+import { registerStockTransferAdjRoutes } from "./stock/transfer-adj";
+import { registerStockMergeRoutes } from "./stock/merge";
 import { registerStockItemManageRoutes } from "./stock/stockItemManageRoutes";
 import { registerStockPriceListImportRoutes } from "./stock/stockPriceListImportRoutes";
 

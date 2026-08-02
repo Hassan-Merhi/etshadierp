@@ -1,0 +1,223 @@
+import { eq, sql } from "drizzle-orm";
+import { db } from "../../db";
+import * as schema from "@shared/schema";
+import { adjustInventory } from "../../inventoryHelper";
+import type { VoucherEntry, InsertVoucherEntry } from "@shared/schema";
+
+export async function createVoucherEntry(entry: InsertVoucherEntry): Promise<VoucherEntry> {
+  const [created] = await db.insert(schema.voucherEntries).values(entry).returning();
+  return created;
+}
+
+export async function updateVoucherEntry(id: number, updates: Partial<InsertVoucherEntry>): Promise<VoucherEntry> {
+  const [updated] = await db
+    .update(schema.voucherEntries)
+    .set(updates)
+    .where(eq(schema.voucherEntries.id, id))
+    .returning();
+  return updated;
+}
+
+export async function deleteVoucherEntry(id: number): Promise<void> {
+  await db.delete(schema.voucherEntries).where(eq(schema.voucherEntries.id, id));
+}
+
+export async function deleteVoucher(id: number): Promise<void> {
+  await db.transaction(async (tx) => {
+    const [voucher] = await tx.select().from(schema.vouchers).where(eq(schema.vouchers.id, id));
+
+    if (!voucher) {
+      throw new Error("Voucher not found");
+    }
+
+    if (voucher.voucherType === "Sales" && voucher.locationId) {
+      const salesItemsList = await tx.select().from(schema.salesItems).where(eq(schema.salesItems.voucherId, id));
+
+      for (const saleItem of salesItemsList) {
+        const quantity = parseFloat(saleItem.quantity);
+        const costPrice = parseFloat(saleItem.costPrice);
+        await adjustInventory(
+          tx,
+          voucher.locationId,
+          saleItem.stockItemId,
+          quantity,
+          voucher.companyId,
+          costPrice,
+          "Sales-Reversal",
+          id
+        );
+      }
+      await tx.delete(schema.salesItems).where(eq(schema.salesItems.voucherId, id));
+    }
+
+    if (voucher.voucherType === "Stock Transfer") {
+      const [transferVoucher] = await tx
+        .select()
+        .from(schema.stockTransferVouchers)
+        .where(eq(schema.stockTransferVouchers.voucherId, id));
+
+      if (transferVoucher) {
+        const transferItems = await tx
+          .select()
+          .from(schema.stockTransferItems)
+          .where(eq(schema.stockTransferItems.transferId, transferVoucher.id));
+
+        const sourceLocationId = transferVoucher.sourceLocationId;
+        const destinationLocationId = transferVoucher.destinationLocationId;
+
+        for (const item of transferItems) {
+          const quantity = parseFloat(item.quantity);
+          const rate = parseFloat(item.rate);
+
+          if (!sourceLocationId)
+            throw new Error(`Cannot reverse stock transfer: source location ID is missing for transfer voucher ${id}`);
+          if (!destinationLocationId)
+            throw new Error(
+              `Cannot reverse stock transfer: destination location ID is missing for transfer voucher ${id}`
+            );
+
+          await adjustInventory(
+            tx,
+            sourceLocationId,
+            item.stockItemId,
+            quantity,
+            voucher.companyId,
+            rate,
+            "StockTransfer-Reversal",
+            id
+          );
+          await adjustInventory(
+            tx,
+            destinationLocationId,
+            item.stockItemId,
+            -quantity,
+            voucher.companyId,
+            rate,
+            "StockTransfer-Reversal",
+            id
+          );
+        }
+
+        await tx.delete(schema.stockTransferItems).where(eq(schema.stockTransferItems.transferId, transferVoucher.id));
+        await tx.delete(schema.stockTransferVouchers).where(eq(schema.stockTransferVouchers.id, transferVoucher.id));
+      }
+    }
+
+    if (
+      voucher.voucherType === "Production" ||
+      voucher.voucherType === "Consumption" ||
+      voucher.voucherType === "Mixed" ||
+      voucher.voucherType === "Stock Adjustment"
+    ) {
+      const [adjustmentVoucher] = await tx
+        .select()
+        .from(schema.stockAdjustmentVouchers)
+        .where(eq(schema.stockAdjustmentVouchers.voucherId, id));
+
+      if (adjustmentVoucher) {
+        const adjustmentItems = await tx
+          .select()
+          .from(schema.stockAdjustmentItems)
+          .where(eq(schema.stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
+
+        const adjustmentType = adjustmentVoucher.adjustmentType;
+
+        for (const item of adjustmentItems) {
+          const rawQuantity = parseFloat(item.quantity);
+          const quantity = Math.abs(rawQuantity);
+          const rate = parseFloat(item.rate);
+
+          const isConsumption = adjustmentType === "Consumption" || (adjustmentType === "Mixed" && rawQuantity < 0);
+          const reversedQuantity = isConsumption ? quantity : -quantity;
+
+          await adjustInventory(
+            tx,
+            adjustmentVoucher.locationId,
+            item.stockItemId,
+            reversedQuantity,
+            voucher.companyId,
+            rate,
+            `${adjustmentType}-Reversal`,
+            id
+          );
+        }
+
+        await tx
+          .delete(schema.stockAdjustmentItems)
+          .where(eq(schema.stockAdjustmentItems.adjustmentId, adjustmentVoucher.id));
+        await tx
+          .delete(schema.stockAdjustmentVouchers)
+          .where(eq(schema.stockAdjustmentVouchers.id, adjustmentVoucher.id));
+      }
+    }
+
+    const linkedPOs = await tx.select().from(schema.purchaseOrders).where(eq(schema.purchaseOrders.voucherId, id));
+
+    if (linkedPOs.length > 0) {
+      const containerUpdates = new Map<number, { itemsTotal: number; containerNumber: string }>();
+      for (const po of linkedPOs) {
+        const itemsTotal = parseFloat(po.itemsTotal || "0");
+        const container = await tx
+          .select()
+          .from(schema.containers)
+          .where(eq(schema.containers.id, po.containerId))
+          .limit(1);
+        const containerNumber = container.length > 0 ? container[0].containerNumber : "";
+        const existing = containerUpdates.get(po.containerId) || { itemsTotal: 0, containerNumber };
+        containerUpdates.set(po.containerId, { itemsTotal: existing.itemsTotal + itemsTotal, containerNumber });
+        await tx.delete(schema.poLineItems).where(eq(schema.poLineItems.poId, po.id));
+      }
+
+      await tx.delete(schema.purchaseOrders).where(eq(schema.purchaseOrders.voucherId, id));
+
+      for (const [containerId, totals] of Array.from(containerUpdates.entries())) {
+        const [container] = await tx
+          .select()
+          .from(schema.containers)
+          .where(eq(schema.containers.id, containerId))
+          .limit(1);
+        if (container) {
+          const chargeVouchers = await tx
+            .select({ id: schema.vouchers.id })
+            .from(schema.vouchers)
+            .where(sql`${schema.vouchers.voucherNumber} LIKE ${"CHARGE-" + container.containerNumber + "-%"}`);
+          for (const chargeVoucher of chargeVouchers) {
+            await tx.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, chargeVoucher.id));
+            await tx.delete(schema.vouchers).where(eq(schema.vouchers.id, chargeVoucher.id));
+          }
+          const newItemsTotal = Math.max(0, parseFloat(container.itemsTotal || "0") - totals.itemsTotal);
+          const newChargesTotal = 0;
+          const newGrandTotal = newItemsTotal + newChargesTotal;
+          const remainingPOs = await tx
+            .select()
+            .from(schema.purchaseOrders)
+            .where(eq(schema.purchaseOrders.containerId, containerId))
+            .limit(1);
+          if (remainingPOs.length === 0) {
+            await tx.delete(schema.containerCharges).where(eq(schema.containerCharges.containerId, containerId));
+            await tx.delete(schema.containers).where(eq(schema.containers.id, containerId));
+          } else {
+            await tx
+              .update(schema.containers)
+              .set({
+                itemsTotal: newItemsTotal.toString(),
+                chargesTotal: newChargesTotal.toString(),
+                grandTotal: newGrandTotal.toString(),
+              })
+              .where(eq(schema.containers.id, containerId));
+          }
+        }
+      }
+    }
+
+    await tx.delete(schema.voucherEntries).where(eq(schema.voucherEntries.voucherId, id));
+    await tx.execute(
+      sql`DELETE FROM factory_daybook_entries WHERE reference_table = 'vouchers' AND reference_id = ${id}`
+    );
+    await tx.delete(schema.vouchers).where(eq(schema.vouchers.id, id));
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Fiscal Period
+// ---------------------------------------------------------------------------

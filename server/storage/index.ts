@@ -25,8 +25,8 @@ export {
 } from "./auth";
 export * from "./accounting";
 export * from "./inventory";
-export * from "./stockOps";
-export * from "./containers";
+export * from "./stock-ops";
+export * from "./containers-store";
 export * from "./suppliers";
 export * from "./employees";
 export * from "./pos";

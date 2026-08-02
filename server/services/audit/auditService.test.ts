@@ -1,8 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const valuesMock = vi.fn();
-const insertMock = vi.fn(() => ({ values: valuesMock }));
-const loggerErrorMock = vi.fn();
+// Hoisted so the vi.mock factories below - which vitest lifts above this line -
+// can close over them.
+const { valuesMock, insertMock, loggerErrorMock } = vi.hoisted(() => {
+  const values = vi.fn();
+  return {
+    valuesMock: values,
+    insertMock: vi.fn(() => ({ values })),
+    loggerErrorMock: vi.fn(),
+  };
+});
 
 vi.mock("../../db", () => ({
   db: {

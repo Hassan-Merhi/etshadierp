@@ -13,16 +13,16 @@ export function registerStatsCountryActivityRoutes(app: Express) {
 
       if (_req.query.startDate && _req.query.endDate) {
         startDateStr = _req.query.startDate as string;
-        endDateStr   = _req.query.endDate   as string;
+        endDateStr = _req.query.endDate as string;
         const start = new Date(startDateStr);
-        const end   = new Date(endDateStr);
+        const end = new Date(endDateStr);
         days = Math.round((end.getTime() - start.getTime()) / 86400000) + 1;
       } else {
         const rawDays = parseInt((_req.query.days as string) || "14");
         days = Math.min(Math.max(rawDays, 1), 90);
         const today = new Date();
-        endDateStr   = today.toISOString().substring(0, 10);
-        const start  = new Date(today);
+        endDateStr = today.toISOString().substring(0, 10);
+        const start = new Date(today);
         start.setDate(start.getDate() - (days - 1));
         startDateStr = start.toISOString().substring(0, 10);
       }
@@ -54,11 +54,27 @@ export function registerStatsCountryActivityRoutes(app: Express) {
         return String(raw).substring(0, 10);
       };
 
-      type ContainerEntry         = { id: number; containerNumber: string; supplierCode: string | null; locationName: string | null };
-      type ImportedContainerEntry = { id: number; containerNumber: string; supplierCode: string | null; shopName: string | null };
-      type LocationEntry          = { locationId: number; locationName: string; count: number };
-      type DayEntry               = { offloads: number; purchases: number; locations: LocationEntry[]; containers: ContainerEntry[]; importedContainers: ImportedContainerEntry[] };
-      type DayMap                 = Map<string, DayEntry>;
+      type ContainerEntry = {
+        id: number;
+        containerNumber: string;
+        supplierCode: string | null;
+        locationName: string | null;
+      };
+      type ImportedContainerEntry = {
+        id: number;
+        containerNumber: string;
+        supplierCode: string | null;
+        shopName: string | null;
+      };
+      type LocationEntry = { locationId: number; locationName: string; count: number };
+      type DayEntry = {
+        offloads: number;
+        purchases: number;
+        locations: LocationEntry[];
+        containers: ContainerEntry[];
+        importedContainers: ImportedContainerEntry[];
+      };
+      type DayMap = Map<string, DayEntry>;
 
       const companyDayMap = new Map<number, DayMap>();
       for (const c of companies) companyDayMap.set(Number(c.id), new Map<string, DayEntry>());
@@ -67,7 +83,8 @@ export function registerStatsCountryActivityRoutes(app: Express) {
         const companyId = Number(rawCompanyId);
         const m = companyDayMap.get(companyId);
         if (!m) return null;
-        if (!m.has(day)) m.set(day, { offloads: 0, purchases: 0, locations: [], containers: [], importedContainers: [] });
+        if (!m.has(day))
+          m.set(day, { offloads: 0, purchases: 0, locations: [], containers: [], importedContainers: [] });
         return m.get(day)!;
       };
 
@@ -81,7 +98,8 @@ export function registerStatsCountryActivityRoutes(app: Express) {
           day: any;
           cnt: string;
           containers: any;
-        }>(`
+        }>(
+          `
           SELECT
             c.company_id::text,
             co.offloaded_at::date AS day,
@@ -102,21 +120,21 @@ export function registerStatsCountryActivityRoutes(app: Express) {
           WHERE c.company_id IN (${companyIdList})
             AND co.offloaded_at::date BETWEEN $1::date AND $2::date
           GROUP BY c.company_id, co.offloaded_at::date
-        `, [startDateStr, endDateStr]);
+        `,
+          [startDateStr, endDateStr]
+        );
 
         for (const row of offloadsResult.rows) {
           const entry = ensureDay(row.company_id, toDateKey(row.day));
           if (entry) {
             entry.offloads = parseInt(row.cnt);
-            const rawContainers = typeof row.containers === "string"
-              ? JSON.parse(row.containers)
-              : row.containers;
+            const rawContainers = typeof row.containers === "string" ? JSON.parse(row.containers) : row.containers;
             if (Array.isArray(rawContainers)) {
               entry.containers = rawContainers.map((c: any) => ({
-                id:              Number(c.id),
+                id: Number(c.id),
                 containerNumber: c.containerNumber || "",
-                supplierCode:    c.supplierCode ?? null,
-                locationName:    c.locationName ?? null,
+                supplierCode: c.supplierCode ?? null,
+                locationName: c.locationName ?? null,
               }));
             }
           }
@@ -130,7 +148,8 @@ export function registerStatsCountryActivityRoutes(app: Express) {
             location_id: string;
             location_name: string;
             cnt: string;
-          }>(`
+          }>(
+            `
             SELECT
               c.company_id::text,
               co.offloaded_at::date AS day,
@@ -144,20 +163,24 @@ export function registerStatsCountryActivityRoutes(app: Express) {
               AND co.offloaded_at::date BETWEEN $1::date AND $2::date
             GROUP BY c.company_id, co.offloaded_at::date, co.location_id, l.name
             ORDER BY co.offloaded_at::date DESC, COUNT(*) DESC
-          `, [startDateStr, endDateStr]);
+          `,
+            [startDateStr, endDateStr]
+          );
 
           for (const row of locResult.rows) {
             const entry = ensureDay(row.company_id, toDateKey(row.day));
             if (entry) {
               entry.locations.push({
-                locationId:   parseInt(row.location_id),
+                locationId: parseInt(row.location_id),
                 locationName: row.location_name,
-                count:        parseInt(row.cnt),
+                count: parseInt(row.cnt),
               });
             }
           }
         } catch (_locErr: unknown) {
-          logger.error("[country-activity] location breakdown failed (non-fatal):", { error: getErrorMessage(_locErr) });
+          logger.error("[country-activity] location breakdown failed (non-fatal):", {
+            error: getErrorMessage(_locErr),
+          });
         }
       } catch (_offloadErr: unknown) {
         logger.error("[country-activity] offloads query failed (non-fatal):", { error: getErrorMessage(_offloadErr) });
@@ -171,7 +194,8 @@ export function registerStatsCountryActivityRoutes(app: Express) {
           day: any;
           cnt: string;
           containers: any;
-        }>(`
+        }>(
+          `
           SELECT
             c.company_id::text,
             c.created_at::date AS day,
@@ -190,40 +214,47 @@ export function registerStatsCountryActivityRoutes(app: Express) {
           WHERE c.company_id IN (${companyIdList})
             AND c.created_at::date BETWEEN $1::date AND $2::date
           GROUP BY c.company_id, c.created_at::date
-        `, [startDateStr, endDateStr]);
+        `,
+          [startDateStr, endDateStr]
+        );
 
         for (const row of purchasesResult.rows) {
           const entry = ensureDay(row.company_id, toDateKey(row.day));
           if (entry) {
             entry.purchases = parseInt(row.cnt);
-            const rawContainers = typeof row.containers === "string"
-              ? JSON.parse(row.containers)
-              : row.containers;
+            const rawContainers = typeof row.containers === "string" ? JSON.parse(row.containers) : row.containers;
             if (Array.isArray(rawContainers)) {
               entry.importedContainers = rawContainers.map((c: any) => ({
-                id:              Number(c.id),
+                id: Number(c.id),
                 containerNumber: c.containerNumber || "",
-                supplierCode:    c.supplierCode ?? null,
-                shopName:        c.shopName ?? null,
+                supplierCode: c.supplierCode ?? null,
+                shopName: c.shopName ?? null,
               }));
             }
           }
         }
       } catch (_poErr: unknown) {
-        logger.error("[country-activity] containers (imports) query failed (non-fatal):", { error: getErrorMessage(_poErr) });
+        logger.error("[country-activity] containers (imports) query failed (non-fatal):", {
+          error: getErrorMessage(_poErr),
+        });
       }
 
       // ── 4. Build date spine ──────────────────────────────────────────────
       let dateSeries: string[] = [];
       try {
-        const datesResult = await pool.query<{ day: any }>(`
+        const datesResult = await pool.query<{ day: any }>(
+          `
           SELECT gs::date AS day
           FROM generate_series($1::date, $2::date, INTERVAL '1 day') AS gs
           ORDER BY day DESC
-        `, [startDateStr, endDateStr]);
+        `,
+          [startDateStr, endDateStr]
+        );
         dateSeries = datesResult.rows.map((r) => toDateKey(r.day));
       } catch (_dsErr: unknown) {
-        logger.error("[country-activity] generate_series failed, using JS fallback:", { error: getErrorMessage(_dsErr) });
+        logger.error("[country-activity] generate_series failed, using JS fallback:", {
+          error: getErrorMessage(_dsErr),
+        });
         const cur = new Date(endDateStr + "T00:00:00");
         const start = new Date(startDateStr + "T00:00:00");
         while (cur >= start) {
@@ -236,18 +267,24 @@ export function registerStatsCountryActivityRoutes(app: Express) {
       const result = companies.map((c) => {
         const dayMap = companyDayMap.get(Number(c.id));
         const dailyData = dateSeries.map((day) => {
-          const entry = dayMap?.get(day) ?? { offloads: 0, purchases: 0, locations: [], containers: [], importedContainers: [] };
+          const entry = dayMap?.get(day) ?? {
+            offloads: 0,
+            purchases: 0,
+            locations: [],
+            containers: [],
+            importedContainers: [],
+          };
           return {
-            date:               day,
-            offloads:           entry.offloads,
-            purchases:          entry.purchases,
-            locations:          entry.locations,
-            containers:         entry.containers,
+            date: day,
+            offloads: entry.offloads,
+            purchases: entry.purchases,
+            locations: entry.locations,
+            containers: entry.containers,
             importedContainers: entry.importedContainers,
           };
         });
 
-        const totalOffloads  = dailyData.reduce((s, d) => s + d.offloads,  0);
+        const totalOffloads = dailyData.reduce((s, d) => s + d.offloads, 0);
         const totalPurchases = dailyData.reduce((s, d) => s + d.purchases, 0);
 
         return { id: c.id, name: c.name, code: c.code, totalOffloads, totalPurchases, days: dailyData };

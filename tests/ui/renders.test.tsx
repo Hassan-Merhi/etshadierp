@@ -232,12 +232,19 @@ describe("FactoryDaybook page", () => {
 // takes props, so it is exercised through the real prop-less entry point.
 describe("PropertiesRentalShops page", () => {
   it("renders the page title heading", async () => {
-    const { default: PropertiesRentalShops } = await import(
-      "@/pages/properties/PropertiesRentalShops"
-    );
+    const { default: PropertiesRentalShops } = await import("@/pages/properties/PropertiesRentalShops");
     renderWithProviders(<PropertiesRentalShops />);
     const heading = await screen.findByTestId("text-page-title");
     expect(heading).toHaveTextContent("Shop Rentals");
   });
 });
 
+// ── 14. StockTransferOrder ───────────────────────────────────────────────────
+// Added before decomposing StockTransferOrder.tsx in Phase 4.
+describe("StockTransferOrder page", () => {
+  it("renders the page title heading", async () => {
+    const { default: StockTransferOrder } = await import("@/pages/StockTransferOrder");
+    renderWithProviders(<StockTransferOrder />);
+    expect(await screen.findByTestId("text-page-title")).toBeInTheDocument();
+  });
+});

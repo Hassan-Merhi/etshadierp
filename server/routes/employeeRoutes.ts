@@ -6,7 +6,7 @@ import { requireAuth, requireNonPOS } from "../auth";
 import { employees, insertEmployeeSchema } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { registerEmployeeGroupRoutes } from "./employeeGroupRoutes";
-import { registerPayrollRoutes } from "./payrollRoutes";
+import { registerPayrollRoutes } from "./erp-payroll";
 
 export function registerEmployeeRoutes(app: Express) {
   app.get("/api/employees", requireAuth, async (req, res) => {

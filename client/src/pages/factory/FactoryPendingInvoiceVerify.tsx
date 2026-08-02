@@ -46,96 +46,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-interface FinalizePreviewBale {
-  id: number;
-  baleReference: string;
-  productName: string;
-  weightKg: number;
-  locationName: string;
-  status: string;
-}
-
-interface FinalizePreview {
-  baleCount: number;
-  totalBalesInOrder: number;
-  bales: FinalizePreviewBale[];
-}
-
-interface ComparisonItem {
-  articleCode: string;
-  productName: string;
-  loadedQty: number;
-  expectedQty: number;
-  diff: number;
-  totalWeight: number;
-  totalPrice: number;
-  pricePerBale: string;
-  stockQty?: number;
-  stockTotalWeight?: number;
-  inProforma: boolean;
-  status: "LOADED_NOT_IN_PROFORMA" | "MISSING_FROM_LOADED" | "UNDER_LOADED" | "OVER_LOADED" | "MATCH";
-}
-
-interface ProformaLine {
-  articleCode: string;
-  productName: string;
-  expectedQty: number;
-  pricePerBale: string;
-  stockQty: number;
-}
-
-interface LoadedGroup {
-  articleCode: string;
-  productName: string;
-  qty: number;
-  totalWeight: number;
-  totalPrice: number;
-  pricePerBale: string;
-  stockQty: number;
-  pricingMode?: string;
-  pricePerKg?: number;
-}
-
-interface VerificationSummary {
-  order: any;
-  proformaLines: ProformaLine[];
-  loadedItems: LoadedGroup[];
-  comparison: ComparisonItem[];
-  totalLoadedBales: number;
-  totalLoadedWeight: number;
-  dataSource?: "bale_rows" | "order_lines";
-}
-
-interface OrderCharge {
-  id: number;
-  name: string;
-  amount: string;
-  chargeType: string;
-  ledgerAccountId?: number | null;
-}
-
-interface OrderDetail {
-  id: number;
-  customerId: number;
-  companyId: number;
-  orderDate: string;
-  status: string;
-  invoiceNumber?: string;
-  subtotalBales: string;
-  freightAmount: string;
-  otherChargesTotal: string;
-  grandTotal: string;
-  totalQtyBales: number;
-  charges: OrderCharge[];
-  containerNumber?: string;
-  shippingCompany?: string;
-  containerNotes?: string;
-  destination?: string;
-}
-
-/** Strip unnecessary trailing zeros — e.g. 5563.00 → "5563", 15836.28 → "15836.28" */
-const fmtNum = (n: number, max = 2) => parseFloat(n.toFixed(max)).toString();
-
+import type {
+  ComparisonItem,
+  FinalizePreview,
+  OrderDetail,
+  VerificationSummary,
+} from "./factorypendinginvoiceverify/types";
+import { fmtNum } from "./factorypendinginvoiceverify/utils";
 export default function FactoryPendingInvoiceVerify() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();

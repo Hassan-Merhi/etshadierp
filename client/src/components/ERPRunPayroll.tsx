@@ -10,7 +10,6 @@ import {
   PlayCircle,
   Banknote,
   FileSpreadsheet,
-  FileText,
   Printer,
   CheckCircle2,
   History,
@@ -25,7 +24,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -54,101 +52,16 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useCompany } from "@/contexts/CompanyContext";
 
-const AVATAR_COLORS = [
-  "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
-  "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-  "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-  "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
-  "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300",
-  "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300",
-  "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300",
-];
-function getAvatarColor(name: string) {
-  let h = 0;
-  for (const c of name) h = c.charCodeAt(0) + ((h << 5) - h);
-  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
-}
-function getInitials(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase();
-}
-function fmt(val: string | number | null | undefined) {
-  const n = parseFloat(String(val || 0));
-  return isNaN(n) ? "0.00" : n.toFixed(2);
-}
-
-interface Employee {
-  id: number;
-  code: string;
-  firstName: string;
-  lastName: string;
-  department: string | null;
-  employeeType: string;
-  monthlySalary: string | null;
-  active: boolean;
-}
-interface WorkerGroup {
-  id: number;
-  name: string;
-  members: { id: number }[];
-}
-interface LedgerAccount {
-  id: number;
-  name: string;
-  code: string;
-  accountType: string;
-}
-interface SalaryAdvance {
-  id: number;
-  employeeId: number;
-  amount: string;
-  remainingBalance: string;
-  fullyPaid: boolean;
-}
-interface PreviewItem {
-  employeeId: number;
-  employeeName: string;
-  groupName: string;
-  baseSalary: number;
-  deduction: number;
-  pendingDeductions: number;
-  netPay: number;
-}
-interface WorkerDeductionRow {
-  workerId: number;
-  amount: string;
-  applied: boolean;
-}
-interface PayrollRun {
-  id: number;
-  status: string;
-  date: string;
-  notes: string | null;
-  paymentAccountId: number | null;
-  paidAt: string | null;
-  createdAt: string;
-  itemCount: number;
-  totalNet: string;
-  totalBase: string;
-  items: PayrollRunItem[];
-}
-interface PayrollRunItem {
-  id: number;
-  runId: number;
-  employeeId: number;
-  employeeName: string;
-  groupName: string | null;
-  baseSalary: string;
-  deduction: string;
-  netPay: string;
-}
-
+import type {
+  Employee,
+  LedgerAccount,
+  PayrollRun,
+  PreviewItem,
+  SalaryAdvance,
+  WorkerDeductionRow,
+  WorkerGroup,
+} from "./erprunpayroll/types";
+import { getAvatarColor, getInitials } from "./erprunpayroll/utils";
 export default function ERPRunPayroll() {
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
@@ -320,7 +233,8 @@ export default function ERPRunPayroll() {
   function toggleWorker(id: number) {
     setSelectedWorkers((p) => {
       const n = new Set(p);
-      if (n.has(id)) n.delete(id); else n.add(id);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
       return n;
     });
   }
@@ -329,7 +243,8 @@ export default function ERPRunPayroll() {
     const allSel = visible.every((id) => selectedWorkers.has(id));
     setSelectedWorkers((p) => {
       const n = new Set(p);
-      if (allSel) visible.forEach((id) => n.delete(id)); else visible.forEach((id) => n.add(id));
+      if (allSel) visible.forEach((id) => n.delete(id));
+      else visible.forEach((id) => n.add(id));
       return n;
     });
   }
@@ -1382,13 +1297,25 @@ export default function ERPRunPayroll() {
             <AlertDialogTitle>Fix Old Expense Accounts?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2 text-sm">
-                <p>This one-time fix will scan all historical payroll records and reclassify any that used old-style expense accounts:</p>
+                <p>
+                  This one-time fix will scan all historical payroll records and reclassify any that used old-style
+                  expense accounts:
+                </p>
                 <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
-                  <li><strong>Worker payroll runs</strong> — split "Salary Expense" into "Salary Expense - {"{Group}"}"</li>
-                  <li><strong>Employee salary deposits</strong> — move "Payroll Deposit Expense" → "Salary Expense - {"{Group}"}"</li>
-                  <li><strong>Employee bonuses</strong> — move "Salary Expense" (wrong) → "Bonus Expense - {"{Group}"}"</li>
+                  <li>
+                    <strong>Worker payroll runs</strong> — split "Salary Expense" into "Salary Expense - {"{Group}"}"
+                  </li>
+                  <li>
+                    <strong>Employee salary deposits</strong> — move "Payroll Deposit Expense" → "Salary Expense -{" "}
+                    {"{Group}"}"
+                  </li>
+                  <li>
+                    <strong>Employee bonuses</strong> — move "Salary Expense" (wrong) → "Bonus Expense - {"{Group}"}"
+                  </li>
                 </ul>
-                <p className="text-muted-foreground">Totals stay the same — only the expense account breakdown changes. Safe to run more than once.</p>
+                <p className="text-muted-foreground">
+                  Totals stay the same — only the expense account breakdown changes. Safe to run more than once.
+                </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1426,10 +1353,13 @@ export default function ERPRunPayroll() {
                     {/* Worker payroll runs */}
                     <div>
                       <p className="font-medium mb-1">Worker Payroll Runs</p>
-                      {migrateResult.total === 0 && <p className="text-muted-foreground">No paid payroll runs found.</p>}
+                      {migrateResult.total === 0 && (
+                        <p className="text-muted-foreground">No paid payroll runs found.</p>
+                      )}
                       {migrateResult.migrated > 0 && (
                         <p className="text-green-700 dark:text-green-400">
-                          <strong>{migrateResult.migrated}</strong> run{migrateResult.migrated !== 1 ? "s" : ""} updated to per-group expense accounts.
+                          <strong>{migrateResult.migrated}</strong> run{migrateResult.migrated !== 1 ? "s" : ""} updated
+                          to per-group expense accounts.
                         </p>
                       )}
                       {migrateResult.alreadyCorrect > 0 && (
@@ -1454,7 +1384,8 @@ export default function ERPRunPayroll() {
                       <p className="font-medium mb-1">Employee Salary Deposits</p>
                       {migrateResult.depositsMigrated > 0 ? (
                         <p className="text-green-700 dark:text-green-400">
-                          <strong>{migrateResult.depositsMigrated}</strong> deposit{migrateResult.depositsMigrated !== 1 ? "s" : ""} moved to correct expense accounts.
+                          <strong>{migrateResult.depositsMigrated}</strong> deposit
+                          {migrateResult.depositsMigrated !== 1 ? "s" : ""} moved to correct expense accounts.
                         </p>
                       ) : (
                         <p className="text-muted-foreground">
@@ -1470,7 +1401,9 @@ export default function ERPRunPayroll() {
                       <p className="font-medium mb-1">Employee Bonuses</p>
                       {migrateResult.bonusesMigrated > 0 ? (
                         <p className="text-green-700 dark:text-green-400">
-                          <strong>{migrateResult.bonusesMigrated}</strong> bonus{migrateResult.bonusesMigrated !== 1 ? "es" : ""} corrected — moved to per-group "Bonus Expense" accounts.
+                          <strong>{migrateResult.bonusesMigrated}</strong> bonus
+                          {migrateResult.bonusesMigrated !== 1 ? "es" : ""} corrected — moved to per-group "Bonus
+                          Expense" accounts.
                         </p>
                       ) : (
                         <p className="text-muted-foreground">

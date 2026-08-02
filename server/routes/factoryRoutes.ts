@@ -1,21 +1,21 @@
 import type { Express } from "express";
 import { eq, and, or } from "drizzle-orm";
 import { companies, userCompanyRoles } from "@shared/schema";
-import { registerFactoryStockRoutes } from "./factory/factoryStockRoutes";
+import { registerFactoryStockRoutes } from "./factory/stock";
 import { registerFactorySuppliersRoutes } from "./factory/factorySuppliersRoutes";
 import { registerFactoryBilingualCatalogRoutes } from "./factory/factoryBilingualCatalogRoutes";
 import { registerFactoryBilingualSnapshotRoutes } from "./factory/factoryBilingualSnapshotRoutes";
-import { registerFactoryProductsRoutes } from "./factory/factoryProductsRoutes";
-import { registerFactoryContainersRoutes } from "./factory/factoryContainersRoutes";
-import { registerFactoryBalesRoutes } from "./factory/factoryBalesRoutes";
-import { registerFactoryCustomersRoutes } from "./factory/factoryCustomersRoutes";
+import { registerFactoryProductsRoutes } from "./factory/products";
+import { registerFactoryContainersRoutes } from "./factory/containers";
+import { registerFactoryBalesRoutes } from "./factory/bales";
+import { registerFactoryCustomersRoutes } from "./factory/customers-core";
 import { registerFactoryContainerReadAccessRoutes } from "./factory/factoryContainerReadAccessRoutes";
-import { registerFactoryDocsUsersRoutes } from "./factory/factoryDocsUsersRoutes";
+import { registerFactoryDocsUsersRoutes } from "./factory/docs-users";
 import { registerFactoryEmployeesPosRoutes } from "./factory/factoryEmployeesPosRoutes";
 import { registerFactoryTransporterRoutes } from "./factory/factoryTransporterRoutes";
 import { registerFactoryStockAllocationV2Routes } from "./factory/factoryStockAllocationV2Routes";
-import { registerFactoryStockAllocationV5Routes } from "./factory/factoryStockAllocationV5Routes";
-import { registerFactoryShippingContainerRoutes } from "./factory/factoryShippingContainerRoutes";
+import { registerFactoryStockAllocationV5Routes } from "./factory/stock-allocation-v5";
+import { registerFactoryShippingContainerRoutes } from "./factory/shipping-containers";
 import { registerFactoryDailyScanRoutes } from "./factory/factoryDailyScanRoutes";
 import { registerFactoryGroundScanRoutes } from "./factory/factoryGroundScanRoutes";
 import { registerFactoryContainerTrackingRoutes } from "./factory/factoryContainerTrackingRoutes";
@@ -143,11 +143,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
-  app.get(
-    "/api/factory/uploads/:folder/:filename",
-    requireAuth,
-    createContainerDocumentDownloadHandler(db)
-  );
+  app.get("/api/factory/uploads/:folder/:filename", requireAuth, createContainerDocumentDownloadHandler(db));
 
   registerFactoryDaybookPaginationRoutes(app);
   registerFactoryStockEntryHistoryPaginationRoutes(app);

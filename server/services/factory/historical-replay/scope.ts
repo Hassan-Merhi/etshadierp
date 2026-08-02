@@ -15,7 +15,7 @@ import {
   loadContainerUniverse,
   computeCanonicalCosts,
   computeBatchCorrections,
-} from "./readModel";
+} from "./read-model";
 
 export function computeReplayFingerprint(
   companyId: number,
@@ -86,7 +86,10 @@ export function computeReplayFingerprint(
     },
     scopeIds: {
       sortedSupplierIds,
-      safeSourceIds: preview.sourceRows.filter((source) => source.safeToRepair).map((source) => source.sourceId).sort((a, b) => a - b),
+      safeSourceIds: preview.sourceRows
+        .filter((source) => source.safeToRepair)
+        .map((source) => source.sourceId)
+        .sort((a, b) => a - b),
       batchIds: preview.batchRows.map((batch) => batch.batchId).sort((a, b) => a - b),
       containerIds: preview.containerRows
         .filter((container) => !container.fxUnresolved && sortedSupplierIds.includes(container.supplierId ?? -1))
@@ -219,7 +222,11 @@ export async function computeReplayWriteScope(
 }> {
   const safeSupplierIds = new Set(
     preview.supplierRows
-      .filter((supplier) => supplier.safeToRepair && (requestedSupplierIds.length === 0 || requestedSupplierIds.includes(supplier.supplierId)))
+      .filter(
+        (supplier) =>
+          supplier.safeToRepair &&
+          (requestedSupplierIds.length === 0 || requestedSupplierIds.includes(supplier.supplierId))
+      )
       .map((supplier) => supplier.supplierId)
   );
   if (safeSupplierIds.size === 0) {
@@ -235,7 +242,10 @@ export async function computeReplayWriteScope(
   }
   const containerIds = new Set(
     preview.containerRows
-      .filter((container) => !container.fxUnresolved && container.supplierId != null && safeSupplierIds.has(container.supplierId))
+      .filter(
+        (container) =>
+          !container.fxUnresolved && container.supplierId != null && safeSupplierIds.has(container.supplierId)
+      )
       .map((container) => container.containerId)
   );
   const expectedRates = new Map<string, number>();
@@ -257,8 +267,10 @@ export async function computeReplayWriteScope(
     preview.sourceRows
       .filter((source) => source.safeToRepair && batchIdsToApply.has(source.batchId))
       .filter((source) => {
-        if (source.pricingBasis === "SUPPLIER_LOCKED_RATE" && source.supplierId != null) return safeSupplierIds.has(source.supplierId);
-        if (source.pricingBasis === "CONTAINER_DIRECT" && source.containerId != null) return canonicalRates.has(source.containerId);
+        if (source.pricingBasis === "SUPPLIER_LOCKED_RATE" && source.supplierId != null)
+          return safeSupplierIds.has(source.supplierId);
+        if (source.pricingBasis === "CONTAINER_DIRECT" && source.containerId != null)
+          return canonicalRates.has(source.containerId);
         return false;
       })
       .map((source) => source.sourceId)
@@ -362,10 +374,10 @@ export async function buildHistoricalReplayScopeInternal(params: {
   if (supplierIdArray.length === 0) return emptyScope();
 
   if (lockRows) {
-    await executor.query(
-      `SELECT id FROM factory_suppliers WHERE id = ANY($1) AND company_id = $2 FOR UPDATE`,
-      [supplierIdArray, companyId]
-    );
+    await executor.query(`SELECT id FROM factory_suppliers WHERE id = ANY($1) AND company_id = $2 FOR UPDATE`, [
+      supplierIdArray,
+      companyId,
+    ]);
     await executor.query(
       `SELECT id FROM factory_containers
        WHERE supplier_id = ANY($1) AND company_id = $2 AND deleted_at IS NULL
@@ -416,9 +428,9 @@ export async function buildHistoricalReplayScopeInternal(params: {
   const expectedRates = new Map<string, number>();
   for (const source of fullPreview.sourceRows) {
     if (
-      source.pricingBasis === "SUPPLIER_LOCKED_RATE"
-      && source.supplierId != null
-      && safeSupplierIds.has(source.supplierId)
+      source.pricingBasis === "SUPPLIER_LOCKED_RATE" &&
+      source.supplierId != null &&
+      safeSupplierIds.has(source.supplierId)
     ) {
       const key = `${source.supplierId}:${source.batchId}`;
       if (!expectedRates.has(key)) expectedRates.set(key, source.expectedHistoricalCostPerKg);
@@ -480,10 +492,10 @@ export async function buildHistoricalReplayScopeInternal(params: {
     );
     for (const row of rawStockResult.rows) rawStockIdToContainer.set(row.id, row.container_id);
     if (lockRows && rawStockIdToContainer.size > 0) {
-      await executor.query(
-        `SELECT id FROM factory_raw_stock WHERE id = ANY($1) AND company_id = $2 FOR UPDATE`,
-        [[...rawStockIdToContainer.keys()], companyId]
-      );
+      await executor.query(`SELECT id FROM factory_raw_stock WHERE id = ANY($1) AND company_id = $2 FOR UPDATE`, [
+        [...rawStockIdToContainer.keys()],
+        companyId,
+      ]);
     }
   }
 
@@ -515,15 +527,15 @@ export async function buildHistoricalReplayScopeInternal(params: {
         ? [...availableBaleIdsToUpdate, ...finalizedBaleIdsToUpdate]
         : availableBaleIdsToUpdate;
       if (baleIdsToLock.length > 0) {
-        await executor.query(
-          `SELECT id FROM factory_bales WHERE id = ANY($1) AND company_id = $2 FOR UPDATE`,
-          [baleIdsToLock, companyId]
-        );
+        await executor.query(`SELECT id FROM factory_bales WHERE id = ANY($1) AND company_id = $2 FOR UPDATE`, [
+          baleIdsToLock,
+          companyId,
+        ]);
       }
-      await executor.query(
-        `SELECT id FROM factory_mix_batches WHERE id = ANY($1) AND company_id = $2 FOR UPDATE`,
-        [batchIdArray, companyId]
-      );
+      await executor.query(`SELECT id FROM factory_mix_batches WHERE id = ANY($1) AND company_id = $2 FOR UPDATE`, [
+        batchIdArray,
+        companyId,
+      ]);
       if (sourceIdsToUpdate.length > 0) {
         await executor.query(
           `SELECT mbs.id

@@ -1,0 +1,174 @@
+export interface CompanyExportData {
+  company: any;
+  companySettings: any[];
+  locations: any[];
+  // Ledger / Finance
+  ledgerAccounts: any[];
+  bankAccounts: any[];
+  fixedAssets: any[];
+  exchangeRates: any[];
+  fiscalPeriodClosures: any[];
+  referenceSequences: any[];
+  agentAccounts: any[];
+  // Vouchers
+  vouchers: any[];
+  voucherEntries: any[];
+  // Suppliers
+  suppliers: any[];
+  supplierTransactions: any[];
+  supplierProformas: any[];
+  supplierProformaLines: any[];
+  supplierContainers: any[];
+  supplierContainerLoadedItems: any[];
+  // Customers
+  customers: any[];
+  customerTransactions: any[];
+  customerBalances: any[];
+  customerOrders: any[];
+  customerOrderLines: any[];
+  customerOrderBales: any[];
+  customerOrderCharges: any[];
+  customerProformas: any[];
+  customerProformaLines: any[];
+  creditNoteItems: any[];
+  // Employees
+  employees: any[];
+  employeePayrolls: any[];
+  employeePayrollItems: any[];
+  employeeAdvances: any[];
+  salaryAdvances: any[];
+  salaryAdvanceDeductions: any[];
+  employeeAdvanceRepayments: any[];
+  employeeAttendance: any[];
+  employeeBonuses: any[];
+  employeeGroups: any[];
+  employeeGroupMembers: any[];
+  employeeBaleRates: any[];
+  employeeBalePercentRates: any[];
+  workerDocs: any[];
+  // Factory Workers
+  factoryWorkers: any[];
+  factoryWorkerCategories: any[];
+  factoryWorkerDocuments: any[];
+  factoryWorkerAdvances: any[];
+  factoryAdvanceRepayments: any[];
+  factoryPayrolls: any[];
+  factoryAttendance: any[];
+  workerBonuses: any[];
+  // Factory Operations
+  factorySettings: any[];
+  factoryCategories: any[];
+  factoryDaybook: any[];
+  factoryDaybookEdits: any[];
+  factoryDailyKpiSnapshots: any[];
+  factoryDailyUsages: any[];
+  factoryAlerts: any[];
+  factoryDutyAuditLog: any[];
+  // Factory Raw / Production
+  factoryRawStock: any[];
+  factoryRawMaterialAdjustments: any[];
+  factoryPressingBatches: any[];
+  pressingBatches: any[];
+  factoryMixBatches: any[];
+  factoryMixBatchSources: any[];
+  mixBatches: any[];
+  mixBatchSources: any[];
+  productionBales: any[];
+  productionRawStock: any[];
+  // Factory Bales
+  factoryBaleProducts: any[];
+  factoryBales: any[];
+  factoryBaleSequences: any[];
+  factoryBaleCostSnapshots: any[];
+  factoryBaleWasteDispatches: any[];
+  factoryWasteEntries: any[];
+  // Factory Containers
+  factoryContainers: any[];
+  factoryContainerCommissions: any[];
+  factoryContainerOtherCharges: any[];
+  factoryContainerProfitSnapshots: any[];
+  factoryOffloadAdditionalCharges: any[];
+  // Factory Suppliers
+  factorySuppliers: any[];
+  factorySupplierPayments: any[];
+  factorySupplierFxTransfers: any[];
+  factorySupplierScoreSnapshots: any[];
+  // Factory FX
+  factoryFxRates: any[];
+  factoryFxAllocations: any[];
+  // Factory POS
+  factoryPosSales: any[];
+  factoryPosSaleItems: any[];
+  // Bales (Sorting)
+  bales: any[];
+  baleProducts: any[];
+  baleProductCategories: any[];
+  baleSequences: any[];
+  baleLabelPrints: any[];
+  baleTransfers: any[];
+  baleTransferItems: any[];
+  baleRecodeSessions: any[];
+  baleRecodeItems: any[];
+  // Stock
+  stockGroups: any[];
+  stockItems: any[];
+  stockItemCodeAliases: any[];
+  stockItemLocationPrices: any[];
+  inventory: any[];
+  inventoryNegativeLayers: any[];
+  stockGroupLocationArchives: any[];
+  stockGroupLocationArchiveItems: any[];
+  stockTransfers: any[];
+  stockTransferItems: any[];
+  stockTransferRevisions: any[];
+  stockTransferRevisionItems: any[];
+  stockAdjustments: any[];
+  stockAdjustmentItems: any[];
+  proformaStockReservations: any[];
+  // Containers
+  containersDetail: any[];
+  containers: any[];
+  containerCharges: any[];
+  containerOffloads: any[];
+  containerOffloadItems: any[];
+  containerFreight: any[];
+  containerFreightPayments: any[];
+  containerDocuments: any[];
+  containerSales: any[];
+  // Purchase Orders
+  purchaseOrders: any[];
+  poLineItems: any[];
+  // POS
+  posShifts: any[];
+  salesItems: any[];
+  // Waste
+  wasteDispatches: any[];
+  wasteDispatchItems: any[];
+  // Spreadsheets
+  spreadsheets: any[];
+  // Import Logs
+  importLogs: any[];
+  // Audit
+  auditLog: any[];
+  // ── Enriched / Detail Views ────────────────────────────────────────────────
+  voucherLinesDetail: any[];
+  poDetail: any[];
+  stockTransferDetail: any[];
+  supplierBalances: any[];
+  supplierTxnDetail: any[];
+  customerBalancesDetail: any[];
+  customerOrderDetail: any[];
+  creditNoteDetail: any[];
+  salaryAdvancesDetail: any[];
+  employeeTxnDetail: any[];
+  locationStockDetail: any[];
+  // ── Factory Enriched Detail Views ──────────────────────────────────────────
+  factoryBaleDetail: any[];
+  factoryWorkerAdvancesDetail: any[];
+  factoryPayrollDetail: any[];
+  factoryContainerDetail: any[];
+  factorySupplierPaymentsDetail: any[];
+  factoryRawStockDetail: any[];
+  factoryMixBatchDetail: any[];
+  factoryPosSalesDetail: any[];
+}

@@ -1,0 +1,43 @@
+/**
+ * Shared state and helpers for the factoryDispatchBatchRoutes routes.
+ *
+ * Extracted verbatim from the former single-file factoryDispatchBatchRoutes.ts.
+ */
+import { db } from "../../../db";
+import { sql, eq, and } from "drizzle-orm";
+import { customerDispatchBatches } from "@shared/schema";
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+export function getCompanyId(req: any): number | null {
+  return (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId || null;
+}
+
+export function getUsername(req: any): string {
+  return (req.session as any).username || (req.session as any).user?.username || "unknown";
+}
+
+export async function isAdmin(req: any, companyId: number): Promise<boolean> {
+  try {
+    const userId = (req.session as any).userId;
+    if (!userId) return false;
+    const rows = await db.execute(
+      sql`SELECT role FROM user_company_roles WHERE company_id = ${companyId} AND user_id = ${String(userId)} LIMIT 1`
+    );
+    const row = (rows as any).rows?.[0];
+    return row?.role === "Admin";
+  } catch {
+    return false;
+  }
+}
+
+// Recalculate and update the batch totals — not needed for batches themselves
+// but we do need to update batch status to LOADING when first ride is created
+export async function ensureBatchStatus(tx: any, batchId: number, companyId: number, status: string) {
+  await tx
+    .update(customerDispatchBatches)
+    .set({ status, updatedAt: new Date() })
+    .where(and(eq(customerDispatchBatches.id, batchId), eq(customerDispatchBatches.companyId, companyId)));
+}
+
+// ── route registration ────────────────────────────────────────────────────────

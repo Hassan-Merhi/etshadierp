@@ -1,111 +1,16 @@
 import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { db, pool } from "../../db";
-import { storage } from "../../storage";
-import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
-import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory } from "../_helpers";
-import { getClientDate } from "../../lib/dateUtils";
-import {
-  inventory,
-  stockItems,
-  stockGroups,
-  stockTransferVouchers,
-  stockTransferItems,
-  stockAdjustmentVouchers,
-  stockAdjustmentItems,
-  containers,
-  containerOffloads,
-  containerOffloadItems,
-  bankAccounts,
-  fixedAssets,
-  ledgerAccounts,
-  insertLedgerAccountSchema,
-  insertStockGroupSchema,
-  insertStockItemSchema,
-  insertContainerSchema,
-  insertStockTransferVoucherSchema,
-  insertStockAdjustmentVoucherSchema,
-  updateStockTransferSchema,
-  updateStockAdjustmentSchema,
-  vouchers,
-  voucherEntries,
-  salesItems,
-  suppliers,
-  customers,
-  customerBalances,
-  employees,
-  locations,
-  userLocations,
-  userCompanyRoles,
-  companies,
-  auditLog,
-  users,
-  FEATURE_KEYS,
-  companySettings,
-  purchaseOrders,
-  poLineItems,
-  interCompanyTransfers,
-  insertInterCompanyTransferSchema,
-  insertContainerSaleSchema,
-  containerSales,
-  insertUserPreferencesSchema,
-  userPreferences,
-  insertDraftPosSaleSchema,
-  InsertDraftPosSale,
-  insertSalaryAdvanceSchema,
-  insertSalaryAdvanceDeductionSchema,
-  salaryAdvances,
-  salaryAdvanceDeductions,
-  fiscalPeriodClosures,
-  wasteDispatches,
-  wasteDispatchItems,
-  dashboardCashAccounts,
-  dashboardPayableAccounts,
-  dashboardAccountSelections,
-  insertDashboardCashAccountSchema,
-  insertDashboardPayableAccountSchema,
-  insertDashboardAccountSelectionSchema,
-  creditNoteItems,
-  pendingBarcodes,
-  insertPendingBarcodeSchema,
-  bales,
-  baleProducts,
-  baleProductCategories,
-  storedFiles,
-  stockItemLocationPrices,
-  exchangeRates,
-  factoryWorkerAdvances,
-  propertyContracts,
-  propertyMonthlyLedger,
-  propertyPayments,
-} from "@shared/schema";
-import {
-  eq,
-  and,
-  or,
-  desc,
-  asc,
-  lt,
-  gt,
-  ne,
-  inArray,
-  sql,
-  isNull,
-  isNotNull,
-  not,
-  gte,
-  lte,
-  like,
-  ilike,
-} from "drizzle-orm";
-import { format } from "date-fns";
-import { z } from "zod";
-import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../../excelHelper";
-import { adjustInventory, reverseInventoryByExactValue } from "../../inventoryHelper";
-import { classifyNetPositionAccounts, getAccountNetBalance, round2 } from "../../netPositionHelper";
+import { db } from "../../db";
+import { requireAuth, requireNonPOS } from "../../auth";
+import { containers, suppliers, employees, salaryAdvances, exchangeRates } from "@shared/schema";
+import { eq, and, or, desc, inArray, sql, isNull, lte } from "drizzle-orm";
+import { classifyNetPositionAccounts, getAccountNetBalance } from "../../netPositionHelper";
 
 import { _getCached, _setCached } from "../../services/shared/ttlCache";
+import { computeRentalOutstanding } from "./netProfitRentalSection";
+import { computeStockInHand } from "./netProfitStockSection";
+import { loadNetProfitData } from "./netProfitDataLoad";
 
 export function registerStatsNetProfitRoutes(app: Express) {
   app.get("/api/stats/net-profit", requireAuth, requireNonPOS, async (req, res) => {
@@ -129,252 +34,18 @@ export function registerStatsNetProfitRoutes(app: Express) {
       const _cached = _getCached(_cacheKey);
       if (_cached) return res.json(_cached);
 
-      // Build voucher conditions synchronously — no DB call needed
-      const voucherConditions: any[] = [
-        eq(vouchers.companyId, companyId),
-        eq(vouchers.optional, false),
-        isNull(vouchers.deletedAt),
-      ];
-      if (toDate) {
-        voucherConditions.push(lte(vouchers.voucherDate, toDate));
-      }
-
-      // Program 6D optimization: replace the two large per-row entry materialisations
-      // with three grouped-SQL queries.  This was validated by the Program 6D
-      // reconciliation script (995/995 cases, max diff < 1e-9, zero semantic mismatches)
-      // and by query-plan evidence showing 97-99% reduction in rows returned to the app.
-      //
-      // Three queries replace the original two:
-      //   1. groupedLedgerRows   — SUM per ledger_account_id, scoped by ACCOUNT's companyId
-      //      Preserves migrated-account attribution (rule 1+2).
-      //   2. groupedSupplierRows — SUM per supplier_id with SQL CASE for pure-side filtering,
-      //      scoped by VOUCHER's companyId.  Mixed debit+credit FX settlement rows
-      //      contribute 0 to both sides (rules 3+4+5).
-      //   3. groupedEmployeeRows — SUM per employee_id, scoped by VOUCHER's companyId (rule 3).
-      //
-      // pool.query is used (not db.select) to avoid the Drizzle ::cast-in-sql-template
-      // issue documented in the project memory.
-      const _entryParams = toDate ? [companyId, toDate] : [companyId];
-      const _dateClause  = toDate ? "AND v.voucher_date <= $2" : "";
-
-      // ── Schema-resilient column probe ────────────────────────────────────────
-      // Production may be running with RUN_STARTUP_MIGRATIONS=false so the
-      // multi-currency columns (base_debit_amount, base_credit_amount) and the
-      // ledger_account opening-balance currency columns may not yet exist.
-      // We probe once (two lightweight information_schema lookups) and choose
-      // the right SQL form for every subsequent query in this handler.
-      // Both probes are run in the same parallel batch as the other startup calls
-      // to add zero sequential latency on the happy path.
-      const [companyRecord, companyAccounts, parentCompanyId,
-             groupedLedgerRows, groupedSupplierRows, groupedEmployeeRows, hasMigratedResult] = await Promise.all([
-        storage.getCompanyById(companyId),
-        // Use a raw pool query so we only SELECT the original columns that are
-        // guaranteed to exist in every deployment (including pre-migration prod).
-        // Drizzle's db.select().from(ledgerAccounts) generates explicit column
-        // names from the schema, which includes the new multi-currency columns —
-        // those cause a "column does not exist" error on old production schemas.
-        pool.query<{
-          id: number; company_id: number; code: string; name: string;
-          account_type: string; sub_type: string | null; opening_balance: string;
-          opening_balance_side: string; active: boolean; is_hidden: boolean;
-          parent_id: number | null; deleted_at: string | null; created_at: string;
-          category: string | null;
-        }>(
-          `SELECT id, company_id, code, name, account_type, sub_type,
-                  opening_balance, opening_balance_side, active, is_hidden,
-                  parent_id, deleted_at, created_at, category
-           FROM ledger_accounts
-           WHERE company_id = $1 AND deleted_at IS NULL
-           ORDER BY code ASC`,
-          [companyId]
-        ).catch(() =>
-          // Fallback for schemas where the category column hasn't been added yet
-          pool.query<{
-            id: number; company_id: number; code: string; name: string;
-            account_type: string; sub_type: string | null; opening_balance: string;
-            opening_balance_side: string; active: boolean; is_hidden: boolean;
-            parent_id: number | null; deleted_at: string | null; created_at: string;
-            category: string | null;
-          }>(
-            `SELECT id, company_id, code, name, account_type, sub_type,
-                    opening_balance, opening_balance_side, active, is_hidden,
-                    parent_id, deleted_at, created_at, NULL::text AS category
-             FROM ledger_accounts
-             WHERE company_id = $1 AND deleted_at IS NULL
-             ORDER BY code ASC`,
-            [companyId]
-          )
-        ).then(r => r.rows.map(row => ({
-          id: row.id,
-          companyId: row.company_id,
-          code: row.code,
-          name: row.name,
-          accountType: row.account_type,
-          subType: row.sub_type,
-          openingBalance: row.opening_balance ?? "0",
-          openingBalanceSide: row.opening_balance_side ?? "Dr",
-          active: row.active,
-          isHidden: row.is_hidden,
-          parentId: row.parent_id,
-          deletedAt: row.deleted_at,
-          createdAt: row.created_at,
-          category: row.category,
-        } as any))),
-        storage.getParentCompanyId(),
-        // 1. Ledger-account balances — account-company scoped (migrated-account rule)
-        // COALESCE(base_debit_amount, debit_amount): uses historical USD base when available
-        // (i.e. after backfill), falls back to debit_amount for legacy rows.
-        // Falls back to plain debit_amount/credit_amount when base columns are absent.
-        pool.query<{ ledger_account_id: string; total_debit: string; total_credit: string }>(
-          `SELECT ve.ledger_account_id,
-                  SUM(COALESCE(ve.base_debit_amount,  ve.debit_amount)::numeric)  AS total_debit,
-                  SUM(COALESCE(ve.base_credit_amount, ve.credit_amount)::numeric) AS total_credit
-           FROM voucher_entries ve
-           JOIN vouchers        v  ON ve.voucher_id        = v.id
-           JOIN ledger_accounts la ON ve.ledger_account_id = la.id
-           WHERE la.company_id = $1
-             AND v.optional    = false
-             AND v.deleted_at IS NULL
-             ${_dateClause}
-           GROUP BY ve.ledger_account_id`,
-          _entryParams,
-        ).catch(() =>
-          pool.query<{ ledger_account_id: string; total_debit: string; total_credit: string }>(
-            `SELECT ve.ledger_account_id,
-                    SUM(ve.debit_amount::numeric)  AS total_debit,
-                    SUM(ve.credit_amount::numeric) AS total_credit
-             FROM voucher_entries ve
-             JOIN vouchers        v  ON ve.voucher_id        = v.id
-             JOIN ledger_accounts la ON ve.ledger_account_id = la.id
-             WHERE la.company_id = $1
-               AND v.optional    = false
-               AND v.deleted_at IS NULL
-               ${_dateClause}
-             GROUP BY ve.ledger_account_id`,
-            _entryParams,
-          )
-        ),
-        // 2. Supplier balances — voucher-company scoped, pure-side only (excludes mixed FX rows)
-        pool.query<{ supplier_id: string; total_debit: string; total_credit: string }>(
-          `SELECT ve.supplier_id,
-                  SUM(CASE WHEN COALESCE(ve.base_debit_amount,  ve.debit_amount)::numeric  > 0
-                                AND COALESCE(ve.base_credit_amount, ve.credit_amount)::numeric = 0
-                           THEN COALESCE(ve.base_debit_amount, ve.debit_amount)::numeric ELSE 0 END) AS total_debit,
-                  SUM(CASE WHEN COALESCE(ve.base_credit_amount, ve.credit_amount)::numeric > 0
-                                AND COALESCE(ve.base_debit_amount,  ve.debit_amount)::numeric  = 0
-                           THEN COALESCE(ve.base_credit_amount, ve.credit_amount)::numeric ELSE 0 END) AS total_credit
-           FROM voucher_entries ve
-           JOIN vouchers v ON ve.voucher_id = v.id
-           WHERE v.company_id    = $1
-             AND ve.supplier_id IS NOT NULL
-             AND v.optional      = false
-             AND v.deleted_at   IS NULL
-             ${_dateClause}
-           GROUP BY ve.supplier_id`,
-          _entryParams,
-        ).catch(() =>
-          pool.query<{ supplier_id: string; total_debit: string; total_credit: string }>(
-            `SELECT ve.supplier_id,
-                    SUM(CASE WHEN ve.debit_amount::numeric  > 0 AND ve.credit_amount::numeric = 0
-                             THEN ve.debit_amount::numeric ELSE 0 END) AS total_debit,
-                    SUM(CASE WHEN ve.credit_amount::numeric > 0 AND ve.debit_amount::numeric  = 0
-                             THEN ve.credit_amount::numeric ELSE 0 END) AS total_credit
-             FROM voucher_entries ve
-             JOIN vouchers v ON ve.voucher_id = v.id
-             WHERE v.company_id    = $1
-               AND ve.supplier_id IS NOT NULL
-               AND v.optional      = false
-               AND v.deleted_at   IS NULL
-               ${_dateClause}
-             GROUP BY ve.supplier_id`,
-            _entryParams,
-          )
-        ),
-        // 3. Employee balances — voucher-company scoped
-        pool.query<{ employee_id: string; total_debit: string; total_credit: string }>(
-          `SELECT ve.employee_id,
-                  SUM(COALESCE(ve.base_debit_amount,  ve.debit_amount)::numeric)  AS total_debit,
-                  SUM(COALESCE(ve.base_credit_amount, ve.credit_amount)::numeric) AS total_credit
-           FROM voucher_entries ve
-           JOIN vouchers v ON ve.voucher_id = v.id
-           WHERE v.company_id    = $1
-             AND ve.employee_id IS NOT NULL
-             AND v.optional      = false
-             AND v.deleted_at   IS NULL
-             ${_dateClause}
-           GROUP BY ve.employee_id`,
-          _entryParams,
-        ).catch(() =>
-          pool.query<{ employee_id: string; total_debit: string; total_credit: string }>(
-            `SELECT ve.employee_id,
-                    SUM(ve.debit_amount::numeric)  AS total_debit,
-                    SUM(ve.credit_amount::numeric) AS total_credit
-             FROM voucher_entries ve
-             JOIN vouchers v ON ve.voucher_id = v.id
-             WHERE v.company_id    = $1
-               AND ve.employee_id IS NOT NULL
-               AND v.optional      = false
-               AND v.deleted_at   IS NULL
-               ${_dateClause}
-             GROUP BY ve.employee_id`,
-            _entryParams,
-          )
-        ),
-        // Phase 6 guard: any entry with base_debit_amount set means COALESCE already
-        // returns the correct historical USD base — legacy CFA revaluation must NOT run.
-        // Falls back to { has_migrated: false } when column doesn't exist yet.
-        pool.query<{ has_migrated: boolean }>(
-          `SELECT EXISTS(
-             SELECT 1 FROM voucher_entries ve
-             JOIN vouchers v ON ve.voucher_id = v.id
-             WHERE v.company_id = $1
-               AND ve.base_debit_amount IS NOT NULL
-           ) AS has_migrated`,
-          [companyId],
-        ).catch(() => ({ rows: [{ has_migrated: false }] })),
-      ]);
-      // true  → some entries have base_debit_amount → COALESCE returns USD base → skip legacy revaluation
-      // false → all entries are pre-migration legacy OR base column absent → legacy CFA revaluation block applies
-      const hasMigratedEntries = (hasMigratedResult as any).rows[0]?.has_migrated === true;
-      const companyBaseCurrency = companyRecord?.baseCurrency || "USD";
-
-      // Build accountBalances from grouped SQL result.
-      // Account-company scoped: migrated accounts carry their full balance to the
-      // destination company regardless of which company their vouchers belong to.
-      const accountBalances = new Map<number, { debit: number; credit: number }>();
-      for (const row of groupedLedgerRows.rows) {
-        if (row.ledger_account_id) {
-          accountBalances.set(Number(row.ledger_account_id), {
-            debit:  parseFloat(row.total_debit  || "0"),
-            credit: parseFloat(row.total_credit || "0"),
-          });
-        }
-      }
-
-      // Build supplierBalances from grouped SQL result.
-      // Pure-side filtering is performed in SQL (CASE expressions above) so mixed
-      // debit+credit FX settlement rows contribute 0 to both sides — matching the
-      // /api/suppliers/stats logic and the original per-row application filter.
-      const supplierBalances = new Map<number, { debit: number; credit: number }>();
-      for (const row of groupedSupplierRows.rows) {
-        if (row.supplier_id) {
-          supplierBalances.set(Number(row.supplier_id), {
-            debit:  parseFloat(row.total_debit  || "0"),
-            credit: parseFloat(row.total_credit || "0"),
-          });
-        }
-      }
-
-      // Build employeeBalances from grouped SQL result (voucher-company scoped).
-      const employeeBalances = new Map<number, { debit: number; credit: number }>();
-      for (const row of groupedEmployeeRows.rows) {
-        if (row.employee_id) {
-          employeeBalances.set(Number(row.employee_id), {
-            debit:  parseFloat(row.total_debit  || "0"),
-            credit: parseFloat(row.total_credit || "0"),
-          });
-        }
-      }
+      // All the report's raw inputs - company row, ledger accounts and the three
+      // grouped balance maps - are loaded in ./netProfitDataLoad.
+      const {
+        companyRecord,
+        companyAccounts,
+        parentCompanyId,
+        hasMigratedEntries,
+        companyBaseCurrency,
+        accountBalances,
+        supplierBalances,
+        employeeBalances,
+      } = await loadNetProfitData(companyId, toDate);
 
       // ============ NET POSITION CALCULATION ============
       // Uses shared helper (netPositionHelper.ts) – single source of truth for
@@ -580,50 +251,18 @@ export function registerStatsNetProfitRoutes(app: Express) {
         }
       }
 
-      // ── ERP Stock In Hand — location inventory (weighted-average cost) ──
-      {
-        const activeLocationsData = await db
-          .select({ id: locations.id })
-          .from(locations)
-          .where(and(eq(locations.companyId, companyId), eq(locations.active, true), isNull(locations.deletedAt)))
-          .execute();
-        const activeLocationIds = activeLocationsData.map((l) => l.id);
-
-        let stockOnFloor = 0;
-        if (activeLocationIds.length > 0) {
-          if (toDate) {
-            const allHistorical = await Promise.all(
-              activeLocationIds.map((locId) => calculateHistoricalLocationInventory(locId, companyId, toDate))
-            );
-            for (const items of allHistorical) {
-              for (const inv of items) {
-                const qty = parseFloat(inv.quantity || "0");
-                const rate = parseFloat(inv.averageRate || "0");
-                if (qty > 0) stockOnFloor += qty * rate;
-              }
-            }
-          } else {
-            const inventoryData = await db
-              .select({ quantity: inventory.quantity, averageRate: inventory.averageRate })
-              .from(inventory)
-              .where(inArray(inventory.locationId, activeLocationIds))
-              .execute();
-            for (const inv of inventoryData) {
-              stockOnFloor += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
-            }
-          }
-        }
-        stockOnFloor = Math.round((stockOnFloor + Number.EPSILON) * 100) / 100;
-        if (stockOnFloor > 0) {
-          forUsTotal += stockOnFloor;
-          categoryTotals["asset_Stock In Hand"] = stockOnFloor;
-          forUsAccounts.push({
-            name: "Stock In Hand (Inventory)",
-            code: "COMPUTED",
-            value: stockOnFloor,
-            category: "Inventory",
-          });
-        }
+      // ERP Stock In Hand - location inventory at weighted-average cost,
+      // computed in ./netProfitStockSection.
+      const stockOnFloor = await computeStockInHand(companyId, toDate);
+      if (stockOnFloor > 0) {
+        forUsTotal += stockOnFloor;
+        categoryTotals["asset_Stock In Hand"] = stockOnFloor;
+        forUsAccounts.push({
+          name: "Stock In Hand (Inventory)",
+          code: "COMPUTED",
+          value: stockOnFloor,
+          category: "Inventory",
+        });
       }
 
       // Add Workers/Payroll - employee balances (salary payable only)
@@ -631,8 +270,8 @@ export function registerStatsNetProfitRoutes(app: Express) {
       // when new columns have been added to the Drizzle schema but not yet migrated.
       const companyEmployees = await db
         .select({
-          id:             employees.id,
-          companyId:      employees.companyId,
+          id: employees.id,
+          companyId: employees.companyId,
           openingBalance: employees.openingBalance,
         })
         .from(employees)
@@ -689,7 +328,9 @@ export function registerStatsNetProfitRoutes(app: Express) {
         rawSalaryAdvances = round2(parseFloat((saRow as any)?.total || "0"));
       } catch (saErr: unknown) {
         // Fallback: column may be absent on old production schemas. Dashboard still loads.
-        logger.warn("[/api/stats/net-profit] salary_advances query skipped (schema gap):", { error: getErrorMessage(saErr) });
+        logger.warn("[/api/stats/net-profit] salary_advances query skipped (schema gap):", {
+          error: getErrorMessage(saErr),
+        });
       }
       // For CFA companies, worker balances come from voucher entries.
       // Guard: only convert if ALL entries are pre-migration (hasMigratedEntries=false).
@@ -699,7 +340,8 @@ export function registerStatsNetProfitRoutes(app: Express) {
         currentCfaRate > 0 && !hasMigratedEntries ? round2(workerLiabilities / currentCfaRate) : workerLiabilities;
       // rawSalaryAdvances comes from the salary_advances table (not voucher entries).
       // Its currency follows the company base currency for CFA companies.
-      const workerAdvancesDisplay = currentCfaRate > 0 && !hasMigratedEntries ? round2(rawSalaryAdvances / currentCfaRate) : rawSalaryAdvances;
+      const workerAdvancesDisplay =
+        currentCfaRate > 0 && !hasMigratedEntries ? round2(rawSalaryAdvances / currentCfaRate) : rawSalaryAdvances;
       if (workerLiabilitiesDisplay > 0) {
         onUsTotal += workerLiabilitiesDisplay;
         categoryTotals["liability_Workers"] = (categoryTotals["liability_Workers"] || 0) + workerLiabilitiesDisplay;
@@ -732,9 +374,9 @@ export function registerStatsNetProfitRoutes(app: Express) {
           supplierIdsWithBalance.length > 0
             ? await db
                 .select({
-                  id:             suppliers.id,
-                  legalName:      suppliers.legalName,
-                  code:           suppliers.code,
+                  id: suppliers.id,
+                  legalName: suppliers.legalName,
+                  code: suppliers.code,
                   openingBalance: suppliers.openingBalance,
                 })
                 .from(suppliers)
@@ -753,12 +395,15 @@ export function registerStatsNetProfitRoutes(app: Express) {
             const netBalance = opening + balance.credit - balance.debit;
             if (netBalance > 0) {
               supplierLiabilities += netBalance;
-              const displayVal = currentCfaRate > 0 && !hasMigratedEntries ? round2(netBalance / currentCfaRate) : netBalance;
+              const displayVal =
+                currentCfaRate > 0 && !hasMigratedEntries ? round2(netBalance / currentCfaRate) : netBalance;
               onUsAccounts.push({ name: sup.legalName, code: sup.code || "", value: displayVal, category: "Supplier" });
             } else if (netBalance < 0) {
               supplierAssets += Math.abs(netBalance);
               const displayVal =
-                currentCfaRate > 0 && !hasMigratedEntries ? round2(Math.abs(netBalance) / currentCfaRate) : Math.abs(netBalance);
+                currentCfaRate > 0 && !hasMigratedEntries
+                  ? round2(Math.abs(netBalance) / currentCfaRate)
+                  : Math.abs(netBalance);
               forUsAccounts.push({
                 name: sup.legalName,
                 code: sup.code || "",
@@ -773,8 +418,11 @@ export function registerStatsNetProfitRoutes(app: Express) {
         // Guard: supplier balances come from voucher entries via COALESCE.
         // Only convert pre-migration amounts; after migration the COALESCE already returns USD.
         const supplierLiabilitiesDisplay =
-          currentCfaRate > 0 && !hasMigratedEntries ? round2(supplierLiabilities / currentCfaRate) : supplierLiabilities;
-        const supplierAssetsDisplay = currentCfaRate > 0 && !hasMigratedEntries ? round2(supplierAssets / currentCfaRate) : supplierAssets;
+          currentCfaRate > 0 && !hasMigratedEntries
+            ? round2(supplierLiabilities / currentCfaRate)
+            : supplierLiabilities;
+        const supplierAssetsDisplay =
+          currentCfaRate > 0 && !hasMigratedEntries ? round2(supplierAssets / currentCfaRate) : supplierAssets;
         if (supplierLiabilitiesDisplay > 0) {
           onUsTotal += supplierLiabilitiesDisplay;
           categoryTotals["liability_Suppliers"] = supplierLiabilitiesDisplay;
@@ -839,87 +487,21 @@ export function registerStatsNetProfitRoutes(app: Express) {
         }
       }
 
-      // ── Rental Outstanding (Tenant Receivables) ──────────────────────────────
-      // For every active rental contract under this company (any module), compute
-      // outstanding = SUM(expected for past+current months) - SUM(paid).
-      // Company is the TENANT paying rent to landlords.
-      // paid > expected → we overpaid → prepaid rent asset → forUs
-      // expected > paid → we still owe → rent payable → onUs
-      //
-      // Wrapped in try-catch: if the property tables are missing schema columns
-      // (e.g. `currency` not yet in prod), the dashboard still loads — rent data
-      // is simply omitted rather than crashing the whole response.
-      try {
-        const activeContracts = await db
-          .select({ id: propertyContracts.id, currency: propertyContracts.currency })
-          .from(propertyContracts)
-          .where(and(eq(propertyContracts.companyId, companyId), eq(propertyContracts.status, "ACTIVE")));
-        if (activeContracts.length > 0) {
-          const contractIds = activeContracts.map((c) => c.id);
-          const asOfExpr = toDate ? sql`${toDate}::date` : sql`CURRENT_DATE`;
-          // Expected: months on or before the asOf date
-          const expectedRows = await db
-            .select({
-              contractId: propertyMonthlyLedger.contractId,
-              expected: sql<string>`COALESCE(SUM(
-              CASE WHEN (
-                ${propertyMonthlyLedger.year} < EXTRACT(YEAR FROM ${asOfExpr})
-                OR (
-                  ${propertyMonthlyLedger.year} = EXTRACT(YEAR FROM ${asOfExpr})
-                  AND ${propertyMonthlyLedger.month} <= EXTRACT(MONTH FROM ${asOfExpr})
-                )
-              ) THEN CAST(${propertyMonthlyLedger.expectedAmount} AS numeric) ELSE 0 END
-            ), 0)`,
-            })
-            .from(propertyMonthlyLedger)
-            .where(inArray(propertyMonthlyLedger.contractId, contractIds))
-            .groupBy(propertyMonthlyLedger.contractId);
-          // Paid: only rent-linked payments (ledgerRowId IS NOT NULL) made on or before the asOf date.
-          // Payments with ledgerRowId=null are guarantee-release/refund log entries — they are NOT
-          // rent payments and must not inflate the "paid" total (which would falsely produce prepaid rent).
-          const paidConditions: any[] = [
-            inArray(propertyPayments.contractId, contractIds),
-            isNotNull(propertyPayments.ledgerRowId),
-          ];
-          if (toDate) paidConditions.push(lte(propertyPayments.paymentDate, toDate));
-          const paidRows = await db
-            .select({
-              contractId: propertyPayments.contractId,
-              paid: sql<string>`COALESCE(SUM(CAST(${propertyPayments.amount} AS numeric)), 0)`,
-            })
-            .from(propertyPayments)
-            .where(and(...paidConditions))
-            .groupBy(propertyPayments.contractId);
-          const paidMap = new Map(paidRows.map((r) => [r.contractId, parseFloat(r.paid)]));
-
-          let prepaidRent = 0;
-          let rentPayable = 0;
-          for (const row of expectedRows) {
-            const expected = parseFloat(row.expected);
-            const paid = paidMap.get(row.contractId) ?? 0;
-            const net = paid - expected; // positive = overpaid
-            const contract = activeContracts.find((c) => c.id === row.contractId);
-            const isCfa = contract?.currency === "CFA";
-            const usd = isCfa && currentCfaRate > 0 ? net / currentCfaRate : net;
-            if (usd > 0) prepaidRent += usd;
-            else if (usd < 0) rentPayable += -usd;
-          }
-          if (prepaidRent > 0.005) {
-            const val = round2(prepaidRent);
-            forUsTotal = round2(forUsTotal + val);
-            categoryTotals["asset_Prepaid Rent"] = (categoryTotals["asset_Prepaid Rent"] || 0) + val;
-            forUsAccounts.push({ name: "Prepaid Rent", code: "PREPAID_RENT", value: val, category: "Prepaid Rent" });
-          }
-          if (rentPayable > 0.005) {
-            const val = round2(rentPayable);
-            onUsTotal = round2(onUsTotal + val);
-            categoryTotals["liability_Rent Payable"] = (categoryTotals["liability_Rent Payable"] || 0) + val;
-            onUsAccounts.push({ name: "Rent Payable", code: "RENT_PAYABLE", value: val, category: "Rent Payable" });
-          }
-        }
-      } catch (rentalErr: unknown) {
-        logger.warn("[/api/stats/net-profit] Rental section skipped (schema or data error):", { error: getErrorMessage(rentalErr) });
-        // Non-fatal: dashboard continues without rent figures
+      // Rental Outstanding (Tenant Receivables) is computed in
+      // ./netProfitRentalSection, which returns the two figures rather than
+      // reaching into these accumulators.
+      const rental = await computeRentalOutstanding(companyId, toDate, currentCfaRate);
+      if (rental.prepaidRent > 0.005) {
+        const val = rental.prepaidRent;
+        forUsTotal = round2(forUsTotal + val);
+        categoryTotals["asset_Prepaid Rent"] = (categoryTotals["asset_Prepaid Rent"] || 0) + val;
+        forUsAccounts.push({ name: "Prepaid Rent", code: "PREPAID_RENT", value: val, category: "Prepaid Rent" });
+      }
+      if (rental.rentPayable > 0.005) {
+        const val = rental.rentPayable;
+        onUsTotal = round2(onUsTotal + val);
+        categoryTotals["liability_Rent Payable"] = (categoryTotals["liability_Rent Payable"] || 0) + val;
+        onUsAccounts.push({ name: "Rent Payable", code: "RENT_PAYABLE", value: val, category: "Rent Payable" });
       }
 
       // Build breakdowns from category totals (with rounding)
