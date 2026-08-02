@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: i18n-audit-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   audit:
