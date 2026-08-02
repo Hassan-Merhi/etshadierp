@@ -24,14 +24,17 @@ function isProtected(element: Element): boolean {
   return Boolean(element.closest(EXCLUDED_SELECTOR));
 }
 
-function translateApprovedText(value: string, language: ApplicationLanguage): string | null {
+export function translateApprovedInterfaceText(
+  value: string,
+  language: ApplicationLanguage,
+): string | null {
   return translateSharedInterfaceText(value, language) ?? translateAccountingDocumentText(value, language);
 }
 
 function translateTextNode(node: Text, language: ApplicationLanguage) {
   const parent = node.parentElement;
   if (!parent || isProtected(parent)) return;
-  const translated = translateApprovedText(node.nodeValue ?? "", language);
+  const translated = translateApprovedInterfaceText(node.nodeValue ?? "", language);
   if (translated !== null && translated !== node.nodeValue) node.nodeValue = translated;
 }
 
@@ -40,12 +43,12 @@ function translateAttributes(element: Element, language: ApplicationLanguage) {
   for (const attribute of TRANSLATABLE_ATTRIBUTES) {
     const value = element.getAttribute(attribute);
     if (!value) continue;
-    const translated = translateApprovedText(value, language);
+    const translated = translateApprovedInterfaceText(value, language);
     if (translated !== null && translated !== value) element.setAttribute(attribute, translated.trim());
   }
 }
 
-function translateTree(root: Node, language: ApplicationLanguage) {
+export function translateInterfaceTree(root: Node, language: ApplicationLanguage) {
   if (root.nodeType === Node.TEXT_NODE) {
     translateTextNode(root as Text, language);
     return;
@@ -62,30 +65,52 @@ function translateTree(root: Node, language: ApplicationLanguage) {
 }
 
 /**
- * Compatibility bridge used by application-surface translation phases.
+ * Transitional compatibility bridge for legacy screens that have not yet been
+ * converted to component-level translation calls.
  *
- * Only exact labels from reviewed dictionaries are translated. It never changes
- * input values, stored names, account/catalog data, codes, references, voucher
- * numbers, container numbers or any element explicitly marked as business data.
+ * The observer is scoped to the React application root rather than document.body
+ * and batches mutation work into one animation frame. Exact reviewed dictionary
+ * matches are still required, and explicit business-data guards are authoritative.
  */
 export function ApplicationInterfaceTranslator({ language }: { language: ApplicationLanguage }) {
   useEffect(() => {
-    translateTree(document.body, language);
+    const root = document.getElementById("root");
+    if (!root) return;
+
+    translateInterfaceTree(root, language);
+    const pending = new Set<Node>();
+    let frame: number | null = null;
+
+    const flush = () => {
+      frame = null;
+      for (const node of pending) translateInterfaceTree(node, language);
+      pending.clear();
+    };
+
+    const schedule = (node: Node) => {
+      pending.add(node);
+      if (frame === null) frame = window.requestAnimationFrame(flush);
+    };
+
     const observer = new MutationObserver((records) => {
       for (const record of records) {
-        for (const node of record.addedNodes) translateTree(node, language);
-        if (record.type === "characterData") translateTree(record.target, language);
-        if (record.type === "attributes") translateTree(record.target, language);
+        for (const node of record.addedNodes) schedule(node);
+        if (record.type === "characterData" || record.type === "attributes") schedule(record.target);
       }
     });
-    observer.observe(document.body, {
+    observer.observe(root, {
       childList: true,
       subtree: true,
       characterData: true,
       attributes: true,
       attributeFilter: [...TRANSLATABLE_ATTRIBUTES],
     });
-    return () => observer.disconnect();
+
+    return () => {
+      observer.disconnect();
+      pending.clear();
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
   }, [language]);
 
   return null;
