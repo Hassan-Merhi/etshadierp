@@ -26,7 +26,9 @@
     "GET /api/factory/customer-orders/:id/export-excel [requireAuth > <anonymous>]",
     "GET /api/factory/customer-orders/:id/export-pdf [requireAuth > <anonymous>]",
     "POST /api/admin/account-migration/execute [requireAuth > <anonymous> > <anonymous>]",
-    "POST /api/admin/account-migration/undo [requireAuth > <anonymous> > <anonymous>]"
+    "POST /api/admin/account-migration/undo [requireAuth > <anonymous> > <anonymous>]",
+    "GET /api/language-preference [requireAuth > <anonymous>]",
+    "PUT /api/language-preference [requireAuth > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
     "USE /api/factory/containers [postOffloadReconciliationMiddleware]",
@@ -44,8 +46,9 @@
       "tests/account-migration-control-reference-safety.test.ts",
       "tests/factory-bilingual-completion.test.ts",
       "tests/factory-bilingual-phase7-documents.test.ts",
-      "tests/factory-bilingual-phase8-surfaces.test.ts"
+      "tests/factory-bilingual-phase8-surfaces.test.ts",
+      "tests/application-language-integration-contract.test.ts"
     ],
-    "maxAdditionalTextAssertions": 178
+    "maxAdditionalTextAssertions": 186
   }
 }
