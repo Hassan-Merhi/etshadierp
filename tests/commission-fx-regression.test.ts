@@ -167,9 +167,14 @@ describe("computeCorrectContainerCost — commission FX isolation", () => {
   it("scenario 8: uses container commissionFxRateToUsd snapshot when no commission record", () => {
     const r = computeCorrectContainerCost(
       makeContainer({
-        containerCcy: "AUD", containerFxToUsd: 0.67, actualKg: 1000, ratePerKg: 0.5,
-        commissionAmount: 1000, commissionCcy: "EUR",
-        commissionFxRateToUsd: 1.18, commissionFxRateConfirmed: true,
+        containerCcy: "AUD",
+        containerFxToUsd: 0.67,
+        actualKg: 1000,
+        ratePerKg: 0.5,
+        commissionAmount: 1000,
+        commissionCcy: "EUR",
+        commissionFxRateToUsd: 1.18,
+        commissionFxRateConfirmed: true,
       }),
       [],
       null
@@ -210,11 +215,13 @@ describe("computeCorrectContainerCost — commission FX isolation", () => {
     const comm = makeCommRec({ ccy: "EUR", fxToUsd: 1.18, confirmed: true, total: 1000 });
     const r1 = computeCorrectContainerCost(
       makeContainer({ containerCcy: "AUD", containerFxToUsd: 0.67, actualKg: 1000, ratePerKg: 1 }),
-      [], comm
+      [],
+      comm
     );
     const r2 = computeCorrectContainerCost(
       makeContainer({ containerCcy: "AUD", containerFxToUsd: 0.72, actualKg: 1000, ratePerKg: 1 }),
-      [], comm
+      [],
+      comm
     );
     // commUsd = 1000×1.18=1180 in both; only base changes
     const commUsd1 = new Decimal(r1.totalUsd).minus(1000 * 1 * 0.67);

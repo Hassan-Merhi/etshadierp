@@ -78,14 +78,19 @@ async function makeContainer(opts: {
 async function cleanupFactoryTables(companyId: number) {
   await pool.query(`DELETE FROM factory_container_receipts WHERE company_id = $1`, [companyId]);
   await pool.query(`DELETE FROM factory_daybook_entries WHERE company_id = $1`, [companyId]);
-  await pool.query(`DELETE FROM factory_mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM factory_mix_batches WHERE company_id = $1)`, [companyId]);
+  await pool.query(
+    `DELETE FROM factory_mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM factory_mix_batches WHERE company_id = $1)`,
+    [companyId]
+  );
   await pool.query(`DELETE FROM factory_mix_batches WHERE company_id = $1`, [companyId]);
   await pool.query(`DELETE FROM factory_raw_stock WHERE company_id = $1`, [companyId]);
   await pool.query(`DELETE FROM factory_offload_additional_charges WHERE company_id = $1`, [companyId]);
   await pool.query(`DELETE FROM factory_container_commissions WHERE company_id = $1`, [companyId]);
   await pool.query(`DELETE FROM factory_containers WHERE company_id = $1`, [companyId]);
   await pool.query(`DELETE FROM factory_suppliers WHERE company_id = $1`, [companyId]);
-  await pool.query(`DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`, [companyId]);
+  await pool.query(`DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`, [
+    companyId,
+  ]);
   await pool.query(`DELETE FROM vouchers WHERE company_id = $1`, [companyId]);
 }
 
@@ -96,7 +101,9 @@ beforeAll(async () => {
   await db.update(schema.companies).set({ companyType: "factory" }).where(eq(schema.companies.id, ctx.companyId));
 
   agent = request.agent(ctx.app);
-  const loginRes = await agent.post("/api/auth/login").send({ username: `${TEST_PREFIX}_testuser`, password: "testpassword123" });
+  const loginRes = await agent
+    .post("/api/auth/login")
+    .send({ username: `${TEST_PREFIX}_testuser`, password: "testpassword123" });
   if (loginRes.status !== 200) throw new Error(`Login failed: ${JSON.stringify(loginRes.body)}`);
   await agent.post("/api/auth/set-company").send({ companyId: ctx.companyId });
 
@@ -117,13 +124,18 @@ beforeEach(async () => {
   // Clean between tests
   await pool.query(`DELETE FROM factory_container_receipts WHERE company_id = $1`, [ctx.companyId]);
   await pool.query(`DELETE FROM factory_daybook_entries WHERE company_id = $1`, [ctx.companyId]);
-  await pool.query(`DELETE FROM factory_mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM factory_mix_batches WHERE company_id = $1)`, [ctx.companyId]);
+  await pool.query(
+    `DELETE FROM factory_mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM factory_mix_batches WHERE company_id = $1)`,
+    [ctx.companyId]
+  );
   await pool.query(`DELETE FROM factory_mix_batches WHERE company_id = $1`, [ctx.companyId]);
   await pool.query(`DELETE FROM factory_raw_stock WHERE company_id = $1`, [ctx.companyId]);
   await pool.query(`DELETE FROM factory_offload_additional_charges WHERE company_id = $1`, [ctx.companyId]);
   await pool.query(`DELETE FROM factory_container_commissions WHERE company_id = $1`, [ctx.companyId]);
   await pool.query(`DELETE FROM factory_containers WHERE company_id = $1`, [ctx.companyId]);
-  await pool.query(`DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`, [ctx.companyId]);
+  await pool.query(`DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`, [
+    ctx.companyId,
+  ]);
   await pool.query(`DELETE FROM vouchers WHERE company_id = $1`, [ctx.companyId]);
 });
 
@@ -169,9 +181,24 @@ describe("computeCorrectContainerCost — fixed total value rule", () => {
 
   it("changes the rate with received weight while preserving the same fixed total value", async () => {
     const base = { totalKg: "20000", ratePerKg: "0.460000", freight: "900" };
-    const container5k = await makeContainer({ containerNumber: `${TEST_PREFIX}-COMP3a`, ...base, actualReceivedKg: "5000", status: "PARTIALLY_RECEIVED" });
-    const container10k = await makeContainer({ containerNumber: `${TEST_PREFIX}-COMP3b`, ...base, actualReceivedKg: "10000", status: "PARTIALLY_RECEIVED" });
-    const container20k = await makeContainer({ containerNumber: `${TEST_PREFIX}-COMP3c`, ...base, actualReceivedKg: "20000", status: "OFFLOADED" });
+    const container5k = await makeContainer({
+      containerNumber: `${TEST_PREFIX}-COMP3a`,
+      ...base,
+      actualReceivedKg: "5000",
+      status: "PARTIALLY_RECEIVED",
+    });
+    const container10k = await makeContainer({
+      containerNumber: `${TEST_PREFIX}-COMP3b`,
+      ...base,
+      actualReceivedKg: "10000",
+      status: "PARTIALLY_RECEIVED",
+    });
+    const container20k = await makeContainer({
+      containerNumber: `${TEST_PREFIX}-COMP3c`,
+      ...base,
+      actualReceivedKg: "20000",
+      status: "OFFLOADED",
+    });
 
     const r5k = computeCorrectContainerCost(container5k as any, [], null);
     const r10k = computeCorrectContainerCost(container10k as any, [], null);
@@ -231,17 +258,15 @@ describe("POST /api/factory/raw-stock/offload — multi-receipt flow", () => {
   it("first partial receipt: fixed total divided by actual weight, status PARTIALLY_RECEIVED", async () => {
     const container = await makeContainer({ containerNumber: `${TEST_PREFIX}-MR1`, totalKg: "20000" });
 
-    const res = await agent
-      .post("/api/factory/raw-stock/offload")
-      .send({
-        containerId: String(container.id),
-        receivedKg: "10000",
-        costPerKg: "0.46",
-        currencyCode: "USD",
-        fxRateToUsd: "1",
-        freight: "900",
-        offloadDate: "2026-07-17",
-      });
+    const res = await agent.post("/api/factory/raw-stock/offload").send({
+      containerId: String(container.id),
+      receivedKg: "10000",
+      costPerKg: "0.46",
+      currencyCode: "USD",
+      fxRateToUsd: "1",
+      freight: "900",
+      offloadDate: "2026-07-17",
+    });
 
     expect(res.status).toBe(200);
 
@@ -255,7 +280,9 @@ describe("POST /api/factory/raw-stock/offload — multi-receipt flow", () => {
     const rawStocks = await db
       .select()
       .from(schema.factoryRawStock)
-      .where(and(eq(schema.factoryRawStock.companyId, ctx.companyId), eq(schema.factoryRawStock.containerId, container.id)));
+      .where(
+        and(eq(schema.factoryRawStock.companyId, ctx.companyId), eq(schema.factoryRawStock.containerId, container.id))
+      );
     expect(rawStocks).toHaveLength(1);
     const fixedTotal = 20000 * 0.46 + 900;
     const expectedRate = fixedTotal / 10000;
@@ -267,9 +294,15 @@ describe("POST /api/factory/raw-stock/offload — multi-receipt flow", () => {
   it("second receipt: accepted, receivedKg updated, daybook NOT doubled", async () => {
     const container = await makeContainer({ containerNumber: `${TEST_PREFIX}-MR2`, totalKg: "20000" });
 
-    const res1 = await agent
-      .post("/api/factory/raw-stock/offload")
-      .send({ containerId: String(container.id), receivedKg: "10000", costPerKg: "0.46", currencyCode: "USD", fxRateToUsd: "1", freight: "900", offloadDate: "2026-07-17" });
+    const res1 = await agent.post("/api/factory/raw-stock/offload").send({
+      containerId: String(container.id),
+      receivedKg: "10000",
+      costPerKg: "0.46",
+      currencyCode: "USD",
+      fxRateToUsd: "1",
+      freight: "900",
+      offloadDate: "2026-07-17",
+    });
     expect(res1.status).toBe(200);
 
     const { rows: dbRows1 } = await pool.query(
@@ -278,9 +311,15 @@ describe("POST /api/factory/raw-stock/offload — multi-receipt flow", () => {
     );
     const daybookCount1 = parseInt(dbRows1[0].n);
 
-    const res2 = await agent
-      .post("/api/factory/raw-stock/offload")
-      .send({ containerId: String(container.id), receivedKg: "8000", costPerKg: "0.46", currencyCode: "USD", fxRateToUsd: "1", freight: "900", offloadDate: "2026-07-18" });
+    const res2 = await agent.post("/api/factory/raw-stock/offload").send({
+      containerId: String(container.id),
+      receivedKg: "8000",
+      costPerKg: "0.46",
+      currencyCode: "USD",
+      fxRateToUsd: "1",
+      freight: "900",
+      offloadDate: "2026-07-18",
+    });
     expect(res2.status).toBe(200);
 
     const { rows: dbRows2 } = await pool.query(
@@ -293,25 +332,47 @@ describe("POST /api/factory/raw-stock/offload — multi-receipt flow", () => {
     const rawStocks = await db
       .select()
       .from(schema.factoryRawStock)
-      .where(and(eq(schema.factoryRawStock.companyId, ctx.companyId), eq(schema.factoryRawStock.containerId, container.id)));
+      .where(
+        and(eq(schema.factoryRawStock.companyId, ctx.companyId), eq(schema.factoryRawStock.containerId, container.id))
+      );
     expect(rawStocks).toHaveLength(1);
     expect(parseFloat(rawStocks[0].receivedKg!)).toBeCloseTo(18000, 1);
 
-    const [updated] = await db.select().from(schema.factoryContainers).where(eq(schema.factoryContainers.id, container.id));
+    const [updated] = await db
+      .select()
+      .from(schema.factoryContainers)
+      .where(eq(schema.factoryContainers.id, container.id));
     expect(updated.status).toBe("PARTIALLY_RECEIVED");
   });
 
   it("final receipt: container transitions to OFFLOADED", async () => {
     const container = await makeContainer({ containerNumber: `${TEST_PREFIX}-MR3`, totalKg: "20000" });
 
-    await agent.post("/api/factory/raw-stock/offload")
-      .send({ containerId: String(container.id), receivedKg: "10000", costPerKg: "0.46", currencyCode: "USD", fxRateToUsd: "1", freight: "900", offloadDate: "2026-07-17" });
+    await agent.post("/api/factory/raw-stock/offload").send({
+      containerId: String(container.id),
+      receivedKg: "10000",
+      costPerKg: "0.46",
+      currencyCode: "USD",
+      fxRateToUsd: "1",
+      freight: "900",
+      offloadDate: "2026-07-17",
+    });
 
-    const res = await agent.post("/api/factory/raw-stock/offload")
-      .send({ containerId: String(container.id), receivedKg: "10000", costPerKg: "0.46", currencyCode: "USD", fxRateToUsd: "1", freight: "0", offloadDate: "2026-07-18" });
+    const res = await agent.post("/api/factory/raw-stock/offload").send({
+      containerId: String(container.id),
+      receivedKg: "10000",
+      costPerKg: "0.46",
+      currencyCode: "USD",
+      fxRateToUsd: "1",
+      freight: "0",
+      offloadDate: "2026-07-18",
+    });
     expect(res.status).toBe(200);
 
-    const [updated] = await db.select().from(schema.factoryContainers).where(eq(schema.factoryContainers.id, container.id));
+    const [updated] = await db
+      .select()
+      .from(schema.factoryContainers)
+      .where(eq(schema.factoryContainers.id, container.id));
     expect(updated.status).toBe("OFFLOADED");
     expect(parseFloat(updated.actualReceivedKg!)).toBeCloseTo(20000, 1);
   });
@@ -319,22 +380,50 @@ describe("POST /api/factory/raw-stock/offload — multi-receipt flow", () => {
   it("OFFLOADED container: second receipt returns 400", async () => {
     const container = await makeContainer({ containerNumber: `${TEST_PREFIX}-MR4`, totalKg: "20000" });
 
-    await agent.post("/api/factory/raw-stock/offload")
-      .send({ containerId: String(container.id), receivedKg: "20000", costPerKg: "0.46", currencyCode: "USD", fxRateToUsd: "1", freight: "900", offloadDate: "2026-07-17" });
+    await agent.post("/api/factory/raw-stock/offload").send({
+      containerId: String(container.id),
+      receivedKg: "20000",
+      costPerKg: "0.46",
+      currencyCode: "USD",
+      fxRateToUsd: "1",
+      freight: "900",
+      offloadDate: "2026-07-17",
+    });
 
-    const res = await agent.post("/api/factory/raw-stock/offload")
-      .send({ containerId: String(container.id), receivedKg: "5000", costPerKg: "0.46", currencyCode: "USD", fxRateToUsd: "1", freight: "0", offloadDate: "2026-07-18" });
+    const res = await agent.post("/api/factory/raw-stock/offload").send({
+      containerId: String(container.id),
+      receivedKg: "5000",
+      costPerKg: "0.46",
+      currencyCode: "USD",
+      fxRateToUsd: "1",
+      freight: "0",
+      offloadDate: "2026-07-18",
+    });
     expect(res.status).toBe(400);
   });
 
   it("excess-kg guard: receipt exceeding remaining is rejected", async () => {
     const container = await makeContainer({ containerNumber: `${TEST_PREFIX}-MR5`, totalKg: "20000" });
 
-    await agent.post("/api/factory/raw-stock/offload")
-      .send({ containerId: String(container.id), receivedKg: "10000", costPerKg: "0.46", currencyCode: "USD", fxRateToUsd: "1", freight: "900", offloadDate: "2026-07-17" });
+    await agent.post("/api/factory/raw-stock/offload").send({
+      containerId: String(container.id),
+      receivedKg: "10000",
+      costPerKg: "0.46",
+      currencyCode: "USD",
+      fxRateToUsd: "1",
+      freight: "900",
+      offloadDate: "2026-07-17",
+    });
 
-    const res = await agent.post("/api/factory/raw-stock/offload")
-      .send({ containerId: String(container.id), receivedKg: "11000", costPerKg: "0.46", currencyCode: "USD", fxRateToUsd: "1", freight: "0", offloadDate: "2026-07-18" });
+    const res = await agent.post("/api/factory/raw-stock/offload").send({
+      containerId: String(container.id),
+      receivedKg: "11000",
+      costPerKg: "0.46",
+      currencyCode: "USD",
+      fxRateToUsd: "1",
+      freight: "0",
+      offloadDate: "2026-07-18",
+    });
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/remaining/i);
   });
@@ -348,16 +437,44 @@ describe("POST /api/factory/raw-stock/offload — multi-receipt flow", () => {
     const containerFull = await makeContainer({ containerNumber: `${TEST_PREFIX}-RATE-FULL`, totalKg: declaredKg });
     const containerPartial = await makeContainer({ containerNumber: `${TEST_PREFIX}-RATE-PART`, totalKg: declaredKg });
 
-    await agent.post("/api/factory/raw-stock/offload")
-      .send({ containerId: String(containerFull.id), receivedKg: "20000", costPerKg: ratePerKg, currencyCode: "USD", fxRateToUsd: "1", freight, offloadDate: "2026-07-17" });
+    await agent.post("/api/factory/raw-stock/offload").send({
+      containerId: String(containerFull.id),
+      receivedKg: "20000",
+      costPerKg: ratePerKg,
+      currencyCode: "USD",
+      fxRateToUsd: "1",
+      freight,
+      offloadDate: "2026-07-17",
+    });
 
-    await agent.post("/api/factory/raw-stock/offload")
-      .send({ containerId: String(containerPartial.id), receivedKg: "10000", costPerKg: ratePerKg, currencyCode: "USD", fxRateToUsd: "1", freight, offloadDate: "2026-07-17" });
+    await agent.post("/api/factory/raw-stock/offload").send({
+      containerId: String(containerPartial.id),
+      receivedKg: "10000",
+      costPerKg: ratePerKg,
+      currencyCode: "USD",
+      fxRateToUsd: "1",
+      freight,
+      offloadDate: "2026-07-17",
+    });
 
-    const [fullRawStock] = await db.select().from(schema.factoryRawStock)
-      .where(and(eq(schema.factoryRawStock.companyId, ctx.companyId), eq(schema.factoryRawStock.containerId, containerFull.id)));
-    const [partialRawStock] = await db.select().from(schema.factoryRawStock)
-      .where(and(eq(schema.factoryRawStock.companyId, ctx.companyId), eq(schema.factoryRawStock.containerId, containerPartial.id)));
+    const [fullRawStock] = await db
+      .select()
+      .from(schema.factoryRawStock)
+      .where(
+        and(
+          eq(schema.factoryRawStock.companyId, ctx.companyId),
+          eq(schema.factoryRawStock.containerId, containerFull.id)
+        )
+      );
+    const [partialRawStock] = await db
+      .select()
+      .from(schema.factoryRawStock)
+      .where(
+        and(
+          eq(schema.factoryRawStock.companyId, ctx.companyId),
+          eq(schema.factoryRawStock.containerId, containerPartial.id)
+        )
+      );
 
     const fullRate = parseFloat(fullRawStock.costPerKg!);
     const partialRate = parseFloat(partialRawStock.costPerKg!);
@@ -371,8 +488,15 @@ describe("POST /api/factory/raw-stock/offload — multi-receipt flow", () => {
   it("factory_container_receipts row is inserted on first and subsequent receipts", async () => {
     const container = await makeContainer({ containerNumber: `${TEST_PREFIX}-RECEIPTS`, totalKg: "20000" });
 
-    await agent.post("/api/factory/raw-stock/offload")
-      .send({ containerId: String(container.id), receivedKg: "12000", costPerKg: "0.46", currencyCode: "USD", fxRateToUsd: "1", freight: "900", offloadDate: "2026-07-17" });
+    await agent.post("/api/factory/raw-stock/offload").send({
+      containerId: String(container.id),
+      receivedKg: "12000",
+      costPerKg: "0.46",
+      currencyCode: "USD",
+      fxRateToUsd: "1",
+      freight: "900",
+      offloadDate: "2026-07-17",
+    });
 
     const { rows: rows1 } = await pool.query(
       `SELECT * FROM factory_container_receipts WHERE company_id = $1 AND container_id = $2 ORDER BY id`,
@@ -383,8 +507,15 @@ describe("POST /api/factory/raw-stock/offload — multi-receipt flow", () => {
     expect(parseFloat(rows1[0].cumulative_received_kg)).toBeCloseTo(12000, 1);
     expect(parseFloat(rows1[0].fixed_cost_per_kg)).toBeGreaterThan(0);
 
-    await agent.post("/api/factory/raw-stock/offload")
-      .send({ containerId: String(container.id), receivedKg: "8000", costPerKg: "0.46", currencyCode: "USD", fxRateToUsd: "1", freight: "0", offloadDate: "2026-07-18" });
+    await agent.post("/api/factory/raw-stock/offload").send({
+      containerId: String(container.id),
+      receivedKg: "8000",
+      costPerKg: "0.46",
+      currencyCode: "USD",
+      fxRateToUsd: "1",
+      freight: "0",
+      offloadDate: "2026-07-18",
+    });
 
     const { rows: rows2 } = await pool.query(
       `SELECT * FROM factory_container_receipts WHERE company_id = $1 AND container_id = $2 ORDER BY id`,

@@ -2,12 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { pool } from "../server/db";
 import { runRentalReconciliation } from "../server/services/rental/rentalReconciliationService";
-import {
-  cleanupTestData,
-  closeTestServer,
-  seedTestData,
-  type TestContext,
-} from "./setup";
+import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from "./setup";
 
 const TEST_PREFIX = "rentalrecon";
 
@@ -39,18 +34,13 @@ function pastDateStr(daysAgo = 5): string {
 async function resetRentalActivity(): Promise<void> {
   await q("DELETE FROM property_payments WHERE contract_id = $1", [testContractId]);
   await q("DELETE FROM property_monthly_ledger WHERE contract_id = $1", [testContractId]);
-  await q(
-    "DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)",
-    [ctx.companyId],
-  );
+  await q("DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)", [
+    ctx.companyId,
+  ]);
   await q("DELETE FROM vouchers WHERE company_id = $1", [ctx.companyId]);
 }
 
-async function createPayment(input: {
-  amount?: string;
-  paymentDate?: string;
-  scheduleFuturePayment?: boolean;
-}) {
+async function createPayment(input: { amount?: string; paymentDate?: string; scheduleFuturePayment?: boolean }) {
   return agent.post("/api/erp/rental/payments").send({
     contractId: testContractId,
     cashAccountId: ctx.cashAccountId,
@@ -73,9 +63,7 @@ beforeAll(async () => {
   }
   const setCompany = await agent.post("/api/auth/set-company").send({ companyId: ctx.companyId });
   if (setCompany.status !== 200) {
-    throw new Error(
-      `Set company failed: ${setCompany.status} ${JSON.stringify(setCompany.body)}`,
-    );
+    throw new Error(`Set company failed: ${setCompany.status} ${JSON.stringify(setCompany.body)}`);
   }
 
   const [unit] = await q(
@@ -83,7 +71,7 @@ beforeAll(async () => {
        (company_id, module, unit_type, unit_number, location_group, active)
      VALUES ($1, 'ERP', 'SHOP', 'T-101', 'Test Group', true)
      RETURNING id`,
-    [ctx.companyId],
+    [ctx.companyId]
   );
   testUnitId = unit.id;
 
@@ -95,7 +83,7 @@ beforeAll(async () => {
        (company_id, module, unit_id, tenant_name, rental_amount, start_date, status, currency)
      VALUES ($1, 'ERP', $2, 'Test Tenant', '500.00', $3, 'ACTIVE', 'USD')
      RETURNING id`,
-    [ctx.companyId, testUnitId, startDate.toISOString().slice(0, 10)],
+    [ctx.companyId, testUnitId, startDate.toISOString().slice(0, 10)]
   );
   testContractId = contract.id;
 }, 60000);
@@ -123,7 +111,7 @@ describe("Rental payment accounting and reconciliation", () => {
        WHERE contract_id = $1
        ORDER BY id DESC
        LIMIT 1`,
-      [testContractId],
+      [testContractId]
     );
     expect(payment.posting_status).toBe("POSTED");
     expect(payment.voucher_id).toBeTruthy();
@@ -142,7 +130,7 @@ describe("Rental payment accounting and reconciliation", () => {
       `SELECT posting_status, voucher_id
        FROM property_payments
        WHERE contract_id = $1`,
-      [testContractId],
+      [testContractId]
     );
     expect(payments.length).toBeGreaterThan(0);
     for (const payment of payments) {
@@ -172,10 +160,7 @@ describe("Rental payment accounting and reconciliation", () => {
     expect(res.status).toBe(200);
     expect(res.body.results[0]?.scheduled).toBeFalsy();
 
-    const payments = await q(
-      "SELECT posting_status FROM property_payments WHERE contract_id = $1",
-      [testContractId],
-    );
+    const payments = await q("SELECT posting_status FROM property_payments WHERE contract_id = $1", [testContractId]);
     expect(payments.length).toBeGreaterThan(0);
     payments.forEach((payment: any) => expect(payment.posting_status).toBe("POSTED"));
   });
@@ -206,7 +191,7 @@ describe("Rental payment accounting and reconciliation", () => {
          ($1, 'ERP', $2, $3, '500', $5,
           EXTRACT(YEAR FROM NOW())::int, EXTRACT(MONTH FROM NOW())::int,
           'SCHEDULED', 'PG-TEST-S', NULL)`,
-      [ctx.companyId, testContractId, testUnitId, todayStr(), futureDateStr(10)],
+      [ctx.companyId, testContractId, testUnitId, todayStr(), futureDateStr(10)]
     );
 
     const all = await agent.get("/api/erp/rental/payments");
@@ -231,7 +216,7 @@ describe("Rental payment accounting and reconciliation", () => {
        FROM property_payments
        WHERE contract_id = $1
        ORDER BY for_year, for_month`,
-      [testContractId],
+      [testContractId]
     );
     expect(payments.length).toBeGreaterThanOrEqual(1);
     payments.forEach((payment: any) => expect(payment.posting_status).toBe("POSTED"));
@@ -254,7 +239,7 @@ describe("Rental payment accounting and reconciliation", () => {
        VALUES ($1, 'ERP', $2, $3, '500', $4,
                EXTRACT(YEAR FROM NOW())::int, EXTRACT(MONTH FROM NOW())::int,
                'POSTED', 'PG-BAD', NULL)`,
-      [ctx.companyId, testContractId, testUnitId, futureDateStr(5)],
+      [ctx.companyId, testContractId, testUnitId, futureDateStr(5)]
     );
 
     const result = await runRentalReconciliation(ctx.companyId, "ERP", todayStr());
@@ -269,7 +254,7 @@ describe("Rental payment accounting and reconciliation", () => {
        VALUES ($1, 'ERP', $2, $3, $4, $5, '500', '9999.00')
        ON CONFLICT (contract_id, year, month)
        DO UPDATE SET paid_amount = '9999.00'`,
-      [ctx.companyId, testContractId, testUnitId, now.getUTCFullYear(), now.getUTCMonth() + 1],
+      [ctx.companyId, testContractId, testUnitId, now.getUTCFullYear(), now.getUTCMonth() + 1]
     );
 
     const result = await runRentalReconciliation(ctx.companyId, "ERP", todayStr());
@@ -284,7 +269,7 @@ describe("Rental payment accounting and reconciliation", () => {
        VALUES ($1, 'ERP', $2, $3, '500', $4,
                EXTRACT(YEAR FROM NOW())::int, EXTRACT(MONTH FROM NOW())::int,
                'SCHEDULED', 'PG-OVERDUE')`,
-      [ctx.companyId, testContractId, testUnitId, pastDateStr(1)],
+      [ctx.companyId, testContractId, testUnitId, pastDateStr(1)]
     );
 
     const result = await runRentalReconciliation(ctx.companyId, "ERP", todayStr());
@@ -303,10 +288,7 @@ describe("Rental payment accounting and reconciliation", () => {
   it("creates billing-day-aware monthly ledger rows", async () => {
     const { ensureMonthlyLedgerRows } = await import("../server/routes/rental/shared");
     await ensureMonthlyLedgerRows(testContractId, todayStr());
-    const rows = await q(
-      "SELECT year, month FROM property_monthly_ledger WHERE contract_id = $1",
-      [testContractId],
-    );
+    const rows = await q("SELECT year, month FROM property_monthly_ledger WHERE contract_id = $1", [testContractId]);
     expect(rows.length).toBeGreaterThan(0);
   });
 

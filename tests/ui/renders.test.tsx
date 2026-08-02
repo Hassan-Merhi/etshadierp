@@ -232,9 +232,7 @@ describe("FactoryDaybook page", () => {
 // takes props, so it is exercised through the real prop-less entry point.
 describe("PropertiesRentalShops page", () => {
   it("renders the page title heading", async () => {
-    const { default: PropertiesRentalShops } = await import(
-      "@/pages/properties/PropertiesRentalShops"
-    );
+    const { default: PropertiesRentalShops } = await import("@/pages/properties/PropertiesRentalShops");
     renderWithProviders(<PropertiesRentalShops />);
     const heading = await screen.findByTestId("text-page-title");
     expect(heading).toHaveTextContent("Shop Rentals");
@@ -250,4 +248,3 @@ describe("StockTransferOrder page", () => {
     expect(await screen.findByTestId("text-page-title")).toBeInTheDocument();
   });
 });
-

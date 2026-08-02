@@ -306,7 +306,9 @@ describe("3. Supplier balance-by-currency reconciliation", () => {
     expect(row!.netBalanceUsd).toBeCloseTo(0, 4);
     expect(row!.hasUnresolvedFx).toBe(true);
 
-    const unresolvedRow = recon.unresolvedFxRows.find((r) => r.supplierId === gbpSupplier.id && r.rowId === container.id);
+    const unresolvedRow = recon.unresolvedFxRows.find(
+      (r) => r.supplierId === gbpSupplier.id && r.rowId === container.id
+    );
     expect(unresolvedRow).toBeTruthy();
     expect(unresolvedRow!.currencyCode).toBe("GBP");
     expect(unresolvedRow!.source).toBe("container");
