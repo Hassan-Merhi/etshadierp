@@ -11,6 +11,7 @@ import { FactorySidebar } from "@/components/FactorySidebar";
 import { FactoryRoutes } from "@/components/FactoryRoutes";
 import { FactoryCatalogLanguageSwitch } from "@/components/FactoryCatalogLanguageSwitch";
 import { FactoryBilingualDocumentActions } from "@/components/FactoryBilingualDocumentActions";
+import { FactoryFrenchCatalogManager } from "@/components/FactoryFrenchCatalogManager";
 import { HistoricalReplaySafetyPanel } from "@/components/HistoricalReplaySafetyPanel";
 import { HistoricalReplayNetEffectPanel } from "@/components/HistoricalReplayNetEffectPanel";
 import { AppTopBar } from "@/components/AppTopBar";
@@ -67,6 +68,7 @@ export function FactoryShell({ user, myAccess, factoryDefaultPage, handleLogout,
             <main id="main-content" tabIndex={-1} aria-label={isFactoryPosRoute ? "Factory point of sale workspace" : "Factory and inventory workspace"} data-pos-workspace={isFactoryPosRoute ? "true" : undefined} className={`flex-1 overflow-y-auto overscroll-y-contain p-3 outline-none sm:p-6 ${isFactoryPosRoute ? factoryPosWorkspaceClasses : ""}`}>
               <div className="w-full min-w-0 max-w-full [&_form]:min-w-0 [&_table]:w-full [&_[role=table]]:w-full [&_.overflow-x-auto]:overscroll-x-contain">
                 <FactoryCatalogLanguageSwitch />
+                <FactoryFrenchCatalogManager />
                 <FactoryBilingualDocumentActions />
                 <ErrorBoundary resetKey={`${currentLocation}:historical-replay-preview`}>
                   {isRawStockRecalculateRoute && <><HistoricalReplaySafetyPanel /><HistoricalReplayNetEffectPanel /></>}
