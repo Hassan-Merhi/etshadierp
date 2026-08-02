@@ -57,11 +57,7 @@ async function populateAfterSuccessfulWrite(req: Request): Promise<void> {
   });
 }
 
-function factoryBilingualSnapshotWriteMiddleware(
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void {
+function factoryBilingualSnapshotWriteMiddleware(req: Request, res: Response, next: NextFunction): void {
   if (!shouldPopulateAfterWrite(req)) {
     next();
     return;

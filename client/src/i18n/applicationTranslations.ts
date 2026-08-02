@@ -50,10 +50,7 @@ export const applicationTranslations = {
 
 export type ApplicationTranslationKey = keyof typeof applicationTranslations;
 
-export function translateApplicationText(
-  key: ApplicationTranslationKey,
-  language: ApplicationLanguage,
-): string {
+export function translateApplicationText(key: ApplicationTranslationKey, language: ApplicationLanguage): string {
   const entry = applicationTranslations[key];
   return entry[language] || entry.en || key;
 }

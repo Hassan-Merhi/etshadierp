@@ -205,9 +205,10 @@ export function resolveFactorySnapshotProductName(input: FactorySnapshotResoluti
         ? input.snapshot.productNameFr
         : input.snapshot.productNameEn
   );
-  const snapshotOpposite = cleanOptionalText(input.snapshot.productNameEn)
-    ?? cleanOptionalText(input.snapshot.productNameAr)
-    ?? cleanOptionalText(input.snapshot.productNameFr);
+  const snapshotOpposite =
+    cleanOptionalText(input.snapshot.productNameEn) ??
+    cleanOptionalText(input.snapshot.productNameAr) ??
+    cleanOptionalText(input.snapshot.productNameFr);
   if (snapshotRequested) return snapshotRequested;
   if (snapshotOpposite) return snapshotOpposite;
   if (input.catalog) return resolveFactoryProductName(input.catalog, input.language);

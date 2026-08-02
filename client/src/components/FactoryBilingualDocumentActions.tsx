@@ -82,22 +82,13 @@ export function FactoryBilingualDocumentActions() {
 
           <DropdownMenuSeparator />
           <DropdownMenuLabel dir="rtl">العربية</DropdownMenuLabel>
-          <DropdownMenuItem
-            dir="rtl"
-            onClick={() => download("export-pdf?lang=ar", "invoice-ar.pdf")}
-          >
+          <DropdownMenuItem dir="rtl" onClick={() => download("export-pdf?lang=ar", "invoice-ar.pdf")}>
             <FileDown className="h-4 w-4" /> فاتورة PDF عربية
           </DropdownMenuItem>
-          <DropdownMenuItem
-            dir="rtl"
-            onClick={() => download("export-excel?lang=ar", "invoice-ar.xlsx")}
-          >
+          <DropdownMenuItem dir="rtl" onClick={() => download("export-excel?lang=ar", "invoice-ar.xlsx")}>
             <FileSpreadsheet className="h-4 w-4" /> فاتورة Excel عربية
           </DropdownMenuItem>
-          <DropdownMenuItem
-            dir="rtl"
-            onClick={() => download("pending-export?lang=ar", "loading-ar.xlsx")}
-          >
+          <DropdownMenuItem dir="rtl" onClick={() => download("pending-export?lang=ar", "loading-ar.xlsx")}>
             <PackageCheck className="h-4 w-4" /> قائمة تحميل عربية
           </DropdownMenuItem>
 

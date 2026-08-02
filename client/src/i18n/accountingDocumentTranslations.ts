@@ -63,7 +63,11 @@ const entries: Entry[] = [
   { en: "File not found", ar: "الملف غير موجود", fr: "Fichier introuvable" },
   { en: "Invalid date", ar: "تاريخ غير صالح", fr: "Date invalide" },
   { en: "Invalid amount", ar: "مبلغ غير صالح", fr: "Montant invalide" },
-  { en: "Please complete all required fields", ar: "يرجى إكمال جميع الحقول المطلوبة", fr: "Veuillez remplir tous les champs obligatoires" },
+  {
+    en: "Please complete all required fields",
+    ar: "يرجى إكمال جميع الحقول المطلوبة",
+    fr: "Veuillez remplir tous les champs obligatoires",
+  },
   { en: "Changes saved successfully", ar: "تم حفظ التغييرات بنجاح", fr: "Modifications enregistrées" },
   { en: "Document generated successfully", ar: "تم إنشاء المستند بنجاح", fr: "Document généré avec succès" },
 ];

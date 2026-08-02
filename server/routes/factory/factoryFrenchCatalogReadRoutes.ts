@@ -40,8 +40,8 @@ export function registerFactoryFrenchCatalogReadRoutes(app: Express): void {
           or(
             ilike(factoryCategories.name, `%${query}%`),
             ilike(factoryCategories.nameAr, `%${query}%`),
-            ilike(factoryCategories.nameFr, `%${query}%`),
-          )!,
+            ilike(factoryCategories.nameFr, `%${query}%`)
+          )!
         );
       }
       const rows = await db
@@ -55,7 +55,7 @@ export function registerFactoryFrenchCatalogReadRoutes(app: Express): void {
           nameEn: category.name,
           displayName: resolveFactoryCategoryName(category, "fr"),
           language: "fr",
-        })),
+        }))
       );
     } catch (error: unknown) {
       return res.status(500).json({ message: getErrorMessage(error) });
@@ -81,8 +81,8 @@ export function registerFactoryFrenchCatalogReadRoutes(app: Express): void {
             ilike(factoryBaleProducts.descriptionFr, `%${query}%`),
             ilike(factoryCategories.name, `%${query}%`),
             ilike(factoryCategories.nameAr, `%${query}%`),
-            ilike(factoryCategories.nameFr, `%${query}%`),
-          )!,
+            ilike(factoryCategories.nameFr, `%${query}%`)
+          )!
         );
       }
       const rows = await db
@@ -98,8 +98,8 @@ export function registerFactoryFrenchCatalogReadRoutes(app: Express): void {
           and(
             eq(factoryCategories.id, factoryBaleProducts.categoryId),
             eq(factoryCategories.companyId, companyId),
-            isNull(factoryCategories.deletedAt),
-          ),
+            isNull(factoryCategories.deletedAt)
+          )
         )
         .where(and(...filters))
         .orderBy(asc(factoryBaleProducts.id));
@@ -108,7 +108,7 @@ export function registerFactoryFrenchCatalogReadRoutes(app: Express): void {
         rows.map(({ product, categoryName, categoryNameAr, categoryNameFr }) => {
           const resolved = resolveFactoryProductLanguage(
             { ...product, categoryName, categoryNameAr, categoryNameFr },
-            "fr",
+            "fr"
           );
           return {
             ...product,
@@ -122,7 +122,7 @@ export function registerFactoryFrenchCatalogReadRoutes(app: Express): void {
             displayCategoryName: resolved.categoryName,
             language: "fr",
           };
-        }),
+        })
       );
     } catch (error: unknown) {
       return res.status(500).json({ message: getErrorMessage(error) });
@@ -149,15 +149,15 @@ export function registerFactoryFrenchCatalogReadRoutes(app: Express): void {
           and(
             eq(factoryCategories.id, factoryBaleProducts.categoryId),
             eq(factoryCategories.companyId, companyId),
-            isNull(factoryCategories.deletedAt),
-          ),
+            isNull(factoryCategories.deletedAt)
+          )
         )
         .where(
           and(
             eq(factoryBaleProducts.id, id),
             eq(factoryBaleProducts.companyId, companyId),
-            isNull(factoryBaleProducts.deletedAt),
-          ),
+            isNull(factoryBaleProducts.deletedAt)
+          )
         )
         .limit(1);
       if (!row) return res.status(404).json({ message: "Product not found" });
@@ -168,7 +168,7 @@ export function registerFactoryFrenchCatalogReadRoutes(app: Express): void {
           categoryNameAr: row.categoryNameAr,
           categoryNameFr: row.categoryNameFr,
         },
-        "fr",
+        "fr"
       );
       return res.json({
         ...row.product,

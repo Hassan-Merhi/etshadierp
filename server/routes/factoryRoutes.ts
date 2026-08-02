@@ -144,11 +144,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
     }
   });
 
-  app.get(
-    "/api/factory/uploads/:folder/:filename",
-    requireAuth,
-    createContainerDocumentDownloadHandler(db)
-  );
+  app.get("/api/factory/uploads/:folder/:filename", requireAuth, createContainerDocumentDownloadHandler(db));
 
   registerFactoryDaybookPaginationRoutes(app);
   registerFactoryStockEntryHistoryPaginationRoutes(app);

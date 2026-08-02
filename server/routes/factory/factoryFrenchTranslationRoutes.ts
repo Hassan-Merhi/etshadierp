@@ -26,11 +26,13 @@ function normalizeCode(value: unknown): string {
 }
 
 async function ensureFrenchColumns() {
-  await db.execute(sql.raw(`
+  await db.execute(
+    sql.raw(`
     ALTER TABLE factory_categories ADD COLUMN IF NOT EXISTS name_fr VARCHAR(100);
     ALTER TABLE factory_bale_products ADD COLUMN IF NOT EXISTS name_fr TEXT;
     ALTER TABLE factory_bale_products ADD COLUMN IF NOT EXISTS description_fr TEXT;
-  `));
+  `)
+  );
 }
 
 export function registerFactoryFrenchTranslationRoutes(app: Express) {
@@ -159,7 +161,14 @@ export function registerFactoryFrenchTranslationRoutes(app: Express) {
       const sheet = workbook.worksheets[0];
       if (!sheet) return res.status(400).json({ message: "Workbook has no worksheet" });
       const headers = new Map<string, number>();
-      sheet.getRow(1).eachCell((cell, col) => headers.set(String(cell.value ?? "").trim().toLowerCase(), col));
+      sheet.getRow(1).eachCell((cell, col) =>
+        headers.set(
+          String(cell.value ?? "")
+            .trim()
+            .toLowerCase(),
+          col
+        )
+      );
       const articleCol = headers.get("article code / barcode") ?? headers.get("article code");
       const productCol = headers.get("french product name");
       const categoryCol = headers.get("french category");
@@ -192,9 +201,19 @@ export function registerFactoryFrenchTranslationRoutes(app: Express) {
       const byCode = new Map(catalog.rows.map((row: any) => [row.articleCode, row]));
       const preview = rows.map((row) => {
         const match: any = byCode.get(String(row.articleCode));
-        return { ...row, productId: match?.id ?? null, categoryId: match?.categoryId ?? null, status: match ? "ready" : "unknown" };
+        return {
+          ...row,
+          productId: match?.id ?? null,
+          categoryId: match?.categoryId ?? null,
+          status: match ? "ready" : "unknown",
+        };
       });
-      return res.json({ rows: preview, totalRows: preview.length, readyRows: preview.filter((row) => row.status === "ready").length, blocked: preview.some((row) => row.status !== "ready") });
+      return res.json({
+        rows: preview,
+        totalRows: preview.length,
+        readyRows: preview.filter((row) => row.status === "ready").length,
+        blocked: preview.some((row) => row.status !== "ready"),
+      });
     } catch (error: unknown) {
       return res.status(500).json({ message: getErrorMessage(error) });
     }
@@ -222,8 +241,14 @@ export function registerFactoryFrenchTranslationRoutes(app: Express) {
           const categoryId = Number((product.rows[0] as any)?.categoryId);
           if (!product.rows[0]) continue;
           updatedProducts += 1;
-          if (Number.isSafeInteger(categoryId) && categoryId > 0 && Object.prototype.hasOwnProperty.call(row, "categoryNameFr")) {
-            await tx.execute(sql`UPDATE factory_categories SET name_fr = ${clean(row.categoryNameFr)}, updated_at = NOW() WHERE id = ${categoryId} AND company_id = ${companyId}`);
+          if (
+            Number.isSafeInteger(categoryId) &&
+            categoryId > 0 &&
+            Object.prototype.hasOwnProperty.call(row, "categoryNameFr")
+          ) {
+            await tx.execute(
+              sql`UPDATE factory_categories SET name_fr = ${clean(row.categoryNameFr)}, updated_at = NOW() WHERE id = ${categoryId} AND company_id = ${companyId}`
+            );
             updatedCategories += 1;
           }
         }

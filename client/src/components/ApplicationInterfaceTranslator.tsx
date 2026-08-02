@@ -54,10 +54,7 @@ function isEligibleTextElement(element: Element): boolean {
   return element.matches(ELIGIBLE_TEXT_SELECTOR) || Boolean(element.closest(ELIGIBLE_TEXT_SELECTOR));
 }
 
-export function translateApprovedInterfaceText(
-  value: string,
-  language: ApplicationLanguage,
-): string | null {
+export function translateApprovedInterfaceText(value: string, language: ApplicationLanguage): string | null {
   return translateSharedInterfaceText(value, language) ?? translateAccountingDocumentText(value, language);
 }
 

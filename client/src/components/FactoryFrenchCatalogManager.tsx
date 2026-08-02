@@ -71,7 +71,11 @@ export function FactoryFrenchCatalogManager() {
       const params = new URLSearchParams({ q: query, status });
       setRows(await jsonRequest(`/api/factory/french-catalog?${params}`));
     } catch (error) {
-      toast({ title: "Unable to load French translations", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
+      toast({
+        title: "Unable to load French translations",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
@@ -107,7 +111,11 @@ export function FactoryFrenchCatalogManager() {
       setEditing(null);
       await loadRows();
     } catch (error) {
-      toast({ title: "Unable to save translation", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
+      toast({
+        title: "Unable to save translation",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
     }
   };
 
@@ -115,13 +123,21 @@ export function FactoryFrenchCatalogManager() {
     try {
       const form = new FormData();
       form.append("file", file);
-      const response = await fetch("/api/factory/french-catalog/import/preview", { method: "POST", credentials: "include", body: form });
+      const response = await fetch("/api/factory/french-catalog/import/preview", {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload?.message || "Unable to preview workbook");
       setPreviewRows(payload.rows ?? []);
       toast({ title: "Workbook preview ready", description: `${payload.readyRows ?? 0} rows are ready to apply.` });
     } catch (error) {
-      toast({ title: "Workbook preview failed", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
+      toast({
+        title: "Workbook preview failed",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
     }
   };
 
@@ -132,11 +148,18 @@ export function FactoryFrenchCatalogManager() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rows: readyPreviewRows }),
       });
-      toast({ title: "French translations imported", description: `${result.updatedProducts} products and ${result.updatedCategories} categories updated.` });
+      toast({
+        title: "French translations imported",
+        description: `${result.updatedProducts} products and ${result.updatedCategories} categories updated.`,
+      });
       setPreviewRows([]);
       await loadRows();
     } catch (error) {
-      toast({ title: "Import failed", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
+      toast({
+        title: "Import failed",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
     }
   };
 
@@ -152,37 +175,79 @@ export function FactoryFrenchCatalogManager() {
       <DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Traductions françaises du catalogue</DialogTitle>
-          <DialogDescription>Modifier, rechercher et importer les noms français sans changer les noms anglais, les codes, le stock ou les coûts.</DialogDescription>
+          <DialogDescription>
+            Modifier, rechercher et importer les noms français sans changer les noms anglais, les codes, le stock ou les
+            coûts.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-wrap gap-2">
           <div className="flex min-w-64 flex-1 gap-2">
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher code, anglais, arabe ou français" onKeyDown={(event) => event.key === "Enter" && void loadRows()} />
-            <Button type="button" variant="outline" onClick={() => void loadRows()} isLoading={loading}><Search /> Rechercher</Button>
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Rechercher code, anglais, arabe ou français"
+              onKeyDown={(event) => event.key === "Enter" && void loadRows()}
+            />
+            <Button type="button" variant="outline" onClick={() => void loadRows()} isLoading={loading}>
+              <Search /> Rechercher
+            </Button>
           </div>
-          <select className="rounded-md border bg-background px-3 text-sm" value={status} onChange={(event) => setStatus(event.target.value as typeof status)}>
+          <select
+            className="rounded-md border bg-background px-3 text-sm"
+            value={status}
+            onChange={(event) => setStatus(event.target.value as typeof status)}
+          >
             <option value="all">Toutes</option>
             <option value="missing">Traduction manquante</option>
             <option value="complete">Traduction complète</option>
           </select>
-          <Button type="button" variant="outline" onClick={() => window.open("/api/factory/french-catalog/template", "_blank")}><Download /> Modèle Excel</Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => window.open("/api/factory/french-catalog/template", "_blank")}
+          >
+            <Download /> Modèle Excel
+          </Button>
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium">
             <Upload className="h-4 w-4" /> Importer Excel
-            <input className="hidden" type="file" accept=".xlsx" onChange={(event) => { const file = event.target.files?.[0]; if (file) void previewWorkbook(file); event.currentTarget.value = ""; }} />
+            <input
+              className="hidden"
+              type="file"
+              accept=".xlsx"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void previewWorkbook(file);
+                event.currentTarget.value = "";
+              }}
+            />
           </label>
         </div>
 
         {previewRows.length > 0 && (
           <div className="rounded-md border p-3">
             <div className="mb-2 flex items-center justify-between gap-3">
-              <span className="text-sm">{readyPreviewRows.length} prêtes · {previewRows.length - readyPreviewRows.length} inconnues</span>
-              <Button type="button" onClick={() => void applyWorkbook()} disabled={readyPreviewRows.length === 0}>Appliquer les lignes valides</Button>
+              <span className="text-sm">
+                {readyPreviewRows.length} prêtes · {previewRows.length - readyPreviewRows.length} inconnues
+              </span>
+              <Button type="button" onClick={() => void applyWorkbook()} disabled={readyPreviewRows.length === 0}>
+                Appliquer les lignes valides
+              </Button>
             </div>
           </div>
         )}
 
         <Table>
-          <TableHeader><TableRow><TableHead>Code</TableHead><TableHead>Anglais</TableHead><TableHead>Français</TableHead><TableHead>Catégorie FR</TableHead><TableHead>État</TableHead><TableHead /></TableRow></TableHeader>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Code</TableHead>
+              <TableHead>Anglais</TableHead>
+              <TableHead>Français</TableHead>
+              <TableHead>Catégorie FR</TableHead>
+              <TableHead>État</TableHead>
+              <TableHead />
+            </TableRow>
+          </TableHeader>
           <TableBody>
             {rows.map((row) => (
               <TableRow key={row.id}>
@@ -191,7 +256,11 @@ export function FactoryFrenchCatalogManager() {
                 <TableCell>{row.nameFr || <span className="text-muted-foreground">Manquante</span>}</TableCell>
                 <TableCell>{row.categoryNameFr || "—"}</TableCell>
                 <TableCell>{row.nameFr ? "Complète" : "Manquante"}</TableCell>
-                <TableCell><Button type="button" size="sm" variant="ghost" onClick={() => startEdit(row)}><Pencil /> Modifier</Button></TableCell>
+                <TableCell>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => startEdit(row)}>
+                    <Pencil /> Modifier
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -199,11 +268,32 @@ export function FactoryFrenchCatalogManager() {
 
         <Dialog open={Boolean(editing)} onOpenChange={(next) => !next && setEditing(null)}>
           <DialogContent>
-            <DialogHeader><DialogTitle>Modifier la traduction française</DialogTitle><DialogDescription>{editing?.articleCode} · {editing?.nameEn}</DialogDescription></DialogHeader>
-            <label className="space-y-1 text-sm"><span>Nom français</span><Input value={nameFr} onChange={(event) => setNameFr(event.target.value)} /></label>
-            <label className="space-y-1 text-sm"><span>Catégorie française</span><Input value={categoryNameFr} onChange={(event) => setCategoryNameFr(event.target.value)} /></label>
-            <label className="space-y-1 text-sm"><span>Description française</span><Textarea value={descriptionFr} onChange={(event) => setDescriptionFr(event.target.value)} /></label>
-            <DialogFooter><Button type="button" variant="outline" onClick={() => setEditing(null)}>Annuler</Button><Button type="button" onClick={() => void saveEdit()}>Enregistrer</Button></DialogFooter>
+            <DialogHeader>
+              <DialogTitle>Modifier la traduction française</DialogTitle>
+              <DialogDescription>
+                {editing?.articleCode} · {editing?.nameEn}
+              </DialogDescription>
+            </DialogHeader>
+            <label className="space-y-1 text-sm">
+              <span>Nom français</span>
+              <Input value={nameFr} onChange={(event) => setNameFr(event.target.value)} />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span>Catégorie française</span>
+              <Input value={categoryNameFr} onChange={(event) => setCategoryNameFr(event.target.value)} />
+            </label>
+            <label className="space-y-1 text-sm">
+              <span>Description française</span>
+              <Textarea value={descriptionFr} onChange={(event) => setDescriptionFr(event.target.value)} />
+            </label>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditing(null)}>
+                Annuler
+              </Button>
+              <Button type="button" onClick={() => void saveEdit()}>
+                Enregistrer
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </DialogContent>

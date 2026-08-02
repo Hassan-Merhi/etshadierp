@@ -1,5 +1,16 @@
 import { sql } from "drizzle-orm";
-import { boolean, decimal, index, integer, pgTable, serial, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  decimal,
+  index,
+  integer,
+  pgTable,
+  serial,
+  text,
+  timestamp,
+  uniqueIndex,
+  varchar,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -18,7 +29,7 @@ export const factoryCategories = pgTable(
   },
   (table) => ({
     uniqueCompanyName: uniqueIndex("factory_categories_company_name_unique").on(table.companyId, table.name),
-  }),
+  })
 );
 
 export const insertFactoryCategorySchema = createInsertSchema(factoryCategories)
@@ -61,14 +72,14 @@ export const factoryBaleProducts = pgTable(
     uniqueCompanyCode: uniqueIndex("factory_bale_products_company_code_unique").on(table.companyId, table.code),
     uniqueCompanyArticleCode: uniqueIndex("factory_bale_products_company_article_code_unique").on(
       table.companyId,
-      table.articleCode,
+      table.articleCode
     ),
     normalizedCompanyArticleCode: index("factory_bale_products_company_article_code_normalized_idx").using(
       "btree",
       table.companyId,
-      sql`upper(btrim(${table.articleCode}))`,
+      sql`upper(btrim(${table.articleCode}))`
     ),
-  }),
+  })
 );
 
 export const insertFactoryBaleProductSchema = createInsertSchema(factoryBaleProducts)

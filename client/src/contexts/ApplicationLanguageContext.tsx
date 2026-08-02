@@ -11,10 +11,7 @@ import {
 } from "@shared/applicationLanguageContract";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ApplicationInterfaceTranslator } from "@/components/ApplicationInterfaceTranslator";
-import {
-  translateApplicationText,
-  type ApplicationTranslationKey,
-} from "@/i18n/applicationTranslations";
+import { translateApplicationText, type ApplicationTranslationKey } from "@/i18n/applicationTranslations";
 
 interface LanguagePreferenceResponse {
   preferredLanguage?: ApplicationLanguage;
@@ -79,7 +76,7 @@ export function ApplicationLanguageProvider({ children }: { children: ReactNode 
       preferenceMutation.mutate(normalized);
       void queryClient.invalidateQueries({ refetchType: "active" });
     },
-    [preferenceMutation.mutate],
+    [preferenceMutation.mutate]
   );
 
   useEffect(() => {
@@ -112,7 +109,7 @@ export function ApplicationLanguageProvider({ children }: { children: ReactNode 
       setLanguage,
       t: (key) => translateApplicationText(key, language),
     }),
-    [language, preferenceMutation.isPending, setLanguage],
+    [language, preferenceMutation.isPending, setLanguage]
   );
 
   return (
