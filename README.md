@@ -43,15 +43,19 @@ npm run dev
 
 ### Environment variables
 
-See `.env.example` for the full list. The essentials:
+`.env.example` documents every variable the server reads, with defaults and
+effects. Only two must be set:
 
 | Variable | Purpose |
 |----------|---------|
-| `DATABASE_URL` | PostgreSQL connection string (required) |
-| `SESSION_SECRET` | Secret used to sign sessions (required in production) |
-| `NODE_ENV` | `development` or `production` |
-| `PORT` | Server port (default `5000`) |
-| `CSRF_ENFORCE` | `0` = warn-only, otherwise hard 403 (default) |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `SESSION_SECRET` | Signs sessions; the server exits without it in production |
+
+Everything else has a working default — `NODE_ENV`, `PORT` (`5000`),
+`CSRF_ENFORCE` (`0` = warn-only, otherwise hard 403), pool sizing, alert
+thresholds, and the optional AI and container-tracking provider keys.
+`npm run verify:env-docs` fails CI if a new variable is added without
+documenting it.
 
 ## Common scripts
 
@@ -66,6 +70,8 @@ See `.env.example` for the full list. The essentials:
 | `npm test` | Backend + frontend test suites (Vitest) |
 | `npm run test:backend` / `npm run test:frontend` | Run one suite |
 | `npm run db:push` | Apply the Drizzle schema to the database |
+| `npm run verify:env-docs` | Check `.env.example` covers every env var the server reads |
+| `npm run verify:dependency-audit` | Fail on unreviewed high/critical production vulnerabilities |
 
 ## Project layout
 
@@ -104,11 +110,13 @@ docs/              Architecture, flows, and audit documentation
 
 GitHub Actions runs on every push / PR to `main`:
 
-- **CI** (`.github/workflows/ci.yml`): type-check → build → lint → format →
-  DB schema push → startup-migration smoke test → backend & frontend tests
-  with coverage thresholds.
-- **Security** (`.github/workflows/security.yml`): production dependency
-  audit and TruffleHog secret scanning.
+- **CI** (`.github/workflows/ci.yml`): env-doc check → type-check → build →
+  lint → format → DB schema push → startup-migration smoke test → backend &
+  frontend tests with coverage thresholds.
+- **Security** (`.github/workflows/security.yml`): dependency audit and
+  TruffleHog secret scanning. The audit gate fails on any high or critical
+  vulnerability in production dependencies unless it carries a written,
+  dated exception in `scripts/verify-dependency-audit.mjs`.
 
 ## More documentation
 

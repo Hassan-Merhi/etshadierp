@@ -76,6 +76,10 @@ jobs:
             fi
           done
 
+      - name: Verify environment documentation
+        if: always() && steps.install.outcome == 'success'
+        run: npm run verify:env-docs
+
       - name: Type-check
         id: typecheck
         if: always() && steps.install.outcome == 'success'
