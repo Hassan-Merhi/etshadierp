@@ -324,3 +324,11 @@ jobs:
           path: coverage/frontend/coverage-summary.json
           if-no-files-found: error
           retention-days: 7
+
+      # Reports floors that measured coverage has climbed well past, so the
+      # ratchet gets tightened deliberately instead of drifting. Headroom is
+      # advisory; this only fails if a summary disagrees with the floors vitest
+      # already enforced, which would mean the two had gone out of sync.
+      - name: Coverage ratchet audit
+        if: always() && steps.backend_coverage.outcome == 'success' && steps.frontend_coverage.outcome == 'success'
+        run: npm run audit:coverage-ratchet

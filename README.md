@@ -72,6 +72,7 @@ documenting it.
 | `npm run db:push` | Apply the Drizzle schema to the database |
 | `npm run verify:env-docs` | Check `.env.example` covers every env var the server reads |
 | `npm run verify:dependency-audit` | Fail on unreviewed high/critical production vulnerabilities |
+| `npm run audit:coverage-ratchet` | Report coverage floors that measured coverage has outgrown |
 
 ## Project layout
 
@@ -112,7 +113,13 @@ GitHub Actions runs on every push / PR to `main`:
 
 - **CI** (`.github/workflows/ci.yml`): env-doc check → type-check → build →
   lint → format → DB schema push → startup-migration smoke test → backend &
-  frontend tests with coverage thresholds.
+  frontend tests with coverage thresholds → coverage ratchet audit.
+
+  Coverage floors live in `config/coverage-thresholds.json`: a global floor per
+  suite plus per-file floors on the modules where a regression is most
+  expensive — posting, inventory costing, and tenant isolation. They are a
+  one-way ratchet, so `npm run audit:coverage-ratchet` reports floors that
+  coverage has climbed past and should be raised.
 - **Security** (`.github/workflows/security.yml`): dependency audit and
   TruffleHog secret scanning. The audit gate fails on any high or critical
   vulnerability in production dependencies unless it carries a written,
