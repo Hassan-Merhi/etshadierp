@@ -5,12 +5,65 @@ on:
     branches:
       - agent/phase-4-supplier-partner-conversion
 
+permissions:
+  contents: write
+
 concurrency:
   group: phase4-supplier-partner-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout Phase 4 branch
+        uses: actions/checkout@v7
+        with:
+          ref: agent/phase-4-supplier-partner-conversion
+          fetch-depth: 0
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Normalize registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Apply repository-pinned Prettier
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            client/src/components/ApplicationInterfaceTranslator.tsx \
+            client/src/i18n/supplierPartnerPhase4TranslationTypes.ts \
+            client/src/i18n/supplierPartnerPhase4Translations.ts \
+            client/src/i18n/supplierPartnerPhase4Translations.part1.ts \
+            client/src/i18n/supplierPartnerPhase4Translations.part2.ts \
+            client/src/i18n/supplierPartnerPhase4Translations.part3.ts \
+            client/src/i18n/supplierPartnerPhase4Translations.part4.ts \
+            scripts/audit-i18n-phase14.mjs \
+            tests/phase14-i18n-release-gate.test.ts \
+            tests/phase4-supplier-partner-translations.test.ts
+
+      - name: Commit exact formatter output
+        run: |
+          if git diff --quiet; then
+            echo "Phase 4 files already match the pinned formatter."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/src/components/ApplicationInterfaceTranslator.tsx client/src/i18n scripts/audit-i18n-phase14.mjs tests/phase14-i18n-release-gate.test.ts tests/phase4-supplier-partner-translations.test.ts
+          git commit -m "Phase 4: apply pinned formatter output"
+          git push origin HEAD:agent/phase-4-supplier-partner-conversion
+
   verify:
+    if: github.actor == 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -55,20 +108,5 @@ jobs:
             tests/phase14-i18n-release-gate.test.ts \
             --maxWorkers=1 --no-file-parallelism
 
-      - name: Generate classified audit without enforcement
-        run: |
-          node scripts/audit-i18n-phase14.mjs \
-            --no-enforce \
-            --json-out artifacts/phase4-i18n-audit/report.json \
-            --markdown-out artifacts/phase4-i18n-audit/report.md \
-            --suggested-baseline-out artifacts/phase4-i18n-audit/suggested-baseline.json
-          cat artifacts/phase4-i18n-audit/report.md >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload Phase 4 audit
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: phase4-supplier-partner-audit
-          path: artifacts/phase4-i18n-audit
-          if-no-files-found: warn
-          retention-days: 7
+      - name: Enforce classified audit
+        run: node scripts/audit-i18n-phase14.mjs
