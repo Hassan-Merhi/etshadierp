@@ -1,4 +1,4 @@
-export const FACTORY_CATALOG_LANGUAGES = ["en", "ar"] as const;
+export const FACTORY_CATALOG_LANGUAGES = ["en", "ar", "fr"] as const;
 
 export type FactoryCatalogLanguage = (typeof FACTORY_CATALOG_LANGUAGES)[number];
 
@@ -9,6 +9,7 @@ export type FactoryArabicImportMode = (typeof FACTORY_ARABIC_IMPORT_MODES)[numbe
 export interface FactoryLocalizedTextSource {
   english?: string | null;
   arabic?: string | null;
+  french?: string | null;
   articleCode?: string | null;
 }
 
@@ -16,18 +17,22 @@ export interface FactoryBilingualProductSource {
   articleCode?: string | null;
   name?: string | null;
   nameAr?: string | null;
+  nameFr?: string | null;
   description?: string | null;
   descriptionAr?: string | null;
+  descriptionFr?: string | null;
 }
 
 export interface FactoryBilingualCategorySource {
   name?: string | null;
   nameAr?: string | null;
+  nameFr?: string | null;
 }
 
 export interface FactoryBilingualProductDisplaySource extends FactoryBilingualProductSource {
   categoryName?: string | null;
   categoryNameAr?: string | null;
+  categoryNameFr?: string | null;
 }
 
 export interface FactoryResolvedProductLanguage {
@@ -38,22 +43,24 @@ export interface FactoryResolvedProductLanguage {
   description: string;
 }
 
-/** Additive response fields returned by bilingual Factory category GET APIs. */
 export interface FactoryBilingualCategoryApiExtension {
   nameEn: string;
   nameAr: string | null;
+  nameFr: string | null;
   displayName: string;
   language: FactoryCatalogLanguage;
 }
 
-/** Additive response fields returned by bilingual Factory product GET APIs. */
 export interface FactoryBilingualProductApiExtension {
   nameEn: string;
   nameAr: string | null;
+  nameFr: string | null;
   descriptionEn: string | null;
   descriptionAr: string | null;
+  descriptionFr: string | null;
   categoryName: string | null;
   categoryNameAr: string | null;
+  categoryNameFr: string | null;
   displayName: string;
   displayDescription: string;
   displayCategoryName: string;
@@ -64,10 +71,13 @@ export interface FactoryBilingualProductSnapshot {
   articleCode: string;
   productNameEn: string | null;
   productNameAr: string | null;
+  productNameFr: string | null;
   categoryNameEn: string | null;
   categoryNameAr: string | null;
+  categoryNameFr: string | null;
   descriptionEn: string | null;
   descriptionAr: string | null;
+  descriptionFr: string | null;
 }
 
 export interface FactoryArabicTranslationImportRow {
@@ -79,7 +89,7 @@ export interface FactoryArabicTranslationImportRow {
 
 export interface FactorySnapshotResolutionInput {
   language: FactoryCatalogLanguage;
-  snapshot: Pick<FactoryBilingualProductSnapshot, "articleCode" | "productNameEn" | "productNameAr">;
+  snapshot: Pick<FactoryBilingualProductSnapshot, "articleCode" | "productNameEn" | "productNameAr" | "productNameFr">;
   catalog?: FactoryBilingualProductSource | null;
 }
 
@@ -89,11 +99,6 @@ function cleanOptionalText(value: unknown): string | null {
   return cleaned.length > 0 ? cleaned : null;
 }
 
-/**
- * Article codes are language-neutral identifiers. Normalization is intentionally
- * conservative: trim surrounding whitespace and normalize case only. Punctuation
- * and leading zeroes are preserved so import matching cannot silently change a code.
- */
 export function normalizeFactoryArticleCode(value: unknown): string {
   const cleaned = cleanOptionalText(value);
   return cleaned ? cleaned.toUpperCase() : "";
@@ -103,7 +108,7 @@ export function parseFactoryCatalogLanguage(
   value: unknown,
   fallback: FactoryCatalogLanguage = "en"
 ): FactoryCatalogLanguage {
-  return value === "en" || value === "ar" ? value : fallback;
+  return value === "en" || value === "ar" || value === "fr" ? value : fallback;
 }
 
 export function parseFactoryArabicImportMode(
@@ -113,21 +118,18 @@ export function parseFactoryArabicImportMode(
   return value === "fill-missing" || value === "replace-existing" ? value : fallback;
 }
 
-/**
- * Live catalog fallback:
- * - Arabic request: Arabic -> English -> article code
- * - English request: English -> Arabic -> article code
- */
 export function resolveFactoryLocalizedText(
   source: FactoryLocalizedTextSource,
   language: FactoryCatalogLanguage
 ): string {
   const english = cleanOptionalText(source.english);
   const arabic = cleanOptionalText(source.arabic);
+  const french = cleanOptionalText(source.french);
   const articleCode = normalizeFactoryArticleCode(source.articleCode);
 
-  if (language === "ar") return arabic ?? english ?? articleCode;
-  return english ?? arabic ?? articleCode;
+  if (language === "ar") return arabic ?? english ?? french ?? articleCode;
+  if (language === "fr") return french ?? english ?? arabic ?? articleCode;
+  return english ?? french ?? arabic ?? articleCode;
 }
 
 export function resolveFactoryProductName(
@@ -135,11 +137,7 @@ export function resolveFactoryProductName(
   language: FactoryCatalogLanguage
 ): string {
   return resolveFactoryLocalizedText(
-    {
-      english: product.name,
-      arabic: product.nameAr,
-      articleCode: product.articleCode,
-    },
+    { english: product.name, arabic: product.nameAr, french: product.nameFr, articleCode: product.articleCode },
     language
   );
 }
@@ -152,6 +150,7 @@ export function resolveFactoryProductDescription(
     {
       english: product.description,
       arabic: product.descriptionAr,
+      french: product.descriptionFr,
       articleCode: product.articleCode,
     },
     language
@@ -164,19 +163,11 @@ export function resolveFactoryCategoryName(
   articleCode?: string | null
 ): string {
   return resolveFactoryLocalizedText(
-    {
-      english: category.name,
-      arabic: category.nameAr,
-      articleCode,
-    },
+    { english: category.name, arabic: category.nameAr, french: category.nameFr, articleCode },
     language
   );
 }
 
-/**
- * Composite live-catalog resolver consumed by APIs, pages, selectors, and future
- * exports. All surfaces must call this contract instead of reimplementing fallback.
- */
 export function resolveFactoryProductLanguage(
   product: FactoryBilingualProductDisplaySource,
   language: FactoryCatalogLanguage
@@ -186,7 +177,7 @@ export function resolveFactoryProductLanguage(
     articleCode: normalizeFactoryArticleCode(product.articleCode),
     name: resolveFactoryProductName(product, language),
     categoryName: resolveFactoryCategoryName(
-      { name: product.categoryName, nameAr: product.categoryNameAr },
+      { name: product.categoryName, nameAr: product.categoryNameAr, nameFr: product.categoryNameFr },
       language,
       product.articleCode
     ),
@@ -194,40 +185,32 @@ export function resolveFactoryProductLanguage(
   };
 }
 
-/**
- * Language-neutral search corpus for client-side consumers and tests. Server SQL
- * queries use the same five fields directly so search behavior stays consistent.
- */
 export function factorySearchValues(product: FactoryBilingualProductDisplaySource): string[] {
   return [
     normalizeFactoryArticleCode(product.articleCode),
     cleanOptionalText(product.name),
     cleanOptionalText(product.nameAr),
+    cleanOptionalText(product.nameFr),
     cleanOptionalText(product.categoryName),
     cleanOptionalText(product.categoryNameAr),
+    cleanOptionalText(product.categoryNameFr),
   ].filter((value): value is string => Boolean(value));
 }
 
-/**
- * Finalized documents must prefer stored snapshots over the current catalog.
- * The opposite-language snapshot is preferred before any current catalog value
- * so a later catalog rename cannot silently rename a historical document.
- */
 export function resolveFactorySnapshotProductName(input: FactorySnapshotResolutionInput): string {
   const snapshotRequested = cleanOptionalText(
-    input.language === "ar" ? input.snapshot.productNameAr : input.snapshot.productNameEn
+    input.language === "ar"
+      ? input.snapshot.productNameAr
+      : input.language === "fr"
+        ? input.snapshot.productNameFr
+        : input.snapshot.productNameEn
   );
-  const snapshotOpposite = cleanOptionalText(
-    input.language === "ar" ? input.snapshot.productNameEn : input.snapshot.productNameAr
-  );
+  const snapshotOpposite = cleanOptionalText(input.snapshot.productNameEn)
+    ?? cleanOptionalText(input.snapshot.productNameAr)
+    ?? cleanOptionalText(input.snapshot.productNameFr);
   if (snapshotRequested) return snapshotRequested;
   if (snapshotOpposite) return snapshotOpposite;
-
-  if (input.catalog) {
-    const catalogResolved = resolveFactoryProductName(input.catalog, input.language);
-    if (catalogResolved) return catalogResolved;
-  }
-
+  if (input.catalog) return resolveFactoryProductName(input.catalog, input.language);
   return normalizeFactoryArticleCode(input.snapshot.articleCode);
 }
 
@@ -239,10 +222,13 @@ export function buildFactoryBilingualProductSnapshot(input: {
     articleCode: normalizeFactoryArticleCode(input.product.articleCode),
     productNameEn: cleanOptionalText(input.product.name),
     productNameAr: cleanOptionalText(input.product.nameAr),
+    productNameFr: cleanOptionalText(input.product.nameFr),
     categoryNameEn: cleanOptionalText(input.category?.name),
     categoryNameAr: cleanOptionalText(input.category?.nameAr),
+    categoryNameFr: cleanOptionalText(input.category?.nameFr),
     descriptionEn: cleanOptionalText(input.product.description),
     descriptionAr: cleanOptionalText(input.product.descriptionAr),
+    descriptionFr: cleanOptionalText(input.product.descriptionFr),
   };
 }
 
