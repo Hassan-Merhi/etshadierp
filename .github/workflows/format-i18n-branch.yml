@@ -1,9 +1,9 @@
 name: Format translation branch
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/phases-1-4-global-trilingual-foundation
+      - main
 
 permissions:
   contents: write
@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   format:
-    if: github.actor != 'github-actions[bot]'
+    if: github.actor != 'github-actions[bot]' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Checkout branch
