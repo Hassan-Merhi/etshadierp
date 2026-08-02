@@ -1,0 +1,33 @@
+name: Phase 2 I18n Audit Discovery
+
+on:
+  push:
+    branches: [agent/phase-2-i18n-audit-cleanup]
+
+concurrency:
+  group: phase2-i18n-audit-discovery
+  cancel-in-progress: true
+
+jobs:
+  discovery:
+    name: Generate classified audit report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Generate classified untranslated-text report
+        run: |
+          node scripts/audit-i18n-phase14.mjs \
+            --no-enforce \
+            --json-out artifacts/i18n-audit/report.json \
+            --markdown-out artifacts/i18n-audit/report.md \
+            --suggested-baseline-out artifacts/i18n-audit/suggested-baseline.json
+
+      - name: Upload discovery report
+        uses: actions/upload-artifact@v7
+        with:
+          name: phase2-i18n-audit-discovery
+          path: artifacts/i18n-audit
+          if-no-files-found: error
+          retention-days: 3
