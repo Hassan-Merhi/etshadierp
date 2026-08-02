@@ -25,10 +25,11 @@ describe("Phase 14 trilingual release gate", () => {
     expect(classifier).toContain("I18n audit classifier contract verified");
     expect(policy.ignoredPathRules.every((rule: { reason?: string }) => Boolean(rule.reason))).toBe(true);
     expect(baseline.schemaVersion).toBe(2);
-    expect(baseline.detectorVersion).toBe(3);
-    expect(baseline.maxActionable).toBe(17923);
+    expect(baseline.detectorVersion).toBe(4);
+    expect(baseline.maxActionable).toBe(16445);
     expect(baseline.maxUnclassified).toBe(0);
     expect(Object.keys(baseline.modules)).toHaveLength(14);
+    expect(baseline.modules["shared-ui"].maxActionable).toBe(0);
     expect(workflow).toContain("verify-i18n-audit-classifier.mjs");
     expect(workflow).toContain("--json-out");
     expect(workflow).toContain("actions/upload-artifact@v7");
