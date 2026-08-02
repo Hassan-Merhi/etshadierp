@@ -41,7 +41,7 @@ export function UserMenu({ accentColor, user, onLogout }: UserMenuProps) {
   const { language, setLanguage, isSaving, t } = useApplicationLanguage();
 
   return (
-    <DropdownMenu>
+    <DropdownMenu dir="ltr">
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
@@ -75,7 +75,7 @@ export function UserMenu({ accentColor, user, onLogout }: UserMenuProps) {
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-64" dir="ltr" data-testid="user-menu-content">
+      <DropdownMenuContent align="end" className="w-64" data-testid="user-menu-content">
         <DropdownMenuLabel className="font-normal">
           <div className="flex min-w-0 flex-col gap-1">
             <span className="truncate text-sm font-medium" data-business-value="true">
