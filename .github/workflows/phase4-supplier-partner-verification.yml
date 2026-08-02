@@ -1,0 +1,74 @@
+name: Phase 4 Supplier Partner verification
+
+on:
+  push:
+    branches:
+      - agent/phase-4-supplier-partner-conversion
+
+concurrency:
+  group: phase4-supplier-partner-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Normalize registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: TypeScript
+        run: npm run check
+
+      - name: Check Phase 4 formatting
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --check \
+            client/src/components/ApplicationInterfaceTranslator.tsx \
+            client/src/i18n/supplierPartnerPhase4TranslationTypes.ts \
+            client/src/i18n/supplierPartnerPhase4Translations.ts \
+            client/src/i18n/supplierPartnerPhase4Translations.part1.ts \
+            client/src/i18n/supplierPartnerPhase4Translations.part2.ts \
+            client/src/i18n/supplierPartnerPhase4Translations.part3.ts \
+            client/src/i18n/supplierPartnerPhase4Translations.part4.ts \
+            scripts/audit-i18n-phase14.mjs \
+            tests/phase14-i18n-release-gate.test.ts \
+            tests/phase4-supplier-partner-translations.test.ts
+
+      - name: Focused Phase 4 tests
+        run: |
+          node node_modules/vitest/vitest.mjs run \
+            tests/phase4-supplier-partner-translations.test.ts \
+            tests/phase14-i18n-release-gate.test.ts \
+            --maxWorkers=1 --no-file-parallelism
+
+      - name: Generate classified audit without enforcement
+        run: |
+          node scripts/audit-i18n-phase14.mjs \
+            --no-enforce \
+            --json-out artifacts/phase4-i18n-audit/report.json \
+            --markdown-out artifacts/phase4-i18n-audit/report.md \
+            --suggested-baseline-out artifacts/phase4-i18n-audit/suggested-baseline.json
+          cat artifacts/phase4-i18n-audit/report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Phase 4 audit
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: phase4-supplier-partner-audit
+          path: artifacts/phase4-i18n-audit
+          if-no-files-found: warn
+          retention-days: 7
