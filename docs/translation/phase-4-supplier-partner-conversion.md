@@ -16,6 +16,8 @@ This phase is stacked on the completed shared-interface conversion, so shared na
 
 The Phase 3 classified audit reported 261 actionable Supplier Partner occurrences across 230 unique values. Phase 4 reviews all 230 values and lowers the Supplier Partner module ratchet from 261 to zero.
 
+Because the same operational and safety phrases are reused elsewhere, the reviewed catalog also removes 1,382 additional occurrences from other modules. The repository-wide actionable backlog falls from 16,445 to 14,802, with zero unclassified findings.
+
 The catalog is split into four focused files:
 
 1. migration and aliases;
@@ -46,6 +48,8 @@ Unknown text is not translated. The compatibility bridge operates only on the re
 ## Audit enforcement
 
 Detector version 5 includes the four Supplier Partner catalog segments as reviewed compatibility sources. The Supplier Partner module ceiling is zero, so any new untranslated Supplier Partner literal fails the audit until it is explicitly reviewed.
+
+Every module ceiling is locked to its exact post-Phase-4 audited value, preserving the cross-module reductions produced by shared operational vocabulary.
 
 ## Regression coverage
 
