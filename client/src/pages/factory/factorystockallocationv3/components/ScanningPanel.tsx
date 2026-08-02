@@ -3,22 +3,33 @@
  *
  * Extracted from FactoryStockAllocationV3.tsx during the Phase 4 god-file split.
  */
-import {useState, useRef, useCallback} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {queryClient} from "@/lib/queryClient";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Input} from "@/components/ui/input";
-import {useToast} from "@/hooks/use-toast";
-import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle} from "@/components/ui/alert-dialog";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {ScanLine, CheckCircle, Trash2, AlertTriangle, Loader2, ArrowLeft} from "lucide-react";
+import { useState, useRef, useCallback } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ScanLine, CheckCircle, Trash2, AlertTriangle, Loader2, ArrowLeft } from "lucide-react";
 
-import type {LoadDetail, V3Load} from "../types";
-import {fmtKg} from "../utils";
-import {StatusBadge} from "./StatusBadge";
+import type { LoadDetail, V3Load } from "../types";
+import { fmtKg } from "../utils";
+import { StatusBadge } from "./StatusBadge";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => void }) {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [scanCode, setScanCode] = useState("");
   const [scanFlash, setScanFlash] = useState<"success" | "error" | null>(null);
@@ -191,7 +202,7 @@ export function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => 
         {/* Scan input */}
         <Card className={`transition-all duration-150 ${flashClass}`}>
           <CardContent className="p-4">
-            <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">Scan Bale</p>
+            <p className="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wide">{tUi("scan.bale")}</p>
             <div className="flex gap-2">
               <Input
                 ref={scannerRef}
@@ -201,7 +212,7 @@ export function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => 
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleScan();
                 }}
-                placeholder="Scan barcode or type reference..."
+                placeholder={tUi("scan.barcode.or.type.reference")}
                 className="font-mono text-sm"
                 data-testid="input-v3-scan"
               />
@@ -224,19 +235,19 @@ export function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Card>
             <CardContent className="p-3 text-center">
-              <p className="text-xs text-muted-foreground">Expected</p>
+              <p className="text-xs text-muted-foreground">{tUi("expected")}</p>
               <p className="text-lg font-semibold">{totalExpected}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-3 text-center">
-              <p className="text-xs text-muted-foreground">Scanned</p>
+              <p className="text-xs text-muted-foreground">{tUi("scanned.2")}</p>
               <p className="text-lg font-semibold text-green-600 dark:text-green-400">{totalScanned}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-3 text-center">
-              <p className="text-xs text-muted-foreground">Difference</p>
+              <p className="text-xs text-muted-foreground">{tUi("difference.2")}</p>
               <p
                 className={`text-lg font-semibold ${diff < 0 ? "text-orange-500" : diff > 0 ? "text-blue-500" : "text-muted-foreground"}`}
               >
@@ -251,16 +262,16 @@ export function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => 
         {summaryRows.length > 0 && (
           <Card>
             <CardHeader className="pb-2 pt-3 px-4">
-              <CardTitle className="text-sm">Item Summary</CardTitle>
+              <CardTitle className="text-sm">{tUi("item.summary")}</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead className="pl-4 text-xs">Item</TableHead>
-                    <TableHead className="text-xs text-right">Expected</TableHead>
-                    <TableHead className="text-xs text-right">Scanned</TableHead>
-                    <TableHead className="pr-4 text-xs text-right">Diff</TableHead>
+                    <TableHead className="pl-4 text-xs">{tUi("item")}</TableHead>
+                    <TableHead className="text-xs text-right">{tUi("expected")}</TableHead>
+                    <TableHead className="text-xs text-right">{tUi("scanned.2")}</TableHead>
+                    <TableHead className="pr-4 text-xs text-right">{tUi("diff")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -297,9 +308,9 @@ export function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => 
             <CardTitle className="text-sm">Scanned Bales ({activeBales.length})</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            {isLoading && <p className="text-sm text-muted-foreground text-center py-4">Loading...</p>}
+            {isLoading && <p className="text-sm text-muted-foreground text-center py-4">{tUi("loading.2")}</p>}
             {!isLoading && activeBales.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">No bales scanned yet</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{tUi("no.bales.scanned.yet")}</p>
             )}
             <Table>
               <TableBody>
@@ -359,7 +370,7 @@ export function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => 
             >
               Cancel
             </AlertDialogCancel>
-            <AlertDialogAction onClick={handleBypass}>Load Anyway</AlertDialogAction>
+            <AlertDialogAction onClick={handleBypass}>{tUi("load.anyway")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -368,14 +379,14 @@ export function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => 
       <AlertDialog open={confirmFinalize} onOpenChange={setConfirmFinalize}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Finalize Load?</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("finalize.load")}</AlertDialogTitle>
             <AlertDialogDescription>
               This will mark all {activeBales.length} scanned bales as SOLD and close the load. This action cannot be
               undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setConfirmFinalize(false);

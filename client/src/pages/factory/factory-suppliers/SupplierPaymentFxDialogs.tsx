@@ -13,6 +13,7 @@ import { ArrowRightLeft, Globe, Info } from "lucide-react";
 import { UseMutationResult } from "@tanstack/react-query";
 import { SupplierWithBalance } from "./factorySupplierTypes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface SupplierPaymentFxDialogsProps {
   paymentDialogSupplier: SupplierWithBalance | null;
@@ -60,6 +61,7 @@ export function SupplierPaymentFxDialogs({
   fxConversionMutation,
   wrapAdminAction,
 }: SupplierPaymentFxDialogsProps) {
+  const tUi = useFactoryText();
   return (
     <>
       <Dialog
@@ -70,7 +72,7 @@ export function SupplierPaymentFxDialogs({
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Record Payment</DialogTitle>
+            <DialogTitle>{tUi("record.payment")}</DialogTitle>
             <DialogDescription>
               {paymentDialogSupplier
                 ? `Pay to: ${paymentDialogSupplier.name} — Balance: $${formatNum(paymentDialogSupplier.totalValue)}`
@@ -84,13 +86,13 @@ export function SupplierPaymentFxDialogs({
                 if (children.length === 0) return null;
                 return (
                   <div>
-                    <Label>Pay to (account)</Label>
+                    <Label>{tUi("pay.to.account")}</Label>
                     <Select
                       value={String(paymentForm.supplierId)}
                       onValueChange={(v) => setPaymentForm((prev: any) => ({ ...prev, supplierId: parseInt(v) }))}
                     >
                       <SelectTrigger data-testid="select-payment-target">
-                        <SelectValue placeholder="Select account" />
+                        <SelectValue placeholder={tUi("select.account")} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={String(paymentDialogSupplier.id)}>
@@ -109,7 +111,7 @@ export function SupplierPaymentFxDialogs({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Entry Date</Label>
+                <Label>{tUi("entry.date.2")}</Label>
                 <Input
                   type="date"
                   value={paymentForm.date}
@@ -131,7 +133,7 @@ export function SupplierPaymentFxDialogs({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Currency</Label>
+                <Label>{tUi("currency")}</Label>
                 <Select
                   value={paymentForm.currencyCode}
                   onValueChange={(v) =>
@@ -166,7 +168,7 @@ export function SupplierPaymentFxDialogs({
 
             {paymentForm.currencyCode !== "USD" && (
               <div>
-                <Label>FX Rate (Amount per 1 USD)</Label>
+                <Label>{tUi("fx.rate.amount.per.1.usd")}</Label>
                 <Input
                   type="number"
                   step="any"
@@ -203,13 +205,13 @@ export function SupplierPaymentFxDialogs({
             )}
 
             <div>
-              <Label>Paid From Account</Label>
+              <Label>{tUi("paid.from.account")}</Label>
               <Select
                 value={paymentForm.paidFromAccountId}
                 onValueChange={(v) => setPaymentForm((prev: any) => ({ ...prev, paidFromAccountId: v }))}
               >
                 <SelectTrigger data-testid="select-payment-account">
-                  <SelectValue placeholder="Select account" />
+                  <SelectValue placeholder={tUi("select.account")} />
                 </SelectTrigger>
                 <SelectContent>
                   {ledgerAccounts?.map((acc) => (
@@ -222,7 +224,7 @@ export function SupplierPaymentFxDialogs({
             </div>
 
             <div>
-              <Label>Notes</Label>
+              <Label>{tUi("notes")}</Label>
               <Input
                 value={paymentForm.notes}
                 onChange={(e) => setPaymentForm((prev: any) => ({ ...prev, notes: e.target.value }))}
@@ -288,7 +290,7 @@ export function SupplierPaymentFxDialogs({
           })()}
           <div className="space-y-4">
             <div>
-              <Label className="text-xs text-muted-foreground mb-1 block">Settlement Source</Label>
+              <Label className="text-xs text-muted-foreground mb-1 block">{tUi("settlement.source")}</Label>
               <div className="flex gap-2">
                 {(["supplier", "commission", "both"] as const).map((t) => {
                   const labels: Record<string, string> = {
@@ -364,7 +366,7 @@ export function SupplierPaymentFxDialogs({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Entry Date</Label>
+                <Label>{tUi("entry.date.2")}</Label>
                 <Input
                   type="date"
                   value={fxConversionForm.date}
@@ -375,9 +377,9 @@ export function SupplierPaymentFxDialogs({
             </div>
 
             <div>
-              <Label>Notes</Label>
+              <Label>{tUi("notes")}</Label>
               <Input
-                placeholder="Conversion note"
+                placeholder={tUi("conversion.note")}
                 value={fxConversionForm.notes}
                 onChange={(e) => setFxConversionForm((prev: any) => ({ ...prev, notes: e.target.value }))}
                 data-testid="input-fx-notes"

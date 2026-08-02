@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ExternalLink, Search, Ship } from "lucide-react";
 import { formatNumber } from "@/lib/formatNumber";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface InvoiceContainerRow {
   id: number;
@@ -68,6 +69,7 @@ function InvoiceStatus({ status }: { status: string }) {
 }
 
 export default function FactoryContainerTracking() {
+  const tUi = useFactoryText();
   const [search, setSearch] = useState("");
 
   const { data: allRows = [], isLoading } = useQuery<InvoiceContainerRow[]>({
@@ -93,7 +95,7 @@ export default function FactoryContainerTracking() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search container, customer, invoice…"
+            placeholder={tUi("search.container.customer.invoice")}
             className="pl-8"
             data-testid="input-tracking-search"
           />
@@ -124,14 +126,14 @@ export default function FactoryContainerTracking() {
             <TableHeader className="sticky top-0 z-20 bg-background">
               <TableRow>
                 <TableHead className="w-10 text-center">#</TableHead>
-                <TableHead className="whitespace-nowrap">Container #</TableHead>
-                <TableHead className="whitespace-nowrap">Customer</TableHead>
-                <TableHead className="whitespace-nowrap">Invoice</TableHead>
-                <TableHead className="whitespace-nowrap text-right">Cost (USD)</TableHead>
+                <TableHead className="whitespace-nowrap">{tUi("container.2")}</TableHead>
+                <TableHead className="whitespace-nowrap">{tUi("customer")}</TableHead>
+                <TableHead className="whitespace-nowrap">{tUi("invoice")}</TableHead>
+                <TableHead className="whitespace-nowrap text-right">{tUi("cost.usd")}</TableHead>
                 <TableHead className="whitespace-nowrap">ETA</TableHead>
-                <TableHead className="whitespace-nowrap">Invoice Status</TableHead>
-                <TableHead className="whitespace-nowrap">Tracking Status</TableHead>
-                <TableHead className="whitespace-nowrap">Tracking</TableHead>
+                <TableHead className="whitespace-nowrap">{tUi("invoice.status")}</TableHead>
+                <TableHead className="whitespace-nowrap">{tUi("tracking.status")}</TableHead>
+                <TableHead className="whitespace-nowrap">{tUi("tracking")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

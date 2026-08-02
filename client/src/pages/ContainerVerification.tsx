@@ -32,7 +32,9 @@ import * as XLSX from "@/lib/excelHelper";
 import { PageHeader } from "@/components/PageHeader";
 
 import type { LoadedItem, VerificationResult } from "./containerverification/types";
+import { useErpText } from "@/i18n/modules/erp";
 export default function ContainerVerification() {
+  const tUi = useErpText();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const searchString = useSearch();
@@ -341,7 +343,7 @@ export default function ContainerVerification() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <PageHeader title="Container Verification" />
+            <PageHeader title={tUi("container.verification")} />
             <p className="text-muted-foreground text-sm">
               {container?.containerNumber || `Container #${containerId}`} - Proforma vs Loaded Items
             </p>
@@ -392,11 +394,11 @@ export default function ContainerVerification() {
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead>Barcode</TableHead>
-                    <TableHead>Item</TableHead>
+                    <TableHead>{tUi("barcode")}</TableHead>
+                    <TableHead>{tUi("item")}</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Wt/Bale</TableHead>
-                    <TableHead className="text-right">Price/Bale</TableHead>
+                    <TableHead className="text-right">{tUi("wt.bale")}</TableHead>
+                    <TableHead className="text-right">{tUi("price.bale")}</TableHead>
                     <TableHead className="w-16"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -407,7 +409,7 @@ export default function ContainerVerification() {
                         <Input
                           value={newItem.barcode}
                           onChange={(e) => setNewItem({ ...newItem, barcode: e.target.value })}
-                          placeholder="Barcode"
+                          placeholder={tUi("barcode")}
                           className="h-8 text-xs"
                           data-testid="input-new-loaded-barcode"
                         />
@@ -416,7 +418,7 @@ export default function ContainerVerification() {
                         <Input
                           value={newItem.itemName}
                           onChange={(e) => setNewItem({ ...newItem, itemName: e.target.value })}
-                          placeholder="Name"
+                          placeholder={tUi("name")}
                           className="h-8 text-xs"
                           data-testid="input-new-loaded-name"
                         />
@@ -559,11 +561,11 @@ export default function ContainerVerification() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Generate Comparison</CardTitle>
+            <CardTitle className="text-sm">{tUi("generate.comparison")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="text-xs font-medium mb-1 block">Supplier</label>
+              <label className="text-xs font-medium mb-1 block">{tUi("supplier")}</label>
               <Select
                 value={selectedSupplierId}
                 onValueChange={(v) => {
@@ -573,7 +575,7 @@ export default function ContainerVerification() {
                 }}
               >
                 <SelectTrigger data-testid="select-supplier">
-                  <SelectValue placeholder="Select supplier" />
+                  <SelectValue placeholder={tUi("select.supplier.2")} />
                 </SelectTrigger>
                 <SelectContent>
                   {suppliers.map((s: any) => (
@@ -585,7 +587,7 @@ export default function ContainerVerification() {
               </Select>
             </div>
             <div>
-              <label className="text-xs font-medium mb-1 block">Proforma</label>
+              <label className="text-xs font-medium mb-1 block">{tUi("proforma")}</label>
               <Select value={selectedProformaId} onValueChange={setSelectedProformaId} disabled={!selectedSupplierId}>
                 <SelectTrigger data-testid="select-proforma">
                   <SelectValue placeholder={selectedSupplierId ? "Select proforma" : "Select a supplier first"} />
@@ -688,16 +690,16 @@ export default function ContainerVerification() {
               </CardHeader>
               <CardContent>
                 {overloaded.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">None</p>
+                  <p className="text-sm text-muted-foreground text-center py-4">{tUi("none")}</p>
                 ) : (
                   <div className="max-h-[400px] overflow-y-auto">
                     <Table>
                       <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
-                          <TableHead>Item</TableHead>
-                          <TableHead className="text-right">Expected</TableHead>
-                          <TableHead className="text-right">Loaded</TableHead>
-                          <TableHead className="text-right">Excess</TableHead>
+                          <TableHead>{tUi("item")}</TableHead>
+                          <TableHead className="text-right">{tUi("expected")}</TableHead>
+                          <TableHead className="text-right">{tUi("loaded")}</TableHead>
+                          <TableHead className="text-right">{tUi("excess")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -745,16 +747,16 @@ export default function ContainerVerification() {
               </CardHeader>
               <CardContent>
                 {lessLoaded.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">None</p>
+                  <p className="text-sm text-muted-foreground text-center py-4">{tUi("none")}</p>
                 ) : (
                   <div className="max-h-[400px] overflow-y-auto">
                     <Table>
                       <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
-                          <TableHead>Item</TableHead>
-                          <TableHead className="text-right">Expected</TableHead>
-                          <TableHead className="text-right">Loaded</TableHead>
-                          <TableHead className="text-right">Short</TableHead>
+                          <TableHead>{tUi("item")}</TableHead>
+                          <TableHead className="text-right">{tUi("expected")}</TableHead>
+                          <TableHead className="text-right">{tUi("loaded")}</TableHead>
+                          <TableHead className="text-right">{tUi("short")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -802,16 +804,16 @@ export default function ContainerVerification() {
               </CardHeader>
               <CardContent>
                 {notRequested.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">None</p>
+                  <p className="text-sm text-muted-foreground text-center py-4">{tUi("none")}</p>
                 ) : (
                   <div className="max-h-[400px] overflow-y-auto">
                     <Table>
                       <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
-                          <TableHead>Item</TableHead>
-                          <TableHead className="text-right">Loaded Qty</TableHead>
-                          <TableHead className="text-right">Total Weight</TableHead>
-                          <TableHead className="text-right">Total Value</TableHead>
+                          <TableHead>{tUi("item")}</TableHead>
+                          <TableHead className="text-right">{tUi("loaded.qty")}</TableHead>
+                          <TableHead className="text-right">{tUi("total.weight")}</TableHead>
+                          <TableHead className="text-right">{tUi("total.value")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -861,17 +863,17 @@ export default function ContainerVerification() {
               </CardHeader>
               <CardContent>
                 {priceDiffs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">None</p>
+                  <p className="text-sm text-muted-foreground text-center py-4">{tUi("none")}</p>
                 ) : (
                   <div className="max-h-[400px] overflow-y-auto">
                     <Table>
                       <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
-                          <TableHead>Item</TableHead>
-                          <TableHead className="text-right">Proforma</TableHead>
-                          <TableHead className="text-right">Loaded</TableHead>
-                          <TableHead className="text-right">Diff/Bale</TableHead>
-                          <TableHead className="text-right">Total Diff</TableHead>
+                          <TableHead>{tUi("item")}</TableHead>
+                          <TableHead className="text-right">{tUi("proforma")}</TableHead>
+                          <TableHead className="text-right">{tUi("loaded")}</TableHead>
+                          <TableHead className="text-right">{tUi("diff.bale")}</TableHead>
+                          <TableHead className="text-right">{tUi("total.diff")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -932,20 +934,20 @@ export default function ContainerVerification() {
                 <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                   <div className="flex items-center gap-2">
                     <ArrowUpRight className="h-4 w-4 text-red-500" />
-                    <CardTitle className="text-xs">Overloaded</CardTitle>
+                    <CardTitle className="text-xs">{tUi("overloaded")}</CardTitle>
                   </div>
                   <Badge variant="secondary">{overloaded.length}</Badge>
                 </CardHeader>
                 <CardContent className="flex-1 p-0">
                   {overloaded.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-3">None</p>
+                    <p className="text-xs text-muted-foreground text-center py-3">{tUi("none")}</p>
                   ) : (
                     <div className="max-h-[300px] overflow-y-auto">
                       <Table>
                         <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow>
-                            <TableHead className="text-xs py-1.5 px-3">Name</TableHead>
-                            <TableHead className="text-xs text-right py-1.5 px-3">Excess</TableHead>
+                            <TableHead className="text-xs py-1.5 px-3">{tUi("name")}</TableHead>
+                            <TableHead className="text-xs text-right py-1.5 px-3">{tUi("excess")}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -976,20 +978,20 @@ export default function ContainerVerification() {
                 <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                   <div className="flex items-center gap-2">
                     <ArrowDownRight className="h-4 w-4 text-amber-500" />
-                    <CardTitle className="text-xs">Less Loaded</CardTitle>
+                    <CardTitle className="text-xs">{tUi("less.loaded")}</CardTitle>
                   </div>
                   <Badge variant="secondary">{lessLoaded.length}</Badge>
                 </CardHeader>
                 <CardContent className="flex-1 p-0">
                   {lessLoaded.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-3">None</p>
+                    <p className="text-xs text-muted-foreground text-center py-3">{tUi("none")}</p>
                   ) : (
                     <div className="max-h-[300px] overflow-y-auto">
                       <Table>
                         <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow>
-                            <TableHead className="text-xs py-1.5 px-3">Name</TableHead>
-                            <TableHead className="text-xs text-right py-1.5 px-3">Short</TableHead>
+                            <TableHead className="text-xs py-1.5 px-3">{tUi("name")}</TableHead>
+                            <TableHead className="text-xs text-right py-1.5 px-3">{tUi("short")}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1020,19 +1022,19 @@ export default function ContainerVerification() {
                 <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-orange-500" />
-                    <CardTitle className="text-xs">Not Requested</CardTitle>
+                    <CardTitle className="text-xs">{tUi("not.requested")}</CardTitle>
                   </div>
                   <Badge variant="secondary">{notRequested.length}</Badge>
                 </CardHeader>
                 <CardContent className="flex-1 p-0">
                   {notRequested.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-3">None</p>
+                    <p className="text-xs text-muted-foreground text-center py-3">{tUi("none")}</p>
                   ) : (
                     <div className="max-h-[300px] overflow-y-auto">
                       <Table>
                         <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow>
-                            <TableHead className="text-xs py-1.5 px-3">Name</TableHead>
+                            <TableHead className="text-xs py-1.5 px-3">{tUi("name")}</TableHead>
                             <TableHead className="text-xs text-right py-1.5 px-3">Qty</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -1064,20 +1066,20 @@ export default function ContainerVerification() {
                 <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                   <div className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4 text-blue-500" />
-                    <CardTitle className="text-xs">Price Diff</CardTitle>
+                    <CardTitle className="text-xs">{tUi("price.diff")}</CardTitle>
                   </div>
                   <Badge variant="secondary">{priceDiffs.length}</Badge>
                 </CardHeader>
                 <CardContent className="flex-1 p-0">
                   {priceDiffs.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-3">None</p>
+                    <p className="text-xs text-muted-foreground text-center py-3">{tUi("none")}</p>
                   ) : (
                     <div className="max-h-[300px] overflow-y-auto">
                       <Table>
                         <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow>
-                            <TableHead className="text-xs py-1.5 px-3">Name</TableHead>
-                            <TableHead className="text-xs text-right py-1.5 px-3">Diff/Bale</TableHead>
+                            <TableHead className="text-xs py-1.5 px-3">{tUi("name")}</TableHead>
+                            <TableHead className="text-xs text-right py-1.5 px-3">{tUi("diff.bale")}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>

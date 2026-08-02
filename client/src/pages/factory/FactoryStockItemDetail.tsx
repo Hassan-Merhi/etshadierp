@@ -8,6 +8,7 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEscapeBack } from "@/hooks/use-escape-back";
 import { PageHeader } from "@/components/PageHeader";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface PressedEntry {
   date: string;
@@ -66,6 +67,7 @@ const fmt = (n: number) => {
 };
 
 export default function FactoryStockItemDetail() {
+  const tUi = useFactoryText();
   const { formatDisplayDate } = useDateFormat();
   const [_factoryMatch, factoryParams] = useRoute("/factory/stock-query/:id");
   const [_location, navigate] = useLocation();
@@ -92,7 +94,7 @@ export default function FactoryStockItemDetail() {
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
         <Card>
-          <CardContent className="p-6 text-center text-muted-foreground">Product not found</CardContent>
+          <CardContent className="p-6 text-center text-muted-foreground">{tUi("product.not.found")}</CardContent>
         </Card>
       </div>
     );
@@ -103,8 +105,8 @@ export default function FactoryStockItemDetail() {
       <div className="flex items-center gap-4">
         <Button variant="ghost" onClick={handleBack} data-testid="button-back" className="gap-2">
           <ArrowLeft className="h-4 w-4" />
-          <span className="hidden sm:inline">Back to Stock Query</span>
-          <span className="sm:hidden">Back</span>
+          <span className="hidden sm:inline">{tUi("back.to.stock.query")}</span>
+          <span className="sm:hidden">{tUi("back")}</span>
         </Button>
       </div>
 
@@ -128,7 +130,9 @@ export default function FactoryStockItemDetail() {
         </div>
       ) : error ? (
         <Card>
-          <CardContent className="p-6 text-center text-muted-foreground">Failed to load product details.</CardContent>
+          <CardContent className="p-6 text-center text-muted-foreground">
+            {tUi("failed.to.load.product.details")}
+          </CardContent>
         </Card>
       ) : !data ? null : (
         <div className="space-y-4 sm:space-y-6">
@@ -142,18 +146,20 @@ export default function FactoryStockItemDetail() {
             </CardHeader>
             <CardContent>
               {!data.currentStock || data.currentStock.totalQty === 0 ? (
-                <div className="py-6 text-center text-muted-foreground text-sm">No bales currently in stock</div>
+                <div className="py-6 text-center text-muted-foreground text-sm">
+                  {tUi("no.bales.currently.in.stock")}
+                </div>
               ) : (
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-md border px-4 py-3">
-                      <p className="text-xs text-muted-foreground mb-1">Total Bales</p>
+                      <p className="text-xs text-muted-foreground mb-1">{tUi("total.bales")}</p>
                       <p className="text-2xl font-bold font-mono" data-testid="text-current-stock-qty">
                         {data.currentStock.totalQty}
                       </p>
                     </div>
                     <div className="rounded-md border px-4 py-3">
-                      <p className="text-xs text-muted-foreground mb-1">Total Weight</p>
+                      <p className="text-xs text-muted-foreground mb-1">{tUi("total.weight")}</p>
                       <p className="text-2xl font-bold font-mono" data-testid="text-current-stock-weight">
                         {fmt(data.currentStock.totalWeight)}{" "}
                         <span className="text-sm font-normal text-muted-foreground">kg</span>
@@ -165,9 +171,9 @@ export default function FactoryStockItemDetail() {
                       <Table>
                         <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow>
-                            <TableHead>Location</TableHead>
-                            <TableHead className="text-right">Bales</TableHead>
-                            <TableHead className="text-right">Weight (kg)</TableHead>
+                            <TableHead>{tUi("location")}</TableHead>
+                            <TableHead className="text-right">{tUi("bales")}</TableHead>
+                            <TableHead className="text-right">{tUi("weight.kg")}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -181,7 +187,7 @@ export default function FactoryStockItemDetail() {
                         </TableBody>
                         <TableFooter className="sticky bottom-0 z-20 bg-background">
                           <TableRow className="font-semibold text-sm">
-                            <TableCell>Total</TableCell>
+                            <TableCell>{tUi("total")}</TableCell>
                             <TableCell className="text-right font-mono">{data.currentStock.totalQty}</TableCell>
                             <TableCell className="text-right font-mono">{fmt(data.currentStock.totalWeight)}</TableCell>
                           </TableRow>
@@ -204,15 +210,15 @@ export default function FactoryStockItemDetail() {
             </CardHeader>
             <CardContent>
               {data.pressed.length === 0 ? (
-                <div className="py-6 text-center text-muted-foreground text-sm">No stock entries yet</div>
+                <div className="py-6 text-center text-muted-foreground text-sm">{tUi("no.stock.entries.yet")}</div>
               ) : (
                 <div className="table-responsive">
                   <Table>
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
-                        <TableHead>Date</TableHead>
+                        <TableHead>{tUi("date")}</TableHead>
                         <TableHead className="text-right">Qty</TableHead>
-                        <TableHead className="text-right">Weight (kg)</TableHead>
+                        <TableHead className="text-right">{tUi("weight.kg")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -228,7 +234,7 @@ export default function FactoryStockItemDetail() {
                     </TableBody>
                     <TableFooter className="sticky bottom-0 z-20 bg-background">
                       <TableRow className="font-semibold text-sm">
-                        <TableCell>Total</TableCell>
+                        <TableCell>{tUi("total")}</TableCell>
                         <TableCell className="text-right font-mono">
                           {data.pressed.reduce((s, r) => s + r.qty, 0)}
                         </TableCell>
@@ -253,18 +259,18 @@ export default function FactoryStockItemDetail() {
             </CardHeader>
             <CardContent>
               {data.sales.length === 0 ? (
-                <div className="py-6 text-center text-muted-foreground text-sm">No sales recorded</div>
+                <div className="py-6 text-center text-muted-foreground text-sm">{tUi("no.sales.recorded")}</div>
               ) : (
                 <div className="table-responsive">
                   <Table>
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Invoice</TableHead>
+                        <TableHead>{tUi("date")}</TableHead>
+                        <TableHead>{tUi("customer")}</TableHead>
+                        <TableHead>{tUi("invoice")}</TableHead>
                         <TableHead className="text-right">Qty</TableHead>
-                        <TableHead className="text-right">Price/Bale</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">{tUi("price.bale.2")}</TableHead>
+                        <TableHead className="text-right">{tUi("total")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -285,7 +291,7 @@ export default function FactoryStockItemDetail() {
                     </TableBody>
                     <TableFooter className="sticky bottom-0 z-20 bg-background">
                       <TableRow className="font-semibold text-sm">
-                        <TableCell colSpan={3}>Total</TableCell>
+                        <TableCell colSpan={3}>{tUi("total")}</TableCell>
                         <TableCell className="text-right font-mono">
                           {data.sales.reduce((s, r) => s + r.qty, 0)}
                         </TableCell>
@@ -311,17 +317,19 @@ export default function FactoryStockItemDetail() {
             </CardHeader>
             <CardContent>
               {data.loaded.length === 0 ? (
-                <div className="py-6 text-center text-muted-foreground text-sm">No bales currently in loading</div>
+                <div className="py-6 text-center text-muted-foreground text-sm">
+                  {tUi("no.bales.currently.in.loading")}
+                </div>
               ) : (
                 <div className="table-responsive">
                   <Table>
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
-                        <TableHead>Invoice</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Container</TableHead>
+                        <TableHead>{tUi("invoice")}</TableHead>
+                        <TableHead>{tUi("customer")}</TableHead>
+                        <TableHead>{tUi("container")}</TableHead>
                         <TableHead className="text-right">Qty</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">{tUi("total")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -337,7 +345,7 @@ export default function FactoryStockItemDetail() {
                     </TableBody>
                     <TableFooter className="sticky bottom-0 z-20 bg-background">
                       <TableRow className="font-semibold text-sm">
-                        <TableCell colSpan={3}>Total</TableCell>
+                        <TableCell colSpan={3}>{tUi("total")}</TableCell>
                         <TableCell className="text-right font-mono">
                           {data.loaded.reduce((s, r) => s + r.qty, 0)}
                         </TableCell>

@@ -1,24 +1,47 @@
-import {useState, useMemo} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {useToast} from "@/hooks/use-toast";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Badge} from "@/components/ui/badge";
-import {Card, CardContent} from "@/components/ui/card";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle} from "@/components/ui/alert-dialog";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {PageHeader} from "@/components/PageHeader";
-import {Layers, Plus, Pencil, Trash2, Search, Loader2, Package, ShoppingBag, MinusCircle, PlusCircle, History} from "lucide-react";
+import { useState, useMemo } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PageHeader } from "@/components/PageHeader";
+import {
+  Layers,
+  Plus,
+  Pencil,
+  Trash2,
+  Search,
+  Loader2,
+  Package,
+  ShoppingBag,
+  MinusCircle,
+  PlusCircle,
+  History,
+} from "lucide-react";
 
-import type {SheetsAndSacksItem} from "./factorysheetsandsacks/types";
-import {TYPES, fmt, fmtInt} from "./factorysheetsandsacks/utils";
-import {ItemFormDialog} from "./factorysheetsandsacks/components/ItemFormDialog";
-import {DeductDialog} from "./factorysheetsandsacks/components/DeductDialog";
-import {RestockDialog} from "./factorysheetsandsacks/components/RestockDialog";
-import {MovementLog} from "./factorysheetsandsacks/components/MovementLog";
+import type { SheetsAndSacksItem } from "./factorysheetsandsacks/types";
+import { TYPES, fmt, fmtInt } from "./factorysheetsandsacks/utils";
+import { ItemFormDialog } from "./factorysheetsandsacks/components/ItemFormDialog";
+import { DeductDialog } from "./factorysheetsandsacks/components/DeductDialog";
+import { RestockDialog } from "./factorysheetsandsacks/components/RestockDialog";
+import { MovementLog } from "./factorysheetsandsacks/components/MovementLog";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactorySheetsAndSacks() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"stock" | "movements">("stock");
   const [search, setSearch] = useState("");
@@ -108,7 +131,7 @@ export default function FactorySheetsAndSacks() {
     <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <PageHeader title="Sheets & Sacks" subtitle="Track packaging materials inventory" />
+        <PageHeader title={tUi("sheets.sacks")} subtitle={tUi("track.packaging.materials.inventory")} />
         {canEdit && (
           <Button onClick={() => setShowAddDialog(true)} data-testid="button-add-item">
             <Plus className="h-4 w-4 mr-1" />
@@ -123,7 +146,7 @@ export default function FactorySheetsAndSacks() {
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-2">
               <Layers className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Total Sheets</span>
+              <span className="text-sm text-muted-foreground">{tUi("total.sheets")}</span>
             </div>
             <div className="text-2xl font-bold mt-1">{stats.sheets}</div>
             <div className="text-xs text-muted-foreground mt-0.5">${fmt(stats.sheetValue)} value</div>
@@ -133,7 +156,7 @@ export default function FactorySheetsAndSacks() {
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-2">
               <ShoppingBag className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Total Sacks</span>
+              <span className="text-sm text-muted-foreground">{tUi("total.sacks")}</span>
             </div>
             <div className="text-2xl font-bold mt-1">{stats.sacks}</div>
             <div className="text-xs text-muted-foreground mt-0.5">${fmt(stats.sackValue)} value</div>
@@ -143,7 +166,7 @@ export default function FactorySheetsAndSacks() {
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-2">
               <Package className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">All Items</span>
+              <span className="text-sm text-muted-foreground">{tUi("all.items")}</span>
             </div>
             <div className="text-2xl font-bold mt-1">{items.length}</div>
           </CardContent>
@@ -152,7 +175,7 @@ export default function FactorySheetsAndSacks() {
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-muted-foreground">$</span>
-              <span className="text-sm text-muted-foreground">Total Value</span>
+              <span className="text-sm text-muted-foreground">{tUi("total.value")}</span>
             </div>
             <div className="text-2xl font-bold mt-1">${fmt(stats.totalValue)}</div>
           </CardContent>
@@ -193,7 +216,7 @@ export default function FactorySheetsAndSacks() {
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name, size..."
+                placeholder={tUi("search.by.name.size")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-8 w-64"
@@ -204,7 +227,7 @@ export default function FactorySheetsAndSacks() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="all">{tUi("all.types")}</SelectItem>
                 {TYPES.map((t) => (
                   <SelectItem key={t} value={t}>
                     {t}
@@ -245,16 +268,16 @@ export default function FactorySheetsAndSacks() {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-6" />
-                        <TableHead>Name</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Size / Weight</TableHead>
-                        <TableHead className="text-right">Qty (packs)</TableHead>
+                        <TableHead>{tUi("name")}</TableHead>
+                        <TableHead>{tUi("type")}</TableHead>
+                        <TableHead>{tUi("size.weight")}</TableHead>
+                        <TableHead className="text-right">{tUi("qty.packs")}</TableHead>
                         <TableHead className="text-right"># / Pack</TableHead>
-                        <TableHead className="text-right">Total Pcs</TableHead>
-                        <TableHead className="text-right">Price / Pc</TableHead>
-                        <TableHead className="text-right">Total Value</TableHead>
-                        <TableHead>Notes</TableHead>
-                        {canEdit && <TableHead className="text-right">Actions</TableHead>}
+                        <TableHead className="text-right">{tUi("total.pcs")}</TableHead>
+                        <TableHead className="text-right">{tUi("price.pc")}</TableHead>
+                        <TableHead className="text-right">{tUi("total.value")}</TableHead>
+                        <TableHead>{tUi("notes")}</TableHead>
+                        {canEdit && <TableHead className="text-right">{tUi("actions")}</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -297,7 +320,7 @@ export default function FactorySheetsAndSacks() {
                                     size="icon"
                                     variant="ghost"
                                     onClick={() => setRestockItem(item)}
-                                    title="Add Stock"
+                                    title={tUi("add.stock")}
                                   >
                                     <PlusCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                                   </Button>
@@ -305,18 +328,23 @@ export default function FactorySheetsAndSacks() {
                                     size="icon"
                                     variant="ghost"
                                     onClick={() => setDeductItem(item)}
-                                    title="Deduct"
+                                    title={tUi("deduct")}
                                   >
                                     <MinusCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                                   </Button>
-                                  <Button size="icon" variant="ghost" onClick={() => setEditItem(item)} title="Edit">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => setEditItem(item)}
+                                    title={tUi("edit")}
+                                  >
                                     <Pencil className="h-4 w-4" />
                                   </Button>
                                   <Button
                                     size="icon"
                                     variant="ghost"
                                     onClick={() => setDeleteItem(item)}
-                                    title="Delete"
+                                    title={tUi("delete")}
                                   >
                                     <Trash2 className="h-4 w-4 text-destructive" />
                                   </Button>
@@ -381,13 +409,13 @@ export default function FactorySheetsAndSacks() {
       <AlertDialog open={!!deleteItem} onOpenChange={(v) => !v && setDeleteItem(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Item</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("delete.item")}</AlertDialogTitle>
             <AlertDialogDescription>
               Delete <strong>{deleteItem?.name}</strong>? This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteItem && deleteMutation.mutate(deleteItem.id)}
               disabled={deleteMutation.isPending}

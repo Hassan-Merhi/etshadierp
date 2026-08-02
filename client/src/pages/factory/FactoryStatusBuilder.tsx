@@ -1,23 +1,63 @@
-import {useState, useEffect, useRef, useCallback} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {useToast} from "@/hooks/use-toast";
-import {useDateFormat} from "@/contexts/DateFormatContext";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle} from "@/components/ui/alert-dialog";
-import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {} from "@/components/ui/dialog";
-import {Badge} from "@/components/ui/badge";
-import {LayoutGrid, Plus, Save, FileDown, Upload, Download, X, Link2, Link2Off, History as HistoryIcon} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  LayoutGrid,
+  Plus,
+  Save,
+  FileDown,
+  Upload,
+  Download,
+  X,
+  Link2,
+  Link2Off,
+  History as HistoryIcon,
+} from "lucide-react";
 
-import type {ApiSheet, CellValue, LinkDialogState, StatusBuilderSheet} from "./factorystatusbuilder/types";
-import {calcDiff, computeDiffValue, computeTotalValue, fmt, fromApiSheet, getEffectiveValue, isDiffColumn, isTotalColumn, makeId, parseCellValue, resolveCellValue} from "./factorystatusbuilder/utils";
-import {TabLabel} from "./factorystatusbuilder/components/TabLabel";
-import {LinkDialog} from "./factorystatusbuilder/components/LinkDialog";
+import type { ApiSheet, CellValue, LinkDialogState, StatusBuilderSheet } from "./factorystatusbuilder/types";
+import {
+  calcDiff,
+  computeDiffValue,
+  computeTotalValue,
+  fmt,
+  fromApiSheet,
+  getEffectiveValue,
+  isDiffColumn,
+  isTotalColumn,
+  makeId,
+  parseCellValue,
+  resolveCellValue,
+} from "./factorystatusbuilder/utils";
+import { TabLabel } from "./factorystatusbuilder/components/TabLabel";
+import { LinkDialog } from "./factorystatusbuilder/components/LinkDialog";
+import { useFactoryText } from "@/i18n/modules/factory";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export default function FactoryStatusBuilder() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -429,7 +469,9 @@ export default function FactoryStatusBuilder() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   if (isLoading) {
-    return <div className="flex items-center justify-center min-h-[200px] text-muted-foreground">Loading pages…</div>;
+    return (
+      <div className="flex items-center justify-center min-h-[200px] text-muted-foreground">{tUi("loading.pages")}</div>
+    );
   }
 
   const diffRow = activeSheet ? calcDiff(localSheets, activeSheet) : [];
@@ -448,7 +490,7 @@ export default function FactoryStatusBuilder() {
         {/* Toolbar */}
         <div className="flex items-center gap-2 px-4 py-2 border-b flex-wrap">
           <LayoutGrid className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="text-sm font-semibold text-foreground mr-2">Factory Sheets</span>
+          <span className="text-sm font-semibold text-foreground mr-2">{tUi("factory.sheets")}</span>
           <div className="flex-1" />
           <input
             ref={fileInputRef}
@@ -564,14 +606,14 @@ export default function FactoryStatusBuilder() {
           <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
             <div className="text-center space-y-2">
               <LayoutGrid className="h-10 w-10 mx-auto opacity-30" />
-              <p>No pages yet. Import an Excel file or add a page.</p>
+              <p>{tUi("no.pages.yet.import.an.excel.file.or.add.a.page")}</p>
             </div>
           </div>
         ) : viewMode === "history" ? (
           /* ── History tab ── */
           <div className="flex-1 overflow-auto p-4">
             {historyLoading ? (
-              <div className="text-center text-sm text-muted-foreground py-8">Loading history…</div>
+              <div className="text-center text-sm text-muted-foreground py-8">{tUi("loading.history")}</div>
             ) : !historyLog || historyLog.length === 0 ? (
               <div className="text-center text-sm text-muted-foreground py-8">
                 No changes recorded yet for this page.
@@ -648,7 +690,7 @@ export default function FactoryStatusBuilder() {
                         data-testid="sb-button-add-column"
                         onClick={addColumn}
                         className="text-muted-foreground hover:text-foreground transition-colors"
-                        title="Add column"
+                        title={tUi("add.column")}
                       >
                         <Plus className="h-4 w-4" />
                       </button>
@@ -888,7 +930,9 @@ export default function FactoryStatusBuilder() {
                   {activeSheet.rows.length > 0 && (
                     <tr className="bg-amber-50/60 dark:bg-amber-950/20">
                       <td className="border border-border px-2 py-1.5">
-                        <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">DIFFERENCE</span>
+                        <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">
+                          {tUi("difference")}
+                        </span>
                       </td>
                       {diffRow.map((val, ci) => {
                         const isNeg = typeof val === "number" && val < 0;
@@ -936,7 +980,7 @@ export default function FactoryStatusBuilder() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {

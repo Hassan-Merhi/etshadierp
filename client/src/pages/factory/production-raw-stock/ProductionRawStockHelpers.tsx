@@ -26,6 +26,7 @@ import { queryClient } from "@/lib/queryClient";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useAdminOverride } from "@/hooks/use-admin-override";
 import { cn } from "@/lib/utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function parseAccountValue(val: string): { type: "ledger" | "supplier"; id: number } | null {
   if (!val) return null;
@@ -53,15 +54,12 @@ export function AccountCombobox({
   disabled = false,
   testId,
 }: AccountComboboxProps) {
+  const tUi = useFactoryText();
   const [open, setOpen] = useState(false);
   const parsed = parseAccountValue(value);
   const selectedAccount = parsed?.type === "ledger" ? accounts.find((a) => a.id === parsed.id) : null;
   const selectedSupplier = parsed?.type === "supplier" ? (suppliers || []).find((s) => s.id === parsed.id) : null;
-  const displayLabel = selectedSupplier
-    ? selectedSupplier.name
-    : selectedAccount
-      ? selectedAccount.name
-      : placeholder;
+  const displayLabel = selectedSupplier ? selectedSupplier.name : selectedAccount ? selectedAccount.name : placeholder;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -82,9 +80,9 @@ export function AccountCombobox({
         align="start"
       >
         <Command>
-          <CommandInput placeholder="Search account, code, type, or supplier..." />
+          <CommandInput placeholder={tUi("search.account.code.type.or.supplier")} />
           <CommandList className="max-h-[360px]">
-            <CommandEmpty>No account found.</CommandEmpty>
+            <CommandEmpty>{tUi("no.account.found")}</CommandEmpty>
             <CommandGroup heading="All Ledger Accounts">
               {accounts.map((account) => (
                 <CommandItem
@@ -122,10 +120,7 @@ export function AccountCombobox({
                     data-testid={`option-factory-supplier-${s.id}`}
                   >
                     <Check
-                      className={cn(
-                        "mr-2 h-4 w-4 shrink-0",
-                        value === `SUP:${s.id}` ? "opacity-100" : "opacity-0"
-                      )}
+                      className={cn("mr-2 h-4 w-4 shrink-0", value === `SUP:${s.id}` ? "opacity-100" : "opacity-0")}
                     />
                     <span className="truncate">{s.name}</span>
                   </CommandItem>
@@ -140,6 +135,7 @@ export function AccountCombobox({
 }
 
 export function AdjustmentsHistoryCard({ onDeleteRequest }: { onDeleteRequest: (id: number) => void }) {
+  const tUi = useFactoryText();
   const { formatDisplayDate } = useDateFormat();
   const [open, setOpen] = useState(false);
   const { data: adjustments, isLoading } = useQuery<any[]>({
@@ -185,12 +181,12 @@ export function AdjustmentsHistoryCard({ onDeleteRequest }: { onDeleteRequest: (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Material / Supplier</TableHead>
-                  <TableHead className="text-right">Qty (kg)</TableHead>
-                  <TableHead className="text-right">Cost/kg</TableHead>
-                  <TableHead>Notes</TableHead>
+                  <TableHead>{tUi("date")}</TableHead>
+                  <TableHead>{tUi("type")}</TableHead>
+                  <TableHead>{tUi("material.supplier")}</TableHead>
+                  <TableHead className="text-right">{tUi("qty.kg")}</TableHead>
+                  <TableHead className="text-right">{tUi("cost.kg.3")}</TableHead>
+                  <TableHead>{tUi("notes")}</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
@@ -237,7 +233,7 @@ export function AdjustmentsHistoryCard({ onDeleteRequest }: { onDeleteRequest: (
             </Table>
           </div>
         ) : (
-          <p className="text-center text-muted-foreground py-6 text-sm">No manual adjustments recorded yet.</p>
+          <p className="text-center text-muted-foreground py-6 text-sm">{tUi("no.manual.adjustments.recorded.yet")}</p>
         )}
       </CardContent>
     </Card>
@@ -251,6 +247,7 @@ interface SupplierCategory {
 }
 
 export function SupplierCategoriesDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [newCatName, setNewCatName] = useState("");
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
@@ -365,7 +362,7 @@ export function SupplierCategoriesDialog({ open, onClose }: { open: boolean; onC
 
           <div className="flex-1 overflow-y-auto space-y-6">
             <div className="space-y-2">
-              <label className="text-sm font-medium">New Category</label>
+              <label className="text-sm font-medium">{tUi("new.category")}</label>
               <div className="flex gap-2">
                 <Input
                   placeholder="e.g. Cyprus, Australia…"
@@ -392,7 +389,7 @@ export function SupplierCategoriesDialog({ open, onClose }: { open: boolean; onC
 
             {categories.length > 0 && (
               <div className="space-y-2">
-                <label className="text-sm font-medium">Categories</label>
+                <label className="text-sm font-medium">{tUi("categories")}</label>
                 <div className="border rounded-md divide-y">
                   {categories.map((cat) => (
                     <div key={cat.id} className="flex items-center gap-2 px-3 py-2">
@@ -470,7 +467,7 @@ export function SupplierCategoriesDialog({ open, onClose }: { open: boolean; onC
 
             {fullSuppliers.length > 0 && (
               <div className="space-y-2">
-                <label className="text-sm font-medium">Assign Suppliers to Categories</label>
+                <label className="text-sm font-medium">{tUi("assign.suppliers.to.categories")}</label>
                 <div className="border rounded-md divide-y">
                   {fullSuppliers.map((sup) => (
                     <div key={sup.id} className="flex items-center gap-3 px-3 py-2">
@@ -489,10 +486,10 @@ export function SupplierCategoriesDialog({ open, onClose }: { open: boolean; onC
                         }}
                       >
                         <SelectTrigger className="h-7 w-40 text-xs" data-testid={`select-supplier-category-${sup.id}`}>
-                          <SelectValue placeholder="Uncategorized" />
+                          <SelectValue placeholder={tUi("uncategorized")} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">Uncategorized</SelectItem>
+                          <SelectItem value="none">{tUi("uncategorized")}</SelectItem>
                           {categories.map((cat) => (
                             <SelectItem key={cat.id} value={String(cat.id)}>
                               {cat.name}
@@ -521,7 +518,7 @@ export function SupplierCategoriesDialog({ open, onClose }: { open: boolean; onC
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogCancel>{tUi("cancel")}</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => {
                     if (deletingId) wrapAdminAction(() => deleteMutation.mutate(deletingId!), "Delete Category");

@@ -3,13 +3,15 @@
  *
  * Extracted from FactoryNetPosition.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {ChevronDown, ChevronRight, ExternalLink} from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 
-import type {AccountItem} from "../types";
-import {fmt} from "../utils";
+import type { AccountItem } from "../types";
+import { fmt } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function SupplierRow({ acc, accentClass, index }: { acc: AccountItem; accentClass: string; index: number }) {
+  const tUi = useFactoryText();
   const [open, setOpen] = useState(false);
   const hasBreakdown = acc.breakdown && acc.breakdown.length > 0;
 
@@ -70,7 +72,7 @@ export function SupplierRow({ acc, accentClass, index }: { acc: AccountItem; acc
             );
           })}
           <div className="border-t border-border mt-1 pt-1 flex justify-between text-xs font-semibold">
-            <span>Total</span>
+            <span>{tUi("total")}</span>
             <span className={`font-mono ${accentClass}`}>{fmt(acc.value)}</span>
           </div>
         </div>

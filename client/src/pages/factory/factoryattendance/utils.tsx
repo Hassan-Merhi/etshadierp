@@ -4,7 +4,7 @@
  * Extracted from FactoryAttendance.tsx during the Phase 4 god-file split.
  */
 import * as XLSX from "@/lib/excelHelper";
-import type {AttendanceRecord, AttendanceStatus, PrintLang, ViewMode, WeekDay, WorkerRow} from "./types";
+import type { AttendanceRecord, AttendanceStatus, PrintLang, ViewMode, WeekDay, WorkerRow } from "./types";
 
 export const STATUS_OPTIONS: AttendanceStatus[] = ["Present", "Absent", "Late", "Half Day", "Leave"];
 

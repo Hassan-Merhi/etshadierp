@@ -8,8 +8,20 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { FileDown, MoreHorizontal, Eye, Upload, Download, FileText, FileSpreadsheet, Save, Check, Sheet } from "lucide-react";
+import {
+  FileDown,
+  MoreHorizontal,
+  Eye,
+  Upload,
+  Download,
+  FileText,
+  FileSpreadsheet,
+  Save,
+  Check,
+  Sheet,
+} from "lucide-react";
 import { Link } from "wouter";
+import { usePosText } from "@/i18n/modules/pos";
 
 export interface POSHeaderProps {
   posUser: any;
@@ -72,6 +84,7 @@ export function POSHeader({
   onDetailedExport,
   onExportTransaction,
 }: POSHeaderProps) {
+  const tUi = usePosText();
   const autosaveLabel = useRelativeTime(lastAutosaved);
 
   return (
@@ -85,10 +98,10 @@ export function POSHeader({
               onClick={onExportTransaction}
               className="gap-2"
               data-testid="button-export-transaction"
-              title="Export transaction to Excel (admin/dev only)"
+              title={tUi("export.transaction.to.excel.admin.dev.only")}
             >
               <Sheet className="h-4 w-4" />
-              <span className="hidden sm:inline">Export Excel</span>
+              <span className="hidden sm:inline">{tUi("export.excel")}</span>
             </Button>
           )}
         </>

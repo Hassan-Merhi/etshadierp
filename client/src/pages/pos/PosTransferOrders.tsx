@@ -1,21 +1,23 @@
-import {useState, useMemo} from "react";
-import {useQuery} from "@tanstack/react-query";
-import {format} from "date-fns";
-import {PageHeader} from "@/components/PageHeader";
-import {CheckCircle2, Search, X, ArrowRight, Clock, Package2, Eye, Pencil, CalendarIcon, Plus} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Badge} from "@/components/ui/badge";
-import {Input} from "@/components/ui/input";
-import {Skeleton} from "@/components/ui/skeleton";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {cn} from "@/lib/utils";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { PageHeader } from "@/components/PageHeader";
+import { CheckCircle2, Search, X, ArrowRight, Clock, Package2, Eye, Pencil, CalendarIcon, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
-import type {PosTransferOrdersProps, TransferSummary} from "./postransferorders/types";
-import {formatDate} from "./postransferorders/utils";
-import {TransferOrderDetail} from "./postransferorders/components/TransferOrderDetail";
-import {CreateTransferDialog} from "./postransferorders/components/CreateTransferDialog";
-import {ViewTransferDialog} from "./postransferorders/components/ViewTransferDialog";
+import type { PosTransferOrdersProps, TransferSummary } from "./postransferorders/types";
+import { formatDate } from "./postransferorders/utils";
+import { TransferOrderDetail } from "./postransferorders/components/TransferOrderDetail";
+import { CreateTransferDialog } from "./postransferorders/components/CreateTransferDialog";
+import { ViewTransferDialog } from "./postransferorders/components/ViewTransferDialog";
+import { usePosText } from "@/i18n/modules/pos";
 export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
+  const tUi = usePosText();
   const [editVoucherId, setEditVoucherId] = useState<number | null>(null);
   const [viewVoucherId, setViewVoucherId] = useState<number | null>(null);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
@@ -90,7 +92,7 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
     <div className="p-4 space-y-4">
       {/* Page header */}
       <div className="flex items-start justify-between gap-2 flex-wrap">
-        <PageHeader title="Orders" subtitle="Review and adjust quantities for your location" />
+        <PageHeader title={tUi("orders")} subtitle={tUi("review.and.adjust.quantities.for.your.location")} />
         {myLocations.length > 1 && (
           <Button onClick={() => setCreateOpen(true)} data-testid="button-new-transfer">
             <Plus className="h-4 w-4 mr-1.5" />
@@ -102,7 +104,7 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
       {/* Filter bar */}
       <div className="flex flex-wrap items-end gap-3 rounded-md bg-muted/30 px-4 py-3">
         <div className="space-y-1 min-w-[140px]">
-          <label className="text-xs font-medium text-muted-foreground">Date</label>
+          <label className="text-xs font-medium text-muted-foreground">{tUi("date")}</label>
           <div className="relative">
             <CalendarIcon className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
             <input
@@ -115,24 +117,24 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
           </div>
         </div>
         <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Status</label>
+          <label className="text-xs font-medium text-muted-foreground">{tUi("status")}</label>
           <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
             <SelectTrigger className="h-8 text-sm w-[120px]" data-testid="select-status-filter">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="applied">Applied</SelectItem>
+              <SelectItem value="pending">{tUi("pending")}</SelectItem>
+              <SelectItem value="applied">{tUi("applied")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-1 flex-1 min-w-[180px]">
-          <label className="text-xs font-medium text-muted-foreground">Search</label>
+          <label className="text-xs font-medium text-muted-foreground">{tUi("search")}</label>
           <div className="relative">
             <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
             <Input
-              placeholder="Voucher # or item..."
+              placeholder={tUi("voucher.or.item")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-8 h-8 text-sm"
@@ -182,8 +184,8 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
       ) : transfers.length === 0 ? (
         <div className="rounded-md border bg-card text-center py-16 text-muted-foreground" data-testid="text-empty">
           <Package2 className="h-10 w-10 mx-auto mb-3 opacity-20" />
-          <p className="text-sm font-medium">No transfer orders found</p>
-          {hasFilters && <p className="text-xs mt-1 opacity-70">Try clearing your filters</p>}
+          <p className="text-sm font-medium">{tUi("no.transfer.orders.found")}</p>
+          {hasFilters && <p className="text-xs mt-1 opacity-70">{tUi("try.clearing.your.filters")}</p>}
         </div>
       ) : (
         <div className="space-y-2">
@@ -248,7 +250,7 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
                   variant="ghost"
                   onClick={() => openView(t.voucherId)}
                   data-testid={`button-view-${t.voucherId}`}
-                  title="View"
+                  title={tUi("view")}
                 >
                   <Eye className="h-4 w-4" />
                 </Button>
@@ -258,7 +260,7 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
                     variant="ghost"
                     onClick={() => setEditVoucherId(t.voucherId)}
                     data-testid={`button-edit-${t.voucherId}`}
-                    title="Adjust"
+                    title={tUi("adjust")}
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>

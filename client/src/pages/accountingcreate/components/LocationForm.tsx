@@ -3,13 +3,13 @@
  *
  * Extracted from AccountingCreate.tsx during the Phase 4 god-file split.
  */
-import {Card} from "@/components/ui/card";
-import {Form, FormControl, FormField, FormItem, FormLabel, FormMessage} from "@/components/ui/form";
-import {Input} from "@/components/ui/input";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Checkbox} from "@/components/ui/checkbox";
-import {useQuery} from "@tanstack/react-query";
-import {FormButtons} from "./FormButtons";
+import { Card } from "@/components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useQuery } from "@tanstack/react-query";
+import { FormButtons } from "./FormButtons";
 
 export // Location Form Component
 function LocationForm({

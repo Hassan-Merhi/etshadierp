@@ -1,13 +1,13 @@
-import {useState} from "react";
-import {useQuery} from "@tanstack/react-query";
-import {Banknote, RotateCcw, Scissors} from "lucide-react";
-import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Banknote, RotateCcw, Scissors } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {} from "@/components/ui/dialog";
 import {} from "@/components/ui/dropdown-menu";
 
-import {AdvancesView} from "./factoryadvancestab/components/AdvancesView";
-import {RepaymentsView} from "./factoryadvancestab/components/RepaymentsView";
-import {DeductionsView} from "./factoryadvancestab/components/DeductionsView";
+import { AdvancesView } from "./factoryadvancestab/components/AdvancesView";
+import { RepaymentsView } from "./factoryadvancestab/components/RepaymentsView";
+import { DeductionsView } from "./factoryadvancestab/components/DeductionsView";
 export default function FactoryAdvancesTab() {
   const [subTab, setSubTab] = useState("advances");
 

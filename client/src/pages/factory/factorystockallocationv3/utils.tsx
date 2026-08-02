@@ -4,7 +4,7 @@
  * Extracted from FactoryStockAllocationV3.tsx during the Phase 4 god-file split.
  */
 
-import type {Tab} from "./types";
+import type { Tab } from "./types";
 
 export function fmtKg(kg: string | number) {
   return `${parseFloat(String(kg)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KG`;

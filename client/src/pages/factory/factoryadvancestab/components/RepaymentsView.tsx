@@ -3,20 +3,22 @@
  *
  * Extracted from FactoryAdvancesTab.tsx during the Phase 4 god-file split.
  */
-import {useState, useMemo} from "react";
-import {useQuery} from "@tanstack/react-query";
-import {useDateFormat} from "@/contexts/DateFormatContext";
-import {Banknote, RotateCcw} from "lucide-react";
-import {Card, CardContent} from "@/components/ui/card";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Skeleton} from "@/components/ui/skeleton";
-import type {FactoryWorker} from "@shared/schema";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import { Banknote, RotateCcw } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { FactoryWorker } from "@shared/schema";
 
-import type {RepaymentRecord} from "../types";
-import {fmt} from "../utils";
+import type { RepaymentRecord } from "../types";
+import { fmt } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function RepaymentsView() {
+  const tUi = useFactoryText();
   const { formatDisplayDate } = useDateFormat();
   const [filterWorker, setFilterWorker] = useState("all");
 
@@ -84,7 +86,7 @@ export function RepaymentsView() {
               <RotateCcw className="h-5 w-5 text-green-600 dark:text-green-400" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Total Repaid</p>
+              <p className="text-xs text-muted-foreground">{tUi("total.repaid")}</p>
               <p className="text-lg font-bold" data-testid="text-repayments-total">
                 {fmt(stats.totalRepaid)}
               </p>
@@ -97,7 +99,7 @@ export function RepaymentsView() {
               <Banknote className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Total Repayments</p>
+              <p className="text-xs text-muted-foreground">{tUi("total.repayments")}</p>
               <p className="text-lg font-bold" data-testid="text-repayments-count">
                 {stats.count}
               </p>
@@ -109,10 +111,10 @@ export function RepaymentsView() {
       <div className="flex flex-wrap items-center gap-3">
         <Select value={filterWorker} onValueChange={setFilterWorker}>
           <SelectTrigger className="w-48" data-testid="select-repayments-filter-worker">
-            <SelectValue placeholder="All Workers" />
+            <SelectValue placeholder={tUi("all.workers.2")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Workers</SelectItem>
+            <SelectItem value="all">{tUi("all.workers.2")}</SelectItem>
             {(workers || []).map((w) => (
               <SelectItem key={w.id} value={String(w.id)}>
                 {w.fullName}
@@ -128,12 +130,12 @@ export function RepaymentsView() {
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
-                  <TableHead>Worker</TableHead>
-                  <TableHead>Loan Date</TableHead>
-                  <TableHead>Repayment Date</TableHead>
-                  <TableHead className="text-right">Amount Paid</TableHead>
-                  <TableHead>Cash Account</TableHead>
-                  <TableHead>Notes</TableHead>
+                  <TableHead>{tUi("worker")}</TableHead>
+                  <TableHead>{tUi("loan.date")}</TableHead>
+                  <TableHead>{tUi("repayment.date")}</TableHead>
+                  <TableHead className="text-right">{tUi("amount.paid")}</TableHead>
+                  <TableHead>{tUi("cash.account.2")}</TableHead>
+                  <TableHead>{tUi("notes")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

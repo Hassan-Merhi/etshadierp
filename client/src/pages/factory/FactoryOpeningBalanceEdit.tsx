@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface OBRecord {
   id: number;
@@ -50,6 +51,7 @@ interface FactorySupplier {
 const CURRENCIES = ["USD", "EUR", "GBP", "AED", "KWD", "SAR", "OMR", "BHD", "QAR", "JOD"];
 
 export default function FactoryOpeningBalanceEdit() {
+  const tUi = useFactoryText();
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   useEscapeToParent("/factory/raw-materials");
@@ -169,7 +171,7 @@ export default function FactoryOpeningBalanceEdit() {
     return (
       <div className="max-w-2xl mx-auto text-center py-12">
         <AlertTriangle className="mx-auto h-10 w-10 text-muted-foreground mb-4" />
-        <p className="text-lg font-semibold">Record not found</p>
+        <p className="text-lg font-semibold">{tUi("record.not.found")}</p>
         <Button className="mt-4" variant="outline" onClick={() => navigate("/factory/raw-materials")}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Raw Materials
@@ -194,7 +196,7 @@ export default function FactoryOpeningBalanceEdit() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <PageHeader title="Factory Opening Balance" />
+          <PageHeader title={tUi("factory.opening.balance")} />
           <p className="text-sm text-muted-foreground">{record.containerNumber}</p>
         </div>
         <Badge variant="secondary" className="ml-auto">
@@ -204,11 +206,11 @@ export default function FactoryOpeningBalanceEdit() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Edit Record</CardTitle>
+          <CardTitle className="text-base">{tUi("edit.record")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>Supplier</Label>
+            <Label>{tUi("supplier")}</Label>
             <Select
               value={form.supplierId}
               onValueChange={(val) => {
@@ -222,10 +224,10 @@ export default function FactoryOpeningBalanceEdit() {
               }}
             >
               <SelectTrigger data-testid="select-supplier">
-                <SelectValue placeholder="Select supplier" />
+                <SelectValue placeholder={tUi("select.supplier.2")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__manual__">Enter manually below</SelectItem>
+                <SelectItem value="__manual__">{tUi("enter.manually.below")}</SelectItem>
                 {suppliers?.map((s) => (
                   <SelectItem key={s.id} value={s.id.toString()}>
                     {s.name}
@@ -236,7 +238,7 @@ export default function FactoryOpeningBalanceEdit() {
             </Select>
             {!form.supplierId && (
               <Input
-                placeholder="Custom supplier name (e.g. Cyprus)"
+                placeholder={tUi("custom.supplier.name.e.g.cyprus")}
                 value={form.supplierName}
                 onChange={(e) => handleFieldChange("supplierName", e.target.value)}
                 data-testid="input-supplier-name"
@@ -246,7 +248,7 @@ export default function FactoryOpeningBalanceEdit() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Received (kg)</Label>
+              <Label>{tUi("received.kg")}</Label>
               <Input
                 type="number"
                 step="0.001"
@@ -256,7 +258,7 @@ export default function FactoryOpeningBalanceEdit() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Used (kg)</Label>
+              <Label>{tUi("used.kg")}</Label>
               <Input
                 value={formatNumber(parseFloat(record.usedKg))}
                 readOnly
@@ -267,7 +269,7 @@ export default function FactoryOpeningBalanceEdit() {
           </div>
 
           <div className="p-3 rounded-md bg-muted">
-            <p className="text-sm text-muted-foreground">Remaining (kg)</p>
+            <p className="text-sm text-muted-foreground">{tUi("remaining.kg")}</p>
             <p className="text-lg font-bold font-mono" data-testid="text-remaining-kg">
               {formatNumber(remainingKg < 0 ? 0 : remainingKg)}
             </p>
@@ -275,7 +277,7 @@ export default function FactoryOpeningBalanceEdit() {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>Currency</Label>
+              <Label>{tUi("currency")}</Label>
               <Select value={form.currencyCode} onValueChange={(v) => handleFieldChange("currencyCode", v)}>
                 <SelectTrigger data-testid="select-currency">
                   <SelectValue />
@@ -300,7 +302,7 @@ export default function FactoryOpeningBalanceEdit() {
               />
             </div>
             <div className="space-y-2">
-              <Label>FX Rate to USD</Label>
+              <Label>{tUi("fx.rate.to.usd")}</Label>
               <Input
                 type="number"
                 step="0.0001"
@@ -322,11 +324,11 @@ export default function FactoryOpeningBalanceEdit() {
           )}
 
           <div className="space-y-2">
-            <Label>Notes</Label>
+            <Label>{tUi("notes")}</Label>
             <Textarea
               value={form.notes}
               onChange={(e) => handleFieldChange("notes", e.target.value)}
-              placeholder="Optional notes..."
+              placeholder={tUi("optional.notes.2")}
               data-testid="input-notes"
             />
           </div>
@@ -362,10 +364,10 @@ export default function FactoryOpeningBalanceEdit() {
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-md bg-muted p-3 text-sm space-y-1">
-            <p className="font-medium">What happens:</p>
-            <p>The opening balance entry will be removed from raw stock.</p>
-            <p>Any bales linked through this entry will remain fully intact.</p>
-            <p>Raw stock linkage will be safely detached without data loss.</p>
+            <p className="font-medium">{tUi("what.happens")}</p>
+            <p>{tUi("the.opening.balance.entry.will.be.removed.from.r")}</p>
+            <p>{tUi("any.bales.linked.through.this.entry.will.remain.")}</p>
+            <p>{tUi("raw.stock.linkage.will.be.safely.detached.withou")}</p>
           </div>
           <DialogFooter className="gap-2 flex-wrap">
             <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} data-testid="button-delete-cancel">

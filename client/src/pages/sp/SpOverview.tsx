@@ -43,7 +43,10 @@ function NavigationCard({ item, testId }: { item: (typeof dailyWork)[number]; te
 
   return (
     <Link href={item.href}>
-      <a data-testid={testId} className="block h-full rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <a
+        data-testid={testId}
+        className="block h-full rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
         <Card className="h-full transition-colors hover:bg-muted/40">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-3">
@@ -74,26 +77,40 @@ export default function SpOverview() {
 
       <section className="space-y-3" aria-labelledby="sp-daily-work-heading">
         <div>
-          <h2 id="sp-daily-work-heading" className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          <h2
+            id="sp-daily-work-heading"
+            className="text-sm font-semibold uppercase tracking-wide text-muted-foreground"
+          >
             Daily work
           </h2>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
           {dailyWork.map((item) => (
-            <NavigationCard key={item.href} item={item} testId={`link-sp-overview-${item.title.toLowerCase().replace(/\s+/g, "-")}`} />
+            <NavigationCard
+              key={item.href}
+              item={item}
+              testId={`link-sp-overview-${item.title.toLowerCase().replace(/\s+/g, "-")}`}
+            />
           ))}
         </div>
       </section>
 
       <section className="space-y-3" aria-labelledby="sp-administration-heading">
         <div>
-          <h2 id="sp-administration-heading" className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          <h2
+            id="sp-administration-heading"
+            className="text-sm font-semibold uppercase tracking-wide text-muted-foreground"
+          >
             Administration
           </h2>
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           {administration.map((item) => (
-            <NavigationCard key={item.href} item={item} testId={`link-sp-overview-${item.title.toLowerCase().replace(/\s+/g, "-")}`} />
+            <NavigationCard
+              key={item.href}
+              item={item}
+              testId={`link-sp-overview-${item.title.toLowerCase().replace(/\s+/g, "-")}`}
+            />
           ))}
         </div>
       </section>

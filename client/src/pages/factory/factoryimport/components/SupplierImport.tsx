@@ -3,24 +3,26 @@
  *
  * Extracted from FactoryImport.tsx during the Phase 4 god-file split.
  */
-import {useState, useCallback} from "react";
-import {useMutation} from "@tanstack/react-query";
-import {X, Loader2} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Input} from "@/components/ui/input";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {useToast} from "@/hooks/use-toast";
-import {factoryApiRequest} from "@/lib/factoryApi";
+import { useState, useCallback } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { X, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import Papa from "papaparse";
 
-import type {SupplierRow} from "../types";
-import {EMPTY_SUPPLIER} from "../utils";
-import {ImportModeChooser} from "./ImportModeChooser";
-import {ManualEntryCard} from "./ManualEntryCard";
-import {ImportResult} from "./ImportResult";
+import type { SupplierRow } from "../types";
+import { EMPTY_SUPPLIER } from "../utils";
+import { ImportModeChooser } from "./ImportModeChooser";
+import { ManualEntryCard } from "./ManualEntryCard";
+import { ImportResult } from "./ImportResult";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function SupplierImport() {
+  const tUi = useFactoryText();
   const [mode, setMode] = useState<"choose" | "csv" | "manual">("choose");
   const [rows, setRows] = useState<SupplierRow[]>([{ ...EMPTY_SUPPLIER }]);
   const [csvData, setCsvData] = useState<SupplierRow[]>([]);
@@ -107,7 +109,7 @@ export function SupplierImport() {
   if (mode === "choose") {
     return (
       <ImportModeChooser
-        title="Import Supplier Balances"
+        title={tUi("import.supplier.balances")}
         description="Import opening balances for factory suppliers. Existing suppliers will be updated, new ones will be created."
         templateType="suppliers"
         onFileUpload={handleFileUpload}
@@ -149,11 +151,11 @@ export function SupplierImport() {
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Opening Balance</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead>{tUi("name")}</TableHead>
+                  <TableHead>{tUi("opening.balance")}</TableHead>
+                  <TableHead>{tUi("contact")}</TableHead>
+                  <TableHead>{tUi("phone")}</TableHead>
+                  <TableHead>{tUi("email")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -176,7 +178,7 @@ export function SupplierImport() {
 
   return (
     <ManualEntryCard
-      title="Add Supplier Balances"
+      title={tUi("add.supplier.balances")}
       columns={["Name *", "Opening Balance", "Contact", "Phone", "Email"]}
       rows={rows}
       onAdd={() => setRows([...rows, { ...EMPTY_SUPPLIER }])}
@@ -195,7 +197,7 @@ export function SupplierImport() {
             <Input
               value={row.name}
               onChange={(e) => onChange(i, "name", e.target.value)}
-              placeholder="Supplier name"
+              placeholder={tUi("supplier.name.2")}
               data-testid={`input-supplier-name-${i}`}
             />
           </TableCell>
@@ -213,7 +215,7 @@ export function SupplierImport() {
             <Input
               value={row.contactPerson}
               onChange={(e) => onChange(i, "contactPerson", e.target.value)}
-              placeholder="Contact person"
+              placeholder={tUi("contact.person.2")}
               data-testid={`input-supplier-contact-${i}`}
             />
           </TableCell>
@@ -221,7 +223,7 @@ export function SupplierImport() {
             <Input
               value={row.phone}
               onChange={(e) => onChange(i, "phone", e.target.value)}
-              placeholder="Phone"
+              placeholder={tUi("phone")}
               data-testid={`input-supplier-phone-${i}`}
             />
           </TableCell>
@@ -229,7 +231,7 @@ export function SupplierImport() {
             <Input
               value={row.email}
               onChange={(e) => onChange(i, "email", e.target.value)}
-              placeholder="Email"
+              placeholder={tUi("email")}
               data-testid={`input-supplier-email-${i}`}
             />
           </TableCell>

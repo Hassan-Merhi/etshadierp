@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fmtDate, DrawerForm, EnrichedContainerRow } from "./gitContainerTypes";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface ContainerDrawerFormProps {
   form: DrawerForm;
@@ -25,6 +26,7 @@ export function ContainerDrawerForm({
   maxOffload,
   daysDelayed,
 }: ContainerDrawerFormProps) {
+  const tUi = useErpText();
   const transUpper = form.transporter.toUpperCase();
   const transLabel =
     transUpper.includes("FARHAT") || transUpper.includes("CONTINENTAL")
@@ -48,10 +50,12 @@ export function ContainerDrawerForm({
 
       {/* ── Calculated read-only preview ── */}
       <div className="rounded-md border bg-muted/30 p-3 space-y-2">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Calculated (read-only)</p>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          {tUi("calculated.read.only")}
+        </p>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <p className="text-xs text-muted-foreground">Max Offload Date</p>
+            <p className="text-xs text-muted-foreground">{tUi("max.offload.date")}</p>
             <p
               className={cn(
                 "text-sm font-medium",
@@ -65,13 +69,13 @@ export function ContainerDrawerForm({
             </p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Days Delayed</p>
+            <p className="text-xs text-muted-foreground">{tUi("days.delayed")}</p>
             <p className={cn("text-sm font-medium", daysDelayed ? "text-red-600" : "text-muted-foreground")}>
               {daysDelayed ? `-${daysDelayed}d` : "—"}
             </p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Offload Overdue</p>
+            <p className="text-xs text-muted-foreground">{tUi("offload.overdue")}</p>
             <p className="text-sm font-medium">
               {container.isOverdue ? (
                 <span className="text-red-600">Yes</span>
@@ -87,7 +91,7 @@ export function ContainerDrawerForm({
 
       {/* ── Shop Name ── */}
       <div className="space-y-1">
-        <Label className="text-xs">Shop Name</Label>
+        <Label className="text-xs">{tUi("shop.name")}</Label>
         <Input
           placeholder="e.g. ABC SHOP"
           value={form.shopName}
@@ -99,7 +103,7 @@ export function ContainerDrawerForm({
 
       {/* ── ETA DAS ── */}
       <div className="space-y-1">
-        <Label className="text-xs">ETA DAS</Label>
+        <Label className="text-xs">{tUi("eta.das")}</Label>
         <Input
           type="date"
           value={form.eta}
@@ -112,7 +116,7 @@ export function ContainerDrawerForm({
       {/* ── Transporter + Transport Fee ── */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <Label className="text-xs">Transporter</Label>
+          <Label className="text-xs">{tUi("transporter")}</Label>
           <Select
             value={form.transporter || "__none"}
             onValueChange={(v) => set("transporter", v === "__none" ? "" : v)}
@@ -123,15 +127,15 @@ export function ContainerDrawerForm({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__none">—</SelectItem>
-              <SelectItem value="FARHAT">FARHAT (+11d)</SelectItem>
-              <SelectItem value="CONTINENTAL">CONTINENTAL (+11d)</SelectItem>
-              <SelectItem value="KDOUH">KDOUH (+12d)</SelectItem>
-              <SelectItem value="TRH">TRH (+14d)</SelectItem>
+              <SelectItem value="FARHAT">{tUi("farhat.11d")}</SelectItem>
+              <SelectItem value="CONTINENTAL">{tUi("continental.11d")}</SelectItem>
+              <SelectItem value="KDOUH">{tUi("kdouh.12d")}</SelectItem>
+              <SelectItem value="TRH">{tUi("trh.14d")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Transport Fee ($)</Label>
+          <Label className="text-xs">{tUi("transport.fee")}</Label>
           <Input
             type="number"
             placeholder="0"
@@ -146,9 +150,9 @@ export function ContainerDrawerForm({
       {/* ── Truck + Location ── */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <Label className="text-xs">Truck / Number Plate</Label>
+          <Label className="text-xs">{tUi("truck.number.plate")}</Label>
           <Input
-            placeholder="T123ABC"
+            placeholder={tUi("t123abc")}
             value={form.numberPlate}
             onChange={(e) => set("numberPlate", e.target.value)}
             disabled={!canEdit}
@@ -156,7 +160,7 @@ export function ContainerDrawerForm({
           />
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Location</Label>
+          <Label className="text-xs">{tUi("location")}</Label>
           <Input
             placeholder="e.g. Kasumbalesa"
             value={form.trackingLocation}
@@ -169,7 +173,7 @@ export function ContainerDrawerForm({
 
       {/* ── Border Date ── */}
       <div className="space-y-1">
-        <Label className="text-xs">Border Date</Label>
+        <Label className="text-xs">{tUi("border.date")}</Label>
         <Input
           type="date"
           value={form.borderDate}
@@ -177,13 +181,13 @@ export function ContainerDrawerForm({
           disabled={!canEdit}
           data-testid="input-drawer-border-date"
         />
-        <p className="text-xs text-muted-foreground">Used to calculate Max Offload Date based on transporter</p>
+        <p className="text-xs text-muted-foreground">{tUi("used.to.calculate.max.offload.date.based.on.tran")}</p>
       </div>
 
       {/* ── Declarant + Duty Fee ── */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <Label className="text-xs">Declarant / Agent</Label>
+          <Label className="text-xs">{tUi("declarant.agent")}</Label>
           <Input
             placeholder="e.g. ATLAS"
             value={form.agent}
@@ -193,7 +197,7 @@ export function ContainerDrawerForm({
           />
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Duty Fee ($)</Label>
+          <Label className="text-xs">{tUi("duty.fee")}</Label>
           <Input
             type="number"
             placeholder="0"
@@ -208,7 +212,7 @@ export function ContainerDrawerForm({
       {/* ── Docs ── */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <Label className="text-xs">Docs Received</Label>
+          <Label className="text-xs">{tUi("docs.received")}</Label>
           <div className="flex items-center gap-2 pt-1">
             <Switch
               checked={form.docReceived}
@@ -220,7 +224,7 @@ export function ContainerDrawerForm({
           </div>
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Docs Sent to Transporter</Label>
+          <Label className="text-xs">{tUi("docs.sent.to.transporter")}</Label>
           <Input
             type="date"
             value={form.docsSentDate}
@@ -233,7 +237,7 @@ export function ContainerDrawerForm({
 
       {/* ── Tracking Link ── */}
       <div className="space-y-1">
-        <Label className="text-xs">Tracking Link</Label>
+        <Label className="text-xs">{tUi("tracking.link")}</Label>
         <Input
           placeholder="https://…"
           value={form.trackingLink}
@@ -245,10 +249,10 @@ export function ContainerDrawerForm({
 
       {/* ── Notes ── */}
       <div className="space-y-1">
-        <Label className="text-xs">Notes</Label>
+        <Label className="text-xs">{tUi("notes")}</Label>
         <Textarea
           rows={3}
-          placeholder="Additional notes…"
+          placeholder={tUi("additional.notes")}
           value={form.trackingDescription}
           onChange={(e) => set("trackingDescription", e.target.value)}
           disabled={!canEdit}
@@ -258,10 +262,10 @@ export function ContainerDrawerForm({
 
       {/* ── BL Docs ── */}
       <div className="space-y-1">
-        <Label className="text-xs">BL Docs</Label>
+        <Label className="text-xs">{tUi("bl.docs")}</Label>
         <Textarea
           rows={3}
-          placeholder="BL document notes…"
+          placeholder={tUi("bl.document.notes")}
           value={form.blDocs}
           onChange={(e) => set("blDocs", e.target.value)}
           disabled={!canEdit}

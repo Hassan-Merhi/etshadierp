@@ -3,11 +3,12 @@
  *
  * Extracted from ProductionComparison.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
-import {Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList} from "@/components/ui/command";
-import {Check, ChevronDown, X} from "lucide-react";
-import {cn} from "@/lib/utils";
+import { useState } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Check, ChevronDown, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function MultiSelectFilter({
   options,
@@ -24,6 +25,7 @@ export function MultiSelectFilter({
   allLabel: string;
   className?: string;
 }) {
+  const tUi = useFactoryText();
   const [open, setOpen] = useState(false);
 
   const toggle = (value: string) => {
@@ -70,7 +72,7 @@ export function MultiSelectFilter({
         <Command>
           <CommandInput placeholder={`Search ${placeholder.toLowerCase()}…`} />
           <CommandList>
-            <CommandEmpty>No results.</CommandEmpty>
+            <CommandEmpty>{tUi("no.results")}</CommandEmpty>
             <CommandGroup>
               {options.map((opt) => {
                 const checked = selected.includes(opt);

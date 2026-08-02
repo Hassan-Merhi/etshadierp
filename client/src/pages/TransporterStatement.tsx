@@ -1,23 +1,23 @@
-import {useState, useMemo, useCallback} from "react";
-import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
-import {apiRequest} from "@/lib/queryClient";
-import {useToast} from "@/hooks/use-toast";
-import {useDateFormat} from "@/contexts/DateFormatContext";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Badge} from "@/components/ui/badge";
-import {Skeleton} from "@/components/ui/skeleton";
-import {TrendingDown, TrendingUp, Minus, RefreshCw, Printer, MessageCircle} from "lucide-react";
-import {cn} from "@/lib/utils";
+import { useState, useMemo, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TrendingDown, TrendingUp, Minus, RefreshCw, Printer, MessageCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-import type {StatementResponse, StatementRow, Transporter} from "./transporterstatement/types";
-import {fmtAmt, fmtNum, monthAgo, today} from "./transporterstatement/utils";
-import {StatusBadge} from "./transporterstatement/components/StatusBadge";
-import {DueDateCell} from "./transporterstatement/components/DueDateCell";
-import {SettingsPopover} from "./transporterstatement/components/SettingsPopover";
+import type { StatementResponse, StatementRow, Transporter } from "./transporterstatement/types";
+import { fmtAmt, fmtNum, monthAgo, today } from "./transporterstatement/utils";
+import { StatusBadge } from "./transporterstatement/components/StatusBadge";
+import { DueDateCell } from "./transporterstatement/components/DueDateCell";
+import { SettingsPopover } from "./transporterstatement/components/SettingsPopover";
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export default function TransporterStatement({ embedded }: { embedded?: boolean }) {

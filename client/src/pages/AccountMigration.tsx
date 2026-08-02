@@ -411,16 +411,22 @@ export default function AccountMigration() {
 
   const srcCompany = companies.find((c) => String(c.id) === srcCompanyId);
   const destCompany = companies.find((c) => String(c.id) === destCompanyId);
-  const canPreview = !!srcCompanyId && !!destCompanyId && selectedAccountIds.length > 0 && srcCompanyId !== destCompanyId;
+  const canPreview =
+    !!srcCompanyId && !!destCompanyId && selectedAccountIds.length > 0 && srcCompanyId !== destCompanyId;
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Account Migration" subtitle="Move one or more ledger accounts with their complete statement history to another company" />
+      <PageHeader
+        title="Account Migration"
+        subtitle="Move one or more ledger accounts with their complete statement history to another company"
+      />
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">1</span>
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
+              1
+            </span>
             Source — pick company and accounts
           </CardTitle>
         </CardHeader>
@@ -450,7 +456,11 @@ export default function AccountMigration() {
                 </SelectTrigger>
                 <SelectContent>
                   {companies.map((company) => (
-                    <SelectItem key={company.id} value={String(company.id)} disabled={String(company.id) === destCompanyId}>
+                    <SelectItem
+                      key={company.id}
+                      value={String(company.id)}
+                      disabled={String(company.id) === destCompanyId}
+                    >
                       <div className="flex items-center gap-2">
                         <span>{company.name}</span>
                         <CompanyBadge company={company} />
@@ -485,7 +495,9 @@ export default function AccountMigration() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">2</span>
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
+              2
+            </span>
             Destination company
           </CardTitle>
         </CardHeader>
@@ -493,13 +505,23 @@ export default function AccountMigration() {
           {loadingCompanies ? (
             <Skeleton className="h-10 w-full" />
           ) : (
-            <Select value={destCompanyId} onValueChange={(v) => { setDestCompanyId(v); setPreview(null); }}>
+            <Select
+              value={destCompanyId}
+              onValueChange={(v) => {
+                setDestCompanyId(v);
+                setPreview(null);
+              }}
+            >
               <SelectTrigger data-testid="select-destination-company">
                 <SelectValue placeholder="Select destination company..." />
               </SelectTrigger>
               <SelectContent>
                 {companies.map((company) => (
-                  <SelectItem key={company.id} value={String(company.id)} disabled={String(company.id) === srcCompanyId}>
+                  <SelectItem
+                    key={company.id}
+                    value={String(company.id)}
+                    disabled={String(company.id) === srcCompanyId}
+                  >
                     <div className="flex items-center gap-2">
                       <span>{company.name}</span>
                       <CompanyBadge company={company} />
@@ -512,7 +534,11 @@ export default function AccountMigration() {
         </CardContent>
       </Card>
 
-      <Button className="w-full" disabled={!canPreview || previewMutation.isPending} onClick={() => previewMutation.mutate()}>
+      <Button
+        className="w-full"
+        disabled={!canPreview || previewMutation.isPending}
+        onClick={() => previewMutation.mutate()}
+      >
         {previewMutation.isPending ? "Preparing preview..." : "Preview migration"}
       </Button>
 
@@ -526,12 +552,25 @@ export default function AccountMigration() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Accounts</p><p className="text-xl font-semibold">{preview.accounts.length}</p></div>
-              <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Entries</p><p className="text-xl font-semibold">{preview.grandTotalEntries}</p></div>
-              <div className="rounded-md border p-3"><p className="text-xs text-muted-foreground">Net</p><p className="text-xl font-semibold font-mono">{fmt(preview.grandTotalDebit - preview.grandTotalCredit)}</p></div>
+              <div className="rounded-md border p-3">
+                <p className="text-xs text-muted-foreground">Accounts</p>
+                <p className="text-xl font-semibold">{preview.accounts.length}</p>
+              </div>
+              <div className="rounded-md border p-3">
+                <p className="text-xs text-muted-foreground">Entries</p>
+                <p className="text-xl font-semibold">{preview.grandTotalEntries}</p>
+              </div>
+              <div className="rounded-md border p-3">
+                <p className="text-xs text-muted-foreground">Net</p>
+                <p className="text-xl font-semibold font-mono">
+                  {fmt(preview.grandTotalDebit - preview.grandTotalCredit)}
+                </p>
+              </div>
             </div>
             <div className="space-y-2">
-              {preview.accounts.map((item) => <AccountPreviewRow key={item.account.id} item={item} />)}
+              {preview.accounts.map((item) => (
+                <AccountPreviewRow key={item.account.id} item={item} />
+              ))}
             </div>
             <Button className="w-full" variant="destructive" onClick={() => setConfirmOpen(true)}>
               Execute migration
@@ -543,11 +582,14 @@ export default function AccountMigration() {
       {lastResult && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><CheckCircle className="h-5 w-5" /> Migration complete</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5" /> Migration complete
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              {lastResult.accounts.length} account{lastResult.accounts.length === 1 ? "" : "s"} and {lastResult.totalEntries} entries were moved.
+              {lastResult.accounts.length} account{lastResult.accounts.length === 1 ? "" : "s"} and{" "}
+              {lastResult.totalEntries} entries were moved.
             </p>
             {!undoDone && (
               <Button variant="outline" onClick={() => setUndoConfirmOpen(true)}>
@@ -563,11 +605,14 @@ export default function AccountMigration() {
           <DialogHeader>
             <DialogTitle>Confirm account migration</DialogTitle>
             <DialogDescription>
-              This will move {selectedAccountIds.length} account{selectedAccountIds.length === 1 ? "" : "s"} from {srcCompany?.name} to {destCompany?.name}.
+              This will move {selectedAccountIds.length} account{selectedAccountIds.length === 1 ? "" : "s"} from{" "}
+              {srcCompany?.name} to {destCompany?.name}.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setConfirmOpen(false)}>
+              Cancel
+            </Button>
             <Button variant="destructive" disabled={executeMutation.isPending} onClick={() => executeMutation.mutate()}>
               {executeMutation.isPending ? "Migrating..." : "Confirm migration"}
             </Button>
@@ -579,10 +624,14 @@ export default function AccountMigration() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Undo migration?</DialogTitle>
-            <DialogDescription>This moves the migrated accounts and vouchers back to the original company.</DialogDescription>
+            <DialogDescription>
+              This moves the migrated accounts and vouchers back to the original company.
+            </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setUndoConfirmOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setUndoConfirmOpen(false)}>
+              Cancel
+            </Button>
             <Button variant="destructive" disabled={undoMutation.isPending} onClick={() => undoMutation.mutate()}>
               {undoMutation.isPending ? "Undoing..." : "Undo migration"}
             </Button>

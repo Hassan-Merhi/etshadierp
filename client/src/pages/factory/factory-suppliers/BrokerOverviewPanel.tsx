@@ -18,12 +18,13 @@ import {
 } from "lucide-react";
 import { CurrencyBalance, SupplierWithBalance } from "./factorySupplierTypes";
 import { DirectContainer } from "./AssignContainersDialog";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 const STATUS_COLORS: Record<string, string> = {
-  PENDING:    "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  PENDING: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
   IN_TRANSIT: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
-  ARRIVED:    "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
-  OFFLOADED:  "bg-muted text-muted-foreground",
+  ARRIVED: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
+  OFFLOADED: "bg-muted text-muted-foreground",
 };
 
 interface BrokerOverviewPanelProps {
@@ -68,6 +69,7 @@ export function BrokerOverviewPanel({
   onAddLinkedSupplier,
   onAssignContainersTo,
 }: BrokerOverviewPanelProps) {
+  const tUi = useFactoryText();
   const parentSup = allSuppliers.find((s) => s.id === parentViewSupplierId);
   const children = subAccountsByParent[parentViewSupplierId] || [];
 
@@ -123,15 +125,10 @@ export function BrokerOverviewPanel({
             onCheckedChange={setBrokerIncludeOtw}
             data-testid="switch-broker-overview-include-otw"
           />
-          <span className="text-xs font-normal text-muted-foreground">Include OTW containers</span>
+          <span className="text-xs font-normal text-muted-foreground">{tUi("include.otw.containers")}</span>
         </label>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onAddLinkedSupplier}
-          data-testid="button-add-linked-supplier"
-        >
+        <Button variant="outline" size="sm" onClick={onAddLinkedSupplier} data-testid="button-add-linked-supplier">
           <Plus className="h-3.5 w-3.5 mr-1.5" />
           Add Linked Supplier
         </Button>
@@ -153,19 +150,19 @@ export function BrokerOverviewPanel({
       {parentSup && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           <div className="rounded-xl border p-4">
-            <div className="text-xs text-muted-foreground">Total Containers</div>
+            <div className="text-xs text-muted-foreground">{tUi("total.containers")}</div>
             <div className="text-2xl font-bold mt-1" data-testid="text-parent-total-containers">
               {parentSup.totalContainers}
             </div>
           </div>
           <div className="rounded-xl border p-4">
-            <div className="text-xs text-muted-foreground">Linked Suppliers</div>
+            <div className="text-xs text-muted-foreground">{tUi("linked.suppliers")}</div>
             <div className="text-2xl font-bold mt-1">{children.length}</div>
           </div>
           {/* Direct containers KPI (broker-owned, not yet assigned to a child) */}
           {!directContainersLoading && directContainers.length > 0 && (
             <div className="rounded-xl border border-amber-200 dark:border-amber-800 p-4">
-              <div className="text-xs text-muted-foreground">Direct (Unassigned)</div>
+              <div className="text-xs text-muted-foreground">{tUi("direct.unassigned")}</div>
               <div className="text-2xl font-bold mt-1 text-amber-600 dark:text-amber-400">
                 {directContainers.length}
               </div>
@@ -215,7 +212,7 @@ export function BrokerOverviewPanel({
             })()}
           {brokerOverviewLoading ? (
             <div className="rounded-xl border p-4">
-              <div className="text-xs text-muted-foreground">Pool Balance</div>
+              <div className="text-xs text-muted-foreground">{tUi("pool.balance")}</div>
               <div className="text-2xl font-bold mt-1 text-muted-foreground animate-pulse">—</div>
             </div>
           ) : (
@@ -303,9 +300,7 @@ export function BrokerOverviewPanel({
                       })}
                     </span>
                   )}
-                  {c.arrivalDate && (
-                    <span className="text-xs text-muted-foreground ml-auto">{c.arrivalDate}</span>
-                  )}
+                  {c.arrivalDate && <span className="text-xs text-muted-foreground ml-auto">{c.arrivalDate}</span>}
                 </div>
               ))}
             </div>
@@ -317,13 +312,13 @@ export function BrokerOverviewPanel({
       <div className="rounded-xl border overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20">
           <Link2 className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-semibold">Linked Suppliers</span>
+          <span className="text-sm font-semibold">{tUi("linked.suppliers")}</span>
         </div>
         <div>
           {children.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
               <Users className="h-10 w-10 mx-auto mb-2 opacity-40" />
-              <p className="text-sm mb-3">No linked suppliers yet</p>
+              <p className="text-sm mb-3">{tUi("no.linked.suppliers.yet")}</p>
               <Button variant="outline" size="sm" onClick={onAddLinkedSupplier}>
                 <Plus className="h-3.5 w-3.5 mr-1.5" />
                 Add Linked Supplier
@@ -379,7 +374,7 @@ export function BrokerOverviewPanel({
                         variant="outline"
                         size="sm"
                         onClick={() => onAssignContainersTo(child.id, child.name)}
-                        title="Assign broker's direct containers to this linked supplier"
+                        title={tUi("assign.broker.s.direct.containers.to.this.linked")}
                         data-testid={`button-assign-containers-${child.id}`}
                         className="text-xs"
                       >
@@ -387,29 +382,30 @@ export function BrokerOverviewPanel({
                         Assign Containers
                       </Button>
                     )}
-                    {child.isActive && (() => {
-                      const childNonUsd = (child.currencyBalances || []).filter(
-                        (c: CurrencyBalance) => c.currencyCode !== "USD" && c.balance > 0.005
-                      );
-                      return childNonUsd.map((cb: CurrencyBalance) => (
-                        <Button
-                          key={cb.currencyCode}
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openFxConversionDialog(child, cb.currencyCode, cb.balance)}
-                          title={`FX Settlement: settle ${cb.currencyCode} → USD`}
-                          data-testid={`button-fx-child-${child.id}-${cb.currencyCode}`}
-                        >
-                          <ArrowRightLeft className="h-4 w-4 text-blue-500 dark:text-blue-400" />
-                        </Button>
-                      ));
-                    })()}
+                    {child.isActive &&
+                      (() => {
+                        const childNonUsd = (child.currencyBalances || []).filter(
+                          (c: CurrencyBalance) => c.currencyCode !== "USD" && c.balance > 0.005
+                        );
+                        return childNonUsd.map((cb: CurrencyBalance) => (
+                          <Button
+                            key={cb.currencyCode}
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openFxConversionDialog(child, cb.currencyCode, cb.balance)}
+                            title={`FX Settlement: settle ${cb.currencyCode} → USD`}
+                            data-testid={`button-fx-child-${child.id}-${cb.currencyCode}`}
+                          >
+                            <ArrowRightLeft className="h-4 w-4 text-blue-500 dark:text-blue-400" />
+                          </Button>
+                        ));
+                      })()}
                     {child.isActive && (
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => openPaymentDialog(child)}
-                        title="Record Payment"
+                        title={tUi("record.payment")}
                         data-testid={`button-pay-child-${child.id}`}
                       >
                         <DollarSign className="h-4 w-4 text-green-600 dark:text-green-400" />

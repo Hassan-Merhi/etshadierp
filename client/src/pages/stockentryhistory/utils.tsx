@@ -4,7 +4,7 @@
  * Extracted from StockEntryHistory.tsx during the Phase 4 god-file split.
  */
 
-import type {GroupRow, MatrixRow, StockEntryHistoryPage, WorkerMatrix} from "./types";
+import type { GroupRow, MatrixRow, StockEntryHistoryPage, WorkerMatrix } from "./types";
 
 export const STATUS_OPTIONS = [
   "PENDING_PRESSING",

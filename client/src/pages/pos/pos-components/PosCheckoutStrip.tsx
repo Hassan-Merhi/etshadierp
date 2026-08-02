@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import type { Location } from "./posTypes";
+import { usePosText } from "@/i18n/modules/pos";
 
 interface PosCheckoutStripProps {
   posUser: any;
@@ -59,6 +60,7 @@ export function PosCheckoutStrip({
   cashLedgerAccounts,
   isSpCompany,
 }: PosCheckoutStripProps) {
+  const tUi = usePosText();
   if (!activeLocation) return null;
 
   return (
@@ -74,7 +76,7 @@ export function PosCheckoutStrip({
         >
           <SelectTrigger className="w-[180px]" data-testid="select-admin-location">
             <MapPin className="h-3.5 w-3.5 mr-1 text-muted-foreground shrink-0" />
-            <SelectValue placeholder="Location" />
+            <SelectValue placeholder={tUi("location")} />
           </SelectTrigger>
           <SelectContent>
             {allLocations.map((loc) => (
@@ -94,7 +96,7 @@ export function PosCheckoutStrip({
         >
           <SelectTrigger className="w-[180px]" data-testid="select-pos-location-strip">
             <MapPin className="h-3.5 w-3.5 mr-1 text-muted-foreground shrink-0" />
-            <SelectValue placeholder="Location" />
+            <SelectValue placeholder={tUi("location")} />
           </SelectTrigger>
           <SelectContent>
             {posAssignedLocations.map((loc) => (
@@ -131,8 +133,8 @@ export function PosCheckoutStrip({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="cash">Cash</SelectItem>
-              <SelectItem value="bank">Bank</SelectItem>
+              <SelectItem value="cash">{tUi("cash")}</SelectItem>
+              <SelectItem value="bank">{tUi("bank")}</SelectItem>
             </SelectContent>
           </Select>
 
@@ -190,9 +192,9 @@ export function PosCheckoutStrip({
           </PopoverTrigger>
           <PopoverContent className="w-64 p-0" align="start">
             <Command>
-              <CommandInput placeholder="Search customer…" data-testid="input-customer-search" />
+              <CommandInput placeholder={tUi("search.customer")} data-testid="input-customer-search" />
               <CommandList>
-                <CommandEmpty>No customer found.</CommandEmpty>
+                <CommandEmpty>{tUi("no.customer.found")}</CommandEmpty>
                 <CommandGroup>
                   {customerAccounts.map((acc: any) => (
                     <CommandItem

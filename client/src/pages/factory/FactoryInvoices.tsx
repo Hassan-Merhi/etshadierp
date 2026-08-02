@@ -45,7 +45,9 @@ import {
 import { InvoiceSummaryBar } from "@/components/InvoiceSummaryBar";
 
 import type { Customer, CustomerOrder, StatusFilter } from "./factoryinvoices/types";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactoryInvoices() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const { formatDisplayDate } = useDateFormat();
@@ -216,7 +218,7 @@ export default function FactoryInvoices() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "DRAFT":
-        return <Badge variant="secondary">Draft</Badge>;
+        return <Badge variant="secondary">{tUi("draft")}</Badge>;
       case "LOADING":
         return (
           <Badge variant="outline" className="border-blue-300 text-blue-700 dark:border-blue-600 dark:text-blue-400">
@@ -234,9 +236,9 @@ export default function FactoryInvoices() {
           </Badge>
         );
       case "FINALIZED":
-        return <Badge variant="default">Finalized</Badge>;
+        return <Badge variant="default">{tUi("finalized")}</Badge>;
       case "CANCELLED":
-        return <Badge variant="destructive">Cancelled</Badge>;
+        return <Badge variant="destructive">{tUi("cancelled")}</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -389,10 +391,10 @@ export default function FactoryInvoices() {
             <div className="w-52">
               <Select value={customerFilter} onValueChange={setCustomerFilter}>
                 <SelectTrigger data-testid="select-customer-filter">
-                  <SelectValue placeholder="All customers" />
+                  <SelectValue placeholder={tUi("all.customers")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Customers</SelectItem>
+                  <SelectItem value="all">{tUi("all.customers.2")}</SelectItem>
                   {customers.map((c) => (
                     <SelectItem key={c.id} value={c.id.toString()} data-testid={`select-customer-option-${c.id}`}>
                       {c.legalName}
@@ -488,7 +490,7 @@ export default function FactoryInvoices() {
                     >
                       <div className="flex flex-col items-center gap-2">
                         <Package className="h-10 w-10 opacity-40" />
-                        <p>No invoices found</p>
+                        <p>{tUi("no.invoices.found")}</p>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -576,7 +578,7 @@ export default function FactoryInvoices() {
                             ) : overloaded > 0 ? (
                               <span className="text-amber-600 dark:text-amber-400 font-medium">+{overloaded}</span>
                             ) : (
-                              <span className="text-green-600 dark:text-green-400 font-medium">Done</span>
+                              <span className="text-green-600 dark:text-green-400 font-medium">{tUi("done")}</span>
                             )}
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm" data-testid={`text-extras-${order.id}`}>
@@ -641,7 +643,7 @@ export default function FactoryInvoices() {
                                     variant="ghost"
                                     size="icon"
                                     data-testid={`button-download-${order.id}`}
-                                    title="Download Invoice"
+                                    title={tUi("download.invoice")}
                                   >
                                     <Download className="h-4 w-4" />
                                   </Button>
@@ -733,7 +735,7 @@ export default function FactoryInvoices() {
                                   </AlertDialogTrigger>
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
-                                      <AlertDialogTitle>Revert to Verified</AlertDialogTitle>
+                                      <AlertDialogTitle>{tUi("revert.to.verified")}</AlertDialogTitle>
                                       <AlertDialogDescription>
                                         This will revert invoice {order.invoiceNumber} for {order.customerName} back to
                                         Verified status. The invoice number will be voided, all bales will return to
@@ -764,7 +766,7 @@ export default function FactoryInvoices() {
                                   </AlertDialogTrigger>
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
-                                      <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+                                      <AlertDialogTitle>{tUi("delete.invoice")}</AlertDialogTitle>
                                       <AlertDialogDescription>
                                         This will permanently delete invoice {order.invoiceNumber || `#${order.id}`} for{" "}
                                         {order.customerName}. Any bales assigned to this order will be returned to
@@ -851,7 +853,7 @@ export default function FactoryInvoices() {
                             ) : totalOverloaded > 0 ? (
                               <span className="text-amber-600 dark:text-amber-400">+{totalOverloaded}</span>
                             ) : (
-                              <span className="text-green-600 dark:text-green-400">Done</span>
+                              <span className="text-green-600 dark:text-green-400">{tUi("done")}</span>
                             )}
                           </TableCell>
                           <TableCell />

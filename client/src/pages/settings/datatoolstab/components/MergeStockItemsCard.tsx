@@ -3,23 +3,25 @@
  *
  * Extracted from DataToolsTab.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {Card, CardHeader, CardTitle, CardContent, CardDescription} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Alert, AlertDescription} from "@/components/ui/alert";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {useToast} from "@/hooks/use-toast";
-import {StockItemAutocomplete} from "@/components/StockItemAutocomplete";
-import {useQuery} from "@tanstack/react-query";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {Loader2, AlertTriangle, Eye, ArrowLeftRight} from "lucide-react";
-import {formatNumber} from "@/lib/formatNumber";
+import { useState } from "react";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { StockItemAutocomplete } from "@/components/StockItemAutocomplete";
+import { useQuery } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Loader2, AlertTriangle, Eye, ArrowLeftRight } from "lucide-react";
+import { formatNumber } from "@/lib/formatNumber";
 
-import type {MergePreviewResult} from "../types";
+import type { MergePreviewResult } from "../types";
+import { useErpText } from "@/i18n/modules/erp";
 
 export function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
+  const tUi = useErpText();
   const { toast } = useToast();
   const [keptItem, setKeptItem] = useState<{ id: number; name: string } | null>(null);
   const [dupItem, setDupItem] = useState<{ id: number; name: string } | null>(null);
@@ -101,7 +103,7 @@ export function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Item to keep</Label>
+            <Label>{tUi("item.to.keep")}</Label>
             <StockItemAutocomplete
               value={keptItem}
               onChange={(id, name) => {
@@ -111,12 +113,12 @@ export function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
                 setConfirmText("");
               }}
               stockItems={allStockItems}
-              placeholder="Search item to keep..."
+              placeholder={tUi("search.item.to.keep")}
               testId="merge-keep-item"
             />
           </div>
           <div className="space-y-2">
-            <Label>Duplicate to merge away</Label>
+            <Label>{tUi("duplicate.to.merge.away")}</Label>
             <StockItemAutocomplete
               value={dupItem}
               onChange={(id, name) => {
@@ -126,7 +128,7 @@ export function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
                 setConfirmText("");
               }}
               stockItems={allStockItems}
-              placeholder="Search duplicate item..."
+              placeholder={tUi("search.duplicate.item")}
               testId="merge-dup-item"
             />
           </div>
@@ -171,12 +173,12 @@ export function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Location</TableHead>
-                    <TableHead className="text-right">Keep Qty</TableHead>
-                    <TableHead className="text-right">Dup Qty</TableHead>
-                    <TableHead className="text-right">Combined Qty</TableHead>
-                    <TableHead className="text-right">Combined Rate</TableHead>
-                    <TableHead className="text-right">Combined Value</TableHead>
+                    <TableHead>{tUi("location")}</TableHead>
+                    <TableHead className="text-right">{tUi("keep.qty")}</TableHead>
+                    <TableHead className="text-right">{tUi("dup.qty")}</TableHead>
+                    <TableHead className="text-right">{tUi("combined.qty")}</TableHead>
+                    <TableHead className="text-right">{tUi("combined.rate")}</TableHead>
+                    <TableHead className="text-right">{tUi("combined.value")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -210,13 +212,13 @@ export function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
             {!preview.uomMismatch && (
               <div className="space-y-2 border-t pt-3">
                 <p className="text-sm text-muted-foreground">
-                  This action cannot be undone. Type <strong>MERGE</strong> to confirm.
+                  This action cannot be undone. Type <strong>{tUi("merge")}</strong> to confirm.
                 </p>
                 <div className="flex gap-2 items-center flex-wrap">
                   <Input
                     value={confirmText}
                     onChange={(e) => setConfirmText(e.target.value)}
-                    placeholder="Type MERGE"
+                    placeholder={tUi("type.merge")}
                     className="max-w-[160px]"
                     data-testid="input-merge-confirm"
                   />

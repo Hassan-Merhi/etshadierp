@@ -1,28 +1,44 @@
-import {useState, useMemo, useRef, useEffect} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {useLocation} from "wouter";
-import {Shield, Plus, Edit, ToggleLeft, ToggleRight, Trash2, DollarSign, Users, UserCheck, Loader2, Receipt, Search, BookOpen} from "lucide-react";
-import {useToast} from "@/hooks/use-toast";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
-import {PageHeader} from "@/components/PageHeader";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter} from "@/components/ui/dialog";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Textarea} from "@/components/ui/textarea";
-import {Switch} from "@/components/ui/switch";
-import {useDateFormat} from "@/contexts/DateFormatContext";
-import {useCompany} from "@/contexts/CompanyContext";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import {
+  Shield,
+  Plus,
+  Edit,
+  ToggleLeft,
+  ToggleRight,
+  Trash2,
+  DollarSign,
+  Users,
+  UserCheck,
+  Loader2,
+  Receipt,
+  Search,
+  BookOpen,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/PageHeader";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useCompany } from "@/contexts/CompanyContext";
 
-import type {InsuranceMember} from "./factoryinsurance/types";
-import {MONTHS, YEARS} from "./factoryinsurance/utils";
-import {MemberFormDialog} from "./factoryinsurance/components/MemberFormDialog";
-import {MemberStatementDrawer} from "./factoryinsurance/components/MemberStatementDrawer";
+import type { InsuranceMember } from "./factoryinsurance/types";
+import { MONTHS, YEARS } from "./factoryinsurance/utils";
+import { MemberFormDialog } from "./factoryinsurance/components/MemberFormDialog";
+import { MemberStatementDrawer } from "./factoryinsurance/components/MemberStatementDrawer";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactoryInsurance() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
   const { selectedCompany } = useCompany();
@@ -215,7 +231,7 @@ export default function FactoryInsurance() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <PageHeader title="Insurance" subtitle="Manage insurance members and generate monthly entries" />
+        <PageHeader title={tUi("insurance")} subtitle={tUi("manage.insurance.members.and.generate.monthly.en")} />
         <div className="flex items-center gap-2 flex-wrap">
           <Button variant="outline" onClick={() => setShowExtraCharges(true)} data-testid="button-extra-charges">
             <Receipt className="h-4 w-4 mr-1" />
@@ -238,7 +254,7 @@ export default function FactoryInsurance() {
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Total Members</span>
+              <span className="text-sm text-muted-foreground">{tUi("total.members")}</span>
             </div>
             <div className="text-2xl font-bold mt-1" data-testid="stat-total">
               {stats.total}
@@ -249,7 +265,7 @@ export default function FactoryInsurance() {
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-2">
               <UserCheck className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Active</span>
+              <span className="text-sm text-muted-foreground">{tUi("active")}</span>
             </div>
             <div className="text-2xl font-bold mt-1 text-green-600 dark:text-green-400" data-testid="stat-active">
               {stats.active}
@@ -260,7 +276,7 @@ export default function FactoryInsurance() {
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Monthly Total</span>
+              <span className="text-sm text-muted-foreground">{tUi("monthly.total")}</span>
             </div>
             <div className="text-2xl font-bold mt-1" data-testid="stat-amount">
               ${stats.totalAmount % 1 === 0 ? stats.totalAmount.toFixed(0) : stats.totalAmount.toFixed(2)}
@@ -277,7 +293,7 @@ export default function FactoryInsurance() {
           <CardContent className="pt-4 pb-4">
             <div className="flex items-center gap-2">
               <BookOpen className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Insurance Expense</span>
+              <span className="text-sm text-muted-foreground">{tUi("insurance.expense")}</span>
             </div>
             <div className="text-2xl font-bold mt-1 font-mono" data-testid="stat-expense-balance">
               {insExpenseBalance != null
@@ -299,7 +315,7 @@ export default function FactoryInsurance() {
       {/* Filters */}
       <div className="flex items-center gap-3 flex-wrap">
         <Input
-          placeholder="Search by name, nationality, position..."
+          placeholder={tUi("search.by.name.nationality.position")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-xs"
@@ -328,7 +344,7 @@ export default function FactoryInsurance() {
           ) : isError ? (
             <div className="flex flex-col items-center justify-center py-12 text-destructive gap-2">
               <Shield className="h-10 w-10 mb-2 opacity-30" />
-              <p className="text-sm font-medium">Failed to load insurance members</p>
+              <p className="text-sm font-medium">{tUi("failed.to.load.insurance.members")}</p>
               <p className="text-xs text-muted-foreground max-w-xs text-center">
                 {(membersError as Error)?.message || "Unknown error"}
               </p>
@@ -354,15 +370,15 @@ export default function FactoryInsurance() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Insurance No.</TableHead>
-                  <TableHead>Nationality</TableHead>
-                  <TableHead>Position</TableHead>
-                  <TableHead>Start Date</TableHead>
-                  <TableHead>Date of Birth</TableHead>
-                  <TableHead className="text-right">Monthly Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{tUi("name")}</TableHead>
+                  <TableHead>{tUi("insurance.no")}</TableHead>
+                  <TableHead>{tUi("nationality")}</TableHead>
+                  <TableHead>{tUi("position")}</TableHead>
+                  <TableHead>{tUi("start.date")}</TableHead>
+                  <TableHead>{tUi("date.of.birth")}</TableHead>
+                  <TableHead className="text-right">{tUi("monthly.amount")}</TableHead>
+                  <TableHead>{tUi("status")}</TableHead>
+                  <TableHead className="text-right">{tUi("actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -401,7 +417,7 @@ export default function FactoryInsurance() {
                           size="icon"
                           variant="ghost"
                           onClick={() => setEditMember(m)}
-                          title="Edit member"
+                          title={tUi("edit.member")}
                           data-testid={`button-edit-${m.id}`}
                         >
                           <Edit className="h-4 w-4" />
@@ -423,7 +439,7 @@ export default function FactoryInsurance() {
                           size="icon"
                           variant="ghost"
                           onClick={() => setDeleteMember(m)}
-                          title="Delete member"
+                          title={tUi("delete.member")}
                           data-testid={`button-delete-${m.id}`}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
@@ -457,7 +473,7 @@ export default function FactoryInsurance() {
       <Dialog open={!!deleteMember} onOpenChange={(v) => !v && setDeleteMember(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete Member</DialogTitle>
+            <DialogTitle>{tUi("delete.member.2")}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             Permanently delete <span className="font-semibold text-foreground">{deleteMember?.name}</span>? This cannot
@@ -488,16 +504,16 @@ export default function FactoryInsurance() {
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Extra Charges</DialogTitle>
+            <DialogTitle>{tUi("add.extra.charges")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-1">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>Date</Label>
+                <Label>{tUi("date")}</Label>
                 <Input type="date" value={ecDate} onChange={(e) => setEcDate(e.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label>Amount</Label>
+                <Label>{tUi("amount")}</Label>
                 <Input
                   type="number"
                   min="0"
@@ -510,12 +526,12 @@ export default function FactoryInsurance() {
             </div>
             {/* DR Account */}
             <div className="space-y-1" ref={ecDrRef}>
-              <Label>Debit Account (Dr)</Label>
+              <Label>{tUi("debit.account.dr")}</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                 <Input
                   className="pl-8"
-                  placeholder="Search account name…"
+                  placeholder={tUi("search.account.name")}
                   value={ecDrSearch}
                   onFocus={() => setEcDrOpen(true)}
                   onChange={(e) => {
@@ -543,19 +559,21 @@ export default function FactoryInsurance() {
                         </div>
                       ))}
                     {ledgerAccounts.filter((a: any) => a.name.toLowerCase().includes(ecDrSearch.toLowerCase()))
-                      .length === 0 && <div className="px-3 py-2 text-muted-foreground italic">No accounts found</div>}
+                      .length === 0 && (
+                      <div className="px-3 py-2 text-muted-foreground italic">{tUi("no.accounts.found")}</div>
+                    )}
                   </div>
                 )}
               </div>
             </div>
             {/* CR Account */}
             <div className="space-y-1" ref={ecCrRef}>
-              <Label>Credit Account (Cr)</Label>
+              <Label>{tUi("credit.account.cr")}</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                 <Input
                   className="pl-8"
-                  placeholder="Search account name…"
+                  placeholder={tUi("search.account.name")}
                   value={ecCrSearch}
                   onFocus={() => setEcCrOpen(true)}
                   onChange={(e) => {
@@ -583,7 +601,9 @@ export default function FactoryInsurance() {
                         </div>
                       ))}
                     {ledgerAccounts.filter((a: any) => a.name.toLowerCase().includes(ecCrSearch.toLowerCase()))
-                      .length === 0 && <div className="px-3 py-2 text-muted-foreground italic">No accounts found</div>}
+                      .length === 0 && (
+                      <div className="px-3 py-2 text-muted-foreground italic">{tUi("no.accounts.found")}</div>
+                    )}
                   </div>
                 )}
               </div>
@@ -621,7 +641,7 @@ export default function FactoryInsurance() {
       <Dialog open={showGenDialog} onOpenChange={(v) => !v && setShowGenDialog(false)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Generate Insurance Entries</DialogTitle>
+            <DialogTitle>{tUi("generate.insurance.entries")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
@@ -630,7 +650,7 @@ export default function FactoryInsurance() {
             </p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>Month</Label>
+                <Label>{tUi("month")}</Label>
                 <Select value={String(genMonth)} onValueChange={(v) => setGenMonth(parseInt(v))}>
                   <SelectTrigger data-testid="select-gen-month">
                     <SelectValue />
@@ -645,7 +665,7 @@ export default function FactoryInsurance() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label>Year</Label>
+                <Label>{tUi("year")}</Label>
                 <Select value={String(genYear)} onValueChange={(v) => setGenYear(parseInt(v))}>
                   <SelectTrigger data-testid="select-gen-year">
                     <SelectValue />

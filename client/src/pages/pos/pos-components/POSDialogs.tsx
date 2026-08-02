@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, Trash2, Check, Send, Plus } from "lucide-react";
+import { usePosText } from "@/i18n/modules/pos";
 
 export interface POSDialogsProps {
   zeroStockAlert: boolean;
@@ -72,6 +73,7 @@ export function POSDialogs({
   stockInventory,
   stockPrintRef,
 }: POSDialogsProps) {
+  const tUi = usePosText();
   return (
     <>
       {/* Zero Stock Alert Dialog */}
@@ -99,7 +101,7 @@ export function POSDialogs({
       <AlertDialog open={showDraftDialog} onOpenChange={setShowDraftDialog}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Drafts</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("drafts")}</AlertDialogTitle>
             <AlertDialogDescription>
               You have {drafts.length} unsaved transaction drafts for this location.
             </AlertDialogDescription>
@@ -124,11 +126,17 @@ export function POSDialogs({
                         </p>
                         {count > 0 && (
                           <p className="text-xs text-muted-foreground font-medium">
-                            Total: ${totalAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            Total: $
+                            {totalAmount.toLocaleString("en-US", {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground">
-                          {new Date(draft.updated_at || draft.updatedAt || draft.created_at || draft.createdAt).toLocaleString()}
+                          {new Date(
+                            draft.updated_at || draft.updatedAt || draft.created_at || draft.createdAt
+                          ).toLocaleString()}
                         </p>
                       </>
                     );
@@ -176,7 +184,7 @@ export function POSDialogs({
       >
         <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Print Invoice</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("print.invoice")}</AlertDialogTitle>
             <AlertDialogDescription>
               Sale has been saved successfully. Would you like to print the invoice?
             </AlertDialogDescription>
@@ -269,7 +277,7 @@ export function POSDialogs({
                       disabled
                       className="gap-2 opacity-60"
                       data-testid="button-stock-wa-none"
-                      title="WhatsApp group not configured for this location"
+                      title={tUi("whatsapp.group.not.configured.for.this.location")}
                     >
                       <Send className="h-4 w-4" />
                       No WhatsApp Group
@@ -306,7 +314,7 @@ export function POSDialogs({
       <AlertDialog open={showStockPrompt} onOpenChange={setShowStockPrompt}>
         <AlertDialogContent className="max-w-xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Location Stock Report</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("location.stock.report")}</AlertDialogTitle>
             <AlertDialogDescription>
               View and share current stock levels for {(activeLocation as any)?.name}.
             </AlertDialogDescription>
@@ -314,13 +322,13 @@ export function POSDialogs({
 
           <div className="max-h-[300px] overflow-y-auto my-4 border rounded-md">
             {stockInventoryLoading ? (
-              <div className="p-8 text-center text-muted-foreground">Loading inventory...</div>
+              <div className="p-8 text-center text-muted-foreground">{tUi("loading.inventory")}</div>
             ) : (
               <table className="w-full text-sm border-collapse">
                 <thead className="sticky top-0 bg-muted/50">
                   <tr className="border-b">
-                    <th className="text-left p-2 font-medium">Item</th>
-                    <th className="text-right p-2 font-medium">Stock</th>
+                    <th className="text-left p-2 font-medium">{tUi("item")}</th>
+                    <th className="text-right p-2 font-medium">{tUi("stock")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -382,7 +390,7 @@ export function POSDialogs({
           style={{ width: "800px", fontFamily: "monospace" }}
         >
           <div className="text-center border-b-2 border-black pb-4 mb-4">
-            <h1 className="text-2xl font-bold uppercase">Stock Level Report</h1>
+            <h1 className="text-2xl font-bold uppercase">{tUi("stock.level.report")}</h1>
             <p className="text-lg">
               Location: {(activeLocation as any)?.name} ({(activeLocation as any)?.code})
             </p>
@@ -391,8 +399,8 @@ export function POSDialogs({
           <table className="w-full border-collapse">
             <thead>
               <tr className="border-b-2 border-black">
-                <th className="text-left py-2">ITEM DESCRIPTION</th>
-                <th className="text-left py-2">CODE</th>
+                <th className="text-left py-2">{tUi("item.description")}</th>
+                <th className="text-left py-2">{tUi("code.2")}</th>
                 <th className="text-right py-2">QTY</th>
               </tr>
             </thead>

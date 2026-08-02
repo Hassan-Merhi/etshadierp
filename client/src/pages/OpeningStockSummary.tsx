@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { EmptyState, LoadingRows } from "@/components/ui/display-state";
 import { PageShell, financialNumberClassName } from "@/components/ui/page-shell";
 import { cn } from "@/lib/utils";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface StockGroupSummary {
   id: number;
@@ -47,6 +48,7 @@ function formatQty(value: number): string {
 }
 
 export default function OpeningStockSummary() {
+  const tUi = useErpText();
   const [, navigate] = useLocation();
   const { selectedCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();
@@ -72,7 +74,7 @@ export default function OpeningStockSummary() {
   return (
     <PageShell>
       <PageHeader
-        title="Opening Stock Summary"
+        title={tUi("opening.stock.summary")}
         subtitle={selectedCompany?.name}
         icon={<Package className="h-5 w-5" />}
       />
@@ -80,20 +82,24 @@ export default function OpeningStockSummary() {
       <Card className="overflow-hidden">
         <div className="bg-primary text-primary-foreground">
           <div className="grid grid-cols-2 p-2 text-xs font-semibold sm:grid-cols-7 sm:p-3 sm:text-sm">
-            <div>Particulars</div>
-            <div className="border-l border-primary-foreground/30 text-center sm:col-span-3">Opening Balance</div>
+            <div>{tUi("particulars")}</div>
+            <div className="border-l border-primary-foreground/30 text-center sm:col-span-3">
+              {tUi("opening.balance")}
+            </div>
             <div className="hidden border-l border-primary-foreground/30 text-center sm:col-span-3 sm:block">
               Closing Balance
             </div>
           </div>
           <div className="grid grid-cols-2 px-2 pb-2 text-xs sm:grid-cols-7 sm:px-3">
             <div />
-            <div className="border-l border-primary-foreground/30 pl-2 text-right">Quantity</div>
-            <div className="hidden text-right sm:block">Rate</div>
-            <div className="hidden text-right sm:block">Value</div>
-            <div className="hidden border-l border-primary-foreground/30 pl-2 text-right sm:block">Quantity</div>
-            <div className="hidden text-right sm:block">Rate</div>
-            <div className="hidden text-right sm:block">Value</div>
+            <div className="border-l border-primary-foreground/30 pl-2 text-right">{tUi("quantity")}</div>
+            <div className="hidden text-right sm:block">{tUi("rate")}</div>
+            <div className="hidden text-right sm:block">{tUi("value")}</div>
+            <div className="hidden border-l border-primary-foreground/30 pl-2 text-right sm:block">
+              {tUi("quantity")}
+            </div>
+            <div className="hidden text-right sm:block">{tUi("rate")}</div>
+            <div className="hidden text-right sm:block">{tUi("value")}</div>
           </div>
         </div>
 
@@ -133,7 +139,7 @@ export default function OpeningStockSummary() {
             ))
           ) : (
             <EmptyState
-              title="No opening stock data"
+              title={tUi("no.opening.stock.data")}
               description="Opening stock balances will appear here once inventory values are available."
               icon={<Package className="h-5 w-5" />}
             />
@@ -143,7 +149,7 @@ export default function OpeningStockSummary() {
         {data?.grandTotal ? (
           <div className="border-t-2 border-primary bg-muted/50">
             <div className="grid grid-cols-2 p-2 font-bold sm:grid-cols-7 sm:p-3">
-              <div className="text-xs sm:text-sm">Grand Total</div>
+              <div className="text-xs sm:text-sm">{tUi("grand.total")}</div>
               <div className={financialNumberClassName}>{formatNumber(data.grandTotal.opening.quantity)} BL</div>
               <div className={cn(financialNumberClassName, "hidden sm:block")}>
                 {openingRate === 0 ? "" : formatAmount(openingRate)}

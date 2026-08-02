@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertCircle, Search } from "lucide-react";
 import type { InventoryLocation as Location } from "./locationInventoryTypes";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface LocationInventoryDialogsProps {
   // Create Location dialog
@@ -40,16 +41,17 @@ export function LocationInventoryDialogs({
   negativeSearchTerm,
   setNegativeSearchTerm,
 }: LocationInventoryDialogsProps) {
+  const tUi = useErpText();
   return (
     <>
       {/* Create Location dialog */}
       <Dialog open={createLocationOpen} onOpenChange={setCreateLocationOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Create Location</DialogTitle>
+            <DialogTitle>{tUi("create.location")}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-3 py-2">
-            <Label htmlFor="create-loc-name">Location Name</Label>
+            <Label htmlFor="create-loc-name">{tUi("location.name")}</Label>
             <Input
               id="create-loc-name"
               value={createLocationName}
@@ -79,7 +81,12 @@ export function LocationInventoryDialogs({
       </Dialog>
 
       {/* Negative stock across all locations dialog */}
-      <Dialog open={showNegativeStock && !selectedLocationLocal} onOpenChange={(open) => { if (!open) setShowNegativeStock(false); }}>
+      <Dialog
+        open={showNegativeStock && !selectedLocationLocal}
+        onOpenChange={(open) => {
+          if (!open) setShowNegativeStock(false);
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
@@ -89,7 +96,7 @@ export function LocationInventoryDialogs({
           <div className="relative shrink-0">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
             <Input
-              placeholder="Search by item or location..."
+              placeholder={tUi("search.by.item.or.location")}
               className="pl-8"
               value={negativeSearchTerm}
               onChange={(e) => setNegativeSearchTerm(e.target.value)}
@@ -98,16 +105,16 @@ export function LocationInventoryDialogs({
           </div>
           <div className="flex-1 overflow-auto min-h-0">
             {negativeStockLoading ? (
-              <p className="text-sm text-muted-foreground p-4">Loading…</p>
+              <p className="text-sm text-muted-foreground p-4">{tUi("loading")}</p>
             ) : allNegativeStock.length === 0 ? (
-              <p className="text-sm text-muted-foreground p-4">No negative stock found.</p>
+              <p className="text-sm text-muted-foreground p-4">{tUi("no.negative.stock.found")}</p>
             ) : (
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-background border-b">
                   <tr>
-                    <th className="text-left py-2 px-3 font-semibold">Item</th>
+                    <th className="text-left py-2 px-3 font-semibold">{tUi("item")}</th>
                     <th className="text-right py-2 px-3 font-semibold">Qty</th>
-                    <th className="text-left py-2 px-3 font-semibold">Location</th>
+                    <th className="text-left py-2 px-3 font-semibold">{tUi("location")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -122,7 +129,10 @@ export function LocationInventoryDialogs({
                       );
                     })
                     .map((item) => (
-                      <tr key={`${item.stockItemId}-${item.locationId}`} className="border-b border-muted/30 hover:bg-muted/20">
+                      <tr
+                        key={`${item.stockItemId}-${item.locationId}`}
+                        className="border-b border-muted/30 hover:bg-muted/20"
+                      >
                         <td className="py-2 px-3 font-medium">
                           <div>{item.name}</div>
                           <div className="text-[11px] text-muted-foreground font-mono">{item.code}</div>

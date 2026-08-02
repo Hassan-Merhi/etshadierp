@@ -3,14 +3,14 @@
  *
  * Extracted from FactoryNetPosition.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Separator} from "@/components/ui/separator";
-import {ChevronDown, ChevronRight} from "lucide-react";
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
-import type {AccountItem, BreakdownItem} from "../types";
-import {fmt} from "../utils";
-import {CategoryGroup} from "./CategoryGroup";
+import type { AccountItem, BreakdownItem } from "../types";
+import { fmt } from "../utils";
+import { CategoryGroup } from "./CategoryGroup";
 
 export function Side({
   label,

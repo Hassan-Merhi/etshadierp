@@ -4,7 +4,7 @@
  * Extracted from FactoryBaleRelabeling.tsx during the Phase 4 god-file split.
  */
 import * as XLSX from "@/lib/excelHelper";
-import type {ApplyItem, ParsedRow} from "./types";
+import type { ApplyItem, ParsedRow } from "./types";
 
 export const POSSIBLE_COLUMNS = [
   "current_reference_code",

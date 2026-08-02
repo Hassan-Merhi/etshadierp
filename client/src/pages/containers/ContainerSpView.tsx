@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Package, Eye, Search, X } from "lucide-react";
 import { AddContainerDialog } from "../../components/AddContainerDialog";
 import type { Container, Supplier } from "@shared/schema";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface ContainerSpViewProps {
   spContainersList: any[];
@@ -33,6 +34,7 @@ export function ContainerSpView({
   setLocation,
   formatDisplayDate,
 }: ContainerSpViewProps) {
+  const tUi = useErpText();
   // Normalize sp_containers rows to a common display shape
   const spNative: any[] = (Array.isArray(spContainersList) ? spContainersList : []).map((c) => ({
     _key: `sp-${c.id}`,
@@ -79,7 +81,7 @@ export function ContainerSpView({
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <PageHeader title="Container Tracking" subtitle="Supplier partner containers">
+      <PageHeader title={tUi("container.tracking")} subtitle={tUi("supplier.partner.containers")}>
         <div className="flex gap-2 flex-wrap">
           <Button className="gap-2" onClick={() => setAddDialogOpen(true)} data-testid="button-add-container">
             <Plus className="h-4 w-4" />
@@ -92,7 +94,7 @@ export function ContainerSpView({
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by invoice, container, supplier…"
+            placeholder={tUi("search.by.invoice.container.supplier")}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -128,9 +130,7 @@ export function ContainerSpView({
             <div
               key={c._key}
               className="flex items-center gap-4 p-4 rounded-md border border-border bg-card hover-elevate cursor-pointer"
-              onClick={() =>
-                setLocation(c._source === "erp" ? `/containers/${c.id}?src=erp` : `/containers/${c.id}`)
-              }
+              onClick={() => setLocation(c._source === "erp" ? `/containers/${c.id}?src=erp` : `/containers/${c.id}`)}
               data-testid={`row-sp-container-${c.id}`}
             >
               <div className="flex-1 min-w-0">
@@ -153,7 +153,7 @@ export function ContainerSpView({
                 <p className="text-sm font-mono">{formatDisplayDate(c.date)}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-muted-foreground hidden sm:block">Total (USD)</p>
+                <p className="text-xs text-muted-foreground hidden sm:block">{tUi("total.usd")}</p>
                 <p className="text-sm font-mono font-semibold">
                   ${c.totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>

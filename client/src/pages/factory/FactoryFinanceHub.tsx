@@ -2,6 +2,7 @@ import { Suspense, lazy } from "react";
 import { useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HardHat, Users, UserRound, FileText, Landmark } from "lucide-react";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 const FactoryWorkersHub = lazy(() => import("@/pages/factory/FactoryWorkersHub"));
 const FactoryEmployeesHub = lazy(() => import("@/pages/factory/FactoryEmployeesHub"));
@@ -18,6 +19,7 @@ const TABS = [
 ];
 
 export default function FactoryFinanceHub() {
+  const tUi = useFactoryText();
   const [location, setLocation] = useLocation();
   const params = new URLSearchParams(location.split("?")[1] ?? "");
   const tabParam = params.get("tab") ?? "";
@@ -40,31 +42,31 @@ export default function FactoryFinanceHub() {
         </div>
 
         <TabsContent value="workers" className="flex-1 overflow-auto m-0 p-0">
-          <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
+          <Suspense fallback={<div className="p-8 text-center text-muted-foreground">{tUi("loading")}</div>}>
             <FactoryWorkersHub />
           </Suspense>
         </TabsContent>
 
         <TabsContent value="employees" className="flex-1 overflow-auto m-0 p-0">
-          <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
+          <Suspense fallback={<div className="p-8 text-center text-muted-foreground">{tUi("loading")}</div>}>
             <FactoryEmployeesHub />
           </Suspense>
         </TabsContent>
 
         <TabsContent value="suppliers" className="flex-1 overflow-auto m-0 p-0">
-          <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
+          <Suspense fallback={<div className="p-8 text-center text-muted-foreground">{tUi("loading")}</div>}>
             <FactorySuppliers />
           </Suspense>
         </TabsContent>
 
         <TabsContent value="vouchers" className="flex-1 overflow-auto m-0 p-0">
-          <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
+          <Suspense fallback={<div className="p-8 text-center text-muted-foreground">{tUi("loading")}</div>}>
             <FactoryVouchers />
           </Suspense>
         </TabsContent>
 
         <TabsContent value="accounts" className="flex-1 overflow-auto m-0 p-0">
-          <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
+          <Suspense fallback={<div className="p-8 text-center text-muted-foreground">{tUi("loading")}</div>}>
             <FactoryAccounts />
           </Suspense>
         </TabsContent>

@@ -24,6 +24,7 @@ import {
   Equal,
 } from "lucide-react";
 import { useLocation } from "wouter";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 type Period =
   | "today"
@@ -139,6 +140,7 @@ function AccountBreakdown({
   type: "income" | "expense";
   badgeClass: string;
 }) {
+  const tUi = useFactoryText();
   const [open, setOpen] = useState(false);
   const [, navigate] = useLocation();
   const active = (accounts || []).filter((a: any) => a.debit !== 0 || a.credit !== 0);
@@ -168,14 +170,14 @@ function AccountBreakdown({
       <CollapsibleContent>
         <div className="ml-6 mb-2 border rounded-md overflow-x-auto">
           {active.length === 0 ? (
-            <p className="text-xs text-muted-foreground italic p-3">No transactions in this period.</p>
+            <p className="text-xs text-muted-foreground italic p-3">{tUi("no.transactions.in.this.period")}</p>
           ) : (
             <table className="w-full text-sm">
               <thead className="sticky top-0 z-30 bg-muted/50">
                 <tr className="bg-muted/50">
-                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">Account</th>
-                  <th className="text-right px-3 py-2 font-medium text-muted-foreground">Debit</th>
-                  <th className="text-right px-3 py-2 font-medium text-muted-foreground">Credit</th>
+                  <th className="text-left px-3 py-2 font-medium text-muted-foreground">{tUi("account")}</th>
+                  <th className="text-right px-3 py-2 font-medium text-muted-foreground">{tUi("debit")}</th>
+                  <th className="text-right px-3 py-2 font-medium text-muted-foreground">{tUi("credit")}</th>
                   <th className="text-right px-3 py-2 font-medium text-muted-foreground">Net</th>
                 </tr>
               </thead>
@@ -206,6 +208,7 @@ function AccountBreakdown({
 }
 
 export default function FactoryNetProfitAnalytics() {
+  const tUi = useFactoryText();
   const now = new Date();
   const [period, setPeriod] = useState<Period>("today");
   const [specificMonth, setSpecificMonth] = useState<number>(now.getMonth() + 1);
@@ -281,7 +284,7 @@ export default function FactoryNetProfitAnalytics() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <PageHeader title="Net Profit Analytics" icon={<BarChart3 className="h-5 w-5" />} />
+          <PageHeader title={tUi("net.profit.analytics")} icon={<BarChart3 className="h-5 w-5" />} />
           <p className="text-muted-foreground text-sm mt-1">Income, expenses and profitability — {periodLabel}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -389,9 +392,9 @@ export default function FactoryNetProfitAnalytics() {
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-3">
                 <ArrowUpRight className="h-4 w-4 text-green-600 dark:text-green-400" />
-                <span className="text-sm font-semibold text-green-600 dark:text-green-400">What We Made</span>
+                <span className="text-sm font-semibold text-green-600 dark:text-green-400">{tUi("what.we.made")}</span>
               </div>
-              <p className="text-xs text-muted-foreground mb-1">Total Revenue:</p>
+              <p className="text-xs text-muted-foreground mb-1">{tUi("total.revenue")}</p>
               <p
                 className="text-xl font-bold text-green-600 dark:text-green-400 font-mono"
                 data-testid="text-total-income"
@@ -401,25 +404,25 @@ export default function FactoryNetProfitAnalytics() {
               <div className="mt-3 space-y-1">
                 {salesTotal > 0 && (
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Sales</span>
+                    <span>{tUi("sales")}</span>
                     <span className="font-mono">{fmt(salesTotal)}</span>
                   </div>
                 )}
                 {directIncTotal > 0 && (
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Direct Income</span>
+                    <span>{tUi("direct.income")}</span>
                     <span className="font-mono">{fmt(directIncTotal)}</span>
                   </div>
                 )}
                 {indirectIncTotal > 0 && (
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Indirect Income</span>
+                    <span>{tUi("indirect.income")}</span>
                     <span className="font-mono">{fmt(indirectIncTotal)}</span>
                   </div>
                 )}
                 {closingStock > 0 && (
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Closing Stock</span>
+                    <span>{tUi("closing.stock")}</span>
                     <span className="font-mono">{fmt(closingStock)}</span>
                   </div>
                 )}
@@ -432,9 +435,11 @@ export default function FactoryNetProfitAnalytics() {
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-3">
                 <ShoppingCart className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">What We Bought</span>
+                <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">
+                  {tUi("what.we.bought")}
+                </span>
               </div>
-              <p className="text-xs text-muted-foreground mb-1">Total Purchases:</p>
+              <p className="text-xs text-muted-foreground mb-1">{tUi("total.purchases")}</p>
               <p
                 className="text-xl font-bold text-orange-600 dark:text-orange-400 font-mono"
                 data-testid="text-purchases"
@@ -444,13 +449,13 @@ export default function FactoryNetProfitAnalytics() {
               <div className="mt-3 space-y-1">
                 {openingStock > 0 && (
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Opening Stock</span>
+                    <span>{tUi("opening.stock")}</span>
                     <span className="font-mono">{fmt(openingStock)}</span>
                   </div>
                 )}
                 {purchasesTotal > 0 && (
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Purchases</span>
+                    <span>{tUi("purchases")}</span>
                     <span className="font-mono">{fmt(purchasesTotal)}</span>
                   </div>
                 )}
@@ -463,22 +468,22 @@ export default function FactoryNetProfitAnalytics() {
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-3">
                 <Receipt className="h-4 w-4 text-red-600 dark:text-red-400" />
-                <span className="text-sm font-semibold text-red-600 dark:text-red-400">What We Spent</span>
+                <span className="text-sm font-semibold text-red-600 dark:text-red-400">{tUi("what.we.spent")}</span>
               </div>
-              <p className="text-xs text-muted-foreground mb-1">Total Expenses:</p>
+              <p className="text-xs text-muted-foreground mb-1">{tUi("total.expenses")}</p>
               <p className="text-xl font-bold text-red-600 dark:text-red-400 font-mono" data-testid="text-expenses">
                 {fmt(directExpTotal + indirectExpTotal)}
               </p>
               <div className="mt-3 space-y-1">
                 {directExpTotal > 0 && (
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Direct Expense</span>
+                    <span>{tUi("direct.expense")}</span>
                     <span className="font-mono">{fmt(directExpTotal)}</span>
                   </div>
                 )}
                 {indirectExpTotal > 0 && (
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Indirect Expense</span>
+                    <span>{tUi("indirect.expense")}</span>
                     <span className="font-mono">{fmt(indirectExpTotal)}</span>
                   </div>
                 )}
@@ -491,7 +496,7 @@ export default function FactoryNetProfitAnalytics() {
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-3">
                 <Equal className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm font-semibold">Net Profit</span>
+                <span className="text-sm font-semibold">{tUi("net.profit")}</span>
               </div>
               <p className="text-xs text-muted-foreground mb-1">{isPositive ? "Revenue − Expenses:" : "Deficit:"}</p>
               <p
@@ -503,7 +508,7 @@ export default function FactoryNetProfitAnalytics() {
               </p>
               <div className="mt-3 space-y-1">
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Revenue</span>
+                  <span>{tUi("revenue")}</span>
                   <span className="font-mono text-green-600 dark:text-green-400">{fmt(totalIncome)}</span>
                 </div>
                 <div className="flex justify-between text-xs text-muted-foreground">
@@ -548,7 +553,9 @@ export default function FactoryNetProfitAnalytics() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Income Side */}
               <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Income</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                  {tUi("income")}
+                </p>
                 {[
                   { label: "Sales (Revenue)", value: salesTotal },
                   { label: "Closing Stock", value: closingStock },
@@ -562,14 +569,16 @@ export default function FactoryNetProfitAnalytics() {
                 ))}
                 <Separator className="my-2" />
                 <div className="flex justify-between text-sm font-semibold">
-                  <span>Total Income</span>
+                  <span>{tUi("total.income")}</span>
                   <span className="text-green-600 dark:text-green-400 font-mono">{fmt(totalIncome)}</span>
                 </div>
               </div>
 
               {/* Expense Side */}
               <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Expenses</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                  {tUi("expenses")}
+                </p>
                 {[
                   { label: "Opening Stock", value: openingStock },
                   { label: "Purchases", value: purchasesTotal },
@@ -583,7 +592,7 @@ export default function FactoryNetProfitAnalytics() {
                 ))}
                 <Separator className="my-2" />
                 <div className="flex justify-between text-sm font-semibold">
-                  <span>Total Expenses</span>
+                  <span>{tUi("total.expenses.2")}</span>
                   <span className="text-red-600 dark:text-red-400 font-mono">{fmt(totalExpenses)}</span>
                 </div>
               </div>
@@ -620,46 +629,46 @@ export default function FactoryNetProfitAnalytics() {
       {!isLoading && data && (
         <Card data-testid="card-account-breakdown">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Account Breakdown</CardTitle>
+            <CardTitle className="text-base">{tUi("account.breakdown")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">
             <AccountBreakdown
-              title="Sales"
+              title={tUi("sales")}
               accounts={rp?.salesAccounts?.accounts || []}
               total={salesTotal}
               type="income"
               badgeClass="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300"
             />
             <AccountBreakdown
-              title="Purchases"
+              title={tUi("purchases")}
               accounts={lp?.purchaseAccounts?.accounts || []}
               total={purchasesTotal}
               type="expense"
               badgeClass="bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300"
             />
             <AccountBreakdown
-              title="Direct Incomes"
+              title={tUi("direct.incomes")}
               accounts={rp?.directIncomes?.accounts || []}
               total={directIncTotal}
               type="income"
               badgeClass="bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300"
             />
             <AccountBreakdown
-              title="Direct Expenses"
+              title={tUi("direct.expenses")}
               accounts={lp?.directExpenses?.accounts || []}
               total={directExpTotal}
               type="expense"
               badgeClass="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
             />
             <AccountBreakdown
-              title="Indirect Incomes"
+              title={tUi("indirect.incomes")}
               accounts={rp?.indirectIncomes?.accounts || []}
               total={indirectIncTotal}
               type="income"
               badgeClass="bg-cyan-100 text-cyan-800 dark:bg-cyan-900/40 dark:text-cyan-300"
             />
             <AccountBreakdown
-              title="Indirect Expenses"
+              title={tUi("indirect.expenses")}
               accounts={lp?.indirectExpenses?.accounts || []}
               total={indirectExpTotal}
               type="expense"

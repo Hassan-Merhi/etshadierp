@@ -78,11 +78,18 @@ export default function SpSetupPanel() {
           {status?.spAccounts && status.spAccounts.length > 0 && (
             <div className="grid gap-1.5">
               {status.spAccounts.map((acct: any) => (
-                <div key={acct.id} className="flex items-center justify-between text-sm py-1 border-b border-border/40 last:border-0">
+                <div
+                  key={acct.id}
+                  className="flex items-center justify-between text-sm py-1 border-b border-border/40 last:border-0"
+                >
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs text-muted-foreground w-24">{acct.code}</span>
                     <span>{acct.name}</span>
-                    {acct.isHidden && <Badge variant="secondary" className="text-xs py-0">hidden</Badge>}
+                    {acct.isHidden && (
+                      <Badge variant="secondary" className="text-xs py-0">
+                        hidden
+                      </Badge>
+                    )}
                   </div>
                   <span className="text-xs text-muted-foreground">{acct.accountType}</span>
                 </div>
@@ -100,14 +107,19 @@ export default function SpSetupPanel() {
           {status?.bankAccounts?.length === 0 && (
             <div className="flex items-start gap-2 text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/20 rounded-md p-3">
               <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-              <span>No bank accounts found. Add at least one bank account for prepaid payments and sales receipts.</span>
+              <span>
+                No bank accounts found. Add at least one bank account for prepaid payments and sales receipts.
+              </span>
             </div>
           )}
 
           {supplierLinkGapCount > 0 ? (
             <div className="flex items-start gap-2 text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/20 rounded-md p-3">
               <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-              <span>{supplierLinkGapCount} Goods-OTW voucher{supplierLinkGapCount === 1 ? "" : "s"} need supplier-ledger repair. Re-run Setup to fix them safely.</span>
+              <span>
+                {supplierLinkGapCount} Goods-OTW voucher{supplierLinkGapCount === 1 ? "" : "s"} need supplier-ledger
+                repair. Re-run Setup to fix them safely.
+              </span>
             </div>
           ) : (
             <div className="flex items-start gap-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/20 rounded-md p-3">
@@ -116,8 +128,16 @@ export default function SpSetupPanel() {
             </div>
           )}
 
-          <Button onClick={() => setupMutation.mutate()} disabled={setupMutation.isPending} data-testid="button-sp-setup">
-            {setupMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Zap className="h-4 w-4 mr-2" />}
+          <Button
+            onClick={() => setupMutation.mutate()}
+            disabled={setupMutation.isPending}
+            data-testid="button-sp-setup"
+          >
+            {setupMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Zap className="h-4 w-4 mr-2" />
+            )}
             {status?.isConfigured ? "Repair & Re-run Setup" : "Initialize Setup"}
           </Button>
         </CardContent>
@@ -128,7 +148,9 @@ export default function SpSetupPanel() {
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <CardTitle className="text-base">SP POS Accounting Policy</CardTitle>
-              <CardDescription className="text-xs mt-1">The dedicated Supplier Partner sales flow applies this entry automatically.</CardDescription>
+              <CardDescription className="text-xs mt-1">
+                The dedicated Supplier Partner sales flow applies this entry automatically.
+              </CardDescription>
             </div>
             <Badge variant="outline" className="text-green-600 border-green-600/40">
               <ShieldCheck className="h-3 w-3 mr-1" /> Automatic
@@ -137,11 +159,16 @@ export default function SpSetupPanel() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="rounded-md bg-muted/40 p-3 text-sm space-y-1">
-            <p><span className="font-medium">Dr Cash / Bank</span> = full customer payment</p>
-            <p><span className="font-medium">Cr Supplier Cash Payable</span> = full customer payment</p>
+            <p>
+              <span className="font-medium">Dr Cash / Bank</span> = full customer payment
+            </p>
+            <p>
+              <span className="font-medium">Cr Supplier Cash Payable</span> = full customer payment
+            </p>
           </div>
           <p className="text-xs text-muted-foreground">
-            Cost of goods and realized profit are retained on SP sale lines and stock movements for reporting. They are not posted as extra voucher lines, preventing the sale amount from being double-counted.
+            Cost of goods and realized profit are retained on SP sale lines and stock movements for reporting. They are
+            not posted as extra voucher lines, preventing the sale amount from being double-counted.
           </p>
         </CardContent>
       </Card>

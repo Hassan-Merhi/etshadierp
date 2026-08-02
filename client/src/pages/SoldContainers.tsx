@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useCompany } from "@/contexts/CompanyContext";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { PageHeader } from "@/components/PageHeader";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface SoldContainer {
   containerId: number;
@@ -33,6 +34,7 @@ interface SoldContainer {
 }
 
 export default function SoldContainers() {
+  const tUi = useErpText();
   const [searchTerm, setSearchTerm] = useState("");
   const { selectedCompany } = useCompany();
   const { formatDisplayDate } = useDateFormat();
@@ -66,7 +68,10 @@ export default function SoldContainers() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <PageHeader title="Sold Containers" subtitle="View all containers that have been sold to customers" />
+          <PageHeader
+            title={tUi("sold.containers")}
+            subtitle={tUi("view.all.containers.that.have.been.sold.to.custo")}
+          />
         </div>
         <HandCoins className="h-8 w-8 text-muted-foreground" />
       </div>
@@ -74,7 +79,7 @@ export default function SoldContainers() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by container number or customer..."
+          placeholder={tUi("search.by.container.number.or.customer")}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10"
@@ -86,7 +91,7 @@ export default function SoldContainers() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <HandCoins className="w-16 h-16 text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">No sold containers found</h2>
+            <h2 className="text-xl font-semibold mb-2">{tUi("no.sold.containers.found")}</h2>
             <p className="text-muted-foreground">
               {soldContainers.length === 0 ? "No containers have been sold yet" : "Try adjusting your search"}
             </p>
@@ -98,13 +103,13 @@ export default function SoldContainers() {
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
-                  <TableHead>Container Number</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Sale Date</TableHead>
-                  <TableHead className="text-right">Container Cost</TableHead>
-                  <TableHead className="text-right hidden sm:table-cell">Commission</TableHead>
-                  <TableHead className="text-right">Total Amount</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{tUi("container.number")}</TableHead>
+                  <TableHead>{tUi("customer")}</TableHead>
+                  <TableHead>{tUi("sale.date")}</TableHead>
+                  <TableHead className="text-right">{tUi("container.cost")}</TableHead>
+                  <TableHead className="text-right hidden sm:table-cell">{tUi("commission")}</TableHead>
+                  <TableHead className="text-right">{tUi("total.amount")}</TableHead>
+                  <TableHead className="text-right">{tUi("actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

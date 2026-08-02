@@ -13,11 +13,13 @@ import { useToast } from "@/hooks/use-toast";
 import {} from "lucide-react";
 import type { Unit } from "../types";
 import { useApiBase } from "../shared";
+import { useErpText } from "@/i18n/modules/erp";
 
 export // ──────────────────────────────────────────────────────────
 // START CONTRACT (vacant unit)
 // ──────────────────────────────────────────────────────────
 function VacantUnitInfoForm({ unit, testIdPrefix }: { unit: Unit; testIdPrefix: string }) {
+  const tUi = useErpText();
   const apiBase = useApiBase();
   const { toast } = useToast();
   const [unitNumber, setUnitNumber] = useState(unit.unitNumber);
@@ -39,7 +41,7 @@ function VacantUnitInfoForm({ unit, testIdPrefix }: { unit: Unit; testIdPrefix: 
     <div className="space-y-4 pt-3">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <Label>Unit Name</Label>
+          <Label>{tUi("unit.name")}</Label>
           <Input
             value={unitNumber}
             onChange={(e) => setUnitNumber(e.target.value.toUpperCase())}
@@ -47,7 +49,7 @@ function VacantUnitInfoForm({ unit, testIdPrefix }: { unit: Unit; testIdPrefix: 
           />
         </div>
         <div>
-          <Label>Dimensions</Label>
+          <Label>{tUi("dimensions")}</Label>
           <Input
             value={dimensions}
             onChange={(e) => setDimensions(e.target.value)}

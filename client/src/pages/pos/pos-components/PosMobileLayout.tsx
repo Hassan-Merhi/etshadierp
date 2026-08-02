@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import type { SaleRow, InventoryItem, Location } from "./posTypes";
 import { getFilteredInventory } from "../utils/posCalculations";
+import { usePosText } from "@/i18n/modules/pos";
 
 interface PosMobileLayoutProps {
   // Location / user
@@ -98,11 +99,11 @@ export function PosMobileLayout({
   formatDisplayAmount,
   isSpCompany,
 }: PosMobileLayoutProps) {
+  const tUi = usePosText();
   const filteredInventory = getFilteredInventory(inventory, searchTerm);
 
   return (
     <div className="flex lg:hidden flex-1 flex-col overflow-y-auto">
-
       {/* Sticky search bar with live dropdown */}
       <div className="sticky top-0 z-20 bg-background px-4 pt-3 pb-2 border-b shadow-sm">
         <div className="relative">
@@ -110,7 +111,7 @@ export function PosMobileLayout({
             <Search className="h-5 w-5 text-muted-foreground shrink-0" />
             <input
               className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground text-base"
-              placeholder="Search or scan item…"
+              placeholder={tUi("search.or.scan.item")}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               ref={mobileSearchInputRef}
@@ -120,7 +121,7 @@ export function PosMobileLayout({
               <button
                 className="text-muted-foreground text-xl leading-none px-1"
                 onClick={() => setSearchTerm("")}
-                aria-label="Clear search"
+                aria-label={tUi("clear.search")}
               >
                 ×
               </button>
@@ -156,7 +157,11 @@ export function PosMobileLayout({
                             : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
                       }`}
                     >
-                      {isOut ? "Out" : isLow ? `${Math.round(item.stock)} Low` : Math.round(item.stock).toLocaleString()}
+                      {isOut
+                        ? "Out"
+                        : isLow
+                          ? `${Math.round(item.stock)} Low`
+                          : Math.round(item.stock).toLocaleString()}
                     </span>
                   </button>
                 );
@@ -180,11 +185,13 @@ export function PosMobileLayout({
             >
               <SelectTrigger className="flex-1 min-w-0" data-testid="select-mobile-location">
                 <MapPin className="h-3.5 w-3.5 mr-1 text-muted-foreground shrink-0" />
-                <SelectValue placeholder="Location" />
+                <SelectValue placeholder={tUi("location")} />
               </SelectTrigger>
               <SelectContent>
                 {allLocations.map((loc) => (
-                  <SelectItem key={loc.id} value={loc.id.toString()}>{loc.name}</SelectItem>
+                  <SelectItem key={loc.id} value={loc.id.toString()}>
+                    {loc.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -198,11 +205,13 @@ export function PosMobileLayout({
             >
               <SelectTrigger className="flex-1 min-w-0" data-testid="select-mobile-pos-location">
                 <MapPin className="h-3.5 w-3.5 mr-1 text-muted-foreground shrink-0" />
-                <SelectValue placeholder="Location" />
+                <SelectValue placeholder={tUi("location")} />
               </SelectTrigger>
               <SelectContent>
                 {posAssignedLocations.map((loc) => (
-                  <SelectItem key={loc.id} value={loc.id.toString()}>{loc.name}</SelectItem>
+                  <SelectItem key={loc.id} value={loc.id.toString()}>
+                    {loc.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -232,7 +241,9 @@ export function PosMobileLayout({
                 onCheckedChange={setIsCreditSale}
                 data-testid="toggle-mobile-credit-sale"
               />
-              <Label htmlFor="mobile-credit-sale" className="text-sm cursor-pointer">Credit Sale</Label>
+              <Label htmlFor="mobile-credit-sale" className="text-sm cursor-pointer">
+                {tUi("credit.sale.2")}
+              </Label>
             </div>
           )}
 
@@ -255,9 +266,9 @@ export function PosMobileLayout({
               </PopoverTrigger>
               <PopoverContent className="w-72 p-0">
                 <Command>
-                  <CommandInput placeholder="Search customer…" />
+                  <CommandInput placeholder={tUi("search.customer")} />
                   <CommandList>
-                    <CommandEmpty>No customer found.</CommandEmpty>
+                    <CommandEmpty>{tUi("no.customer.found")}</CommandEmpty>
                     <CommandGroup>
                       {customerAccounts.map((acc: any) => (
                         <CommandItem
@@ -290,8 +301,8 @@ export function PosMobileLayout({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="cash">Cash</SelectItem>
-                  <SelectItem value="bank">Bank</SelectItem>
+                  <SelectItem value="cash">{tUi("cash")}</SelectItem>
+                  <SelectItem value="bank">{tUi("bank")}</SelectItem>
                 </SelectContent>
               </Select>
               <Select
@@ -305,10 +316,14 @@ export function PosMobileLayout({
                 <SelectContent>
                   {paymentAccountType === "bank"
                     ? (Array.isArray(bankAccounts) ? bankAccounts : []).map((acc: any) => (
-                        <SelectItem key={acc.id} value={String(acc.id)}>{acc.name} ({acc.code})</SelectItem>
+                        <SelectItem key={acc.id} value={String(acc.id)}>
+                          {acc.name} ({acc.code})
+                        </SelectItem>
                       ))
                     : cashLedgerAccounts.map((acc: any) => (
-                        <SelectItem key={acc.id} value={String(acc.id)}>{acc.name}</SelectItem>
+                        <SelectItem key={acc.id} value={String(acc.id)}>
+                          {acc.name}
+                        </SelectItem>
                       ))}
                 </SelectContent>
               </Select>
@@ -322,69 +337,71 @@ export function PosMobileLayout({
         {rows.filter((r) => r.stockItemId && r.quantity > 0).length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
             <ShoppingCart className="h-12 w-12 opacity-30" />
-            <p className="text-sm">Search above to add items</p>
+            <p className="text-sm">{tUi("search.above.to.add.items")}</p>
           </div>
         ) : (
-          rows.filter((r) => r.stockItemId).map((row) => {
-            const actualIdx = rows.indexOf(row);
-            if (!row.stockItemId) return null;
-            return (
-              <Card key={row.id} className="p-3">
-                <div className="flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm leading-tight truncate">{row.itemName}</p>
-                    <p className="text-xs text-muted-foreground font-mono">{row.stockItemCode}</p>
+          rows
+            .filter((r) => r.stockItemId)
+            .map((row) => {
+              const actualIdx = rows.indexOf(row);
+              if (!row.stockItemId) return null;
+              return (
+                <Card key={row.id} className="p-3">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm leading-tight truncate">{row.itemName}</p>
+                      <p className="text-xs text-muted-foreground font-mono">{row.stockItemCode}</p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setRows(rows.filter((_, i) => i !== actualIdx))}
+                      className="shrink-0 text-destructive"
+                      data-testid={`button-mobile-delete-${actualIdx}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setRows(rows.filter((_, i) => i !== actualIdx))}
-                    className="shrink-0 text-destructive"
-                    data-testid={`button-mobile-delete-${actualIdx}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="flex items-center gap-3 mt-3">
-                  <div className="flex-1 flex flex-col gap-1">
-                    <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Qty</span>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      value={row.quantity || ""}
-                      onChange={(e) => updateRow(actualIdx, "quantity", e.target.value)}
-                      className="w-full h-10 text-center border border-input rounded-md bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                      data-testid={`input-mobile-qty-${actualIdx}`}
-                    />
+                  <div className="flex items-center gap-3 mt-3">
+                    <div className="flex-1 flex flex-col gap-1">
+                      <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Qty</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={row.quantity || ""}
+                        onChange={(e) => updateRow(actualIdx, "quantity", e.target.value)}
+                        className="w-full h-10 text-center border border-input rounded-md bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                        data-testid={`input-mobile-qty-${actualIdx}`}
+                      />
+                    </div>
+                    <div className="flex-1 flex flex-col gap-1">
+                      <span className="text-[11px] text-muted-foreground uppercase tracking-wide">{tUi("rate")}</span>
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={row.rate || ""}
+                        onChange={(e) => updateRow(actualIdx, "rate", e.target.value)}
+                        className="w-full h-10 text-center border border-input rounded-md bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                        data-testid={`input-mobile-rate-${actualIdx}`}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1 items-end">
+                      <span className="text-[11px] text-muted-foreground uppercase tracking-wide">{tUi("total")}</span>
+                      <span className="h-10 flex items-center font-mono font-bold text-base">
+                        {formatDisplayAmount(row.amount)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex-1 flex flex-col gap-1">
-                    <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Rate</span>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      value={row.rate || ""}
-                      onChange={(e) => updateRow(actualIdx, "rate", e.target.value)}
-                      className="w-full h-10 text-center border border-input rounded-md bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
-                      data-testid={`input-mobile-rate-${actualIdx}`}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1 items-end">
-                    <span className="text-[11px] text-muted-foreground uppercase tracking-wide">Total</span>
-                    <span className="h-10 flex items-center font-mono font-bold text-base">
-                      {formatDisplayAmount(row.amount)}
-                    </span>
-                  </div>
-                </div>
-              </Card>
-            );
-          })
+                </Card>
+              );
+            })
         )}
       </div>
 
       {/* Notes */}
       <div className="px-4 pb-2">
         <Textarea
-          placeholder="Notes (optional)"
+          placeholder={tUi("notes.optional")}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           className="resize-none h-12 min-h-[48px] text-sm"

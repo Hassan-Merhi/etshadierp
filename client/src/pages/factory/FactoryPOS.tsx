@@ -42,7 +42,9 @@ import {
 
 import type { CartRow, ExpenseRow, InventoryItem } from "./factorypos/types";
 import { COLUMNS, emptyRow, formatNum } from "./factorypos/utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactoryPOS() {
+  const tUi = useFactoryText();
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -467,7 +469,7 @@ export default function FactoryPOS() {
           {editSaleId ? (
             <Button variant="outline" size="sm" onClick={() => navigate("/factory/pos")} data-testid="button-new-sale">
               <Plus className="h-4 w-4 sm:mr-1" />
-              <span className="hidden sm:inline">New Sale</span>
+              <span className="hidden sm:inline">{tUi("new.sale")}</span>
             </Button>
           ) : (
             <Button
@@ -477,7 +479,7 @@ export default function FactoryPOS() {
               data-testid="button-toggle-history"
             >
               <History className="h-4 w-4 sm:mr-1" />
-              <span className="hidden sm:inline">History</span>
+              <span className="hidden sm:inline">{tUi("history")}</span>
             </Button>
           )}
           <Button
@@ -491,12 +493,12 @@ export default function FactoryPOS() {
               "..."
             ) : editSaleId ? (
               <>
-                <span className="hidden sm:inline">Update</span>
+                <span className="hidden sm:inline">{tUi("update")}</span>
                 <Pencil className="h-4 w-4" />
               </>
             ) : (
               <>
-                <span className="hidden sm:inline">Save</span>
+                <span className="hidden sm:inline">{tUi("save")}</span>
                 <Check className="h-4 w-4" />
               </>
             )}
@@ -511,7 +513,7 @@ export default function FactoryPOS() {
           <MapPin className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
           <Select value={locationId} onValueChange={setLocationId}>
             <SelectTrigger className="w-full sm:w-48" data-testid="select-location">
-              <SelectValue placeholder="Select location" />
+              <SelectValue placeholder={tUi("select.location.2")} />
             </SelectTrigger>
             <SelectContent>
               {(locations || []).map((l: any) => (
@@ -554,7 +556,7 @@ export default function FactoryPOS() {
           <Wallet className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
           <Select value={cashAccountId} onValueChange={setCashAccountId}>
             <SelectTrigger className="w-full sm:w-48" data-testid="select-cash-account">
-              <SelectValue placeholder="Cash account" />
+              <SelectValue placeholder={tUi("cash.account.3")} />
             </SelectTrigger>
             <SelectContent>
               {cashAccounts.map((a: any) => (
@@ -598,7 +600,7 @@ export default function FactoryPOS() {
           <div className="flex items-center gap-2 col-span-2 sm:col-span-1">
             <User className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
             <Input
-              placeholder="Customer name (optional)"
+              placeholder={tUi("customer.name.optional")}
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
               className="w-full sm:w-44"
@@ -610,7 +612,7 @@ export default function FactoryPOS() {
             <User className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
             <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
               <SelectTrigger className="w-full sm:w-48" data-testid="select-credit-customer">
-                <SelectValue placeholder="Select customer *" />
+                <SelectValue placeholder={tUi("select.customer.4")} />
               </SelectTrigger>
               <SelectContent>
                 {(allCustomers || []).map((c: any) => (
@@ -626,7 +628,7 @@ export default function FactoryPOS() {
         {/* Notes */}
         <div className="col-span-2 sm:col-span-1 sm:flex-1 flex items-center gap-2 order-last sm:order-none">
           <Textarea
-            placeholder="Notes (optional)"
+            placeholder={tUi("notes.optional")}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             className="resize-none h-9"
@@ -690,7 +692,7 @@ export default function FactoryPOS() {
           data-testid="mobile-add-item-card"
         >
           <Plus className="h-4 w-4" />
-          <span className="text-sm">Tap to add item</span>
+          <span className="text-sm">{tUi("tap.to.add.item")}</span>
         </div>
 
         {/* Mobile summary */}
@@ -781,7 +783,7 @@ export default function FactoryPOS() {
                                 )}
                               </div>
                             ) : (
-                              <span className="text-muted-foreground/50 text-xs">Click a product →</span>
+                              <span className="text-muted-foreground/50 text-xs">{tUi("click.a.product")}</span>
                             )}
                           </div>
                         ) : (
@@ -813,9 +815,9 @@ export default function FactoryPOS() {
             {/* Summary row */}
             <div className="flex flex-col sm:flex-row sm:justify-end items-stretch sm:items-center gap-2 sm:gap-6 sm:max-w-lg ml-auto">
               <div className="flex items-center justify-between sm:justify-start gap-2 text-sm flex-wrap">
-                <span className="text-muted-foreground">Items:</span>
+                <span className="text-muted-foreground">{tUi("items")}</span>
                 <span className="font-mono">{validRows.length}</span>
-                <span className="text-muted-foreground ml-2">Qty:</span>
+                <span className="text-muted-foreground ml-2">{tUi("qty")}</span>
                 <span className="font-mono" data-testid="text-total-qty">
                   {totalQty}
                 </span>
@@ -829,7 +831,7 @@ export default function FactoryPOS() {
                 )}
               </div>
               <div className="flex items-center justify-between sm:justify-start gap-2">
-                <span className="text-lg font-medium">Total:</span>
+                <span className="text-lg font-medium">{tUi("total.2")}</span>
                 <span className="text-2xl font-semibold font-mono" data-testid="text-grand-total">
                   {ccPrefix}
                   {formatNum(total)}
@@ -843,7 +845,7 @@ export default function FactoryPOS() {
                 <div key={exp.id} className="flex gap-2 items-center">
                   <Select value={exp.accountId} onValueChange={(v) => updateExpenseRow(idx, "accountId", v)}>
                     <SelectTrigger className="flex-1 min-w-0" data-testid={`select-expense-account-${idx}`}>
-                      <SelectValue placeholder="Expense account" />
+                      <SelectValue placeholder={tUi("expense.account")} />
                     </SelectTrigger>
                     <SelectContent>
                       {(ledgerAccounts || []).map((a: any) => (
@@ -854,7 +856,7 @@ export default function FactoryPOS() {
                     </SelectContent>
                   </Select>
                   <Input
-                    placeholder="Description"
+                    placeholder={tUi("description")}
                     value={exp.description}
                     onChange={(e) => updateExpenseRow(idx, "description", e.target.value)}
                     className="w-28 shrink-0"
@@ -863,7 +865,7 @@ export default function FactoryPOS() {
                   <Input
                     type="number"
                     inputMode="decimal"
-                    placeholder="Amount"
+                    placeholder={tUi("amount")}
                     value={exp.amount}
                     onChange={(e) => updateExpenseRow(idx, "amount", e.target.value)}
                     className="w-24 shrink-0 text-right font-mono"
@@ -893,14 +895,14 @@ export default function FactoryPOS() {
                 {totalExpenseAmount > 0 && (
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span>Deductions:</span>
+                      <span>{tUi("deductions")}</span>
                       <span className="font-mono text-destructive">
                         -{ccPrefix}
                         {formatNum(totalExpenseAmount)}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-base font-medium">Net Cash:</span>
+                      <span className="text-base font-medium">{tUi("net.cash")}</span>
                       <span className="text-xl font-semibold font-mono" data-testid="text-net-total">
                         {ccPrefix}
                         {formatNum(netTotal)}
@@ -926,7 +928,7 @@ export default function FactoryPOS() {
                         </div>
                         {custObj && (
                           <div className="flex justify-between">
-                            <span className="text-muted-foreground">Previous balance</span>
+                            <span className="text-muted-foreground">{tUi("previous.balance")}</span>
                             <span className="font-mono">
                               {prevNet >= 0 ? "Dr " : "Cr "}
                               {ccPrefix}
@@ -935,14 +937,14 @@ export default function FactoryPOS() {
                           </div>
                         )}
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">This sale (Dr)</span>
+                          <span className="text-muted-foreground">{tUi("this.sale.dr")}</span>
                           <span className="font-mono">
                             +{ccPrefix}
                             {formatNum(total)}
                           </span>
                         </div>
                         <div className="flex justify-between font-semibold border-t border-border pt-1.5">
-                          <span>Balance after sale</span>
+                          <span>{tUi("balance.after.sale")}</span>
                           <span className="font-mono" data-testid="text-balance-after-sale">
                             {afterSale >= 0 ? "Dr " : "Cr "}
                             {ccPrefix}
@@ -960,13 +962,15 @@ export default function FactoryPOS() {
         {/* Right: Product Browser */}
         <Card className="hidden lg:flex w-96 flex-col sticky top-4 max-h-[calc(100vh-8rem)] self-start">
           <div className="p-4 border-b">
-            <h3 className="text-sm font-medium mb-2">Products</h3>
-            <p className="text-xs text-muted-foreground mb-3">Type or scan a barcode — ↑↓ to navigate, Enter to add</p>
+            <h3 className="text-sm font-medium mb-2">{tUi("products")}</h3>
+            <p className="text-xs text-muted-foreground mb-3">
+              {tUi("type.or.scan.a.barcode.to.navigate.enter.to.add")}
+            </p>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 ref={searchRef}
-                placeholder="Scan barcode or search..."
+                placeholder={tUi("scan.barcode.or.search")}
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
@@ -983,12 +987,12 @@ export default function FactoryPOS() {
             {!locationId ? (
               <div className="flex flex-col items-center justify-center h-full gap-2 text-muted-foreground">
                 <Package className="h-8 w-8 opacity-40" />
-                <span className="text-sm">Select a location first</span>
+                <span className="text-sm">{tUi("select.a.location.first")}</span>
               </div>
             ) : invLoading ? (
-              <div className="text-center text-muted-foreground text-sm py-8">Loading inventory...</div>
+              <div className="text-center text-muted-foreground text-sm py-8">{tUi("loading.inventory")}</div>
             ) : filteredInventory.length === 0 ? (
-              <div className="text-center text-muted-foreground text-sm py-8">No products in stock</div>
+              <div className="text-center text-muted-foreground text-sm py-8">{tUi("no.products.in.stock")}</div>
             ) : (
               <div className="space-y-1" ref={itemListRef}>
                 {filteredInventory.map((item, idx) => {
@@ -1057,18 +1061,18 @@ export default function FactoryPOS() {
           </CardHeader>
           <CardContent className="p-0">
             {salesLoading ? (
-              <div className="p-6 text-center text-muted-foreground">Loading...</div>
+              <div className="p-6 text-center text-muted-foreground">{tUi("loading.2")}</div>
             ) : !sales || sales.length === 0 ? (
-              <div className="p-6 text-center text-muted-foreground">No sales yet</div>
+              <div className="p-6 text-center text-muted-foreground">{tUi("no.sales.yet")}</div>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Sale #</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>{tUi("sale")}</TableHead>
+                    <TableHead>{tUi("date")}</TableHead>
+                    <TableHead>{tUi("customer")}</TableHead>
+                    <TableHead className="text-right">{tUi("total")}</TableHead>
+                    <TableHead>{tUi("status")}</TableHead>
                     <TableHead></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1114,11 +1118,11 @@ export default function FactoryPOS() {
       <Sheet open={mobileBrowseOpen} onOpenChange={setMobileBrowseOpen}>
         <SheetContent side="bottom" className="h-[80vh] flex flex-col">
           <div className="pb-3 border-b">
-            <div className="text-base font-semibold mb-3">Add Product</div>
+            <div className="text-base font-semibold mb-3">{tUi("add.product")}</div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Scan barcode or search..."
+                placeholder={tUi("scan.barcode.or.search")}
                 value={mobileBrowseSearch}
                 onChange={(e) => setMobileBrowseSearch(e.target.value)}
                 onKeyDown={(e) => {
@@ -1140,9 +1144,9 @@ export default function FactoryPOS() {
           </div>
           <div className="flex-1 overflow-y-auto space-y-1 pt-3">
             {!locationId ? (
-              <div className="text-center text-muted-foreground text-sm py-8">Select a location first</div>
+              <div className="text-center text-muted-foreground text-sm py-8">{tUi("select.a.location.first")}</div>
             ) : mobileFilteredInventory.length === 0 ? (
-              <div className="text-center text-muted-foreground text-sm py-8">No products in stock</div>
+              <div className="text-center text-muted-foreground text-sm py-8">{tUi("no.products.in.stock")}</div>
             ) : (
               mobileFilteredInventory.map((item) => {
                 const price = parseFloat(item.sellingPrice || "0");
@@ -1202,7 +1206,7 @@ export default function FactoryPOS() {
                   />
                 </div>
                 <div className="rounded-md bg-muted/30 border px-3 py-2.5 flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Amount</span>
+                  <span className="text-sm text-muted-foreground">{tUi("amount")}</span>
                   <span className="text-lg font-semibold font-mono">
                     {ccPrefix}
                     {formatNum(mobileRow.quantity * mobileRow.unitPrice)}
@@ -1240,7 +1244,7 @@ export default function FactoryPOS() {
           setMobileBrowseOpen(true);
         }}
         data-testid="button-mobile-fab-add"
-        aria-label="Add product"
+        aria-label={tUi("add.product.2")}
       >
         <Plus className="h-7 w-7" />
       </button>
@@ -1277,8 +1281,8 @@ export default function FactoryPOS() {
       <AlertDialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
         <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Print Invoice</AlertDialogTitle>
-            <AlertDialogDescription>Sale recorded successfully. Print the invoice?</AlertDialogDescription>
+            <AlertDialogTitle>{tUi("print.invoice")}</AlertDialogTitle>
+            <AlertDialogDescription>{tUi("sale.recorded.successfully.print.the.invoice")}</AlertDialogDescription>
           </AlertDialogHeader>
 
           {/* Hidden Print Template */}
@@ -1355,7 +1359,7 @@ export default function FactoryPOS() {
                     border: "1.5px solid black",
                   }}
                 >
-                  <div style={{ fontWeight: "900" }}>Customer</div>
+                  <div style={{ fontWeight: "900" }}>{tUi("customer")}</div>
                   <div>{savedSale.customerName}</div>
                 </div>
               )}
@@ -1633,7 +1637,7 @@ export default function FactoryPOS() {
                             color: "#a00",
                           }}
                         >
-                          <span>BALANCE DUE:</span>
+                          <span>{tUi("balance.due")}</span>
                           <span>{fmtPrintAmt(savedSale?.total ?? 0)}</span>
                         </div>
                         <div
@@ -1662,7 +1666,7 @@ export default function FactoryPOS() {
                             color: "#555",
                           }}
                         >
-                          <span>SALES TOTAL:</span>
+                          <span>{tUi("sales.total")}</span>
                           <span>{fmtPrintAmt(savedSale?.total ?? 0)}</span>
                         </div>
                         <div
@@ -1676,7 +1680,7 @@ export default function FactoryPOS() {
                             justifyContent: "space-between",
                           }}
                         >
-                          <span>NET CASH RECEIVED:</span>
+                          <span>{tUi("net.cash.received")}</span>
                           <span>{fmtPrintAmt(printNetTotal)}</span>
                         </div>
                       </>
@@ -1692,7 +1696,7 @@ export default function FactoryPOS() {
                           justifyContent: "space-between",
                         }}
                       >
-                        <span>TOTAL PAID:</span>
+                        <span>{tUi("total.paid.2")}</span>
                         <span>{fmtPrintAmt(savedSale?.total ?? 0)}</span>
                       </div>
                     )}
@@ -1712,7 +1716,7 @@ export default function FactoryPOS() {
                     border: "1.5px solid black",
                   }}
                 >
-                  <span style={{ fontWeight: "900" }}>Note:</span> {savedSale.notes}
+                  <span style={{ fontWeight: "900" }}>{tUi("note.2")}</span> {savedSale.notes}
                 </div>
               )}
 
@@ -1727,7 +1731,7 @@ export default function FactoryPOS() {
                   borderTop: "1.5px solid black",
                 }}
               >
-                <div>Thank you for your business!</div>
+                <div>{tUi("thank.you.for.your.business")}</div>
               </div>
             </div>
           </div>
@@ -1748,7 +1752,7 @@ export default function FactoryPOS() {
       <AlertDialog open={voidId !== null} onOpenChange={() => setVoidId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Void this sale?</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("void.this.sale")}</AlertDialogTitle>
             <AlertDialogDescription>
               This will mark the sale as voided and restore the bale inventory. This cannot be undone.
             </AlertDialogDescription>

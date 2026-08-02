@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/PageHeader";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export default function FactorySupplierReport() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const today = new Date().toLocaleDateString("en-CA");
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-CA");
@@ -85,7 +87,10 @@ export default function FactorySupplierReport() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <PageHeader title="Supplier Usage Report" subtitle="Generate supplier-level usage and cost reports" />
+          <PageHeader
+            title={tUi("supplier.usage.report")}
+            subtitle={tUi("generate.supplier.level.usage.and.cost.reports")}
+          />
         </div>
       </div>
 
@@ -100,7 +105,7 @@ export default function FactorySupplierReport() {
           <div className="flex items-end gap-4 flex-wrap">
             {companies.length > 1 && (
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Company</Label>
+                <Label className="text-xs text-muted-foreground">{tUi("company")}</Label>
                 <Select
                   value={companyId ? String(companyId) : ""}
                   onValueChange={(val) => {
@@ -109,7 +114,7 @@ export default function FactorySupplierReport() {
                   }}
                 >
                   <SelectTrigger className="w-48" data-testid="select-company">
-                    <SelectValue placeholder="Select company" />
+                    <SelectValue placeholder={tUi("select.company")} />
                   </SelectTrigger>
                   <SelectContent>
                     {companies.map((c: any) => (
@@ -123,7 +128,7 @@ export default function FactorySupplierReport() {
             )}
 
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">From</Label>
+              <Label className="text-xs text-muted-foreground">{tUi("from")}</Label>
               <Input
                 type="date"
                 value={startDate}
@@ -145,17 +150,17 @@ export default function FactorySupplierReport() {
             </div>
 
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Supplier</Label>
+              <Label className="text-xs text-muted-foreground">{tUi("supplier")}</Label>
               <Select
                 value={supplierId || "all"}
                 onValueChange={(val) => setSupplierId(val === "all" ? "" : val)}
                 disabled={!companyId || suppliersLoading}
               >
                 <SelectTrigger className="w-48" data-testid="select-supplier">
-                  <SelectValue placeholder="All Suppliers" />
+                  <SelectValue placeholder={tUi("all.suppliers.2")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Suppliers</SelectItem>
+                  <SelectItem value="all">{tUi("all.suppliers.2")}</SelectItem>
                   {suppliers.map((s: any) => (
                     <SelectItem key={s.id} value={String(s.id)}>
                       {s.name}
@@ -201,7 +206,7 @@ export default function FactorySupplierReport() {
           <div className="flex items-start gap-3">
             <Package className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
             <div>
-              <p className="text-sm font-medium">What this report includes</p>
+              <p className="text-sm font-medium">{tUi("what.this.report.includes")}</p>
               <p className="text-sm text-muted-foreground mt-1">
                 This report includes supplier-level KG balances, cost analysis, bale production data, and mixing
                 breakdowns for the selected date range.

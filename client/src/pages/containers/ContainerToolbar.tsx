@@ -8,6 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface ContainerToolbarProps {
   isDeveloper: boolean;
@@ -32,6 +33,7 @@ export function ContainerToolbar({
   onRefreshEtasClick,
   refreshEtasIsPending,
 }: ContainerToolbarProps) {
+  const tUi = useErpText();
   return (
     <div className="flex gap-2 flex-wrap">
       {isDeveloper && (
@@ -42,11 +44,7 @@ export function ContainerToolbar({
           disabled={syncAllIsPending}
           data-testid="button-sync-all-vouchers"
         >
-          {syncAllIsPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Wrench className="h-4 w-4" />
-          )}
+          {syncAllIsPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
           Fix All PO &amp; Parent JV Sync
         </Button>
       )}
@@ -57,14 +55,10 @@ export function ContainerToolbar({
           className="gap-2"
           onClick={onRefreshEtasClick}
           disabled={refreshEtasIsPending}
-          title="Refresh ETAs via JSONCargo (Maersk / Hapag-Lloyd / MSC / CMA CGM)"
+          title={tUi("refresh.etas.via.jsoncargo.maersk.hapag.lloyd.ms")}
           data-testid="button-refresh-etas"
         >
-          {refreshEtasIsPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4" />
-          )}
+          {refreshEtasIsPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           Update ETAs
         </Button>
       )}

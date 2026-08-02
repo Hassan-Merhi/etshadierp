@@ -3,18 +3,19 @@
  *
  * Extracted from FactoryOtwTrackingTab.tsx during the Phase 4 god-file split.
  */
-import {useState, useEffect} from "react";
-import {useMutation, useQueryClient as useTQClient} from "@tanstack/react-query";
-import {Button} from "@/components/ui/button";
-import {Label} from "@/components/ui/label";
-import {Separator} from "@/components/ui/separator";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Sheet, SheetContent, SheetHeader, SheetTitle} from "@/components/ui/sheet";
-import {Switch} from "@/components/ui/switch";
-import {Loader2, Settings2} from "lucide-react";
-import {useToast} from "@/hooks/use-toast";
-import {factoryApiRequest} from "@/lib/factoryApi";
-import type {ContainerWithSupplier} from "../types";
+import { useState, useEffect } from "react";
+import { useMutation, useQueryClient as useTQClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
+import { Loader2, Settings2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { factoryApiRequest } from "@/lib/factoryApi";
+import type { ContainerWithSupplier } from "../types";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export // ── Tracking Settings Sheet ──────────────────────────────────────────────────
 function TrackingSettingsSheet({
@@ -26,6 +27,7 @@ function TrackingSettingsSheet({
   open: boolean;
   onClose: () => void;
 }) {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const tqClient = useTQClient();
   const [enabled, setEnabled] = useState(true);
@@ -80,7 +82,7 @@ function TrackingSettingsSheet({
         <div className="flex-1 px-6 py-5 space-y-6">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium">Enable Tracking</p>
+              <p className="text-sm font-medium">{tUi("enable.tracking")}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Allow this container to be tracked via carrier APIs
               </p>
@@ -90,7 +92,7 @@ function TrackingSettingsSheet({
           <Separator />
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium">Auto Update</p>
+              <p className="text-sm font-medium">{tUi("auto.update")}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Let the scheduler check this container automatically
               </p>
@@ -104,7 +106,7 @@ function TrackingSettingsSheet({
           </div>
           <Separator />
           <div className="space-y-2">
-            <Label className="text-sm font-medium">Carrier Hint</Label>
+            <Label className="text-sm font-medium">{tUi("carrier.hint")}</Label>
             <p className="text-xs text-muted-foreground">
               Select the shipping line — enables JSON Cargo ETA tracking for Maersk, Hapag-Lloyd, MSC, and CMA CGM.
             </p>
@@ -114,14 +116,14 @@ function TrackingSettingsSheet({
               disabled={!enabled}
             >
               <SelectTrigger data-testid="select-carrier-hint-tab">
-                <SelectValue placeholder="None (auto-detect)" />
+                <SelectValue placeholder={tUi("none.auto.detect")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="NONE">None (auto-detect)</SelectItem>
-                <SelectItem value="MAERSK">Maersk</SelectItem>
-                <SelectItem value="HAPAG">Hapag-Lloyd</SelectItem>
+                <SelectItem value="NONE">{tUi("none.auto.detect")}</SelectItem>
+                <SelectItem value="MAERSK">{tUi("maersk")}</SelectItem>
+                <SelectItem value="HAPAG">{tUi("hapag.lloyd")}</SelectItem>
                 <SelectItem value="MSC">MSC</SelectItem>
-                <SelectItem value="CMA">CMA CGM</SelectItem>
+                <SelectItem value="CMA">{tUi("cma.cgm")}</SelectItem>
               </SelectContent>
             </Select>
             {carrierHint && !["MAERSK", "HAPAG", "MSC", "CMA"].includes(carrierHint) && (

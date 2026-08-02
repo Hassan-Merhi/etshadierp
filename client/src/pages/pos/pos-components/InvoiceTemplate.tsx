@@ -1,4 +1,5 @@
 import { formatNumber } from "@/lib/formatNumber";
+import { usePosText } from "@/i18n/modules/pos";
 
 export interface InvoiceTemplateProps {
   printRef: React.RefObject<HTMLDivElement>;
@@ -19,6 +20,7 @@ export function InvoiceTemplate({
   fmtPrint,
   fmtPrintCurrency,
 }: InvoiceTemplateProps) {
+  const tUi = usePosText();
   return (
     <div style={{ position: "fixed", top: 0, left: "-99999px", width: "680px", pointerEvents: "none", zIndex: -1 }}>
       <div
@@ -87,7 +89,7 @@ export function InvoiceTemplate({
                 textAlign: "center",
               }}
             >
-              <span style={{ fontWeight: "900" }}>Daily Rate:</span> $1 ={" "}
+              <span style={{ fontWeight: "900" }}>{tUi("daily.rate")}</span> $1 ={" "}
               {formatNumber(parseFloat(savedSale?.voucher?.exchangeRate) || exchangeRate || 0)} CFA
             </div>
           )}
@@ -103,7 +105,7 @@ export function InvoiceTemplate({
               border: "1.5px solid black",
             }}
           >
-            <div style={{ fontWeight: "900" }}>CREDIT SALE</div>
+            <div style={{ fontWeight: "900" }}>{tUi("credit.sale")}</div>
             <div>Customer: {savedSale.customer.name}</div>
           </div>
         )}
@@ -384,7 +386,7 @@ export function InvoiceTemplate({
             justifyContent: "space-between",
           }}
         >
-          <span>TOTAL PAID:</span>
+          <span>{tUi("total.paid")}</span>
           <span>
             {fmtPrintCurrency(
               (savedSale?.items ?? []).reduce((sum: number, item: any) => {
@@ -407,7 +409,7 @@ export function InvoiceTemplate({
               border: "1.5px solid black",
             }}
           >
-            <span style={{ fontWeight: "900" }}>Note:</span> {savedSale.voucher.description}
+            <span style={{ fontWeight: "900" }}>{tUi("note")}</span> {savedSale.voucher.description}
           </div>
         )}
 
@@ -422,7 +424,7 @@ export function InvoiceTemplate({
             borderTop: "1.5px solid black",
           }}
         >
-          <div>Thank you for your business!</div>
+          <div>{tUi("thank.you.for.your.business")}</div>
         </div>
       </div>
     </div>

@@ -52,7 +52,9 @@ import type {
   OrderDetail,
   Proforma,
 } from "./factorycontainerloadingscan/types";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactoryContainerLoadingScan() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const search = useSearch();
@@ -753,16 +755,16 @@ export default function FactoryContainerLoadingScan() {
       {showScanSuccessPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="bg-green-500 text-white rounded-xl px-16 py-10 shadow-2xl border-4 border-green-300 text-center">
-            <div className="text-5xl font-black tracking-wide drop-shadow-md">SCANNED</div>
-            <div className="text-5xl font-black tracking-wide drop-shadow-md">SUCCESSFULLY</div>
+            <div className="text-5xl font-black tracking-wide drop-shadow-md">{tUi("scanned")}</div>
+            <div className="text-5xl font-black tracking-wide drop-shadow-md">{tUi("successfully")}</div>
           </div>
         </div>
       )}
       {showScanErrorPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="bg-red-600 text-white rounded-xl px-16 py-10 shadow-2xl border-4 border-red-300 text-center">
-            <div className="text-5xl font-black tracking-wide drop-shadow-md">SCAN ERROR</div>
-            <div className="text-5xl font-black tracking-wide drop-shadow-md">TRY AGAIN</div>
+            <div className="text-5xl font-black tracking-wide drop-shadow-md">{tUi("scan.error")}</div>
+            <div className="text-5xl font-black tracking-wide drop-shadow-md">{tUi("try.again")}</div>
           </div>
         </div>
       )}
@@ -772,8 +774,8 @@ export default function FactoryContainerLoadingScan() {
           style={{ top: "4rem" }}
         >
           <div className="bg-orange-500 text-white rounded-xl px-12 py-6 shadow-2xl border-4 border-orange-700 text-center">
-            <div className="text-3xl font-black tracking-wide">QUANTITY EXCEEDED</div>
-            <div className="text-2xl font-bold mt-1">Scan again to bypass</div>
+            <div className="text-3xl font-black tracking-wide">{tUi("quantity.exceeded")}</div>
+            <div className="text-2xl font-bold mt-1">{tUi("scan.again.to.bypass")}</div>
           </div>
         </div>
       )}
@@ -783,8 +785,8 @@ export default function FactoryContainerLoadingScan() {
           style={{ top: "4rem" }}
         >
           <div className="bg-amber-400 text-amber-950 rounded-xl px-12 py-6 shadow-2xl border-4 border-amber-600 text-center">
-            <div className="text-3xl font-black tracking-wide">ITEM NOT REQUESTED</div>
-            <div className="text-2xl font-bold mt-1">Scan again to bypass</div>
+            <div className="text-3xl font-black tracking-wide">{tUi("item.not.requested")}</div>
+            <div className="text-2xl font-bold mt-1">{tUi("scan.again.to.bypass")}</div>
           </div>
         </div>
       )}
@@ -794,8 +796,8 @@ export default function FactoryContainerLoadingScan() {
             <ScanLine className="h-4 w-4 text-primary" />
           </div>
           <div>
-            <h1 className="text-base font-semibold leading-tight">Container Loading</h1>
-            <p className="text-xs text-muted-foreground">Floor loader bale scanning</p>
+            <h1 className="text-base font-semibold leading-tight">{tUi("container.loading")}</h1>
+            <p className="text-xs text-muted-foreground">{tUi("floor.loader.bale.scanning")}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -896,7 +898,7 @@ export default function FactoryContainerLoadingScan() {
                         variant="ghost"
                         onClick={() => downloadTemplate("ref")}
                         data-testid="button-template-ref"
-                        title="Download Ref Number template"
+                        title={tUi("download.ref.number.template")}
                       >
                         <Download className="h-3 w-3" />
                       </Button>
@@ -915,7 +917,7 @@ export default function FactoryContainerLoadingScan() {
                     value={scanCode}
                     onChange={(e) => setScanCode(e.target.value)}
                     onKeyDown={handleScan}
-                    placeholder="Scan barcode, ref no., article code, item name (partial ok)…"
+                    placeholder={tUi("scan.barcode.ref.no.article.code.item.name.parti")}
                     disabled={!orderId || !selectedLocationId || addBaleMutation.isPending}
                     className={`text-lg h-12 font-mono ${scanInputClass}`}
                     autoFocus
@@ -952,7 +954,7 @@ export default function FactoryContainerLoadingScan() {
                     data-testid="text-no-bales"
                   >
                     <Package className="h-12 w-12 mb-3 opacity-40" />
-                    <p>No bales scanned yet</p>
+                    <p>{tUi("no.bales.scanned.yet")}</p>
                     <p className="text-sm mt-1">
                       {!orderId
                         ? "Set up the loading order first, then scan bales"
@@ -1049,11 +1051,11 @@ export default function FactoryContainerLoadingScan() {
                   <Table className="mt-3">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Reference</TableHead>
-                        <TableHead>Article</TableHead>
-                        <TableHead className="text-right">Weight</TableHead>
-                        <TableHead>Removed By</TableHead>
-                        <TableHead>Time</TableHead>
+                        <TableHead>{tUi("reference")}</TableHead>
+                        <TableHead>{tUi("article")}</TableHead>
+                        <TableHead className="text-right">{tUi("weight")}</TableHead>
+                        <TableHead>{tUi("removed.by")}</TableHead>
+                        <TableHead>{tUi("time")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1087,14 +1089,14 @@ export default function FactoryContainerLoadingScan() {
           {/* Setup card — hidden once order started and proforma is showing */}
           <div className="rounded-xl border overflow-hidden">
             <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20">
-              <span className="text-sm font-semibold">Setup</span>
+              <span className="text-sm font-semibold">{tUi("setup")}</span>
             </div>
             <div className="p-4 space-y-4">
               <div>
-                <label className="text-sm font-medium mb-1 block">Customer</label>
+                <label className="text-sm font-medium mb-1 block">{tUi("customer")}</label>
                 <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId} disabled={!!orderId}>
                   <SelectTrigger data-testid="select-customer">
-                    <SelectValue placeholder="Select customer..." />
+                    <SelectValue placeholder={tUi("select.customer.3")} />
                   </SelectTrigger>
                   <SelectContent>
                     {customers.map((c) => (
@@ -1113,7 +1115,7 @@ export default function FactoryContainerLoadingScan() {
                 </label>
                 <Select value={selectedLocationId} onValueChange={setSelectedLocationId} disabled={!!orderId}>
                   <SelectTrigger data-testid="select-location">
-                    <SelectValue placeholder="Select location..." />
+                    <SelectValue placeholder={tUi("select.location")} />
                   </SelectTrigger>
                   <SelectContent>
                     {locations.map((loc) => (
@@ -1131,10 +1133,10 @@ export default function FactoryContainerLoadingScan() {
 
               {customerId && !orderId && activeProformas.length > 0 && (
                 <div className="space-y-1">
-                  <label className="text-sm font-medium">Proforma</label>
+                  <label className="text-sm font-medium">{tUi("proforma")}</label>
                   <Select value={selectedProformaId} onValueChange={setSelectedProformaId} disabled={!!orderId}>
                     <SelectTrigger data-testid="select-proforma">
-                      <SelectValue placeholder="Select a proforma..." />
+                      <SelectValue placeholder={tUi("select.a.proforma")} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none" data-testid="select-proforma-none">
@@ -1158,13 +1160,13 @@ export default function FactoryContainerLoadingScan() {
 
               {/* Note field — editable before and after loading starts */}
               <div>
-                <label className="text-sm font-medium mb-1 block">Note</label>
+                <label className="text-sm font-medium mb-1 block">{tUi("note")}</label>
                 {orderId ? (
                   <div className="flex gap-2 items-start">
                     <Textarea
                       value={loadingNote}
                       onChange={(e) => setLoadingNote(e.target.value)}
-                      placeholder="Add a note for this loading..."
+                      placeholder={tUi("add.a.note.for.this.loading")}
                       className="resize-none text-sm"
                       rows={2}
                       data-testid="input-loading-note"
@@ -1175,7 +1177,7 @@ export default function FactoryContainerLoadingScan() {
                       onClick={() => saveNoteMutation.mutate(loadingNote)}
                       disabled={saveNoteMutation.isPending}
                       data-testid="button-save-note"
-                      title="Save note"
+                      title={tUi("save.note")}
                     >
                       <Save className="h-4 w-4" />
                     </Button>
@@ -1184,7 +1186,7 @@ export default function FactoryContainerLoadingScan() {
                   <Textarea
                     value={loadingNote}
                     onChange={(e) => setLoadingNote(e.target.value)}
-                    placeholder="Optional note (e.g. Rush order, Handle with care)"
+                    placeholder={tUi("optional.note.e.g.rush.order.handle.with.care")}
                     className="resize-none text-sm"
                     rows={2}
                     data-testid="input-loading-note"
@@ -1233,13 +1235,13 @@ export default function FactoryContainerLoadingScan() {
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
-                      <TableHead className="text-xs">Article</TableHead>
-                      <TableHead className="text-xs">Product</TableHead>
-                      <TableHead className="text-xs text-right">Expected</TableHead>
-                      <TableHead className="text-xs text-right">Loaded</TableHead>
-                      <TableHead className="text-xs text-right">Remaining</TableHead>
-                      <TableHead className="text-xs">Status</TableHead>
-                      <TableHead className="text-xs text-right">Stock</TableHead>
+                      <TableHead className="text-xs">{tUi("article")}</TableHead>
+                      <TableHead className="text-xs">{tUi("product")}</TableHead>
+                      <TableHead className="text-xs text-right">{tUi("expected")}</TableHead>
+                      <TableHead className="text-xs text-right">{tUi("loaded")}</TableHead>
+                      <TableHead className="text-xs text-right">{tUi("remaining")}</TableHead>
+                      <TableHead className="text-xs">{tUi("status")}</TableHead>
+                      <TableHead className="text-xs text-right">{tUi("stock")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1378,10 +1380,10 @@ export default function FactoryContainerLoadingScan() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-xs py-1.5">Article</TableHead>
-                        <TableHead className="text-xs py-1.5">Product</TableHead>
+                        <TableHead className="text-xs py-1.5">{tUi("article")}</TableHead>
+                        <TableHead className="text-xs py-1.5">{tUi("product")}</TableHead>
                         <TableHead className="text-xs text-right py-1.5">Qty</TableHead>
-                        <TableHead className="text-xs text-right py-1.5">Weight (kg)</TableHead>
+                        <TableHead className="text-xs text-right py-1.5">{tUi("weight.kg")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1409,23 +1411,23 @@ export default function FactoryContainerLoadingScan() {
           ) : orderId ? (
             <div className="rounded-xl border overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20">
-                <span className="text-sm font-semibold">Order Summary</span>
+                <span className="text-sm font-semibold">{tUi("order.summary")}</span>
               </div>
               <div className="p-4 space-y-2">
                 <div className="flex items-center justify-between gap-2 text-sm">
-                  <span>Total Bales</span>
+                  <span>{tUi("total.bales")}</span>
                   <span className="font-mono" data-testid="text-total-bales">
                     {bales.length}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-2 text-sm">
-                  <span>Total Weight</span>
+                  <span>{tUi("total.weight")}</span>
                   <span className="font-mono" data-testid="text-total-weight">
                     {totalWeight.toFixed(2)} kg
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-2 text-sm">
-                  <span>Article Groups</span>
+                  <span>{tUi("article.groups")}</span>
                   <span className="font-mono" data-testid="text-article-groups">
                     {Object.keys(groupedBalesMap).length}
                   </span>
@@ -1474,11 +1476,11 @@ export default function FactoryContainerLoadingScan() {
       >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Import Bales from Excel</DialogTitle>
+            <DialogTitle>{tUi("import.bales.from.excel")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-muted-foreground">Download template:</span>
+              <span className="text-xs text-muted-foreground">{tUi("download.template.2")}</span>
               <Button
                 size="sm"
                 variant="outline"
@@ -1508,7 +1510,7 @@ export default function FactoryContainerLoadingScan() {
                     <TableHeader className="sticky top-0 bg-background">
                       <TableRow>
                         <TableHead>#</TableHead>
-                        <TableHead>Ref / Code</TableHead>
+                        <TableHead>{tUi("ref.code.2")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1535,7 +1537,7 @@ export default function FactoryContainerLoadingScan() {
                     <Table>
                       <TableHeader className="sticky top-0 bg-background">
                         <TableRow>
-                          <TableHead>Article Code</TableHead>
+                          <TableHead>{tUi("article.code")}</TableHead>
                           <TableHead className="text-right">Qty</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1667,7 +1669,7 @@ export default function FactoryContainerLoadingScan() {
       <Dialog open={showFinalizeDialog} onOpenChange={setShowFinalizeDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Validate Loading</DialogTitle>
+            <DialogTitle>{tUi("validate.loading")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             {linkedProforma && proformaProgress.length > 0 ? (
@@ -1679,10 +1681,10 @@ export default function FactoryContainerLoadingScan() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Article / Product</TableHead>
-                        <TableHead className="text-right">Expected</TableHead>
-                        <TableHead className="text-right">Loaded</TableHead>
-                        <TableHead className="text-right">Status</TableHead>
+                        <TableHead>{tUi("article.product")}</TableHead>
+                        <TableHead className="text-right">{tUi("expected")}</TableHead>
+                        <TableHead className="text-right">{tUi("loaded")}</TableHead>
+                        <TableHead className="text-right">{tUi("status")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1731,7 +1733,7 @@ export default function FactoryContainerLoadingScan() {
                                 {groupedBalesMap[code].baleName}
                               </div>
                             )}
-                            <div className="text-red-500 text-xs">Not on proforma</div>
+                            <div className="text-red-500 text-xs">{tUi("not.on.proforma")}</div>
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm text-muted-foreground">—</TableCell>
                           <TableCell className="text-right font-mono text-sm text-red-600 dark:text-red-400 font-semibold">
@@ -1783,13 +1785,13 @@ export default function FactoryContainerLoadingScan() {
                 </p>
                 <div className="space-y-1 text-sm">
                   <div className="flex items-center justify-between gap-2">
-                    <span>Total Bales:</span>
+                    <span>{tUi("total.bales.2")}</span>
                     <span className="font-mono font-semibold" data-testid="text-dialog-total-bales">
                       {bales.length}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
-                    <span>Total Weight:</span>
+                    <span>{tUi("total.weight.2")}</span>
                     <span className="font-mono font-semibold" data-testid="text-dialog-total-weight">
                       {totalWeight.toFixed(2)} kg
                     </span>
@@ -1798,7 +1800,7 @@ export default function FactoryContainerLoadingScan() {
               </>
             )}
             <div className="space-y-1">
-              <label className="text-sm font-medium">Loading Date</label>
+              <label className="text-sm font-medium">{tUi("loading.date")}</label>
               <input
                 type="date"
                 value={finalizeDate}
@@ -1831,10 +1833,10 @@ export default function FactoryContainerLoadingScan() {
       <Dialog open={showLastScannedPopup} onOpenChange={setShowLastScannedPopup}>
         <DialogContent className="max-w-sm" data-testid="dialog-last-scanned">
           <DialogHeader>
-            <DialogTitle className="text-base">Resuming Loading</DialogTitle>
+            <DialogTitle className="text-base">{tUi("resuming.loading")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Last bale scanned in this session:</p>
+            <p className="text-sm text-muted-foreground">{tUi("last.bale.scanned.in.this.session")}</p>
             <div
               className="bg-muted rounded-md px-4 py-3 font-mono text-lg font-semibold text-center"
               data-testid="text-last-scanned-ref"
@@ -1864,14 +1866,14 @@ export default function FactoryContainerLoadingScan() {
       >
         <AlertDialogContent data-testid="dialog-confirm-remove-bale">
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove bale from loading?</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("remove.bale.from.loading")}</AlertDialogTitle>
             <AlertDialogDescription>
               Bale <span className="font-mono font-semibold">{baleToDelete?.baleReference}</span> will be removed from
               this loading and returned to stock. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-remove-bale">Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-remove-bale">{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground"
               data-testid="button-confirm-remove-bale"

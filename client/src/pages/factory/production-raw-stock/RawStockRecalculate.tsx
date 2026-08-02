@@ -1,25 +1,56 @@
-import {useMemo, useState, Suspense} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {Link} from "wouter";
-import {ArrowLeft, RefreshCw, CheckCircle2, Layers, ShieldAlert, History, ChevronDown, ChevronRight, Undo2, RotateCcw, AlertTriangle, ShieldCheck} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Checkbox} from "@/components/ui/checkbox";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Badge} from "@/components/ui/badge";
-import {Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription} from "@/components/ui/dialog";
-import {Skeleton} from "@/components/ui/skeleton";
-import {useToast} from "@/hooks/use-toast";
-import {useAdminOverride} from "@/hooks/use-admin-override";
-import {queryClient} from "@/lib/queryClient";
-import {useAppMode} from "@/contexts/AppModeContext";
-import {getApiRequest} from "@/lib/factoryApi";
-import {formatNumber} from "@/lib/formatNumber";
+import { useMemo, useState, Suspense } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
+import {
+  ArrowLeft,
+  RefreshCw,
+  CheckCircle2,
+  Layers,
+  ShieldAlert,
+  History,
+  ChevronDown,
+  ChevronRight,
+  Undo2,
+  RotateCcw,
+  AlertTriangle,
+  ShieldCheck,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { useAdminOverride } from "@/hooks/use-admin-override";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
+import { formatNumber } from "@/lib/formatNumber";
 
-import type {AffectedMixBatchRow, FullAuditResult, HistoricalReplayResult, RecalcRow, SourceMismatchRow, SupplierRateAuditRow, SupplierRatePreviewRow, UndoLogRow} from "./rawstockrecalculate/types";
-import {BatchDetail} from "./rawstockrecalculate/utils";
+import type {
+  AffectedMixBatchRow,
+  FullAuditResult,
+  HistoricalReplayResult,
+  RecalcRow,
+  SourceMismatchRow,
+  SupplierRateAuditRow,
+  SupplierRatePreviewRow,
+  UndoLogRow,
+} from "./rawstockrecalculate/types";
+import { BatchDetail } from "./rawstockrecalculate/utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function RawStockRecalculate() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const appMode = useAppMode();
@@ -810,7 +841,7 @@ export default function RawStockRecalculate() {
             </Button>
           </Link>
           <div>
-            <h1 className="text-lg font-bold leading-tight">Recalculate Raw Material Cost</h1>
+            <h1 className="text-lg font-bold leading-tight">{tUi("recalculate.raw.material.cost")}</h1>
             <p className="text-xs text-muted-foreground leading-tight">
               Recomputes each container's true landed cost/kg from its stored charges and shows what would change before
               anything is saved.
@@ -939,7 +970,7 @@ export default function RawStockRecalculate() {
 
           {isPreviewError ? (
             <div className="border border-red-500/30 bg-red-500/10 rounded-md p-3 text-sm text-red-700 dark:text-red-400 space-y-2">
-              <div className="font-medium">Failed to load recalculation preview.</div>
+              <div className="font-medium">{tUi("failed.to.load.recalculation.preview")}</div>
               <div className="text-xs">
                 {(previewErrorMsg as any)?.message || "An unexpected error occurred. Check server logs."}
               </div>
@@ -948,7 +979,9 @@ export default function RawStockRecalculate() {
               </Button>
             </div>
           ) : isLoading ? (
-            <div className="text-sm text-muted-foreground py-12 text-center">Computing recalculation preview...</div>
+            <div className="text-sm text-muted-foreground py-12 text-center">
+              {tUi("computing.recalculation.preview")}
+            </div>
           ) : (
             <>
               {fxUnresolvedRows.length > 0 && (
@@ -964,7 +997,7 @@ export default function RawStockRecalculate() {
                       </span>
                     ))}
                   </div>
-                  <div>Resolve/confirm these containers' exchange rates first, then refresh.</div>
+                  <div>{tUi("resolve.confirm.these.containers.exchange.rates.")}</div>
                 </div>
               )}
 
@@ -999,14 +1032,14 @@ export default function RawStockRecalculate() {
                               data-testid="checkbox-select-all"
                             />
                           </TableHead>
-                          <TableHead>Container</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Supplier</TableHead>
-                          <TableHead className="text-right">Received (kg)</TableHead>
-                          <TableHead className="text-right">Remaining (kg)</TableHead>
-                          <TableHead className="text-right">Current $/kg</TableHead>
-                          <TableHead className="text-right">Corrected $/kg</TableHead>
-                          <TableHead className="text-right">Change</TableHead>
+                          <TableHead>{tUi("container")}</TableHead>
+                          <TableHead>{tUi("status")}</TableHead>
+                          <TableHead>{tUi("supplier")}</TableHead>
+                          <TableHead className="text-right">{tUi("received.kg")}</TableHead>
+                          <TableHead className="text-right">{tUi("remaining.kg")}</TableHead>
+                          <TableHead className="text-right">{tUi("current.kg")}</TableHead>
+                          <TableHead className="text-right">{tUi("corrected.kg")}</TableHead>
+                          <TableHead className="text-right">{tUi("change")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1065,17 +1098,17 @@ export default function RawStockRecalculate() {
                         <TableHeader className="bg-muted/50">
                           <TableRow>
                             <TableHead className="w-6" />
-                            <TableHead>Batch</TableHead>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Total (kg)</TableHead>
-                            <TableHead className="text-right">From Selected (kg)</TableHead>
-                            <TableHead className="text-right">Old $/kg</TableHead>
-                            <TableHead className="text-right">New $/kg</TableHead>
+                            <TableHead>{tUi("batch")}</TableHead>
+                            <TableHead>{tUi("date")}</TableHead>
+                            <TableHead>{tUi("status")}</TableHead>
+                            <TableHead className="text-right">{tUi("total.kg.4")}</TableHead>
+                            <TableHead className="text-right">{tUi("from.selected.kg")}</TableHead>
+                            <TableHead className="text-right">{tUi("old.kg")}</TableHead>
+                            <TableHead className="text-right">{tUi("new.kg")}</TableHead>
                             <TableHead className="text-right">Δ $/kg</TableHead>
-                            <TableHead className="text-right">Total Δ</TableHead>
-                            <TableHead className="text-right">Change</TableHead>
-                            <TableHead className="text-right">Bales</TableHead>
+                            <TableHead className="text-right">{tUi("total.3")}</TableHead>
+                            <TableHead className="text-right">{tUi("change")}</TableHead>
+                            <TableHead className="text-right">{tUi("bales")}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1185,7 +1218,7 @@ export default function RawStockRecalculate() {
       {activeTab === "sources" && (
         <div className="space-y-3">
           <div>
-            <h2 className="text-sm font-semibold leading-tight">Mix-batch source cost mismatches</h2>
+            <h2 className="text-sm font-semibold leading-tight">{tUi("mix.batch.source.cost.mismatches")}</h2>
             <p className="text-xs text-muted-foreground leading-tight">
               Sources whose recorded cost/kg doesn't match the container's corrected USD cost — includes both zero-cost
               and nonzero-but-wrong values.
@@ -1210,12 +1243,12 @@ export default function RawStockRecalculate() {
                           disabled={fixableSourceMismatches.length === 0}
                         />
                       </TableHead>
-                      <TableHead>Batch</TableHead>
-                      <TableHead>Source</TableHead>
-                      <TableHead className="text-right">Weight (kg)</TableHead>
-                      <TableHead className="text-right">Current $/kg (USD)</TableHead>
-                      <TableHead className="text-right">Corrected $/kg (USD)</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>{tUi("batch")}</TableHead>
+                      <TableHead>{tUi("source")}</TableHead>
+                      <TableHead className="text-right">{tUi("weight.kg")}</TableHead>
+                      <TableHead className="text-right">{tUi("current.kg.usd")}</TableHead>
+                      <TableHead className="text-right">{tUi("corrected.kg.usd")}</TableHead>
+                      <TableHead>{tUi("status")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1254,7 +1287,7 @@ export default function RawStockRecalculate() {
                             <input
                               type="number"
                               step="0.000001"
-                              placeholder="Enter $/kg USD"
+                              placeholder={tUi("enter.kg.usd")}
                               className="w-28 text-right text-xs border rounded px-1.5 py-0.5 bg-background"
                               value={manualRates[r.sourceId] || ""}
                               onChange={(e) => setManualRates((prev) => ({ ...prev, [r.sourceId]: e.target.value }))}
@@ -1298,7 +1331,7 @@ export default function RawStockRecalculate() {
                       variant="outline"
                       disabled={sourceMismatchFixMutation.isPending}
                       onClick={handleFixAllSources}
-                      title="Fix all fixable mismatches in one shot — no dry-run, admin-confirmed"
+                      title={tUi("fix.all.fixable.mismatches.in.one.shot.no.dry.ru")}
                     >
                       <RefreshCw className="h-4 w-4 mr-1.5" />
                       Fix All ({fixableSourceMismatches.length})
@@ -1329,7 +1362,7 @@ export default function RawStockRecalculate() {
           {auditLoading ? (
             <Skeleton className="h-48 w-full" />
           ) : !fullAudit ? (
-            <div className="text-sm text-muted-foreground py-12 text-center">Loading audit...</div>
+            <div className="text-sm text-muted-foreground py-12 text-center">{tUi("loading.audit")}</div>
           ) : (
             <>
               {/* Summary cards */}
@@ -1387,10 +1420,10 @@ export default function RawStockRecalculate() {
                 <Table>
                   <TableHeader className="bg-muted/50">
                     <TableRow>
-                      <TableHead>Container</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Issue Codes</TableHead>
-                      <TableHead className="text-right">Repairable?</TableHead>
+                      <TableHead>{tUi("container")}</TableHead>
+                      <TableHead>{tUi("status")}</TableHead>
+                      <TableHead>{tUi("issue.codes")}</TableHead>
+                      <TableHead className="text-right">{tUi("repairable")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1531,12 +1564,12 @@ export default function RawStockRecalculate() {
                             }}
                           />
                         </TableHead>
-                        <TableHead>Supplier</TableHead>
-                        <TableHead className="text-right">Pre-recompute rate (restore to)</TableHead>
-                        <TableHead className="text-right">Recomputed (wrong)</TableHead>
-                        <TableHead className="text-right">Current rate</TableHead>
-                        <TableHead>Overwritten at</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead>{tUi("supplier")}</TableHead>
+                        <TableHead className="text-right">{tUi("pre.recompute.rate.restore.to")}</TableHead>
+                        <TableHead className="text-right">{tUi("recomputed.wrong")}</TableHead>
+                        <TableHead className="text-right">{tUi("current.rate")}</TableHead>
+                        <TableHead>{tUi("overwritten.at")}</TableHead>
+                        <TableHead>{tUi("status")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1604,7 +1637,7 @@ export default function RawStockRecalculate() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-semibold leading-tight">Recalculation history</h2>
+                <h2 className="text-sm font-semibold leading-tight">{tUi("recalculation.history")}</h2>
                 <p className="text-xs text-muted-foreground leading-tight">
                   Each row is a saved snapshot of the before-state. Undo restores all affected containers, mix batches,
                   bales, and supplier locked rates atomically.
@@ -1623,11 +1656,11 @@ export default function RawStockRecalculate() {
                 <Table>
                   <TableHeader className="bg-muted/50">
                     <TableRow>
-                      <TableHead>Applied at</TableHead>
+                      <TableHead>{tUi("applied.at")}</TableHead>
                       <TableHead>By</TableHead>
-                      <TableHead>Containers</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
+                      <TableHead>{tUi("containers")}</TableHead>
+                      <TableHead>{tUi("status")}</TableHead>
+                      <TableHead className="text-right">{tUi("action")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1685,7 +1718,7 @@ export default function RawStockRecalculate() {
             )}
 
             <div className="text-xs text-muted-foreground bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
-              <strong>Important:</strong> Undo restores the exact numerical values that were in place before the
+              <strong>{tUi("important")}</strong> Undo restores the exact numerical values that were in place before the
               recalculation. If any other changes were made to the same containers between the recalculation and now
               (e.g. new charges, new offloads), those will also be reverted. Review before confirming.
             </div>
@@ -1716,7 +1749,7 @@ export default function RawStockRecalculate() {
 
           {isReplayError && (
             <div className="border border-red-500/30 bg-red-500/10 rounded-md p-3 text-sm text-red-700 dark:text-red-400 space-y-2">
-              <div className="font-medium">Failed to load historical replay preview.</div>
+              <div className="font-medium">{tUi("failed.to.load.historical.replay.preview")}</div>
               <div className="text-xs">
                 {(replayErrorMsg as any)?.message || "An unexpected error occurred. Check server logs."}
               </div>
@@ -1763,7 +1796,7 @@ export default function RawStockRecalculate() {
 
               {replayPreview.summary.scanCoverageError && (
                 <div className="border border-amber-500/30 bg-amber-500/10 rounded-md p-3 text-xs text-amber-700 dark:text-amber-400">
-                  <strong>Scan coverage mismatch:</strong> Some containers could not be included in the replay.
+                  <strong>{tUi("scan.coverage.mismatch")}</strong> Some containers could not be included in the replay.
                   Containers scanned ({replayPreview.summary.containersScanned}) differs from universe (
                   {replayPreview.summary.totalReceivedContainers}). Check server logs for details.
                 </div>
@@ -1853,14 +1886,14 @@ export default function RawStockRecalculate() {
                     <TableHeader>
                       <TableRow className="text-xs">
                         <TableHead className="w-8 pl-3"></TableHead>
-                        <TableHead>Supplier</TableHead>
-                        <TableHead className="text-right">Current rate</TableHead>
-                        <TableHead className="text-right">Replay end rate</TableHead>
+                        <TableHead>{tUi("supplier")}</TableHead>
+                        <TableHead className="text-right">{tUi("current.rate")}</TableHead>
+                        <TableHead className="text-right">{tUi("replay.end.rate")}</TableHead>
                         <TableHead className="text-right">Δ</TableHead>
-                        <TableHead className="text-right">Sources</TableHead>
-                        <TableHead className="text-right">Batches</TableHead>
-                        <TableHead className="text-right">Bales</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">{tUi("sources")}</TableHead>
+                        <TableHead className="text-right">{tUi("batches")}</TableHead>
+                        <TableHead className="text-right">{tUi("bales")}</TableHead>
+                        <TableHead>{tUi("status")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -2112,13 +2145,14 @@ export default function RawStockRecalculate() {
           <div className="space-y-3 pt-1">
             <div className="space-y-1.5">
               <Label htmlFor="replay-confirm-input" className="text-xs font-medium">
-                Type <span className="font-mono font-bold text-destructive">APPLY HISTORICAL REPLAY</span> to confirm:
+                Type <span className="font-mono font-bold text-destructive">{tUi("apply.historical.replay")}</span> to
+                confirm:
               </Label>
               <Input
                 id="replay-confirm-input"
                 value={replayConfirmText}
                 onChange={(e) => setReplayConfirmText(e.target.value)}
-                placeholder="APPLY HISTORICAL REPLAY"
+                placeholder={tUi("apply.historical.replay")}
                 className="font-mono text-sm"
                 autoComplete="off"
                 autoFocus
@@ -2217,8 +2251,8 @@ export default function RawStockRecalculate() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Supplier</TableHead>
-                        <TableHead className="text-right">Current rate</TableHead>
+                        <TableHead>{tUi("supplier")}</TableHead>
+                        <TableHead className="text-right">{tUi("current.rate")}</TableHead>
                         <TableHead className="text-right">→ New rate</TableHead>
                         <TableHead className="text-right">Δ</TableHead>
                       </TableRow>
@@ -2258,7 +2292,7 @@ export default function RawStockRecalculate() {
               {/* DEFECT 13 FIX: Apply button removed — deprecated, use Historical Replay. */}
               <div className="flex justify-end gap-2 pt-2">
                 <p className="text-xs text-amber-700 dark:text-amber-400 mr-auto mt-1 font-medium">
-                  Applying is deprecated — use <strong>Historical Cost Replay</strong> instead.
+                  Applying is deprecated — use <strong>{tUi("historical.cost.replay")}</strong> instead.
                 </p>
                 <Button
                   variant="outline"
@@ -2280,7 +2314,7 @@ export default function RawStockRecalculate() {
       {activeTab === "partialfix" && (
         <div className="space-y-3">
           <div>
-            <h2 className="text-sm font-semibold leading-tight">Partial Offload Legacy Cost Fix</h2>
+            <h2 className="text-sm font-semibold leading-tight">{tUi("partial.offload.legacy.cost.fix")}</h2>
             <p className="text-xs text-muted-foreground leading-tight max-w-2xl">
               Finds containers that were partially received and whose stored cost/kg was calculated using the old wrong
               formula (supplier rate only, ignoring freight + commission + other charges). Applies the correct formula:{" "}
@@ -2319,13 +2353,13 @@ export default function RawStockRecalculate() {
                 <Table>
                   <TableHeader className="bg-muted/50">
                     <TableRow>
-                      <TableHead>Container</TableHead>
-                      <TableHead>Supplier</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Received kg</TableHead>
-                      <TableHead className="text-right">Old $/kg</TableHead>
-                      <TableHead className="text-right">Correct $/kg</TableHead>
-                      <TableHead className="text-right">Diff %</TableHead>
+                      <TableHead>{tUi("container")}</TableHead>
+                      <TableHead>{tUi("supplier")}</TableHead>
+                      <TableHead>{tUi("status")}</TableHead>
+                      <TableHead className="text-right">{tUi("received.kg.3")}</TableHead>
+                      <TableHead className="text-right">{tUi("old.kg")}</TableHead>
+                      <TableHead className="text-right">{tUi("correct.kg")}</TableHead>
+                      <TableHead className="text-right">{tUi("diff.2")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -2393,8 +2427,8 @@ export default function RawStockRecalculate() {
       <Dialog open={detailBatchId !== null} onOpenChange={(open) => !open && setDetailBatchId(null)}>
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader className="sr-only">
-            <DialogTitle>Mix Batch Detail</DialogTitle>
-            <DialogDescription>Sources, bales, and cost breakdown for this mix batch.</DialogDescription>
+            <DialogTitle>{tUi("mix.batch.detail")}</DialogTitle>
+            <DialogDescription>{tUi("sources.bales.and.cost.breakdown.for.this.mix.ba")}</DialogDescription>
           </DialogHeader>
           {detailBatchId !== null && (
             <Suspense fallback={<Skeleton className="h-64 w-full" />}>

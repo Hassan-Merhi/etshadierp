@@ -67,8 +67,10 @@ import { BrokerOverviewPanel } from "./factory-suppliers/BrokerOverviewPanel";
 import { SupplierStatement } from "./factory-suppliers/SupplierStatement";
 import { SupplierDialogs } from "./factory-suppliers/SupplierDialogs";
 import { AssignContainersDialog, DirectContainer } from "./factory-suppliers/AssignContainersDialog";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export default function FactorySuppliers() {
+  const tUi = useFactoryText();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { formatDisplayDate } = useDateFormat();
   const [createOpen, setCreateOpen] = useState(false);
@@ -157,13 +159,12 @@ export default function FactorySuppliers() {
     retry: 1,
   });
 
-  const [collapsedStmtSections, setCollapsedStmtSections] = useState<Set<string>>(
-    new Set(["currencyPools"])
-  );
+  const [collapsedStmtSections, setCollapsedStmtSections] = useState<Set<string>>(new Set(["currencyPools"]));
   const toggleStmtSection = (key: string) =>
     setCollapsedStmtSections((prev) => {
       const n = new Set(prev);
-      if (n.has(key)) n.delete(key); else n.add(key);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
       return n;
     });
 
@@ -374,7 +375,8 @@ export default function FactorySuppliers() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
       toast({ title: "Supplier created" });
     },
-    onError: (err: Error) => toast({ title: "Failed to create supplier", description: err.message, variant: "destructive" }),
+    onError: (err: Error) =>
+      toast({ title: "Failed to create supplier", description: err.message, variant: "destructive" }),
   });
 
   const updateMutation = useMutation({
@@ -423,7 +425,10 @@ export default function FactorySuppliers() {
   const makeBrokerMutation = useMutation({
     mutationFn: async ({ id, isBroker }: { id: number; isBroker: boolean }) => {
       const res = await factoryApiRequest("PATCH", `/api/factory/suppliers/${id}/set-broker`, { isBroker });
-      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || "Failed"); }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed");
+      }
       return res.json();
     },
     onSuccess: (_, { isBroker }) => {
@@ -435,8 +440,13 @@ export default function FactorySuppliers() {
 
   const moveContainerMutation = useMutation({
     mutationFn: async ({ containerId, targetSupplierId }: { containerId: number; targetSupplierId: number }) => {
-      const res = await factoryApiRequest("POST", `/api/factory/containers/${containerId}/move-supplier`, { targetSupplierId });
-      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.message || "Failed to move container"); }
+      const res = await factoryApiRequest("POST", `/api/factory/containers/${containerId}/move-supplier`, {
+        targetSupplierId,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to move container");
+      }
       return res.json();
     },
     onSuccess: (data) => {
@@ -453,7 +463,9 @@ export default function FactorySuppliers() {
     mutationFn: async ({ containerIds, targetSupplierId }: { containerIds: number[]; targetSupplierId: number }) => {
       const results: any[] = [];
       for (const containerId of containerIds) {
-        const res = await factoryApiRequest("POST", `/api/factory/containers/${containerId}/move-supplier`, { targetSupplierId });
+        const res = await factoryApiRequest("POST", `/api/factory/containers/${containerId}/move-supplier`, {
+          targetSupplierId,
+        });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           throw new Error(`Container ${containerId}: ${err.message || "Failed"}`);
@@ -465,13 +477,19 @@ export default function FactorySuppliers() {
     onSuccess: (results) => {
       setAssignTarget(null);
       queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", parentViewSupplierId, "direct-containers"] });
-      toast({ title: `${results.length} container${results.length !== 1 ? "s" : ""} assigned to ${results[0]?.toSupplierName}` });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/factory/suppliers", parentViewSupplierId, "direct-containers"],
+      });
+      toast({
+        title: `${results.length} container${results.length !== 1 ? "s" : ""} assigned to ${results[0]?.toSupplierName}`,
+      });
     },
     onError: (err: Error) => {
       // Invalidate even on partial failure so UI reflects any containers that did move
       queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers", parentViewSupplierId, "direct-containers"] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/factory/suppliers", parentViewSupplierId, "direct-containers"],
+      });
       toast({ title: "Assignment failed", description: err.message, variant: "destructive" });
     },
   });
@@ -572,7 +590,7 @@ export default function FactorySuppliers() {
     >
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle>Move Container</DialogTitle>
+          <DialogTitle>{tUi("move.container")}</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground mb-2">
           Moving <span className="font-semibold text-foreground">{moveContainerDialog.containerRef}</span> to a new
@@ -581,7 +599,7 @@ export default function FactorySuppliers() {
         </p>
         <Select value={moveTargetSupplierId} onValueChange={setMoveTargetSupplierId}>
           <SelectTrigger>
-            <SelectValue placeholder="Select target supplier…" />
+            <SelectValue placeholder={tUi("select.target.supplier")} />
           </SelectTrigger>
           <SelectContent>
             {activeSuppliers
@@ -646,9 +664,10 @@ export default function FactorySuppliers() {
         key: `p-${p.id}`,
         date: p.date,
         type: "payment",
-        ref: p.currencyCode !== "USD"
-          ? `Payment #${p.id} (${p.currencyCode} ${formatNum(p.amount)} @ ${parseFloat(p.fxRateToUsd).toFixed(4)})`
-          : `Payment #${p.id}`,
+        ref:
+          p.currencyCode !== "USD"
+            ? `Payment #${p.id} (${p.currencyCode} ${formatNum(p.amount)} @ ${parseFloat(p.fxRateToUsd).toFixed(4)})`
+            : `Payment #${p.id}`,
         detail: p.notes || undefined,
         amount: formatNum(p.amount),
         amountVal: parseFloat(p.amountUsd),
@@ -665,9 +684,10 @@ export default function FactorySuppliers() {
         key: `vp-${p.id}`,
         date: p.voucherDate,
         type: "payment",
-        ref: currency !== "USD"
-          ? `${p.voucherNumber} (${currency} ${formatNum(String(debitAmt))} @ ${fx.toFixed(4)})`
-          : p.voucherNumber,
+        ref:
+          currency !== "USD"
+            ? `${p.voucherNumber} (${currency} ${formatNum(String(debitAmt))} @ ${fx.toFixed(4)})`
+            : p.voucherNumber,
         detail: p.description || undefined,
         amount: formatNum(String(debitAmt)),
         amountVal: p.optional ? 0 : usdAmt,
@@ -709,9 +729,7 @@ export default function FactorySuppliers() {
     );
 
     // Compute running balance oldest→newest
-    const sortedForBalance = [...allRows].sort(
-      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
+    const sortedForBalance = [...allRows].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     let runningBal = 0;
     const balanceByKey: Record<string, { bal: number; cc: string }> = {};
     for (const row of sortedForBalance) {
@@ -749,75 +767,75 @@ export default function FactorySuppliers() {
 
     return (
       <>
-      <SupplierStatement
-        statementSupplierId={statementSupplierId}
-        statementData={statementData}
-        statementLoading={statementLoading}
-        statementError={statementError}
-        supplierIncludeOtw={supplierIncludeOtw}
-        setSupplierIncludeOtw={setSupplierIncludeOtw}
-        collapsedStmtSections={collapsedStmtSections}
-        toggleStmtSection={toggleStmtSection}
-        isBrokerStatement={isBrokerStatement}
-        statementReturnToParent={statementReturnToParent}
-        setStatementSupplierId={setStatementSupplierId}
-        setStatementReturnToParent={setStatementReturnToParent}
-        openFxConversionDialog={(f, t, c, n, tc) => {
-          setFxConversionForm({
-            fromSupplierId: f,
-            toSupplierId: t,
-            selectedCurrency: c,
-            amount: n,
-            availableBalance: n,
-            supplierBalance: n,
-            commissionBalance: tc || "0",
-            fxRateToUsd: "",
-            date: today,
-            notes: "",
-            effectiveDate: "",
-          });
-          setFxConversionOpen(true);
-        }}
-        formatNum={formatNum}
-        formatDate={formatDate}
-        formatKg={formatKg}
-        today={today}
-        fxConversionOpen={fxConversionOpen}
-        setFxConversionOpen={setFxConversionOpen}
-        fxConversionForm={fxConversionForm}
-        setFxConversionForm={setFxConversionForm}
-        fxSourceType={fxSourceType}
-        setFxSourceType={setFxSourceType}
-        allSuppliers={allSuppliers}
-        subAccountsByParent={subAccountsByParent}
-        wrapAdminAction={wrapAdminAction}
-        deleteFxTransferMutation={deleteFxTransferMutation}
-        statDateFilter={statDateFilter}
-        setStatDateFilter={setStatDateFilter}
-        onEditPayment={() => {}}
-        onDeletePayment={(id) => wrapAdminAction(() => deletePaymentMutation.mutate(id), "Delete Payment")}
-        setEditObComm={setEditObComm}
-        statusColor={statusColor}
-        statusDisplayLabel={statusDisplayLabel}
-        typeBadge={typeBadge}
-        displayedRows={filteredRows}
-        balanceByKey={balanceByKey}
-        sfTotalPurchases={sfTotalPurchases}
-        sfTotalPayments={sfTotalPayments}
-        sfPurchasesQty={sfPurchasesQty}
-        sfTxCount={filteredRows.length}
-        currencyTotals={currencyTotals}
-        primaryCc="USD"
-        onRenameSupplier={(id, newName) => renameSupplierMutation.mutate({ id, name: newName })}
-        onDeleteSupplier={(id) =>
-          wrapAdminAction(() => {
-            permanentDeleteMutation.mutate(id);
-            setStatementSupplierId(null);
-            if (statementReturnToParent) setStatementReturnToParent(false);
-          }, "Delete Supplier")
-        }
-      />
-      {moveContainerDialogJsx}
+        <SupplierStatement
+          statementSupplierId={statementSupplierId}
+          statementData={statementData}
+          statementLoading={statementLoading}
+          statementError={statementError}
+          supplierIncludeOtw={supplierIncludeOtw}
+          setSupplierIncludeOtw={setSupplierIncludeOtw}
+          collapsedStmtSections={collapsedStmtSections}
+          toggleStmtSection={toggleStmtSection}
+          isBrokerStatement={isBrokerStatement}
+          statementReturnToParent={statementReturnToParent}
+          setStatementSupplierId={setStatementSupplierId}
+          setStatementReturnToParent={setStatementReturnToParent}
+          openFxConversionDialog={(f, t, c, n, tc) => {
+            setFxConversionForm({
+              fromSupplierId: f,
+              toSupplierId: t,
+              selectedCurrency: c,
+              amount: n,
+              availableBalance: n,
+              supplierBalance: n,
+              commissionBalance: tc || "0",
+              fxRateToUsd: "",
+              date: today,
+              notes: "",
+              effectiveDate: "",
+            });
+            setFxConversionOpen(true);
+          }}
+          formatNum={formatNum}
+          formatDate={formatDate}
+          formatKg={formatKg}
+          today={today}
+          fxConversionOpen={fxConversionOpen}
+          setFxConversionOpen={setFxConversionOpen}
+          fxConversionForm={fxConversionForm}
+          setFxConversionForm={setFxConversionForm}
+          fxSourceType={fxSourceType}
+          setFxSourceType={setFxSourceType}
+          allSuppliers={allSuppliers}
+          subAccountsByParent={subAccountsByParent}
+          wrapAdminAction={wrapAdminAction}
+          deleteFxTransferMutation={deleteFxTransferMutation}
+          statDateFilter={statDateFilter}
+          setStatDateFilter={setStatDateFilter}
+          onEditPayment={() => {}}
+          onDeletePayment={(id) => wrapAdminAction(() => deletePaymentMutation.mutate(id), "Delete Payment")}
+          setEditObComm={setEditObComm}
+          statusColor={statusColor}
+          statusDisplayLabel={statusDisplayLabel}
+          typeBadge={typeBadge}
+          displayedRows={filteredRows}
+          balanceByKey={balanceByKey}
+          sfTotalPurchases={sfTotalPurchases}
+          sfTotalPayments={sfTotalPayments}
+          sfPurchasesQty={sfPurchasesQty}
+          sfTxCount={filteredRows.length}
+          currencyTotals={currencyTotals}
+          primaryCc="USD"
+          onRenameSupplier={(id, newName) => renameSupplierMutation.mutate({ id, name: newName })}
+          onDeleteSupplier={(id) =>
+            wrapAdminAction(() => {
+              permanentDeleteMutation.mutate(id);
+              setStatementSupplierId(null);
+              if (statementReturnToParent) setStatementReturnToParent(false);
+            }, "Delete Supplier")
+          }
+        />
+        {moveContainerDialogJsx}
       </>
     );
   }
@@ -867,12 +885,10 @@ export default function FactorySuppliers() {
           directContainersLoading={directContainersLoading}
           onAddLinkedSupplier={() => {
             setCreateSubAccountParentId(parentViewSupplierId);
-            resetForm(parentViewSupplierId);  // pass directly to avoid stale-closure
+            resetForm(parentViewSupplierId); // pass directly to avoid stale-closure
             setCreateOpen(true);
           }}
-          onAssignContainersTo={(supplierId, supplierName) =>
-            setAssignTarget({ id: supplierId, name: supplierName })
-          }
+          onAssignContainersTo={(supplierId, supplierName) => setAssignTarget({ id: supplierId, name: supplierName })}
         />
         <AssignContainersDialog
           open={!!assignTarget}
@@ -950,7 +966,7 @@ export default function FactorySuppliers() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <PageHeader title="Brokers & Suppliers" />
+          <PageHeader title={tUi("brokers.suppliers")} />
           <p className="text-muted-foreground mt-1">
             {brokerCount} brokers · {standaloneCount} standalone
           </p>
@@ -970,24 +986,24 @@ export default function FactorySuppliers() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="rounded-xl border p-4">
-          <div className="text-xs text-muted-foreground">Brokers</div>
+          <div className="text-xs text-muted-foreground">{tUi("brokers")}</div>
           <div className="text-2xl font-bold mt-1">{brokerCount}</div>
         </div>
         <div className="rounded-xl border p-4">
-          <div className="text-xs text-muted-foreground">Standalone Suppliers</div>
+          <div className="text-xs text-muted-foreground">{tUi("standalone.suppliers")}</div>
           <div className="text-2xl font-bold mt-1">{standaloneCount}</div>
         </div>
         <div className="rounded-xl border p-4">
-          <div className="text-xs text-muted-foreground">Total Containers</div>
+          <div className="text-xs text-muted-foreground">{tUi("total.containers")}</div>
           <div className="text-2xl font-bold mt-1">{totalContainers}</div>
         </div>
         <div className="rounded-xl border p-4">
-          <div className="text-xs text-muted-foreground">Total USD</div>
+          <div className="text-xs text-muted-foreground">{tUi("total.usd")}</div>
           <div className="text-sm font-semibold mt-1">
-            <span className="text-muted-foreground">We owe </span>${formatNum(String(totalUsdOwed))}
+            <span className="text-muted-foreground">{tUi("we.owe")} </span>${formatNum(String(totalUsdOwed))}
           </div>
           <div className="text-sm">
-            <span className="text-muted-foreground">Overpaid </span>
+            <span className="text-muted-foreground">{tUi("overpaid")} </span>
             <span className="text-green-600">${formatNum(String(totalUsdOverpaid))}</span>
           </div>
         </div>
@@ -1000,11 +1016,11 @@ export default function FactorySuppliers() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All</SelectItem>
-            <SelectItem value="brokers">Brokers</SelectItem>
-            <SelectItem value="standalone">Standalone</SelectItem>
-            <SelectItem value="with-balance">With Balance</SelectItem>
-            <SelectItem value="zero-balance">Zero Balance</SelectItem>
-            <SelectItem value="has-foreign">Has Foreign Currency</SelectItem>
+            <SelectItem value="brokers">{tUi("brokers")}</SelectItem>
+            <SelectItem value="standalone">{tUi("standalone")}</SelectItem>
+            <SelectItem value="with-balance">{tUi("with.balance")}</SelectItem>
+            <SelectItem value="zero-balance">{tUi("zero.balance.2")}</SelectItem>
+            <SelectItem value="has-foreign">{tUi("has.foreign.currency")}</SelectItem>
           </SelectContent>
         </Select>
         <div className="flex items-center gap-2">
@@ -1028,13 +1044,15 @@ export default function FactorySuppliers() {
             ? Object.values(s.otwByCurrency).reduce((a, b) => a + b, 0)
             : s.pendingContainers || 0;
           const kgNum = parseFloat(s.totalKg || "0");
-          const nonUsdBalances = (s.currencyBalances || []).filter((c) => c.currencyCode !== "USD" && Math.abs(c.balance) > 0.005);
+          const nonUsdBalances = (s.currencyBalances || []).filter(
+            (c) => c.currencyCode !== "USD" && Math.abs(c.balance) > 0.005
+          );
           return (
             <div key={s.id} className="p-4 flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <div className="font-semibold flex items-center gap-2 flex-wrap">
                   {s.name}
-                  {isBroker && <Badge variant="secondary">Broker</Badge>}
+                  {isBroker && <Badge variant="secondary">{tUi("broker")}</Badge>}
                 </div>
                 <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap mt-0.5">
                   <span className="flex items-center gap-1">
@@ -1061,17 +1079,24 @@ export default function FactorySuppliers() {
 
               <div className="text-right shrink-0 space-y-0.5">
                 {(Math.abs(balVal) > 0.005 || nonUsdBalances.length > 0) && (
-                  <div className="text-xs text-muted-foreground mb-0.5">Balance</div>
+                  <div className="text-xs text-muted-foreground mb-0.5">{tUi("balance")}</div>
                 )}
-                <div className={`font-semibold text-sm ${balVal < 0 ? "text-green-600" : balVal > 0 ? "" : "text-muted-foreground"}`}>
-                  {balVal === 0 && nonUsdBalances.length === 0
-                    ? <span className="text-muted-foreground text-xs">$-</span>
-                    : `$${formatNum(String(Math.abs(balVal)))}${balVal < 0 ? " CR" : ""}`}
+                <div
+                  className={`font-semibold text-sm ${balVal < 0 ? "text-green-600" : balVal > 0 ? "" : "text-muted-foreground"}`}
+                >
+                  {balVal === 0 && nonUsdBalances.length === 0 ? (
+                    <span className="text-muted-foreground text-xs">$-</span>
+                  ) : (
+                    `$${formatNum(String(Math.abs(balVal)))}${balVal < 0 ? " CR" : ""}`
+                  )}
                 </div>
                 {nonUsdBalances.map((cb) => (
                   <div key={cb.currencyCode} className="flex items-center justify-end gap-1">
-                    <span className={`text-xs tabular-nums ${cb.balance < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
-                      {cb.currencyCode} {formatNum(String(Math.abs(cb.balance).toFixed(2)))}{cb.balance < 0 ? " CR" : ""}
+                    <span
+                      className={`text-xs tabular-nums ${cb.balance < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}
+                    >
+                      {cb.currencyCode} {formatNum(String(Math.abs(cb.balance).toFixed(2)))}
+                      {cb.balance < 0 ? " CR" : ""}
                     </span>
                     {cb.balance > 0.005 && (
                       <Button
@@ -1160,7 +1185,7 @@ export default function FactorySuppliers() {
                       <DropdownMenuItem
                         onClick={() => {
                           setCreateSubAccountParentId(s.id);
-                          resetForm(s.id);  // pass directly to avoid stale-closure
+                          resetForm(s.id); // pass directly to avoid stale-closure
                           setCreateOpen(true);
                         }}
                         data-testid={`btn-add-linked-${s.id}`}
@@ -1169,33 +1194,35 @@ export default function FactorySuppliers() {
                         Add Linked Supplier
                       </DropdownMenuItem>
                     )}
-                    {nonUsdBalances.filter((cb) => cb.balance > 0.005).map((cb) => (
-                      <DropdownMenuItem
-                        key={cb.currencyCode}
-                        onClick={() => {
-                          const toId = (s as any).parentId || s.id;
-                          const balStr = cb.balance.toFixed(2);
-                          setFxConversionForm({
-                            fromSupplierId: s.id,
-                            toSupplierId: toId,
-                            selectedCurrency: cb.currencyCode,
-                            amount: balStr,
-                            availableBalance: balStr,
-                            supplierBalance: balStr,
-                            commissionBalance: "0",
-                            fxRateToUsd: "",
-                            date: today,
-                            notes: "",
-                            effectiveDate: "",
-                          });
-                          setFxSourceType("supplier");
-                          setFxConversionOpen(true);
-                        }}
-                      >
-                        <ArrowRightLeft className="h-4 w-4 mr-2 text-blue-500" />
-                        FX Settlement ({cb.currencyCode})
-                      </DropdownMenuItem>
-                    ))}
+                    {nonUsdBalances
+                      .filter((cb) => cb.balance > 0.005)
+                      .map((cb) => (
+                        <DropdownMenuItem
+                          key={cb.currencyCode}
+                          onClick={() => {
+                            const toId = (s as any).parentId || s.id;
+                            const balStr = cb.balance.toFixed(2);
+                            setFxConversionForm({
+                              fromSupplierId: s.id,
+                              toSupplierId: toId,
+                              selectedCurrency: cb.currencyCode,
+                              amount: balStr,
+                              availableBalance: balStr,
+                              supplierBalance: balStr,
+                              commissionBalance: "0",
+                              fxRateToUsd: "",
+                              date: today,
+                              notes: "",
+                              effectiveDate: "",
+                            });
+                            setFxSourceType("supplier");
+                            setFxConversionOpen(true);
+                          }}
+                        >
+                          <ArrowRightLeft className="h-4 w-4 mr-2 text-blue-500" />
+                          FX Settlement ({cb.currencyCode})
+                        </DropdownMenuItem>
+                      ))}
                     {isBroker && (
                       <DropdownMenuItem
                         data-testid={`btn-bulk-fx-${s.id}`}
@@ -1256,7 +1283,7 @@ export default function FactorySuppliers() {
           );
         })}
         {filteredTopLevel.length === 0 && !isLoading && (
-          <div className="p-8 text-center text-muted-foreground text-sm">No suppliers found.</div>
+          <div className="p-8 text-center text-muted-foreground text-sm">{tUi("no.suppliers.found")}</div>
         )}
       </div>
 

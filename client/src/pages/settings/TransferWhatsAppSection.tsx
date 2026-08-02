@@ -66,8 +66,10 @@ interface CompanyRowProps {
 }
 
 import { CompanyRow } from "./CompanyRow";
+import { useErpText } from "@/i18n/modules/erp";
 
 export function TransferWhatsAppSection() {
+  const tUi = useErpText();
   const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [chatsLoading, setChatsLoading] = useState(false);
@@ -177,7 +179,7 @@ export function TransferWhatsAppSection() {
         <div className="flex items-center gap-3">
           <ArrowLeftRight className="h-4 w-4 text-blue-500" />
           <div className="text-left">
-            <p className="text-sm font-medium">Stock Transfers — WhatsApp</p>
+            <p className="text-sm font-medium">{tUi("stock.transfers.whatsapp")}</p>
             <p className="text-xs text-muted-foreground">
               Send a transfer image to a specific group per destination location, or fall back to a company-wide group.
             </p>
@@ -211,12 +213,14 @@ export function TransferWhatsAppSection() {
                 {settings?.hasCredentials && settings?.waEnabled ? (
                   <>
                     <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-muted-foreground">WhatsApp connected and enabled.</span>
+                    <span className="text-muted-foreground">{tUi("whatsapp.connected.and.enabled")}</span>
                   </>
                 ) : settings?.hasCredentials ? (
                   <>
                     <XCircle className="h-4 w-4 text-amber-500" />
-                    <span className="text-muted-foreground">Credentials set but WhatsApp sending is disabled.</span>
+                    <span className="text-muted-foreground">
+                      {tUi("credentials.set.but.whatsapp.sending.is.disabled")}
+                    </span>
                   </>
                 ) : (
                   <>
@@ -247,7 +251,7 @@ export function TransferWhatsAppSection() {
                   Loading locations…
                 </div>
               ) : locations.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No locations found.</p>
+                <p className="text-xs text-muted-foreground">{tUi("no.locations.found")}</p>
               ) : (
                 <div className="space-y-2">
                   {locations.map((loc) => {
@@ -270,7 +274,7 @@ export function TransferWhatsAppSection() {
                                 {matchedChat?.name ?? chatId}
                               </p>
                             ) : (
-                              <p className="text-xs text-muted-foreground mt-0.5">Uses company fallback</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">{tUi("uses.company.fallback")}</p>
                             )}
                           </div>
                         </div>
@@ -337,12 +341,12 @@ export function TransferWhatsAppSection() {
               <Separator />
 
               <div className="rounded-md bg-muted/40 p-3 space-y-1">
-                <p className="text-xs font-medium text-muted-foreground">What gets sent:</p>
+                <p className="text-xs font-medium text-muted-foreground">{tUi("what.gets.sent")}</p>
                 <ul className="text-xs text-muted-foreground list-disc list-inside space-y-0.5">
                   <li>A PNG image card with the transfer date</li>
-                  <li>From and To location names</li>
-                  <li>Table of all items with quantity and unit of measure</li>
-                  <li>No costs or pricing — quantities only</li>
+                  <li>{tUi("from.and.to.location.names")}</li>
+                  <li>{tUi("table.of.all.items.with.quantity.and.unit.of.mea")}</li>
+                  <li>{tUi("no.costs.or.pricing.quantities.only")}</li>
                 </ul>
               </div>
             </>
@@ -359,7 +363,7 @@ export function TransferWhatsAppSection() {
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Set Transfer Group</DialogTitle>
+            <DialogTitle>{tUi("set.transfer.group")}</DialogTitle>
             <DialogDescription>
               Choose the WhatsApp group for transfers arriving at <strong>{editingLoc?.name}</strong>.
             </DialogDescription>
@@ -369,7 +373,7 @@ export function TransferWhatsAppSection() {
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
               <Input
-                placeholder="Search groups…"
+                placeholder={tUi("search.groups")}
                 value={chatSearch}
                 onChange={(e) => setChatSearch(e.target.value)}
                 className="pl-8"
@@ -385,7 +389,7 @@ export function TransferWhatsAppSection() {
               }}
               disabled={chatsLoading}
               data-testid="button-refresh-loc-transfer-chats"
-              title="Refresh groups"
+              title={tUi("refresh.groups")}
             >
               <RefreshCw className={`h-4 w-4 ${chatsLoading ? "animate-spin" : ""}`} />
             </Button>

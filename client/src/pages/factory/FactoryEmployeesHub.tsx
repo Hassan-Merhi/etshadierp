@@ -57,12 +57,24 @@ export default function FactoryEmployeesHub() {
         </Select>
       </div>
 
-      <TabsContent value="employees" className="mt-0"><FactoryEmployees /></TabsContent>
-      <TabsContent value="payroll" className="mt-0"><FactoryEmployeePayrollTab /></TabsContent>
-      <TabsContent value="attendance" className="mt-0"><FactoryEmployeeAttendanceTab /></TabsContent>
-      <TabsContent value="advances" className="mt-0"><FactoryEmployeeAdvancesTab /></TabsContent>
-      <TabsContent value="bonuses" className="mt-0"><FactoryEmployeeBonusesTab /></TabsContent>
-      <TabsContent value="withdrawals" className="mt-0"><FactoryEmployeeWithdrawalsTab /></TabsContent>
+      <TabsContent value="employees" className="mt-0">
+        <FactoryEmployees />
+      </TabsContent>
+      <TabsContent value="payroll" className="mt-0">
+        <FactoryEmployeePayrollTab />
+      </TabsContent>
+      <TabsContent value="attendance" className="mt-0">
+        <FactoryEmployeeAttendanceTab />
+      </TabsContent>
+      <TabsContent value="advances" className="mt-0">
+        <FactoryEmployeeAdvancesTab />
+      </TabsContent>
+      <TabsContent value="bonuses" className="mt-0">
+        <FactoryEmployeeBonusesTab />
+      </TabsContent>
+      <TabsContent value="withdrawals" className="mt-0">
+        <FactoryEmployeeWithdrawalsTab />
+      </TabsContent>
     </Tabs>
   );
 }

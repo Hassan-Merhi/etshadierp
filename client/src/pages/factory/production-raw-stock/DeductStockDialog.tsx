@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AlertTriangle } from "lucide-react";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface DeductStockDialogProps {
   open: boolean;
@@ -29,6 +30,7 @@ export function DeductStockDialog({
   deductReceivedMutation,
   wrapAdminAction,
 }: DeductStockDialogProps) {
+  const tUi = useFactoryText();
   const [deductKg, setDeductKg] = useState("");
   const [deductNotes, setDeductNotes] = useState("");
   const [deductReference, setDeductReference] = useState("");
@@ -66,7 +68,7 @@ export function DeductStockDialog({
           </div>
 
           <div className="space-y-1">
-            <Label>Quantity to Deduct (KG)</Label>
+            <Label>{tUi("quantity.to.deduct.kg")}</Label>
             <Input
               type="number"
               step="0.001"
@@ -77,7 +79,7 @@ export function DeductStockDialog({
           </div>
 
           <div className="space-y-1">
-            <Label>Reference (optional)</Label>
+            <Label>{tUi("reference.optional")}</Label>
             <Input
               value={deductReference}
               onChange={(e) => setDeductReference(e.target.value)}
@@ -86,11 +88,11 @@ export function DeductStockDialog({
           </div>
 
           <div className="space-y-1">
-            <Label>Notes (optional)</Label>
+            <Label>{tUi("notes.optional")}</Label>
             <Textarea
               value={deductNotes}
               onChange={(e) => setDeductNotes(e.target.value)}
-              placeholder="Reason for deduction..."
+              placeholder={tUi("reason.for.deduction")}
             />
           </div>
 

@@ -14,6 +14,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Upload, FileSpreadsheet, CheckCircle, XCircle, Download, ArrowRightLeft } from "lucide-react";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface Location {
   id: number;
@@ -25,6 +26,7 @@ interface StockTransferImportProps {
 }
 
 export default function StockTransferImport({ posUser }: StockTransferImportProps) {
+  const tUi = useErpText();
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
   const isPOS = !!posUser;
@@ -320,8 +322,8 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <PageHeader title="Stock Transfer Import" icon={<ArrowRightLeft className="h-5 w-5" />} />
-          <p className="text-muted-foreground mt-1">Import stock transfers from Excel (Barcode, Quantity)</p>
+          <PageHeader title={tUi("stock.transfer.import")} icon={<ArrowRightLeft className="h-5 w-5" />} />
+          <p className="text-muted-foreground mt-1">{tUi("import.stock.transfers.from.excel.barcode.quanti")}</p>
         </div>
         <Button variant="outline" onClick={downloadTemplate} data-testid="button-download-template">
           <Download className="h-4 w-4 mr-2" />
@@ -331,19 +333,19 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
 
       <Card>
         <CardHeader>
-          <CardTitle>Upload Transfer Data</CardTitle>
-          <CardDescription>Upload an Excel file with columns: Barcode, Quantity</CardDescription>
+          <CardTitle>{tUi("upload.transfer.data")}</CardTitle>
+          <CardDescription>{tUi("upload.an.excel.file.with.columns.barcode.quanti")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="file">Excel File</Label>
+              <Label htmlFor="file">{tUi("excel.file")}</Label>
               <Input id="file" type="file" accept=".xlsx,.xls" onChange={handleFileChange} data-testid="input-file" />
               {file && <p className="text-sm text-muted-foreground">Selected: {file.name}</p>}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="transferDate">Transfer Date</Label>
+              <Label htmlFor="transferDate">{tUi("transfer.date")}</Label>
               <Input
                 id="transferDate"
                 type="date"
@@ -356,7 +358,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="sourceLocation">Source Location</Label>
+              <Label htmlFor="sourceLocation">{tUi("source.location")}</Label>
               {isPOS ? (
                 <div className="p-3 bg-muted rounded-md">
                   <span className="font-medium">{sourceLocationName || "Your Location"}</span>
@@ -364,7 +366,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
               ) : (
                 <Select value={selectedSourceLocation} onValueChange={setSelectedSourceLocation}>
                   <SelectTrigger id="sourceLocation" data-testid="select-source-location">
-                    <SelectValue placeholder="Select source location" />
+                    <SelectValue placeholder={tUi("select.source.location")} />
                   </SelectTrigger>
                   <SelectContent>
                     {locations.map((location) => (
@@ -378,10 +380,10 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="destLocation">Destination Location</Label>
+              <Label htmlFor="destLocation">{tUi("destination.location")}</Label>
               <Select value={selectedDestLocation} onValueChange={setSelectedDestLocation}>
                 <SelectTrigger id="destLocation" data-testid="select-dest-location">
-                  <SelectValue placeholder="Select destination location" />
+                  <SelectValue placeholder={tUi("select.destination.location")} />
                 </SelectTrigger>
                 <SelectContent>
                   {locations
@@ -397,12 +399,12 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes (Optional)</Label>
+            <Label htmlFor="notes">{tUi("notes.optional.2")}</Label>
             <Textarea
               id="notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Optional notes for this transfer"
+              placeholder={tUi("optional.notes.for.this.transfer")}
               data-testid="input-notes"
             />
           </div>
@@ -448,7 +450,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
       {validationResult?.errors && validationResult.errors.length > 0 && (
         <Card className="border-destructive">
           <CardHeader>
-            <CardTitle className="text-destructive">Validation Errors</CardTitle>
+            <CardTitle className="text-destructive">{tUi("validation.errors")}</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="list-disc list-inside space-y-1">
@@ -472,11 +474,11 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead>Barcode</TableHead>
-                    <TableHead>Item Name</TableHead>
-                    <TableHead className="text-right">Quantity</TableHead>
-                    <TableHead className="text-right">Available</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>{tUi("barcode")}</TableHead>
+                    <TableHead>{tUi("item.name")}</TableHead>
+                    <TableHead className="text-right">{tUi("quantity")}</TableHead>
+                    <TableHead className="text-right">{tUi("available")}</TableHead>
+                    <TableHead>{tUi("status")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -492,7 +494,9 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
                       >
                         <TableCell className="font-mono">{item.barcode}</TableCell>
                         <TableCell>
-                          {validation?.stockItemName || <span className="text-muted-foreground italic">Unknown</span>}
+                          {validation?.stockItemName || (
+                            <span className="text-muted-foreground italic">{tUi("unknown")}</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">{item.quantity}</TableCell>
                         <TableCell className="text-right">
@@ -512,7 +516,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
                               </div>
                             )
                           ) : (
-                            <span className="text-sm text-muted-foreground">Not validated</span>
+                            <span className="text-sm text-muted-foreground">{tUi("not.validated")}</span>
                           )}
                         </TableCell>
                       </TableRow>
@@ -529,7 +533,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
       <ConfirmDialog
         open={confirmDialogOpen}
         onOpenChange={setConfirmDialogOpen}
-        title="Import with Validation Errors?"
+        title={tUi("import.with.validation.errors")}
         tone="warning"
         confirmText={validItemsCount === 0 ? "OK" : `Import ${validItemsCount} Item(s)`}
         onConfirm={handleConfirmedImport}

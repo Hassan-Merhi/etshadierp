@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface DailyProduction {
   date: string;
@@ -48,6 +49,7 @@ function getWasteColor(percent: number): string {
 }
 
 export default function FactoryKpis() {
+  const tUi = useFactoryText();
   const { formatDisplayDate } = useDateFormat();
   const defaults = getDefaultDateRange();
   const [from, setFrom] = useState(defaults.from);
@@ -101,11 +103,11 @@ export default function FactoryKpis() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <PageHeader title="Factory KPIs" subtitle="Production metrics and performance analysis" />
+          <PageHeader title={tUi("factory.kpis")} subtitle={tUi("production.metrics.and.performance.analysis")} />
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">From</Label>
+            <Label className="text-xs text-muted-foreground">{tUi("from")}</Label>
             <Input
               type="date"
               value={from}
@@ -147,13 +149,13 @@ export default function FactoryKpis() {
         <TabsContent value="daily">
           <Card>
             <CardHeader>
-              <CardTitle>Daily Production</CardTitle>
+              <CardTitle>{tUi("daily.production")}</CardTitle>
             </CardHeader>
             <CardContent>
               {dailyQuery.isLoading ? (
                 <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  <span className="ml-2 text-muted-foreground">Loading daily production...</span>
+                  <span className="ml-2 text-muted-foreground">{tUi("loading.daily.production")}</span>
                 </div>
               ) : !Array.isArray(dailyQuery.data) || dailyQuery.data.length === 0 ? (
                 <div className="text-center py-8">
@@ -166,10 +168,10 @@ export default function FactoryKpis() {
                   <Table>
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Bales Produced</TableHead>
-                        <TableHead>KG Pressed</TableHead>
-                        <TableHead>Waste KG</TableHead>
+                        <TableHead>{tUi("date")}</TableHead>
+                        <TableHead>{tUi("bales.produced")}</TableHead>
+                        <TableHead>{tUi("kg.pressed")}</TableHead>
+                        <TableHead>{tUi("waste.kg")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -195,13 +197,13 @@ export default function FactoryKpis() {
           <TabsContent value="workers">
             <Card>
               <CardHeader>
-                <CardTitle>Worker Performance</CardTitle>
+                <CardTitle>{tUi("worker.performance")}</CardTitle>
               </CardHeader>
               <CardContent>
                 {workersQuery.isLoading ? (
                   <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                    <span className="ml-2 text-muted-foreground">Loading worker performance...</span>
+                    <span className="ml-2 text-muted-foreground">{tUi("loading.worker.performance")}</span>
                   </div>
                 ) : !Array.isArray(workersQuery.data) || workersQuery.data.length === 0 ? (
                   <div className="text-center py-8">
@@ -215,9 +217,9 @@ export default function FactoryKpis() {
                       <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead>#</TableHead>
-                          <TableHead>Worker Name</TableHead>
-                          <TableHead>Bales Count</TableHead>
-                          <TableHead>Total KG</TableHead>
+                          <TableHead>{tUi("worker.name")}</TableHead>
+                          <TableHead>{tUi("bales.count")}</TableHead>
+                          <TableHead>{tUi("total.kg.2")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -244,13 +246,13 @@ export default function FactoryKpis() {
           <TabsContent value="mixes">
             <Card>
               <CardHeader>
-                <CardTitle>Mix Efficiency</CardTitle>
+                <CardTitle>{tUi("mix.efficiency")}</CardTitle>
               </CardHeader>
               <CardContent>
                 {mixesQuery.isLoading ? (
                   <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                    <span className="ml-2 text-muted-foreground">Loading mix efficiency...</span>
+                    <span className="ml-2 text-muted-foreground">{tUi("loading.mix.efficiency")}</span>
                   </div>
                 ) : !Array.isArray(mixesQuery.data) || mixesQuery.data.length === 0 ? (
                   <div className="text-center py-8">
@@ -263,11 +265,11 @@ export default function FactoryKpis() {
                     <Table>
                       <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
-                          <TableHead>Mix Batch ID</TableHead>
-                          <TableHead>Total Input KG</TableHead>
-                          <TableHead>Total Output KG</TableHead>
-                          <TableHead>Waste KG</TableHead>
-                          <TableHead>Waste %</TableHead>
+                          <TableHead>{tUi("mix.batch.id")}</TableHead>
+                          <TableHead>{tUi("total.input.kg")}</TableHead>
+                          <TableHead>{tUi("total.output.kg")}</TableHead>
+                          <TableHead>{tUi("waste.kg")}</TableHead>
+                          <TableHead>{tUi("waste.2")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>

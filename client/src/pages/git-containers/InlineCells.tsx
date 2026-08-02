@@ -130,7 +130,7 @@ export function InlineTextCell({
         mono && "font-mono"
       )}
     >
-      {value ? (uppercase ? value.toUpperCase() : value) : <span className="text-muted-foreground/50 text-xs">—</span>}
+      {value ? uppercase ? value.toUpperCase() : value : <span className="text-muted-foreground/50 text-xs">—</span>}
     </span>
   );
 }

@@ -9,6 +9,7 @@ import { useEscapeBack } from "@/hooks/use-escape-back";
 import { cn } from "@/lib/utils";
 import { EmptyState, LoadingRows } from "@/components/ui/display-state";
 import { PageShell, PageActions, financialNumberClassName as financialNumberClass } from "@/components/ui/page-shell";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface StockBale {
   id: number;
@@ -30,6 +31,7 @@ function fmtDate(val: string | null | undefined): string {
 }
 
 export default function FactoryStockBaleList() {
+  const tUi = useFactoryText();
   const [, navigate] = useLocation();
   const search = useSearch();
   const params = new URLSearchParams(search);
@@ -87,7 +89,7 @@ export default function FactoryStockBaleList() {
       ) : bales.length === 0 ? (
         <EmptyState
           icon={<Package className="h-5 w-5" />}
-          title="No in-stock bales"
+          title={tUi("no.in.stock.bales")}
           description={`No IN_STOCK bales found for ${articleCode}.`}
         />
       ) : (
@@ -95,12 +97,12 @@ export default function FactoryStockBaleList() {
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-muted">
-                <th className="text-left px-3 py-2.5 font-medium border-b text-xs">Reference No.</th>
-                <th className="text-left px-3 py-2.5 font-medium border-b text-xs">Bale Code</th>
-                <th className="text-right px-3 py-2.5 font-medium border-b text-xs">Weight (kg)</th>
-                <th className="text-left px-3 py-2.5 font-medium border-b text-xs">Production Date</th>
-                <th className="text-left px-3 py-2.5 font-medium border-b text-xs">Worker</th>
-                <th className="text-center px-3 py-2.5 font-medium border-b text-xs">Status</th>
+                <th className="text-left px-3 py-2.5 font-medium border-b text-xs">{tUi("reference.no")}</th>
+                <th className="text-left px-3 py-2.5 font-medium border-b text-xs">{tUi("bale.code")}</th>
+                <th className="text-right px-3 py-2.5 font-medium border-b text-xs">{tUi("weight.kg")}</th>
+                <th className="text-left px-3 py-2.5 font-medium border-b text-xs">{tUi("production.date.2")}</th>
+                <th className="text-left px-3 py-2.5 font-medium border-b text-xs">{tUi("worker")}</th>
+                <th className="text-center px-3 py-2.5 font-medium border-b text-xs">{tUi("status")}</th>
               </tr>
             </thead>
             <tbody>
@@ -110,7 +112,7 @@ export default function FactoryStockBaleList() {
                   className={cn(
                     "border-b last:border-0 transition-colors",
                     idx % 2 === 0 ? "bg-background" : "bg-muted/20",
-                    bale.lockedInLoading && "opacity-60",
+                    bale.lockedInLoading && "opacity-60"
                   )}
                   data-testid={`row-bale-${bale.referenceNumber}`}
                 >
@@ -127,7 +129,7 @@ export default function FactoryStockBaleList() {
                           weightKg: bale.weightKg,
                         });
                       }}
-                      title="Correct weight"
+                      title={tUi("correct.weight")}
                     >
                       {parseFloat(bale.weightKg).toFixed(2)}
                       <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 group-focus-visible:opacity-60 shrink-0" />

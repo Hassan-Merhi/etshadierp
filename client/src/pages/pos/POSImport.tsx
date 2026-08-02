@@ -35,6 +35,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { usePosText } from "@/i18n/modules/pos";
 
 interface Location {
   id: number;
@@ -54,6 +55,7 @@ interface Customer {
 }
 
 export default function POSImport() {
+  const tUi = usePosText();
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
   const { displayCurrency, exchangeRate, isLoadingCompany } = useCurrencyContext();
@@ -494,8 +496,8 @@ export default function POSImport() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Upload Sales Data</CardTitle>
-          <CardDescription>Upload an Excel file with columns: Barcode, Quantity, Rate</CardDescription>
+          <CardTitle>{tUi("upload.sales.data")}</CardTitle>
+          <CardDescription>{tUi("upload.an.excel.file.with.columns.barcode.quanti")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center gap-4 p-3 rounded-lg bg-muted/50">
@@ -525,13 +527,13 @@ export default function POSImport() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="file">Excel File</Label>
+              <Label htmlFor="file">{tUi("excel.file")}</Label>
               <Input id="file" type="file" accept=".xlsx,.xls" onChange={handleFileChange} data-testid="input-file" />
               {file && <p className="text-sm text-muted-foreground">Selected: {file.name}</p>}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="saleDate">Sale Date</Label>
+              <Label htmlFor="saleDate">{tUi("sale.date")}</Label>
               <Input
                 id="saleDate"
                 type="date"
@@ -545,10 +547,10 @@ export default function POSImport() {
           {showCurrencySelector && (
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="currency">Currency (Excel rates are in)</Label>
+                <Label htmlFor="currency">{tUi("currency.excel.rates.are.in")}</Label>
                 <Select value={saleCurrency} onValueChange={(v) => setSaleCurrency(v as "USD" | "CFA")}>
                   <SelectTrigger id="currency" data-testid="select-currency">
-                    <SelectValue placeholder="Select currency" />
+                    <SelectValue placeholder={tUi("select.currency")} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="USD">USD</SelectItem>
@@ -571,10 +573,10 @@ export default function POSImport() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="location">Location</Label>
+              <Label htmlFor="location">{tUi("location")}</Label>
               <Select value={selectedLocation} onValueChange={setSelectedLocation}>
                 <SelectTrigger id="location" data-testid="select-location">
-                  <SelectValue placeholder="Select location" />
+                  <SelectValue placeholder={tUi("select.location")} />
                 </SelectTrigger>
                 <SelectContent>
                   {locations.map((location) => (
@@ -588,10 +590,10 @@ export default function POSImport() {
 
             {isCreditSale ? (
               <div className="space-y-2">
-                <Label htmlFor="customer">Customer</Label>
+                <Label htmlFor="customer">{tUi("customer")}</Label>
                 <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
                   <SelectTrigger id="customer" data-testid="select-customer">
-                    <SelectValue placeholder="Select customer" />
+                    <SelectValue placeholder={tUi("select.customer")} />
                   </SelectTrigger>
                   <SelectContent>
                     {customers.map((customer) => (
@@ -604,10 +606,10 @@ export default function POSImport() {
               </div>
             ) : (
               <div className="space-y-2">
-                <Label htmlFor="cashAccount">Cash Account</Label>
+                <Label htmlFor="cashAccount">{tUi("cash.account")}</Label>
                 <Select value={selectedCashAccount} onValueChange={setSelectedCashAccount}>
                   <SelectTrigger id="cashAccount" data-testid="select-cash-account">
-                    <SelectValue placeholder="Select cash account" />
+                    <SelectValue placeholder={tUi("select.cash.account")} />
                   </SelectTrigger>
                   <SelectContent>
                     {ledgerAccounts
@@ -716,12 +718,12 @@ export default function POSImport() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Barcode</TableHead>
-                    <TableHead>Item Name</TableHead>
-                    <TableHead className="text-right">Quantity</TableHead>
+                    <TableHead>{tUi("barcode")}</TableHead>
+                    <TableHead>{tUi("item.name")}</TableHead>
+                    <TableHead className="text-right">{tUi("quantity")}</TableHead>
                     <TableHead className="text-right">Rate ({saleCurrency})</TableHead>
                     <TableHead className="text-right">Total ({saleCurrency})</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>{tUi("status")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -733,7 +735,9 @@ export default function POSImport() {
                       <TableRow key={index} className={hasError ? "bg-destructive/10" : ""}>
                         <TableCell className="font-mono">{item.barcode}</TableCell>
                         <TableCell>
-                          {validation?.stockItemName || <span className="text-muted-foreground italic">Unknown</span>}
+                          {validation?.stockItemName || (
+                            <span className="text-muted-foreground italic">{tUi("unknown")}</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">{item.quantity}</TableCell>
                         <TableCell className="text-right">
@@ -763,7 +767,7 @@ export default function POSImport() {
                               </div>
                             )
                           ) : (
-                            <span className="text-sm text-muted-foreground">Not validated</span>
+                            <span className="text-sm text-muted-foreground">{tUi("not.validated")}</span>
                           )}
                         </TableCell>
                       </TableRow>
@@ -784,7 +788,7 @@ export default function POSImport() {
               Inventory Warnings
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
-              <p>The following items will have inventory issues after this import:</p>
+              <p>{tUi("the.following.items.will.have.inventory.issues.a")}</p>
               <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-md border border-amber-200 dark:border-amber-800 max-h-60 overflow-y-auto">
                 <ul className="list-disc list-inside space-y-1 text-sm">
                   {validationResult?.warnings?.map((warning: string, index: number) => (
@@ -794,11 +798,11 @@ export default function POSImport() {
                   ))}
                 </ul>
               </div>
-              <p className="mt-3 font-semibold">Are you sure you want to proceed with the import?</p>
+              <p className="mt-3 font-semibold">{tUi("are.you.sure.you.want.to.proceed.with.the.import")}</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-import">Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-import">{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmImport}
               data-testid="button-confirm-import"
@@ -814,7 +818,7 @@ export default function POSImport() {
       <AlertDialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Import Successful</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("import.successful")}</AlertDialogTitle>
             <AlertDialogDescription>
               Sale has been imported successfully. Would you like to print the invoice?
             </AlertDialogDescription>
@@ -889,7 +893,7 @@ export default function POSImport() {
                       textAlign: "center",
                     }}
                   >
-                    <span style={{ fontWeight: "900" }}>Daily Rate:</span> $1 ={" "}
+                    <span style={{ fontWeight: "900" }}>{tUi("daily.rate")}</span> $1 ={" "}
                     {formatNumber(parseFloat(importedSale?.voucher?.exchangeRate) || exchangeRate || 0)} CFA
                   </div>
                 )}
@@ -905,7 +909,7 @@ export default function POSImport() {
                     border: "2px solid black",
                   }}
                 >
-                  <div style={{ fontWeight: "900" }}>CREDIT SALE</div>
+                  <div style={{ fontWeight: "900" }}>{tUi("credit.sale")}</div>
                   <div>Customer: {importedSale.customer.name}</div>
                 </div>
               )}
@@ -934,7 +938,9 @@ export default function POSImport() {
                       Description
                     </th>
                     <th style={{ textAlign: "center", padding: "4px 3px", width: "12%", fontWeight: "900" }}>Qty</th>
-                    <th style={{ textAlign: "center", padding: "4px 3px", width: "20%", fontWeight: "900" }}>Rate</th>
+                    <th style={{ textAlign: "center", padding: "4px 3px", width: "20%", fontWeight: "900" }}>
+                      {tUi("rate")}
+                    </th>
                     <th style={{ textAlign: "center", padding: "4px 3px", width: "20%", fontWeight: "900" }}>Amt</th>
                   </tr>
                 </thead>
@@ -983,7 +989,9 @@ export default function POSImport() {
                 </tbody>
                 <tfoot>
                   <tr style={{ borderTop: "2px solid black", fontWeight: "900" }}>
-                    <td style={{ padding: "5px 3px", fontWeight: "900", borderRight: "2px solid black" }}>TOTAL</td>
+                    <td style={{ padding: "5px 3px", fontWeight: "900", borderRight: "2px solid black" }}>
+                      {tUi("total.2")}
+                    </td>
                     <td style={{ textAlign: "center", padding: "5px 3px" }}>
                       {fmtPrint(
                         (importedSale?.items ?? []).reduce(
@@ -1018,7 +1026,7 @@ export default function POSImport() {
                   justifyContent: "space-between",
                 }}
               >
-                <span>TOTAL PAID:</span>
+                <span>{tUi("total.paid")}</span>
                 <span>
                   {fmtPrint(
                     (importedSale?.items ?? []).reduce(
@@ -1041,7 +1049,7 @@ export default function POSImport() {
                     border: "2px solid black",
                   }}
                 >
-                  <span style={{ fontWeight: "900" }}>Note:</span> {importedSale.voucher.description}
+                  <span style={{ fontWeight: "900" }}>{tUi("note")}</span> {importedSale.voucher.description}
                 </div>
               )}
 
@@ -1056,7 +1064,7 @@ export default function POSImport() {
                   borderTop: "2px solid black",
                 }}
               >
-                <div>Thank you for your business!</div>
+                <div>{tUi("thank.you.for.your.business")}</div>
               </div>
             </div>
           </div>

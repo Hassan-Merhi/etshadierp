@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Ship, Search, X, Package } from "lucide-react";
 import { useLocation } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 // ── localStorage helpers ────────────────────────────────────────────────────
 const NOTES_KEY = "factory-otw-row-notes";
@@ -108,6 +109,7 @@ function NotesCell({
   notes: Record<string, string>;
   onSave: (id: number, val: string) => void;
 }) {
+  const tUi = useFactoryText();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const current = notes[String(containerId)] ?? "";
@@ -144,7 +146,7 @@ function NotesCell({
       className={`text-xs cursor-pointer rounded px-1 py-0.5 hover-elevate ${current ? "text-foreground" : "text-muted-foreground italic"}`}
       onClick={startEdit}
       data-testid={`text-notes-${containerId}`}
-      title="Click to edit"
+      title={tUi("click.to.edit")}
     >
       {current || "Add note…"}
     </span>
@@ -153,6 +155,7 @@ function NotesCell({
 
 // ── Main component ───────────────────────────────────────────────────────────
 export default function FactoryStockOTW() {
+  const tUi = useFactoryText();
   const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
@@ -243,7 +246,7 @@ export default function FactoryStockOTW() {
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
         <Ship className="h-5 w-5 text-muted-foreground shrink-0" />
-        <PageHeader title="OTW Container Tracking" subtitle="Containers currently in transit" />
+        <PageHeader title={tUi("otw.container.tracking")} subtitle={tUi("containers.currently.in.transit")} />
         <Badge variant="outline" className="ml-auto shrink-0" data-testid="badge-total-count">
           {otwContainers.length} container{otwContainers.length !== 1 ? "s" : ""}
         </Badge>
@@ -256,17 +259,17 @@ export default function FactoryStockOTW() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search container #, supplier…"
+            placeholder={tUi("search.container.supplier")}
             className="pl-8"
             data-testid="input-search"
           />
         </div>
         <Select value={supplierFilter} onValueChange={setSupplierFilter}>
           <SelectTrigger className="w-[200px]" data-testid="select-supplier-filter">
-            <SelectValue placeholder="All suppliers" />
+            <SelectValue placeholder={tUi("all.suppliers")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All suppliers</SelectItem>
+            <SelectItem value="all">{tUi("all.suppliers")}</SelectItem>
             {suppliers.map(([key, name]) => (
               <SelectItem key={key} value={key}>
                 {name}
@@ -315,14 +318,14 @@ export default function FactoryStockOTW() {
             <TableHeader className="sticky top-0 z-20 bg-background">
               <TableRow>
                 <TableHead className="w-10 text-center">#</TableHead>
-                <TableHead className="whitespace-nowrap">Container #</TableHead>
-                <TableHead className="whitespace-nowrap">Supplier</TableHead>
+                <TableHead className="whitespace-nowrap">{tUi("container.2")}</TableHead>
+                <TableHead className="whitespace-nowrap">{tUi("supplier")}</TableHead>
                 <TableHead className="whitespace-nowrap">ETA</TableHead>
-                <TableHead className="whitespace-nowrap text-right">Cost</TableHead>
-                <TableHead className="whitespace-nowrap text-right">Freight</TableHead>
-                <TableHead className="whitespace-nowrap text-right">Commission</TableHead>
-                <TableHead className="whitespace-nowrap text-center">Docs</TableHead>
-                <TableHead className="whitespace-nowrap min-w-[160px]">Notes</TableHead>
+                <TableHead className="whitespace-nowrap text-right">{tUi("cost")}</TableHead>
+                <TableHead className="whitespace-nowrap text-right">{tUi("freight")}</TableHead>
+                <TableHead className="whitespace-nowrap text-right">{tUi("commission")}</TableHead>
+                <TableHead className="whitespace-nowrap text-center">{tUi("docs")}</TableHead>
+                <TableHead className="whitespace-nowrap min-w-[160px]">{tUi("notes")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -402,7 +405,7 @@ export default function FactoryStockOTW() {
                         checked={docDone}
                         onCheckedChange={(v) => toggleDoc(c.id, !!v)}
                         data-testid={`checkbox-docs-${c.id}`}
-                        aria-label="Docs received"
+                        aria-label={tUi("docs.received")}
                       />
                     </TableCell>
 
@@ -425,32 +428,32 @@ export default function FactoryStockOTW() {
             <div className="flex items-center gap-2">
               <Package className="h-4 w-4 text-muted-foreground shrink-0" />
               <div>
-                <p className="text-xs text-muted-foreground">Containers</p>
+                <p className="text-xs text-muted-foreground">{tUi("containers")}</p>
                 <p className="text-base font-bold tabular-nums" data-testid="text-total-count">
                   {filtered.length}
                 </p>
               </div>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Total Cost</p>
+              <p className="text-xs text-muted-foreground">{tUi("total.cost")}</p>
               <p className="text-base font-bold tabular-nums whitespace-nowrap" data-testid="text-total-cost">
                 {fmtTotals(totals.costByCcy)}
               </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Total Freight</p>
+              <p className="text-xs text-muted-foreground">{tUi("total.freight")}</p>
               <p className="text-base font-bold tabular-nums whitespace-nowrap" data-testid="text-total-freight">
                 {fmtTotals(totals.freightByCcy)}
               </p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground">Total Commission</p>
+              <p className="text-xs text-muted-foreground">{tUi("total.commission")}</p>
               <p className="text-base font-bold tabular-nums whitespace-nowrap" data-testid="text-total-commission">
                 {fmtTotals(totals.commByCcy)}
               </p>
             </div>
             <div className="ml-auto">
-              <p className="text-xs text-muted-foreground">Docs Received</p>
+              <p className="text-xs text-muted-foreground">{tUi("docs.received.2")}</p>
               <p className="text-base font-bold tabular-nums" data-testid="text-docs-received">
                 {docsReceived} / {filtered.length}
               </p>

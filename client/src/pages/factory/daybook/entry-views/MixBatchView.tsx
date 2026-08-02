@@ -9,6 +9,7 @@ import { DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/di
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatNumber } from "@/lib/formatNumber";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function MixBatchView({
   entry,
@@ -25,6 +26,7 @@ export function MixBatchView({
   mixBatchSources: any;
   onNavigate: any;
 }) {
+  const tUi = useFactoryText();
   const mb = mixBatchDetail;
   const totalKg = mb ? parseFloat(mb.totalWeightKg || "0") : 0;
   const totalCost = mb ? parseFloat(mb.totalCost || "0") : 0;
@@ -35,7 +37,7 @@ export function MixBatchView({
     <>
       <DialogHeader>
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <DialogTitle>Mix Batch Details</DialogTitle>
+          <DialogTitle>{tUi("mix.batch.details")}</DialogTitle>
           <Badge variant="outline" className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40">
             {entry.txType === "MIX_BATCH_TOPUP" ? "Top-up" : "Mix Batch Created"}
           </Badge>
@@ -47,7 +49,7 @@ export function MixBatchView({
         {/* Batch summary card */}
         <div className="rounded-md border p-4 space-y-3">
           {!mb ? (
-            <p className="text-sm text-muted-foreground">Loading batch details…</p>
+            <p className="text-sm text-muted-foreground">{tUi("loading.batch.details")}</p>
           ) : (
             <>
               <div className="flex items-start justify-between gap-2 flex-wrap">
@@ -78,15 +80,15 @@ export function MixBatchView({
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                 <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
-                  <p className="text-xs text-muted-foreground">Total Weight</p>
+                  <p className="text-xs text-muted-foreground">{tUi("total.weight")}</p>
                   <p className="font-semibold font-mono">{formatNumber(totalKg)} kg</p>
                 </div>
                 <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
-                  <p className="text-xs text-muted-foreground">Total Cost</p>
+                  <p className="text-xs text-muted-foreground">{tUi("total.cost")}</p>
                   <p className="font-semibold font-mono">${formatNumber(totalCost)}</p>
                 </div>
                 <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
-                  <p className="text-xs text-muted-foreground">Cost / kg</p>
+                  <p className="text-xs text-muted-foreground">{tUi("cost.kg")}</p>
                   <p className="font-semibold font-mono">${formatNumber(costPerKg)}</p>
                 </div>
               </div>
@@ -101,7 +103,9 @@ export function MixBatchView({
             {sourcesTotalKg > 0 ? ` · ${formatNumber(sourcesTotalKg)} kg total` : ""})
           </p>
           {mixBatchSources.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4 rounded-md border">No source records found</p>
+            <p className="text-sm text-muted-foreground text-center py-4 rounded-md border">
+              {tUi("no.source.records.found")}
+            </p>
           ) : (
             <div className="rounded-md border overflow-x-auto">
               <table className="w-full text-sm">
@@ -161,7 +165,7 @@ export function MixBatchView({
                 {mixBatchSources.length > 1 && (
                   <tfoot>
                     <tr className="bg-muted/30 border-t">
-                      <td className="px-3 py-2 text-xs font-medium text-muted-foreground">Total</td>
+                      <td className="px-3 py-2 text-xs font-medium text-muted-foreground">{tUi("total")}</td>
                       <td className="px-3 py-2 text-right font-mono font-medium">{formatNumber(sourcesTotalKg)} kg</td>
                       <td />
                       <td className="px-3 py-2 text-right font-mono font-medium">

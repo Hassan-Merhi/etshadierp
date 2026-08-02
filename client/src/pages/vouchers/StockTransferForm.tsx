@@ -58,7 +58,9 @@ import { stockTransferFormSchema } from "./stocktransferform/utils";
 import { ApproveRevisionDialog } from "./stock-transfer-form/dialogs/ApproveRevisionDialog";
 import { SaveAsRevisionDialog } from "./stock-transfer-form/dialogs/SaveAsRevisionDialog";
 import { ImportTransferExcelDialog } from "./stock-transfer-form/dialogs/ImportTransferExcelDialog";
+import { useErpText } from "@/i18n/modules/erp";
 export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTransferFormProps) {
+  const tUi = useErpText();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const appMode = useAppMode();
@@ -823,7 +825,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
           <div className="flex flex-wrap items-center gap-2 sm:gap-4 mb-4">
             {isPOS && (
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">From:</span>
+                <span className="text-sm text-muted-foreground">{tUi("from.2")}</span>
                 {myLocations.length > 1 ? (
                   <Select
                     value={posSelectedSourceId?.toString() || ""}
@@ -843,7 +845,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                     }}
                   >
                     <SelectTrigger className="w-[160px]" data-testid="select-source-location-pos">
-                      <SelectValue placeholder="Select source..." />
+                      <SelectValue placeholder={tUi("select.source.2")} />
                     </SelectTrigger>
                     <SelectContent>
                       {myLocations.map((l) => (
@@ -871,7 +873,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                   >
                     <FormControl>
                       <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-destination-location">
-                        <SelectValue placeholder="Select destination..." />
+                        <SelectValue placeholder={tUi("select.destination.2")} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -894,7 +896,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
               name="voucherDate"
               render={({ field }) => (
                 <FormItem className="flex items-center gap-2 space-y-0">
-                  <FormLabel className="text-sm text-muted-foreground whitespace-nowrap">Date:</FormLabel>
+                  <FormLabel className="text-sm text-muted-foreground whitespace-nowrap">{tUi("date.2")}</FormLabel>
                   <FormControl>
                     <Input
                       type="date"
@@ -996,7 +998,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                       </div>
                       {!isPOS && (
                         <div className="space-y-1">
-                          <label className="text-xs text-muted-foreground">Source</label>
+                          <label className="text-xs text-muted-foreground">{tUi("source")}</label>
                           <input
                             type="text"
                             value={
@@ -1028,7 +1030,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                                 }
                               }, 250);
                             }}
-                            placeholder="Type location..."
+                            placeholder={tUi("type.location")}
                             data-testid={`input-source-mobile-${index}`}
                             className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring"
                           />
@@ -1056,7 +1058,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                         </div>
                       )}
                       <div className="space-y-1">
-                        <label className="text-xs text-muted-foreground">Item</label>
+                        <label className="text-xs text-muted-foreground">{tUi("item")}</label>
                         <input
                           type="text"
                           value={
@@ -1095,7 +1097,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                               }
                             }, 200);
                           }}
-                          placeholder="Type to search item..."
+                          placeholder={tUi("type.to.search.item")}
                           data-testid={`input-item-name-mobile-${index}`}
                           className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring"
                         />
@@ -1192,7 +1194,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                         </div>
                         {!isPOS && (
                           <div className="space-y-1">
-                            <label className="text-xs text-muted-foreground">Rate</label>
+                            <label className="text-xs text-muted-foreground">{tUi("rate")}</label>
                             <input
                               type="number"
                               step="0.01"
@@ -1207,7 +1209,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                       </div>
                       {!isPOS && (
                         <div className="flex items-center justify-between px-1">
-                          <span className="text-xs text-muted-foreground">Amount</span>
+                          <span className="text-xs text-muted-foreground">{tUi("amount")}</span>
                           <span className="text-sm font-mono font-medium">
                             {formatAmount(parseFloat(entry?.quantity || "0") * parseFloat(entry?.rate || "0"))}
                           </span>
@@ -1381,7 +1383,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                                   }, 50);
                                 }
                               }}
-                              placeholder="Type location..."
+                              placeholder={tUi("type.location")}
                               className="w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20"
                               data-testid={`input-source-${index}`}
                             />
@@ -1552,7 +1554,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                                 }
                               }
                             }}
-                            placeholder="Type to search..."
+                            placeholder={tUi("type.to.search")}
                             className="w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20"
                             data-testid={`input-item-name-${index}`}
                           />
@@ -1816,17 +1818,17 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
               {/* Total Section */}
               <div className="border-t bg-muted/20 p-4">
                 <div className="flex flex-wrap justify-end items-center gap-2 sm:gap-8 max-w-lg ml-auto">
-                  <div className="text-xs text-muted-foreground">Total Items:</div>
+                  <div className="text-xs text-muted-foreground">{tUi("total.items")}</div>
                   <div className="text-xs font-mono font-medium">
                     {transferEntries.filter((e) => e.stockItemId > 0).length}
                   </div>
-                  <div className="text-xs text-muted-foreground">Total Qty:</div>
+                  <div className="text-xs text-muted-foreground">{tUi("total.qty.2")}</div>
                   <div className="text-xs font-mono font-medium">
                     {Math.floor(transferEntries.reduce((sum, e) => sum + parseFloat(e.quantity || "0"), 0))}
                   </div>
                   {!isPOS && (
                     <>
-                      <div className="text-xs font-semibold">Grand Total:</div>
+                      <div className="text-xs font-semibold">{tUi("grand.total.2")}</div>
                       <div className="text-sm font-bold font-mono" data-testid="text-transfer-total">
                         {formatAmount(transferTotal)}
                       </div>
@@ -1841,7 +1843,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
               <Card className="hidden sm:flex flex-col w-full lg:w-80 lg:sticky lg:top-4 max-h-[60vh] lg:max-h-[calc(100vh-12rem)] self-start">
                 <div className="p-4 border-b">
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <h3 className="text-sm font-semibold">Search Items</h3>
+                    <h3 className="text-sm font-semibold">{tUi("search.items.2")}</h3>
                     <button
                       onClick={() => setShowItemSidebar(false)}
                       className="text-xs text-muted-foreground hover:text-foreground"
@@ -1858,7 +1860,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search by name or code..."
+                      placeholder={tUi("search.by.name.or.code")}
                       value={transferSearchTerm}
                       onChange={(e) => {
                         setTransferSearchTerm(e.target.value);
@@ -1888,7 +1890,11 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                           })
                           .sort((a: any, b: any) => (a.stockItemName || "").localeCompare(b.stockItemName || ""));
                         if (filteredInventory.length === 0)
-                          return <div className="text-center py-8 text-sm text-muted-foreground">No items found</div>;
+                          return (
+                            <div className="text-center py-8 text-sm text-muted-foreground">
+                              {tUi("no.items.found")}
+                            </div>
+                          );
                         return filteredInventory.map((item: any, idx: number) => {
                           const stock = parseFloat(item.quantity || "0");
                           const isHighlighted = idx === transferHighlightedIndex && activeTransferRow !== null;
@@ -1981,7 +1987,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
               <Card className="hidden sm:flex flex-col w-full lg:w-80 lg:sticky lg:top-4 max-h-[60vh] lg:max-h-[calc(100vh-12rem)] self-start">
                 <div className="p-4 border-b">
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <h3 className="text-sm font-semibold">Select Source</h3>
+                    <h3 className="text-sm font-semibold">{tUi("select.source.3")}</h3>
                     <button
                       onClick={() => setShowSourceSidebar(false)}
                       className="text-xs text-muted-foreground hover:text-foreground"
@@ -1993,7 +1999,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search locations..."
+                      placeholder={tUi("search.locations")}
                       value={transferSourceSearchTerm}
                       onChange={(e) => {
                         setTransferSourceSearchTerm(e.target.value);
@@ -2018,7 +2024,11 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                         })
                         .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
                       if (filteredLocations.length === 0)
-                        return <div className="text-center py-8 text-sm text-muted-foreground">No locations found</div>;
+                        return (
+                          <div className="text-center py-8 text-sm text-muted-foreground">
+                            {tUi("no.locations.found.2")}
+                          </div>
+                        );
                       return filteredLocations.map((loc, idx) => {
                         const isHighlighted = idx === transferSourceHighlightedIndex && activeTransferRow !== null;
                         return (
@@ -2074,7 +2084,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                   <FormControl>
                     <Textarea
                       {...field}
-                      placeholder="Notes (optional)"
+                      placeholder={tUi("notes.optional")}
                       className="resize-none h-9"
                       data-testid="input-transfer-notes"
                     />
@@ -2094,7 +2104,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                       data-testid="checkbox-transfer-optional"
                     />
                   </FormControl>
-                  <FormLabel className="text-sm">Optional</FormLabel>
+                  <FormLabel className="text-sm">{tUi("optional")}</FormLabel>
                 </FormItem>
               )}
             />
@@ -2168,7 +2178,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
           >
             <div className="flex items-center gap-2">
               <GitBranch className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-semibold">Revision History</span>
+              <span className="text-sm font-semibold">{tUi("revision.history")}</span>
               {transferRevisions.length > 0 && (
                 <Badge variant="secondary" className="ml-1 text-xs no-default-active-elevate">
                   {transferRevisions.length}
@@ -2186,7 +2196,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
               {transferRevisions.length === 0 ? (
                 <EmptyState
                   icon={History}
-                  title="No revisions yet"
+                  title={tUi("no.revisions.yet")}
                   description='Use "Save as Revision" to record tracked changes to this transfer.'
                 />
               ) : (
@@ -2194,7 +2204,9 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                   <div key={rev.id} className="border rounded-md overflow-hidden">
                     {rev.optional && (
                       <div className="flex items-center justify-between gap-3 px-3 py-2 status-warning border-b">
-                        <span className="text-xs font-medium">Pending POS adjustment — awaiting admin approval</span>
+                        <span className="text-xs font-medium">
+                          {tUi("pending.pos.adjustment.awaiting.admin.approval")}
+                        </span>
                         <Button
                           size="sm"
                           variant="default"
@@ -2219,7 +2231,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                         {rev.note && <span className="text-xs italic text-muted-foreground">"{rev.note}"</span>}
                       </div>
                       <div className="flex items-center gap-2 text-xs">
-                        <span className="text-muted-foreground">Reference only:</span>
+                        <span className="text-muted-foreground">{tUi("reference.only")}</span>
                         <Switch
                           checked={rev.optional}
                           onCheckedChange={async (checked) => {
@@ -2243,10 +2255,10 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                         <table className="w-full text-sm">
                           <thead className="bg-muted/30">
                             <tr>
-                              <th className="text-left p-2 font-medium">Item</th>
-                              <th className="text-left p-2 font-medium hidden sm:table-cell">From</th>
+                              <th className="text-left p-2 font-medium">{tUi("item")}</th>
+                              <th className="text-left p-2 font-medium hidden sm:table-cell">{tUi("from")}</th>
                               <th className="text-right p-2 font-medium">Was</th>
-                              <th className="text-right p-2 font-medium">Change</th>
+                              <th className="text-right p-2 font-medium">{tUi("change")}</th>
                               <th className="text-right p-2 font-medium">Now</th>
                             </tr>
                           </thead>
@@ -2331,7 +2343,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       <AlertDialog open={importConfirmDialogOpen} onOpenChange={setImportConfirmDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Import with Validation Errors?</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("import.with.validation.errors")}</AlertDialogTitle>
             <AlertDialogDescription>
               {importValidItemsCount === 0 ? (
                 <>All {importTotalItemsCount} items have validation errors. Nothing will be imported.</>
@@ -2347,7 +2359,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-import-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-import-cancel">{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmedImport} data-testid="button-import-confirm">
               {importValidItemsCount === 0 ? "OK" : `Import ${importValidItemsCount} Item(s)`}
             </AlertDialogAction>

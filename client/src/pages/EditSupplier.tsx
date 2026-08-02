@@ -18,8 +18,10 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { insertSupplierSchema } from "@shared/schema";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useErpText } from "@/i18n/modules/erp";
 
 export default function EditSupplier() {
+  const tUi = useErpText();
   const params = useParams();
   const [_location, navigate] = useLocation();
   const handleBack = useBackToParent();
@@ -120,7 +122,7 @@ export default function EditSupplier() {
           <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <PageHeader title="Supplier Not Found" />
+          <PageHeader title={tUi("supplier.not.found")} />
         </div>
       </div>
     );
@@ -136,14 +138,14 @@ export default function EditSupplier() {
           <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-page-title">
             Edit Supplier
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">Update supplier information and opening balance</p>
+          <p className="text-sm text-muted-foreground mt-1">{tUi("update.supplier.information.and.opening.balance")}</p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Supplier Details</CardTitle>
-          <CardDescription>Update the supplier information below</CardDescription>
+          <CardTitle>{tUi("supplier.details")}</CardTitle>
+          <CardDescription>{tUi("update.the.supplier.information.below")}</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -154,9 +156,9 @@ export default function EditSupplier() {
                   name="code"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Code *</FormLabel>
+                      <FormLabel>{tUi("code.2")}</FormLabel>
                       <FormControl>
-                        <Input placeholder="SUP-001" {...field} data-testid="input-code" />
+                        <Input placeholder={tUi("sup.001")} {...field} data-testid="input-code" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -168,9 +170,9 @@ export default function EditSupplier() {
                   name="legalName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Legal Name *</FormLabel>
+                      <FormLabel>{tUi("legal.name")}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Acme Corporation" {...field} data-testid="input-legalName" />
+                        <Input placeholder={tUi("acme.corporation")} {...field} data-testid="input-legalName" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -182,7 +184,7 @@ export default function EditSupplier() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email *</FormLabel>
+                      <FormLabel>{tUi("email")}</FormLabel>
                       <FormControl>
                         <Input type="email" placeholder="contact@supplier.com" {...field} data-testid="input-email" />
                       </FormControl>
@@ -196,7 +198,7 @@ export default function EditSupplier() {
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Phone</FormLabel>
+                      <FormLabel>{tUi("phone")}</FormLabel>
                       <FormControl>
                         <Input placeholder="+1 234 567 8900" {...field} data-testid="input-phone" />
                       </FormControl>
@@ -210,7 +212,7 @@ export default function EditSupplier() {
                   name="address"
                   render={({ field }) => (
                     <FormItem className="col-span-1 sm:col-span-2">
-                      <FormLabel>Address</FormLabel>
+                      <FormLabel>{tUi("address")}</FormLabel>
                       <FormControl>
                         <Input placeholder="123 Business St, City, State" {...field} data-testid="input-address" />
                       </FormControl>
@@ -224,9 +226,9 @@ export default function EditSupplier() {
                   name="taxId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Tax ID (GST/VAT)</FormLabel>
+                      <FormLabel>{tUi("tax.id.gst.vat")}</FormLabel>
                       <FormControl>
-                        <Input placeholder="GST123456" {...field} data-testid="input-taxId" />
+                        <Input placeholder={tUi("gst123456")} {...field} data-testid="input-taxId" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -238,9 +240,9 @@ export default function EditSupplier() {
                   name="paymentTerms"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Payment Terms</FormLabel>
+                      <FormLabel>{tUi("payment.terms")}</FormLabel>
                       <FormControl>
-                        <Input placeholder="Net 30" {...field} data-testid="input-paymentTerms" />
+                        <Input placeholder={tUi("net.30")} {...field} data-testid="input-paymentTerms" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -252,7 +254,7 @@ export default function EditSupplier() {
                   name="openingBalance"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Opening Balance</FormLabel>
+                      <FormLabel>{tUi("opening.balance")}</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -272,18 +274,18 @@ export default function EditSupplier() {
                   name="stockGroupId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Linked Stock Group</FormLabel>
+                      <FormLabel>{tUi("linked.stock.group")}</FormLabel>
                       <Select
                         value={field.value ? String(field.value) : "__none__"}
                         onValueChange={(v) => field.onChange(v === "__none__" ? null : Number(v))}
                       >
                         <FormControl>
                           <SelectTrigger data-testid="select-stock-group">
-                            <SelectValue placeholder="No stock group linked" />
+                            <SelectValue placeholder={tUi("no.stock.group.linked")} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="__none__">No stock group linked</SelectItem>
+                          <SelectItem value="__none__">{tUi("no.stock.group.linked")}</SelectItem>
                           {stockGroups.map((g: any) => (
                             <SelectItem key={g.id} value={String(g.id)}>
                               {g.name}
@@ -309,7 +311,7 @@ export default function EditSupplier() {
                         />
                       </FormControl>
                       <div className="space-y-1 leading-none">
-                        <FormLabel>Active</FormLabel>
+                        <FormLabel>{tUi("active")}</FormLabel>
                       </div>
                     </FormItem>
                   )}

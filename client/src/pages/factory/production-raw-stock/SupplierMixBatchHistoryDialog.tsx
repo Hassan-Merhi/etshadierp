@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface SupplierMixBatchHistoryDialogProps {
   supplierId: number | null;
@@ -37,7 +38,8 @@ function getKindMeta(row: RawStockHistoryRow) {
   if (row.kind === "receipt") {
     return {
       icon: Container,
-      badgeClass: "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800",
+      badgeClass:
+        "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800",
       label: "Offload / Receipt",
       sign: "+" as const,
     };
@@ -74,14 +76,13 @@ export function SupplierMixBatchHistoryDialog({
   open,
   onClose,
 }: SupplierMixBatchHistoryDialogProps) {
+  const tUi = useFactoryText();
   const { data: history = [], isLoading } = useQuery<RawStockHistoryRow[]>({
     queryKey: [`/api/factory/raw-stock/history/${supplierId}`],
     enabled: open && supplierId !== null,
   });
 
-  const totalIn = history
-    .filter((r) => r.kind === "receipt" || r.type === "ADD")
-    .reduce((s, r) => s + (r.kg || 0), 0);
+  const totalIn = history.filter((r) => r.kind === "receipt" || r.type === "ADD").reduce((s, r) => s + (r.kg || 0), 0);
   // Note: DEDUCT adjustments reduce receivedKg directly on the container/receipt record
   // (history-only entry, not a separate movement against the balance) — see
   // rawStockReceiptRoutes.ts's DEDUCT-skip logic. Counting it here too would double-subtract
@@ -129,11 +130,11 @@ export function SupplierMixBatchHistoryDialog({
             <Table>
               <TableHeader className="bg-muted/50 sticky top-0">
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="py-3">Entry</TableHead>
-                  <TableHead className="py-3">Date</TableHead>
-                  <TableHead className="text-right py-3">Weight (kg)</TableHead>
-                  <TableHead className="text-right py-3">Cost/kg</TableHead>
-                  <TableHead className="py-3">Type</TableHead>
+                  <TableHead className="py-3">{tUi("entry")}</TableHead>
+                  <TableHead className="py-3">{tUi("date")}</TableHead>
+                  <TableHead className="text-right py-3">{tUi("weight.kg")}</TableHead>
+                  <TableHead className="text-right py-3">{tUi("cost.kg.3")}</TableHead>
+                  <TableHead className="py-3">{tUi("type")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

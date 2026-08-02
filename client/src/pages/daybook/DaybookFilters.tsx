@@ -19,12 +19,7 @@ interface DaybookFiltersProps {
   onNextDay?: () => void;
 }
 
-export function DaybookFilters({
-  periodFilter,
-  setPeriodFilter,
-  filters,
-  setFilters,
-}: DaybookFiltersProps) {
+export function DaybookFilters({ periodFilter, setPeriodFilter, filters, setFilters }: DaybookFiltersProps) {
   const hasActiveFilters =
     filters.voucherType !== "all" ||
     !!filters.searchQuery ||
@@ -36,18 +31,10 @@ export function DaybookFilters({
     <div className="flex flex-col gap-2">
       {/* Single row: date | types | status | search */}
       <div className="flex flex-wrap items-center gap-2">
-        <PeriodFilter
-          value={periodFilter}
-          onChange={setPeriodFilter}
-          data-testid="period-filter"
-        />
+        <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
 
         <Select value={filters.voucherType} onValueChange={(value) => setFilters({ ...filters, voucherType: value })}>
-          <SelectTrigger
-            id="voucher-type"
-            data-testid="select-voucher-type"
-            className="w-[130px]"
-          >
+          <SelectTrigger id="voucher-type" data-testid="select-voucher-type" className="w-[130px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -66,11 +53,7 @@ export function DaybookFilters({
           value={filters.statusFilter}
           onValueChange={(value) => setFilters({ ...filters, statusFilter: value as "all" | "active" | "optional" })}
         >
-          <SelectTrigger
-            id="status-filter"
-            data-testid="select-status-filter"
-            className="w-[130px]"
-          >
+          <SelectTrigger id="status-filter" data-testid="select-status-filter" className="w-[130px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

@@ -35,6 +35,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface Employee {
   id: number;
@@ -94,6 +95,7 @@ function fmt(val: string | number | null | undefined) {
 }
 
 export default function FactoryEmployees() {
+  const tUi = useFactoryText();
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -283,22 +285,22 @@ export default function FactoryEmployees() {
           <>
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
               <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Total</span>
+              <span className="text-muted-foreground">{tUi("total")}</span>
               <span className="font-semibold">{employees.length}</span>
             </div>
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
               <UserCheck2 className="h-4 w-4 text-emerald-500" />
-              <span className="text-muted-foreground">Active</span>
+              <span className="text-muted-foreground">{tUi("active")}</span>
               <span className="font-semibold">{totalActive}</span>
             </div>
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
               <UserMinus className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Inactive</span>
+              <span className="text-muted-foreground">{tUi("inactive")}</span>
               <span className="font-semibold">{totalInactive}</span>
             </div>
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
               <DollarSign className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Monthly Payroll</span>
+              <span className="text-muted-foreground">{tUi("monthly.payroll")}</span>
               <span className="font-semibold font-mono">{fmt(totalMonthlySalary)}</span>
             </div>
           </>
@@ -310,7 +312,7 @@ export default function FactoryEmployees() {
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search employees..."
+            placeholder={tUi("search.employees")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -322,8 +324,8 @@ export default function FactoryEmployees() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="Active">Active</SelectItem>
-            <SelectItem value="Inactive">Inactive</SelectItem>
+            <SelectItem value="Active">{tUi("active")}</SelectItem>
+            <SelectItem value="Inactive">{tUi("inactive")}</SelectItem>
             <SelectItem value="All">All</SelectItem>
           </SelectContent>
         </Select>
@@ -382,7 +384,7 @@ export default function FactoryEmployees() {
                     <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
                       <Users className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <p className="text-sm font-medium">No employees found</p>
+                    <p className="text-sm font-medium">{tUi("no.employees.found.2")}</p>
                     <p className="text-xs text-muted-foreground">
                       {search ? "Try a different search term" : "Add your first employee to get started"}
                     </p>
@@ -454,7 +456,7 @@ export default function FactoryEmployees() {
                             variant="ghost"
                             onClick={() => setEndingContractEmployee(emp)}
                             data-testid={`button-end-contract-${emp.id}`}
-                            title="End Contract"
+                            title={tUi("end.contract")}
                           >
                             <UserX className="h-3.5 w-3.5 text-destructive" />
                           </Button>
@@ -465,7 +467,7 @@ export default function FactoryEmployees() {
                             onClick={() => reactivateMutation.mutate(emp.id)}
                             disabled={reactivateMutation.isPending}
                             data-testid={`button-reactivate-${emp.id}`}
-                            title="Reactivate"
+                            title={tUi("reactivate")}
                           >
                             <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
                           </Button>
@@ -497,37 +499,37 @@ export default function FactoryEmployees() {
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label>First Name *</Label>
+                <Label>{tUi("first.name.2")}</Label>
                 <Input
                   value={formData.firstName}
                   onChange={(e) => handleField("firstName", e.target.value)}
-                  placeholder="First name"
+                  placeholder={tUi("first.name.3")}
                   data-testid="input-first-name"
                 />
               </div>
               <div className="space-y-1">
-                <Label>Last Name *</Label>
+                <Label>{tUi("last.name.2")}</Label>
                 <Input
                   value={formData.lastName}
                   onChange={(e) => handleField("lastName", e.target.value)}
-                  placeholder="Last name"
+                  placeholder={tUi("last.name.3")}
                   data-testid="input-last-name"
                 />
               </div>
             </div>
             {!editingEmployee && (
               <div className="space-y-1">
-                <Label>Code (optional)</Label>
+                <Label>{tUi("code.optional")}</Label>
                 <Input
                   value={formData.code}
                   onChange={(e) => handleField("code", e.target.value)}
-                  placeholder="Auto-generated if blank"
+                  placeholder={tUi("auto.generated.if.blank")}
                   data-testid="input-code"
                 />
               </div>
             )}
             <div className="space-y-1">
-              <Label>Department</Label>
+              <Label>{tUi("department")}</Label>
               <Input
                 value={formData.department}
                 onChange={(e) => handleField("department", e.target.value)}
@@ -536,7 +538,7 @@ export default function FactoryEmployees() {
               />
             </div>
             <div className="space-y-1">
-              <Label>Phone</Label>
+              <Label>{tUi("phone")}</Label>
               <Input
                 value={formData.phone}
                 onChange={(e) => handleField("phone", e.target.value)}
@@ -546,7 +548,7 @@ export default function FactoryEmployees() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label>Monthly Salary</Label>
+                <Label>{tUi("monthly.salary")}</Label>
                 <Input
                   type="number"
                   min="0"
@@ -558,7 +560,7 @@ export default function FactoryEmployees() {
                 />
               </div>
               <div className="space-y-1">
-                <Label>Join Date *</Label>
+                <Label>{tUi("join.date")}</Label>
                 <Input
                   type="date"
                   value={formData.joinDate}
@@ -605,7 +607,7 @@ export default function FactoryEmployees() {
       >
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>End Contract</DialogTitle>
+            <DialogTitle>{tUi("end.contract")}</DialogTitle>
           </DialogHeader>
           {endingContractEmployee &&
             (() => {
@@ -630,7 +632,7 @@ export default function FactoryEmployees() {
                       </div>
                       <p className="text-xs text-amber-700/80 dark:text-amber-400/80 leading-relaxed">
                         Running payroll records salary as <em>earned</em> — it doesn't mean cash was handed out. To
-                        clear this balance, go to <strong>Withdrawals</strong> and record a cash payment of $
+                        clear this balance, go to <strong>{tUi("withdrawals")}</strong> and record a cash payment of $
                         {fmtBal(balance)} before ending the contract.
                       </p>
                     </div>
@@ -678,7 +680,7 @@ export default function FactoryEmployees() {
       <Dialog open={recalcConfirmOpen} onOpenChange={setRecalcConfirmOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Recalculate All Employee Balances</DialogTitle>
+            <DialogTitle>{tUi("recalculate.all.employee.balances")}</DialogTitle>
             <DialogDescription>
               This will rebuild every employee's current balance, total deposits, and total withdrawals from their
               actual accounting records. Use this to fix balances that were corrupted by deletions that didn't reverse
@@ -734,9 +736,9 @@ export default function FactoryEmployees() {
           recalcResult.employees.filter((e) => Math.abs(e.oldBalance - e.newBalance) > 0.005).length > 0 ? (
             <div className="max-h-64 overflow-y-auto border rounded-xl overflow-hidden text-sm">
               <div className="grid grid-cols-3 px-3 py-2 bg-muted/40 text-xs font-semibold text-muted-foreground">
-                <span>Employee</span>
-                <span className="text-right">Old Balance</span>
-                <span className="text-right">New Balance</span>
+                <span>{tUi("employee")}</span>
+                <span className="text-right">{tUi("old.balance")}</span>
+                <span className="text-right">{tUi("new.balance")}</span>
               </div>
               {recalcResult.employees
                 .filter((e) => Math.abs(e.oldBalance - e.newBalance) > 0.005)

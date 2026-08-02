@@ -5,6 +5,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { OtwNotes, OtwCurrencyInline } from "./ContainerBadges";
 import { otwContainerByCurrency, otwNum, otwFmtCcy, otwCcySymbol, OTW_STATUS_LABEL } from "./otwHelpers";
 import type { ContainerWithSupplier } from "./otwHelpers";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface OtwSupplierGroup {
   supplierId: number | null;
@@ -39,6 +40,7 @@ export function OtwSummaryView({
   fmtOtwKg,
   onViewContainer,
 }: OtwSummaryViewProps) {
+  const tUi = useFactoryText();
   return (
     <div className="space-y-4">
       <OtwNotes />
@@ -47,7 +49,7 @@ export function OtwSummaryView({
         <div className="rounded-xl border overflow-hidden">
           <div className="py-16 text-center">
             <Ship className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-40" />
-            <p className="text-muted-foreground">No containers currently on the way.</p>
+            <p className="text-muted-foreground">{tUi("no.containers.currently.on.the.way")}</p>
           </div>
         </div>
       ) : (
@@ -152,7 +154,7 @@ export function OtwSummaryView({
               <div className="flex items-center gap-2">
                 <Package className="h-4 w-4 text-muted-foreground shrink-0" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Containers</p>
+                  <p className="text-xs text-muted-foreground">{tUi("containers")}</p>
                   <p className="text-lg font-bold font-mono" data-testid="text-otw-grand-containers">
                     {otwGrandTotals.containers}
                   </p>
@@ -161,7 +163,7 @@ export function OtwSummaryView({
               <div className="flex items-start gap-2">
                 <Boxes className="h-4 w-4 text-muted-foreground shrink-0 mt-1" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Total KG</p>
+                  <p className="text-xs text-muted-foreground">{tUi("total.kg.2")}</p>
                   <p className="text-lg font-bold font-mono" data-testid="text-otw-grand-kg">
                     {fmtOtwKg(otwGrandTotals.kg)}
                   </p>
@@ -169,7 +171,7 @@ export function OtwSummaryView({
               </div>
               <div className="flex items-start gap-2 flex-1">
                 <div className="w-full">
-                  <p className="text-xs text-muted-foreground mb-1">Total Value by Currency</p>
+                  <p className="text-xs text-muted-foreground mb-1">{tUi("total.value.by.currency")}</p>
                   <div className="flex flex-wrap gap-x-6 gap-y-1" data-testid="text-otw-grand-totals">
                     {Object.entries(otwGrandTotals.totalsByCurrency)
                       .filter(([, v]) => v > 0)

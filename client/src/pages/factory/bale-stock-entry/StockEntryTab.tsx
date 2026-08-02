@@ -16,7 +16,13 @@ import { DraftRestorePrompt } from "@/components/DraftRestorePrompt";
 import { isZebraMode } from "@/lib/zebraPrint";
 import { getPaperFormat } from "@/components/LabelPrintSettings";
 import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
-import { generateCombinedLabelsHtml, generateA5LabelsHtml, prefetchBannersForPrint, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
+import {
+  generateCombinedLabelsHtml,
+  generateA5LabelsHtml,
+  prefetchBannersForPrint,
+  type LabelData,
+  type A4DesignColor,
+} from "@/lib/labelHtml";
 import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
 
 import { StockEntryCart } from "./StockEntryCart";
@@ -29,6 +35,7 @@ import {
 import { StockEntryScanner } from "./StockEntryScanner";
 import { StockEntrySidebar } from "./StockEntrySidebar";
 import { openBrowserPrint, printLabels } from "./StockEntryPrinting";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface CartItem {
   productId: number;
@@ -40,6 +47,7 @@ interface CartItem {
 }
 
 export function StockEntryTab() {
+  const tUi = useFactoryText();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [scanInput, setScanInput] = useState("");
   const [scanError, setScanError] = useState("");
@@ -381,7 +389,7 @@ export function StockEntryTab() {
                 <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-primary/10 text-primary">
                   <Package className="h-4 w-4" />
                 </div>
-                <CardTitle className="text-base font-bold">New Production Entry</CardTitle>
+                <CardTitle className="text-base font-bold">{tUi("new.production.entry")}</CardTitle>
               </div>
               <div className="flex items-center gap-2">
                 <Button

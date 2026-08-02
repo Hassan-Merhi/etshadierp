@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { useToast } from "@/hooks/use-toast";
 import {} from "lucide-react";
 import { useApiBase } from "../shared";
+import { useErpText } from "@/i18n/modules/erp";
 
 export // ──────────────────────────────────────────────────────────
 // CREATE UNIT DIALOG
@@ -27,6 +28,7 @@ function CreateUnitDialog({
   onClose: () => void;
   testIdPrefix: string;
 }) {
+  const tUi = useErpText();
   const apiBase = useApiBase();
   const { toast } = useToast();
   const [form, setForm] = useState({ unitNumber: "", locationGroup: "", size: "", dimensions: "", notes: "" });
@@ -49,7 +51,7 @@ function CreateUnitDialog({
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <Label>Unit # *</Label>
+            <Label>{tUi("unit.2")}</Label>
             <Input
               value={form.unitNumber}
               onChange={(e) => setForm((f) => ({ ...f, unitNumber: e.target.value }))}
@@ -58,7 +60,7 @@ function CreateUnitDialog({
             />
           </div>
           <div>
-            <Label>Location Group *</Label>
+            <Label>{tUi("location.group")}</Label>
             <Input
               value={form.locationGroup}
               onChange={(e) => setForm((f) => ({ ...f, locationGroup: e.target.value.toUpperCase() }))}
@@ -68,7 +70,7 @@ function CreateUnitDialog({
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <Label>Size</Label>
+              <Label>{tUi("size")}</Label>
               <Input
                 value={form.size}
                 onChange={(e) => setForm((f) => ({ ...f, size: e.target.value }))}
@@ -77,7 +79,7 @@ function CreateUnitDialog({
               />
             </div>
             <div>
-              <Label>Dimensions</Label>
+              <Label>{tUi("dimensions")}</Label>
               <Input
                 value={form.dimensions}
                 onChange={(e) => setForm((f) => ({ ...f, dimensions: e.target.value }))}
@@ -87,7 +89,7 @@ function CreateUnitDialog({
             </div>
           </div>
           <div>
-            <Label>Notes</Label>
+            <Label>{tUi("notes")}</Label>
             <Textarea
               value={form.notes}
               onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}

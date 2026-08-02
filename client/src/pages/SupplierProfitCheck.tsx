@@ -1,25 +1,66 @@
-import {useState, useMemo, useCallback, useEffect, useRef} from "react";
-import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
-import {PeriodFilter, PeriodFilterValue} from "@/components/ui/period-filter";
-import {useCompany} from "@/contexts/CompanyContext";
-import {useToast} from "@/hooks/use-toast";
-import {apiRequest} from "@/lib/queryClient";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Badge} from "@/components/ui/badge";
-import {Checkbox} from "@/components/ui/checkbox";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter} from "@/components/ui/dialog";
-import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {TrendingUp, AlertTriangle, Search, Download, FileText, CheckCircle, Package, Loader2, BarChart2, Save, Hash, ShoppingCart, Columns, RotateCcw, Truck, Filter, ChevronDown, CircleDollarSign, MapPin, Container, Plus, Upload, X, FileSpreadsheet} from "lucide-react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { PeriodFilter, PeriodFilterValue } from "@/components/ui/period-filter";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  TrendingUp,
+  AlertTriangle,
+  Search,
+  Download,
+  FileText,
+  CheckCircle,
+  Package,
+  Loader2,
+  BarChart2,
+  Save,
+  Hash,
+  ShoppingCart,
+  Columns,
+  RotateCcw,
+  Truck,
+  Filter,
+  ChevronDown,
+  CircleDollarSign,
+  MapPin,
+  Container,
+  Plus,
+  Upload,
+  X,
+  FileSpreadsheet,
+} from "lucide-react";
 
-import type {AnalysisRow, ColKey, ColVisibility, ComputedRow, LocationGroup, OtwContainer} from "./supplierprofitcheck/types";
-import {ALL_COLUMNS, DEFAULT_COL_VISIBILITY, STATUS_OPTIONS, STORAGE_KEY_COLS, fmt, loadColVisibility} from "./supplierprofitcheck/utils";
-import {ProfitCell} from "./supplierprofitcheck/components/ProfitCell";
-import {StatusBadge} from "./supplierprofitcheck/components/StatusBadge";
-import {StatCard} from "./supplierprofitcheck/components/StatCard";
+import type {
+  AnalysisRow,
+  ColKey,
+  ColVisibility,
+  ComputedRow,
+  LocationGroup,
+  OtwContainer,
+} from "./supplierprofitcheck/types";
+import {
+  ALL_COLUMNS,
+  DEFAULT_COL_VISIBILITY,
+  STATUS_OPTIONS,
+  STORAGE_KEY_COLS,
+  fmt,
+  loadColVisibility,
+} from "./supplierprofitcheck/utils";
+import { ProfitCell } from "./supplierprofitcheck/components/ProfitCell";
+import { StatusBadge } from "./supplierprofitcheck/components/StatusBadge";
+import { StatCard } from "./supplierprofitcheck/components/StatCard";
+import { useErpText } from "@/i18n/modules/erp";
 export default function SupplierProfitCheck() {
+  const tUi = useErpText();
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const companyId = selectedCompany?.id;
@@ -676,8 +717,8 @@ export default function SupplierProfitCheck() {
                 <BarChart2 className="w-4 h-4 text-amber-500" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-base font-bold tracking-tight leading-tight">Supplier Profit Check</h1>
-                <p className="text-[11px] text-muted-foreground">Analyze item profitability before ordering</p>
+                <h1 className="text-base font-bold tracking-tight leading-tight">{tUi("supplier.profit.check")}</h1>
+                <p className="text-[11px] text-muted-foreground">{tUi("analyze.item.profitability.before.ordering")}</p>
               </div>
             </div>
             {/* Autosave indicator */}
@@ -715,7 +756,7 @@ export default function SupplierProfitCheck() {
               onClick={() => importFileRef.current?.click()}
               className="shrink-0"
               data-testid="button-import-excel"
-              title="Import item codes from Excel to check profit"
+              title={tUi("import.item.codes.from.excel.to.check.profit")}
             >
               <FileSpreadsheet className="w-4 h-4 mr-1.5" />
               Import Excel
@@ -742,7 +783,7 @@ export default function SupplierProfitCheck() {
                 }}
                 className="shrink-0 text-muted-foreground"
                 data-testid="button-clear-import"
-                title="Clear imported items"
+                title={tUi("clear.imported.items")}
               >
                 <X className="w-4 h-4 mr-1.5" />
                 Clear Import ({importedRows.length})
@@ -803,7 +844,7 @@ export default function SupplierProfitCheck() {
                   }}
                 >
                   <SelectTrigger data-testid="select-supplier">
-                    <SelectValue placeholder="Select supplier…" />
+                    <SelectValue placeholder={tUi("select.supplier")} />
                   </SelectTrigger>
                   <SelectContent>
                     {suppliers.map((s: any) => (
@@ -843,9 +884,9 @@ export default function SupplierProfitCheck() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Supplier Items</SelectItem>
-                    <SelectItem value="proforma">Existing Proforma</SelectItem>
-                    <SelectItem value="otw_containers">Containers OTW</SelectItem>
+                    <SelectItem value="all">{tUi("all.supplier.items")}</SelectItem>
+                    <SelectItem value="proforma">{tUi("existing.proforma")}</SelectItem>
+                    <SelectItem value="otw_containers">{tUi("containers.otw")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -857,7 +898,7 @@ export default function SupplierProfitCheck() {
                   </label>
                   <Select value={proformaId} onValueChange={setProformaId}>
                     <SelectTrigger data-testid="select-proforma">
-                      <SelectValue placeholder="Select proforma…" />
+                      <SelectValue placeholder={tUi("select.proforma")} />
                     </SelectTrigger>
                     <SelectContent>
                       {proformas.map((p: any) => (
@@ -890,8 +931,8 @@ export default function SupplierProfitCheck() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="avg">Average Sell Price</SelectItem>
-                    <SelectItem value="location_group">Location Group Price</SelectItem>
+                    <SelectItem value="avg">{tUi("average.sell.price")}</SelectItem>
+                    <SelectItem value="location_group">{tUi("location.group.price")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -908,7 +949,7 @@ export default function SupplierProfitCheck() {
                   ) : (
                     <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
                       <SelectTrigger data-testid="select-location-group">
-                        <SelectValue placeholder="Select group…" />
+                        <SelectValue placeholder={tUi("select.group")} />
                       </SelectTrigger>
                       <SelectContent>
                         {locationGroups.map((lg) => (
@@ -948,14 +989,18 @@ export default function SupplierProfitCheck() {
                   )}
                 </div>
                 {!supplierId ? (
-                  <p className="text-xs text-muted-foreground italic">Select a supplier first to see OTW containers.</p>
+                  <p className="text-xs text-muted-foreground italic">
+                    {tUi("select.a.supplier.first.to.see.otw.containers")}
+                  </p>
                 ) : isLoadingOtw ? (
                   <div className="flex items-center gap-2 py-2">
                     <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">Loading containers…</span>
+                    <span className="text-xs text-muted-foreground">{tUi("loading.containers")}</span>
                   </div>
                 ) : otwContainers.length === 0 ? (
-                  <p className="text-xs text-muted-foreground italic">No OTW containers found for this supplier.</p>
+                  <p className="text-xs text-muted-foreground italic">
+                    {tUi("no.otw.containers.found.for.this.supplier")}
+                  </p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {otwContainers.map((c) => {
@@ -1097,7 +1142,9 @@ export default function SupplierProfitCheck() {
             />
             {/* Issues card */}
             <div className="rounded-xl border bg-card px-4 py-3">
-              <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">Issues</div>
+              <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
+                {tUi("issues")}
+              </div>
               <div className="space-y-1">
                 {summary.losingCount > 0 && (
                   <div className="flex items-center gap-1.5">
@@ -1141,7 +1188,7 @@ export default function SupplierProfitCheck() {
                   summary.noGroupPriceCount === 0 && (
                     <div className="flex items-center gap-1.5">
                       <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
-                      <span className="text-xs text-emerald-500 font-medium">All good</span>
+                      <span className="text-xs text-emerald-500 font-medium">{tUi("all.good")}</span>
                     </div>
                   )}
               </div>
@@ -1154,7 +1201,7 @@ export default function SupplierProfitCheck() {
           <div className="flex flex-wrap items-center gap-3 justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-2.5">
             <div className="flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
-              <span className="text-sm font-medium">Proforma saved:</span>
+              <span className="text-sm font-medium">{tUi("proforma.saved")}</span>
               <span className="font-mono text-sm text-emerald-600 dark:text-emerald-400">
                 {savedProforma.reference}
               </span>
@@ -1177,7 +1224,7 @@ export default function SupplierProfitCheck() {
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
               <Input
-                placeholder="Search code / name"
+                placeholder={tUi("search.code.name")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-8 w-48 rounded-lg"
@@ -1237,7 +1284,9 @@ export default function SupplierProfitCheck() {
                   ))}
                 </div>
                 <div className="mt-2 pt-1.5 border-t">
-                  <p className="text-[10px] text-muted-foreground px-1.5">Select multiple to combine filters</p>
+                  <p className="text-[10px] text-muted-foreground px-1.5">
+                    {tUi("select.multiple.to.combine.filters")}
+                  </p>
                 </div>
               </PopoverContent>
             </Popover>
@@ -1251,7 +1300,9 @@ export default function SupplierProfitCheck() {
               </PopoverTrigger>
               <PopoverContent className="w-56 p-2" align="start">
                 <div className="flex items-center justify-between mb-2 pb-1.5 border-b">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Columns</span>
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {tUi("columns")}
+                  </span>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1314,8 +1365,8 @@ export default function SupplierProfitCheck() {
                   )}
                   {colVisibility.dubaiPrice && (
                     <TableHead className="text-right min-w-[110px] text-[11px] font-bold uppercase tracking-wide">
-                      <span className="text-amber-500">Dubai Price</span>
-                      <div className="font-normal text-muted-foreground normal-case text-[10px]">PO rate</div>
+                      <span className="text-amber-500">{tUi("dubai.price")}</span>
+                      <div className="font-normal text-muted-foreground normal-case text-[10px]">{tUi("po.rate")}</div>
                     </TableHead>
                   )}
                   {colVisibility.extraPerBale && (
@@ -1326,14 +1377,18 @@ export default function SupplierProfitCheck() {
                   )}
                   {colVisibility.landingCost && (
                     <TableHead className="text-right min-w-[110px] text-[11px] font-bold uppercase tracking-wide">
-                      <span className="text-blue-500">Landing Cost</span>
-                      <div className="font-normal text-muted-foreground normal-case text-[10px]">Dubai + Extra</div>
+                      <span className="text-blue-500">{tUi("landing.cost")}</span>
+                      <div className="font-normal text-muted-foreground normal-case text-[10px]">
+                        {tUi("dubai.extra")}
+                      </div>
                     </TableHead>
                   )}
                   {colVisibility.costProfit && (
                     <TableHead className="text-right min-w-[130px] text-[11px] font-bold uppercase tracking-wide">
-                      <span className="text-emerald-500">Cost Profit</span>
-                      <div className="font-normal text-muted-foreground normal-case text-[10px]">Sell − Landing</div>
+                      <span className="text-emerald-500">{tUi("cost.profit")}</span>
+                      <div className="font-normal text-muted-foreground normal-case text-[10px]">
+                        {tUi("sell.landing")}
+                      </div>
                     </TableHead>
                   )}
                   {colVisibility.status && (
@@ -1373,7 +1428,7 @@ export default function SupplierProfitCheck() {
                   <TableRow>
                     <TableCell colSpan={visibleColCount} className="text-center py-16 text-muted-foreground">
                       <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                      <p className="text-sm">No items match your filters</p>
+                      <p className="text-sm">{tUi("no.items.match.your.filters")}</p>
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -1582,7 +1637,7 @@ export default function SupplierProfitCheck() {
               <BarChart2 className="w-10 h-10 text-muted-foreground opacity-50" />
             </div>
             <div>
-              <p className="font-semibold text-base">Select a supplier to begin</p>
+              <p className="font-semibold text-base">{tUi("select.a.supplier.to.begin")}</p>
               <p className="text-sm text-muted-foreground mt-1">
                 Choose a supplier from the panel above to load its items
               </p>
@@ -1592,7 +1647,7 @@ export default function SupplierProfitCheck() {
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Calculating profitability…</p>
+            <p className="text-sm text-muted-foreground">{tUi("calculating.profitability")}</p>
           </div>
         )}
       </div>
@@ -1641,7 +1696,7 @@ export default function SupplierProfitCheck() {
                   Name <span className="text-destructive">*</span>
                 </label>
                 <Input
-                  placeholder="Item name"
+                  placeholder={tUi("item.name.2")}
                   value={newItemName}
                   onChange={(e) => setNewItemName(e.target.value)}
                   data-testid="input-new-item-name"
@@ -1651,13 +1706,13 @@ export default function SupplierProfitCheck() {
 
             {/* Stock Group */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-muted-foreground">Stock Group</label>
+              <label className="text-xs font-medium text-muted-foreground">{tUi("stock.group")}</label>
               <Select value={newItemGroupId} onValueChange={setNewItemGroupId}>
                 <SelectTrigger data-testid="select-new-item-group">
-                  <SelectValue placeholder="No group (optional)" />
+                  <SelectValue placeholder={tUi("no.group.optional")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No group</SelectItem>
+                  <SelectItem value="none">{tUi("no.group")}</SelectItem>
                   {(stockGroups as any[]).map((g: any) => (
                     <SelectItem key={g.id} value={String(g.id)}>
                       {g.name}
@@ -1671,7 +1726,7 @@ export default function SupplierProfitCheck() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                  <span className="text-amber-500">Dubai Price</span>
+                  <span className="text-amber-500">{tUi("dubai.price")}</span>
                   <span className="font-normal">(optional)</span>
                 </label>
                 <div className="relative">
@@ -1765,20 +1820,20 @@ export default function SupplierProfitCheck() {
           </DialogHeader>
           <div className="flex-1 overflow-y-auto space-y-4">
             <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground space-y-1">
-              <p className="font-medium text-foreground">Expected Excel format:</p>
-              <p>Row 1 = headers. Supported column names (case-insensitive):</p>
+              <p className="font-medium text-foreground">{tUi("expected.excel.format")}</p>
+              <p>{tUi("row.1.headers.supported.column.names.case.insens")}</p>
               <ul className="list-disc list-inside space-y-0.5 ml-1">
                 <li>
-                  <strong>Code</strong> (required) — item code from ERP
+                  <strong>{tUi("code")}</strong> (required) — item code from ERP
                 </li>
                 <li>
-                  <strong>Cost / Dubai / PO Price</strong> (optional) — overrides cost price
+                  <strong>{tUi("cost.dubai.po.price")}</strong> (optional) — overrides cost price
                 </li>
                 <li>
-                  <strong>Sell / Avg Price</strong> (optional) — overrides selling price
+                  <strong>{tUi("sell.avg.price")}</strong> (optional) — overrides selling price
                 </li>
                 <li>
-                  <strong>Qty / Quantity</strong> (optional) — pre-fills order qty
+                  <strong>{tUi("qty.quantity")}</strong> (optional) — pre-fills order qty
                 </li>
               </ul>
             </div>
@@ -1939,18 +1994,18 @@ export default function SupplierProfitCheck() {
             )}
             <div className="space-y-2">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Proforma Reference</label>
+                <label className="text-xs font-medium text-muted-foreground">{tUi("proforma.reference")}</label>
                 <Input
-                  placeholder="Auto-generated if blank"
+                  placeholder={tUi("auto.generated.if.blank")}
                   value={proformaRef}
                   onChange={(e) => setProformaRef(e.target.value)}
                   data-testid="input-proforma-ref"
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Notes (optional)</label>
+                <label className="text-xs font-medium text-muted-foreground">{tUi("notes.optional")}</label>
                 <Input
-                  placeholder="Any notes..."
+                  placeholder={tUi("any.notes")}
                   value={proformaNotes}
                   onChange={(e) => setProformaNotes(e.target.value)}
                   data-testid="input-proforma-notes"

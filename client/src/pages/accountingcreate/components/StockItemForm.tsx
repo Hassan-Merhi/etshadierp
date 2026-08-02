@@ -3,16 +3,17 @@
  *
  * Extracted from AccountingCreate.tsx during the Phase 4 god-file split.
  */
-import {useEffect} from "react";
-import {Card} from "@/components/ui/card";
-import {Form, FormControl, FormField, FormItem, FormLabel, FormMessage} from "@/components/ui/form";
-import {Input} from "@/components/ui/input";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Checkbox} from "@/components/ui/checkbox";
-import {useQuery} from "@tanstack/react-query";
-import {formatNumber} from "@/lib/formatNumber";
+import { useEffect } from "react";
+import { Card } from "@/components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useQuery } from "@tanstack/react-query";
+import { formatNumber } from "@/lib/formatNumber";
 
-import {FormButtons} from "./FormButtons";
+import { FormButtons } from "./FormButtons";
+import { useErpText } from "@/i18n/modules/erp";
 
 export // Stock Item Form Component
 function StockItemForm({
@@ -26,6 +27,7 @@ function StockItemForm({
   onCancel: () => void;
   isPending: boolean;
 }) {
+  const tUi = useErpText();
   const { data: stockGroups = [] } = useQuery<any[]>({
     queryKey: ["/api/stock-groups"],
   });
@@ -51,9 +53,9 @@ function StockItemForm({
               name="code"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Code *</FormLabel>
+                  <FormLabel>{tUi("code.2")}</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="ITEM001" data-testid="input-code" />
+                    <Input {...field} placeholder={tUi("item001")} data-testid="input-code" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -65,9 +67,9 @@ function StockItemForm({
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Name *</FormLabel>
+                  <FormLabel>{tUi("name.2")}</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="Premium Cotton Bale" data-testid="input-name" />
+                    <Input {...field} placeholder={tUi("premium.cotton.bale")} data-testid="input-name" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -79,14 +81,14 @@ function StockItemForm({
               name="stockGroupId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Stock Group</FormLabel>
+                  <FormLabel>{tUi("stock.group")}</FormLabel>
                   <Select
                     onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)}
                     value={field.value?.toString() || ""}
                   >
                     <FormControl>
                       <SelectTrigger data-testid="select-stock-group">
-                        <SelectValue placeholder="None" />
+                        <SelectValue placeholder={tUi("none")} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -107,9 +109,9 @@ function StockItemForm({
               name="uom"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Unit of Measure *</FormLabel>
+                  <FormLabel>{tUi("unit.of.measure")}</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="Kg, Pcs, Bale" data-testid="input-uom" />
+                    <Input {...field} placeholder={tUi("kg.pcs.bale")} data-testid="input-uom" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -121,7 +123,7 @@ function StockItemForm({
               name="openingQty"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Opening Quantity</FormLabel>
+                  <FormLabel>{tUi("opening.quantity")}</FormLabel>
                   <FormControl>
                     <Input {...field} type="number" step="0.001" placeholder="0.000" data-testid="input-opening-qty" />
                   </FormControl>
@@ -135,7 +137,7 @@ function StockItemForm({
               name="openingRate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Opening Rate</FormLabel>
+                  <FormLabel>{tUi("opening.rate")}</FormLabel>
                   <FormControl>
                     <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-opening-rate" />
                   </FormControl>
@@ -149,7 +151,7 @@ function StockItemForm({
               name="openingValue"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Opening Value (Auto)</FormLabel>
+                  <FormLabel>{tUi("opening.value.auto")}</FormLabel>
                   <FormControl>
                     <Input {...field} readOnly className="bg-muted" data-testid="input-opening-value" />
                   </FormControl>
@@ -163,7 +165,7 @@ function StockItemForm({
               name="reorderLevel"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Reorder Level</FormLabel>
+                  <FormLabel>{tUi("reorder.level")}</FormLabel>
                   <FormControl>
                     <Input
                       {...field}
@@ -183,7 +185,7 @@ function StockItemForm({
               name="sellingPrice"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Selling Price</FormLabel>
+                  <FormLabel>{tUi("selling.price")}</FormLabel>
                   <FormControl>
                     <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-selling-price" />
                   </FormControl>
@@ -200,7 +202,7 @@ function StockItemForm({
                   <FormControl>
                     <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-active" />
                   </FormControl>
-                  <FormLabel className="!mt-0">Active</FormLabel>
+                  <FormLabel className="!mt-0">{tUi("active")}</FormLabel>
                 </FormItem>
               )}
             />

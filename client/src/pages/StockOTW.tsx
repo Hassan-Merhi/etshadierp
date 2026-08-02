@@ -15,6 +15,7 @@ import type { Container } from "@shared/schema";
 import { PageHeader } from "@/components/PageHeader";
 import CombinedInventory from "@/pages/CombinedInventory";
 import { ExcelJS, writeFile } from "@/lib/excelHelper";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface StockItem {
   stockItemCode: string;
@@ -48,6 +49,7 @@ interface GroupedStockItem {
 }
 
 function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boolean; onToggleCombined: () => void }) {
+  const tUi = useErpText();
   const { formatAmount } = useCurrencyContext();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
@@ -408,7 +410,7 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
       <div className="p-3 sm:p-0 space-y-4 sm:space-y-6">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex-1 min-w-0">
-            <PageHeader title="Combined Inventory" subtitle="OTW stock combined with in-hand stock" />
+            <PageHeader title={tUi("combined.inventory")} subtitle={tUi("otw.stock.combined.with.in.hand.stock")} />
           </div>
           <Button
             variant="outline"
@@ -430,7 +432,10 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
     <div className="p-3 sm:p-0 space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex-1 min-w-0">
-          <PageHeader title="Stock On The Way" subtitle="All stock items from containers currently in transit" />
+          <PageHeader
+            title={tUi("stock.on.the.way")}
+            subtitle={tUi("all.stock.items.from.containers.currently.in.tra")}
+          />
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <Button
@@ -460,7 +465,7 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
       {hasErrors && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error Loading Data</AlertTitle>
+          <AlertTitle>{tUi("error.loading.data")}</AlertTitle>
           <AlertDescription>
             {containersError ? "Failed to load containers. " : ""}
             {otwItemsError ? "Failed to load stock items. " : ""}
@@ -480,26 +485,26 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
             >
               {otwContainers.length}
             </span>
-            <span className="text-xs text-muted-foreground">Containers OTW</span>
+            <span className="text-xs text-muted-foreground">{tUi("containers.otw")}</span>
           </div>
           <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
             <Package className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-semibold" data-testid="text-total-items">
               {groupedItems.length}
             </span>
-            <span className="text-xs text-muted-foreground">Unique Items</span>
+            <span className="text-xs text-muted-foreground">{tUi("unique.items")}</span>
           </div>
           <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
             <span className="text-sm font-semibold font-mono" data-testid="text-total-quantity">
               {Math.round(groupedItems.reduce((s, i) => s + i.totalQuantity, 0)).toLocaleString()}
             </span>
-            <span className="text-xs text-muted-foreground">Total Qty</span>
+            <span className="text-xs text-muted-foreground">{tUi("total.qty")}</span>
           </div>
           <div className="flex items-center gap-2 bg-primary/10 rounded-lg px-3 py-2">
             <span className="text-sm font-semibold font-mono text-primary" data-testid="text-summary-value">
               {formatAmount(containerGrandTotal)}
             </span>
-            <span className="text-xs text-muted-foreground">Total Value</span>
+            <span className="text-xs text-muted-foreground">{tUi("total.value")}</span>
           </div>
         </div>
       )}
@@ -510,7 +515,7 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search by name, container, supplier, grade or category..."
+              placeholder={tUi("search.by.name.container.supplier.grade.or.categ")}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -520,10 +525,10 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
           {gradeOptions.length > 0 && (
             <Select value={selectedGrade} onValueChange={setSelectedGrade}>
               <SelectTrigger className="w-[140px]" data-testid="select-grade-filter">
-                <SelectValue placeholder="All Grades" />
+                <SelectValue placeholder={tUi("all.grades")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Grades</SelectItem>
+                <SelectItem value="all">{tUi("all.grades")}</SelectItem>
                 {gradeOptions.map((g) => (
                   <SelectItem key={g} value={g}>
                     {g}
@@ -535,10 +540,10 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
           {categoryOptions.length > 0 && (
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
               <SelectTrigger className="w-[150px]" data-testid="select-category-filter">
-                <SelectValue placeholder="All Categories" />
+                <SelectValue placeholder={tUi("all.categories")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="all">{tUi("all.categories")}</SelectItem>
                 {categoryOptions.map((c) => (
                   <SelectItem key={c} value={c}>
                     {c}
@@ -550,10 +555,10 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
           {supplierOptions.length > 1 && (
             <Select value={selectedSupplier} onValueChange={setSelectedSupplier}>
               <SelectTrigger className="w-[160px]" data-testid="select-supplier-filter">
-                <SelectValue placeholder="All Suppliers" />
+                <SelectValue placeholder={tUi("all.suppliers")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Suppliers</SelectItem>
+                <SelectItem value="all">{tUi("all.suppliers")}</SelectItem>
                 {supplierOptions.map((s) => (
                   <SelectItem key={s} value={s}>
                     {s}
@@ -577,7 +582,7 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
           <div className="w-14 h-14 rounded-xl bg-muted/60 flex items-center justify-center mb-4">
             <Ship className="w-7 h-7 text-muted-foreground" />
           </div>
-          <h2 className="text-lg font-semibold mb-1">No stock on the way</h2>
+          <h2 className="text-lg font-semibold mb-1">{tUi("no.stock.on.the.way")}</h2>
           <p className="text-sm text-muted-foreground">
             {stockItems.length === 0
               ? "There are no containers currently in transit"
@@ -592,9 +597,9 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
               <TableHeader className="bg-muted/40">
                 <TableRow>
                   <TableHead className="w-10 pl-4"></TableHead>
-                  <TableHead>Item Name</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="text-right">Total Cost</TableHead>
+                  <TableHead>{tUi("item.name")}</TableHead>
+                  <TableHead className="text-right">{tUi("quantity")}</TableHead>
+                  <TableHead className="text-right">{tUi("total.cost")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

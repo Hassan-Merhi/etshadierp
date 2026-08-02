@@ -1,24 +1,60 @@
-import {useState, useEffect, useCallback} from "react";
+import { useState, useEffect, useCallback } from "react";
 import * as XLSX from "@/lib/excelHelper";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Skeleton} from "@/components/ui/skeleton";
-import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
-import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
-import {useToast} from "@/hooks/use-toast";
-import {CalendarDays, CheckCircle, XCircle, RotateCcw, Save, Printer, FileDown, Users, UserCheck, UserX, Clock, Languages, ChevronDown} from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import {
+  CalendarDays,
+  CheckCircle,
+  XCircle,
+  RotateCcw,
+  Save,
+  Printer,
+  FileDown,
+  Users,
+  UserCheck,
+  UserX,
+  Clock,
+  Languages,
+  ChevronDown,
+} from "lucide-react";
 
-import type {AttendanceRecord, AttendanceStatus, ViewMode, WorkerRow} from "./factoryattendance/types";
-import {STATUS_COLORS, STATUS_OPTIONS, exportRangeExcel, exportWeeklyExcel, formatDate, generateDateRange, generateRangePrintHtml, generateWeeklyBlankSheetHtml, generateWeeklyResultsSheetHtml, getInitialMode, getWeekDays, setModeInUrl, todayStr} from "./factoryattendance/utils";
-import {PerWorkerView} from "./factoryattendance/components/PerWorkerView";
-import {SummaryCard} from "./factoryattendance/components/SummaryCard";
+import type { AttendanceRecord, AttendanceStatus, ViewMode, WorkerRow } from "./factoryattendance/types";
+import {
+  STATUS_COLORS,
+  STATUS_OPTIONS,
+  exportRangeExcel,
+  exportWeeklyExcel,
+  formatDate,
+  generateDateRange,
+  generateRangePrintHtml,
+  generateWeeklyBlankSheetHtml,
+  generateWeeklyResultsSheetHtml,
+  getInitialMode,
+  getWeekDays,
+  setModeInUrl,
+  todayStr,
+} from "./factoryattendance/utils";
+import { PerWorkerView } from "./factoryattendance/components/PerWorkerView";
+import { SummaryCard } from "./factoryattendance/components/SummaryCard";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactoryAttendance() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [mode, setMode] = useState<ViewMode>(getInitialMode);
 
@@ -319,10 +355,10 @@ export default function FactoryAttendance() {
             <CardContent className="pt-4">
               <div className="flex flex-wrap gap-3 items-end">
                 <div className="flex flex-col gap-1">
-                  <Label className="text-xs text-muted-foreground font-medium">Range Export</Label>
+                  <Label className="text-xs text-muted-foreground font-medium">{tUi("range.export")}</Label>
                   <div className="flex items-center gap-2 flex-wrap">
                     <div className="flex flex-col gap-1">
-                      <Label className="text-xs text-muted-foreground">From</Label>
+                      <Label className="text-xs text-muted-foreground">{tUi("from")}</Label>
                       <Input
                         type="date"
                         data-testid="input-range-start"
@@ -436,10 +472,14 @@ export default function FactoryAttendance() {
                       <thead className="sticky top-0 z-30 bg-muted/50">
                         <tr className="border-b bg-muted/40">
                           <th className="text-left px-4 py-2 font-medium text-muted-foreground w-8">#</th>
-                          <th className="text-left px-4 py-2 font-medium text-muted-foreground w-24">Code</th>
-                          <th className="text-left px-4 py-2 font-medium text-muted-foreground">Worker Name</th>
-                          <th className="text-left px-4 py-2 font-medium text-muted-foreground w-44">Status</th>
-                          <th className="text-left px-4 py-2 font-medium text-muted-foreground">Notes</th>
+                          <th className="text-left px-4 py-2 font-medium text-muted-foreground w-24">{tUi("code")}</th>
+                          <th className="text-left px-4 py-2 font-medium text-muted-foreground">
+                            {tUi("worker.name")}
+                          </th>
+                          <th className="text-left px-4 py-2 font-medium text-muted-foreground w-44">
+                            {tUi("status")}
+                          </th>
+                          <th className="text-left px-4 py-2 font-medium text-muted-foreground">{tUi("notes")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -488,7 +528,7 @@ export default function FactoryAttendance() {
                               <td className="px-4 py-2">
                                 <Input
                                   data-testid={`input-notes-${worker.id}`}
-                                  placeholder="Optional notes"
+                                  placeholder={tUi("optional.notes")}
                                   value={notesMap[worker.id] ?? ""}
                                   onChange={(e) => setNotes(worker.id, e.target.value)}
                                   className="h-8 text-xs"
@@ -549,7 +589,7 @@ export default function FactoryAttendance() {
                           </Select>
                           <Input
                             data-testid={`input-notes-mobile-${worker.id}`}
-                            placeholder="Notes (optional)"
+                            placeholder={tUi("notes.optional")}
                             value={notesMap[worker.id] ?? ""}
                             onChange={(e) => setNotes(worker.id, e.target.value)}
                             className="h-8 text-xs"

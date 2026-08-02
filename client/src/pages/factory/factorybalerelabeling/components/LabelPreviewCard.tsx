@@ -3,11 +3,13 @@
  *
  * Extracted from FactoryBaleRelabeling.tsx during the Phase 4 god-file split.
  */
-import {useLabelDesignColors} from "@/hooks/useLabelDesignColors";
+import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 
-import type {LabelPreviewCardProps} from "../types";
+import type { LabelPreviewCardProps } from "../types";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function LabelPreviewCard({ item, designColor, printFormat }: LabelPreviewCardProps) {
+  const tUi = useFactoryText();
   const { colors } = useLabelDesignColors();
   const colorOpt = colors.find((o) => o.value === designColor);
   const accentColor = colorOpt?.color ?? "#6d28d9";
@@ -31,13 +33,13 @@ export function LabelPreviewCard({ item, designColor, printFormat }: LabelPrevie
           <div style={{ fontSize: "11pt", fontWeight: 900, letterSpacing: "1px" }}>HMD</div>
           <div style={{ textAlign: "right", fontSize: "7pt", lineHeight: 1.3 }}>
             <div>
-              <strong>PIECES:</strong> 1
+              <strong>{tUi("pieces")}</strong> 1
             </div>
             <div>
-              <strong>ARTICLE:</strong> {item.articleCode || "—"}
+              <strong>{tUi("article.2")}</strong> {item.articleCode || "—"}
             </div>
             <div>
-              <strong>APRX WEIGHT:</strong> {parseFloat(item.weightKg || "0").toFixed(1)} KGS
+              <strong>{tUi("aprx.weight")}</strong> {parseFloat(item.weightKg || "0").toFixed(1)} KGS
             </div>
           </div>
         </div>
@@ -90,13 +92,13 @@ export function LabelPreviewCard({ item, designColor, printFormat }: LabelPrevie
       <div style={{ padding: "8px 10px", display: "flex", flexDirection: "column", gap: "4px" }}>
         <div style={{ fontSize: "7pt", lineHeight: 1.4 }}>
           <div>
-            <strong>PIECES:</strong> 1
+            <strong>{tUi("pieces")}</strong> 1
           </div>
           <div>
-            <strong>ARTICLE:</strong> {item.articleCode || "—"}
+            <strong>{tUi("article.2")}</strong> {item.articleCode || "—"}
           </div>
           <div>
-            <strong>WEIGHT:</strong> {parseFloat(item.weightKg || "0").toFixed(1)} KGS
+            <strong>{tUi("weight.2")}</strong> {parseFloat(item.weightKg || "0").toFixed(1)} KGS
           </div>
         </div>
         <div style={{ textAlign: "center", borderTop: "1px solid #eee", paddingTop: "4px" }}>

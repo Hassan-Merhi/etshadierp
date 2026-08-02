@@ -145,9 +145,7 @@ export function AccountStatementView({
               <span className="text-muted-foreground text-xs shrink-0">|</span>
               <span className="text-sm font-mono tabular-nums shrink-0">
                 {formatAmount(Math.abs(closingBalance))}
-                <span className="ml-1 text-[10px] opacity-70">
-                  {closingBalance >= 0 ? "Dr" : "Cr"}
-                </span>
+                <span className="ml-1 text-[10px] opacity-70">{closingBalance >= 0 ? "Dr" : "Cr"}</span>
               </span>
             </>
           )}
@@ -190,30 +188,34 @@ export function AccountStatementView({
               )}
             </>
           )}
-          {selectedAccount && (["ledger", "bank-account", "bank", "supplier", "employee"].includes(selectedAccount.type)) && (
-            <Button
-              size="icon"
-              variant="ghost"
-              title="Export Excel Statement"
-              data-testid="button-export-excel"
-              onClick={() => {
-                const typeMap: Record<string, string> = {
-                  "ledger": "ledger",
-                  "bank": "bank",
-                  "bank-account": "bank",
-                  "supplier": "supplier",
-                  "employee": "employee",
-                };
-                const serverType = typeMap[selectedAccount.type] || "ledger";
-                const params = new URLSearchParams({ accountType: serverType, accountId: String(selectedAccount.accountId) });
-                if (periodFilter?.fromDate) params.set("startDate", periodFilter.fromDate);
-                if (periodFilter?.toDate) params.set("endDate", periodFilter.toDate);
-                window.open(`/api/accounts/statement/export-excel?${params.toString()}`, "_blank");
-              }}
-            >
-              <FileSpreadsheet className="h-4 w-4 text-green-600" />
-            </Button>
-          )}
+          {selectedAccount &&
+            ["ledger", "bank-account", "bank", "supplier", "employee"].includes(selectedAccount.type) && (
+              <Button
+                size="icon"
+                variant="ghost"
+                title="Export Excel Statement"
+                data-testid="button-export-excel"
+                onClick={() => {
+                  const typeMap: Record<string, string> = {
+                    ledger: "ledger",
+                    bank: "bank",
+                    "bank-account": "bank",
+                    supplier: "supplier",
+                    employee: "employee",
+                  };
+                  const serverType = typeMap[selectedAccount.type] || "ledger";
+                  const params = new URLSearchParams({
+                    accountType: serverType,
+                    accountId: String(selectedAccount.accountId),
+                  });
+                  if (periodFilter?.fromDate) params.set("startDate", periodFilter.fromDate);
+                  if (periodFilter?.toDate) params.set("endDate", periodFilter.toDate);
+                  window.open(`/api/accounts/statement/export-excel?${params.toString()}`, "_blank");
+                }}
+              >
+                <FileSpreadsheet className="h-4 w-4 text-green-600" />
+              </Button>
+            )}
           {/* Language toggle for PDF */}
           <div className="flex items-center rounded border text-[10px] font-semibold overflow-hidden">
             {(["en", "fr", "ar"] as const).map((l) => (

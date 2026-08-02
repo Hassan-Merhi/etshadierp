@@ -10,6 +10,7 @@ import { formatNumber } from "@/lib/formatNumber";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import type { FactoryMixBatch } from "@shared/schema";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface RawStockRow {
   id: number;
@@ -47,6 +48,7 @@ function filterBalesByDate(bales: any[], startDate: Date): any[] {
 }
 
 export default function ProductionSummary() {
+  const tUi = useFactoryText();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const { data: balesData, isLoading: balesLoading } = useQuery<any[]>({
@@ -112,13 +114,13 @@ export default function ProductionSummary() {
     <div className="space-y-6">
       <div className="flex items-center gap-3 flex-wrap">
         <BarChart3 className="h-6 w-6 text-muted-foreground" />
-        <PageHeader title="Production Summary" />
+        <PageHeader title={tUi("production.summary")} />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Bales Produced</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{tUi("total.bales.produced")}</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -130,7 +132,7 @@ export default function ProductionSummary() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Weight Produced</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{tUi("total.weight.produced")}</CardTitle>
             <Scale className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -142,7 +144,7 @@ export default function ProductionSummary() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Active Batches</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{tUi("active.batches")}</CardTitle>
             <Boxes className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -154,7 +156,7 @@ export default function ProductionSummary() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Raw Stock Available</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{tUi("raw.stock.available")}</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -169,20 +171,20 @@ export default function ProductionSummary() {
         <CardHeader>
           <div className="flex items-center gap-2 flex-wrap">
             <Calendar className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-base">Today's Production</CardTitle>
+            <CardTitle className="text-base">{tUi("today.s.production")}</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
           {todayCount > 0 ? (
             <div className="flex items-center gap-6 flex-wrap" data-testid="section-today-production">
               <div>
-                <p className="text-sm text-muted-foreground">Bales</p>
+                <p className="text-sm text-muted-foreground">{tUi("bales")}</p>
                 <p className="text-xl font-bold font-mono" data-testid="text-today-bales">
                   {formatNumber(todayCount)}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Weight</p>
+                <p className="text-sm text-muted-foreground">{tUi("weight")}</p>
                 <p className="text-xl font-bold font-mono" data-testid="text-today-weight">
                   {formatNumber(todayWeight)} kg
                 </p>
@@ -199,18 +201,18 @@ export default function ProductionSummary() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">This Week</CardTitle>
+            <CardTitle className="text-base">{tUi("this.week")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-6 flex-wrap" data-testid="section-week-production">
               <div>
-                <p className="text-sm text-muted-foreground">Bales</p>
+                <p className="text-sm text-muted-foreground">{tUi("bales")}</p>
                 <p className="text-xl font-bold font-mono" data-testid="text-week-bales">
                   {formatNumber(weekCount)}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Weight</p>
+                <p className="text-sm text-muted-foreground">{tUi("weight")}</p>
                 <p className="text-xl font-bold font-mono" data-testid="text-week-weight">
                   {formatNumber(weekWeight)} kg
                 </p>
@@ -221,18 +223,18 @@ export default function ProductionSummary() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">This Month</CardTitle>
+            <CardTitle className="text-base">{tUi("this.month")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-6 flex-wrap" data-testid="section-month-production">
               <div>
-                <p className="text-sm text-muted-foreground">Bales</p>
+                <p className="text-sm text-muted-foreground">{tUi("bales")}</p>
                 <p className="text-xl font-bold font-mono" data-testid="text-month-bales">
                   {formatNumber(monthCount)}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Weight</p>
+                <p className="text-sm text-muted-foreground">{tUi("weight")}</p>
                 <p className="text-xl font-bold font-mono" data-testid="text-month-weight">
                   {formatNumber(monthWeight)} kg
                 </p>
@@ -246,7 +248,7 @@ export default function ProductionSummary() {
         <CardHeader>
           <div className="flex items-center gap-2 flex-wrap">
             <Boxes className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-base">Batch Utilization</CardTitle>
+            <CardTitle className="text-base">{tUi("batch.utilization")}</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
@@ -255,11 +257,11 @@ export default function ProductionSummary() {
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead>Batch</TableHead>
-                    <TableHead className="text-right">Total (kg)</TableHead>
-                    <TableHead className="text-right">Used (kg)</TableHead>
-                    <TableHead className="text-right">Remaining (kg)</TableHead>
-                    <TableHead className="min-w-[150px]">Utilization</TableHead>
+                    <TableHead>{tUi("batch")}</TableHead>
+                    <TableHead className="text-right">{tUi("total.kg.4")}</TableHead>
+                    <TableHead className="text-right">{tUi("used.kg")}</TableHead>
+                    <TableHead className="text-right">{tUi("remaining.kg")}</TableHead>
+                    <TableHead className="min-w-[150px]">{tUi("utilization")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -302,7 +304,7 @@ export default function ProductionSummary() {
         <CardHeader>
           <div className="flex items-center gap-2 flex-wrap">
             <Package className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-base">Raw Stock Status</CardTitle>
+            <CardTitle className="text-base">{tUi("raw.stock.status")}</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
@@ -311,11 +313,11 @@ export default function ProductionSummary() {
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead>Container</TableHead>
-                    <TableHead className="text-right">Received (kg)</TableHead>
-                    <TableHead className="text-right">Used (kg)</TableHead>
-                    <TableHead className="text-right">Remaining (kg)</TableHead>
-                    <TableHead className="text-right">Cost/kg</TableHead>
+                    <TableHead>{tUi("container")}</TableHead>
+                    <TableHead className="text-right">{tUi("received.kg")}</TableHead>
+                    <TableHead className="text-right">{tUi("used.kg")}</TableHead>
+                    <TableHead className="text-right">{tUi("remaining.kg")}</TableHead>
+                    <TableHead className="text-right">{tUi("cost.kg.3")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

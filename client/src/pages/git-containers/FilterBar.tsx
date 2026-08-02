@@ -54,15 +54,7 @@ function Lbl({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Col({
-  label,
-  children,
-  className,
-}: {
-  label: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
+function Col({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={cn("flex flex-col min-w-0", className)}>
       <Lbl>{label}</Lbl>
@@ -131,7 +123,6 @@ export function FilterBar({
 
   return (
     <div className="rounded-lg border border-border/50 bg-card/60 backdrop-blur-sm p-3 space-y-2.5 animate-in fade-in slide-in-from-top-1 duration-150">
-
       {/* ── Row 1: entity filters ─────────────────────────────────── */}
       <div className="flex flex-wrap gap-2">
         <Col label="Company" className="w-32">
@@ -142,7 +133,9 @@ export function FilterBar({
             <SelectContent>
               <SelectItem value="ALL">All Companies</SelectItem>
               {companies.map((c) => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -319,12 +312,7 @@ export function FilterBar({
           <Button
             variant={activeCount > 0 ? "secondary" : "ghost"}
             size="sm"
-            className={cn(
-              "h-7 text-xs gap-1.5",
-              activeCount > 0
-                ? "text-foreground"
-                : "text-muted-foreground"
-            )}
+            className={cn("h-7 text-xs gap-1.5", activeCount > 0 ? "text-foreground" : "text-muted-foreground")}
             onClick={clearFilters}
             data-testid="button-reset-filters"
             disabled={activeCount === 0}

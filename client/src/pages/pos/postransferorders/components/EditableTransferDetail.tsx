@@ -3,20 +3,21 @@
  *
  * Extracted from PosTransferOrders.tsx during the Phase 4 god-file split.
  */
-import {useState, useMemo, useRef, useEffect, useCallback} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {ArrowLeft, Loader2, Save, CheckCircle2, X, ArrowRight, Clock, Lock, Plus} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
-import {Textarea} from "@/components/ui/textarea";
-import {useToast} from "@/hooks/use-toast";
-import {apiRequest, queryClient} from "@/lib/queryClient";
-import {cn} from "@/lib/utils";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { ArrowLeft, Loader2, Save, CheckCircle2, X, ArrowRight, Clock, Lock, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { cn } from "@/lib/utils";
 
-import type {ExtraItem, InventoryItem, PosUser, TransferDetail} from "../types";
-import {fmtQty, formatDate, formatDateTime} from "../utils";
-import {ItemSearchPanel} from "./ItemSearchPanel";
+import type { ExtraItem, InventoryItem, PosUser, TransferDetail } from "../types";
+import { fmtQty, formatDate, formatDateTime } from "../utils";
+import { ItemSearchPanel } from "./ItemSearchPanel";
+import { usePosText } from "@/i18n/modules/pos";
 
 export // ─── Editable detail view ─────────────────────────────────────────────────────
 function EditableTransferDetail({
@@ -30,6 +31,7 @@ function EditableTransferDetail({
   voucherId: number;
   onBack: () => void;
 }) {
+  const tUi = usePosText();
   const { toast } = useToast();
 
   // Pre-populate from any existing pending revision (so user sees their prior adjustments)
@@ -264,10 +266,10 @@ function EditableTransferDetail({
             {/* Column header */}
             <div className="grid grid-cols-[2rem_1fr_5rem_5rem] sm:grid-cols-[2rem_1fr_5.5rem_6.5rem_6rem_2rem] bg-muted/60 border-b px-3 py-2.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider gap-2">
               <span>#</span>
-              <span>Item</span>
-              <span className="hidden sm:block text-right">Original</span>
+              <span>{tUi("item")}</span>
+              <span className="hidden sm:block text-right">{tUi("original")}</span>
               <span className="text-center">Adj</span>
-              <span className="text-right">New Qty</span>
+              <span className="text-right">{tUi("new.qty")}</span>
               <span className="hidden sm:block" />
             </div>
 
@@ -430,7 +432,7 @@ function EditableTransferDetail({
               <input
                 ref={searchBarRef}
                 type="text"
-                placeholder="Add item by searching…"
+                placeholder={tUi("add.item.by.searching")}
                 value={panelSearch}
                 onChange={(e) => {
                   setPanelSearch(e.target.value);
@@ -481,14 +483,14 @@ function EditableTransferDetail({
               <span>
                 {totalItems} {totalItems === 1 ? "item" : "items"} total
               </span>
-              {hasChanges && <span className="text-primary font-medium">Unsaved changes</span>}
+              {hasChanges && <span className="text-primary font-medium">{tUi("unsaved.changes")}</span>}
             </div>
           </div>
 
           {/* Notes + Save */}
           <div className="flex flex-col sm:flex-row gap-3 items-start">
             <Textarea
-              placeholder="Notes (optional)..."
+              placeholder={tUi("notes.optional.2")}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={2}
@@ -554,10 +556,10 @@ function EditableTransferDetail({
                       {rev.note && <p className="text-xs text-muted-foreground italic">{rev.note}</p>}
                       <div className="rounded-md border overflow-hidden">
                         <div className="grid grid-cols-[1fr_auto_auto_auto] bg-muted/30 border-b px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide gap-x-4">
-                          <span>Item</span>
+                          <span>{tUi("item")}</span>
                           <span className="text-right">Was</span>
                           <span className="text-right">Now</span>
-                          <span className="text-right">Change</span>
+                          <span className="text-right">{tUi("change")}</span>
                         </div>
                         {rev.items
                           .filter((ri) => parseFloat(ri.delta) !== 0)

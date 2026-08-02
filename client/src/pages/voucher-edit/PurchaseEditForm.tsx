@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { StockItemCombobox, StockItem } from "./VoucherEditHelpers";
 import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/formatNumber";
+import { useErpText } from "@/i18n/modules/erp";
 
 export function PurchaseEditForm({
   form,
@@ -38,6 +39,7 @@ export function PurchaseEditForm({
   formatAmount: (amount: number) => string;
   grandTotal: number;
 }) {
+  const tUi = useErpText();
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "items",
@@ -46,8 +48,8 @@ export function PurchaseEditForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Edit Purchase Voucher</CardTitle>
-        <CardDescription>Update purchase invoice details and line items</CardDescription>
+        <CardTitle>{tUi("edit.purchase.voucher")}</CardTitle>
+        <CardDescription>{tUi("update.purchase.invoice.details.and.line.items")}</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -58,7 +60,7 @@ export function PurchaseEditForm({
                 name="voucherDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date</FormLabel>
+                    <FormLabel>{tUi("date")}</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -125,7 +127,7 @@ export function PurchaseEditForm({
                       name={`items.${index}.stockItemId`}
                       render={({ field: itemField }) => (
                         <FormItem>
-                          <FormLabel className="text-xs">Stock Item</FormLabel>
+                          <FormLabel className="text-xs">{tUi("stock.item")}</FormLabel>
                           <FormControl>
                             <StockItemCombobox
                               value={
@@ -155,7 +157,7 @@ export function PurchaseEditForm({
                         name={`items.${index}.quantity`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-xs">Quantity</FormLabel>
+                            <FormLabel className="text-xs">{tUi("quantity")}</FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
@@ -175,7 +177,7 @@ export function PurchaseEditForm({
                         name={`items.${index}.rate`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-xs">Rate</FormLabel>
+                            <FormLabel className="text-xs">{tUi("rate")}</FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
@@ -192,7 +194,7 @@ export function PurchaseEditForm({
                       />
                     </div>
                     <div className="flex items-center justify-between pt-2 border-t">
-                      <span className="text-sm text-muted-foreground">Total</span>
+                      <span className="text-sm text-muted-foreground">{tUi("total")}</span>
                       <span className="font-mono font-medium" data-testid={`text-total-purchase-mobile-${index}`}>
                         {formatAmount(lineTotal)}
                       </span>
@@ -212,7 +214,7 @@ export function PurchaseEditForm({
                   Add Row
                 </Button>
                 <div className="text-right">
-                  <div className="text-sm text-muted-foreground">Grand Total</div>
+                  <div className="text-sm text-muted-foreground">{tUi("grand.total")}</div>
                   <div className="font-bold font-mono">{formatAmount(grandTotal)}</div>
                 </div>
               </div>
@@ -222,10 +224,10 @@ export function PurchaseEditForm({
               <table className="w-full">
                 <thead className="bg-muted/50 sticky top-0 z-30">
                   <tr>
-                    <th className="text-left p-3 font-medium w-[40%]">Stock Item</th>
-                    <th className="text-left p-3 font-medium w-[15%]">Quantity</th>
-                    <th className="text-left p-3 font-medium w-[15%]">Rate</th>
-                    <th className="text-right p-3 font-medium w-[25%]">Total</th>
+                    <th className="text-left p-3 font-medium w-[40%]">{tUi("stock.item")}</th>
+                    <th className="text-left p-3 font-medium w-[15%]">{tUi("quantity")}</th>
+                    <th className="text-left p-3 font-medium w-[15%]">{tUi("rate")}</th>
+                    <th className="text-right p-3 font-medium w-[25%]">{tUi("total")}</th>
                     <th className="w-[5%]"></th>
                   </tr>
                 </thead>
@@ -380,9 +382,9 @@ export function PurchaseEditForm({
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel>{tUi("notes")}</FormLabel>
                   <FormControl>
-                    <Textarea {...field} placeholder="Additional notes..." rows={3} data-testid="input-notes" />
+                    <Textarea {...field} placeholder={tUi("additional.notes.2")} rows={3} data-testid="input-notes" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

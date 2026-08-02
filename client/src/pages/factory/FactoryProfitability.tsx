@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Loader2, Info } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface BaleCost {
   baleRef: string;
@@ -82,6 +83,7 @@ function HeaderTooltip({ label, tip }: { label: string; tip: string }) {
 }
 
 export default function FactoryProfitability() {
+  const tUi = useFactoryText();
   const defaults = getDefaultDateRange();
   const [from, setFrom] = useState(defaults.from);
   const [to, setTo] = useState(defaults.to);
@@ -147,11 +149,11 @@ export default function FactoryProfitability() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <PageHeader title="Profitability Analysis" subtitle="Bale costs and container profitability" />
+          <PageHeader title={tUi("profitability.analysis")} subtitle={tUi("bale.costs.and.container.profitability")} />
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">From</Label>
+            <Label className="text-xs text-muted-foreground">{tUi("from")}</Label>
             <Input
               type="date"
               value={from}
@@ -189,14 +191,14 @@ export default function FactoryProfitability() {
           {balesQuery.isLoading ? (
             <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-muted-foreground">Loading bale costs...</span>
+              <span className="ml-2 text-muted-foreground">{tUi("loading.bale.costs")}</span>
             </div>
           ) : (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Bales</CardTitle>
+                    <CardTitle className="text-sm font-medium">{tUi("total.bales")}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold" data-testid="text-total-bales">
@@ -206,7 +208,7 @@ export default function FactoryProfitability() {
                 </Card>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Avg Cost/Bale</CardTitle>
+                    <CardTitle className="text-sm font-medium">{tUi("avg.cost.bale")}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold" data-testid="text-avg-cost">
@@ -216,7 +218,7 @@ export default function FactoryProfitability() {
                 </Card>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Avg Profit/Bale</CardTitle>
+                    <CardTitle className="text-sm font-medium">{tUi("avg.profit.bale")}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div
@@ -229,7 +231,7 @@ export default function FactoryProfitability() {
                 </Card>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Profit</CardTitle>
+                    <CardTitle className="text-sm font-medium">{tUi("total.profit")}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div
@@ -244,7 +246,7 @@ export default function FactoryProfitability() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Bale Cost Breakdown</CardTitle>
+                  <CardTitle>{tUi("bale.cost.breakdown")}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {!Array.isArray(balesQuery.data) || balesQuery.data.length === 0 ? (
@@ -258,7 +260,7 @@ export default function FactoryProfitability() {
                       <Table>
                         <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow>
-                            <TableHead>Bale Ref</TableHead>
+                            <TableHead>{tUi("bale.ref")}</TableHead>
                             <TableHead>
                               <HeaderTooltip label="Material Cost" tip="Raw material cost allocated to this bale" />
                             </TableHead>
@@ -274,7 +276,7 @@ export default function FactoryProfitability() {
                             <TableHead>
                               <HeaderTooltip label="Total Cost" tip="Material + Labor + Overhead + Freight" />
                             </TableHead>
-                            <TableHead>Sale Price</TableHead>
+                            <TableHead>{tUi("sale.price")}</TableHead>
                             <TableHead>
                               <HeaderTooltip label="Profit" tip="Sale Price - Total Cost" />
                             </TableHead>
@@ -313,14 +315,14 @@ export default function FactoryProfitability() {
             {containersQuery.isLoading ? (
               <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                <span className="ml-2 text-muted-foreground">Loading container profitability...</span>
+                <span className="ml-2 text-muted-foreground">{tUi("loading.container.profitability")}</span>
               </div>
             ) : (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+                      <CardTitle className="text-sm font-medium">{tUi("total.revenue.2")}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold" data-testid="text-total-revenue">
@@ -330,7 +332,7 @@ export default function FactoryProfitability() {
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
+                      <CardTitle className="text-sm font-medium">{tUi("total.cost")}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold" data-testid="text-container-total-cost">
@@ -340,7 +342,7 @@ export default function FactoryProfitability() {
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Profit</CardTitle>
+                      <CardTitle className="text-sm font-medium">{tUi("total.profit")}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div
@@ -353,7 +355,7 @@ export default function FactoryProfitability() {
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Avg Margin %</CardTitle>
+                      <CardTitle className="text-sm font-medium">{tUi("avg.margin")}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold" data-testid="text-avg-margin">
@@ -365,7 +367,7 @@ export default function FactoryProfitability() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Container Profitability</CardTitle>
+                    <CardTitle>{tUi("container.profitability")}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     {!Array.isArray(containersQuery.data) || containersQuery.data.length === 0 ? (
@@ -379,7 +381,7 @@ export default function FactoryProfitability() {
                         <Table>
                           <TableHeader className="sticky top-0 z-30 bg-background">
                             <TableRow>
-                              <TableHead>Container Ref</TableHead>
+                              <TableHead>{tUi("container.ref")}</TableHead>
                               <TableHead>
                                 <HeaderTooltip label="Revenue" tip="Total sales revenue from this container" />
                               </TableHead>

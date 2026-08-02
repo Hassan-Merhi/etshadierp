@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, Bell, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface Alert {
   id: number;
@@ -56,6 +57,7 @@ function getSeverityBadge(severity: string) {
 }
 
 export default function FactoryAlerts() {
+  const tUi = useFactoryText();
   const alertsQuery = useQuery<Alert[]>({
     queryKey: ["/api/factory/alerts"],
   });
@@ -85,7 +87,7 @@ export default function FactoryAlerts() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <PageHeader title="Factory Alerts" />
+          <PageHeader title={tUi("factory.alerts")} />
           <p className="text-muted-foreground mt-1">
             <span data-testid="text-unread-count">{unreadCount}</span> unread alert{unreadCount !== 1 ? "s" : ""}
           </p>
@@ -115,7 +117,7 @@ export default function FactoryAlerts() {
           {alertsQuery.isLoading ? (
             <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-muted-foreground">Loading alerts...</span>
+              <span className="ml-2 text-muted-foreground">{tUi("loading.alerts")}</span>
             </div>
           ) : alerts.length === 0 ? (
             <div className="text-center py-8">
@@ -128,12 +130,12 @@ export default function FactoryAlerts() {
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead>Severity</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Message</TableHead>
-                    <TableHead>Entity</TableHead>
-                    <TableHead>Created At</TableHead>
-                    <TableHead>Action</TableHead>
+                    <TableHead>{tUi("severity")}</TableHead>
+                    <TableHead>{tUi("title")}</TableHead>
+                    <TableHead>{tUi("message")}</TableHead>
+                    <TableHead>{tUi("entity")}</TableHead>
+                    <TableHead>{tUi("created.at")}</TableHead>
+                    <TableHead>{tUi("action")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

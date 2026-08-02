@@ -1,22 +1,42 @@
-import {KPICard} from "@/components/KPICard";
-import {Card} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {PageHeader} from "@/components/PageHeader";
-import {useCurrencyContext} from "@/contexts/CurrencyContext";
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger} from "@/components/ui/dialog";
-import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
-import {Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList} from "@/components/ui/command";
-import {TrendingUp, Plus, X, Wallet, ArrowUpRight, ArrowDownLeft, Check, ChevronsUpDown, Truck, DollarSign, GripVertical} from "lucide-react";
-import {cn} from "@/lib/utils";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {useCompany} from "@/contexts/CompanyContext";
-import {useState, useRef} from "react";
-import {useToast} from "@/hooks/use-toast";
-import {queryClient, apiRequest} from "@/lib/queryClient";
+import { KPICard } from "@/components/KPICard";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/PageHeader";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import {
+  TrendingUp,
+  Plus,
+  X,
+  Wallet,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Check,
+  ChevronsUpDown,
+  Truck,
+  DollarSign,
+  GripVertical,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useState, useRef } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
-import type {Account, DashboardCashAccount, ImportCycleBalanceData, PayableAccount, ProfitData} from "./propertiesdashboard/types";
-import {CustomNetPositionView} from "./propertiesdashboard/components/CustomNetPositionView";
+import type {
+  Account,
+  DashboardCashAccount,
+  ImportCycleBalanceData,
+  PayableAccount,
+  ProfitData,
+} from "./propertiesdashboard/types";
+import { CustomNetPositionView } from "./propertiesdashboard/components/CustomNetPositionView";
+import { useErpText } from "@/i18n/modules/erp";
 export default function PropertiesDashboard() {
+  const tUi = useErpText();
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
@@ -245,7 +265,7 @@ export default function PropertiesDashboard() {
   if (isError) {
     return (
       <div className="space-y-6">
-        <div className="text-destructive">Failed to load dashboard data. Please try again.</div>
+        <div className="text-destructive">{tUi("failed.to.load.dashboard.data.please.try.again")}</div>
       </div>
     );
   }
@@ -253,13 +273,17 @@ export default function PropertiesDashboard() {
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <PageHeader title="Dashboard" subtitle="Overview of your properties performance" showHomeButton={false} />
+        <PageHeader
+          title={tUi("dashboard")}
+          subtitle={tUi("overview.of.your.properties.performance")}
+          showHomeButton={false}
+        />
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         <KPICard
-          title="Total Income"
+          title={tUi("total.income")}
           value={isLoading ? "Loading..." : formatAmount(profitData?.totalIncome || 0)}
           change="From all income accounts"
           changeType="positive"
@@ -267,7 +291,7 @@ export default function PropertiesDashboard() {
           data-testid="kpi-total-income"
         />
         <KPICard
-          title="Net Position"
+          title={tUi("net.position")}
           value={isLoading ? "Loading..." : formatAmount(profitData?.netPosition || 0)}
           change={profitData?.netPositionLabel || "What we have minus what we owe"}
           changeType={(profitData?.netPosition ?? 0) >= 0 ? "positive" : "negative"}
@@ -275,7 +299,7 @@ export default function PropertiesDashboard() {
           data-testid="kpi-net-position"
         />
         <KPICard
-          title="Import Cycle Balance"
+          title={tUi("import.cycle.balance")}
           value={
             !importCycleData
               ? "Loading..."
@@ -293,11 +317,11 @@ export default function PropertiesDashboard() {
       {/* Net Position Breakdown */}
       <Card className="p-4 sm:p-6">
         <div className="mb-4">
-          <h3 className="text-lg font-medium">Net Position Breakdown</h3>
+          <h3 className="text-lg font-medium">{tUi("net.position.breakdown")}</h3>
         </div>
         {isLoading ? (
           <div className="flex items-center justify-center h-[200px]">
-            <p className="text-muted-foreground">Loading...</p>
+            <p className="text-muted-foreground">{tUi("loading.3")}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
@@ -315,7 +339,7 @@ export default function PropertiesDashboard() {
                   </div>
                 ))}
                 <div className="border-t pt-2 mt-2 flex justify-between font-medium">
-                  <span>Total Assets:</span>
+                  <span>{tUi("total.assets")}</span>
                   <span className="font-mono text-green-600">{formatAmount(profitData?.forUsTotal ?? 0)}</span>
                 </div>
               </div>
@@ -335,7 +359,7 @@ export default function PropertiesDashboard() {
                   </div>
                 ))}
                 <div className="border-t pt-2 mt-2 flex justify-between font-medium">
-                  <span>Total Liabilities:</span>
+                  <span>{tUi("total.liabilities")}</span>
                   <span className="font-mono text-red-600">{formatAmount(profitData?.onUsTotal ?? 0)}</span>
                 </div>
               </div>
@@ -355,7 +379,7 @@ export default function PropertiesDashboard() {
                   </div>
                 ))}
                 <div className="border-t pt-2 mt-2 flex justify-between font-medium">
-                  <span>Total Expenses:</span>
+                  <span>{tUi("total.expenses")}</span>
                   <span className="font-mono text-orange-600">{formatAmount(profitData?.expensesTotal ?? 0)}</span>
                 </div>
               </div>
@@ -363,10 +387,10 @@ export default function PropertiesDashboard() {
 
             {/* Net Position Calculation */}
             <div className="border rounded-lg p-4 bg-muted/30">
-              <h4 className="font-medium mb-3">Net Position</h4>
+              <h4 className="font-medium mb-3">{tUi("net.position")}</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Assets:</span>
+                  <span className="text-muted-foreground">{tUi("assets")}</span>
                   <span className="font-mono text-green-600">{formatAmount(profitData?.forUsTotal ?? 0)}</span>
                 </div>
                 <div className="flex justify-between">
@@ -407,7 +431,7 @@ export default function PropertiesDashboard() {
         {/* KPI summary bar */}
         <div className="grid grid-cols-1 sm:grid-cols-3 divide-x border-b">
           <div className="p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">Available</p>
+            <p className="text-xs text-muted-foreground mb-1">{tUi("available")}</p>
             <p className="text-xl font-bold font-mono text-green-600" data-testid="text-total-available">
               {formatAmount(
                 displayedCashAccounts.reduce(
@@ -418,7 +442,7 @@ export default function PropertiesDashboard() {
             </p>
           </div>
           <div className="p-4 text-center">
-            <p className="text-xs text-muted-foreground mb-1">To Pay</p>
+            <p className="text-xs text-muted-foreground mb-1">{tUi("to.pay")}</p>
             <p className="text-xl font-bold font-mono text-red-600" data-testid="text-total-payable">
               {formatAmount(dashboardPayableAccounts.reduce((s, a) => s + Math.abs(a.balance), 0))}
             </p>
@@ -461,11 +485,11 @@ export default function PropertiesDashboard() {
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Add Account to Available</DialogTitle>
+                    <DialogTitle>{tUi("add.account.to.available")}</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4">
                     <div>
-                      <label className="text-sm font-medium mb-2 block">Account</label>
+                      <label className="text-sm font-medium mb-2 block">{tUi("account")}</label>
                       <Popover open={cashComboboxOpen} onOpenChange={setCashComboboxOpen}>
                         <PopoverTrigger asChild>
                           <Button
@@ -484,9 +508,9 @@ export default function PropertiesDashboard() {
                         </PopoverTrigger>
                         <PopoverContent className="w-full p-0" align="start">
                           <Command>
-                            <CommandInput placeholder="Search accounts..." />
+                            <CommandInput placeholder={tUi("search.accounts.2")} />
                             <CommandList>
-                              <CommandEmpty>No account found.</CommandEmpty>
+                              <CommandEmpty>{tUi("no.account.found")}</CommandEmpty>
                               <CommandGroup>
                                 {availableCashAccounts.map((account) => (
                                   <CommandItem
@@ -538,7 +562,7 @@ export default function PropertiesDashboard() {
                 Error loading accounts: {(cashAccountsError as any)?.message || "Unknown error"}
               </p>
             ) : displayedCashAccounts.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No accounts added yet</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{tUi("no.accounts.added.yet")}</p>
             ) : (
               <div className="space-y-1">
                 {displayedCashAccounts.map((dca) => {
@@ -576,7 +600,7 @@ export default function PropertiesDashboard() {
                   );
                 })}
                 <div className="flex items-center justify-between py-2 px-2 bg-green-50 dark:bg-green-950/30 rounded font-bold mt-1">
-                  <span className="text-sm">Total Available</span>
+                  <span className="text-sm">{tUi("total.available")}</span>
                   <span className="text-sm font-mono text-green-600">
                     {formatAmount(
                       displayedCashAccounts.reduce(
@@ -608,11 +632,11 @@ export default function PropertiesDashboard() {
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Add Account to To Pay</DialogTitle>
+                    <DialogTitle>{tUi("add.account.to.to.pay")}</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4">
                     <div>
-                      <label className="text-sm font-medium mb-2 block">Account</label>
+                      <label className="text-sm font-medium mb-2 block">{tUi("account")}</label>
                       <Popover open={payableComboboxOpen} onOpenChange={setPayableComboboxOpen}>
                         <PopoverTrigger asChild>
                           <Button
@@ -631,9 +655,9 @@ export default function PropertiesDashboard() {
                         </PopoverTrigger>
                         <PopoverContent className="w-full p-0" align="start">
                           <Command>
-                            <CommandInput placeholder="Search accounts..." />
+                            <CommandInput placeholder={tUi("search.accounts.2")} />
                             <CommandList>
-                              <CommandEmpty>No account found.</CommandEmpty>
+                              <CommandEmpty>{tUi("no.account.found")}</CommandEmpty>
                               <CommandGroup>
                                 {availablePayableAccounts.map((account) => (
                                   <CommandItem
@@ -681,7 +705,7 @@ export default function PropertiesDashboard() {
                 Error loading accounts: {(payableAccountsError as any)?.message || "Unknown error"}
               </p>
             ) : dashboardPayableAccounts.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No accounts added yet</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{tUi("no.accounts.added.yet")}</p>
             ) : (
               <div className="space-y-1">
                 {dashboardPayableAccounts.map((account) => (
@@ -716,7 +740,7 @@ export default function PropertiesDashboard() {
                   </div>
                 ))}
                 <div className="flex items-center justify-between py-2 px-2 bg-red-50 dark:bg-red-950/30 rounded font-bold mt-1">
-                  <span className="text-sm">Total To Pay</span>
+                  <span className="text-sm">{tUi("total.to.pay")}</span>
                   <span className="text-sm font-mono text-red-600">
                     {formatAmount(dashboardPayableAccounts.reduce((s, a) => s + Math.abs(a.balance), 0))}
                   </span>

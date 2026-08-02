@@ -25,6 +25,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface OrderLine {
   articleCode: string;
@@ -132,6 +133,7 @@ function ProfitPct({ value }: { value: number | null }) {
 }
 
 export default function CustomerInvoiceDetail() {
+  const tUi = useErpText();
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
@@ -161,11 +163,11 @@ export default function CustomerInvoiceDetail() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "DRAFT":
-        return <Badge variant="secondary">Draft</Badge>;
+        return <Badge variant="secondary">{tUi("draft")}</Badge>;
       case "FINALIZED":
-        return <Badge variant="default">Finalized</Badge>;
+        return <Badge variant="default">{tUi("finalized")}</Badge>;
       case "CANCELLED":
-        return <Badge variant="destructive">Cancelled</Badge>;
+        return <Badge variant="destructive">{tUi("cancelled")}</Badge>;
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -273,14 +275,14 @@ export default function CustomerInvoiceDetail() {
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div className="flex flex-wrap gap-6">
           <div>
-            <p className="text-sm text-muted-foreground">Customer</p>
+            <p className="text-sm text-muted-foreground">{tUi("customer")}</p>
             <p className="font-semibold text-lg" data-testid="text-customer-name">
               {order.customerName || "-"}
             </p>
           </div>
           {order.containerNumber && (
             <div>
-              <p className="text-sm text-muted-foreground">Container No.</p>
+              <p className="text-sm text-muted-foreground">{tUi("container.no")}</p>
               <p className="font-semibold font-mono" data-testid="text-container-number">
                 {order.containerNumber}
               </p>
@@ -288,7 +290,7 @@ export default function CustomerInvoiceDetail() {
           )}
           {order.shippingCompany && (
             <div>
-              <p className="text-sm text-muted-foreground">Shipping</p>
+              <p className="text-sm text-muted-foreground">{tUi("shipping")}</p>
               <p className="font-semibold" data-testid="text-shipping-company">
                 {order.shippingCompany}
               </p>
@@ -327,7 +329,7 @@ export default function CustomerInvoiceDetail() {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+                  <AlertDialogTitle>{tUi("delete.invoice")}</AlertDialogTitle>
                   <AlertDialogDescription>
                     This will permanently delete invoice {order.invoiceNumber || `#${order.id}`} for{" "}
                     {order.customerName}. Any bales assigned to this order will be returned to stock. This cannot be
@@ -335,7 +337,7 @@ export default function CustomerInvoiceDetail() {
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+                  <AlertDialogCancel data-testid="button-cancel-delete">{tUi("cancel")}</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={() => deleteMutation.mutate(order.id)}
                     data-testid="button-confirm-delete"
@@ -354,13 +356,13 @@ export default function CustomerInvoiceDetail() {
           <TableHeader className="sticky top-0 z-30 bg-background">
             <TableRow>
               <TableHead className="w-[50px]">#</TableHead>
-              <TableHead>Article Code</TableHead>
-              <TableHead>Bale Name</TableHead>
+              <TableHead>{tUi("article.code")}</TableHead>
+              <TableHead>{tUi("bale.name")}</TableHead>
               <TableHead className="text-right">Qty</TableHead>
-              <TableHead className="text-right">Weight/Bale</TableHead>
-              <TableHead className="text-right">Total Weight</TableHead>
-              <TableHead className="text-right">Price/Bale</TableHead>
-              <TableHead className="text-right">Total Price</TableHead>
+              <TableHead className="text-right">{tUi("weight.bale")}</TableHead>
+              <TableHead className="text-right">{tUi("total.weight")}</TableHead>
+              <TableHead className="text-right">{tUi("price.bale")}</TableHead>
+              <TableHead className="text-right">{tUi("total.price")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -455,29 +457,29 @@ export default function CustomerInvoiceDetail() {
       <Card className="p-4">
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2 text-sm">
-            <span>Subtotal (Bales)</span>
+            <span>{tUi("subtotal.bales")}</span>
             <span className="font-mono" data-testid="text-subtotal">
               {subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
             </span>
           </div>
           <div className="flex items-center justify-between gap-2 text-sm">
-            <span>Total Charges</span>
+            <span>{tUi("total.charges")}</span>
             <span className="font-mono" data-testid="text-total-charges">
               {totalCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
             </span>
           </div>
           <div className="border-t pt-2 flex items-center justify-between gap-2">
-            <span className="font-semibold">Grand Total</span>
+            <span className="font-semibold">{tUi("grand.total")}</span>
             <span className="font-mono font-bold text-lg" data-testid="text-grand-total">
               {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
             </span>
           </div>
           <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-            <span>Total Bales Qty</span>
+            <span>{tUi("total.bales.qty")}</span>
             <span data-testid="text-total-bales-qty">{totalBalesQty}</span>
           </div>
           <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-            <span>Total Weight</span>
+            <span>{tUi("total.weight")}</span>
             <span className="font-mono" data-testid="text-total-weight-kg">
               {totalWeightKg.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} kg
             </span>
@@ -512,7 +514,7 @@ export default function CustomerInvoiceDetail() {
                   data-testid="text-partial-cost-warning"
                 >
                   <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                  <span>Some lines are missing production cost data. Totals may be incomplete.</span>
+                  <span>{tUi("some.lines.are.missing.production.cost.data.tota")}</span>
                 </div>
               )}
 
@@ -520,14 +522,14 @@ export default function CustomerInvoiceDetail() {
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
-                      <TableHead>Bale</TableHead>
+                      <TableHead>{tUi("bale")}</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
-                      <TableHead className="text-right">Sell/Bale</TableHead>
-                      <TableHead className="text-right">Total Selling</TableHead>
-                      <TableHead className="text-right">Cost/Bale</TableHead>
-                      <TableHead className="text-right">Total Cost</TableHead>
-                      <TableHead className="text-right">Profit</TableHead>
-                      <TableHead className="text-right">Margin</TableHead>
+                      <TableHead className="text-right">{tUi("sell.bale")}</TableHead>
+                      <TableHead className="text-right">{tUi("total.selling")}</TableHead>
+                      <TableHead className="text-right">{tUi("cost.bale")}</TableHead>
+                      <TableHead className="text-right">{tUi("total.cost")}</TableHead>
+                      <TableHead className="text-right">{tUi("profit")}</TableHead>
+                      <TableHead className="text-right">{tUi("margin")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -594,23 +596,23 @@ export default function CustomerInvoiceDetail() {
               <Card className="p-4">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-4 text-sm">
-                    <span className="text-muted-foreground">Total Selling</span>
+                    <span className="text-muted-foreground">{tUi("total.selling")}</span>
                     <span className="font-mono font-semibold" data-testid="text-total-selling-sum">
                       {fmt(profitability.totalSelling)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-4 text-sm">
-                    <span className="text-muted-foreground">Total Cost</span>
+                    <span className="text-muted-foreground">{tUi("total.cost")}</span>
                     <span className="font-mono font-semibold" data-testid="text-total-cost-sum">
                       {profitability.totalCost !== null ? (
                         fmt(profitability.totalCost)
                       ) : (
-                        <span className="text-muted-foreground text-xs">Incomplete</span>
+                        <span className="text-muted-foreground text-xs">{tUi("incomplete")}</span>
                       )}
                     </span>
                   </div>
                   <div className="border-t pt-2 flex items-center justify-between gap-4">
-                    <span className="font-semibold">Total Profit</span>
+                    <span className="font-semibold">{tUi("total.profit")}</span>
                     <div className="flex flex-col items-end gap-0.5">
                       <ProfitValue value={profitability.totalProfit} className="text-base" />
                       {profitability.totalMarginPct !== null && (

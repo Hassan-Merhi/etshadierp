@@ -12,6 +12,7 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import * as XLSX from "@/lib/excelHelper";
 import type { Location } from "@shared/schema";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface ImportBaleRow {
   itemName: string;
@@ -23,6 +24,7 @@ interface ImportBaleRow {
 }
 
 export function ImportBalesTab() {
+  const tUi = useFactoryText();
   const [fileName, setFileName] = useState("");
   const [importRows, setImportRows] = useState<ImportBaleRow[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
@@ -177,10 +179,10 @@ export function ImportBalesTab() {
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <p className="text-sm text-muted-foreground mb-1.5">Warehouse Location</p>
+          <p className="text-sm text-muted-foreground mb-1.5">{tUi("warehouse.location")}</p>
           <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
             <SelectTrigger data-testid="select-import-location">
-              <SelectValue placeholder="Select Location..." />
+              <SelectValue placeholder={tUi("select.location.3")} />
             </SelectTrigger>
             <SelectContent>
               {activeLocations?.map((loc) => (
@@ -192,7 +194,7 @@ export function ImportBalesTab() {
           </Select>
         </div>
         <div>
-          <p className="text-sm text-muted-foreground mb-1.5">Upload Excel File</p>
+          <p className="text-sm text-muted-foreground mb-1.5">{tUi("upload.excel.file")}</p>
           <div className="flex items-center gap-2 flex-wrap">
             <input
               ref={fileInputRef}
@@ -240,12 +242,12 @@ export function ImportBalesTab() {
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead>#</TableHead>
-                    <TableHead>Item Name</TableHead>
-                    <TableHead className="text-right">Weight</TableHead>
-                    <TableHead>Barcode</TableHead>
-                    <TableHead>Ref Number</TableHead>
+                    <TableHead>{tUi("item.name")}</TableHead>
+                    <TableHead className="text-right">{tUi("weight")}</TableHead>
+                    <TableHead>{tUi("barcode")}</TableHead>
+                    <TableHead>{tUi("ref.number")}</TableHead>
                     <TableHead className="text-center">Qty</TableHead>
-                    <TableHead>Production Date</TableHead>
+                    <TableHead>{tUi("production.date.2")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

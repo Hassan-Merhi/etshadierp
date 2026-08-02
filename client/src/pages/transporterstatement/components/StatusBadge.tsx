@@ -3,8 +3,8 @@
  *
  * Extracted from TransporterStatement.tsx during the Phase 4 god-file split.
  */
-import {Badge} from "@/components/ui/badge";
-import {fmtAmt} from "../utils";
+import { Badge } from "@/components/ui/badge";
+import { fmtAmt } from "../utils";
 
 export function StatusBadge({
   status,

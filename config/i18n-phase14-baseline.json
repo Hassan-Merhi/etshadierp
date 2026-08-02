@@ -1,4 +1,4 @@
 {
   "description": "One-way ceiling for candidate untranslated UI literals. This equals the measured PR #377 count from the I18n Audit workflow and may only be lowered as literals are migrated.",
-  "maxFindings": 9110
+  "maxFindings": 3587
 }

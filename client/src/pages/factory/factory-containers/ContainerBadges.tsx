@@ -3,6 +3,7 @@ import { StickyNote } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { OTW_NOTES_KEY, otwFmtCcy, otwCcySymbol, getContainerStatusLabel } from "./otwHelpers";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function OtwCurrencyInline({ amounts }: { amounts: Record<string, number> }) {
   const entries = Object.entries(amounts).filter(([, v]) => v > 0);
@@ -19,6 +20,7 @@ export function OtwCurrencyInline({ amounts }: { amounts: Record<string, number>
 }
 
 export function OtwNotes() {
+  const tUi = useFactoryText();
   const [value, setValue] = useState(() => localStorage.getItem(OTW_NOTES_KEY) ?? "");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -41,13 +43,13 @@ export function OtwNotes() {
     <div className="rounded-xl border overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-2.5 border-b bg-muted/20">
         <StickyNote className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Notes</span>
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{tUi("notes")}</span>
       </div>
       <div className="px-4 py-3">
         <Textarea
           value={value}
           onChange={handleChange}
-          placeholder="Write anything here…"
+          placeholder={tUi("write.anything.here")}
           className="min-h-[72px] resize-y text-sm border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
           data-testid="textarea-otw-notes"
         />

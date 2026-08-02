@@ -1,27 +1,48 @@
-import {useState, useRef} from "react";
-import {useLocation} from "wouter";
-import {useMutation, useQuery} from "@tanstack/react-query";
-import {PageHeader} from "@/components/PageHeader";
-import {Upload, CheckCircle, AlertCircle, RefreshCw, Printer, Download, ChevronDown, ChevronUp, Tag, FileSpreadsheet, Eye} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
-import {Checkbox} from "@/components/ui/checkbox";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Label} from "@/components/ui/label";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {useToast} from "@/hooks/use-toast";
-import {queryClient} from "@/lib/queryClient";
-import {factoryApiRequest} from "@/lib/factoryApi";
-import {useDateFormat} from "@/contexts/DateFormatContext";
+import { useState, useRef } from "react";
+import { useLocation } from "wouter";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { PageHeader } from "@/components/PageHeader";
+import {
+  Upload,
+  CheckCircle,
+  AlertCircle,
+  RefreshCw,
+  Printer,
+  Download,
+  ChevronDown,
+  ChevronUp,
+  Tag,
+  FileSpreadsheet,
+  Eye,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
+import { useDateFormat } from "@/contexts/DateFormatContext";
 import * as XLSX from "@/lib/excelHelper";
-import {generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, prefetchBannersForPrint, type A4DesignColor, type LabelData} from "@/lib/labelHtml";
-import {useLabelDesignColors} from "@/hooks/useLabelDesignColors";
+import {
+  generateCombinedLabelsHtml,
+  generateA5LabelsHtml,
+  generateStickerLabelsHtml,
+  prefetchBannersForPrint,
+  type A4DesignColor,
+  type LabelData,
+} from "@/lib/labelHtml";
+import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 
-import type {ApplyItem, ParsedRow, Step, ValidationResult} from "./factorybalerelabeling/types";
-import {downloadCsv, downloadExcelTemplate, parseExcelFile} from "./factorybalerelabeling/utils";
-import {LabelPreviewCard} from "./factorybalerelabeling/components/LabelPreviewCard";
+import type { ApplyItem, ParsedRow, Step, ValidationResult } from "./factorybalerelabeling/types";
+import { downloadCsv, downloadExcelTemplate, parseExcelFile } from "./factorybalerelabeling/utils";
+import { LabelPreviewCard } from "./factorybalerelabeling/components/LabelPreviewCard";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactoryBaleRelabeling() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -196,8 +217,8 @@ export default function FactoryBaleRelabeling() {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <PageHeader
-              title="Bale Relabeling"
-              subtitle="Import bales from Excel and generate new reference codes with printable labels"
+              title={tUi("bale.relabeling")}
+              subtitle={tUi("import.bales.from.excel.and.generate.new.referen")}
             />
           </div>
           {step !== "upload" && (
@@ -253,9 +274,9 @@ export default function FactoryBaleRelabeling() {
               <div className="flex items-start gap-2 rounded-md bg-muted/50 border p-3 text-sm text-muted-foreground">
                 <FileSpreadsheet className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
                 <span>
-                  Not sure of the format? Click <strong>Download Template</strong> above to get a pre-formatted Excel
-                  file. Fill in your bale reference codes in the <code>current_reference_code</code> column and upload
-                  it here.
+                  Not sure of the format? Click <strong>{tUi("download.template")}</strong> above to get a pre-formatted
+                  Excel file. Fill in your bale reference codes in the <code>current_reference_code</code> column and
+                  upload it here.
                 </span>
               </div>
 
@@ -295,7 +316,7 @@ export default function FactoryBaleRelabeling() {
                       <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead className="w-16">Row</TableHead>
-                          <TableHead>Current Reference Code</TableHead>
+                          <TableHead>{tUi("current.reference.code")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -355,18 +376,18 @@ export default function FactoryBaleRelabeling() {
             {/* Validation table */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Validation Results</CardTitle>
+                <CardTitle className="text-base">{tUi("validation.results")}</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="max-h-80 overflow-y-auto">
                   <Table>
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
-                        <TableHead>Current Reference</TableHead>
-                        <TableHead>Product</TableHead>
-                        <TableHead>Weight (kg)</TableHead>
-                        <TableHead>Stock Status</TableHead>
-                        <TableHead>Valid</TableHead>
+                        <TableHead>{tUi("current.reference")}</TableHead>
+                        <TableHead>{tUi("product")}</TableHead>
+                        <TableHead>{tUi("weight.kg")}</TableHead>
+                        <TableHead>{tUi("stock.status")}</TableHead>
+                        <TableHead>{tUi("valid")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -420,7 +441,7 @@ export default function FactoryBaleRelabeling() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label className="text-sm font-medium mb-2 block">Print Formats (select one or more)</Label>
+                  <Label className="text-sm font-medium mb-2 block">{tUi("print.formats.select.one.or.more")}</Label>
                   <div className="flex flex-wrap gap-4">
                     {(["A4", "A5", "STICKER"] as const).map((fmt) => (
                       <label
@@ -502,19 +523,19 @@ export default function FactoryBaleRelabeling() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <Card>
                 <CardContent className="pt-4 pb-3">
-                  <p className="text-xs text-muted-foreground">Bales Relabeled</p>
+                  <p className="text-xs text-muted-foreground">{tUi("bales.relabeled")}</p>
                   <p className="text-2xl font-bold">{applyResult.items.length}</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="pt-4 pb-3">
-                  <p className="text-xs text-muted-foreground">Format</p>
+                  <p className="text-xs text-muted-foreground">{tUi("format")}</p>
                   <p className="text-2xl font-bold">{printFormatLabel}</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="pt-4 pb-3">
-                  <p className="text-xs text-muted-foreground">Session ID</p>
+                  <p className="text-xs text-muted-foreground">{tUi("session.id")}</p>
                   <p className="text-2xl font-bold">#{applyResult.sessionId}</p>
                 </CardContent>
               </Card>
@@ -574,7 +595,7 @@ export default function FactoryBaleRelabeling() {
                   ))}
                   <p className="text-xs text-muted-foreground">
                     Showing up to 4 per format — {applyResult.items.length} total bales will print. Click{" "}
-                    <strong>Print Labels</strong> above to print all.
+                    <strong>{tUi("print.labels")}</strong> above to print all.
                   </p>
                 </CardContent>
               )}
@@ -593,10 +614,10 @@ export default function FactoryBaleRelabeling() {
                   <Table>
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
-                        <TableHead>Old Reference</TableHead>
-                        <TableHead>New Reference</TableHead>
-                        <TableHead>Product</TableHead>
-                        <TableHead>Weight (kg)</TableHead>
+                        <TableHead>{tUi("old.reference")}</TableHead>
+                        <TableHead>{tUi("new.reference")}</TableHead>
+                        <TableHead>{tUi("product")}</TableHead>
+                        <TableHead>{tUi("weight.kg")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -626,23 +647,23 @@ export default function FactoryBaleRelabeling() {
             onClick={() => setShowHistory((v) => !v)}
             data-testid="button-toggle-history"
           >
-            <span>Recent Relabeling Sessions</span>
+            <span>{tUi("recent.relabeling.sessions")}</span>
             {showHistory ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </button>
           {showHistory && (
             <div className="border-t px-4 pb-4 pt-2">
               {sessions.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-2">No sessions yet</p>
+                <p className="text-sm text-muted-foreground py-2">{tUi("no.sessions.yet")}</p>
               ) : (
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>File</TableHead>
-                      <TableHead>Format</TableHead>
-                      <TableHead>Total</TableHead>
-                      <TableHead>Valid</TableHead>
-                      <TableHead>Invalid</TableHead>
+                      <TableHead>{tUi("date")}</TableHead>
+                      <TableHead>{tUi("file")}</TableHead>
+                      <TableHead>{tUi("format")}</TableHead>
+                      <TableHead>{tUi("total")}</TableHead>
+                      <TableHead>{tUi("valid")}</TableHead>
+                      <TableHead>{tUi("invalid")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

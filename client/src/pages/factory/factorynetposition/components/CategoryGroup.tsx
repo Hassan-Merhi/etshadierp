@@ -3,14 +3,14 @@
  *
  * Extracted from FactoryNetPosition.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {Badge} from "@/components/ui/badge";
-import {ChevronDown, ChevronRight} from "lucide-react";
+import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
-import type {AccountItem} from "../types";
-import {fmt, getNamePrefix} from "../utils";
-import {SupplierRow} from "./SupplierRow";
-import {PrefixGroup} from "./PrefixGroup";
+import type { AccountItem } from "../types";
+import { fmt, getNamePrefix } from "../utils";
+import { SupplierRow } from "./SupplierRow";
+import { PrefixGroup } from "./PrefixGroup";
 
 export function CategoryGroup({
   title,

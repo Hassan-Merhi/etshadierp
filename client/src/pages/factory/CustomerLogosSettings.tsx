@@ -8,8 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, Pencil, Trash2, Image } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export default function CustomerLogosSettings() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
@@ -89,7 +91,7 @@ export default function CustomerLogosSettings() {
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <Image className="h-6 w-6 text-muted-foreground" />
-        <PageHeader title="Customer Logos" />
+        <PageHeader title={tUi("customer.logos")} />
       </div>
       <p className="text-sm text-muted-foreground">
         Upload logos per customer. These replace the default HMD logo on bale labels when selected during stock entry.
@@ -98,7 +100,7 @@ export default function CustomerLogosSettings() {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Select Customer</CardTitle>
+          <CardTitle className="text-base">{tUi("select.customer.2")}</CardTitle>
         </CardHeader>
         <CardContent>
           <Select
@@ -109,7 +111,7 @@ export default function CustomerLogosSettings() {
             }}
           >
             <SelectTrigger data-testid="select-logo-customer">
-              <SelectValue placeholder="Choose a customer to manage logos..." />
+              <SelectValue placeholder={tUi("choose.a.customer.to.manage.logos")} />
             </SelectTrigger>
             <SelectContent>
               {activeCustomers.map((c: any) => (
@@ -154,12 +156,12 @@ export default function CustomerLogosSettings() {
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">Loading logos...</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">{tUi("loading.logos")}</p>
             ) : logos.length === 0 ? (
               <div className="text-center py-8 space-y-2">
                 <Image className="h-10 w-10 text-muted-foreground/40 mx-auto" />
-                <p className="text-sm text-muted-foreground">No logos uploaded yet.</p>
-                <p className="text-xs text-muted-foreground">Click "Upload Logo" to add the first one.</p>
+                <p className="text-sm text-muted-foreground">{tUi("no.logos.uploaded.yet")}</p>
+                <p className="text-xs text-muted-foreground">{tUi("click.upload.logo.to.add.the.first.one")}</p>
               </div>
             ) : (
               <div className="space-y-2">

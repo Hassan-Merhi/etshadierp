@@ -1,22 +1,42 @@
-import {useState, Fragment} from "react";
-import {useMutation, useQuery} from "@tanstack/react-query";
-import {PlusCircle, Plus, X, Info, Pencil, Trash2, AlertTriangle, RotateCcw, ChevronDown, ChevronUp} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter} from "@/components/ui/dialog";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {useToast} from "@/hooks/use-toast";
-import {factoryApiRequest} from "@/lib/factoryApi";
-import {formatNumber} from "@/lib/formatNumber";
-import {useAdminOverride} from "@/hooks/use-admin-override";
+import { useState, Fragment } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  PlusCircle,
+  Plus,
+  X,
+  Info,
+  Pencil,
+  Trash2,
+  AlertTriangle,
+  RotateCcw,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { factoryApiRequest } from "@/lib/factoryApi";
+import { formatNumber } from "@/lib/formatNumber";
+import { useAdminOverride } from "@/hooks/use-admin-override";
 
-import type {HistoryRow, MutationResult, PostOffloadCharge, PostOffloadDialogProps} from "./postoffloaddialog/types";
-import {invalidateChargeQueries} from "./postoffloaddialog/utils";
-import {RateCell} from "./postoffloaddialog/components/RateCell";
-import {MutationResultPanel} from "./postoffloaddialog/components/MutationResultPanel";
+import type { HistoryRow, MutationResult, PostOffloadCharge, PostOffloadDialogProps } from "./postoffloaddialog/types";
+import { invalidateChargeQueries } from "./postoffloaddialog/utils";
+import { RateCell } from "./postoffloaddialog/components/RateCell";
+import { MutationResultPanel } from "./postoffloaddialog/components/MutationResultPanel";
+import { useFactoryText } from "@/i18n/modules/factory";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOffloadDialogProps) {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
 
@@ -279,7 +299,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-2 text-sm">
-              <p>This will reverse the following charge and all its downstream effects:</p>
+              <p>{tUi("this.will.reverse.the.following.charge.and.all.i")}</p>
               <div className="rounded-md border px-3 py-2 space-y-1">
                 <p>
                   <strong>{undoCharge.description}</strong>
@@ -292,12 +312,12 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                 </p>
               </div>
               <ul className="text-sm text-muted-foreground list-disc pl-4 space-y-0.5">
-                <li>Container landed cost reverted</li>
-                <li>Raw-stock cost per kg reverted</li>
-                <li>Supplier locked rate reverted</li>
-                <li>All linked mix-batch and bale costs reverted</li>
-                <li>Linked voucher soft-deleted</li>
-                <li>Reversing daybook entry created</li>
+                <li>{tUi("container.landed.cost.reverted")}</li>
+                <li>{tUi("raw.stock.cost.per.kg.reverted")}</li>
+                <li>{tUi("supplier.locked.rate.reverted")}</li>
+                <li>{tUi("all.linked.mix.batch.and.bale.costs.reverted")}</li>
+                <li>{tUi("linked.voucher.soft.deleted")}</li>
+                <li>{tUi("reversing.daybook.entry.created")}</li>
               </ul>
               {isLegacy && (
                 <div className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/20 p-3 space-y-2">
@@ -317,7 +337,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                 </div>
               )}
               <div className="space-y-1">
-                <label className="text-sm font-medium">Reversal date</label>
+                <label className="text-sm font-medium">{tUi("reversal.date")}</label>
                 <Input type="date" value={undoDate} onChange={(e) => setUndoDate(e.target.value)} className="w-48" />
               </div>
             </div>
@@ -358,7 +378,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
         >
           <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
             <DialogHeader>
-              <DialogTitle>Charge Undone</DialogTitle>
+              <DialogTitle>{tUi("charge.undone")}</DialogTitle>
             </DialogHeader>
             <div className="flex-1 overflow-y-auto py-2">
               <MutationResultPanel result={undoResult} />
@@ -372,7 +392,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
               >
                 Back
               </Button>
-              <Button onClick={handleClose}>Close</Button>
+              <Button onClick={handleClose}>{tUi("close")}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -430,7 +450,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="col-span-2 space-y-1">
-                      <label className="text-sm font-medium">Description</label>
+                      <label className="text-sm font-medium">{tUi("description")}</label>
                       <Input
                         value={editDesc}
                         onChange={(e) => setEditDesc(e.target.value)}
@@ -438,7 +458,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-sm font-medium">Amount</label>
+                      <label className="text-sm font-medium">{tUi("amount")}</label>
                       <Input
                         type="number"
                         value={editAmount}
@@ -448,7 +468,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-sm font-medium">Currency</label>
+                      <label className="text-sm font-medium">{tUi("currency")}</label>
                       <Select value={editCcy} onValueChange={setEditCcy}>
                         <SelectTrigger>
                           <SelectValue />
@@ -463,13 +483,13 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                       </Select>
                     </div>
                     <div className="col-span-2 space-y-1">
-                      <label className="text-sm font-medium">Account (optional)</label>
+                      <label className="text-sm font-medium">{tUi("account.optional")}</label>
                       <Select value={editLedgerId} onValueChange={setEditLedgerId}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select account (optional)" />
+                          <SelectValue placeholder={tUi("select.account.optional")} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="">{tUi("none")}</SelectItem>
                           {ledgerAccounts.map((a: any) => (
                             <SelectItem key={a.id} value={String(a.id)}>
                               {a.code ? `${a.code} - ${a.name}` : a.name}
@@ -479,7 +499,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                       </Select>
                     </div>
                     <div className="col-span-2 space-y-1">
-                      <label className="text-sm font-medium">Date</label>
+                      <label className="text-sm font-medium">{tUi("date")}</label>
                       <Input
                         type="date"
                         value={editTxDate}
@@ -492,12 +512,12 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                   {/* Snapshot info */}
                   {(editingCharge.supplierLockedRateBefore || editingCharge.supplierInventoryValueDeltaUsd) && (
                     <div className="rounded-md border px-3 py-2 text-xs text-muted-foreground space-y-1">
-                      <p className="font-medium text-foreground text-sm">Stored snapshots</p>
+                      <p className="font-medium text-foreground text-sm">{tUi("stored.snapshots")}</p>
                       <RateCell label="Rate before" value={editingCharge.supplierLockedRateBefore} />
                       <RateCell label="Rate after" value={editingCharge.supplierLockedRateAfter} />
                       {editingCharge.supplierRemainingKgAtApply && (
                         <div className="flex justify-between">
-                          <span>Supplier remaining at apply</span>
+                          <span>{tUi("supplier.remaining.at.apply")}</span>
                           <span className="font-mono">
                             {formatNumber(parseFloat(editingCharge.supplierRemainingKgAtApply))} kg
                           </span>
@@ -505,7 +525,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                       )}
                       {editingCharge.supplierInventoryValueDeltaUsd && (
                         <div className="flex justify-between">
-                          <span>Inventory value applied</span>
+                          <span>{tUi("inventory.value.applied")}</span>
                           <span className="font-mono">
                             ${parseFloat(editingCharge.supplierInventoryValueDeltaUsd).toFixed(6)}
                           </span>
@@ -544,7 +564,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                   </Button>
                 </>
               )}
-              {editResult && <Button onClick={handleClose}>Close</Button>}
+              {editResult && <Button onClick={handleClose}>{tUi("close")}</Button>}
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -608,9 +628,11 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                                       : ""}
                                     {" · "}
                                     {charge.fxRateConfirmed ? (
-                                      <span className="text-green-600 dark:text-green-400">FX ✓</span>
+                                      <span className="text-green-600 dark:text-green-400">{tUi("fx")}</span>
                                     ) : (
-                                      <span className="text-amber-600 dark:text-amber-400">FX unconfirmed</span>
+                                      <span className="text-amber-600 dark:text-amber-400">
+                                        {tUi("fx.unconfirmed")}
+                                      </span>
                                     )}
                                     {charge.fxRateDate ? ` · ${charge.fxRateDate}` : ""}
                                   </p>
@@ -631,7 +653,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                                     size="icon"
                                     className="h-7 w-7"
                                     onClick={() => startEdit(charge)}
-                                    title="Edit charge"
+                                    title={tUi("edit.charge")}
                                   >
                                     <Pencil className="h-3.5 w-3.5" />
                                   </Button>
@@ -644,7 +666,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                                       setUndoLegacyRate("");
                                       setUndoDate(new Date().toLocaleDateString("en-CA"));
                                     }}
-                                    title="Undo charge"
+                                    title={tUi("undo.charge")}
                                   >
                                     <RotateCcw className="h-3.5 w-3.5" />
                                   </Button>
@@ -679,7 +701,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                     <p>Enter charges that arrived after the original offload — port fees, duties, handling, etc.</p>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-sm font-medium">Date</label>
+                    <label className="text-sm font-medium">{tUi("date")}</label>
                     <Input
                       type="date"
                       value={txDate}
@@ -690,7 +712,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between flex-wrap gap-1">
-                      <label className="text-sm font-medium">New Charges</label>
+                      <label className="text-sm font-medium">{tUi("new.charges")}</label>
                       <Button
                         variant="outline"
                         size="sm"
@@ -719,10 +741,10 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                     ) : (
                       <div className="space-y-1">
                         <div className="grid grid-cols-[2fr_1fr_auto_2fr_auto] gap-x-2 gap-y-1 items-center">
-                          <div className="text-xs text-muted-foreground font-medium">Description</div>
-                          <div className="text-xs text-muted-foreground font-medium">Amount</div>
+                          <div className="text-xs text-muted-foreground font-medium">{tUi("description")}</div>
+                          <div className="text-xs text-muted-foreground font-medium">{tUi("amount")}</div>
                           <div className="text-xs text-muted-foreground font-medium">CCY</div>
-                          <div className="text-xs text-muted-foreground font-medium">Account / Broker</div>
+                          <div className="text-xs text-muted-foreground font-medium">{tUi("account.broker")}</div>
                           <div />
                           {newCharges.map((charge, idx) => (
                             <Fragment key={charge.id}>
@@ -778,7 +800,7 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                                 }
                               >
                                 <SelectTrigger data-testid={`select-poc-account-${idx}`}>
-                                  <SelectValue placeholder="Select account (optional)" />
+                                  <SelectValue placeholder={tUi("select.account.optional")} />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {ledgerAccounts.map((a: any) => (

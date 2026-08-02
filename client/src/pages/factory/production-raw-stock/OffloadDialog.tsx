@@ -24,6 +24,7 @@ import { queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
 import { resolveFactoryOffloadValuationKg } from "@shared/factoryOffloadValuation";
 import { AccountCombobox } from "./ProductionRawStockHelpers";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface OffloadDialogProps {
   open: boolean;
@@ -46,6 +47,7 @@ export function OffloadDialog({
   wrapAdminAction,
   mixBatches,
 }: OffloadDialogProps) {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   // Idempotency key is generated lazily on first submit and reused on retries.
   // Reset when the dialog closes or when the user selects a different container.
@@ -95,7 +97,15 @@ export function OffloadDialog({
   const handleAddAdditionalCharge = () => {
     setAdditionalCharges((prev) => [
       ...prev,
-      { id: Date.now().toString(), description: "", amount: "", currencyCode: "USD", fxRate: "1", fxRateLoading: false, ledgerAccountId: "" },
+      {
+        id: Date.now().toString(),
+        description: "",
+        amount: "",
+        currencyCode: "USD",
+        fxRate: "1",
+        fxRateLoading: false,
+        ledgerAccountId: "",
+      },
     ]);
   };
 
@@ -130,9 +140,7 @@ export function OffloadDialog({
       }
       return;
     }
-    setAdditionalCharges((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, [field]: value } : c))
-    );
+    setAdditionalCharges((prev) => prev.map((c) => (c.id === id ? { ...c, [field]: value } : c)));
   };
 
   const selectedContainer = useMemo(() => {
@@ -172,37 +180,41 @@ export function OffloadDialog({
     });
     if (valuationKg <= 0) return null;
 
-    const materialUsd =
-      parseFloat(costPerKg || "0") * parseFloat(fxRateToUsd || "1") * valuationKg;
-    const freightUsd =
-      parseFloat(freight || "0") * parseFloat(freightFxRate || "1");
-    const otherUsd =
-      parseFloat(otherCharges || "0") * parseFloat(otherChargesFxRate || "1");
+    const materialUsd = parseFloat(costPerKg || "0") * parseFloat(fxRateToUsd || "1") * valuationKg;
+    const freightUsd = parseFloat(freight || "0") * parseFloat(freightFxRate || "1");
+    const otherUsd = parseFloat(otherCharges || "0") * parseFloat(otherChargesFxRate || "1");
 
     let commissionUsd = 0;
     if (commissionPersonName.trim() && parseFloat(commissionRate || "0") > 0) {
-      const commBase =
-        parseFloat(commissionRate || "0") * parseFloat(commissionFxRate || "1");
+      const commBase = parseFloat(commissionRate || "0") * parseFloat(commissionFxRate || "1");
       commissionUsd = commissionType === "PER_KG" ? commBase * valuationKg : commBase;
     }
 
     const extraUsd = additionalCharges
       .filter((c) => parseFloat(c.amount || "0") > 0)
-      .reduce(
-        (sum, c) =>
-          sum + parseFloat(c.amount || "0") * parseFloat(c.fxRate || "1"),
-        0
-      );
+      .reduce((sum, c) => sum + parseFloat(c.amount || "0") * parseFloat(c.fxRate || "1"), 0);
 
     const dutyUsd = dutyPending ? 0 : parseFloat(dutyAmount || "0");
     const totalUsd = materialUsd + freightUsd + otherUsd + commissionUsd + extraUsd + dutyUsd;
 
     return totalUsd / receivedKg;
   }, [
-    actualReceivedKg, selectedContainer, selectedContainerId, costPerKg, fxRateToUsd,
-    freight, freightFxRate, otherCharges, otherChargesFxRate,
-    commissionPersonName, commissionRate, commissionFxRate, commissionType,
-    additionalCharges, dutyAmount, dutyPending,
+    actualReceivedKg,
+    selectedContainer,
+    selectedContainerId,
+    costPerKg,
+    fxRateToUsd,
+    freight,
+    freightFxRate,
+    otherCharges,
+    otherChargesFxRate,
+    commissionPersonName,
+    commissionRate,
+    commissionFxRate,
+    commissionType,
+    additionalCharges,
+    dutyAmount,
+    dutyPending,
   ]);
 
   // Auto-fetch the live USD exchange rate whenever the freight currency is changed
@@ -295,10 +307,18 @@ export function OffloadDialog({
       // the server uses the DB rate; the field is disabled so the user cannot override it).
       setCostPerKg((container as any).fixedCostPerKgUsd || container.ratePerKg || "");
       // Clear charge fields — they are locked for subsequent receipts
-      setFreight(""); setFreightAccountId(""); setFreightFromContainer(false);
-      setOtherCharges(""); setOtherChargesAccountId(""); setOtherChargesFromContainer(false);
-      setCommissionPersonName(""); setCommissionRate(""); setCommissionFromContainer(false);
-      setDutyAmount(""); setDutyAccountId(""); setDutyPending(false);
+      setFreight("");
+      setFreightAccountId("");
+      setFreightFromContainer(false);
+      setOtherCharges("");
+      setOtherChargesAccountId("");
+      setOtherChargesFromContainer(false);
+      setCommissionPersonName("");
+      setCommissionRate("");
+      setCommissionFromContainer(false);
+      setDutyAmount("");
+      setDutyAccountId("");
+      setDutyPending(false);
       setAdditionalCharges([]);
       idempotencyKeyRef.current = null; // reset key on new container selection
       return;
@@ -470,7 +490,7 @@ export function OffloadDialog({
         <div className="space-y-6 py-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Select Container</Label>
+              <Label>{tUi("select.container")}</Label>
               <Popover open={containerComboOpen} onOpenChange={setContainerComboOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -494,9 +514,9 @@ export function OffloadDialog({
                 </PopoverTrigger>
                 <PopoverContent className="p-0" style={{ width: "var(--radix-popover-trigger-width)" }} align="start">
                   <Command>
-                    <CommandInput placeholder="Search container number or supplier..." />
+                    <CommandInput placeholder={tUi("search.container.number.or.supplier")} />
                     <CommandList>
-                      <CommandEmpty>No container found.</CommandEmpty>
+                      <CommandEmpty>{tUi("no.container.found")}</CommandEmpty>
                       <CommandGroup>
                         {availableContainers?.map((c) => (
                           <CommandItem
@@ -523,7 +543,7 @@ export function OffloadDialog({
               </Popover>
             </div>
             <div className="space-y-2">
-              <Label>Offload Date</Label>
+              <Label>{tUi("offload.date")}</Label>
               <Input type="date" value={offloadDate} onChange={(e) => setOffloadDate(e.target.value)} />
             </div>
           </div>
@@ -536,24 +556,47 @@ export function OffloadDialog({
                 Subsequent Receipt — Partial Container
               </div>
               <div className="grid grid-cols-3 gap-2 text-sm text-blue-800">
-                <span>Declared: <strong>{formatNumber(partialReceiptInfo.declared)} kg</strong></span>
-                <span>Already received: <strong>{formatNumber(partialReceiptInfo.alreadyReceived)} kg</strong></span>
-                <span>Remaining: <strong>{formatNumber(partialReceiptInfo.remaining)} kg</strong></span>
+                <span>
+                  {tUi("declared")} <strong>{formatNumber(partialReceiptInfo.declared)} kg</strong>
+                </span>
+                <span>
+                  {tUi("already.received")} <strong>{formatNumber(partialReceiptInfo.alreadyReceived)} kg</strong>
+                </span>
+                <span>
+                  {tUi("remaining.2")} <strong>{formatNumber(partialReceiptInfo.remaining)} kg</strong>
+                </span>
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm text-blue-800">
-                <span>Fixed Landed Cost/KG (USD): <strong>{selectedContainer?.fixedCostPerKgUsd ? formatNumber(parseFloat(selectedContainer.fixedCostPerKgUsd), 6) : "—"} USD/kg</strong></span>
-                <span>Value of This Receipt: <strong>{receiptValue != null ? `${formatNumber(receiptValue, 2)} USD` : "—"}</strong></span>
+                <span>
+                  {tUi("fixed.landed.cost.kg.usd")}{" "}
+                  <strong>
+                    {selectedContainer?.fixedCostPerKgUsd
+                      ? formatNumber(parseFloat(selectedContainer.fixedCostPerKgUsd), 6)
+                      : "—"}{" "}
+                    USD/kg
+                  </strong>
+                </span>
+                <span>
+                  {tUi("value.of.this.receipt")}{" "}
+                  <strong>{receiptValue != null ? `${formatNumber(receiptValue, 2)} USD` : "—"}</strong>
+                </span>
               </div>
               <p className="text-xs text-blue-600 flex items-center gap-1">
                 <Lock className="h-3 w-3" />
-                Freight, charges, and commission are locked — they were posted on the first receipt. Only the received weight applies here.
+                Freight, charges, and commission are locked — they were posted on the first receipt. Only the received
+                weight applies here.
               </p>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Received Weight (KG){isSubsequentReceipt && partialReceiptInfo ? ` (max ${formatNumber(partialReceiptInfo.remaining)} kg remaining)` : ""}</Label>
+              <Label>
+                Received Weight (KG)
+                {isSubsequentReceipt && partialReceiptInfo
+                  ? ` (max ${formatNumber(partialReceiptInfo.remaining)} kg remaining)`
+                  : ""}
+              </Label>
               <Input
                 type="number"
                 step="0.001"
@@ -573,7 +616,9 @@ export function OffloadDialog({
                 disabled={isSubsequentReceipt}
               />
               {isSubsequentReceipt && (
-                <p className="text-xs text-muted-foreground">Rate established at first offload — not editable here.</p>
+                <p className="text-xs text-muted-foreground">
+                  {tUi("rate.established.at.first.offload.not.editable.h")}
+                </p>
               )}
             </div>
           </div>
@@ -581,210 +626,221 @@ export function OffloadDialog({
           {isSubsequentReceipt ? (
             <div className="rounded-lg border border-muted bg-muted/30 p-4 text-sm text-muted-foreground flex items-center gap-2">
               <Lock className="h-4 w-4 shrink-0" />
-              Freight, other charges, commission, duty, and additional charges were recorded on the first receipt and are not re-posted here. The fixed landed cost/kg ({selectedContainer?.currencyCode}) already covers the full container.
+              Freight, other charges, commission, duty, and additional charges were recorded on the first receipt and
+              are not re-posted here. The fixed landed cost/kg ({selectedContainer?.currencyCode}) already covers the
+              full container.
             </div>
           ) : (
-          <>
-          <Separator />
-          <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <h3 className="font-semibold text-sm">Freight & Other Charges</h3>
-              <div className="grid grid-cols-[1fr_auto] gap-2">
-                <div className="space-y-2">
-                  <Label>Freight Cost</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={freight}
-                    onChange={(e) => setFreight(e.target.value)}
-                    disabled={freightFromContainer}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Currency</Label>
-                  <Select value={freightCurrencyCode} onValueChange={setFreightCurrencyCode} disabled={freightFromContainer}>
-                    <SelectTrigger className="w-24">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="EUR">EUR</SelectItem>
-                      <SelectItem value="AUD">AUD</SelectItem>
-                      <SelectItem value="GBP">GBP</SelectItem>
-                      <SelectItem value="LBP">LBP</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              {freightCurrencyCode !== "USD" && (
-                <p className="text-xs text-muted-foreground -mt-2">
-                  {freightFxRateLoading
-                    ? "Fetching current exchange rate…"
-                    : parseFloat(freightFxRate) > 0
-                      ? `1 ${freightCurrencyCode} = ${formatNumber(parseFloat(freightFxRate))} USD — freight will be posted to the ledger in USD.`
-                      : "Exchange rate unavailable — enter it manually to convert this charge to USD."}
-                </p>
-              )}
-              <div className="space-y-2">
-                <Label>Freight Account</Label>
-                <AccountCombobox
-                  value={freightAccountId}
-                  onValueChange={setFreightAccountId}
-                  accounts={ledgerAccounts}
-                  suppliers={factorySuppliers}
-                />
-              </div>
-
+            <>
               <Separator />
-
-              <div className="grid grid-cols-[1fr_auto] gap-2">
-                <div className="space-y-2">
-                  <Label>Other Charges</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={otherCharges}
-                    onChange={(e) => setOtherCharges(e.target.value)}
-                    disabled={otherChargesFromContainer}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Currency</Label>
-                  <Select
-                    value={otherChargesCurrencyCode}
-                    onValueChange={setOtherChargesCurrencyCode}
-                    disabled={otherChargesFromContainer}
-                  >
-                    <SelectTrigger className="w-24">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="EUR">EUR</SelectItem>
-                      <SelectItem value="AUD">AUD</SelectItem>
-                      <SelectItem value="GBP">GBP</SelectItem>
-                      <SelectItem value="LBP">LBP</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              {otherChargesCurrencyCode !== "USD" && (
-                <p className="text-xs text-muted-foreground -mt-2">
-                  {otherChargesFxRateLoading
-                    ? "Fetching current exchange rate…"
-                    : parseFloat(otherChargesFxRate) > 0
-                      ? `1 ${otherChargesCurrencyCode} = ${formatNumber(parseFloat(otherChargesFxRate))} USD — other charges will be posted to the ledger in USD.`
-                      : "Exchange rate unavailable — enter it manually to convert this charge to USD."}
-                </p>
-              )}
-              <div className="space-y-2">
-                <Label>Other Charges Account</Label>
-                <AccountCombobox
-                  value={otherChargesAccountId}
-                  onValueChange={setOtherChargesAccountId}
-                  accounts={ledgerAccounts}
-                  suppliers={factorySuppliers}
-                  disabled={otherChargesFromContainer}
-                />
-              </div>
-
-              <Separator />
-
-              {/* ── Extra Charges (multiple rows) ── */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm text-muted-foreground">Extra Charges</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 gap-1 text-xs"
-                    onClick={handleAddAdditionalCharge}
-                  >
-                    <Plus className="h-3 w-3" />
-                    Add
-                  </Button>
-                </div>
-                {additionalCharges.length > 0 && (
-                  <div className="space-y-3">
-                    {additionalCharges.map((charge) => (
-                      <div key={charge.id} className="rounded-md border p-3 space-y-2 bg-muted/20">
-                        <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
-                          <Input
-                            placeholder="Description"
-                            value={charge.description}
-                            onChange={(e) => handleUpdateAdditionalCharge(charge.id, "description", e.target.value)}
-                          />
-                          <Select
-                            value={charge.currencyCode}
-                            onValueChange={(v) => handleUpdateAdditionalCharge(charge.id, "currencyCode", v)}
-                          >
-                            <SelectTrigger className="w-24">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="USD">USD</SelectItem>
-                              <SelectItem value="EUR">EUR</SelectItem>
-                              <SelectItem value="AUD">AUD</SelectItem>
-                              <SelectItem value="GBP">GBP</SelectItem>
-                              <SelectItem value="LBP">LBP</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={() => handleRemoveAdditionalCharge(charge.id)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          placeholder="Amount"
-                          value={charge.amount}
-                          onChange={(e) => handleUpdateAdditionalCharge(charge.id, "amount", e.target.value)}
-                        />
-                        {charge.currencyCode !== "USD" && (
-                          <p className="text-xs text-muted-foreground">
-                            {charge.fxRateLoading
-                              ? "Fetching exchange rate…"
-                              : parseFloat(charge.fxRate) > 0
-                                ? `1 ${charge.currencyCode} = ${formatNumber(parseFloat(charge.fxRate))} USD`
-                                : "Exchange rate unavailable — will use container FX rate"}
-                          </p>
-                        )}
-                        <AccountCombobox
-                          value={charge.ledgerAccountId}
-                          onValueChange={(v) => handleUpdateAdditionalCharge(charge.id, "ledgerAccountId", v)}
-                          accounts={ledgerAccounts}
-                          suppliers={factorySuppliers}
-                          placeholder="Select account"
-                        />
-                      </div>
-                    ))}
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-sm">{tUi("freight.other.charges")}</h3>
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <div className="space-y-2">
+                      <Label>{tUi("freight.cost")}</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={freight}
+                        onChange={(e) => setFreight(e.target.value)}
+                        disabled={freightFromContainer}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{tUi("currency")}</Label>
+                      <Select
+                        value={freightCurrencyCode}
+                        onValueChange={setFreightCurrencyCode}
+                        disabled={freightFromContainer}
+                      >
+                        <SelectTrigger className="w-24">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USD">USD</SelectItem>
+                          <SelectItem value="EUR">EUR</SelectItem>
+                          <SelectItem value="AUD">AUD</SelectItem>
+                          <SelectItem value="GBP">GBP</SelectItem>
+                          <SelectItem value="LBP">LBP</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
+                  {freightCurrencyCode !== "USD" && (
+                    <p className="text-xs text-muted-foreground -mt-2">
+                      {freightFxRateLoading
+                        ? "Fetching current exchange rate…"
+                        : parseFloat(freightFxRate) > 0
+                          ? `1 ${freightCurrencyCode} = ${formatNumber(parseFloat(freightFxRate))} USD — freight will be posted to the ledger in USD.`
+                          : "Exchange rate unavailable — enter it manually to convert this charge to USD."}
+                    </p>
+                  )}
+                  <div className="space-y-2">
+                    <Label>{tUi("freight.account")}</Label>
+                    <AccountCombobox
+                      value={freightAccountId}
+                      onValueChange={setFreightAccountId}
+                      accounts={ledgerAccounts}
+                      suppliers={factorySuppliers}
+                    />
+                  </div>
 
-            <div className="space-y-4">
-              <h3 className="font-semibold text-sm">Duty Details</h3>
-              <div className="space-y-2">
-                <Label>Duty Amount (USD)</Label>
-                <Input type="number" step="0.01" value={dutyAmount} onChange={(e) => setDutyAmount(e.target.value)} />
+                  <Separator />
+
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <div className="space-y-2">
+                      <Label>{tUi("other.charges")}</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={otherCharges}
+                        onChange={(e) => setOtherCharges(e.target.value)}
+                        disabled={otherChargesFromContainer}
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{tUi("currency")}</Label>
+                      <Select
+                        value={otherChargesCurrencyCode}
+                        onValueChange={setOtherChargesCurrencyCode}
+                        disabled={otherChargesFromContainer}
+                      >
+                        <SelectTrigger className="w-24">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USD">USD</SelectItem>
+                          <SelectItem value="EUR">EUR</SelectItem>
+                          <SelectItem value="AUD">AUD</SelectItem>
+                          <SelectItem value="GBP">GBP</SelectItem>
+                          <SelectItem value="LBP">LBP</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  {otherChargesCurrencyCode !== "USD" && (
+                    <p className="text-xs text-muted-foreground -mt-2">
+                      {otherChargesFxRateLoading
+                        ? "Fetching current exchange rate…"
+                        : parseFloat(otherChargesFxRate) > 0
+                          ? `1 ${otherChargesCurrencyCode} = ${formatNumber(parseFloat(otherChargesFxRate))} USD — other charges will be posted to the ledger in USD.`
+                          : "Exchange rate unavailable — enter it manually to convert this charge to USD."}
+                    </p>
+                  )}
+                  <div className="space-y-2">
+                    <Label>{tUi("other.charges.account")}</Label>
+                    <AccountCombobox
+                      value={otherChargesAccountId}
+                      onValueChange={setOtherChargesAccountId}
+                      accounts={ledgerAccounts}
+                      suppliers={factorySuppliers}
+                      disabled={otherChargesFromContainer}
+                    />
+                  </div>
+
+                  <Separator />
+
+                  {/* ── Extra Charges (multiple rows) ── */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm text-muted-foreground">{tUi("extra.charges")}</Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 gap-1 text-xs"
+                        onClick={handleAddAdditionalCharge}
+                      >
+                        <Plus className="h-3 w-3" />
+                        Add
+                      </Button>
+                    </div>
+                    {additionalCharges.length > 0 && (
+                      <div className="space-y-3">
+                        {additionalCharges.map((charge) => (
+                          <div key={charge.id} className="rounded-md border p-3 space-y-2 bg-muted/20">
+                            <div className="grid grid-cols-[1fr_auto_auto] gap-2 items-center">
+                              <Input
+                                placeholder={tUi("description")}
+                                value={charge.description}
+                                onChange={(e) => handleUpdateAdditionalCharge(charge.id, "description", e.target.value)}
+                              />
+                              <Select
+                                value={charge.currencyCode}
+                                onValueChange={(v) => handleUpdateAdditionalCharge(charge.id, "currencyCode", v)}
+                              >
+                                <SelectTrigger className="w-24">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="USD">USD</SelectItem>
+                                  <SelectItem value="EUR">EUR</SelectItem>
+                                  <SelectItem value="AUD">AUD</SelectItem>
+                                  <SelectItem value="GBP">GBP</SelectItem>
+                                  <SelectItem value="LBP">LBP</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={() => handleRemoveAdditionalCharge(charge.id)}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder={tUi("amount")}
+                              value={charge.amount}
+                              onChange={(e) => handleUpdateAdditionalCharge(charge.id, "amount", e.target.value)}
+                            />
+                            {charge.currencyCode !== "USD" && (
+                              <p className="text-xs text-muted-foreground">
+                                {charge.fxRateLoading
+                                  ? "Fetching exchange rate…"
+                                  : parseFloat(charge.fxRate) > 0
+                                    ? `1 ${charge.currencyCode} = ${formatNumber(parseFloat(charge.fxRate))} USD`
+                                    : "Exchange rate unavailable — will use container FX rate"}
+                              </p>
+                            )}
+                            <AccountCombobox
+                              value={charge.ledgerAccountId}
+                              onValueChange={(v) => handleUpdateAdditionalCharge(charge.id, "ledgerAccountId", v)}
+                              accounts={ledgerAccounts}
+                              suppliers={factorySuppliers}
+                              placeholder={tUi("select.account")}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-sm">{tUi("duty.details")}</h3>
+                  <div className="space-y-2">
+                    <Label>{tUi("duty.amount.usd")}</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={dutyAmount}
+                      onChange={(e) => setDutyAmount(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch checked={dutyPending} onCheckedChange={setDutyPending} />
+                    <Label>{tUi("duty.payment.pending")}</Label>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <Switch checked={dutyPending} onCheckedChange={setDutyPending} />
-                <Label>Duty Payment Pending</Label>
-              </div>
-            </div>
-          </div>
-          </>
+            </>
           )}
 
           {/* Warning: commission FX rate couldn't be resolved — user can still submit;
@@ -795,8 +851,9 @@ export function OffloadDialog({
             !commissionFxRateLoading &&
             !(parseFloat(commissionFxRate) > 0) && (
               <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                Could not fetch the {containerCommissionCcy}/USD exchange rate automatically.
-                The offload will be validated by the server — if it fails, check that an exchange rate is configured for {containerCommissionCcy}.
+                Could not fetch the {containerCommissionCcy}/USD exchange rate automatically. The offload will be
+                validated by the server — if it fails, check that an exchange rate is configured for{" "}
+                {containerCommissionCcy}.
               </div>
             )}
 

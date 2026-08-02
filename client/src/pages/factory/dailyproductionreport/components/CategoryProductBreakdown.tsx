@@ -3,12 +3,13 @@
  *
  * Extracted from DailyProductionReport.tsx during the Phase 4 god-file split.
  */
-import {useState, useMemo} from "react";
-import {Badge} from "@/components/ui/badge";
-import {Button} from "@/components/ui/button";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {ChevronDown, ChevronRight, Tag} from "lucide-react";
-import {fmtKg, fmtMoney} from "../utils";
+import { useState, useMemo } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ChevronDown, ChevronRight, Tag } from "lucide-react";
+import { fmtKg, fmtMoney } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function CategoryProductBreakdown({
   categories,
@@ -31,6 +32,7 @@ export function CategoryProductBreakdown({
   totalWeightKg: number;
   totalValue: number;
 }) {
+  const tUi = useFactoryText();
   const [openCats, setOpenCats] = useState<Set<string>>(new Set());
 
   const allOpen = categories.length > 0 && openCats.size === categories.length;
@@ -67,7 +69,7 @@ export function CategoryProductBreakdown({
       <div className="space-y-1 min-w-[420px]">
         {/* Header row */}
         <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 px-2 pb-1 border-b items-center">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Category</span>
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{tUi("category")}</span>
           <Button
             variant="outline"
             size="sm"
@@ -124,12 +126,12 @@ export function CategoryProductBreakdown({
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-xs">Article Code</TableHead>
-                        <TableHead className="text-xs">Product</TableHead>
+                        <TableHead className="text-xs">{tUi("article.code")}</TableHead>
+                        <TableHead className="text-xs">{tUi("product")}</TableHead>
                         <TableHead className="text-xs text-right">Qty</TableHead>
-                        <TableHead className="text-xs text-right">Weight</TableHead>
-                        <TableHead className="text-xs text-right">Cost / Bale</TableHead>
-                        <TableHead className="text-xs text-right">Value</TableHead>
+                        <TableHead className="text-xs text-right">{tUi("weight")}</TableHead>
+                        <TableHead className="text-xs text-right">{tUi("cost.bale")}</TableHead>
+                        <TableHead className="text-xs text-right">{tUi("value")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -161,7 +163,7 @@ export function CategoryProductBreakdown({
 
         {/* Totals footer */}
         <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-2 pt-2 border-t">
-          <span className="text-sm font-semibold text-muted-foreground">Totals</span>
+          <span className="text-sm font-semibold text-muted-foreground">{tUi("totals")}</span>
           <span className="text-sm font-mono font-bold text-right w-16">{totalBales.toLocaleString()}</span>
           <span className="text-sm font-mono font-bold text-right w-24">{fmtKg(totalWeightKg)}</span>
           <span className="text-sm font-mono font-bold text-right w-24">{fmtMoney(totalValue)}</span>

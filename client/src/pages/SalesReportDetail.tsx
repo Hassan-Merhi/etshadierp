@@ -27,7 +27,9 @@ import { Badge } from "@/components/ui/badge";
 
 import type { ItemGroup, PLBasis, PLFilter, SalesReportItem, VoucherGroup } from "./salesreportdetail/types";
 import { LOCATION_PALETTE, formatNumericValue, profitColor } from "./salesreportdetail/utils";
+import { useErpText } from "@/i18n/modules/erp";
 export default function SalesReportDetail() {
+  const tUi = useErpText();
   const [, navigate] = useLocation();
   const handleBack = useBackToParent();
   const { formatAmount } = useCurrencyContext();
@@ -434,7 +436,7 @@ export default function SalesReportDetail() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-56 p-2" align="end">
-                  <p className="text-xs font-medium text-muted-foreground px-2 pb-1">Show / hide columns</p>
+                  <p className="text-xs font-medium text-muted-foreground px-2 pb-1">{tUi("show.hide.columns")}</p>
                   <div className="space-y-1">
                     {ITEM_COLUMNS.map((c) => (
                       <div
@@ -510,25 +512,25 @@ export default function SalesReportDetail() {
           <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
             <Card>
               <CardHeader className="pb-2">
-                <CardDescription className="text-xs">Total Qty</CardDescription>
+                <CardDescription className="text-xs">{tUi("total.qty")}</CardDescription>
                 <CardTitle className="text-lg">{formatNumber(totalQty)}</CardTitle>
               </CardHeader>
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardDescription className="text-xs">Total Sales</CardDescription>
+                <CardDescription className="text-xs">{tUi("total.sales")}</CardDescription>
                 <CardTitle className="text-lg">{formatAmount(totalSales)}</CardTitle>
               </CardHeader>
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardDescription className="text-xs">Cost Total</CardDescription>
+                <CardDescription className="text-xs">{tUi("cost.total")}</CardDescription>
                 <CardTitle className="text-lg">{formatAmount(totalCost)}</CardTitle>
               </CardHeader>
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardDescription className="text-xs">Cost Profit</CardDescription>
+                <CardDescription className="text-xs">{tUi("cost.profit")}</CardDescription>
                 <CardTitle className={`text-lg ${profitColor(costProfit)}`}>
                   {formatAmount(Math.abs(costProfit))}
                 </CardTitle>
@@ -536,13 +538,13 @@ export default function SalesReportDetail() {
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardDescription className="text-xs">Hassan's Total</CardDescription>
+                <CardDescription className="text-xs">{tUi("hassan.s.total")}</CardDescription>
                 <CardTitle className="text-lg">{formatAmount(totalConfiguredCost)}</CardTitle>
               </CardHeader>
             </Card>
             <Card>
               <CardHeader className="pb-2">
-                <CardDescription className="text-xs">Hassan's Profit</CardDescription>
+                <CardDescription className="text-xs">{tUi("hassan.s.profit")}</CardDescription>
                 <CardTitle className={`text-lg ${profitColor(configuredProfit)}`}>
                   {formatAmount(Math.abs(configuredProfit))}
                 </CardTitle>
@@ -559,18 +561,22 @@ export default function SalesReportDetail() {
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead className="w-6"></TableHead>
-                        <TableHead>Location</TableHead>
+                        <TableHead>{tUi("location")}</TableHead>
                         {col("qty") && <TableHead className="text-right">Qty</TableHead>}
-                        {col("costPrice") && <TableHead className="text-right">Cost Price</TableHead>}
-                        {col("hassanPrice") && <TableHead className="text-right">Hassan's Price</TableHead>}
-                        {col("pricePerBale") && <TableHead className="text-right">Price / Bale</TableHead>}
-                        <TableHead className="text-right">Total Sales</TableHead>
-                        {col("costProfitBale") && <TableHead className="text-right">Cost Profit / Bale</TableHead>}
-                        {col("hassanProfitBale") && (
-                          <TableHead className="text-right">Hassan's Profit / Bale</TableHead>
+                        {col("costPrice") && <TableHead className="text-right">{tUi("cost.price")}</TableHead>}
+                        {col("hassanPrice") && <TableHead className="text-right">{tUi("hassan.s.price")}</TableHead>}
+                        {col("pricePerBale") && <TableHead className="text-right">{tUi("price.bale.2")}</TableHead>}
+                        <TableHead className="text-right">{tUi("total.sales")}</TableHead>
+                        {col("costProfitBale") && (
+                          <TableHead className="text-right">{tUi("cost.profit.bale")}</TableHead>
                         )}
-                        {col("costProfitTotal") && <TableHead className="text-right">Cost Profit</TableHead>}
-                        {col("hassanProfitTotal") && <TableHead className="text-right">Hassan's Profit</TableHead>}
+                        {col("hassanProfitBale") && (
+                          <TableHead className="text-right">{tUi("hassan.s.profit.bale")}</TableHead>
+                        )}
+                        {col("costProfitTotal") && <TableHead className="text-right">{tUi("cost.profit")}</TableHead>}
+                        {col("hassanProfitTotal") && (
+                          <TableHead className="text-right">{tUi("hassan.s.profit")}</TableHead>
+                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -774,15 +780,15 @@ export default function SalesReportDetail() {
                             </div>
                             <div className="grid grid-cols-2 gap-1 text-xs">
                               <div>
-                                <span className="text-muted-foreground">Qty: </span>
+                                <span className="text-muted-foreground">{tUi("qty")} </span>
                                 <span className="font-mono">{formatNumber(vg.totalQty)}</span>
                               </div>
                               <div>
-                                <span className="text-muted-foreground">Price/Bale: </span>
+                                <span className="text-muted-foreground">{tUi("price.bale.3")} </span>
                                 <span className="font-mono">{formatAmount(groupPpb)}</span>
                               </div>
                               <div>
-                                <span className="text-muted-foreground">Total Sales: </span>
+                                <span className="text-muted-foreground">{tUi("total.sales.2")} </span>
                                 <span className="font-mono">{formatAmount(vg.totalSales)}</span>
                               </div>
                             </div>
@@ -807,15 +813,15 @@ export default function SalesReportDetail() {
                                   <div className="font-medium">{item.stockItemName}</div>
                                   <div className="grid grid-cols-2 gap-1 mt-1">
                                     <div>
-                                      <span className="text-muted-foreground">Qty: </span>
+                                      <span className="text-muted-foreground">{tUi("qty")} </span>
                                       <span className="font-mono">{formatNumericValue(item.quantity)}</span>
                                     </div>
                                     <div>
-                                      <span className="text-muted-foreground">Price/Bale: </span>
+                                      <span className="text-muted-foreground">{tUi("price.bale.3")} </span>
                                       <span className="font-mono">{formatAmount(ppb)}</span>
                                     </div>
                                     <div>
-                                      <span className="text-muted-foreground">Sales: </span>
+                                      <span className="text-muted-foreground">{tUi("sales")} </span>
                                       <span className="font-mono">{formatAmount(item.totalSales)}</span>
                                     </div>
                                     <div>
@@ -826,7 +832,7 @@ export default function SalesReportDetail() {
                                       Hassan's: {formatAmount(Math.abs(item.configuredProfit))}
                                     </div>
                                     <div>
-                                      <span className="text-muted-foreground">Cost Price: </span>
+                                      <span className="text-muted-foreground">{tUi("cost.price.2")} </span>
                                       <span className="font-mono">{formatAmount(item.costPrice)}</span>
                                     </div>
                                     <div className={`font-mono ${profitColor(parseFloat(item.costProfit))}`}>
@@ -855,17 +861,21 @@ export default function SalesReportDetail() {
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead className="w-6"></TableHead>
-                        <TableHead>Item / Location</TableHead>
+                        <TableHead>{tUi("item.location")}</TableHead>
                         {col("qty") && <TableHead className="text-right">Qty</TableHead>}
-                        {col("costPrice") && <TableHead className="text-right">Cost Price</TableHead>}
-                        {col("hassanPrice") && <TableHead className="text-right">Hassan's Price</TableHead>}
-                        {col("pricePerBale") && <TableHead className="text-right">Price / Bale</TableHead>}
-                        {col("costProfitBale") && <TableHead className="text-right">Cost Profit / Bale</TableHead>}
-                        {col("hassanProfitBale") && (
-                          <TableHead className="text-right">Hassan's Profit / Bale</TableHead>
+                        {col("costPrice") && <TableHead className="text-right">{tUi("cost.price")}</TableHead>}
+                        {col("hassanPrice") && <TableHead className="text-right">{tUi("hassan.s.price")}</TableHead>}
+                        {col("pricePerBale") && <TableHead className="text-right">{tUi("price.bale.2")}</TableHead>}
+                        {col("costProfitBale") && (
+                          <TableHead className="text-right">{tUi("cost.profit.bale")}</TableHead>
                         )}
-                        {col("costProfitTotal") && <TableHead className="text-right">Cost Profit</TableHead>}
-                        {col("hassanProfitTotal") && <TableHead className="text-right">Hassan's Profit</TableHead>}
+                        {col("hassanProfitBale") && (
+                          <TableHead className="text-right">{tUi("hassan.s.profit.bale")}</TableHead>
+                        )}
+                        {col("costProfitTotal") && <TableHead className="text-right">{tUi("cost.profit")}</TableHead>}
+                        {col("hassanProfitTotal") && (
+                          <TableHead className="text-right">{tUi("hassan.s.profit")}</TableHead>
+                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1249,15 +1259,15 @@ export default function SalesReportDetail() {
                             </div>
                             <div className="grid grid-cols-2 gap-1 text-xs">
                               <div>
-                                <span className="text-muted-foreground">Qty: </span>
+                                <span className="text-muted-foreground">{tUi("qty")} </span>
                                 <span className="font-mono">{formatNumber(group.totalQty)}</span>
                               </div>
                               <div>
-                                <span className="text-muted-foreground">Sales: </span>
+                                <span className="text-muted-foreground">{tUi("sales")} </span>
                                 <span className="font-mono">{formatAmount(group.totalSales)}</span>
                               </div>
                               <div>
-                                <span className="text-muted-foreground">Cost: </span>
+                                <span className="text-muted-foreground">{tUi("cost")} </span>
                                 <span className="font-mono">{formatAmount(group.totalCost)}</span>
                               </div>
                             </div>
@@ -1319,11 +1329,11 @@ export default function SalesReportDetail() {
                                       </div>
                                       <div className="grid grid-cols-2 gap-1 text-xs pl-5">
                                         <div>
-                                          <span className="text-muted-foreground">Qty: </span>
+                                          <span className="text-muted-foreground">{tUi("qty")} </span>
                                           <span className="font-mono">{formatNumber(loc.totalQty)}</span>
                                         </div>
                                         <div>
-                                          <span className="text-muted-foreground">Sales: </span>
+                                          <span className="text-muted-foreground">{tUi("sales")} </span>
                                           <span className="font-mono">{formatAmount(loc.totalSales)}</span>
                                         </div>
                                       </div>
@@ -1350,11 +1360,11 @@ export default function SalesReportDetail() {
                                           </div>
                                           <div className="grid grid-cols-2 gap-1 mt-1">
                                             <div>
-                                              <span className="text-muted-foreground">Qty: </span>
+                                              <span className="text-muted-foreground">{tUi("qty")} </span>
                                               <span className="font-mono">{formatNumericValue(item.quantity)}</span>
                                             </div>
                                             <div>
-                                              <span className="text-muted-foreground">Sales: </span>
+                                              <span className="text-muted-foreground">{tUi("sales")} </span>
                                               <span className="font-mono">{formatAmount(item.totalSales)}</span>
                                             </div>
                                           </div>

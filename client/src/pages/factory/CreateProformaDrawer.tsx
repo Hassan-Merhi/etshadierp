@@ -11,6 +11,7 @@ import { AlertTriangle, Save, Loader2, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 const DRAFT_KEY = "create-proforma-draft-v2";
 
@@ -74,6 +75,7 @@ function clearDraft() {
 }
 
 export default function CreateProformaDrawer({ open, onClose, articleRows, onSuccess }: Props) {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -317,7 +319,7 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
         data-testid="dialog-create-proforma"
       >
         <DialogHeader className="px-5 py-4 border-b shrink-0">
-          <DialogTitle className="text-base">Create Proforma from Stock Allocation</DialogTitle>
+          <DialogTitle className="text-base">{tUi("create.proforma.from.stock.allocation")}</DialogTitle>
         </DialogHeader>
 
         {/* Top fields row */}
@@ -342,7 +344,7 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
                 data-testid="select-proforma-customer"
                 className={cn(errors.customerId && "border-destructive")}
               >
-                <SelectValue placeholder="Select customer…" />
+                <SelectValue placeholder={tUi("select.customer")} />
               </SelectTrigger>
               <SelectContent>
                 {customersQuery.isLoading && (
@@ -383,7 +385,7 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label className="text-xs font-medium">Status</Label>
+            <Label className="text-xs font-medium">{tUi("status")}</Label>
             <div className="flex items-center gap-2 h-9">
               <Switch checked={isActive} onCheckedChange={setIsActive} data-testid="switch-proforma-active" />
               <span className="text-sm text-muted-foreground">{isActive ? "Active" : "Inactive"}</span>
@@ -465,7 +467,9 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
                 <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[90px] text-muted-foreground">
                   Total KG
                 </th>
-                <th className="text-center px-3 py-2 font-medium border-b whitespace-nowrap min-w-[130px]">Price</th>
+                <th className="text-center px-3 py-2 font-medium border-b whitespace-nowrap min-w-[130px]">
+                  {tUi("price")}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -629,7 +633,7 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
                 {warningCount} over Free to Promise
               </span>
             )}
-            <span className="text-[10px] text-muted-foreground/60">Ctrl/⌘+S to save</span>
+            <span className="text-[10px] text-muted-foreground/60">{tUi("ctrl.s.to.save")}</span>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="default" onClick={onClose} data-testid="button-cancel-proforma">

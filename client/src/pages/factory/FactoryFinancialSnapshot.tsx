@@ -35,7 +35,9 @@ import type { CardKey, NetPositionData, PinnedRow, SnapshotData } from "./factor
 import { kg, usd } from "./factoryfinancialsnapshot/utils";
 import { KpiCard } from "./factoryfinancialsnapshot/components/KpiCard";
 import { SectionHeader } from "./factoryfinancialsnapshot/components/SectionHeader";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactoryFinancialSnapshot() {
+  const tUi = useFactoryText();
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -362,7 +364,7 @@ export default function FactoryFinancialSnapshot() {
           <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
             <div className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-muted-foreground" />
-              <PageHeader title="Financial Snapshot" />
+              <PageHeader title={tUi("financial.snapshot")} />
             </div>
             <div className="flex items-center gap-2">
               {lastUpdated && (
@@ -385,11 +387,11 @@ export default function FactoryFinancialSnapshot() {
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           {/* ── Section 1: Factory Floor ─────────────────────────────────── */}
           <div>
-            <SectionHeader title="Factory Floor" color="#10b981" />
+            <SectionHeader title={tUi("factory.floor")} color="#10b981" />
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <KpiCard
                 icon={Package}
-                title="Raw Material Value"
+                title={tUi("raw.material.value")}
                 value={computed ? usd(computed.rawMaterialValue) : "—"}
                 sub="Remaining stock"
                 color="green"
@@ -397,7 +399,7 @@ export default function FactoryFinancialSnapshot() {
               />
               <KpiCard
                 icon={Layers}
-                title="Mix Batches on Tables"
+                title={tUi("mix.batches.on.tables")}
                 value={computed ? usd(computed.mixBatchValue) : "—"}
                 sub="Active & open batches"
                 color="blue"
@@ -405,7 +407,7 @@ export default function FactoryFinancialSnapshot() {
               />
               <KpiCard
                 icon={Scale}
-                title="Bale Stock Weight"
+                title={tUi("bale.stock.weight")}
                 value={snapshot ? kg(snapshot.baleWeightTotal) : "—"}
                 sub={snapshot ? `${snapshot.baleCount.toLocaleString()} bales in stock` : undefined}
                 color="purple"
@@ -418,11 +420,11 @@ export default function FactoryFinancialSnapshot() {
 
           {/* ── Section 2: Balances & Credit ─────────────────────────────── */}
           <div>
-            <SectionHeader title="Balances & Credit" color="#f59e0b" />
+            <SectionHeader title={tUi("balances.credit")} color="#f59e0b" />
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {/* ── Supplier Balances (auto: all suppliers) ── */}
               {allLoading ? (
-                <KpiCard icon={TrendingDown} title="Supplier Balances" value="—" color="red" loading />
+                <KpiCard icon={TrendingDown} title={tUi("supplier.balances")} value="—" color="red" loading />
               ) : (
                 <Card data-testid="kpi-card-supplier">
                   <CardContent className="p-4">
@@ -436,7 +438,7 @@ export default function FactoryFinancialSnapshot() {
                           <TrendingDown className="h-4 w-4" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs text-muted-foreground font-medium">Supplier Balances</p>
+                          <p className="text-xs text-muted-foreground font-medium">{tUi("supplier.balances")}</p>
                           <p
                             className="text-lg font-semibold font-mono mt-0.5 text-red-600 dark:text-red-400"
                             data-testid="value-supplier"
@@ -503,7 +505,7 @@ export default function FactoryFinancialSnapshot() {
 
               {/* ── Customer Credit (auto: all Dr customers) ── */}
               {allLoading ? (
-                <KpiCard icon={TrendingUp} title="Customer Credit" value="—" color="green" loading />
+                <KpiCard icon={TrendingUp} title={tUi("customer.credit")} value="—" color="green" loading />
               ) : (
                 <Card data-testid="kpi-card-customer">
                   <CardContent className="p-4">
@@ -517,7 +519,7 @@ export default function FactoryFinancialSnapshot() {
                           <TrendingUp className="h-4 w-4" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs text-muted-foreground font-medium">Customer Credit</p>
+                          <p className="text-xs text-muted-foreground font-medium">{tUi("customer.credit")}</p>
                           <p
                             className="text-lg font-semibold font-mono mt-0.5 text-emerald-600 dark:text-emerald-400"
                             data-testid="value-customer"
@@ -558,7 +560,7 @@ export default function FactoryFinancialSnapshot() {
 
               {/* ── Worker Advances Outstanding (pinned) ── */}
               {allLoading ? (
-                <KpiCard icon={HardHat} title="Worker Advances Outstanding" value="—" color="amber" loading />
+                <KpiCard icon={HardHat} title={tUi("worker.advances.outstanding")} value="—" color="amber" loading />
               ) : (
                 <Card data-testid="kpi-card-advance">
                   <CardContent className="p-4">
@@ -572,13 +574,17 @@ export default function FactoryFinancialSnapshot() {
                           <HardHat className="h-4 w-4" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs text-muted-foreground font-medium">Worker Advances Outstanding</p>
+                          <p className="text-xs text-muted-foreground font-medium">
+                            {tUi("worker.advances.outstanding")}
+                          </p>
                           <p
                             className="text-lg font-semibold font-mono mt-0.5 text-amber-600 dark:text-amber-400"
                             data-testid="value-advance"
                           >
                             {computed.advanceCount === 0 ? (
-                              <span className="text-sm font-normal text-muted-foreground">No accounts selected</span>
+                              <span className="text-sm font-normal text-muted-foreground">
+                                {tUi("no.accounts.selected")}
+                              </span>
                             ) : (
                               usd(Math.abs(computed.advanceNet))
                             )}
@@ -662,11 +668,11 @@ export default function FactoryFinancialSnapshot() {
 
           {/* ── Section 3: Accounts & Finance ────────────────────────────── */}
           <div>
-            <SectionHeader title="Accounts & Finance" color="#6366f1" />
+            <SectionHeader title={tUi("accounts.finance")} color="#6366f1" />
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {/* ── Cash & Bank (manual pinned) ── */}
               {allLoading ? (
-                <KpiCard icon={Wallet} title="Cash & Bank" value="—" color="green" loading />
+                <KpiCard icon={Wallet} title={tUi("cash.bank")} value="—" color="green" loading />
               ) : (
                 <Card data-testid="kpi-card-cash-bank">
                   <CardContent className="p-4">
@@ -682,13 +688,15 @@ export default function FactoryFinancialSnapshot() {
                           <Wallet className="h-4 w-4" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs text-muted-foreground font-medium">Cash & Bank</p>
+                          <p className="text-xs text-muted-foreground font-medium">{tUi("cash.bank")}</p>
                           <p
                             className={`text-lg font-semibold font-mono mt-0.5 ${computed.cashBankTotal >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
                             data-testid="value-cash-bank"
                           >
                             {computed.cashBankCount === 0 ? (
-                              <span className="text-sm font-normal text-muted-foreground">No accounts selected</span>
+                              <span className="text-sm font-normal text-muted-foreground">
+                                {tUi("no.accounts.selected")}
+                              </span>
                             ) : (
                               usd(computed.cashBankTotal)
                             )}
@@ -769,7 +777,7 @@ export default function FactoryFinancialSnapshot() {
 
               {/* ── Agent Accounts (manual) ── */}
               {allLoading ? (
-                <KpiCard icon={UserRound} title="Agent Accounts" value="—" color="amber" loading />
+                <KpiCard icon={UserRound} title={tUi("agent.accounts")} value="—" color="amber" loading />
               ) : (
                 <Card data-testid="kpi-card-agents">
                   <CardContent className="p-4">
@@ -785,12 +793,14 @@ export default function FactoryFinancialSnapshot() {
                           <UserRound className="h-4 w-4" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs text-muted-foreground font-medium">Agent Accounts</p>
+                          <p className="text-xs text-muted-foreground font-medium">{tUi("agent.accounts")}</p>
                           <p
                             className={`text-lg font-semibold font-mono mt-0.5 ${computed.agentNet >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}
                           >
                             {computed.agentCount === 0 ? (
-                              <span className="text-sm font-normal text-muted-foreground">No accounts selected</span>
+                              <span className="text-sm font-normal text-muted-foreground">
+                                {tUi("no.accounts.selected")}
+                              </span>
                             ) : (
                               usd(Math.abs(computed.agentNet))
                             )}
@@ -872,7 +882,7 @@ export default function FactoryFinancialSnapshot() {
 
               {/* ── Freight / Embassy / Shipping (manual) ── */}
               {allLoading ? (
-                <KpiCard icon={Truck} title="Freight / Embassy / Shipping" value="—" color="amber" loading />
+                <KpiCard icon={Truck} title={tUi("freight.embassy.shipping")} value="—" color="amber" loading />
               ) : (
                 <Card data-testid="kpi-card-freight">
                   <CardContent className="p-4">
@@ -888,12 +898,14 @@ export default function FactoryFinancialSnapshot() {
                           <Truck className="h-4 w-4" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs text-muted-foreground font-medium">Freight / Embassy / Shipping</p>
+                          <p className="text-xs text-muted-foreground font-medium">{tUi("freight.embassy.shipping")}</p>
                           <p
                             className={`text-lg font-semibold font-mono mt-0.5 ${computed.freightNet >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"}`}
                           >
                             {computed.freightCount === 0 ? (
-                              <span className="text-sm font-normal text-muted-foreground">No accounts selected</span>
+                              <span className="text-sm font-normal text-muted-foreground">
+                                {tUi("no.accounts.selected")}
+                              </span>
                             ) : (
                               usd(Math.abs(computed.freightNet))
                             )}
@@ -1004,7 +1016,7 @@ export default function FactoryFinancialSnapshot() {
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input
                 className="pl-8 h-8 text-sm"
-                placeholder="Search accounts..."
+                placeholder={tUi("search.accounts")}
                 value={pickerSearch}
                 onChange={(e) => setPickerSearch(e.target.value)}
                 autoFocus

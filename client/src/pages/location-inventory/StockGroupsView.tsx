@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { InventoryLocation as Location } from "./locationInventoryTypes";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface StockGroupSummary {
   groupId: number | null;
@@ -94,6 +95,7 @@ export function StockGroupsView({
   setSelectedGroup,
   setItemCategoryFilter,
 }: StockGroupsViewProps) {
+  const tUi = useErpText();
   return (
     <>
       {/* Location title + action buttons */}
@@ -133,7 +135,7 @@ export function StockGroupsView({
                 </>
               )}
             </div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Stock Groups</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">{tUi("stock.groups.2")}</p>
           </div>
         </div>
 
@@ -175,10 +177,7 @@ export function StockGroupsView({
             <DropdownMenuItem onClick={() => handlePrintWithOption(true)} data-testid="menu-export-pdf-cost">
               <Printer className="h-4 w-4 mr-2" /> Export to PDF (with cost)
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handlePrintWithOption(false)}
-              data-testid="menu-export-pdf-nocost"
-            >
+            <DropdownMenuItem onClick={() => handlePrintWithOption(false)} data-testid="menu-export-pdf-nocost">
               <Printer className="h-4 w-4 mr-2" /> Export to PDF (without cost)
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -210,12 +209,7 @@ export function StockGroupsView({
         {!posUser && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 ml-auto"
-                data-testid="button-location-menu"
-              >
+              <Button variant="outline" size="sm" className="gap-1.5 ml-auto" data-testid="button-location-menu">
                 Location <ChevronDown className="h-3 w-3" />
               </Button>
             </DropdownMenuTrigger>
@@ -244,7 +238,7 @@ export function StockGroupsView({
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search stock groups by name..."
+            placeholder={tUi("search.stock.groups.by.name")}
             value={groupSearchTerm}
             onChange={(e) => setGroupSearchTerm(e.target.value)}
             className="pl-9"
@@ -256,11 +250,11 @@ export function StockGroupsView({
           onValueChange={(v) => setGroupCategoryFilter(v === "all" ? "" : v)}
         >
           <SelectTrigger className="w-48" data-testid="select-category-filter">
-            <SelectValue placeholder="All Categories" />
+            <SelectValue placeholder={tUi("all.categories")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            <SelectItem value="none">Uncategorized</SelectItem>
+            <SelectItem value="all">{tUi("all.categories")}</SelectItem>
+            <SelectItem value="none">{tUi("uncategorized")}</SelectItem>
             {categoriesList.map((cat) => (
               <SelectItem key={cat.id} value={String(cat.id)}>
                 {cat.name}
@@ -290,16 +284,16 @@ export function StockGroupsView({
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-muted/50 border-b">
-                <th className="text-left px-4 py-3 font-medium">Name</th>
-                <th className="text-center px-4 py-3 font-medium">Items</th>
-                <th className="text-right px-4 py-3 font-medium">Total Qty (BL)</th>
+                <th className="text-left px-4 py-3 font-medium">{tUi("name")}</th>
+                <th className="text-center px-4 py-3 font-medium">{tUi("items")}</th>
+                <th className="text-right px-4 py-3 font-medium">{tUi("total.qty.bl")}</th>
                 {!posUser && (
                   <>
-                    <th className="text-right px-4 py-3 font-medium">Avg Rate</th>
-                    <th className="text-right px-4 py-3 font-medium">Total Value</th>
+                    <th className="text-right px-4 py-3 font-medium">{tUi("avg.rate")}</th>
+                    <th className="text-right px-4 py-3 font-medium">{tUi("total.value")}</th>
                   </>
                 )}
-                <th className="text-right px-4 py-3 font-medium">Export</th>
+                <th className="text-right px-4 py-3 font-medium">{tUi("export")}</th>
               </tr>
             </thead>
             <tbody>
@@ -327,9 +321,7 @@ export function StockGroupsView({
                       <td className="px-4 py-3 text-right font-mono text-muted-foreground">
                         {formatAmount(g.averageRate)}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono font-semibold">
-                        {formatAmount(g.totalValue)}
-                      </td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold">{formatAmount(g.totalValue)}</td>
                     </>
                   )}
                   <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
@@ -365,11 +357,9 @@ export function StockGroupsView({
             </tbody>
             <tfoot>
               <tr className="bg-muted/50 border-t-2 font-semibold">
-                <td className="px-4 py-3 font-bold">Total</td>
+                <td className="px-4 py-3 font-bold">{tUi("total")}</td>
                 <td className="px-4 py-3 text-center">
-                  <Badge variant="secondary">
-                    {filteredStockGroups.reduce((s, g) => s + g.itemCount, 0)}
-                  </Badge>
+                  <Badge variant="secondary">{filteredStockGroups.reduce((s, g) => s + g.itemCount, 0)}</Badge>
                 </td>
                 <td className="px-4 py-3 text-right font-mono font-bold">
                   {Math.floor(filteredStockGroups.reduce((s, g) => s + g.totalQuantity, 0)).toLocaleString()}

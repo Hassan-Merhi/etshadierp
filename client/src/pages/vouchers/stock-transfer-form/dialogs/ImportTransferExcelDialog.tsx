@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Upload, CheckCircle, XCircle, Download, FileSpreadsheet } from "lucide-react";
+import { useErpText } from "@/i18n/modules/erp";
 
 export function ImportTransferExcelDialog({
   downloadImportTemplate,
@@ -64,6 +65,7 @@ export function ImportTransferExcelDialog({
   setImportDialogOpen: any;
   setImportNotes: any;
 }) {
+  const tUi = useErpText();
   return (
     <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
       <DialogContent className="w-[95vw] sm:max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -80,7 +82,7 @@ export function ImportTransferExcelDialog({
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex-1 w-full sm:w-auto">
-              <Label htmlFor="import-file">Excel File</Label>
+              <Label htmlFor="import-file">{tUi("excel.file")}</Label>
               <Input
                 id="import-file"
                 type="file"
@@ -104,10 +106,10 @@ export function ImportTransferExcelDialog({
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <Label htmlFor="import-dest-location">Destination Location</Label>
+              <Label htmlFor="import-dest-location">{tUi("destination.location")}</Label>
               <Select value={importDestLocation} onValueChange={setImportDestLocation}>
                 <SelectTrigger id="import-dest-location" className="mt-1" data-testid="select-import-dest-location">
-                  <SelectValue placeholder="Select destination..." />
+                  <SelectValue placeholder={tUi("select.destination.2")} />
                 </SelectTrigger>
                 <SelectContent>
                   {[...locations]
@@ -121,7 +123,7 @@ export function ImportTransferExcelDialog({
               </Select>
             </div>
             <div>
-              <Label htmlFor="import-date">Transfer Date</Label>
+              <Label htmlFor="import-date">{tUi("transfer.date")}</Label>
               <Input
                 id="import-date"
                 type="date"
@@ -133,12 +135,12 @@ export function ImportTransferExcelDialog({
             </div>
           </div>
           <div>
-            <Label htmlFor="import-notes">Notes (Optional)</Label>
+            <Label htmlFor="import-notes">{tUi("notes.optional.2")}</Label>
             <Textarea
               id="import-notes"
               value={importNotes}
               onChange={(e) => setImportNotes(e.target.value)}
-              placeholder="Optional notes for this transfer..."
+              placeholder={tUi("optional.notes.for.this.transfer.2")}
               rows={2}
               className="mt-1"
               data-testid="input-import-notes"
@@ -184,7 +186,7 @@ export function ImportTransferExcelDialog({
           </div>
           {importValidationResult?.errors && importValidationResult.errors.length > 0 && (
             <div className="p-3 border border-destructive rounded-md bg-destructive/10">
-              <p className="font-medium text-destructive mb-2">Validation Errors:</p>
+              <p className="font-medium text-destructive mb-2">{tUi("validation.errors.2")}</p>
               <ul className="list-disc list-inside space-y-1">
                 {importValidationResult.errors.map((error: string, index: number) => (
                   <li key={index} className="text-sm text-destructive">
@@ -203,12 +205,12 @@ export function ImportTransferExcelDialog({
                 <Table>
                   <TableHeader className="sticky top-0 z-20 bg-background">
                     <TableRow>
-                      <TableHead className="sticky left-0 bg-muted z-10">Source Location</TableHead>
-                      <TableHead>Barcode</TableHead>
-                      <TableHead>Item Name</TableHead>
-                      <TableHead className="text-right">Quantity</TableHead>
-                      <TableHead className="text-right">Available</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead className="sticky left-0 bg-muted z-10">{tUi("source.location")}</TableHead>
+                      <TableHead>{tUi("barcode")}</TableHead>
+                      <TableHead>{tUi("item.name")}</TableHead>
+                      <TableHead className="text-right">{tUi("quantity")}</TableHead>
+                      <TableHead className="text-right">{tUi("available")}</TableHead>
+                      <TableHead>{tUi("status")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -226,7 +228,9 @@ export function ImportTransferExcelDialog({
                           </TableCell>
                           <TableCell className="font-mono">{item.barcode}</TableCell>
                           <TableCell>
-                            {validation?.stockItemName || <span className="text-muted-foreground italic">Unknown</span>}
+                            {validation?.stockItemName || (
+                              <span className="text-muted-foreground italic">{tUi("unknown")}</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-right">{item.quantity}</TableCell>
                           <TableCell className="text-right">
@@ -246,7 +250,7 @@ export function ImportTransferExcelDialog({
                                 </div>
                               )
                             ) : (
-                              <span className="text-sm text-muted-foreground">Not validated</span>
+                              <span className="text-sm text-muted-foreground">{tUi("not.validated")}</span>
                             )}
                           </TableCell>
                         </TableRow>
@@ -270,7 +274,9 @@ export function ImportTransferExcelDialog({
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-medium truncate">
-                          {validation?.stockItemName || <span className="text-muted-foreground italic">Unknown</span>}
+                          {validation?.stockItemName || (
+                            <span className="text-muted-foreground italic">{tUi("unknown")}</span>
+                          )}
                         </span>
                         {validation ? (
                           hasError ? (

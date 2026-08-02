@@ -33,6 +33,7 @@ import {
   type A4DesignColor,
 } from "@/lib/labelHtml";
 import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface Location {
   id: number;
@@ -62,6 +63,7 @@ interface BaleRow {
 }
 
 export default function FactoryReprintLabels() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const { colors } = useLabelDesignColors();
   const appMode = useAppMode();
@@ -229,7 +231,7 @@ export default function FactoryReprintLabels() {
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <PageHeader title="Reprint Labels" icon={<Tag className="h-5 w-5" />} />
+          <PageHeader title={tUi("reprint.labels")} icon={<Tag className="h-5 w-5" />} />
           <p className="text-sm text-muted-foreground mt-0.5">
             Select a location, filter bales by name or reference, then print selected labels.
           </p>
@@ -241,7 +243,7 @@ export default function FactoryReprintLabels() {
       <Card className="p-4">
         <div className="flex items-center gap-3 flex-wrap">
           <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="text-sm font-medium">Location:</span>
+          <span className="text-sm font-medium">{tUi("location.2")}</span>
           <Select
             value={selectedLocationId}
             onValueChange={(val) => {
@@ -254,7 +256,7 @@ export default function FactoryReprintLabels() {
             data-testid="select-location"
           >
             <SelectTrigger className="w-[240px]" data-testid="select-location-trigger">
-              <SelectValue placeholder="Choose a location…" />
+              <SelectValue placeholder={tUi("choose.a.location")} />
             </SelectTrigger>
             <SelectContent>
               {locationsLoading ? (
@@ -287,7 +289,7 @@ export default function FactoryReprintLabels() {
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
-                placeholder="Filter by bale name or reference…"
+                placeholder={tUi("filter.by.bale.name.or.reference")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9"
@@ -316,7 +318,7 @@ export default function FactoryReprintLabels() {
                 <div className="relative mb-2">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                   <Input
-                    placeholder="Search article codes…"
+                    placeholder={tUi("search.article.codes")}
                     value={articleCodeSearch}
                     onChange={(e) => setArticleCodeSearch(e.target.value)}
                     className="pl-7 h-8 text-sm"
@@ -371,7 +373,7 @@ export default function FactoryReprintLabels() {
                   {uniqueArticleCodes.filter(
                     (c) => !articleCodeSearch.trim() || c.toLowerCase().includes(articleCodeSearch.toLowerCase())
                   ).length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-2">No article codes found</p>
+                    <p className="text-sm text-muted-foreground text-center py-2">{tUi("no.article.codes.found")}</p>
                   )}
                 </div>
               </PopoverContent>
@@ -409,7 +411,7 @@ export default function FactoryReprintLabels() {
           {/* Active article code filter chips */}
           {articleCodeFilters.size > 0 && (
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-xs text-muted-foreground">Filtering by:</span>
+              <span className="text-xs text-muted-foreground">{tUi("filtering.by")}</span>
               {Array.from(articleCodeFilters).map((code) => (
                 <Badge
                   key={code}
@@ -465,10 +467,10 @@ export default function FactoryReprintLabels() {
                   <thead className="sticky top-0 z-30 bg-muted/50">
                     <tr className="h-10">
                       <th className="w-10 px-3"></th>
-                      <th className="text-left px-3 font-medium">Reference No.</th>
-                      <th className="text-left px-3 font-medium">Bale Name</th>
-                      <th className="text-left px-3 font-medium">Article Code</th>
-                      <th className="text-right px-3 font-medium">Weight (KG)</th>
+                      <th className="text-left px-3 font-medium">{tUi("reference.no")}</th>
+                      <th className="text-left px-3 font-medium">{tUi("bale.name")}</th>
+                      <th className="text-left px-3 font-medium">{tUi("article.code")}</th>
+                      <th className="text-right px-3 font-medium">{tUi("weight.kg.2")}</th>
                       <th className="text-right px-3 font-medium">Pcs</th>
                     </tr>
                   </thead>
@@ -563,8 +565,8 @@ export default function FactoryReprintLabels() {
       <Dialog open={designPickerOpen} onOpenChange={setDesignPickerOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Choose A4 Label Design</DialogTitle>
-            <DialogDescription>Pick a color design for the A4 label sheet.</DialogDescription>
+            <DialogTitle>{tUi("choose.a4.label.design")}</DialogTitle>
+            <DialogDescription>{tUi("pick.a.color.design.for.the.a4.label.sheet")}</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-2 py-2">
             {colors.map((opt) => (

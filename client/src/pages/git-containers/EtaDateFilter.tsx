@@ -37,13 +37,7 @@ interface EtaDateFilterProps {
   testId?: string;
 }
 
-export function EtaDateFilter({
-  value,
-  onChange,
-  allEtaDates,
-  hasContainersWithNoEta,
-  testId,
-}: EtaDateFilterProps) {
+export function EtaDateFilter({ value, onChange, allEtaDates, hasContainersWithNoEta, testId }: EtaDateFilterProps) {
   const [expandedYears, setExpandedYears] = useState<Set<string>>(new Set());
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
 
@@ -132,9 +126,7 @@ export function EtaDateFilter({
 
   function toggleYear(y: string) {
     const next = new Set(selectedDates);
-    const allYearDates = Object.entries(tree[y] ?? {}).flatMap(([m, days]) =>
-      days.map((d) => `${y}-${m}-${d}`)
-    );
+    const allYearDates = Object.entries(tree[y] ?? {}).flatMap(([m, days]) => days.map((d) => `${y}-${m}-${d}`));
     if (yearState(y) === "checked") {
       allYearDates.forEach((d) => next.delete(d));
     } else {
@@ -190,18 +182,12 @@ export function EtaDateFilter({
 
       <PopoverContent className="w-52 p-1" align="start" sideOffset={4}>
         {/* ── Select All ── */}
-        <Row
-          checked={toRadix(overallState())}
-          label="(Select All)"
-          onClick={toggleAll}
-        />
+        <Row checked={toRadix(overallState())} label="(Select All)" onClick={toggleAll} />
 
         <div className="border-t my-1" />
 
         {/* ── No ETA ── */}
-        {hasContainersWithNoEta && (
-          <Row checked={includeNoEta} label="(No ETA)" onClick={toggleNoEta} />
-        )}
+        {hasContainersWithNoEta && <Row checked={includeNoEta} label="(No ETA)" onClick={toggleNoEta} />}
 
         {/* ── Year / Month / Day tree ── */}
         <div className="max-h-64 overflow-y-auto">
@@ -293,11 +279,7 @@ function Row({
             onToggleExpand?.();
           }}
         >
-          {expanded ? (
-            <ChevronDown className="h-3 w-3" />
-          ) : (
-            <ChevronRight className="h-3 w-3" />
-          )}
+          {expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
         </button>
       ) : (
         <span className="w-3 shrink-0" />

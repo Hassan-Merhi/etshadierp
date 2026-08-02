@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRightLeft } from "lucide-react";
 import { StatementResponse } from "./factorySupplierTypes";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface CurrencyPoolsProps {
   statementData: StatementResponse;
@@ -37,6 +38,7 @@ export function CurrencyPools({
   setFxConversionOpen,
   openFxConversionDialog,
 }: CurrencyPoolsProps) {
+  const tUi = useFactoryText();
   return (
     <div className="rounded-xl border overflow-hidden">
       <div className="flex items-center justify-between gap-2 flex-wrap px-4 py-3 border-b bg-muted/20">
@@ -44,7 +46,7 @@ export function CurrencyPools({
           className="flex items-center gap-2 cursor-pointer hover-elevate rounded px-1 py-0.5 flex-1"
           onClick={() => toggleStmtSection("currencyPools")}
         >
-          <span className="text-sm font-semibold">Currency Pools</span>
+          <span className="text-sm font-semibold">{tUi("currency.pools")}</span>
         </span>
         {statementData.currencyGroups.some(
           (g) => g.currencyCode !== "USD" && (parseFloat(g.netPayable) > 0 || parseFloat(g.totalCommission) > 0)
@@ -118,12 +120,14 @@ export function CurrencyPools({
                     <TableRow key={group.currencyCode}>
                       <TableCell className="font-semibold">
                         <Badge variant="outline">{group.currencyCode}</Badge>
-                        {isCommissionOnly && <span className="ml-2 text-xs text-muted-foreground">Commission</span>}
+                        {isCommissionOnly && (
+                          <span className="ml-2 text-xs text-muted-foreground">{tUi("commission")}</span>
+                        )}
                         {isCrossFreightPool && hasCommission && !isAutoSettled && (
-                          <span className="ml-2 text-xs text-muted-foreground">Freight + Commission</span>
+                          <span className="ml-2 text-xs text-muted-foreground">{tUi("freight.commission")}</span>
                         )}
                         {isAutoSettled && (
-                          <span className="ml-2 text-xs text-muted-foreground">Freight · In broker pool</span>
+                          <span className="ml-2 text-xs text-muted-foreground">{tUi("freight.in.broker.pool")}</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right text-sm tabular-nums">
@@ -186,7 +190,7 @@ export function CurrencyPools({
                       </TableCell>
                       <TableCell className="text-right text-sm tabular-nums font-bold">
                         {isAutoSettled ? (
-                          <span className="text-muted-foreground text-sm font-normal">In broker pool</span>
+                          <span className="text-muted-foreground text-sm font-normal">{tUi("in.broker.pool")}</span>
                         ) : isOverpaid ? (
                           <span className="text-green-600 dark:text-green-400">
                             {ccPrefix}

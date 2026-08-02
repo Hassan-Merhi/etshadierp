@@ -9,6 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface CombinedStockViewProps {
   allInventoryLoading: boolean;
@@ -28,12 +29,7 @@ interface CombinedStockViewProps {
   allStockCategoryFilter: string[];
   setAllStockCategoryFilter: (cats: string[] | ((prev: string[]) => string[])) => void;
   allStockSelectedRowIndex: number;
-  openMovement: (
-    locId: number | null,
-    locName: string | null,
-    stockItemId: number,
-    stockItemName: string
-  ) => void;
+  openMovement: (locId: number | null, locName: string | null, stockItemId: number, stockItemName: string) => void;
   formatAmount: (amt: number) => string;
   posUser?: any;
   allStockTableRef: React.RefObject<HTMLDivElement>;
@@ -61,14 +57,16 @@ export function CombinedStockView({
   posUser,
   allStockTableRef,
 }: CombinedStockViewProps) {
+  const tUi = useErpText();
   // Table columns: locations that actually have stock (derived from inventory data)
   const uniqueLocationNames = Array.from(new Map(allInventoryLocations.map((l) => [l.name, l])).values());
 
   // Dropdown options: full location list so empty locations are still selectable.
   // Falls back to inventory-derived list if allLocations wasn't passed.
-  const dropdownLocations = allLocations && allLocations.length > 0
-    ? [...allLocations].sort((a, b) => (a.name || "").localeCompare(b.name || ""))
-    : uniqueLocationNames;
+  const dropdownLocations =
+    allLocations && allLocations.length > 0
+      ? [...allLocations].sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+      : uniqueLocationNames;
   // Deduplicate categories by id (guard against any API-level duplicates)
   const uniqueCategories = Array.from(new Map(categoriesList.map((c) => [c.id, c])).values());
 
@@ -85,12 +83,12 @@ export function CombinedStockView({
           <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
             <Package className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-semibold">{filteredCombinedRows.length.toLocaleString()}</span>
-            <span className="text-xs text-muted-foreground">Items</span>
+            <span className="text-xs text-muted-foreground">{tUi("items")}</span>
           </div>
           <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
             <Warehouse className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-semibold">{uniqueLocationNames.length.toLocaleString()}</span>
-            <span className="text-xs text-muted-foreground">Locations</span>
+            <span className="text-xs text-muted-foreground">{tUi("locations")}</span>
           </div>
           {!posUser && (
             <div className="flex items-center gap-2 bg-primary/10 rounded-lg px-3 py-2">
@@ -109,7 +107,7 @@ export function CombinedStockView({
           <div className="relative flex-1 min-w-48">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search items by name or code..."
+              placeholder={tUi("search.items.by.name.or.code")}
               value={allStockSearchTerm}
               onChange={(e) => setAllStockSearchTerm(e.target.value)}
               className="pl-10"
@@ -121,10 +119,10 @@ export function CombinedStockView({
             onValueChange={(v) => setAllStockGroupFilter(v === "__all__" ? "" : v)}
           >
             <SelectTrigger className="w-full sm:w-48" data-testid="select-all-stock-group">
-              <SelectValue placeholder="All Groups" />
+              <SelectValue placeholder={tUi("all.groups")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">All Groups</SelectItem>
+              <SelectItem value="__all__">{tUi("all.groups")}</SelectItem>
               {allInventoryGroups.map((g) => (
                 <SelectItem key={String(g.id)} value={g.id === null ? "null" : String(g.id)}>
                   {g.name}
@@ -137,10 +135,10 @@ export function CombinedStockView({
             onValueChange={(v) => setAllStockLocationFilter(v === "__all__" ? "" : v)}
           >
             <SelectTrigger className="w-full sm:w-48" data-testid="select-all-stock-location">
-              <SelectValue placeholder="All Locations" />
+              <SelectValue placeholder={tUi("all.locations")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">All Locations</SelectItem>
+              <SelectItem value="__all__">{tUi("all.locations")}</SelectItem>
               {dropdownLocations.map((loc) => (
                 <SelectItem key={loc.id ?? loc.name} value={loc.name}>
                   {loc.name}
@@ -310,7 +308,7 @@ export function CombinedStockView({
                             "px-4 py-2 font-medium whitespace-nowrap sticky left-0 z-10 transition-colors cursor-pointer",
                             isSelected ? "bg-accent" : "bg-background"
                           )}
-                          title="View stock movement across all locations"
+                          title={tUi("view.stock.movement.across.all.locations")}
                           onClick={() => openMovement(null, null, row.stockItemId, row.stockItemName)}
                           data-testid={`button-allstock-name-${row.stockItemId}`}
                         >

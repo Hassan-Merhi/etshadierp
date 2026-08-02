@@ -56,7 +56,9 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import type { OrderDetail } from "./factoryinvoicedetail/types";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactoryInvoiceDetail() {
+  const tUi = useFactoryText();
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
@@ -632,14 +634,14 @@ export default function FactoryInvoiceDetail() {
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div className="flex flex-wrap gap-6">
           <div>
-            <p className="text-sm text-muted-foreground">Customer</p>
+            <p className="text-sm text-muted-foreground">{tUi("customer")}</p>
             <p className="font-semibold text-lg" data-testid="text-customer-name">
               {order.customerName || "-"}
             </p>
           </div>
           {order.containerNumber && (
             <div>
-              <p className="text-sm text-muted-foreground">Container No.</p>
+              <p className="text-sm text-muted-foreground">{tUi("container.no")}</p>
               <p className="font-semibold font-mono" data-testid="text-container-number">
                 {order.containerNumber}
               </p>
@@ -647,7 +649,7 @@ export default function FactoryInvoiceDetail() {
           )}
           {order.shippingCompany && (
             <div>
-              <p className="text-sm text-muted-foreground">Shipping</p>
+              <p className="text-sm text-muted-foreground">{tUi("shipping")}</p>
               <p className="font-semibold" data-testid="text-shipping-company">
                 {order.shippingCompany}
               </p>
@@ -655,7 +657,7 @@ export default function FactoryInvoiceDetail() {
           )}
           {order.destination && (
             <div>
-              <p className="text-sm text-muted-foreground">Destination</p>
+              <p className="text-sm text-muted-foreground">{tUi("destination")}</p>
               <p className="font-semibold" data-testid="text-destination">
                 {order.destination}
               </p>
@@ -718,7 +720,9 @@ export default function FactoryInvoiceDetail() {
             <DropdownMenuContent align="end" className="w-56">
               {isAdmin && (isLoadingStatus || isFinalized) && (
                 <>
-                  <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">View</DropdownMenuLabel>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                    {tUi("view")}
+                  </DropdownMenuLabel>
                   <DropdownMenuItem
                     onClick={() => navigate(`/factory/sales/pending-invoices/${order.id}/verify`)}
                     data-testid="button-proforma-vs-loaded"
@@ -732,7 +736,9 @@ export default function FactoryInvoiceDetail() {
 
               {isAdmin && (
                 <>
-                  <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Pricing</DropdownMenuLabel>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                    {tUi("pricing")}
+                  </DropdownMenuLabel>
                   {order.status !== "CANCELLED" && (
                     <DropdownMenuItem
                       onClick={() => repriceProductionMutation.mutate()}
@@ -770,7 +776,9 @@ export default function FactoryInvoiceDetail() {
                 </>
               )}
 
-              <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">Export</DropdownMenuLabel>
+              <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
+                {tUi("export")}
+              </DropdownMenuLabel>
               <DropdownMenuItem onClick={handleExportExcel} data-testid="button-export-excel">
                 <FileSpreadsheet className="h-4 w-4" />
                 Download Excel
@@ -825,7 +833,7 @@ export default function FactoryInvoiceDetail() {
         <AlertDialog open={revertDialogOpen} onOpenChange={setRevertDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Revert invoice to Draft?</AlertDialogTitle>
+              <AlertDialogTitle>{tUi("revert.invoice.to.draft")}</AlertDialogTitle>
               <AlertDialogDescription>
                 This will un-finalize {order.invoiceNumber || `Order #${order.id}`} and return it to Draft status. The
                 invoice number will be cleared and bales will be returned to "Reserved" state. Any recorded payments
@@ -833,7 +841,7 @@ export default function FactoryInvoiceDetail() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel data-testid="button-cancel-unfinalize">Cancel</AlertDialogCancel>
+              <AlertDialogCancel data-testid="button-cancel-unfinalize">{tUi("cancel")}</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => unfinalizeMutation.mutate()}
                 disabled={unfinalizeMutation.isPending}
@@ -848,14 +856,14 @@ export default function FactoryInvoiceDetail() {
         <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+              <AlertDialogTitle>{tUi("delete.invoice")}</AlertDialogTitle>
               <AlertDialogDescription>
                 This will permanently delete order {order.invoiceNumber || `#${order.id}`} for {order.customerName}. Any
                 bales assigned to this order will be returned to stock. This cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+              <AlertDialogCancel data-testid="button-cancel-delete">{tUi("cancel")}</AlertDialogCancel>
               <AlertDialogAction onClick={() => deleteMutation.mutate(order.id)} data-testid="button-confirm-delete">
                 Delete
               </AlertDialogAction>
@@ -871,7 +879,7 @@ export default function FactoryInvoiceDetail() {
             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2">
                 <Truck className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-semibold">Dispatch Batch</span>
+                <span className="text-sm font-semibold">{tUi("dispatch.batch")}</span>
                 {dispatchBatch?.batch && <span className="font-mono font-bold">{dispatchBatch.batch.batchNumber}</span>}
               </div>
               <Button
@@ -888,24 +896,24 @@ export default function FactoryInvoiceDetail() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 text-sm">
                 {dispatchBatch.proforma && (
                   <div>
-                    <p className="text-xs text-muted-foreground">Proforma</p>
+                    <p className="text-xs text-muted-foreground">{tUi("proforma")}</p>
                     <p>{dispatchBatch.proforma.name}</p>
                   </div>
                 )}
                 {dispatchBatch.customerName && (
                   <div>
-                    <p className="text-xs text-muted-foreground">Customer</p>
+                    <p className="text-xs text-muted-foreground">{tUi("customer")}</p>
                     <p>{dispatchBatch.customerName}</p>
                   </div>
                 )}
                 {dispatchBatch.totals && (
                   <>
                     <div>
-                      <p className="text-xs text-muted-foreground">Total Bales</p>
+                      <p className="text-xs text-muted-foreground">{tUi("total.bales")}</p>
                       <p className="font-mono font-medium">{dispatchBatch.totals.totalBales}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Rides</p>
+                      <p className="text-xs text-muted-foreground">{tUi("rides")}</p>
                       <p>
                         {dispatchBatch.rides?.length || 0} truck{dispatchBatch.rides?.length !== 1 ? "s" : ""}
                       </p>
@@ -914,7 +922,7 @@ export default function FactoryInvoiceDetail() {
                 )}
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground">Loading batch info…</p>
+              <p className="text-xs text-muted-foreground">{tUi("loading.batch.info")}</p>
             )}
           </CardContent>
         </Card>
@@ -925,11 +933,11 @@ export default function FactoryInvoiceDetail() {
           <TableHeader className="sticky top-0 z-30 bg-background">
             <TableRow>
               <TableHead className="w-[50px]">#</TableHead>
-              <TableHead>Article Code</TableHead>
-              <TableHead>Bale Name</TableHead>
+              <TableHead>{tUi("article.code")}</TableHead>
+              <TableHead>{tUi("bale.name")}</TableHead>
               <TableHead className="text-right">Qty</TableHead>
-              <TableHead className="text-right">Weight/Bale</TableHead>
-              <TableHead className="text-right">Total Weight</TableHead>
+              <TableHead className="text-right">{tUi("weight.bale")}</TableHead>
+              <TableHead className="text-right">{tUi("total.weight")}</TableHead>
               {isAdmin &&
                 (() => {
                   const anyPerKg = sortedLines.some((l) => l.pricingMode === "per_kg");
@@ -943,7 +951,9 @@ export default function FactoryInvoiceDetail() {
                   );
                 })()}
               {isAdmin && (
-                <TableHead className={`text-right${hideExportSelling ? " print:hidden" : ""}`}>Total Price</TableHead>
+                <TableHead className={`text-right${hideExportSelling ? " print:hidden" : ""}`}>
+                  {tUi("total.price")}
+                </TableHead>
               )}
             </TableRow>
           </TableHeader>
@@ -970,7 +980,7 @@ export default function FactoryInvoiceDetail() {
                       className="text-left hover-elevate rounded-md px-1 -mx-1 py-0.5 font-medium underline-offset-2 hover:underline"
                       onClick={() => setBaleRefArticle({ code: line.articleCode, name: line.baleName })}
                       data-testid={`button-bale-refs-${idx}`}
-                      title="Click to see all reference numbers"
+                      title={tUi("click.to.see.all.reference.numbers")}
                     >
                       {line.baleName}
                     </button>
@@ -1027,7 +1037,7 @@ export default function FactoryInvoiceDetail() {
                                 onClick={() => startEdit(line.articleCode, line.pricePerBale)}
                                 className="group flex items-center justify-end gap-1 w-full hover-elevate rounded-md px-1 py-0.5"
                                 data-testid={`button-edit-price-${idx}`}
-                                title="Click to edit price"
+                                title={tUi("click.to.edit.price")}
                               >
                                 <span>
                                   {displayRate.toLocaleString(undefined, {
@@ -1178,7 +1188,7 @@ export default function FactoryInvoiceDetail() {
                         }
                       >
                         <SelectTrigger className="h-8 text-xs flex-1" data-testid={`select-charge-ledger-${charge.id}`}>
-                          <SelectValue placeholder="Select ledger account..." />
+                          <SelectValue placeholder={tUi("select.ledger.account")} />
                         </SelectTrigger>
                         <SelectContent>
                           {ledgerAccounts.map((acc) => (
@@ -1231,7 +1241,7 @@ export default function FactoryInvoiceDetail() {
                 <div className="space-y-2">
                   <div className="grid grid-cols-2 gap-2">
                     <Input
-                      placeholder="Charge name"
+                      placeholder={tUi("charge.name.2")}
                       value={newChargeName}
                       onChange={(e) => setNewChargeName(e.target.value)}
                       className="text-sm"
@@ -1239,7 +1249,7 @@ export default function FactoryInvoiceDetail() {
                     />
                     <Input
                       type="number"
-                      placeholder="Amount"
+                      placeholder={tUi("amount")}
                       value={newChargeAmount}
                       onChange={(e) => setNewChargeAmount(e.target.value)}
                       className="text-sm font-mono"
@@ -1252,14 +1262,14 @@ export default function FactoryInvoiceDetail() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="FREIGHT">Freight</SelectItem>
-                        <SelectItem value="CLEARANCE">Clearance</SelectItem>
-                        <SelectItem value="OTHER">Other</SelectItem>
+                        <SelectItem value="FREIGHT">{tUi("freight")}</SelectItem>
+                        <SelectItem value="CLEARANCE">{tUi("clearance")}</SelectItem>
+                        <SelectItem value="OTHER">{tUi("other")}</SelectItem>
                       </SelectContent>
                     </Select>
                     <Select value={newChargeLedgerId} onValueChange={setNewChargeLedgerId}>
                       <SelectTrigger className="text-sm" data-testid="select-new-charge-ledger">
-                        <SelectValue placeholder="Ledger account..." />
+                        <SelectValue placeholder={tUi("ledger.account")} />
                       </SelectTrigger>
                       <SelectContent>
                         {ledgerAccounts.map((acc) => (
@@ -1270,7 +1280,9 @@ export default function FactoryInvoiceDetail() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <p className="text-xs text-muted-foreground">Saving will immediately post an accounting voucher.</p>
+                  <p className="text-xs text-muted-foreground">
+                    {tUi("saving.will.immediately.post.an.accounting.vouch")}
+                  </p>
                   <div className="flex items-center gap-2">
                     <Button
                       size="sm"
@@ -1330,19 +1342,19 @@ export default function FactoryInvoiceDetail() {
           {isAdmin && (
             <>
               <div className="flex items-center justify-between gap-2 text-sm">
-                <span>Subtotal (Bales)</span>
+                <span>{tUi("subtotal.bales")}</span>
                 <span className="font-mono" data-testid="text-subtotal">
                   {subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-2 text-sm">
-                <span>Total Charges</span>
+                <span>{tUi("total.charges")}</span>
                 <span className="font-mono" data-testid="text-total-charges">
                   {totalCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="border-t pt-2 flex items-center justify-between gap-2">
-                <span className="font-semibold">Grand Total</span>
+                <span className="font-semibold">{tUi("grand.total")}</span>
                 <span className="font-mono font-bold text-lg" data-testid="text-grand-total">
                   {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                 </span>
@@ -1350,11 +1362,11 @@ export default function FactoryInvoiceDetail() {
             </>
           )}
           <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-            <span>Total Bales Qty</span>
+            <span>{tUi("total.bales.qty")}</span>
             <span data-testid="text-total-bales-qty">{totalBalesQty}</span>
           </div>
           <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-            <span>Total Weight</span>
+            <span>{tUi("total.weight")}</span>
             <span className="font-mono" data-testid="text-total-weight-kg">
               {totalWeightKg.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} kg
             </span>
@@ -1365,18 +1377,18 @@ export default function FactoryInvoiceDetail() {
       <Dialog open={showProformaDialog} onOpenChange={setShowProformaDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Apply Proforma Prices</DialogTitle>
+            <DialogTitle>{tUi("apply.proforma.prices")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               Select a proforma to apply its article prices to all matching bales in this order.
             </p>
             {proformas.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">No proformas found for this customer.</p>
+              <p className="text-sm text-muted-foreground italic">{tUi("no.proformas.found.for.this.customer")}</p>
             ) : (
               <Select value={selectedProformaId} onValueChange={setSelectedProformaId}>
                 <SelectTrigger data-testid="select-proforma">
-                  <SelectValue placeholder="Select a proforma..." />
+                  <SelectValue placeholder={tUi("select.a.proforma")} />
                 </SelectTrigger>
                 <SelectContent>
                   {proformas.map((p) => (
@@ -1393,7 +1405,9 @@ export default function FactoryInvoiceDetail() {
                 if (!pf || pf.lines.length === 0) return null;
                 return (
                   <div className="rounded-md border p-3 space-y-1 max-h-48 overflow-y-auto">
-                    <p className="text-xs font-medium text-muted-foreground mb-2">Price lines in this proforma:</p>
+                    <p className="text-xs font-medium text-muted-foreground mb-2">
+                      {tUi("price.lines.in.this.proforma")}
+                    </p>
                     {pf.lines.map((l, i) => (
                       <div key={i} className="flex justify-between text-sm">
                         <span className="text-muted-foreground">{l.articleCode}</span>
@@ -1475,7 +1489,7 @@ export default function FactoryInvoiceDetail() {
                               className="absolute -top-1.5 -left-1.5 opacity-0 group-hover:opacity-100 bg-background border rounded-full p-0.5 hover-elevate transition-opacity"
                               onClick={() => setRemoveBaleState({ orderBaleId: b.id, reference: b.baleReference })}
                               data-testid={`button-remove-bale-${b.id}`}
-                              title="Remove this bale and return to stock"
+                              title={tUi("remove.this.bale.and.return.to.stock")}
                             >
                               <Trash2 className="h-3 w-3 text-destructive" />
                             </button>
@@ -1486,7 +1500,7 @@ export default function FactoryInvoiceDetail() {
                                 setNewRefInput("");
                               }}
                               data-testid={`button-exchange-bale-${b.id}`}
-                              title="Exchange this bale for another"
+                              title={tUi("exchange.this.bale.for.another")}
                             >
                               <ArrowLeftRight className="h-3 w-3" />
                             </button>
@@ -1510,14 +1524,14 @@ export default function FactoryInvoiceDetail() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove bale from invoice?</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("remove.bale.from.invoice")}</AlertDialogTitle>
             <AlertDialogDescription>
               Bale <span className="font-mono font-medium">{removeBaleState?.reference}</span> will be removed from this
               invoice and returned to stock. The invoice totals will update automatically.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-remove-bale">Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-remove-bale">{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => removeBaleState && removeBaleMutation.mutate(removeBaleState.orderBaleId)}
               disabled={removeBaleMutation.isPending}
@@ -1549,11 +1563,11 @@ export default function FactoryInvoiceDetail() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
-              <span className="text-muted-foreground">Removing: </span>
+              <span className="text-muted-foreground">{tUi("removing")} </span>
               <span className="font-mono font-medium">{exchangeBale?.reference}</span>
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Replacement bale reference</label>
+              <label className="text-sm font-medium">{tUi("replacement.bale.reference")}</label>
               <Input
                 placeholder="e.g. REF12345"
                 value={newRefInput}

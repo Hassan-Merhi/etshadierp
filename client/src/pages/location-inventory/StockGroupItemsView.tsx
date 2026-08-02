@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { InventoryTable } from "./InventoryTable";
 import type { InventoryItem, StockGroupSummary } from "./locationInventoryTypes";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface StockGroupItemsViewProps {
   selectedGroup: StockGroupSummary;
@@ -42,6 +43,7 @@ export function StockGroupItemsView({
   navigate,
   inventory,
 }: StockGroupItemsViewProps) {
+  const tUi = useErpText();
   return (
     <>
       {/* Stats bar */}
@@ -63,10 +65,8 @@ export function StockGroupItemsView({
             </span>
             {!posUser && (
               <span>
-                <span className="font-semibold text-foreground">
-                  {formatAmount(selectedGroup.totalValue)}
-                </span>{" "}
-                total value
+                <span className="font-semibold text-foreground">{formatAmount(selectedGroup.totalValue)}</span> total
+                value
               </span>
             )}
           </div>
@@ -89,7 +89,7 @@ export function StockGroupItemsView({
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search items by name..."
+            placeholder={tUi("search.items.by.name")}
             value={itemSearchTerm}
             onChange={(e) => setItemSearchTerm(e.target.value)}
             className="pl-9"
@@ -101,11 +101,11 @@ export function StockGroupItemsView({
           onValueChange={(v) => setItemCategoryFilter(v === "all" ? [] : [v])}
         >
           <SelectTrigger className="w-48">
-            <SelectValue placeholder="All Categories" />
+            <SelectValue placeholder={tUi("all.categories")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            <SelectItem value="none">Uncategorized</SelectItem>
+            <SelectItem value="all">{tUi("all.categories")}</SelectItem>
+            <SelectItem value="none">{tUi("uncategorized")}</SelectItem>
             {categoriesList.map((cat) => (
               <SelectItem key={cat.id} value={String(cat.id)}>
                 {cat.name}

@@ -58,6 +58,7 @@ import { RepayByMonthDialog } from "./../dialogs/RepayByMonthDialog";
 import { ConfirmRepaymentDialog } from "./../dialogs/ConfirmRepaymentDialog";
 import { PostAccountingPreviewDialog } from "./../dialogs/PostAccountingPreviewDialog";
 import { ReconcileBalancesDialog } from "./../dialogs/ReconcileBalancesDialog";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export interface AuditAdvance {
   id: number;
@@ -73,6 +74,7 @@ export interface AuditAdvance {
 }
 
 export function AdvancesView() {
+  const tUi = useFactoryText();
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
 
@@ -532,14 +534,14 @@ export function AdvancesView() {
           <>
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
               <Banknote className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Total Given</span>
+              <span className="text-muted-foreground">{tUi("total.given")}</span>
               <span className="font-semibold font-mono" data-testid="text-advances-total-given">
                 {fmt(stats.totalGiven)}
               </span>
             </div>
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
               <Banknote className="h-4 w-4 text-amber-500" />
-              <span className="text-muted-foreground">Outstanding</span>
+              <span className="text-muted-foreground">{tUi("outstanding")}</span>
               <span
                 className="font-semibold font-mono text-amber-600 dark:text-amber-400"
                 data-testid="text-advances-outstanding"
@@ -549,7 +551,7 @@ export function AdvancesView() {
             </div>
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
               <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Active</span>
+              <span className="text-muted-foreground">{tUi("active")}</span>
               <span className="font-semibold" data-testid="text-advances-active-count">
                 {stats.outstandingCount}
               </span>
@@ -562,10 +564,10 @@ export function AdvancesView() {
       <div className="flex flex-wrap items-center gap-3">
         <Select value={filterWorker} onValueChange={setFilterWorker}>
           <SelectTrigger className="w-48" data-testid="select-filter-worker">
-            <SelectValue placeholder="All Workers" />
+            <SelectValue placeholder={tUi("all.workers.2")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Workers</SelectItem>
+            <SelectItem value="all">{tUi("all.workers.2")}</SelectItem>
             {(workers || []).map((w) => (
               <SelectItem key={w.id} value={String(w.id)}>
                 {w.fullName}
@@ -575,12 +577,12 @@ export function AdvancesView() {
         </Select>
         <Select value={filterStatus} onValueChange={setFilterStatus}>
           <SelectTrigger className="w-40" data-testid="select-filter-status">
-            <SelectValue placeholder="All Status" />
+            <SelectValue placeholder={tUi("all.status")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="outstanding">Outstanding</SelectItem>
-            <SelectItem value="paid">Fully Paid</SelectItem>
+            <SelectItem value="all">{tUi("all.status")}</SelectItem>
+            <SelectItem value="outstanding">{tUi("outstanding")}</SelectItem>
+            <SelectItem value="paid">{tUi("fully.paid")}</SelectItem>
           </SelectContent>
         </Select>
         <div className="ml-auto flex items-center gap-2 flex-wrap">
@@ -641,7 +643,7 @@ export function AdvancesView() {
           <div className="flex items-center gap-2 ml-auto flex-wrap">
             <Select value={bulkCashAccountId} onValueChange={setBulkCashAccountId}>
               <SelectTrigger className="w-52" data-testid="select-bulk-cash-account">
-                <SelectValue placeholder="Select cash account…" />
+                <SelectValue placeholder={tUi("select.cash.account.2")} />
               </SelectTrigger>
               <SelectContent>
                 {(cashAccounts || []).map((a) => (
@@ -679,16 +681,16 @@ export function AdvancesView() {
                     }
                   }}
                   data-testid="checkbox-select-all"
-                  aria-label="Select all"
+                  aria-label={tUi("select.all")}
                 />
               </TableHead>
-              <TableHead className="text-xs h-9 font-semibold">Worker</TableHead>
-              <TableHead className="text-xs h-9 font-semibold">Date</TableHead>
-              <TableHead className="text-xs h-9 font-semibold text-right">Amount</TableHead>
-              <TableHead className="text-xs h-9 font-semibold text-right">Remaining</TableHead>
-              <TableHead className="text-xs h-9 font-semibold">Type</TableHead>
-              <TableHead className="text-xs h-9 font-semibold">Status</TableHead>
-              <TableHead className="text-xs h-9 font-semibold">Notes</TableHead>
+              <TableHead className="text-xs h-9 font-semibold">{tUi("worker")}</TableHead>
+              <TableHead className="text-xs h-9 font-semibold">{tUi("date")}</TableHead>
+              <TableHead className="text-xs h-9 font-semibold text-right">{tUi("amount")}</TableHead>
+              <TableHead className="text-xs h-9 font-semibold text-right">{tUi("remaining")}</TableHead>
+              <TableHead className="text-xs h-9 font-semibold">{tUi("type")}</TableHead>
+              <TableHead className="text-xs h-9 font-semibold">{tUi("status")}</TableHead>
+              <TableHead className="text-xs h-9 font-semibold">{tUi("notes")}</TableHead>
               <TableHead className="text-xs h-9 w-12"></TableHead>
             </TableRow>
           </TableHeader>
@@ -730,7 +732,7 @@ export function AdvancesView() {
                     <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
                       <Banknote className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <p className="text-sm font-medium">No advances found</p>
+                    <p className="text-sm font-medium">{tUi("no.advances.found")}</p>
                     <p className="text-xs text-muted-foreground">
                       {filterWorker !== "all" || filterStatus !== "all"
                         ? "Try adjusting your filters"
@@ -815,7 +817,7 @@ export function AdvancesView() {
                           variant="ghost"
                           size="icon"
                           onClick={() => setReverseTarget(adv)}
-                          title="Reverse this advance"
+                          title={tUi("reverse.this.advance")}
                           data-testid={`button-reverse-advance-${adv.id}`}
                         >
                           <RotateCcw className="h-4 w-4 text-amber-600 dark:text-amber-400" />
@@ -866,7 +868,7 @@ export function AdvancesView() {
       <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Advance</DialogTitle>
+            <DialogTitle>{tUi("delete.advance")}</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete this advance of {fmt(deleteTarget?.amount)} for {deleteTarget?.workerName}
               ?

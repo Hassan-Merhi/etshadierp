@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowRightLeft, FileText, ChevronRight } from "lucide-react";
 import { StatementResponse, SupplierWithBalance } from "./factorySupplierTypes";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface LinkedSupplierExposureProps {
   statementData: StatementResponse;
@@ -35,6 +36,7 @@ export function LinkedSupplierExposure({
   formatNum,
   openFxConversionDialog,
 }: LinkedSupplierExposureProps) {
+  const tUi = useFactoryText();
   return (
     <div className="rounded-xl border overflow-hidden">
       <div
@@ -42,7 +44,7 @@ export function LinkedSupplierExposure({
         onClick={() => toggleStmtSection("linkedSuppliers")}
       >
         <span className="flex items-center gap-2 flex-1">
-          <span className="text-sm font-semibold">Linked Supplier Exposure</span>
+          <span className="text-sm font-semibold">{tUi("linked.supplier.exposure")}</span>
           <ChevronRight
             className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("linkedSuppliers") ? "" : "rotate-180"}`}
           />

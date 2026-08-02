@@ -3,22 +3,34 @@
  *
  * Extracted from FactoryStatusBuilder.tsx during the Phase 4 god-file split.
  */
-import {useState, useEffect} from "react";
-import {Button} from "@/components/ui/button";
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter} from "@/components/ui/dialog";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import type {LinkDialogState, StatusBuilderSheet} from "../types";
-import {fmt, resolveCellValue} from "../utils";
+import type { LinkDialogState, StatusBuilderSheet } from "../types";
+import { fmt, resolveCellValue } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function LinkDialog({
-  state, sheets, onClose, onSave,
+  state,
+  sheets,
+  onClose,
+  onSave,
 }: {
   state: LinkDialogState;
   sheets: StatusBuilderSheet[];
   onClose: () => void;
   onSave: (sourceSheetId: string, sourceRowId: string, sourceColId: string) => void;
 }) {
+  const tUi = useFactoryText();
   const [selSheetId, setSelSheetId] = useState("");
   const [selRowId, setSelRowId] = useState("");
   const [selColId, setSelColId] = useState("");
@@ -29,7 +41,7 @@ export function LinkDialog({
       setSelRowId(state.sourceRowId || "");
       setSelColId(state.sourceColId || "");
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.open]);
 
   const srcSheet = sheets.find((s) => s.stableId === selSheetId);
@@ -38,9 +50,13 @@ export function LinkDialog({
   let previewVal = "—";
   if (selSheetId && selRowId && selColId) {
     const res = resolveCellValue(sheets, selSheetId, selRowId, selColId);
-    if (res.broken) { previewVal = "#REF!"; previewLabel = "Missing source"; }
-    else if (res.circular) { previewVal = "#CYCLE!"; previewLabel = "Circular reference"; }
-    else if (res.value !== null) previewVal = fmt(res.value);
+    if (res.broken) {
+      previewVal = "#REF!";
+      previewLabel = "Missing source";
+    } else if (res.circular) {
+      previewVal = "#CYCLE!";
+      previewLabel = "Circular reference";
+    } else if (res.value !== null) previewVal = fmt(res.value);
 
     const sCol = srcSheet?.columns.find((c) => c.id === selColId);
     if (selRowId === "__diff__") {
@@ -54,62 +70,74 @@ export function LinkDialog({
   const canSave = !!selSheetId && !!selRowId && !!selColId;
 
   return (
-    <Dialog open={state.open} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog
+      open={state.open}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Link Cell</DialogTitle>
-          <DialogDescription>
-            Choose the source page, row, and column to pull data from.
-          </DialogDescription>
+          <DialogTitle>{tUi("link.cell")}</DialogTitle>
+          <DialogDescription>Choose the source page, row, and column to pull data from.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-1">
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Source Page</label>
+            <label className="text-sm font-medium">{tUi("source.page")}</label>
             <Select
               value={selSheetId}
-              onValueChange={(v) => { setSelSheetId(v); setSelRowId(""); setSelColId(""); }}
+              onValueChange={(v) => {
+                setSelSheetId(v);
+                setSelRowId("");
+                setSelColId("");
+              }}
             >
               <SelectTrigger data-testid="sb-select-link-sheet">
-                <SelectValue placeholder="Select page…" />
+                <SelectValue placeholder={tUi("select.page")} />
               </SelectTrigger>
               <SelectContent>
                 {sheets.map((s) => (
-                  <SelectItem key={s.stableId} value={s.stableId}>{s.name}</SelectItem>
+                  <SelectItem key={s.stableId} value={s.stableId}>
+                    {s.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Source Row</label>
+            <label className="text-sm font-medium">{tUi("source.row")}</label>
             <Select
               value={selRowId}
-              onValueChange={(v) => { setSelRowId(v); setSelColId(""); }}
+              onValueChange={(v) => {
+                setSelRowId(v);
+                setSelColId("");
+              }}
               disabled={!srcSheet}
             >
               <SelectTrigger data-testid="sb-select-link-row">
                 <SelectValue placeholder={srcSheet ? "Select row…" : "Select page first"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__diff__">Difference (auto-calculated)</SelectItem>
+                <SelectItem value="__diff__">{tUi("difference.auto.calculated")}</SelectItem>
                 {srcSheet?.rows.map((r) => (
-                  <SelectItem key={r.id} value={r.id}>{r.label || "(row)"}</SelectItem>
+                  <SelectItem key={r.id} value={r.id}>
+                    {r.label || "(row)"}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Source Column</label>
-            <Select
-              value={selColId}
-              onValueChange={setSelColId}
-              disabled={!selRowId}
-            >
+            <label className="text-sm font-medium">{tUi("source.column")}</label>
+            <Select value={selColId} onValueChange={setSelColId} disabled={!selRowId}>
               <SelectTrigger data-testid="sb-select-link-col">
                 <SelectValue placeholder={selRowId ? "Select column…" : "Select row first"} />
               </SelectTrigger>
               <SelectContent>
                 {srcSheet?.columns.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.label || "(col)"}</SelectItem>
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.label || "(col)"}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -117,15 +145,23 @@ export function LinkDialog({
           {selColId && (
             <div className="rounded-md border bg-muted/40 px-3 py-2">
               <p className="text-xs text-muted-foreground mb-1">{previewLabel}</p>
-              <p className={`text-sm font-mono font-medium ${previewVal === "#REF!" || previewVal === "#CYCLE!" ? "text-red-500" : ""}`}>
+              <p
+                className={`text-sm font-mono font-medium ${previewVal === "#REF!" || previewVal === "#CYCLE!" ? "text-red-500" : ""}`}
+              >
                 {previewVal}
               </p>
             </div>
           )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} data-testid="sb-button-link-cancel">Cancel</Button>
-          <Button onClick={() => onSave(selSheetId, selRowId, selColId)} disabled={!canSave} data-testid="sb-button-link-save">
+          <Button variant="outline" onClick={onClose} data-testid="sb-button-link-cancel">
+            {tUi("cancel")}
+          </Button>
+          <Button
+            onClick={() => onSave(selSheetId, selRowId, selColId)}
+            disabled={!canSave}
+            data-testid="sb-button-link-save"
+          >
             Save Link
           </Button>
         </DialogFooter>

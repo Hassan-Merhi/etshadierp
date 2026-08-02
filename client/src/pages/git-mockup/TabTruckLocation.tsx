@@ -88,7 +88,7 @@ export function TabTruckLocation() {
         const msg =
           apiErr?.status === 413 || String(apiErr?.message).includes("too large")
             ? "Tracking report is too large to send to WhatsApp."
-            : apiErr?.message ?? "Failed to send";
+            : (apiErr?.message ?? "Failed to send");
         toast({ title: "Failed to send", description: msg, variant: "destructive" });
         return;
       }

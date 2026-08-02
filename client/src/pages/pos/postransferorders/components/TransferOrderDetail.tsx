@@ -3,12 +3,13 @@
  *
  * Extracted from PosTransferOrders.tsx during the Phase 4 god-file split.
  */
-import {useQuery} from "@tanstack/react-query";
-import {ArrowLeft} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Skeleton} from "@/components/ui/skeleton";
-import type {PosUser, TransferDetail} from "../types";
-import {EditableTransferDetail} from "./EditableTransferDetail";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import type { PosUser, TransferDetail } from "../types";
+import { EditableTransferDetail } from "./EditableTransferDetail";
+import { usePosText } from "@/i18n/modules/pos";
 
 export // ─── Detail shell ─────────────────────────────────────────────────────────────
 function TransferOrderDetail({
@@ -20,6 +21,7 @@ function TransferOrderDetail({
   posUser: PosUser;
   onBack: () => void;
 }) {
+  const tUi = usePosText();
   const { data: detail, isLoading } = useQuery<TransferDetail>({
     queryKey: ["/api/pos-transfer-detail", voucherId],
     queryFn: async () => {
@@ -45,7 +47,7 @@ function TransferOrderDetail({
           <ArrowLeft className="h-4 w-4 mr-1.5" />
           Back
         </Button>
-        <p className="text-sm text-destructive">Failed to load order.</p>
+        <p className="text-sm text-destructive">{tUi("failed.to.load.order")}</p>
       </div>
     );
   }

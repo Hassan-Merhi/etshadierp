@@ -19,6 +19,7 @@ import { GuaranteeForm } from "./GuaranteeForm";
 import { EndContractForm } from "./EndContractForm";
 import { EditInfoForm } from "./EditInfoForm";
 import { LedgerView } from "./LedgerView";
+import { useErpText } from "@/i18n/modules/erp";
 
 export // ──────────────────────────────────────────────────────────
 // UNIT ACTION DIALOG (4 tabs + ledger)
@@ -36,6 +37,7 @@ function UnitActionDialog({
   unitType: "WAREHOUSE" | "SHOP";
   testIdPrefix: string;
 }) {
+  const tUi = useErpText();
   const apiBase = useApiBase();
   const { data: detail, isLoading } = useQuery<{
     unit: Unit;
@@ -65,7 +67,7 @@ function UnitActionDialog({
           <DialogTitle className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline">{unit.unitNumber}</Badge>
             {contract && <span className="text-base font-normal text-muted-foreground">— {contract.tenantName}</span>}
-            {!contract && <Badge variant="secondary">Vacant</Badge>}
+            {!contract && <Badge variant="secondary">{tUi("vacant")}</Badge>}
             {isShared && (
               <Badge className="bg-sky-600 text-white text-xs">
                 Shared from {unit.ownerCompanyName ?? "another company"}
@@ -75,10 +77,12 @@ function UnitActionDialog({
         </DialogHeader>
 
         {isLoading ? (
-          <div className="p-6 text-center text-muted-foreground">Loading…</div>
+          <div className="p-6 text-center text-muted-foreground">{tUi("loading")}</div>
         ) : !contract ? (
           isShared ? (
-            <div className="p-6 text-center text-muted-foreground text-sm">This is a read-only shared unit.</div>
+            <div className="p-6 text-center text-muted-foreground text-sm">
+              {tUi("this.is.a.read.only.shared.unit")}
+            </div>
           ) : (
             <Tabs defaultValue="contract" className="w-full">
               <TabsList className="grid w-full grid-cols-2">

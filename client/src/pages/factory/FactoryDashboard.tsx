@@ -22,6 +22,7 @@ import { SectionCard } from "@/components/SectionCard";
 import { FactoryKpiCard } from "@/components/FactoryKpiCard";
 import { LoadingSkeleton } from "@/components/LoadingSkeleton";
 import { StatusBadge } from "@/components/StatusBadge";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface DashboardData {
   waste: { totalKg: number; breakdown: Array<{ wasteType: string; kg: number }> };
@@ -92,6 +93,7 @@ function CollapsiblePane({ open, children }: { open: boolean; children: React.Re
 }
 
 export default function FactoryDashboard() {
+  const tUi = useFactoryText();
   const today = new Date().toLocaleDateString("en-CA");
   const [date, setDate] = useState(today);
   const [showBalesPane, setShowBalesPane] = useState(false);
@@ -123,9 +125,9 @@ export default function FactoryDashboard() {
 
   return (
     <div>
-      <PageHeader title="Factory Dashboard" subtitle="Production overview and operations">
+      <PageHeader title={tUi("factory.dashboard")} subtitle={tUi("production.overview.and.operations")}>
         <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Date</Label>
+          <Label className="text-xs text-muted-foreground">{tUi("date")}</Label>
           <Input
             type="date"
             value={date}
@@ -145,7 +147,7 @@ export default function FactoryDashboard() {
             <FactoryKpiCard
               metric="scrap"
               icon={Trash2}
-              title="Waste"
+              title={tUi("waste")}
               value={`${fmt(data?.waste?.totalKg ?? 0, 1)} kg`}
               hint={wasteHint || undefined}
               data-testid="card-stat-waste"
@@ -153,7 +155,7 @@ export default function FactoryDashboard() {
             <FactoryKpiCard
               metric="output"
               icon={Package}
-              title="Loaded Containers"
+              title={tUi("loaded.containers")}
               value={data?.containers?.loaded ?? 0}
               hint="customer containers finalized"
               data-testid="card-stat-loaded-containers"
@@ -161,14 +163,14 @@ export default function FactoryDashboard() {
             <FactoryKpiCard
               metric="neutral"
               icon={Users}
-              title="Active Workers"
+              title={tUi("active.workers")}
               value={data?.workers?.active ?? 0}
               data-testid="card-stat-active-workers"
             />
             <FactoryKpiCard
               metric="input"
               icon={CalendarCheck}
-              title="Attendance Today"
+              title={tUi("attendance.today")}
               value={data?.workers?.attendanceToday ?? 0}
               hint="workers present"
               data-testid="card-stat-attendance"
@@ -178,7 +180,7 @@ export default function FactoryDashboard() {
           {/* Container OTW */}
           <SectionCard
             icon={Ship}
-            title="Container OTW"
+            title={tUi("container.otw")}
             actions={<Badge variant="outline">{containersOtw.length} active</Badge>}
             data-testid="section-container-otw"
           >
@@ -191,12 +193,12 @@ export default function FactoryDashboard() {
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
-                      <TableHead>Container</TableHead>
-                      <TableHead>Supplier</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Origin</TableHead>
+                      <TableHead>{tUi("container")}</TableHead>
+                      <TableHead>{tUi("supplier")}</TableHead>
+                      <TableHead>{tUi("status")}</TableHead>
+                      <TableHead>{tUi("origin")}</TableHead>
                       <TableHead className="text-right">KG</TableHead>
-                      <TableHead>Arrival</TableHead>
+                      <TableHead>{tUi("arrival")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -221,7 +223,7 @@ export default function FactoryDashboard() {
           {/* Total Bales Pressed */}
           <SectionCard
             icon={Boxes}
-            title="Total Bales Pressed"
+            title={tUi("total.bales.pressed")}
             description={`${kpis?.balesPressedToday ?? 0} bales · ${fmt(kpis?.totalBaleWeightToday ?? 0, 1)} kg total`}
             actions={
               <Button
@@ -241,15 +243,15 @@ export default function FactoryDashboard() {
             </div>
             <CollapsiblePane open={showBalesPane}>
               {!kpis?.balesDetail || kpis.balesDetail.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No bales pressed today</p>
+                <p className="text-sm text-muted-foreground">{tUi("no.bales.pressed.today")}</p>
               ) : (
                 <div className="max-h-64 overflow-y-auto">
                   <Table>
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Product</TableHead>
-                        <TableHead className="text-right">Bales</TableHead>
+                        <TableHead>{tUi("category")}</TableHead>
+                        <TableHead>{tUi("product")}</TableHead>
+                        <TableHead className="text-right">{tUi("bales")}</TableHead>
                         <TableHead className="text-right">KG</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -274,14 +276,14 @@ export default function FactoryDashboard() {
             <FactoryKpiCard
               metric="input"
               icon={TrendingUp}
-              title="Opening Stock"
+              title={tUi("opening.stock")}
               value={`${fmt(kpis?.openingStockKg ?? 0, 1)} kg`}
               data-testid="card-stat-opening-stock"
             />
             <FactoryKpiCard
               metric="output"
               icon={TrendingDown}
-              title="Closing Stock"
+              title={tUi("closing.stock")}
               value={`${fmt(kpis?.closingStockKg ?? 0, 1)} kg`}
               data-testid="card-stat-closing-stock"
             />

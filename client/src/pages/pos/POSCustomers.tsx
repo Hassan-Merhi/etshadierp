@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useReactToPrint } from "react-to-print";
 import { format } from "date-fns";
 import { z } from "zod";
+import { usePosText } from "@/i18n/modules/pos";
 
 interface POSCustomer {
   id: number;
@@ -39,6 +40,7 @@ const formSchema = z.object({
 type FormData = z.infer<typeof formSchema>;
 
 export default function POSCustomers() {
+  const tUi = usePosText();
   const { toast } = useToast();
   const { formatCashAmount, formatAmount } = useCurrencyContext();
   const { selectedCompany } = useCompany();
@@ -111,7 +113,7 @@ export default function POSCustomers() {
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageHeader title="Customers" subtitle="Manage customer accounts" />
+        <PageHeader title={tUi("customers")} subtitle={tUi("manage.customer.accounts")} />
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
             <Button size="sm" data-testid="button-create-customer">
@@ -121,7 +123,7 @@ export default function POSCustomers() {
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Create New Customer</DialogTitle>
+              <DialogTitle>{tUi("create.new.customer")}</DialogTitle>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
@@ -130,9 +132,9 @@ export default function POSCustomers() {
                   name="legalName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Customer Name *</FormLabel>
+                      <FormLabel>{tUi("customer.name")}</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Enter customer name" data-testid="input-legal-name" />
+                        <Input {...field} placeholder={tUi("enter.customer.name")} data-testid="input-legal-name" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -143,7 +145,7 @@ export default function POSCustomers() {
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
+                      <FormLabel>{tUi("phone.number")}</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
@@ -162,7 +164,7 @@ export default function POSCustomers() {
                     name="openingBalance"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Opening Balance</FormLabel>
+                        <FormLabel>{tUi("opening.balance")}</FormLabel>
                         <FormControl>
                           <Input
                             {...field}
@@ -182,16 +184,16 @@ export default function POSCustomers() {
                     name="openingBalanceSide"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Balance Side</FormLabel>
+                        <FormLabel>{tUi("balance.side")}</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value || "Dr"}>
                           <FormControl>
                             <SelectTrigger data-testid="select-balance-side">
-                              <SelectValue placeholder="Select side" />
+                              <SelectValue placeholder={tUi("select.side")} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="Dr">Dr (Debit)</SelectItem>
-                            <SelectItem value="Cr">Cr (Credit)</SelectItem>
+                            <SelectItem value="Dr">{tUi("dr.debit")}</SelectItem>
+                            <SelectItem value="Cr">{tUi("cr.credit")}</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -223,7 +225,7 @@ export default function POSCustomers() {
         <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
           <Users className="h-4 w-4 text-muted-foreground shrink-0" />
           <div>
-            <p className="text-xs text-muted-foreground leading-none mb-0.5">Total Customers</p>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">{tUi("total.customers")}</p>
             {isLoading ? (
               <Skeleton className="h-5 w-10 mt-0.5" />
             ) : (
@@ -236,7 +238,7 @@ export default function POSCustomers() {
         <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
           <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
           <div>
-            <p className="text-xs text-muted-foreground leading-none mb-0.5">Total Receivables</p>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">{tUi("total.receivables")}</p>
             {isLoading ? (
               <Skeleton className="h-5 w-20 mt-0.5" />
             ) : (
@@ -253,7 +255,7 @@ export default function POSCustomers() {
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
-            placeholder="Search customers..."
+            placeholder={tUi("search.customers")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -281,10 +283,10 @@ export default function POSCustomers() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
-                    <TableHead className="text-xs">Customer Name</TableHead>
-                    <TableHead className="text-xs hidden sm:table-cell">Phone</TableHead>
-                    <TableHead className="text-xs text-right">Balance</TableHead>
-                    <TableHead className="text-xs">Side</TableHead>
+                    <TableHead className="text-xs">{tUi("customer.name.2")}</TableHead>
+                    <TableHead className="text-xs hidden sm:table-cell">{tUi("phone")}</TableHead>
+                    <TableHead className="text-xs text-right">{tUi("balance")}</TableHead>
+                    <TableHead className="text-xs">{tUi("side")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -374,7 +376,7 @@ export default function POSCustomers() {
                 ))}
               </div>
             ) : sorted.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">No transactions found</div>
+              <div className="text-center py-8 text-muted-foreground">{tUi("no.transactions.found")}</div>
             ) : (
               (() => {
                 let running = openingBalance;
@@ -382,18 +384,18 @@ export default function POSCustomers() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead className="text-right">Debit</TableHead>
-                        <TableHead className="text-right">Credit</TableHead>
-                        <TableHead className="text-right">Balance</TableHead>
+                        <TableHead>{tUi("date")}</TableHead>
+                        <TableHead>{tUi("description")}</TableHead>
+                        <TableHead className="text-right">{tUi("debit")}</TableHead>
+                        <TableHead className="text-right">{tUi("credit")}</TableHead>
+                        <TableHead className="text-right">{tUi("balance")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {openingBalance !== 0 && (
                         <TableRow className="text-muted-foreground text-sm">
                           <TableCell>—</TableCell>
-                          <TableCell className="italic">Opening Balance</TableCell>
+                          <TableCell className="italic">{tUi("opening.balance")}</TableCell>
                           <TableCell />
                           <TableCell />
                           <TableCell className="text-right font-mono">
@@ -431,7 +433,7 @@ export default function POSCustomers() {
                     </TableBody>
                     <TableHeader className="border-t-2">
                       <TableRow className="font-semibold">
-                        <TableHead colSpan={2}>Total</TableHead>
+                        <TableHead colSpan={2}>{tUi("total")}</TableHead>
                         <TableHead className="text-right font-mono text-foreground">{formatAmount(totalDr)}</TableHead>
                         <TableHead className="text-right font-mono text-foreground">{formatAmount(totalCr)}</TableHead>
                         <TableHead className="text-right font-mono text-foreground">
@@ -478,7 +480,7 @@ export default function POSCustomers() {
             }}
           />
           <div style={{ textAlign: "center", marginBottom: "12px" }}>
-            <div style={{ fontSize: "14pt", fontWeight: "900" }}>Customer Statement</div>
+            <div style={{ fontSize: "14pt", fontWeight: "900" }}>{tUi("customer.statement")}</div>
             <div style={{ fontSize: "10pt", color: "#555" }}>{selectedCompany?.name}</div>
             <div style={{ fontSize: "9pt", color: "#777", marginTop: "2px" }}>
               Printed: {new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
@@ -497,8 +499,8 @@ export default function POSCustomers() {
           <table>
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Description</th>
+                <th>{tUi("date")}</th>
+                <th>{tUi("description")}</th>
                 <th className="text-right" style={{ textAlign: "right" }}>
                   Debit
                 </th>
@@ -515,7 +517,7 @@ export default function POSCustomers() {
                 <tr style={{ color: "#777" }}>
                   <td>—</td>
                   <td>
-                    <em>Opening Balance</em>
+                    <em>{tUi("opening.balance")}</em>
                   </td>
                   <td></td>
                   <td></td>
@@ -544,7 +546,7 @@ export default function POSCustomers() {
             </tbody>
             <tfoot>
               <tr style={{ fontWeight: "bold", borderTop: "2px solid #333" }}>
-                <td colSpan={2}>Total</td>
+                <td colSpan={2}>{tUi("total")}</td>
                 <td style={{ textAlign: "right" }}>{formatAmount(totalDr)}</td>
                 <td style={{ textAlign: "right" }}>{formatAmount(totalCr)}</td>
                 <td style={{ textAlign: "right" }}>

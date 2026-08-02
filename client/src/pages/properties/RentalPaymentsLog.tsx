@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { AlertTriangle, ClipboardList, Search, Trash2 } from "lucide-react";
 import { format } from "date-fns";
+import { useErpText } from "@/i18n/modules/erp";
 
 const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const fmtMoney = (v: string | number | null | undefined) => {
@@ -75,6 +76,7 @@ export default function RentalPaymentsLog({
   testIdPrefix,
   apiBase = "/api/properties/rental",
 }: Props) {
+  const tUi = useErpText();
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
@@ -125,14 +127,14 @@ export default function RentalPaymentsLog({
         <div className="flex items-center gap-3">
           {pageIcon ?? <ClipboardList className="h-7 w-7 text-indigo-600" />}
           <div>
-            <PageHeader title={pageTitle} subtitle="All payment receipts recorded across all units, sorted by date." />
+            <PageHeader title={pageTitle} subtitle={tUi("all.payment.receipts.recorded.across.all.units.s")} />
           </div>
         </div>
         <div className="relative w-64">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             className="pl-8"
-            placeholder="Search tenant, unit, notes…"
+            placeholder={tUi("search.tenant.unit.notes")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             data-testid={`input-${testIdPrefix}-payments-search`}
@@ -144,7 +146,7 @@ export default function RentalPaymentsLog({
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs text-muted-foreground font-normal">TOTAL PAYMENTS</CardTitle>
+            <CardTitle className="text-xs text-muted-foreground font-normal">{tUi("total.payments.2")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid={`stat-${testIdPrefix}-total-payments`}>
@@ -154,7 +156,7 @@ export default function RentalPaymentsLog({
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs text-muted-foreground font-normal">TOTAL AMOUNT RECEIVED</CardTitle>
+            <CardTitle className="text-xs text-muted-foreground font-normal">{tUi("total.amount.received")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div
@@ -167,7 +169,7 @@ export default function RentalPaymentsLog({
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs text-muted-foreground font-normal">UNIQUE TENANTS</CardTitle>
+            <CardTitle className="text-xs text-muted-foreground font-normal">{tUi("unique.tenants")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{new Set(filtered.map((p) => p.tenantName).filter(Boolean)).size}</div>
@@ -180,7 +182,7 @@ export default function RentalPaymentsLog({
         <CardContent className="p-0">
           <div className="table-responsive">
             {isLoading ? (
-              <div className="p-8 text-center text-muted-foreground">Loading payments…</div>
+              <div className="p-8 text-center text-muted-foreground">{tUi("loading.payments")}</div>
             ) : filtered.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
                 {payments.length === 0 ? "No payments recorded yet." : "No payments match your search."}
@@ -189,13 +191,13 @@ export default function RentalPaymentsLog({
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-30 bg-muted/50 border-b">
                   <tr>
-                    <th className="text-left px-3 py-2 font-semibold">Date</th>
-                    <th className="text-left px-3 py-2 font-semibold">Client Name</th>
-                    <th className="text-left px-3 py-2 font-semibold">Unit</th>
-                    <th className="text-right px-3 py-2 font-semibold">Amount</th>
-                    <th className="text-left px-3 py-2 font-semibold">For Month</th>
-                    <th className="text-left px-3 py-2 font-semibold">Notes</th>
-                    <th className="text-left px-3 py-2 font-semibold">Daybook</th>
+                    <th className="text-left px-3 py-2 font-semibold">{tUi("date")}</th>
+                    <th className="text-left px-3 py-2 font-semibold">{tUi("client.name")}</th>
+                    <th className="text-left px-3 py-2 font-semibold">{tUi("unit")}</th>
+                    <th className="text-right px-3 py-2 font-semibold">{tUi("amount")}</th>
+                    <th className="text-left px-3 py-2 font-semibold">{tUi("for.month")}</th>
+                    <th className="text-left px-3 py-2 font-semibold">{tUi("notes")}</th>
+                    <th className="text-left px-3 py-2 font-semibold">{tUi("daybook")}</th>
                     <th className="w-10"></th>
                   </tr>
                 </thead>
@@ -231,7 +233,7 @@ export default function RentalPaymentsLog({
                         ) : (
                           <span
                             className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400"
-                            title="No accounting entry — payment was recorded without a cash account"
+                            title={tUi("no.accounting.entry.payment.was.recorded.without")}
                           >
                             <AlertTriangle className="h-3 w-3" />
                             No entry
@@ -277,7 +279,7 @@ export default function RentalPaymentsLog({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this payment?</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("delete.this.payment")}</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget && (
                 <>
@@ -292,7 +294,7 @@ export default function RentalPaymentsLog({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground"
               onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}

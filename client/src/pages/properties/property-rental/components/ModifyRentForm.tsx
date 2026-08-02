@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Contract } from "../types";
 import { fmtMoneyCurrency } from "../utils";
 import { useApiBase } from "../shared";
+import { useErpText } from "@/i18n/modules/erp";
 
 export // ──────────────────────────────────────────────────────────
 // TAB 2: MODIFY RENT
@@ -28,6 +29,7 @@ function ModifyRentForm({
   testIdPrefix: string;
   unitId: number;
 }) {
+  const tUi = useErpText();
   const apiBase = useApiBase();
   const { toast } = useToast();
   const [newAmount, setNewAmount] = useState("");
@@ -47,7 +49,7 @@ function ModifyRentForm({
   return (
     <div className="space-y-3 pt-3">
       <div className="bg-muted/40 rounded-md p-3 text-sm">
-        <span className="text-muted-foreground">Current Rental Amount: </span>
+        <span className="text-muted-foreground">{tUi("current.rental.amount")} </span>
         <span className="font-bold">{fmtMoneyCurrency(contract.rentalAmount, contract.currency)}</span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -62,7 +64,7 @@ function ModifyRentForm({
           />
         </div>
         <div>
-          <Label>Effective From</Label>
+          <Label>{tUi("effective.from")}</Label>
           <RadioGroup
             value={effectiveFrom}
             onValueChange={(v) => setEffectiveFrom(v as any)}
@@ -83,7 +85,7 @@ function ModifyRentForm({
           </RadioGroup>
         </div>
       </div>
-      <p className="text-xs text-muted-foreground italic">Only updates future months that haven't been paid yet.</p>
+      <p className="text-xs text-muted-foreground italic">{tUi("only.updates.future.months.that.haven.t.been.pai")}</p>
       <DialogFooter>
         <Button
           onClick={() => modify.mutate()}

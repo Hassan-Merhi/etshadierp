@@ -3,11 +3,12 @@
  *
  * Extracted from AccountingCreate.tsx during the Phase 4 god-file split.
  */
-import {Card} from "@/components/ui/card";
-import {Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage} from "@/components/ui/form";
-import {Input} from "@/components/ui/input";
-import {Checkbox} from "@/components/ui/checkbox";
-import {FormButtons} from "./FormButtons";
+import { Card } from "@/components/ui/card";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { FormButtons } from "./FormButtons";
+import { useErpText } from "@/i18n/modules/erp";
 
 export // Supplier Form Component
 function SupplierForm({
@@ -21,6 +22,7 @@ function SupplierForm({
   onCancel: () => void;
   isPending: boolean;
 }) {
+  const tUi = useErpText();
   return (
     <Card className="p-4 md:p-6">
       <Form {...form}>
@@ -31,11 +33,11 @@ function SupplierForm({
               name="legalName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Legal Name *</FormLabel>
+                  <FormLabel>{tUi("legal.name")}</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="ABC Suppliers Inc." data-testid="input-legal-name" />
+                    <Input {...field} placeholder={tUi("abc.suppliers.inc")} data-testid="input-legal-name" />
                   </FormControl>
-                  <FormDescription>Code will be auto-generated from name</FormDescription>
+                  <FormDescription>{tUi("code.will.be.auto.generated.from.name")}</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -46,7 +48,7 @@ function SupplierForm({
               name="openingBalance"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Opening Balance</FormLabel>
+                  <FormLabel>{tUi("opening.balance")}</FormLabel>
                   <FormControl>
                     <Input
                       {...field}
@@ -69,7 +71,7 @@ function SupplierForm({
                   <FormControl>
                     <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-active" />
                   </FormControl>
-                  <FormLabel className="!mt-0">Active</FormLabel>
+                  <FormLabel className="!mt-0">{tUi("active")}</FormLabel>
                 </FormItem>
               )}
             />

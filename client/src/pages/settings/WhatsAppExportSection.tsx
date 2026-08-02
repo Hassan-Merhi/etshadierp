@@ -8,7 +8,20 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { MessageSquare, Plus, Trash2, Users, CheckCircle, XCircle, ChevronDown, ChevronRight, RefreshCw, Loader2, AlertTriangle, Moon } from "lucide-react";
+import {
+  MessageSquare,
+  Plus,
+  Trash2,
+  Users,
+  CheckCircle,
+  XCircle,
+  ChevronDown,
+  ChevronRight,
+  RefreshCw,
+  Loader2,
+  AlertTriangle,
+  Moon,
+} from "lucide-react";
 
 interface WaSettings {
   instanceId: string;
@@ -236,24 +249,36 @@ export function WhatsAppExportSection() {
                   Check Status
                 </Button>
               )}
-              {instanceStateData && (
-                instanceStateData.state === "authorized" ? (
-                  <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300">
+              {instanceStateData &&
+                (instanceStateData.state === "authorized" ? (
+                  <Badge
+                    variant="secondary"
+                    className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300"
+                  >
                     <CheckCircle className="h-3 w-3" />
                     Authorized
                   </Badge>
                 ) : instanceStateData.state === "sleepMode" ? (
-                  <Badge variant="secondary" className="gap-1 text-amber-700 bg-amber-100 dark:bg-amber-950 dark:text-amber-300">
+                  <Badge
+                    variant="secondary"
+                    className="gap-1 text-amber-700 bg-amber-100 dark:bg-amber-950 dark:text-amber-300"
+                  >
                     <Moon className="h-3 w-3" />
                     Sleeping
                   </Badge>
                 ) : instanceStateData.state === "notAuthorized" ? (
-                  <Badge variant="secondary" className="gap-1 text-red-700 bg-red-100 dark:bg-red-950 dark:text-red-300">
+                  <Badge
+                    variant="secondary"
+                    className="gap-1 text-red-700 bg-red-100 dark:bg-red-950 dark:text-red-300"
+                  >
                     <XCircle className="h-3 w-3" />
                     Not authorized
                   </Badge>
                 ) : instanceStateData.state === "yellowCard" ? (
-                  <Badge variant="secondary" className="gap-1 text-orange-700 bg-orange-100 dark:bg-orange-950 dark:text-orange-300">
+                  <Badge
+                    variant="secondary"
+                    className="gap-1 text-orange-700 bg-orange-100 dark:bg-orange-950 dark:text-orange-300"
+                  >
                     <AlertTriangle className="h-3 w-3" />
                     Warning
                   </Badge>
@@ -262,13 +287,17 @@ export function WhatsAppExportSection() {
                     <XCircle className="h-3 w-3 text-muted-foreground" />
                     Unknown
                   </Badge>
-                )
-              )}
+                ))}
             </div>
             {instanceStateData?.state === "sleepMode" && (
               <p className="text-xs text-amber-700 dark:text-amber-400 mt-2 bg-amber-50 dark:bg-amber-950/40 rounded px-2 py-1.5">
                 Your Green API instance is in sleep mode. Log in to{" "}
-                <a href="https://console.green-api.com" target="_blank" rel="noreferrer" className="underline font-medium">
+                <a
+                  href="https://console.green-api.com"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline font-medium"
+                >
                   console.green-api.com
                 </a>{" "}
                 and wake up your instance — messages won't be delivered while asleep.
@@ -277,7 +306,12 @@ export function WhatsAppExportSection() {
             {instanceStateData?.state === "notAuthorized" && (
               <p className="text-xs text-red-700 dark:text-red-400 mt-2 bg-red-50 dark:bg-red-950/40 rounded px-2 py-1.5">
                 Your WhatsApp session has expired. Go to{" "}
-                <a href="https://console.green-api.com" target="_blank" rel="noreferrer" className="underline font-medium">
+                <a
+                  href="https://console.green-api.com"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline font-medium"
+                >
                   console.green-api.com
                 </a>{" "}
                 and scan the QR code to reconnect.

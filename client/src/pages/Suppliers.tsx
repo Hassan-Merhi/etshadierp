@@ -43,6 +43,7 @@ import { suppliersApi } from "@/api/suppliersApi";
 import { format } from "date-fns";
 import { utils, writeFile } from "@/lib/excelHelper";
 import { useEscapeBack } from "@/hooks/use-escape-back";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface SupplierWithStats {
   id: number;
@@ -59,6 +60,7 @@ interface SupplierWithStats {
 }
 
 export default function Suppliers() {
+  const tUi = useErpText();
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierWithStats | null>(null);
   const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [hideZeroBalance, setHideZeroBalance] = useState(true);
@@ -279,8 +281,8 @@ export default function Suppliers() {
   return (
     <div className="p-6 space-y-5">
       <PageHeader
-        title="Suppliers"
-        subtitle="Manage supplier accounts and track container shipments"
+        title={tUi("suppliers")}
+        subtitle={tUi("manage.supplier.accounts.and.track.container.shi")}
         showBackButton={false}
       />
 
@@ -295,7 +297,7 @@ export default function Suppliers() {
                 <Users className="w-5 h-5 text-blue-500" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Active Suppliers</p>
+                <p className="text-xs text-muted-foreground">{tUi("active.suppliers")}</p>
                 <p className="text-2xl font-bold leading-tight" data-testid="text-active-suppliers">
                   {activeSuppliers.length}
                 </p>
@@ -306,7 +308,7 @@ export default function Suppliers() {
                 <Container className="w-5 h-5 text-violet-500" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Total Containers</p>
+                <p className="text-xs text-muted-foreground">{tUi("total.containers")}</p>
                 <p className="text-2xl font-bold leading-tight" data-testid="text-total-containers">
                   {totalContainers}
                 </p>
@@ -317,7 +319,7 @@ export default function Suppliers() {
                 <DollarSign className="w-5 h-5 text-amber-500" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Total Outstanding</p>
+                <p className="text-xs text-muted-foreground">{tUi("total.outstanding")}</p>
                 <p className="text-xl font-bold leading-tight font-mono" data-testid="text-total-balance">
                   {formatAmount(totalBalance)}
                 </p>
@@ -332,7 +334,7 @@ export default function Suppliers() {
         <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
-            placeholder="Search suppliers..."
+            placeholder={tUi("search.suppliers")}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-9"
@@ -370,8 +372,8 @@ export default function Suppliers() {
             <Truck className="w-5 h-5 text-muted-foreground" />
           </div>
           <div>
-            <p className="text-sm font-medium">No suppliers found</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Create suppliers in the Master Data page</p>
+            <p className="text-sm font-medium">{tUi("no.suppliers.found")}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{tUi("create.suppliers.in.the.master.data.page")}</p>
           </div>
         </div>
       ) : sortedSuppliers.length === 0 ? (
@@ -380,8 +382,8 @@ export default function Suppliers() {
             <Search className="w-5 h-5 text-muted-foreground" />
           </div>
           <div>
-            <p className="text-sm font-medium">No results</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Try adjusting your search or filter</p>
+            <p className="text-sm font-medium">{tUi("no.results")}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{tUi("try.adjusting.your.search.or.filter")}</p>
           </div>
         </div>
       ) : (
@@ -417,7 +419,7 @@ export default function Suppliers() {
                     {supplier.containerCount} container{supplier.containerCount !== 1 ? "s" : ""}
                   </p>
                 ) : (
-                  <p className="text-xs text-muted-foreground mt-0.5">No containers</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{tUi("no.containers")}</p>
                 )}
               </div>
 
@@ -466,7 +468,7 @@ export default function Suppliers() {
                   size="icon"
                   onClick={() => navigate(`/suppliers/${supplier.id}/proformas`)}
                   data-testid={`button-proformas-supplier-${supplier.id}`}
-                  title="Proformas"
+                  title={tUi("proformas")}
                 >
                   <FileText className="h-4 w-4" />
                 </Button>
@@ -475,7 +477,7 @@ export default function Suppliers() {
                   size="icon"
                   onClick={() => navigate(`/suppliers/${supplier.id}/edit`)}
                   data-testid={`button-edit-supplier-${supplier.id}`}
-                  title="Edit"
+                  title={tUi("edit")}
                 >
                   <Edit className="h-4 w-4" />
                 </Button>
@@ -495,10 +497,10 @@ export default function Suppliers() {
               <DialogTitle className="text-lg font-bold mr-auto">{selectedSupplier?.legalName}</DialogTitle>
               <Select value={companyFilter} onValueChange={setCompanyFilter}>
                 <SelectTrigger className="w-40" data-testid="select-company-filter">
-                  <SelectValue placeholder="All Companies" />
+                  <SelectValue placeholder={tUi("all.companies")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Companies</SelectItem>
+                  <SelectItem value="all">{tUi("all.companies")}</SelectItem>
                   {companies.map((company: any) => (
                     <SelectItem key={company.id} value={company.id.toString()}>
                       {company.name}
@@ -521,7 +523,7 @@ export default function Suppliers() {
             {/* Row 2: KPI cards */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-3">
               <div className="rounded-lg border bg-muted/30 px-4 py-2.5">
-                <p className="text-xs text-muted-foreground mb-1">Total Purchases</p>
+                <p className="text-xs text-muted-foreground mb-1">{tUi("total.purchases")}</p>
                 {ledgerLoading ? (
                   <Skeleton className="h-5 w-24" />
                 ) : (
@@ -529,7 +531,7 @@ export default function Suppliers() {
                 )}
               </div>
               <div className="rounded-lg border bg-muted/30 px-4 py-2.5">
-                <p className="text-xs text-muted-foreground mb-1">Total Payments</p>
+                <p className="text-xs text-muted-foreground mb-1">{tUi("total.payments")}</p>
                 {ledgerLoading ? (
                   <Skeleton className="h-5 w-24" />
                 ) : (
@@ -539,7 +541,7 @@ export default function Suppliers() {
                 )}
               </div>
               <div className="rounded-lg border bg-muted/30 px-4 py-2.5">
-                <p className="text-xs text-muted-foreground mb-1">Purchases Qty</p>
+                <p className="text-xs text-muted-foreground mb-1">{tUi("purchases.qty")}</p>
                 {ledgerLoading ? (
                   <Skeleton className="h-5 w-10" />
                 ) : (
@@ -547,11 +549,11 @@ export default function Suppliers() {
                 )}
               </div>
               <div className="rounded-lg border bg-muted/30 px-4 py-2.5">
-                <p className="text-xs text-muted-foreground mb-1">Transactions</p>
+                <p className="text-xs text-muted-foreground mb-1">{tUi("transactions")}</p>
                 {ledgerLoading ? <Skeleton className="h-5 w-10" /> : <p className="font-semibold text-sm">{txCount}</p>}
               </div>
               <div className="rounded-lg border bg-muted/30 px-4 py-2.5">
-                <p className="text-xs text-muted-foreground mb-1">Balance</p>
+                <p className="text-xs text-muted-foreground mb-1">{tUi("balance")}</p>
                 {ledgerLoading ? (
                   <Skeleton className="h-5 w-24" />
                 ) : (
@@ -644,7 +646,7 @@ export default function Suppliers() {
                     <DollarSign className="w-5 h-5 text-muted-foreground" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">No transactions</p>
+                    <p className="text-sm font-medium">{tUi("no.transactions")}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       No transactions found{companyFilter !== "all" ? " for this company" : ""}
                     </p>
@@ -654,20 +656,20 @@ export default function Suppliers() {
                 <div className="space-y-2">
                   {openingEntry && (
                     <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-2.5">
-                      <span className="text-xs font-medium text-muted-foreground">Opening Balance</span>
+                      <span className="text-xs font-medium text-muted-foreground">{tUi("opening.balance")}</span>
                       <span className="font-mono font-semibold text-sm">{formatAmount(openingEntry.balance)}</span>
                     </div>
                   )}
                   <Table wrapperClassName="max-h-[calc(90vh-390px)]">
                     <TableHeader>
                       <TableRow className="bg-muted/40 hover:bg-muted/40">
-                        <TableHead className="h-9 text-xs font-semibold">Date</TableHead>
-                        <TableHead className="h-9 text-xs font-semibold">Company</TableHead>
-                        <TableHead className="h-9 text-xs font-semibold">Type</TableHead>
+                        <TableHead className="h-9 text-xs font-semibold">{tUi("date")}</TableHead>
+                        <TableHead className="h-9 text-xs font-semibold">{tUi("company.2")}</TableHead>
+                        <TableHead className="h-9 text-xs font-semibold">{tUi("type")}</TableHead>
                         <TableHead className="h-9 text-xs font-semibold">Ref</TableHead>
-                        <TableHead className="h-9 text-xs font-semibold text-right">Debit</TableHead>
-                        <TableHead className="h-9 text-xs font-semibold text-right">Credit</TableHead>
-                        <TableHead className="h-9 text-xs font-semibold text-right">Balance</TableHead>
+                        <TableHead className="h-9 text-xs font-semibold text-right">{tUi("debit")}</TableHead>
+                        <TableHead className="h-9 text-xs font-semibold text-right">{tUi("credit")}</TableHead>
+                        <TableHead className="h-9 text-xs font-semibold text-right">{tUi("balance")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -763,7 +765,7 @@ export default function Suppliers() {
                     <FileText className="w-5 h-5 text-muted-foreground" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">No purchase orders</p>
+                    <p className="text-sm font-medium">{tUi("no.purchase.orders")}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       No purchase orders found{companyFilter !== "all" ? " for this company" : ""}
                     </p>
@@ -796,10 +798,10 @@ export default function Suppliers() {
                       <Table wrapperClassName="max-h-[calc(90vh-340px)]">
                         <TableHeader>
                           <TableRow className="bg-muted/40 hover:bg-muted/40">
-                            <TableHead className="h-9 text-xs font-semibold">Container</TableHead>
-                            <TableHead className="h-9 text-xs font-semibold">Import Date</TableHead>
-                            <TableHead className="h-9 text-xs font-semibold">Company</TableHead>
-                            <TableHead className="h-9 text-xs font-semibold text-right">Total</TableHead>
+                            <TableHead className="h-9 text-xs font-semibold">{tUi("container")}</TableHead>
+                            <TableHead className="h-9 text-xs font-semibold">{tUi("import.date")}</TableHead>
+                            <TableHead className="h-9 text-xs font-semibold">{tUi("company.2")}</TableHead>
+                            <TableHead className="h-9 text-xs font-semibold text-right">{tUi("total")}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -839,7 +841,7 @@ export default function Suppliers() {
                       </Table>
                       <div className="flex justify-end">
                         <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-4 py-2 text-sm">
-                          <span className="text-muted-foreground">Grand Total</span>
+                          <span className="text-muted-foreground">{tUi("grand.total")}</span>
                           <span className="font-mono font-semibold">{formatAmount(grandTotal)}</span>
                         </div>
                       </div>
@@ -856,13 +858,13 @@ export default function Suppliers() {
       <AlertDialog open={!!supplierToDelete} onOpenChange={(open) => !open && setSupplierToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Supplier</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("delete.supplier")}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete <strong>{supplierToDelete?.name}</strong>? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => supplierToDelete && deleteMutation.mutate(supplierToDelete.id)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"

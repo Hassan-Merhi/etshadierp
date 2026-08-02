@@ -3,8 +3,8 @@
  *
  * Extracted from FactoryOtwTrackingTab.tsx during the Phase 4 god-file split.
  */
-import {Badge} from "@/components/ui/badge";
-import {CONTAINER_STATUS_LABELS} from "../utils";
+import { Badge } from "@/components/ui/badge";
+import { CONTAINER_STATUS_LABELS } from "../utils";
 
 export function ContainerStatusBadge({ status }: { status: string }) {
   const label = CONTAINER_STATUS_LABELS[status] ?? status;

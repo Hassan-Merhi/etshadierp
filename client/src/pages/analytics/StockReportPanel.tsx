@@ -14,6 +14,7 @@ import {
   OpeningStockItemsData,
 } from "./analyticsTypes";
 import { Fragment } from "react";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface StockReportPanelProps {
   activeSection: string;
@@ -64,6 +65,7 @@ export function StockReportPanel({
   toggleStockGroup,
   stockGroupItems,
 }: StockReportPanelProps) {
+  const tUi = useErpText();
   if (activeSection === "stock") {
     return (
       <Card className="p-6">
@@ -72,13 +74,13 @@ export function StockReportPanel({
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
               <Package className="h-4 w-4" />
             </div>
-            <h3 className="font-semibold text-base">Stock Movement Report</h3>
+            <h3 className="font-semibold text-base">{tUi("stock.movement.report")}</h3>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-4 mb-6 items-end">
           <div className="flex flex-col gap-1.5">
-            <Label>Start Date</Label>
+            <Label>{tUi("start.date.2")}</Label>
             <Input
               type="date"
               value={reportStartDate}
@@ -87,7 +89,7 @@ export function StockReportPanel({
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label>End Date</Label>
+            <Label>{tUi("end.date.2")}</Label>
             <Input
               type="date"
               value={reportEndDate}
@@ -96,13 +98,13 @@ export function StockReportPanel({
             />
           </div>
           <div className="flex flex-col gap-1.5 min-w-[160px]">
-            <Label>Location</Label>
+            <Label>{tUi("location")}</Label>
             <Select value={reportLocationId} onValueChange={setReportLocationId}>
               <SelectTrigger>
-                <SelectValue placeholder="All Locations" />
+                <SelectValue placeholder={tUi("all.locations")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Locations</SelectItem>
+                <SelectItem value="all">{tUi("all.locations")}</SelectItem>
                 {locations.map((loc) => (
                   <SelectItem key={loc.id} value={loc.id.toString()}>
                     {loc.name}
@@ -112,13 +114,13 @@ export function StockReportPanel({
             </Select>
           </div>
           <div className="flex flex-col gap-1.5 min-w-[160px]">
-            <Label>Stock Group</Label>
+            <Label>{tUi("stock.group")}</Label>
             <Select value={reportStockGroupId} onValueChange={setReportStockGroupId}>
               <SelectTrigger>
-                <SelectValue placeholder="All Groups" />
+                <SelectValue placeholder={tUi("all.groups")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Groups</SelectItem>
+                <SelectItem value="all">{tUi("all.groups")}</SelectItem>
                 {stockGroups.map((group) => (
                   <SelectItem key={group.id} value={group.id.toString()}>
                     {group.name}
@@ -140,9 +142,9 @@ export function StockReportPanel({
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
-                  <TableHead>Item Name</TableHead>
-                  <TableHead className="text-right">Total Quantity</TableHead>
-                  <TableHead className="text-right">Total Value</TableHead>
+                  <TableHead>{tUi("item.name")}</TableHead>
+                  <TableHead className="text-right">{tUi("total.quantity")}</TableHead>
+                  <TableHead className="text-right">{tUi("total.value")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -156,7 +158,7 @@ export function StockReportPanel({
               </TableBody>
               <TableBody className="font-semibold border-t-2">
                 <TableRow>
-                  <TableCell>Total</TableCell>
+                  <TableCell>{tUi("total")}</TableCell>
                   <TableCell className="text-right font-mono">
                     {formatNumber(stockMovementData.summary.grandTotalQuantity)}
                   </TableCell>
@@ -168,7 +170,9 @@ export function StockReportPanel({
             </Table>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground text-center py-8">Select filters to load stock movement</p>
+          <p className="text-sm text-muted-foreground text-center py-8">
+            {tUi("select.filters.to.load.stock.movement")}
+          </p>
         )}
       </Card>
     );
@@ -182,19 +186,19 @@ export function StockReportPanel({
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
               <FileText className="h-4 w-4" />
             </div>
-            <h3 className="font-semibold text-base">Opening Stock Summary</h3>
+            <h3 className="font-semibold text-base">{tUi("opening.stock.summary")}</h3>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-4 mb-6 items-end">
           <div className="flex flex-col gap-1.5 min-w-[200px]">
-            <Label>Location</Label>
+            <Label>{tUi("location")}</Label>
             <Select value={openingStockLocationId} onValueChange={handleOpeningStockLocationChange}>
               <SelectTrigger>
-                <SelectValue placeholder="All Locations" />
+                <SelectValue placeholder={tUi("all.locations")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Locations</SelectItem>
+                <SelectItem value="all">{tUi("all.locations")}</SelectItem>
                 {locations.map((loc) => (
                   <SelectItem key={loc.id} value={loc.id.toString()}>
                     {loc.name}
@@ -216,11 +220,11 @@ export function StockReportPanel({
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
-                  <TableHead>Stock Group</TableHead>
-                  <TableHead className="text-right">Opening Qty</TableHead>
-                  <TableHead className="text-right">Opening Value</TableHead>
-                  <TableHead className="text-right">Closing Qty</TableHead>
-                  <TableHead className="text-right">Closing Value</TableHead>
+                  <TableHead>{tUi("stock.group")}</TableHead>
+                  <TableHead className="text-right">{tUi("opening.qty")}</TableHead>
+                  <TableHead className="text-right">{tUi("opening.value")}</TableHead>
+                  <TableHead className="text-right">{tUi("closing.qty")}</TableHead>
+                  <TableHead className="text-right">{tUi("closing.value")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -275,7 +279,7 @@ export function StockReportPanel({
               </TableBody>
               <TableBody className="font-semibold border-t-2">
                 <TableRow>
-                  <TableCell>Grand Total</TableCell>
+                  <TableCell>{tUi("grand.total")}</TableCell>
                   <TableCell className="text-right font-mono">
                     {formatNumber(openingStockData.grandTotal.opening.quantity)}
                   </TableCell>
@@ -293,7 +297,7 @@ export function StockReportPanel({
             </Table>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground text-center py-8">Load opening stock data</p>
+          <p className="text-sm text-muted-foreground text-center py-8">{tUi("load.opening.stock.data")}</p>
         )}
       </Card>
     );

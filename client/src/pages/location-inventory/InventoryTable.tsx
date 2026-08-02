@@ -2,6 +2,7 @@ import { TrendingUp, TrendingDown, Package, Badge as BadgeIcon } from "lucide-re
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface InventoryItem {
   inventoryId: number | null;
@@ -48,30 +49,31 @@ export function InventoryTable({
   inventory,
   selectedGroup,
 }: InventoryTableProps) {
+  const tUi = useErpText();
   return (
     <Card className="border-none shadow-none bg-transparent">
       <div>
         <table className="w-full text-sm border-collapse">
           <thead className="sticky top-0 z-10 bg-background">
             <tr className="bg-muted/50 text-muted-foreground h-10">
-              <th className="text-left px-3 font-medium">Item</th>
+              <th className="text-left px-3 font-medium">{tUi("item")}</th>
               {showMovement ? (
                 <>
-                  <th className="text-left px-3 font-medium">Category</th>
-                  <th className="text-right px-3 font-medium">Opening (BL)</th>
-                  <th className="text-right px-3 font-medium">Closing (BL)</th>
-                  <th className="text-right px-3 font-medium">Movement</th>
+                  <th className="text-left px-3 font-medium">{tUi("category")}</th>
+                  <th className="text-right px-3 font-medium">{tUi("opening.bl")}</th>
+                  <th className="text-right px-3 font-medium">{tUi("closing.bl")}</th>
+                  <th className="text-right px-3 font-medium">{tUi("movement")}</th>
                 </>
               ) : (
                 <>
-                  <th className="text-left px-3 font-medium">Category</th>
-                  <th className={`text-right px-3 font-medium ${posUser ? "pr-6" : ""}`}>Quantity</th>
+                  <th className="text-left px-3 font-medium">{tUi("category")}</th>
+                  <th className={`text-right px-3 font-medium ${posUser ? "pr-6" : ""}`}>{tUi("quantity")}</th>
                 </>
               )}
               {!posUser && (
                 <>
-                  <th className="text-right px-3 font-medium">Avg Rate</th>
-                  <th className="text-right px-3 pr-6 font-medium">Total Value</th>
+                  <th className="text-right px-3 font-medium">{tUi("avg.rate")}</th>
+                  <th className="text-right px-3 pr-6 font-medium">{tUi("total.value")}</th>
                 </>
               )}
             </tr>
@@ -183,7 +185,7 @@ export function InventoryTable({
           {filteredStockItems.length > 0 && (
             <tfoot className="bg-muted/50 border-t-2 font-semibold">
               <tr className="h-12">
-                <td className="px-3 font-bold">Total</td>
+                <td className="px-3 font-bold">{tUi("total")}</td>
                 <td className="px-3"></td>
                 {showMovement ? (
                   <>

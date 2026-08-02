@@ -3,14 +3,14 @@
  *
  * Extracted from PropertiesDashboard.tsx during the Phase 4 god-file split.
  */
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {Badge} from "@/components/ui/badge";
-import {useCurrencyContext} from "@/contexts/CurrencyContext";
-import {Eye, EyeOff, RotateCcw, Equal} from "lucide-react";
-import {useState, useCallback, useMemo} from "react";
-import type {ProfitData, PropsCustomAccount} from "../types";
-import {loadPropsCustomViewHidden, savePropsCustomViewHidden} from "../utils";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { Eye, EyeOff, RotateCcw, Equal } from "lucide-react";
+import { useState, useCallback, useMemo } from "react";
+import type { ProfitData, PropsCustomAccount } from "../types";
+import { loadPropsCustomViewHidden, savePropsCustomViewHidden } from "../utils";
 
 export function CustomNetPositionView({ data }: { data: ProfitData }) {
   const { formatAmount } = useCurrencyContext();

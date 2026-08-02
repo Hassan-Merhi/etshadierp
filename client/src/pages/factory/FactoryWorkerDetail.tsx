@@ -58,7 +58,9 @@ import { GenerateMissingAccountingEntryDialog } from "./factory-worker-detail/di
 import { MarkPayrollPaidDialog } from "./factory-worker-detail/dialogs/MarkPayrollPaidDialog";
 import { DocumentPreviewDialog } from "./factory-worker-detail/dialogs/DocumentPreviewDialog";
 import { PayrollDetailDialog } from "./factory-worker-detail/dialogs/PayrollDetailDialog";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactoryWorkerDetail() {
+  const tUi = useFactoryText();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const [, navigate] = useLocation();
   useEscapeToParent("/factory/payroll-hub?tab=workers");
@@ -621,7 +623,9 @@ export default function FactoryWorkerDetail() {
   const netBalance = totalPaidSalary + totalPaidBonuses - advancesLeft;
 
   if (!workerId)
-    return <div className="flex items-center justify-center py-20 text-muted-foreground">Invalid worker ID</div>;
+    return (
+      <div className="flex items-center justify-center py-20 text-muted-foreground">{tUi("invalid.worker.id")}</div>
+    );
 
   if (workerLoading) {
     return (
@@ -643,7 +647,7 @@ export default function FactoryWorkerDetail() {
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="flex items-center justify-center py-20 text-muted-foreground">Worker not found</div>
+        <div className="flex items-center justify-center py-20 text-muted-foreground">{tUi("worker.not.found")}</div>
       </div>
     );
   }
@@ -708,7 +712,7 @@ export default function FactoryWorkerDetail() {
               <div className="border-t pt-3 space-y-2">
                 {worker.employeeCode && (
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="text-muted-foreground text-xs">Code</span>
+                    <span className="text-muted-foreground text-xs">{tUi("code")}</span>
                     <span className="font-mono text-xs ml-auto" data-testid="text-worker-code">
                       {worker.employeeCode}
                     </span>
@@ -716,7 +720,7 @@ export default function FactoryWorkerDetail() {
                 )}
                 {worker.nationality && (
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="text-muted-foreground text-xs">Nationality</span>
+                    <span className="text-muted-foreground text-xs">{tUi("nationality")}</span>
                     <span className="text-xs ml-auto">{worker.nationality}</span>
                   </div>
                 )}
@@ -791,14 +795,14 @@ export default function FactoryWorkerDetail() {
           {!statsLoading && stats && (
             <Card>
               <CardHeader className="pb-2 pt-4 px-5">
-                <CardTitle className="text-sm text-muted-foreground">Production Stats</CardTitle>
+                <CardTitle className="text-sm text-muted-foreground">{tUi("production.stats")}</CardTitle>
               </CardHeader>
               <CardContent className="px-5 pb-4 space-y-3">
                 <div className="text-center">
                   <p className="text-2xl font-bold" data-testid="text-stat-bales">
                     {stats.totalBales}
                   </p>
-                  <p className="text-xs text-muted-foreground">Total Bales</p>
+                  <p className="text-xs text-muted-foreground">{tUi("total.bales")}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-center">
                   <div>
@@ -811,7 +815,7 @@ export default function FactoryWorkerDetail() {
                     <p className="font-semibold text-sm" data-testid="text-stat-paid">
                       {fmt(stats.totalPaid)}
                     </p>
-                    <p className="text-xs text-muted-foreground">Paid</p>
+                    <p className="text-xs text-muted-foreground">{tUi("paid")}</p>
                   </div>
                 </div>
               </CardContent>
@@ -852,7 +856,7 @@ export default function FactoryWorkerDetail() {
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2">
-                      <span>Personal</span>
+                      <span>{tUi("personal")}</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="px-4 pb-4">
@@ -930,7 +934,7 @@ export default function FactoryWorkerDetail() {
               {worker.notes && (
                 <Card>
                   <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground mb-1">Notes</p>
+                    <p className="text-xs text-muted-foreground mb-1">{tUi("notes")}</p>
                     <p className="text-sm whitespace-pre-wrap" data-testid="text-worker-notes">
                       {worker.notes}
                     </p>
@@ -944,47 +948,49 @@ export default function FactoryWorkerDetail() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <Card>
                     <CardContent className="p-4 text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Net Balance</p>
+                      <p className="text-xs text-muted-foreground mb-1">{tUi("net.balance")}</p>
                       <p
                         className={`text-xl font-bold ${netBalance >= 0 ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"}`}
                         data-testid="stat-net-balance"
                       >
                         ${netBalance.toFixed(2)}
                       </p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">Paid + Bonus − Outstanding Advances</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {tUi("paid.bonus.outstanding.advances")}
+                      </p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-4 text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Total Paid</p>
+                      <p className="text-xs text-muted-foreground mb-1">{tUi("total.paid")}</p>
                       <p className="text-xl font-bold text-green-700 dark:text-green-400" data-testid="stat-total-paid">
                         ${fmtNum(totalPaid)}
                       </p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">Salary only</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{tUi("salary.only")}</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-4 text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Pending</p>
+                      <p className="text-xs text-muted-foreground mb-1">{tUi("pending")}</p>
                       <p
                         className="text-xl font-bold text-amber-700 dark:text-amber-400"
                         data-testid="stat-total-pending"
                       >
                         ${fmtNum(totalPending)}
                       </p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">Unpaid payrolls</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{tUi("unpaid.payrolls")}</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-4 text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Advances Left</p>
+                      <p className="text-xs text-muted-foreground mb-1">{tUi("advances.left")}</p>
                       <p
                         className={`text-xl font-bold ${advancesLeft > 0 ? "text-red-700 dark:text-red-400" : "text-muted-foreground"}`}
                         data-testid="stat-advances-left"
                       >
                         ${advancesLeft.toFixed(2)}
                       </p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">Outstanding balance</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">{tUi("outstanding.balance.2")}</p>
                     </CardContent>
                   </Card>
                 </div>
@@ -1000,21 +1006,21 @@ export default function FactoryWorkerDetail() {
                     ) : !payrolls?.length ? (
                       <div className="text-center py-12 text-muted-foreground">
                         <DollarSign className="mx-auto h-8 w-8 mb-3 opacity-30" />
-                        <p className="font-medium">No payroll records</p>
+                        <p className="font-medium">{tUi("no.payroll.records")}</p>
                       </div>
                     ) : (
                       <div className="table-responsive">
                         <Table>
                           <TableHeader className="sticky top-0 z-30 bg-background">
                             <TableRow>
-                              <TableHead>Period</TableHead>
-                              <TableHead className="text-right">Base</TableHead>
-                              <TableHead className="text-right">Transport</TableHead>
-                              <TableHead className="text-right">Bonus</TableHead>
-                              <TableHead className="text-right">Advances</TableHead>
+                              <TableHead>{tUi("period")}</TableHead>
+                              <TableHead className="text-right">{tUi("base")}</TableHead>
+                              <TableHead className="text-right">{tUi("transport")}</TableHead>
+                              <TableHead className="text-right">{tUi("bonus")}</TableHead>
+                              <TableHead className="text-right">{tUi("advances")}</TableHead>
                               <TableHead className="text-right">Net</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead>Paid On</TableHead>
+                              <TableHead>{tUi("status")}</TableHead>
+                              <TableHead>{tUi("paid.on")}</TableHead>
                               <TableHead></TableHead>
                             </TableRow>
                           </TableHeader>
@@ -1052,7 +1058,7 @@ export default function FactoryWorkerDetail() {
                                         variant="ghost"
                                         onClick={() => setDetailPayrollId(p.id)}
                                         data-testid={`button-detail-payroll-${p.id}`}
-                                        title="View details"
+                                        title={tUi("view.details")}
                                       >
                                         <Eye className="h-4 w-4 text-muted-foreground" />
                                       </Button>
@@ -1082,7 +1088,7 @@ export default function FactoryWorkerDetail() {
                                               setFixAcctOpen(true);
                                             }}
                                             data-testid={`button-fix-acct-${p.id}`}
-                                            title="Generate missing accounting entry"
+                                            title={tUi("generate.missing.accounting.entry")}
                                           >
                                             <Wrench className="h-4 w-4 text-amber-500" />
                                           </Button>
@@ -1115,19 +1121,19 @@ export default function FactoryWorkerDetail() {
                       </div>
                     ) : !workerAdvances?.length ? (
                       <div className="text-center py-8 text-muted-foreground">
-                        <p className="text-sm">No advances given</p>
+                        <p className="text-sm">{tUi("no.advances.given")}</p>
                       </div>
                     ) : (
                       <div className="table-responsive">
                         <Table>
                           <TableHeader className="sticky top-0 z-30 bg-background">
                             <TableRow>
-                              <TableHead>Date</TableHead>
-                              <TableHead className="text-right">Amount</TableHead>
-                              <TableHead className="text-right">Remaining</TableHead>
-                              <TableHead>Type</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead>Notes</TableHead>
+                              <TableHead>{tUi("date")}</TableHead>
+                              <TableHead className="text-right">{tUi("amount")}</TableHead>
+                              <TableHead className="text-right">{tUi("remaining")}</TableHead>
+                              <TableHead>{tUi("type")}</TableHead>
+                              <TableHead>{tUi("status")}</TableHead>
+                              <TableHead>{tUi("notes")}</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1198,7 +1204,9 @@ export default function FactoryWorkerDetail() {
                       </Card>
                       <Card>
                         <CardHeader className="pb-1 pt-3 px-4">
-                          <CardTitle className="text-xs font-medium text-muted-foreground">Loan Remaining</CardTitle>
+                          <CardTitle className="text-xs font-medium text-muted-foreground">
+                            {tUi("loan.remaining")}
+                          </CardTitle>
                         </CardHeader>
                         <CardContent className="px-4 pb-3">
                           <p
@@ -1214,7 +1222,9 @@ export default function FactoryWorkerDetail() {
                       </Card>
                       <Card>
                         <CardHeader className="pb-1 pt-3 px-4">
-                          <CardTitle className="text-xs font-medium text-muted-foreground">Total Balance</CardTitle>
+                          <CardTitle className="text-xs font-medium text-muted-foreground">
+                            {tUi("total.balance")}
+                          </CardTitle>
                         </CardHeader>
                         <CardContent className="px-4 pb-3">
                           <p
@@ -1234,7 +1244,7 @@ export default function FactoryWorkerDetail() {
 
                 <Card>
                   <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2 flex-wrap">
-                    <CardTitle className="text-sm">Advance History</CardTitle>
+                    <CardTitle className="text-sm">{tUi("advance.history")}</CardTitle>
                     <div className="flex items-center gap-2 flex-wrap">
                       {(() => {
                         const allOutstanding = (workerAdvances || []).filter((a) => !a.fullyPaid);
@@ -1305,7 +1315,7 @@ export default function FactoryWorkerDetail() {
                       <div className="p-4 border-b space-y-3">
                         <div className="flex items-center gap-3 flex-wrap">
                           <div className="space-y-1">
-                            <Label className="text-xs">Date</Label>
+                            <Label className="text-xs">{tUi("date")}</Label>
                             <Input
                               type="date"
                               value={advanceDate}
@@ -1315,7 +1325,7 @@ export default function FactoryWorkerDetail() {
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-xs">Amount ($)</Label>
+                            <Label className="text-xs">{tUi("amount.4")}</Label>
                             <Input
                               type="number"
                               min="0"
@@ -1328,9 +1338,9 @@ export default function FactoryWorkerDetail() {
                             />
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-xs">Notes</Label>
+                            <Label className="text-xs">{tUi("notes")}</Label>
                             <Input
-                              placeholder="Optional"
+                              placeholder={tUi("optional")}
                               value={advanceNotes}
                               onChange={(e) => setAdvanceNotes(e.target.value)}
                               className="w-40"
@@ -1340,22 +1350,22 @@ export default function FactoryWorkerDetail() {
                         </div>
                         <div className="flex items-center gap-3 flex-wrap">
                           <div className="space-y-1">
-                            <Label className="text-xs">Repayment Type</Label>
+                            <Label className="text-xs">{tUi("repayment.type")}</Label>
                             <Select value={advanceRepaymentType} onValueChange={(v) => setAdvanceRepaymentType(v)}>
                               <SelectTrigger className="w-48" data-testid="select-advance-repayment-type">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="salary_deduction">Deduct from Salary</SelectItem>
-                                <SelectItem value="manual_repayment">Manual Repayment (Loan)</SelectItem>
+                                <SelectItem value="salary_deduction">{tUi("deduct.from.salary")}</SelectItem>
+                                <SelectItem value="manual_repayment">{tUi("manual.repayment.loan")}</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
                           <div className="space-y-1">
-                            <Label className="text-xs">Cash Account (optional)</Label>
+                            <Label className="text-xs">{tUi("cash.account.optional")}</Label>
                             <Select value={advanceCashAccountId} onValueChange={setAdvanceCashAccountId}>
                               <SelectTrigger className="w-48" data-testid="select-advance-cash-account">
-                                <SelectValue placeholder="None (no cash deduction)" />
+                                <SelectValue placeholder={tUi("none.no.cash.deduction")} />
                               </SelectTrigger>
                               <SelectContent>
                                 {(cashAccounts || []).map((a) => (
@@ -1407,12 +1417,12 @@ export default function FactoryWorkerDetail() {
                       <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead className="w-8"></TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
-                          <TableHead className="text-right">Remaining</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Notes</TableHead>
+                          <TableHead>{tUi("date")}</TableHead>
+                          <TableHead className="text-right">{tUi("amount")}</TableHead>
+                          <TableHead className="text-right">{tUi("remaining")}</TableHead>
+                          <TableHead>{tUi("type")}</TableHead>
+                          <TableHead>{tUi("status")}</TableHead>
+                          <TableHead>{tUi("notes")}</TableHead>
                           <TableHead className="w-24"></TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1500,7 +1510,7 @@ export default function FactoryWorkerDetail() {
                       >
                         <DialogContent>
                           <DialogHeader>
-                            <DialogTitle>Record Repayment</DialogTitle>
+                            <DialogTitle>{tUi("record.repayment")}</DialogTitle>
                             <DialogDescription>
                               Advance of {fmt(adv.amount)} | Remaining: {fmt(adv.remainingBalance)}
                             </DialogDescription>
@@ -1508,7 +1518,7 @@ export default function FactoryWorkerDetail() {
                           <div className="space-y-4 py-2">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div className="space-y-2">
-                                <Label>Date</Label>
+                                <Label>{tUi("date")}</Label>
                                 <Input
                                   type="date"
                                   value={repayDate}
@@ -1517,7 +1527,7 @@ export default function FactoryWorkerDetail() {
                                 />
                               </div>
                               <div className="space-y-2">
-                                <Label>Amount ($)</Label>
+                                <Label>{tUi("amount.4")}</Label>
                                 <Input
                                   type="number"
                                   min="0"
@@ -1531,10 +1541,10 @@ export default function FactoryWorkerDetail() {
                               </div>
                             </div>
                             <div className="space-y-2">
-                              <Label>Cash Account (receives repayment)</Label>
+                              <Label>{tUi("cash.account.receives.repayment")}</Label>
                               <Select value={repayCashAccountId} onValueChange={setRepayCashAccountId}>
                                 <SelectTrigger data-testid="select-repay-cash-account">
-                                  <SelectValue placeholder="Select cash account (optional)" />
+                                  <SelectValue placeholder={tUi("select.cash.account.optional")} />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {(cashAccounts || []).map((a) => (
@@ -1546,9 +1556,9 @@ export default function FactoryWorkerDetail() {
                               </Select>
                             </div>
                             <div className="space-y-2">
-                              <Label>Notes</Label>
+                              <Label>{tUi("notes")}</Label>
                               <Input
-                                placeholder="Optional notes"
+                                placeholder={tUi("optional.notes")}
                                 value={repayNotes}
                                 onChange={(e) => setRepayNotes(e.target.value)}
                                 data-testid="input-repay-notes"
@@ -1610,7 +1620,7 @@ export default function FactoryWorkerDetail() {
                       >
                         <DialogContent className="max-w-lg" data-testid="dialog-bulk-repay">
                           <DialogHeader>
-                            <DialogTitle>Repay All Outstanding Loans</DialogTitle>
+                            <DialogTitle>{tUi("repay.all.outstanding.loans")}</DialogTitle>
                             <DialogDescription>
                               Each loan is repaid on the last day of its own month. Adjust any date if needed, then
                               confirm.
@@ -1620,9 +1630,9 @@ export default function FactoryWorkerDetail() {
                             {/* Per-loan preview with individual editable dates */}
                             <div className="rounded-md border overflow-hidden">
                               <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 px-3 py-1.5 bg-muted text-xs font-medium text-muted-foreground">
-                                <span>Loan Issued</span>
-                                <span className="text-right">Amount</span>
-                                <span className="text-right">Repay On</span>
+                                <span>{tUi("loan.issued")}</span>
+                                <span className="text-right">{tUi("amount")}</span>
+                                <span className="text-right">{tUi("repay.on")}</span>
                               </div>
                               <div className="divide-y max-h-56 overflow-y-auto">
                                 {outstandingLoans.map((a) => {
@@ -1652,15 +1662,15 @@ export default function FactoryWorkerDetail() {
                                 })}
                               </div>
                               <div className="flex items-center justify-between px-3 py-2 bg-muted/50 border-t text-sm font-semibold">
-                                <span>Total</span>
+                                <span>{tUi("total")}</span>
                                 <span className="font-mono text-blue-700 dark:text-blue-400">{fmt(totalToClear)}</span>
                               </div>
                             </div>
                             <div className="space-y-2">
-                              <Label>Cash Account (receives repayment)</Label>
+                              <Label>{tUi("cash.account.receives.repayment")}</Label>
                               <Select value={bulkRepayCashAccountId} onValueChange={setBulkRepayCashAccountId}>
                                 <SelectTrigger data-testid="select-bulk-repay-cash">
-                                  <SelectValue placeholder="Select cash account (optional)" />
+                                  <SelectValue placeholder={tUi("select.cash.account.optional")} />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {(cashAccounts || []).map((a) => (
@@ -1719,7 +1729,7 @@ export default function FactoryWorkerDetail() {
               <TabsContent value="documents" className="space-y-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-semibold">Worker Documents</h3>
+                    <h3 className="text-sm font-semibold">{tUi("worker.documents")}</h3>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {documents?.length || 0} file{documents?.length !== 1 ? "s" : ""} uploaded
                     </p>
@@ -1755,8 +1765,8 @@ export default function FactoryWorkerDetail() {
                   <Card>
                     <CardContent className="py-16 text-center text-muted-foreground">
                       <FileText className="mx-auto h-8 w-8 mb-3 opacity-30" />
-                      <p className="font-medium">No documents uploaded yet</p>
-                      <p className="text-sm mt-1">Upload contracts, IDs, permits, or any other files</p>
+                      <p className="font-medium">{tUi("no.documents.uploaded.yet")}</p>
+                      <p className="text-sm mt-1">{tUi("upload.contracts.ids.permits.or.any.other.files")}</p>
                     </CardContent>
                   </Card>
                 ) : (
@@ -1891,12 +1901,12 @@ export default function FactoryWorkerDetail() {
                         <Table>
                           <TableHeader className="sticky top-0 z-30 bg-background">
                             <TableRow>
-                              <TableHead>Bale Code</TableHead>
-                              <TableHead>Product</TableHead>
-                              <TableHead className="text-right">Weight KG</TableHead>
-                              <TableHead className="text-right">Cost</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead>Date</TableHead>
+                              <TableHead>{tUi("bale.code")}</TableHead>
+                              <TableHead>{tUi("product")}</TableHead>
+                              <TableHead className="text-right">{tUi("weight.kg.3")}</TableHead>
+                              <TableHead className="text-right">{tUi("cost")}</TableHead>
+                              <TableHead>{tUi("status")}</TableHead>
+                              <TableHead>{tUi("date")}</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -1933,7 +1943,7 @@ export default function FactoryWorkerDetail() {
                     ) : (
                       <div className="text-center py-10 text-muted-foreground">
                         <Package className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                        <p className="font-medium">No bales found</p>
+                        <p className="font-medium">{tUi("no.bales.found")}</p>
                         <p className="text-sm mt-1">
                           No bale records{startDate || endDate ? " in selected range" : ""}
                         </p>
@@ -2007,7 +2017,7 @@ export default function FactoryWorkerDetail() {
       >
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete Document?</DialogTitle>
+            <DialogTitle>{tUi("delete.document")}</DialogTitle>
             <DialogDescription>
               This will permanently remove the uploaded document. This cannot be undone.
             </DialogDescription>

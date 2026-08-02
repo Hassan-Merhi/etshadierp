@@ -6,6 +6,7 @@ import { Package, ArrowLeft, ArrowRight, ChevronRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { PeriodFilter } from "@/components/ui/period-filter";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface StockMovementDialogProps {
   stockMovementOpen: boolean;
@@ -32,6 +33,7 @@ export function StockMovementDialog({
   formatAmount,
   navigate,
 }: StockMovementDialogProps) {
+  const tUi = useErpText();
   const toSafeNumber = (value: unknown): number => {
     const parsed = typeof value === "number" ? value : Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
@@ -100,7 +102,7 @@ export function StockMovementDialog({
                 <Package className="h-5 w-5 text-primary" />
               </div>
               <div>
-                <DialogTitle className="text-xl">Stock Movement</DialogTitle>
+                <DialogTitle className="text-xl">{tUi("stock.movement")}</DialogTitle>
                 <DialogDescription className="text-xs">
                   {stockMovementItem?.stockItemName}{" "}
                   {stockMovementItem?.locationName ? `at ${stockMovementItem.locationName}` : "(All Locations)"}
@@ -458,7 +460,7 @@ export function StockMovementDialog({
                       n === 0 ? <span className="text-muted-foreground/30">—</span> : <>{formatAmount(n)}</>;
                     return (
                       <tr className="bg-muted/50 border-t-2 font-semibold text-sm">
-                        <td className="px-4 py-2.5 border-r">Total</td>
+                        <td className="px-4 py-2.5 border-r">{tUi("total")}</td>
                         <td className="px-3 py-2.5 text-right font-mono text-muted-foreground">
                           {fmtQ(smRowsWithYear[0]?.openingQty ?? 0)}
                         </td>
@@ -500,7 +502,7 @@ export function StockMovementDialog({
         <div className="flex items-center justify-between gap-2 px-6 py-4 border-t flex-shrink-0">
           <div>
             {drillMonth && (
-              <span className="text-xs text-muted-foreground">Press Esc to return to monthly summary</span>
+              <span className="text-xs text-muted-foreground">{tUi("press.esc.to.return.to.monthly.summary")}</span>
             )}
           </div>
           <div className="flex items-center gap-2">

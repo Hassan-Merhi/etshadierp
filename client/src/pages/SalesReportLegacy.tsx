@@ -42,7 +42,9 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { formatNumber } from "@/lib/formatNumber";
 
 import type { DailySummary, GroupingType, ProfitFilter, SalesReportItem } from "./salesreportlegacy/types";
+import { useErpText } from "@/i18n/modules/erp";
 export default function SalesReport() {
+  const tUi = useErpText();
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("today"));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
 
@@ -459,7 +461,7 @@ export default function SalesReport() {
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-2">
         <div>
-          <PageHeader title="Sales Report" />
+          <PageHeader title={tUi("sales.report")} />
           <p className="text-sm text-muted-foreground">
             Analyze profit and loss from POS transactions
             {isMultiCompanyMode && " · All Companies"}
@@ -517,13 +519,13 @@ export default function SalesReport() {
           <>
             <div className="flex items-center gap-1.5 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm">
               <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-muted-foreground text-xs">Total Sales</span>
+              <span className="text-muted-foreground text-xs">{tUi("total.sales")}</span>
               <span className="font-semibold font-mono text-sm" data-testid="text-total-sales">
                 {formatAmount(totals.totalSales)}
               </span>
             </div>
             <div className="flex items-center gap-1.5 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm">
-              <span className="text-muted-foreground text-xs">Cost Price</span>
+              <span className="text-muted-foreground text-xs">{tUi("cost.price")}</span>
               <span className="font-semibold font-mono text-sm" data-testid="text-total-cost">
                 {formatAmount(totals.totalCost)}
               </span>
@@ -534,7 +536,7 @@ export default function SalesReport() {
               ) : (
                 <TrendingDown className="h-3.5 w-3.5 text-red-500" />
               )}
-              <span className="text-muted-foreground text-xs">Cost Profit</span>
+              <span className="text-muted-foreground text-xs">{tUi("cost.profit")}</span>
               <span
                 className={`font-semibold font-mono text-sm ${totals.costProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
                 data-testid="text-cost-profit"
@@ -544,7 +546,7 @@ export default function SalesReport() {
               </span>
             </div>
             <div className="flex items-center gap-1.5 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm">
-              <span className="text-muted-foreground text-xs">Hassan's Price</span>
+              <span className="text-muted-foreground text-xs">{tUi("hassan.s.price")}</span>
               <span className="font-semibold font-mono text-sm" data-testid="text-configured-cost">
                 {formatAmount(totals.totalConfiguredCost)}
               </span>
@@ -555,7 +557,7 @@ export default function SalesReport() {
               ) : (
                 <TrendingDown className="h-3.5 w-3.5 text-red-500" />
               )}
-              <span className="text-muted-foreground text-xs">Hassan's Profit</span>
+              <span className="text-muted-foreground text-xs">{tUi("hassan.s.profit")}</span>
               <span
                 className={`font-semibold font-mono text-sm ${totals.configuredProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
                 data-testid="text-configured-profit"
@@ -613,7 +615,7 @@ export default function SalesReport() {
                   data-testid="option-all-companies"
                 >
                   <Checkbox checked={selectedCompanies.length === 0} className="h-4 w-4 pointer-events-none" />
-                  <span className="text-sm font-medium">All Companies</span>
+                  <span className="text-sm font-medium">{tUi("all.companies")}</span>
                 </div>
                 <div className="border-t my-1" />
                 {companyFilterOptions.map(([code, name]) => (
@@ -644,9 +646,9 @@ export default function SalesReport() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="daily">Daily</SelectItem>
-            <SelectItem value="monthly">Monthly</SelectItem>
-            <SelectItem value="yearly">Yearly</SelectItem>
+            <SelectItem value="daily">{tUi("daily")}</SelectItem>
+            <SelectItem value="monthly">{tUi("monthly")}</SelectItem>
+            <SelectItem value="yearly">{tUi("yearly")}</SelectItem>
           </SelectContent>
         </Select>
 
@@ -656,9 +658,9 @@ export default function SalesReport() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Profits</SelectItem>
-            <SelectItem value="positive">Positive Only</SelectItem>
-            <SelectItem value="negative">Negative Only</SelectItem>
+            <SelectItem value="all">{tUi("all.profits")}</SelectItem>
+            <SelectItem value="positive">{tUi("positive.only")}</SelectItem>
+            <SelectItem value="negative">{tUi("negative.only")}</SelectItem>
           </SelectContent>
         </Select>
 
@@ -697,7 +699,7 @@ export default function SalesReport() {
                 onClick={() => setSelectedLocations([])}
               >
                 <Checkbox checked={selectedLocations.length === 0} className="h-4 w-4" />
-                <span className="text-sm font-medium">All Locations</span>
+                <span className="text-sm font-medium">{tUi("all.locations")}</span>
               </div>
               <div className="border-t my-1" />
               {locations.map((loc: any) => (
@@ -738,7 +740,7 @@ export default function SalesReport() {
                 onClick={() => setSelectedStockGroups([])}
               >
                 <Checkbox checked={selectedStockGroups.length === 0} className="h-4 w-4" />
-                <span className="text-sm font-medium">All Groups</span>
+                <span className="text-sm font-medium">{tUi("all.groups")}</span>
               </div>
               <div className="border-t my-1" />
               {stockGroups.map((g: any) => (
@@ -762,7 +764,7 @@ export default function SalesReport() {
 
         {/* Search */}
         <Input
-          placeholder="Search..."
+          placeholder={tUi("search.2")}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-40 h-9"
@@ -790,10 +792,12 @@ export default function SalesReport() {
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="text-xs h-9 font-semibold">Date</TableHead>
-                  <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">Items</TableHead>
+                  <TableHead className="text-xs h-9 font-semibold">{tUi("date")}</TableHead>
+                  <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">
+                    {tUi("items")}
+                  </TableHead>
                   <TableHead className="text-xs h-9 font-semibold text-right">Qty</TableHead>
-                  <TableHead className="text-xs h-9 font-semibold text-right">Total Sales</TableHead>
+                  <TableHead className="text-xs h-9 font-semibold text-right">{tUi("total.sales")}</TableHead>
                   <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">
                     Cost Price
                   </TableHead>
@@ -847,8 +851,10 @@ export default function SalesReport() {
                         <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
                           <TrendingUp className="h-5 w-5 text-muted-foreground" />
                         </div>
-                        <p className="text-sm font-medium">No sales found</p>
-                        <p className="text-xs text-muted-foreground">Try adjusting your date range or filters</p>
+                        <p className="text-sm font-medium">{tUi("no.sales.found")}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {tUi("try.adjusting.your.date.range.or.filters")}
+                        </p>
                       </div>
                     </TableCell>
                   </TableRow>

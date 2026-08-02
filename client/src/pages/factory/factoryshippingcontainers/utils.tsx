@@ -4,7 +4,7 @@
  * Extracted from FactoryShippingContainers.tsx during the Phase 4 god-file split.
  */
 
-import type {ShippingColId} from "./types";
+import type { ShippingColId } from "./types";
 
 export const LIST_KEY = "/api/factory/shipping-container-rows";
 

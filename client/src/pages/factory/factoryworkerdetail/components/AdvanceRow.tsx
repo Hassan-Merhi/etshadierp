@@ -3,14 +3,16 @@
  *
  * Extracted from FactoryWorkerDetail.tsx during the Phase 4 god-file split.
  */
-import {useQuery} from "@tanstack/react-query";
-import {ChevronDown, ChevronRight, RotateCcw} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Badge} from "@/components/ui/badge";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import type {AdvanceRowProps, CashAccount} from "../types";
+import { useQuery } from "@tanstack/react-query";
+import { ChevronDown, ChevronRight, RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import type { AdvanceRowProps, CashAccount } from "../types";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function AdvanceRow({ adv, isLoan, isExpanded, onToggleExpand, onRepay, formatDate, fmt }: AdvanceRowProps) {
+  const tUi = useFactoryText();
   const { data: cashAccounts } = useQuery<CashAccount[]>({
     queryKey: ["/api/factory/cash-accounts"],
     enabled: isLoan && isExpanded,
@@ -96,18 +98,18 @@ export function AdvanceRow({ adv, isLoan, isExpanded, onToggleExpand, onRepay, f
       {isLoan && isExpanded && (
         <TableRow>
           <TableCell colSpan={8} className="bg-muted/30 p-3">
-            <div className="text-xs font-medium text-muted-foreground mb-2">Repayment History</div>
+            <div className="text-xs font-medium text-muted-foreground mb-2">{tUi("repayment.history")}</div>
             {repaymentsWithRunningBalance.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No repayments recorded yet</p>
+              <p className="text-xs text-muted-foreground">{tUi("no.repayments.recorded.yet")}</p>
             ) : (
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead className="text-xs">Date</TableHead>
-                    <TableHead className="text-xs text-right">Amount</TableHead>
-                    <TableHead className="text-xs">Cash Account</TableHead>
-                    <TableHead className="text-xs text-right">Balance After</TableHead>
-                    <TableHead className="text-xs">Notes</TableHead>
+                    <TableHead className="text-xs">{tUi("date")}</TableHead>
+                    <TableHead className="text-xs text-right">{tUi("amount")}</TableHead>
+                    <TableHead className="text-xs">{tUi("cash.account.2")}</TableHead>
+                    <TableHead className="text-xs text-right">{tUi("balance.after")}</TableHead>
+                    <TableHead className="text-xs">{tUi("notes")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

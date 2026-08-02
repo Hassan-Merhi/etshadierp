@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { fmt } from "../utils";
 
 import type { AuditAdvance } from "../components/AdvancesView";
+import { useFactoryText } from "@/i18n/modules/factory";
 export function RepaymentAuditDialog({
   auditCashBalance,
   auditData,
@@ -47,6 +48,7 @@ export function RepaymentAuditDialog({
   setRepayAuditForm: any;
   setRepayAuditOpen: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog
       open={repayAuditOpen}
@@ -57,7 +59,7 @@ export function RepaymentAuditDialog({
     >
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Repayment Audit — Salary Deduction Advances</DialogTitle>
+          <DialogTitle>{tUi("repayment.audit.salary.deduction.advances")}</DialogTitle>
           <DialogDescription>
             Scans every Salary Deduction advance and finds ones where the cash account is missing an entry — either the
             voucher was deleted (Case A) or the advance was marked paid without any repayment record (Case B).
@@ -91,19 +93,19 @@ export function RepaymentAuditDialog({
                 {/* Summary */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                   <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
-                    <p className="text-xs text-muted-foreground mb-1">Total Advances</p>
+                    <p className="text-xs text-muted-foreground mb-1">{tUi("total.advances")}</p>
                     <p className="font-bold">{summary.total}</p>
                   </div>
                   <div className="rounded-md bg-green-50 dark:bg-green-900/20 px-3 py-2 text-center">
-                    <p className="text-xs text-muted-foreground mb-1">Already OK</p>
+                    <p className="text-xs text-muted-foreground mb-1">{tUi("already.ok")}</p>
                     <p className="font-bold text-green-700 dark:text-green-400">{summary.ok}</p>
                   </div>
                   <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-center">
-                    <p className="text-xs text-muted-foreground mb-1">Missing Voucher</p>
+                    <p className="text-xs text-muted-foreground mb-1">{tUi("missing.voucher")}</p>
                     <p className="font-bold text-amber-700 dark:text-amber-400">{summary.missingVoucher}</p>
                   </div>
                   <div className="rounded-md bg-red-50 dark:bg-red-900/20 px-3 py-2 text-center">
-                    <p className="text-xs text-muted-foreground mb-1">No Record</p>
+                    <p className="text-xs text-muted-foreground mb-1">{tUi("no.record")}</p>
                     <p className="font-bold text-red-700 dark:text-red-400">{summary.noRepayment}</p>
                   </div>
                 </div>
@@ -111,8 +113,8 @@ export function RepaymentAuditDialog({
                 {auditAdvances.length === 0 ? (
                   <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
                     <CheckCircle2 className="h-8 w-8 text-green-500" />
-                    <p className="text-sm font-medium">All repayments are fully accounted for</p>
-                    <p className="text-xs">Every paid advance has matching voucher entries on the cash account.</p>
+                    <p className="text-sm font-medium">{tUi("all.repayments.are.fully.accounted.for")}</p>
+                    <p className="text-xs">{tUi("every.paid.advance.has.matching.voucher.entries.")}</p>
                   </div>
                 ) : (
                   <>
@@ -127,7 +129,7 @@ export function RepaymentAuditDialog({
                           onValueChange={(v) => setRepayAuditForm((p: any) => ({ ...p, cashAccountId: v }))}
                         >
                           <SelectTrigger data-testid="select-audit-cash-account">
-                            <SelectValue placeholder="Select cash account" />
+                            <SelectValue placeholder={tUi("select.cash.account")} />
                           </SelectTrigger>
                           <SelectContent>
                             {(cashAccounts || []).map((a: any) => (
@@ -163,25 +165,25 @@ export function RepaymentAuditDialog({
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-3 divide-x">
                           <div className="px-4 py-3 text-center">
-                            <p className="text-xs text-muted-foreground mb-1">Cash Account Balance</p>
+                            <p className="text-xs text-muted-foreground mb-1">{tUi("cash.account.balance")}</p>
                             <p className="font-mono font-bold">
                               {auditCashBalance ? fmt(parseFloat(auditCashBalance.balance)) : "…"}
                             </p>
-                            <p className="text-xs text-muted-foreground mt-1">No change</p>
+                            <p className="text-xs text-muted-foreground mt-1">{tUi("no.change")}</p>
                           </div>
                           <div className="px-4 py-3 text-center">
-                            <p className="text-xs text-muted-foreground mb-1">Factory Worker Advances</p>
+                            <p className="text-xs text-muted-foreground mb-1">{tUi("factory.worker.advances")}</p>
                             <p className="font-mono font-bold text-green-700 dark:text-green-400">
                               −{fmt(missingTotal)}
                             </p>
-                            <p className="text-xs text-muted-foreground mt-1">Decreases (CR)</p>
+                            <p className="text-xs text-muted-foreground mt-1">{tUi("decreases.cr")}</p>
                           </div>
                           <div className="px-4 py-3 text-center">
-                            <p className="text-xs text-muted-foreground mb-1">Workers Salary Payable</p>
+                            <p className="text-xs text-muted-foreground mb-1">{tUi("workers.salary.payable")}</p>
                             <p className="font-mono font-bold text-amber-700 dark:text-amber-400">
                               −{fmt(missingTotal)}
                             </p>
-                            <p className="text-xs text-muted-foreground mt-1">Decreases (DR)</p>
+                            <p className="text-xs text-muted-foreground mt-1">{tUi("decreases.dr")}</p>
                           </div>
                         </div>
                       </div>
@@ -190,11 +192,11 @@ export function RepaymentAuditDialog({
                     {/* Per-worker breakdown */}
                     <div className="border rounded-md overflow-hidden">
                       <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-3 px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20">
-                        <span>Worker / Advance Date</span>
-                        <span className="text-right">Amount</span>
-                        <span className="text-right">Missing</span>
-                        <span>Case</span>
-                        <span>Status</span>
+                        <span>{tUi("worker.advance.date")}</span>
+                        <span className="text-right">{tUi("amount")}</span>
+                        <span className="text-right">{tUi("missing")}</span>
+                        <span>{tUi("case")}</span>
+                        <span>{tUi("status")}</span>
                       </div>
                       <div className="divide-y max-h-64 overflow-y-auto">
                         {Object.entries(grouped).map(([workerName, wAdvances]) => (
@@ -232,7 +234,7 @@ export function RepaymentAuditDialog({
                         ))}
                       </div>
                       <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-3 px-4 py-2 text-sm font-bold bg-muted/20 border-t">
-                        <span>Total Missing</span>
+                        <span>{tUi("total.missing")}</span>
                         <span></span>
                         <span className="font-mono text-right">{fmt(missingTotal)}</span>
                         <span></span>
@@ -242,12 +244,12 @@ export function RepaymentAuditDialog({
 
                     <div className="text-xs text-muted-foreground space-y-0.5">
                       <p>
-                        <span className="font-medium">Case A</span> — repayment record exists but voucher was deleted.
-                        Will re-create the DR Cash / CR Advances voucher.
+                        <span className="font-medium">{tUi("case.a")}</span> — repayment record exists but voucher was
+                        deleted. Will re-create the DR Cash / CR Advances voucher.
                       </p>
                       <p>
-                        <span className="font-medium">Case B</span> — advance marked paid with no repayment record. Will
-                        create both the repayment record and the voucher.
+                        <span className="font-medium">{tUi("case.b")}</span> — advance marked paid with no repayment
+                        record. Will create both the repayment record and the voucher.
                       </p>
                     </div>
                   </>

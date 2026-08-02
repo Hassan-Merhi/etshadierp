@@ -1,23 +1,56 @@
-import {useState, useMemo, useEffect} from "react";
-import {useQuery, useMutation, useQueryClient, useQueries} from "@tanstack/react-query";
+import { useState, useMemo, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import * as XLSX from "@/lib/excelHelper";
-import {ChevronDown, ChevronRight, Download, Search, RotateCcw, List, AlignJustify, FileDown, MoreVertical, CalendarRange, MessageCircle, Loader2, History, Users, Package, MapPin, Tag, Layers, Check} from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Download,
+  Search,
+  RotateCcw,
+  List,
+  AlignJustify,
+  FileDown,
+  MoreVertical,
+  CalendarRange,
+  MessageCircle,
+  Loader2,
+  History,
+  Users,
+  Package,
+  MapPin,
+  Tag,
+  Layers,
+  Check,
+} from "lucide-react";
 import ProductionPlannerDialog from "./factory/ProductionPlannerDialog";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
-import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
-import {Checkbox} from "@/components/ui/checkbox";
-import {useDateFormat} from "@/contexts/DateFormatContext";
-import {useToast} from "@/hooks/use-toast";
-import {apiRequest} from "@/lib/queryClient";
-import type {Location} from "@shared/schema";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import type { Location } from "@shared/schema";
 
-import type {BaleDetail, GroupRow, StockEntryHistoryPage, StockEntryHistoryProps} from "./stockentryhistory/types";
-import {STATUS_COLORS, STATUS_OPTIONS, buildWorkerMatrix, fetchAllStockEntryHistoryPages} from "./stockentryhistory/utils";
+import type { BaleDetail, GroupRow, StockEntryHistoryPage, StockEntryHistoryProps } from "./stockentryhistory/types";
+import {
+  STATUS_COLORS,
+  STATUS_OPTIONS,
+  buildWorkerMatrix,
+  fetchAllStockEntryHistoryPages,
+} from "./stockentryhistory/utils";
+import { useErpText } from "@/i18n/modules/erp";
 export default function StockEntryHistory({ onActiveDateChange }: StockEntryHistoryProps = {}) {
+  const tUi = useErpText();
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -582,7 +615,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
 <body>
   <div class="header">
     <div class="header-left">
-      <h1>Worker Bale Matrix</h1>
+      <h1>{tUi("worker.bale.matrix")}</h1>
       <div class="sub">Stock Entry History &nbsp;&middot;&nbsp; ${fromDate} &rarr; ${toDate}</div>
     </div>
     <div class="header-right">
@@ -594,15 +627,15 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   <table>
     <thead>
       <tr>
-        <th class="prod-h">Product / Article</th>
+        <th class="prod-h">{tUi("product.article")}</th>
         ${headerCells}
-        <th class="total-h">Total</th>
+        <th class="total-h">{tUi("total")}</th>
       </tr>
     </thead>
     <tbody>
       ${dataRows}
       <tr class="totals-row">
-        <td class="prod-total">TOTAL</td>
+        <td class="prod-total">{tUi("total.3")}</td>
         ${totalCells}
         <td class="grand">${grandTotal}</td>
       </tr>
@@ -728,7 +761,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
 <body>
   <div class="page-header">
     <div>
-      <h1>Worker Bales Report</h1>
+      <h1>{tUi("worker.bales.report")}</h1>
       <div class="sub">Stock Entry History &nbsp;&middot;&nbsp; ${fromDate} &rarr; ${toDate}</div>
     </div>
     <div class="meta">
@@ -739,17 +772,17 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   <table>
     <thead>
       <tr>
-        <th style="width:16%">Reference</th>
-        <th style="width:18%">Worker</th>
-        <th>Product</th>
-        <th class="r" style="width:9%">Weight (kg)</th>
-        <th class="r" style="width:14%">Total / Person</th>
+        <th style="width:16%">{tUi("reference")}</th>
+        <th style="width:18%">{tUi("worker")}</th>
+        <th>{tUi("product")}</th>
+        <th class="r" style="width:9%">{tUi("weight.kg")}</th>
+        <th class="r" style="width:14%">{tUi("total.person")}</th>
       </tr>
     </thead>
     <tbody>
       ${detailRowsHtml}
       <tr style="background:#1e3a8a;color:#fff;font-weight:800;">
-        <td colspan="3" style="color:#fff;padding:3px 5px;">TOTAL</td>
+        <td colspan="3" style="color:#fff;padding:3px 5px;">{tUi("total.3")}</td>
         <td style="text-align:right;color:#fff;padding:3px 5px;">${grandKg.toFixed(0)}</td>
         <td style="text-align:center;color:#fff;padding:3px 5px;">${grandBales}</td>
       </tr>
@@ -760,7 +793,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
 
   <div class="page-header">
     <div>
-      <h1>Worker Summary</h1>
+      <h1>{tUi("worker.summary")}</h1>
       <div class="sub">Stock Entry History &nbsp;&middot;&nbsp; ${fromDate} &rarr; ${toDate}</div>
     </div>
     <div class="meta">
@@ -771,9 +804,9 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   <table>
     <thead>
       <tr>
-        <th>Worker</th>
-        <th class="r" style="width:18%">Bales</th>
-        <th class="r" style="width:22%">Total Weight (kg)</th>
+        <th>{tUi("worker")}</th>
+        <th class="r" style="width:18%">{tUi("bales")}</th>
+        <th class="r" style="width:22%">{tUi("total.weight.kg")}</th>
       </tr>
     </thead>
     <tbody>
@@ -832,7 +865,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     return (
       <span
         className="cursor-pointer hover:underline hover:text-primary"
-        title="Click to edit date"
+        title={tUi("click.to.edit.date")}
         onClick={() => setEditingDateKey(editKey)}
       >
         {dateStr ? formatDisplayDate(dateStr) : "—"}
@@ -849,8 +882,10 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
             <History className="h-4 w-4 text-sky-500" />
           </div>
           <div>
-            <h2 className="text-base font-bold leading-tight">Stock Entry History</h2>
-            <p className="text-xs text-muted-foreground leading-tight">Browse and filter recorded bale entries</p>
+            <h2 className="text-base font-bold leading-tight">{tUi("stock.entry.history")}</h2>
+            <p className="text-xs text-muted-foreground leading-tight">
+              {tUi("browse.and.filter.recorded.bale.entries")}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -994,10 +1029,10 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
               }}
             >
               <SelectTrigger className="h-8 text-xs" data-testid="select-category">
-                <SelectValue placeholder="All groups" />
+                <SelectValue placeholder={tUi("all.groups.2")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Groups</SelectItem>
+                <SelectItem value="all">{tUi("all.groups")}</SelectItem>
                 {categories.map((c: any) => (
                   <SelectItem key={c.id} value={String(c.id)}>
                     {c.name}
@@ -1013,10 +1048,10 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
             </div>
             <Select value={workerIdFilter} onValueChange={setWorkerIdFilter}>
               <SelectTrigger className="h-8 text-xs" data-testid="select-worker">
-                <SelectValue placeholder="All workers" />
+                <SelectValue placeholder={tUi("all.workers")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Workers</SelectItem>
+                <SelectItem value="all">{tUi("all.workers.2")}</SelectItem>
                 {filteredWorkers.map((w: any) => (
                   <SelectItem key={w.id} value={String(w.id)}>
                     {w.fullName}
@@ -1032,10 +1067,10 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
             </div>
             <Select value={productIdFilter} onValueChange={setProductIdFilter}>
               <SelectTrigger className="h-8 text-xs" data-testid="select-product">
-                <SelectValue placeholder="All products" />
+                <SelectValue placeholder={tUi("all.products")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Products</SelectItem>
+                <SelectItem value="all">{tUi("all.products.2")}</SelectItem>
                 {products.map((p: any) => (
                   <SelectItem key={p.id} value={String(p.id)}>
                     {p.name}
@@ -1051,10 +1086,10 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
             </div>
             <Select value={locationIdFilter} onValueChange={setLocationIdFilter}>
               <SelectTrigger className="h-8 text-xs" data-testid="select-location">
-                <SelectValue placeholder="All locations" />
+                <SelectValue placeholder={tUi("all.locations.2")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Locations</SelectItem>
+                <SelectItem value="all">{tUi("all.locations")}</SelectItem>
                 {locations.map((l: any) => (
                   <SelectItem key={l.id} value={String(l.id)}>
                     {l.name}
@@ -1070,10 +1105,10 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="h-8 text-xs" data-testid="select-status">
-                <SelectValue placeholder="All statuses" />
+                <SelectValue placeholder={tUi("all.statuses")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="all">{tUi("all.statuses.2")}</SelectItem>
                 {STATUS_OPTIONS.map((s) => (
                   <SelectItem key={s} value={s}>
                     {s}
@@ -1135,7 +1170,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input
             className="pl-8 h-7 text-xs"
-            placeholder="Search by reference number…"
+            placeholder={tUi("search.by.reference.number")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             data-testid="input-search"
@@ -1157,19 +1192,19 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       {/* ── Summary pill-cards ── show dataset-level totals (all pages, full filter) ── */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-slate-500/10 border-slate-500/20">
-          <span className="text-xs font-semibold text-slate-500">Groups</span>
+          <span className="text-xs font-semibold text-slate-500">{tUi("groups")}</span>
           <span className="text-sm font-bold tabular-nums text-slate-600 dark:text-slate-300">
             {(pagedGroups?.total ?? filteredGroups.length).toLocaleString()}
           </span>
         </div>
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-emerald-500/10 border-emerald-500/20">
-          <span className="text-xs font-semibold text-emerald-500">Bales</span>
+          <span className="text-xs font-semibold text-emerald-500">{tUi("bales")}</span>
           <span className="text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
             {(pagedGroups?.totalBales ?? totalBales).toLocaleString()}
           </span>
         </div>
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-sky-500/10 border-sky-500/20">
-          <span className="text-xs font-semibold text-sky-500">Weight</span>
+          <span className="text-xs font-semibold text-sky-500">{tUi("weight")}</span>
           <span className="text-sm font-bold tabular-nums text-sky-600 dark:text-sky-400">
             {(pagedGroups?.totalWeight ?? totalWeight).toFixed(2)}
           </span>
@@ -1187,7 +1222,9 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                 <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">
                   No. Workers
                 </th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Worker</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">
+                  {tUi("worker")}
+                </th>
                 <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">
                   Target
                 </th>
@@ -1238,7 +1275,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                       {plan && workerCount > 0 ? workerCount : <span className="text-xs text-muted-foreground">—</span>}
                     </td>
                     <td className="px-3 py-2 font-semibold">
-                      {wg.workerName || <span className="italic text-muted-foreground">Unassigned</span>}
+                      {wg.workerName || <span className="italic text-muted-foreground">{tUi("unassigned")}</span>}
                     </td>
                     <td className="px-3 py-2 text-right text-muted-foreground">
                       {plan && target > 0 ? target : <span className="text-xs text-muted-foreground">—</span>}
@@ -1268,13 +1305,13 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                           <thead>
                             <tr className="text-muted-foreground border-b bg-muted/20">
                               <th className="px-8 py-1.5 text-left w-6"></th>
-                              <th className="px-3 py-1.5 text-left">Date</th>
-                              <th className="px-3 py-1.5 text-left">Location</th>
-                              <th className="px-3 py-1.5 text-left">Product</th>
-                              <th className="px-3 py-1.5 text-right">Bales</th>
-                              <th className="px-3 py-1.5 text-right">Total kg</th>
-                              <th className="px-3 py-1.5 text-right">Avg kg</th>
-                              <th className="px-3 py-1.5">Reassign</th>
+                              <th className="px-3 py-1.5 text-left">{tUi("date")}</th>
+                              <th className="px-3 py-1.5 text-left">{tUi("location")}</th>
+                              <th className="px-3 py-1.5 text-left">{tUi("product")}</th>
+                              <th className="px-3 py-1.5 text-right">{tUi("bales")}</th>
+                              <th className="px-3 py-1.5 text-right">{tUi("total.kg")}</th>
+                              <th className="px-3 py-1.5 text-right">{tUi("avg.kg")}</th>
+                              <th className="px-3 py-1.5">{tUi("reassign")}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1344,7 +1381,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                                         className="h-6 w-36 text-xs"
                                         data-testid={`select-assign-worker-${gKey}`}
                                       >
-                                        <SelectValue placeholder="Reassign…" />
+                                        <SelectValue placeholder={tUi("reassign.2")} />
                                       </SelectTrigger>
                                       <SelectContent>
                                         {workers
@@ -1365,10 +1402,10 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                                       <table className="w-full text-xs">
                                         <thead>
                                           <tr className="text-muted-foreground">
-                                            <th className="text-left pb-1 pr-4">Reference</th>
-                                            <th className="text-right pb-1 pr-4">Weight (kg)</th>
-                                            <th className="text-left pb-1 pr-4">Status</th>
-                                            <th className="text-left pb-1">Finalized At</th>
+                                            <th className="text-left pb-1 pr-4">{tUi("reference")}</th>
+                                            <th className="text-right pb-1 pr-4">{tUi("weight.kg")}</th>
+                                            <th className="text-left pb-1 pr-4">{tUi("status")}</th>
+                                            <th className="text-left pb-1">{tUi("finalized.at")}</th>
                                           </tr>
                                         </thead>
                                         <tbody>
@@ -1432,17 +1469,31 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-30 bg-muted border-b-2 border-border/60">
               <tr className="text-left">
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Reference</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Date</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Location</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Worker</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Product</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Article</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">
+                  {tUi("reference")}
+                </th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">{tUi("date")}</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">
+                  {tUi("location")}
+                </th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">
+                  {tUi("worker")}
+                </th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">
+                  {tUi("product")}
+                </th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">
+                  {tUi("article")}
+                </th>
                 <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">
                   Weight (kg)
                 </th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Status</th>
-                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Finalized At</th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">
+                  {tUi("status")}
+                </th>
+                <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">
+                  {tUi("finalized.at")}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -1476,7 +1527,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                   </td>
                   <td className="px-3 py-1.5">{b.locationName}</td>
                   <td className="px-3 py-1.5">
-                    {b.workerName || <span className="italic text-muted-foreground text-xs">Unassigned</span>}
+                    {b.workerName || <span className="italic text-muted-foreground text-xs">{tUi("unassigned")}</span>}
                   </td>
                   <td className="px-3 py-1.5">{b.productName || "—"}</td>
                   <td className="px-3 py-1.5 text-muted-foreground text-xs">{b.articleCode || "—"}</td>

@@ -3,13 +3,14 @@
  *
  * Extracted from FactoryPayrollTab.tsx during the Phase 4 god-file split.
  */
-import {ChevronDown, ChevronRight, Trash2, RotateCcw, Wrench} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Badge} from "@/components/ui/badge";
-import {Checkbox} from "@/components/ui/checkbox";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import type {BatchRowProps} from "../types";
-import {STATUS_CONFIG, fmt, fmtDate} from "../utils";
+import { ChevronDown, ChevronRight, Trash2, RotateCcw, Wrench } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import type { BatchRowProps } from "../types";
+import { STATUS_CONFIG, fmt, fmtDate } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function BatchRow({
   group,
@@ -29,6 +30,7 @@ export function BatchRow({
   condensed,
   isDeveloper,
 }: BatchRowProps) {
+  const tUi = useFactoryText();
   const isExpanded = expanded.has(group.key);
   const total = group.records.reduce((s, p) => s + parseFloat(p.netSalary || "0"), 0);
   const paidCount = group.records.filter((p) => p.status === "PAID").length;
@@ -87,7 +89,7 @@ export function BatchRow({
               setDeleteBatchGroup(group);
             }}
             data-testid={`button-delete-batch-${group.key}`}
-            title="Delete batch — reverses all payments and accounting entries"
+            title={tUi("delete.batch.reverses.all.payments.and.accountin")}
           >
             <Trash2 className="h-4 w-4 text-muted-foreground" />
           </Button>
@@ -100,14 +102,14 @@ export function BatchRow({
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
                 <TableHead className="w-10 pl-8 text-xs h-9 font-semibold"></TableHead>
-                <TableHead className="text-xs h-9 font-semibold">Worker</TableHead>
-                <TableHead className="text-center text-xs h-9 font-semibold">Present</TableHead>
-                <TableHead className="text-center text-xs h-9 font-semibold">Absent</TableHead>
-                <TableHead className="text-right text-xs h-9 font-semibold">Deductions</TableHead>
-                <TableHead className="text-right text-xs h-9 font-semibold">Advances</TableHead>
+                <TableHead className="text-xs h-9 font-semibold">{tUi("worker")}</TableHead>
+                <TableHead className="text-center text-xs h-9 font-semibold">{tUi("present")}</TableHead>
+                <TableHead className="text-center text-xs h-9 font-semibold">{tUi("absent")}</TableHead>
+                <TableHead className="text-right text-xs h-9 font-semibold">{tUi("deductions.2")}</TableHead>
+                <TableHead className="text-right text-xs h-9 font-semibold">{tUi("advances")}</TableHead>
                 <TableHead className="text-right text-xs h-9 font-semibold">Net</TableHead>
-                <TableHead className="text-xs h-9 font-semibold">Status</TableHead>
-                <TableHead className="text-xs h-9 font-semibold">Paid On</TableHead>
+                <TableHead className="text-xs h-9 font-semibold">{tUi("status")}</TableHead>
+                <TableHead className="text-xs h-9 font-semibold">{tUi("paid.on")}</TableHead>
                 <TableHead className="text-xs h-9"></TableHead>
               </TableRow>
             </TableHeader>
@@ -202,7 +204,7 @@ export function BatchRow({
                               setFixAcctOpen(true);
                             }}
                             data-testid={`button-fix-acct-${p.id}`}
-                            title="Generate missing accounting entry"
+                            title={tUi("generate.missing.accounting.entry")}
                           >
                             <Wrench className="h-4 w-4 text-amber-500" />
                           </Button>
@@ -212,7 +214,7 @@ export function BatchRow({
                           variant="ghost"
                           onClick={() => setUndoTargetId(p.id)}
                           data-testid={`button-undo-payroll-${p.id}`}
-                          title="Undo — reverses all accounting entries"
+                          title={tUi("undo.reverses.all.accounting.entries")}
                         >
                           <RotateCcw className="h-4 w-4 text-muted-foreground" />
                         </Button>

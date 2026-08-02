@@ -4,7 +4,7 @@
  * Extracted from SupplierProfitCheck.tsx during the Phase 4 god-file split.
  */
 
-import {fmt} from "../utils";
+import { fmt } from "../utils";
 
 export function ProfitCell({ value, pct }: { value: number | null; pct: number | null }) {
   if (value == null) return <span className="text-muted-foreground text-xs">—</span>;

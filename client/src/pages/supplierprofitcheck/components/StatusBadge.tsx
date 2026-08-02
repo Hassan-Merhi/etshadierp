@@ -3,8 +3,8 @@
  *
  * Extracted from SupplierProfitCheck.tsx during the Phase 4 god-file split.
  */
-import {Badge} from "@/components/ui/badge";
-import {TrendingUp, TrendingDown, Minus, AlertTriangle} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { TrendingUp, TrendingDown, Minus, AlertTriangle } from "lucide-react";
 
 export function StatusBadge({ status }: { status: string }) {
   if (status === "gaining")

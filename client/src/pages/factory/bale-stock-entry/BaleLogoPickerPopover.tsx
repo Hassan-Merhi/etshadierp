@@ -4,6 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ImagePlus } from "lucide-react";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function BaleLogoPickerPopover({
   productId,
@@ -20,6 +21,7 @@ export function BaleLogoPickerPopover({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const tUi = useFactoryText();
   const [pickerCustomerId, setPickerCustomerId] = useState("none");
   const { data: logos = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/customers", pickerCustomerId, "logos"],
@@ -49,11 +51,11 @@ export function BaleLogoPickerPopover({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-3" align="end">
-        <p className="text-xs font-medium text-muted-foreground mb-2">Label logo (this bale only)</p>
+        <p className="text-xs font-medium text-muted-foreground mb-2">{tUi("label.logo.this.bale.only")}</p>
         <div className="space-y-2">
           <Select value={pickerCustomerId} onValueChange={setPickerCustomerId}>
             <SelectTrigger className="text-sm">
-              <SelectValue placeholder="Choose customer..." />
+              <SelectValue placeholder={tUi("choose.customer")} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">— Choose customer —</SelectItem>
@@ -66,7 +68,7 @@ export function BaleLogoPickerPopover({
           </Select>
           {pickerCustomerId !== "none" &&
             (logos.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-1">No logos uploaded for this customer.</p>
+              <p className="text-xs text-muted-foreground py-1">{tUi("no.logos.uploaded.for.this.customer")}</p>
             ) : (
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {logos.map((logo: any) => (

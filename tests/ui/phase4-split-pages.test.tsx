@@ -19,6 +19,7 @@ import userEvent from "@testing-library/user-event";
 
 import { getQueryFn } from "@/lib/queryClient";
 import { renderWithProviders, stubFetch } from "./helpers";
+import { ApplicationLanguageProvider } from "@/contexts/ApplicationLanguageContext";
 
 /**
  * renderWithProviders builds a bare QueryClient, but the application sets a
@@ -35,7 +36,11 @@ function renderWithData(ui: React.ReactElement) {
       mutations: { retry: false },
     },
   });
-  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+  return render(
+    <QueryClientProvider client={client}>
+      <ApplicationLanguageProvider>{ui}</ApplicationLanguageProvider>
+    </QueryClientProvider>
+  );
 }
 
 beforeAll(() => stubFetch());

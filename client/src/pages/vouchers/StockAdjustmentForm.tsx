@@ -35,7 +35,9 @@ import type {
   StockItem,
 } from "./stockadjustmentform/types";
 import { stockAdjustmentFormSchema } from "./stockadjustmentform/utils";
+import { useErpText } from "@/i18n/modules/erp";
 export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProps) {
+  const tUi = useErpText();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const appMode = useAppMode();
@@ -370,7 +372,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
       <Card>
         <div className="p-5">
           <div className="flex items-center gap-2 mb-5">
-            <span className="text-sm font-semibold">Production / Consumption Voucher</span>
+            <span className="text-sm font-semibold">{tUi("production.consumption.voucher")}</span>
           </div>
           <Form {...stockAdjustmentForm}>
             <form noValidate onSubmit={stockAdjustmentForm.handleSubmit(onStockAdjustmentSubmit)} className="space-y-6">
@@ -381,14 +383,14 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
                   name="locationId"
                   render={({ field }) => (
                     <FormItem className="flex-1">
-                      <FormLabel>Location</FormLabel>
+                      <FormLabel>{tUi("location")}</FormLabel>
                       <Select
                         value={field.value > 0 ? field.value.toString() : ""}
                         onValueChange={(v) => field.onChange(parseInt(v))}
                       >
                         <FormControl>
                           <SelectTrigger data-testid="select-adjustment-location">
-                            <SelectValue placeholder="Select location..." />
+                            <SelectValue placeholder={tUi("select.location")} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -410,7 +412,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
                   name="voucherDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Date</FormLabel>
+                      <FormLabel>{tUi("date")}</FormLabel>
                       <FormControl>
                         <Input
                           type="date"
@@ -467,7 +469,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
                           </div>
                           <div className="grid grid-cols-2 gap-2">
                             <div className="space-y-1">
-                              <label className="text-xs text-muted-foreground">Type (P/C)</label>
+                              <label className="text-xs text-muted-foreground">{tUi("type.p.c")}</label>
                               <input
                                 type="text"
                                 value={
@@ -491,7 +493,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
                             </div>
                             {currentEntry?.stockItemId > 0 && (
                               <div className="space-y-1">
-                                <label className="text-xs text-muted-foreground">Available</label>
+                                <label className="text-xs text-muted-foreground">{tUi("available")}</label>
                                 <div className="px-3 py-2 text-sm font-mono text-muted-foreground">
                                   {formatNumber(parseFloat(availableQty))}
                                 </div>
@@ -499,7 +501,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
                             )}
                           </div>
                           <div className="space-y-1">
-                            <label className="text-xs text-muted-foreground">Item</label>
+                            <label className="text-xs text-muted-foreground">{tUi("item")}</label>
                             <input
                               type="text"
                               value={
@@ -531,7 +533,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
                                   }
                                 }, 200);
                               }}
-                              placeholder="Type to search item..."
+                              placeholder={tUi("type.to.search.item")}
                               data-testid={`input-adjustment-item-mobile-${index}`}
                               className="w-full px-3 py-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring"
                             />
@@ -583,7 +585,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
                               />
                             </div>
                             <div className="space-y-1">
-                              <label className="text-xs text-muted-foreground">Rate</label>
+                              <label className="text-xs text-muted-foreground">{tUi("rate")}</label>
                               <input
                                 type="number"
                                 step="0.01"
@@ -596,7 +598,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
                             </div>
                           </div>
                           <div className="flex items-center justify-between px-1">
-                            <span className="text-xs text-muted-foreground">Amount</span>
+                            <span className="text-xs text-muted-foreground">{tUi("amount")}</span>
                             <span
                               className={`text-sm font-mono font-medium ${currentEntry?.type === "CONSUME" ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}
                             >
@@ -629,11 +631,11 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
                       </Button>
                       <div className="text-right text-xs space-y-0.5">
                         <div>
-                          <span className="text-muted-foreground">Consume: </span>
+                          <span className="text-muted-foreground">{tUi("consume")} </span>
                           <span className="text-destructive font-mono">{formatAmount(consumptionTotal)}</span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground">Produce: </span>
+                          <span className="text-muted-foreground">{tUi("produce")} </span>
                           <span className="text-emerald-600 font-mono">{formatAmount(productionTotal)}</span>
                         </div>
                       </div>
@@ -834,7 +836,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
                                       }
                                     }
                                   }}
-                                  placeholder="Type to search..."
+                                  placeholder={tUi("type.to.search")}
                                   className="w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20"
                                   data-testid={`input-adjustment-item-${index}`}
                                 />
@@ -979,19 +981,19 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
                         Add Row
                       </Button>
                       <div className="flex flex-wrap items-center gap-2 sm:gap-6">
-                        <div className="text-xs text-muted-foreground">Total Qty:</div>
+                        <div className="text-xs text-muted-foreground">{tUi("total.qty.2")}</div>
                         <div className="text-xs font-mono font-medium">
                           {formatNumber(adjustmentEntries.reduce((sum, e) => sum + parseFloat(e.quantity || "0"), 0))}
                         </div>
-                        <div className="text-xs text-muted-foreground">Consume:</div>
+                        <div className="text-xs text-muted-foreground">{tUi("consume")}</div>
                         <div className="text-xs font-mono font-medium text-destructive">
                           {formatAmount(consumptionTotal)}
                         </div>
-                        <div className="text-xs text-muted-foreground">Produce:</div>
+                        <div className="text-xs text-muted-foreground">{tUi("produce")}</div>
                         <div className="text-xs font-mono font-medium text-green-600">
                           {formatAmount(productionTotal)}
                         </div>
-                        <div className="text-sm font-semibold">Total:</div>
+                        <div className="text-sm font-semibold">{tUi("total.2")}</div>
                         <div className="text-sm font-bold font-mono" data-testid="text-adjustment-total">
                           {formatAmount(displayAdjustmentTotal)}
                         </div>
@@ -1005,7 +1007,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
                   <Card className="hidden sm:flex flex-col w-full lg:w-80 lg:sticky lg:top-4 max-h-[60vh] lg:max-h-[calc(100vh-12rem)] self-start">
                     <div className="p-4 border-b">
                       <div className="flex items-center justify-between gap-2 mb-2">
-                        <h3 className="text-sm font-semibold">Search Items</h3>
+                        <h3 className="text-sm font-semibold">{tUi("search.items.2")}</h3>
                         <button
                           onClick={() => setShowAdjustmentSidebar(false)}
                           className="text-xs text-muted-foreground hover:text-foreground"
@@ -1022,7 +1024,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
                       <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                          placeholder="Search by name or code..."
+                          placeholder={tUi("search.by.name.or.code")}
                           value={adjustmentSearchTerm}
                           onChange={(e) => {
                             setAdjustmentSearchTerm(e.target.value);
@@ -1114,11 +1116,11 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
                 name="notes"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Notes</FormLabel>
+                    <FormLabel>{tUi("notes")}</FormLabel>
                     <FormControl>
                       <Textarea
                         {...field}
-                        placeholder="Additional notes..."
+                        placeholder={tUi("additional.notes.2")}
                         rows={3}
                         data-testid="input-adjustment-notes"
                       />
@@ -1142,7 +1144,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
-                      <FormLabel>Mark as Optional</FormLabel>
+                      <FormLabel>{tUi("mark.as.optional")}</FormLabel>
                     </div>
                   </FormItem>
                 )}

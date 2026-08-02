@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-react";
 import { SaleRow } from "./posTypes";
+import { usePosText } from "@/i18n/modules/pos";
 
 export interface SaleGridProps {
   rows: SaleRow[];
@@ -48,6 +49,7 @@ export function SaleGrid({
   toast,
   isEditMode = false,
 }: SaleGridProps) {
+  const tUi = usePosText();
   return (
     <Card className="flex-1 overflow-hidden min-w-0">
       <div className="table-responsive">
@@ -224,7 +226,7 @@ export function SaleGrid({
                   <span className="font-semibold text-foreground font-mono">{qty.toFixed(2)}</span>
                 </span>
                 <span className="text-sm ml-auto flex items-baseline gap-1">
-                  <span className="text-muted-foreground">Total</span>
+                  <span className="text-muted-foreground">{tUi("total")}</span>
                   <span className="font-mono font-bold text-2xl">{formatDisplayAmount(total)}</span>
                 </span>
               </div>

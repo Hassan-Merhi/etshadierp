@@ -51,7 +51,9 @@ import { AddPriceLineDialog } from "./factory-proformas/dialogs/AddPriceLineDial
 import { EditPriceLineDialog } from "./factory-proformas/dialogs/EditPriceLineDialog";
 import { CreatePendingLoadingDialog } from "./factory-proformas/dialogs/CreatePendingLoadingDialog";
 import { ImportProformaExcelDialog } from "./factory-proformas/dialogs/ImportProformaExcelDialog";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactoryProformas() {
+  const tUi = useFactoryText();
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
@@ -625,8 +627,8 @@ export default function FactoryProformas() {
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 pt-6 pb-4 border-b">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Customer Proformas</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Price lists for bale sales per customer</p>
+          <h1 className="text-xl font-semibold tracking-tight">{tUi("customer.proformas")}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">{tUi("price.lists.for.bale.sales.per.customer")}</p>
         </div>
         {customerId && (
           <div className="flex items-center gap-2 flex-wrap">
@@ -669,7 +671,7 @@ export default function FactoryProformas() {
                 }}
               >
                 <SelectTrigger data-testid="select-customer" className="flex-1">
-                  <SelectValue placeholder="Select a customer to view proformas..." />
+                  <SelectValue placeholder={tUi("select.a.customer.to.view.proformas")} />
                 </SelectTrigger>
                 <SelectContent>
                   {customers.map((c) => (
@@ -687,7 +689,7 @@ export default function FactoryProformas() {
               <Input
                 value={proformaSearch}
                 onChange={(e) => setProformaSearch(e.target.value)}
-                placeholder="Search proformas…"
+                placeholder={tUi("search.proformas")}
                 className="pl-8 h-9 w-52 text-sm"
                 data-testid="input-proforma-search"
               />
@@ -725,8 +727,8 @@ export default function FactoryProformas() {
             <div className="rounded-full bg-muted p-4 mb-4">
               <Users className="h-8 w-8 text-muted-foreground" />
             </div>
-            <p className="font-medium text-muted-foreground">No customer selected</p>
-            <p className="text-sm text-muted-foreground mt-1">Pick a customer above to view their proformas</p>
+            <p className="font-medium text-muted-foreground">{tUi("no.customer.selected")}</p>
+            <p className="text-sm text-muted-foreground mt-1">{tUi("pick.a.customer.above.to.view.their.proformas")}</p>
           </div>
         )}
 
@@ -736,8 +738,10 @@ export default function FactoryProformas() {
             <div className="rounded-full bg-muted p-4 mb-4">
               <FileText className="h-8 w-8 text-muted-foreground" />
             </div>
-            <p className="font-medium text-muted-foreground">No proformas yet</p>
-            <p className="text-sm text-muted-foreground mt-1">Create a proforma to define this customer's pricing</p>
+            <p className="font-medium text-muted-foreground">{tUi("no.proformas.yet")}</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {tUi("create.a.proforma.to.define.this.customer.s.pric")}
+            </p>
             <Button size="sm" className="mt-4" onClick={() => setIsCreateOpen(true)}>
               <Plus className="mr-1.5 h-3.5 w-3.5" />
               New Proforma
@@ -914,7 +918,7 @@ export default function FactoryProformas() {
                             )
                           }
                           data-testid={`button-create-dispatch-batch-${proforma.id}`}
-                          title="Create dispatch batch"
+                          title={tUi("create.dispatch.batch")}
                         >
                           <Truck className="h-4 w-4 text-muted-foreground" />
                         </Button>
@@ -1002,7 +1006,7 @@ export default function FactoryProformas() {
                             onClick={() => saveAgreedPricesMutation.mutate(proforma.id)}
                             disabled={saveAgreedPricesMutation.isPending}
                             data-testid={`button-save-agreed-prices-${proforma.id}`}
-                            title="Save these prices as the customer's agreed prices"
+                            title={tUi("save.these.prices.as.the.customer.s.agreed.price")}
                           >
                             <BookmarkCheck className="mr-1.5 h-3.5 w-3.5" />
                             Save as Agreed Prices
@@ -1013,7 +1017,7 @@ export default function FactoryProformas() {
                             onClick={() => applyProductionPricesMutation.mutate(proforma.id)}
                             disabled={applyProductionPricesMutation.isPending}
                             data-testid={`button-apply-production-prices-${proforma.id}`}
-                            title="Set all line prices to the production (cost) price from the catalogue"
+                            title={tUi("set.all.line.prices.to.the.production.cost.price")}
                           >
                             Apply Production Price
                           </Button>
@@ -1023,7 +1027,7 @@ export default function FactoryProformas() {
                             onClick={() => applyCatalogPricesMutation.mutate(proforma.id)}
                             disabled={applyCatalogPricesMutation.isPending}
                             data-testid={`button-apply-selling-prices-${proforma.id}`}
-                            title="Set all line prices to the selling price from the catalogue"
+                            title={tUi("set.all.line.prices.to.the.selling.price.from.th")}
                           >
                             Apply Selling Price
                           </Button>
@@ -1136,7 +1140,7 @@ export default function FactoryProformas() {
                                           ) : canEdit ? (
                                             <button
                                               className="font-mono hover:underline hover:text-primary cursor-pointer w-full text-right"
-                                              title="Click to edit quantity"
+                                              title={tUi("click.to.edit.quantity")}
                                               onClick={() => {
                                                 setInlineQtyLineId(line.id);
                                                 setInlineQtyValue(String(line.quantity));
@@ -1222,13 +1226,13 @@ export default function FactoryProformas() {
                             {/* Summary footer */}
                             <div className="flex items-center gap-6 px-4 py-3 bg-muted/20 border-t text-sm flex-wrap">
                               <div className="flex items-center gap-1.5">
-                                <span className="text-xs text-muted-foreground">Bales</span>
+                                <span className="text-xs text-muted-foreground">{tUi("bales")}</span>
                                 <span className="font-semibold font-mono" data-testid={`text-total-qty-${proforma.id}`}>
                                   {totalQty.toLocaleString()}
                                 </span>
                               </div>
                               <div className="flex items-center gap-1.5">
-                                <span className="text-xs text-muted-foreground">Weight</span>
+                                <span className="text-xs text-muted-foreground">{tUi("weight")}</span>
                                 <span
                                   className="font-semibold font-mono"
                                   data-testid={`text-total-weight-${proforma.id}`}
@@ -1242,7 +1246,7 @@ export default function FactoryProformas() {
                               </div>
                               {!hideProformaPrice && (
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-xs text-muted-foreground">Total</span>
+                                  <span className="text-xs text-muted-foreground">{tUi("total")}</span>
                                   <span
                                     className="font-semibold font-mono"
                                     data-testid={`text-total-amount-${proforma.id}`}
@@ -1259,7 +1263,7 @@ export default function FactoryProformas() {
                             data-testid={`text-no-lines-${proforma.id}`}
                           >
                             <Package className="h-8 w-8 text-muted-foreground/40 mb-2" />
-                            <p className="text-sm text-muted-foreground">No price lines yet</p>
+                            <p className="text-sm text-muted-foreground">{tUi("no.price.lines.yet")}</p>
                             {canEdit && (
                               <Button
                                 size="sm"
@@ -1292,11 +1296,11 @@ export default function FactoryProformas() {
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Create New Proforma</DialogTitle>
+            <DialogTitle>{tUi("create.new.proforma")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>
-              <label className="text-sm font-medium mb-1 block">Proforma Name</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("proforma.name.2")}</label>
               <Input
                 placeholder="e.g. Summer 2024 Pricing"
                 value={newProformaName}

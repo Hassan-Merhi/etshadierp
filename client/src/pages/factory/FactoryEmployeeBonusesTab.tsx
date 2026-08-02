@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface Employee {
   id: number;
@@ -47,6 +48,7 @@ function fmt(val: string | number | null | undefined) {
 const today = () => new Date().toLocaleDateString("en-CA");
 
 export default function FactoryEmployeeBonusesTab() {
+  const tUi = useFactoryText();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { toast } = useToast();
   const [empFilter, setEmpFilter] = useState("all");
@@ -128,13 +130,13 @@ export default function FactoryEmployeeBonusesTab() {
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3 items-end justify-between">
         <div>
-          <Label className="text-xs text-muted-foreground mb-1 block">Employee</Label>
+          <Label className="text-xs text-muted-foreground mb-1 block">{tUi("employee")}</Label>
           <Select value={empFilter} onValueChange={setEmpFilter}>
             <SelectTrigger className="w-48" data-testid="select-bonus-emp-filter">
-              <SelectValue placeholder="All employees" />
+              <SelectValue placeholder={tUi("all.employees")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Employees</SelectItem>
+              <SelectItem value="all">{tUi("all.employees.2")}</SelectItem>
               {employees.map((e) => (
                 <SelectItem key={e.id} value={String(e.id)}>
                   {e.firstName} {e.lastName}
@@ -167,7 +169,7 @@ export default function FactoryEmployeeBonusesTab() {
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <Gift className="h-10 w-10 mx-auto mb-3 opacity-40" />
-            <p>No bonuses recorded yet.</p>
+            <p>{tUi("no.bonuses.recorded.yet")}</p>
           </CardContent>
         </Card>
       ) : (
@@ -176,10 +178,10 @@ export default function FactoryEmployeeBonusesTab() {
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Notes</TableHead>
+                  <TableHead>{tUi("employee")}</TableHead>
+                  <TableHead>{tUi("date")}</TableHead>
+                  <TableHead className="text-right">{tUi("amount")}</TableHead>
+                  <TableHead>{tUi("notes")}</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
@@ -241,17 +243,17 @@ export default function FactoryEmployeeBonusesTab() {
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Employee Bonus</DialogTitle>
+            <DialogTitle>{tUi("add.employee.bonus")}</DialogTitle>
             <DialogDescription>
               The bonus amount will be immediately credited to the employee's account balance.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Employee</Label>
+              <Label>{tUi("employee")}</Label>
               <Select value={addForm.employeeId} onValueChange={(v) => setAddForm((f) => ({ ...f, employeeId: v }))}>
                 <SelectTrigger data-testid="select-bonus-employee">
-                  <SelectValue placeholder="Select employee" />
+                  <SelectValue placeholder={tUi("select.employee")} />
                 </SelectTrigger>
                 <SelectContent>
                   {employees.map((e) => (
@@ -264,7 +266,7 @@ export default function FactoryEmployeeBonusesTab() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Date</Label>
+                <Label>{tUi("date")}</Label>
                 <Input
                   type="date"
                   value={addForm.bonusDate}
@@ -273,7 +275,7 @@ export default function FactoryEmployeeBonusesTab() {
                 />
               </div>
               <div>
-                <Label>Amount</Label>
+                <Label>{tUi("amount")}</Label>
                 <Input
                   type="number"
                   placeholder="0.00"
@@ -284,7 +286,7 @@ export default function FactoryEmployeeBonusesTab() {
               </div>
             </div>
             <div>
-              <Label>Notes (optional)</Label>
+              <Label>{tUi("notes.optional")}</Label>
               <Textarea
                 placeholder="e.g. Performance bonus Q1..."
                 value={addForm.notes}
@@ -313,7 +315,7 @@ export default function FactoryEmployeeBonusesTab() {
       <Dialog open={!!deleteConfirm} onOpenChange={(o) => !o && setDeleteConfirm(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reverse Bonus</DialogTitle>
+            <DialogTitle>{tUi("reverse.bonus")}</DialogTitle>
             <DialogDescription>
               This will reverse and delete the bonus of <strong>{deleteConfirm && fmt(deleteConfirm.amount)}</strong>{" "}
               for {deleteConfirm?.firstName} {deleteConfirm?.lastName}. The amount will be deducted from their account

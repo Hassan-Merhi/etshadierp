@@ -58,8 +58,10 @@ import {
   exportContainers,
   downloadContainerTemplate,
 } from "./factory-containers/ContainerDialogs";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export default function FactoryContainers() {
+  const tUi = useFactoryText();
   const [viewMode, setViewMode] = useState<"list" | "summary" | "tracking">("tracking");
   const [trackingNowId, setTrackingNowId] = useState<number | null>(null);
   const [openOtwGroups, setOpenOtwGroups] = useState<Set<string>>(new Set());
@@ -85,7 +87,11 @@ export default function FactoryContainers() {
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const { data: containers, isLoading } = useQuery<ContainerWithSupplier[]>({ queryKey: ["/api/factory/containers"] });
   const { data: suppliers } = useQuery<FactorySupplier[]>({ queryKey: ["/api/factory/suppliers"] });
-  const { data: ledgerAccounts = [] } = useQuery<any[]>({ queryKey: ["/api/ledger-accounts?includeHidden=true"], staleTime: 60_000, refetchOnWindowFocus: false });
+  const { data: ledgerAccounts = [] } = useQuery<any[]>({
+    queryKey: ["/api/ledger-accounts?includeHidden=true"],
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
 
   // ── OTW Summary computed values ──────────────────────────────────────────
   const otwContainers = useMemo(() => (containers || []).filter((c) => STATUS_ACTIVE.has(c.status)), [containers]);
@@ -239,7 +245,10 @@ export default function FactoryContainers() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <PageHeader title="Factory Containers" subtitle="Track incoming containers (separate from ERP containers)" />
+          <PageHeader
+            title={tUi("factory.containers")}
+            subtitle={tUi("track.incoming.containers.separate.from.erp.cont")}
+          />
         </div>
         <div className="flex gap-2 flex-wrap">
           {selectedIds.size > 0 && (
@@ -447,13 +456,13 @@ export default function FactoryContainers() {
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>#</TableHead>
-                        <TableHead>Container #</TableHead>
-                        <TableHead>Supplier</TableHead>
-                        <TableHead>Origin</TableHead>
+                        <TableHead>{tUi("container.2")}</TableHead>
+                        <TableHead>{tUi("supplier")}</TableHead>
+                        <TableHead>{tUi("origin")}</TableHead>
                         <TableHead className="text-right">Kg</TableHead>
-                        <TableHead className="text-right">Rate/Kg</TableHead>
-                        <TableHead>Currency</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">{tUi("rate.kg")}</TableHead>
+                        <TableHead>{tUi("currency")}</TableHead>
+                        <TableHead>{tUi("status")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>

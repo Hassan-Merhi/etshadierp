@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Check, X, Pencil, Search, Tag, RefreshCw, AlertCircle, Download, Upload } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { ExcelJS, readFile } from "@/lib/excelHelper";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface FactoryBaleProduct {
   id: number;
@@ -35,6 +36,7 @@ interface FactoryCategory {
 }
 
 export default function FactoryPriceList() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
@@ -239,7 +241,7 @@ export default function FactoryPriceList() {
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 flex-wrap">
         <div>
-          <PageHeader title="Factory Price List" subtitle="Set selling prices for bale products." />
+          <PageHeader title={tUi("factory.price.list")} subtitle={tUi("set.selling.prices.for.bale.products")} />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="secondary" data-testid="text-price-coverage">
@@ -253,8 +255,8 @@ export default function FactoryPriceList() {
             data-testid="button-download-price-template"
           >
             <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Download Template</span>
-            <span className="sm:hidden">Template</span>
+            <span className="hidden sm:inline">{tUi("download.template")}</span>
+            <span className="sm:hidden">{tUi("template")}</span>
           </Button>
           <Button
             variant="outline"
@@ -274,7 +276,7 @@ export default function FactoryPriceList() {
         <div className="relative flex-1 min-w-[160px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search..."
+            placeholder={tUi("search")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-8"
@@ -283,10 +285,10 @@ export default function FactoryPriceList() {
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
           <SelectTrigger className="w-[150px] sm:w-[180px]" data-testid="select-category-filter">
-            <SelectValue placeholder="All Categories" />
+            <SelectValue placeholder={tUi("all.categories")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
+            <SelectItem value="all">{tUi("all.categories")}</SelectItem>
             {categories.map((c) => (
               <SelectItem key={c.id} value={String(c.id)}>
                 {c.name}
@@ -302,7 +304,7 @@ export default function FactoryPriceList() {
         >
           <AlertCircle className="h-4 w-4" />
           <span className="hidden sm:inline">{showZeroOnly ? "Showing unpriced" : "Show unpriced"}</span>
-          <span className="sm:hidden">Unpriced</span>
+          <span className="sm:hidden">{tUi("unpriced")}</span>
         </Button>
       </div>
 
@@ -324,12 +326,12 @@ export default function FactoryPriceList() {
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
-                  <TableHead className="hidden sm:table-cell">Article Code</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead className="hidden sm:table-cell">Category</TableHead>
-                  <TableHead className="text-right hidden sm:table-cell">Kg / Bale</TableHead>
-                  <TableHead className="text-right">Sell Price</TableHead>
-                  <TableHead className="text-right hidden sm:table-cell">Prod. Cost</TableHead>
+                  <TableHead className="hidden sm:table-cell">{tUi("article.code")}</TableHead>
+                  <TableHead>{tUi("product")}</TableHead>
+                  <TableHead className="hidden sm:table-cell">{tUi("category")}</TableHead>
+                  <TableHead className="text-right hidden sm:table-cell">{tUi("kg.bale")}</TableHead>
+                  <TableHead className="text-right">{tUi("sell.price")}</TableHead>
+                  <TableHead className="text-right hidden sm:table-cell">{tUi("prod.cost")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -492,7 +494,7 @@ export default function FactoryPriceList() {
           ) : (
             <div className="text-center py-12">
               <Tag className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-4 text-lg font-semibold">No products found</h3>
+              <h3 className="mt-4 text-lg font-semibold">{tUi("no.products.found")}</h3>
               <p className="text-muted-foreground mt-2 text-sm">
                 {showZeroOnly
                   ? "All products have a selling price set."
@@ -506,12 +508,12 @@ export default function FactoryPriceList() {
       </Card>
 
       <div className="rounded-md bg-muted/50 border p-4 text-sm text-muted-foreground space-y-1">
-        <p className="font-medium text-foreground">How prices work:</p>
+        <p className="font-medium text-foreground">{tUi("how.prices.work")}</p>
         <p>
           Selling prices set here are the catalog prices used across proformas when you click "Apply Catalog Prices."
         </p>
         <p>On each proforma line you can lock the price — locked lines are skipped when applying catalog prices.</p>
-        <p>Production cost is used for profitability reports and is not shown to customers.</p>
+        <p>{tUi("production.cost.is.used.for.profitability.report")}</p>
       </div>
     </div>
   );

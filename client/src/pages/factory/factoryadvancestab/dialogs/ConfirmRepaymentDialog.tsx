@@ -15,6 +15,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { fmt } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function ConfirmRepaymentDialog({
   cashAccounts,
@@ -31,6 +32,7 @@ export function ConfirmRepaymentDialog({
   setConfirmRepay: any;
   setRepayingMonth: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog
       open={!!confirmRepay}
@@ -50,11 +52,11 @@ export function ConfirmRepaymentDialog({
         <div className="space-y-1 text-sm">
           {/* Summary line */}
           <div className="flex justify-between items-center py-2 px-3 rounded-md bg-muted/40 font-medium">
-            <span>Repayment date</span>
+            <span>{tUi("repayment.date.2")}</span>
             <span className="font-mono">{repayByMonthForm.repaymentDate}</span>
           </div>
           <div className="flex justify-between items-center py-2 px-3 rounded-md bg-muted/40 font-medium">
-            <span>Cash account</span>
+            <span>{tUi("cash.account.3")}</span>
             <span>
               {(cashAccounts || []).find((a: any) => String(a.id) === repayByMonthForm.cashAccountId)?.name ?? "—"}
             </span>
@@ -64,9 +66,9 @@ export function ConfirmRepaymentDialog({
         {/* Per-advance breakdown */}
         <div className="border rounded-md overflow-hidden mt-2">
           <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20">
-            <span>Worker</span>
-            <span className="text-right">Original</span>
-            <span className="text-right">Will repay</span>
+            <span>{tUi("worker")}</span>
+            <span className="text-right">{tUi("original")}</span>
+            <span className="text-right">{tUi("will.repay")}</span>
           </div>
           <div className="divide-y">
             {(confirmRepay?.items || []).map((adv: any) => (
@@ -79,7 +81,7 @@ export function ConfirmRepaymentDialog({
               </div>
             ))}
             <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-2 text-sm font-bold bg-muted/20">
-              <span>Total</span>
+              <span>{tUi("total")}</span>
               <span></span>
               <span className="font-mono text-right">{fmt(confirmRepay?.total ?? 0)}</span>
             </div>

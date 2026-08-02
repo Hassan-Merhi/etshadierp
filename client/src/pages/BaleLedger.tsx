@@ -110,10 +110,9 @@ function BaleDetailRows({
   const { data, isLoading } = useQuery<{ baleDetails: BaleDetail[] }>({
     queryKey: ["/api/factory/bale-ledger/details", section, productId ?? "null"],
     queryFn: async () => {
-      const res = await fetch(
-        `/api/factory/bale-ledger/details?section=${section}&productId=${productId ?? "null"}`,
-        { credentials: "include" }
-      );
+      const res = await fetch(`/api/factory/bale-ledger/details?section=${section}&productId=${productId ?? "null"}`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch bale details");
       return res.json();
     },

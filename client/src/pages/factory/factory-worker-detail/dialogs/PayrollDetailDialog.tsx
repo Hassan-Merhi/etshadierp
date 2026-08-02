@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fmtNum } from "../../factoryworkerdetail/utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function PayrollDetailDialog({
   detailPayrollId,
@@ -23,6 +24,7 @@ export function PayrollDetailDialog({
   payrollDetailLoading: any;
   setDetailPayrollId: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog
       open={detailPayrollId !== null}
@@ -53,7 +55,9 @@ export function PayrollDetailDialog({
           <div className="space-y-5">
             {/* Pay Breakdown */}
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Pay Breakdown</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                {tUi("pay.breakdown")}
+              </p>
               <div className="rounded-md border divide-y text-sm">
                 {[
                   { label: "Base Salary", value: payrollDetail.payroll.baseSalary, className: "" },
@@ -85,7 +89,7 @@ export function PayrollDetailDialog({
                   </div>
                 ))}
                 <div className="flex justify-between items-center px-3 py-2.5 bg-muted/40 font-semibold">
-                  <span>Net Salary</span>
+                  <span>{tUi("net.salary")}</span>
                   <span className="font-mono text-base">${fmtNum(payrollDetail.payroll.netSalary)}</span>
                 </div>
               </div>
@@ -137,11 +141,11 @@ export function PayrollDetailDialog({
                   <Table>
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
-                        <TableHead>Date</TableHead>
+                        <TableHead>{tUi("date")}</TableHead>
                         <TableHead>Day</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Shift</TableHead>
-                        <TableHead>Notes</TableHead>
+                        <TableHead>{tUi("status")}</TableHead>
+                        <TableHead>{tUi("shift")}</TableHead>
+                        <TableHead>{tUi("notes")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -179,13 +183,15 @@ export function PayrollDetailDialog({
               parseFloat((payrollDetail.payroll as any).kgProcessed || "0") > 0 ||
               parseFloat((payrollDetail.payroll as any).overtimeHours || "0") > 0) && (
               <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Production</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  {tUi("production")}
+                </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {parseFloat((payrollDetail.payroll as any).balesCount || "0") > 0 && (
                     <Card>
                       <CardContent className="p-3 text-center">
                         <p className="text-xl font-bold">{(payrollDetail.payroll as any).balesCount}</p>
-                        <p className="text-xs text-muted-foreground">Bales</p>
+                        <p className="text-xs text-muted-foreground">{tUi("bales")}</p>
                       </CardContent>
                     </Card>
                   )}
@@ -205,7 +211,7 @@ export function PayrollDetailDialog({
                         <p className="text-xl font-bold">
                           {parseFloat((payrollDetail.payroll as any).overtimeHours || "0").toFixed(1)}
                         </p>
-                        <p className="text-xs text-muted-foreground">OT Hours</p>
+                        <p className="text-xs text-muted-foreground">{tUi("ot.hours")}</p>
                       </CardContent>
                     </Card>
                   )}
@@ -216,7 +222,7 @@ export function PayrollDetailDialog({
             {/* Notes */}
             {payrollDetail.payroll.notes && (
               <div className="rounded-md bg-muted/40 px-3 py-2 text-sm">
-                <span className="text-muted-foreground text-xs font-medium">Notes: </span>
+                <span className="text-muted-foreground text-xs font-medium">{tUi("notes.2")} </span>
                 {payrollDetail.payroll.notes}
               </div>
             )}

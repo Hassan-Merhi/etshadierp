@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, DollarSign, TrendingDown, TrendingUp } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface FreightPayment {
   vendor: string;
@@ -49,6 +50,7 @@ function formatCurrency(value: number): string {
 }
 
 export default function FactoryCashflow() {
+  const tUi = useFactoryText();
   const [days, setDays] = useState<number>(30);
 
   const { data, isLoading } = useQuery<CashflowData>({
@@ -64,7 +66,7 @@ export default function FactoryCashflow() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <PageHeader title="Cash Flow Forecast" />
+          <PageHeader title={tUi("cash.flow.forecast")} />
           <p className="text-muted-foreground mt-1">Projected cash flow for the next {days} days</p>
         </div>
         <div className="flex items-center gap-2" data-testid="period-selector">
@@ -84,7 +86,7 @@ export default function FactoryCashflow() {
       {isLoading ? (
         <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-muted-foreground">Loading cashflow forecast...</span>
+          <span className="ml-2 text-muted-foreground">{tUi("loading.cashflow.forecast")}</span>
         </div>
       ) : !data ? (
         <div className="text-center py-8">
@@ -97,7 +99,7 @@ export default function FactoryCashflow() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card data-testid="card-total-outgoing">
               <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Outgoing</CardTitle>
+                <CardTitle className="text-sm font-medium">{tUi("total.outgoing")}</CardTitle>
                 <TrendingDown className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -109,7 +111,7 @@ export default function FactoryCashflow() {
 
             <Card data-testid="card-expected-income">
               <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Expected Income</CardTitle>
+                <CardTitle className="text-sm font-medium">{tUi("expected.income")}</CardTitle>
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -124,7 +126,7 @@ export default function FactoryCashflow() {
 
             <Card data-testid="card-net-position">
               <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Net Position</CardTitle>
+                <CardTitle className="text-sm font-medium">{tUi("net.position")}</CardTitle>
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -139,7 +141,7 @@ export default function FactoryCashflow() {
 
             <Card data-testid="card-payroll-estimate">
               <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Payroll Estimate</CardTitle>
+                <CardTitle className="text-sm font-medium">{tUi("payroll.estimate")}</CardTitle>
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -152,7 +154,7 @@ export default function FactoryCashflow() {
 
           <Card data-testid="card-freight-payments">
             <CardHeader>
-              <CardTitle>Upcoming Freight Payments</CardTitle>
+              <CardTitle>{tUi("upcoming.freight.payments")}</CardTitle>
             </CardHeader>
             <CardContent>
               {!data.freightPayments || data.freightPayments.length === 0 ? (
@@ -166,10 +168,10 @@ export default function FactoryCashflow() {
                   <Table>
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
-                        <TableHead>Vendor</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Due Date</TableHead>
-                        <TableHead>Remaining</TableHead>
+                        <TableHead>{tUi("vendor")}</TableHead>
+                        <TableHead>{tUi("amount")}</TableHead>
+                        <TableHead>{tUi("due.date")}</TableHead>
+                        <TableHead>{tUi("remaining")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -192,7 +194,7 @@ export default function FactoryCashflow() {
 
           <Card data-testid="card-payroll-forecast">
             <CardHeader>
-              <CardTitle>Payroll Forecast</CardTitle>
+              <CardTitle>{tUi("payroll.forecast")}</CardTitle>
             </CardHeader>
             <CardContent>
               {!data.payrollForecast || data.payrollForecast.length === 0 ? (
@@ -206,9 +208,9 @@ export default function FactoryCashflow() {
                   <Table>
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
-                        <TableHead>Period</TableHead>
-                        <TableHead>Estimated Amount</TableHead>
-                        <TableHead>Employees</TableHead>
+                        <TableHead>{tUi("period")}</TableHead>
+                        <TableHead>{tUi("estimated.amount")}</TableHead>
+                        <TableHead>{tUi("employees")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -235,16 +237,16 @@ export default function FactoryCashflow() {
           {data.incomeEntries && data.incomeEntries.length > 0 && (
             <Card data-testid="card-expected-income-details">
               <CardHeader>
-                <CardTitle>Expected Income</CardTitle>
+                <CardTitle>{tUi("expected.income")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="table-responsive">
                   <Table>
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
-                        <TableHead>Source</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Expected Date</TableHead>
+                        <TableHead>{tUi("source")}</TableHead>
+                        <TableHead>{tUi("amount")}</TableHead>
+                        <TableHead>{tUi("expected.date")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>

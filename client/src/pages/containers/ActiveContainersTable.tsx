@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Container } from "@shared/schema";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface ActiveContainersTableProps {
   containers: Container[];
@@ -39,6 +40,7 @@ export function ActiveContainersTable({
   isEditNumberPending,
   getSupplierName,
 }: ActiveContainersTableProps) {
+  const tUi = useErpText();
   /* Container list */
   if (isLoading) {
     return (
@@ -56,7 +58,7 @@ export function ActiveContainersTable({
         <div className="w-14 h-14 rounded-xl bg-muted/60 flex items-center justify-center mb-4">
           <Package className="w-7 h-7 text-muted-foreground" />
         </div>
-        <h2 className="text-lg font-semibold mb-1">No containers found</h2>
+        <h2 className="text-lg font-semibold mb-1">{tUi("no.containers.found")}</h2>
         <p className="text-sm text-muted-foreground mb-4">
           {allContainers.length === 0
             ? "Import your first purchase order to get started"
@@ -100,8 +102,7 @@ export function ActiveContainersTable({
                       value={editingNumberValue}
                       onChange={(e) => onEditNumberChange(e.target.value.toUpperCase())}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter")
-                          onEditNumberSave(container.id, editingNumberValue);
+                        if (e.key === "Enter") onEditNumberSave(container.id, editingNumberValue);
                         if (e.key === "Escape") onEditNumberCancel();
                       }}
                       autoFocus
@@ -153,12 +154,12 @@ export function ActiveContainersTable({
             </div>
             <div className="flex items-center gap-4 flex-shrink-0">
               <div className="text-right hidden sm:block">
-                <p className="text-xs text-muted-foreground">Import date</p>
+                <p className="text-xs text-muted-foreground">{tUi("import.date.2")}</p>
                 <p className="text-sm font-mono">{formatDisplayDate(container.importDate)}</p>
               </div>
               {!hideContainerCosts && (
                 <div className="text-right">
-                  <p className="text-xs text-muted-foreground hidden sm:block">Total</p>
+                  <p className="text-xs text-muted-foreground hidden sm:block">{tUi("total")}</p>
                   <p className="text-sm font-mono font-semibold">
                     {formatAmount(parseFloat(container.grandTotal || "0"))}
                   </p>

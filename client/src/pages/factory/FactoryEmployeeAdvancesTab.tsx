@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface Employee {
   id: number;
@@ -68,6 +69,7 @@ function fmt(val: string | number | null | undefined) {
 const today = () => new Date().toLocaleDateString("en-CA");
 
 export default function FactoryEmployeeAdvancesTab() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<"all" | "open" | "paid">("open");
   const [empFilter, setEmpFilter] = useState<string>("all");
@@ -213,10 +215,10 @@ export default function FactoryEmployeeAdvancesTab() {
       <div className="flex flex-wrap items-center gap-3">
         <Select value={empFilter} onValueChange={setEmpFilter}>
           <SelectTrigger className="w-44" data-testid="select-emp-filter">
-            <SelectValue placeholder="All employees" />
+            <SelectValue placeholder={tUi("all.employees")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Employees</SelectItem>
+            <SelectItem value="all">{tUi("all.employees.2")}</SelectItem>
             {employees.map((e) => (
               <SelectItem key={e.id} value={String(e.id)}>
                 {e.firstName} {e.lastName}
@@ -230,14 +232,14 @@ export default function FactoryEmployeeAdvancesTab() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All</SelectItem>
-            <SelectItem value="open">Open</SelectItem>
-            <SelectItem value="paid">Fully Paid</SelectItem>
+            <SelectItem value="open">{tUi("open")}</SelectItem>
+            <SelectItem value="paid">{tUi("fully.paid")}</SelectItem>
           </SelectContent>
         </Select>
         {!isLoading && advances.some((a) => !a.fullyPaid) && (
           <div className="flex items-center gap-2 rounded-lg border bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 px-3 py-1.5 text-sm">
             <Banknote className="h-4 w-4 text-amber-500 shrink-0" />
-            <span className="text-muted-foreground">Outstanding</span>
+            <span className="text-muted-foreground">{tUi("outstanding")}</span>
             <span className="font-semibold font-mono text-amber-700 dark:text-amber-300">${fmt(totalOutstanding)}</span>
           </div>
         )}
@@ -251,12 +253,12 @@ export default function FactoryEmployeeAdvancesTab() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
-              <TableHead className="text-xs h-9 font-semibold">Employee</TableHead>
-              <TableHead className="text-xs h-9 font-semibold">Date</TableHead>
-              <TableHead className="text-xs h-9 font-semibold text-right">Amount</TableHead>
-              <TableHead className="text-xs h-9 font-semibold text-right">Remaining</TableHead>
-              <TableHead className="text-xs h-9 font-semibold">Status</TableHead>
-              <TableHead className="text-xs h-9 font-semibold">Notes</TableHead>
+              <TableHead className="text-xs h-9 font-semibold">{tUi("employee")}</TableHead>
+              <TableHead className="text-xs h-9 font-semibold">{tUi("date")}</TableHead>
+              <TableHead className="text-xs h-9 font-semibold text-right">{tUi("amount")}</TableHead>
+              <TableHead className="text-xs h-9 font-semibold text-right">{tUi("remaining")}</TableHead>
+              <TableHead className="text-xs h-9 font-semibold">{tUi("status")}</TableHead>
+              <TableHead className="text-xs h-9 font-semibold">{tUi("notes")}</TableHead>
               <TableHead className="text-xs h-9 w-24"></TableHead>
             </TableRow>
           </TableHeader>
@@ -292,7 +294,7 @@ export default function FactoryEmployeeAdvancesTab() {
                     <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
                       <Banknote className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <p className="text-sm font-medium">No advances found</p>
+                    <p className="text-sm font-medium">{tUi("no.advances.found")}</p>
                     <p className="text-xs text-muted-foreground">
                       {statusFilter !== "all" || empFilter !== "all"
                         ? "Try adjusting your filters"
@@ -371,15 +373,15 @@ export default function FactoryEmployeeAdvancesTab() {
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Employee Advance</DialogTitle>
-            <DialogDescription>Record an advance paid to an employee.</DialogDescription>
+            <DialogTitle>{tUi("add.employee.advance")}</DialogTitle>
+            <DialogDescription>{tUi("record.an.advance.paid.to.an.employee")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Employee</Label>
+              <Label>{tUi("employee")}</Label>
               <Select value={addForm.employeeId} onValueChange={(v) => setAddForm((f) => ({ ...f, employeeId: v }))}>
                 <SelectTrigger data-testid="select-add-employee">
-                  <SelectValue placeholder="Select employee" />
+                  <SelectValue placeholder={tUi("select.employee")} />
                 </SelectTrigger>
                 <SelectContent>
                   {employees.map((e) => (
@@ -392,7 +394,7 @@ export default function FactoryEmployeeAdvancesTab() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Date</Label>
+                <Label>{tUi("date")}</Label>
                 <Input
                   type="date"
                   value={addForm.advanceDate}
@@ -401,7 +403,7 @@ export default function FactoryEmployeeAdvancesTab() {
                 />
               </div>
               <div>
-                <Label>Amount</Label>
+                <Label>{tUi("amount")}</Label>
                 <Input
                   type="number"
                   placeholder="0.00"
@@ -412,13 +414,13 @@ export default function FactoryEmployeeAdvancesTab() {
               </div>
             </div>
             <div>
-              <Label>Cash Account (optional)</Label>
+              <Label>{tUi("cash.account.optional")}</Label>
               <Select
                 value={addForm.cashAccountId}
                 onValueChange={(v) => setAddForm((f) => ({ ...f, cashAccountId: v }))}
               >
                 <SelectTrigger data-testid="select-cash-account">
-                  <SelectValue placeholder="Select account" />
+                  <SelectValue placeholder={tUi("select.account")} />
                 </SelectTrigger>
                 <SelectContent>
                   {cashAccounts.map((a) => (
@@ -430,9 +432,9 @@ export default function FactoryEmployeeAdvancesTab() {
               </Select>
             </div>
             <div>
-              <Label>Notes</Label>
+              <Label>{tUi("notes")}</Label>
               <Textarea
-                placeholder="Optional notes..."
+                placeholder={tUi("optional.notes.2")}
                 value={addForm.notes}
                 onChange={(e) => setAddForm((f) => ({ ...f, notes: e.target.value }))}
                 rows={2}
@@ -459,7 +461,7 @@ export default function FactoryEmployeeAdvancesTab() {
       <Dialog open={!!repayOpen} onOpenChange={(o) => !o && setRepayOpen(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Record Repayment</DialogTitle>
+            <DialogTitle>{tUi("record.repayment")}</DialogTitle>
             <DialogDescription>
               {repayOpen && `Advance of ${fmt(repayOpen.amount)} — Remaining: ${fmt(repayOpen.remainingBalance)}`}
             </DialogDescription>
@@ -467,7 +469,7 @@ export default function FactoryEmployeeAdvancesTab() {
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Date</Label>
+                <Label>{tUi("date")}</Label>
                 <Input
                   type="date"
                   value={repayForm.repaymentDate}
@@ -476,7 +478,7 @@ export default function FactoryEmployeeAdvancesTab() {
                 />
               </div>
               <div>
-                <Label>Amount</Label>
+                <Label>{tUi("amount")}</Label>
                 <Input
                   type="number"
                   placeholder="0.00"
@@ -487,13 +489,13 @@ export default function FactoryEmployeeAdvancesTab() {
               </div>
             </div>
             <div>
-              <Label>Cash Account (optional)</Label>
+              <Label>{tUi("cash.account.optional")}</Label>
               <Select
                 value={repayForm.cashAccountId}
                 onValueChange={(v) => setRepayForm((f) => ({ ...f, cashAccountId: v }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select account" />
+                  <SelectValue placeholder={tUi("select.account")} />
                 </SelectTrigger>
                 <SelectContent>
                   {cashAccounts.map((a) => (
@@ -505,9 +507,9 @@ export default function FactoryEmployeeAdvancesTab() {
               </Select>
             </div>
             <div>
-              <Label>Notes</Label>
+              <Label>{tUi("notes")}</Label>
               <Textarea
-                placeholder="Optional notes..."
+                placeholder={tUi("optional.notes.2")}
                 value={repayForm.notes}
                 onChange={(e) => setRepayForm((f) => ({ ...f, notes: e.target.value }))}
                 rows={2}
@@ -534,7 +536,7 @@ export default function FactoryEmployeeAdvancesTab() {
       <Dialog open={!!deleteConfirm} onOpenChange={(o) => !o && setDeleteConfirm(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Advance</DialogTitle>
+            <DialogTitle>{tUi("delete.advance")}</DialogTitle>
             <DialogDescription>
               This will permanently delete the advance of {deleteConfirm && fmt(deleteConfirm.amount)} for{" "}
               {deleteConfirm?.firstName} {deleteConfirm?.lastName} along with all repayments. This cannot be undone.

@@ -3,10 +3,10 @@
  *
  * Extracted from DailyProductionReport.tsx during the Phase 4 god-file split.
  */
-import {useMemo} from "react";
-import {PieChart, Pie, Cell, Tooltip, ResponsiveContainer} from "recharts";
+import { useMemo } from "react";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 
-import {GROUP_ORDER, PIE_COLORS, classifyCategory} from "../utils";
+import { GROUP_ORDER, PIE_COLORS, classifyCategory } from "../utils";
 
 export function CategoryPieChart({
   byCategory,

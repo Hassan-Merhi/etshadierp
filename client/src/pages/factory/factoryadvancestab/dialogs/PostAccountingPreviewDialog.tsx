@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fmt } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function PostAccountingPreviewDialog({
   cashAccounts,
@@ -41,6 +42,7 @@ export function PostAccountingPreviewDialog({
   unvouchered: any;
   unvoucheredLoading: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog
       open={postAccountingOpen}
@@ -51,7 +53,7 @@ export function PostAccountingPreviewDialog({
     >
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Post Accounting for Old Advances — Preview</DialogTitle>
+          <DialogTitle>{tUi("post.accounting.for.old.advances.preview")}</DialogTitle>
           <DialogDescription>
             Creates a Payment voucher (DR Factory Worker Advances / CR Cash) for every advance that has no accounting
             entry yet. Review what will be posted before confirming.
@@ -66,7 +68,7 @@ export function PostAccountingPreviewDialog({
             </Label>
             <Select value={postCashAccountId} onValueChange={setPostCashAccountId}>
               <SelectTrigger data-testid="select-post-cash-account">
-                <SelectValue placeholder="Select cash account" />
+                <SelectValue placeholder={tUi("select.cash.account")} />
               </SelectTrigger>
               <SelectContent>
                 {(cashAccounts || []).map((a: any) => (
@@ -87,8 +89,8 @@ export function PostAccountingPreviewDialog({
           ) : !unvouchered?.length ? (
             <div className="text-center py-8 text-muted-foreground">
               <BookOpen className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No unvouchered advances found</p>
-              <p className="text-xs mt-1">All advances already have accounting entries</p>
+              <p className="text-sm">{tUi("no.unvouchered.advances.found")}</p>
+              <p className="text-xs mt-1">{tUi("all.advances.already.have.accounting.entries")}</p>
             </div>
           ) : (
             (() => {
@@ -106,11 +108,11 @@ export function PostAccountingPreviewDialog({
                   {/* Summary boxes */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                     <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
-                      <p className="text-xs text-muted-foreground mb-1">Advances to Post</p>
+                      <p className="text-xs text-muted-foreground mb-1">{tUi("advances.to.post")}</p>
                       <p className="font-bold">{unvouchered.length}</p>
                     </div>
                     <div className="rounded-md bg-blue-50 dark:bg-blue-900/20 px-3 py-2 text-center">
-                      <p className="text-xs text-muted-foreground mb-1">DR Factory Advances</p>
+                      <p className="text-xs text-muted-foreground mb-1">{tUi("dr.factory.advances")}</p>
                       <p className="font-bold font-mono text-blue-700 dark:text-blue-400">{fmt(grandTotal)}</p>
                     </div>
                     <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-center">
@@ -124,9 +126,9 @@ export function PostAccountingPreviewDialog({
                   {/* Per-advance breakdown */}
                   <div className="border rounded-md overflow-hidden">
                     <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20">
-                      <span>Worker / Date</span>
-                      <span className="text-right">Type</span>
-                      <span className="text-right text-blue-600 dark:text-blue-400">DR Advances</span>
+                      <span>{tUi("worker.date")}</span>
+                      <span className="text-right">{tUi("type")}</span>
+                      <span className="text-right text-blue-600 dark:text-blue-400">{tUi("dr.advances")}</span>
                       <span className="text-right text-amber-600 dark:text-amber-400">
                         CR {selectedAcct?.name ?? "Cash"}
                       </span>
@@ -163,7 +165,7 @@ export function PostAccountingPreviewDialog({
                     </div>
                     {/* Grand total row */}
                     <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-4 px-4 py-2 text-sm font-bold bg-muted/20 border-t">
-                      <span>Total</span>
+                      <span>{tUi("total")}</span>
                       <span></span>
                       <span className="font-mono text-right text-blue-700 dark:text-blue-400">{fmt(grandTotal)}</span>
                       <span className="font-mono text-right text-amber-700 dark:text-amber-400">{fmt(grandTotal)}</span>

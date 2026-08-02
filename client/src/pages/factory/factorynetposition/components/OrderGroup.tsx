@@ -3,12 +3,12 @@
  *
  * Extracted from FactoryNetPosition.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {Badge} from "@/components/ui/badge";
-import {ChevronDown, ChevronRight} from "lucide-react";
+import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
-import type {OrderItem} from "../types";
-import {fmt, fmtDate} from "../utils";
+import type { OrderItem } from "../types";
+import { fmt, fmtDate } from "../utils";
 
 export function OrderGroup({
   label,

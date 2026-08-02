@@ -63,7 +63,7 @@ export default function Accounts() {
       cleanupRef.current?.();
       cleanupRef.current = null;
     },
-    [],
+    []
   );
 
   return (

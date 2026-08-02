@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/PageHeader";
 import { Loader2, Upload, RotateCcw, ImageIcon, CheckCircle, Plus, Pencil, Trash2, X, Check } from "lucide-react";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface ColorRow {
   id: number;
@@ -30,6 +31,7 @@ function slugify(label: string): string {
 }
 
 export default function LabelBannersSettings() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const addFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -182,7 +184,7 @@ export default function LabelBannersSettings() {
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-4xl mx-auto">
       <PageHeader
-        title="Label Banner Images"
+        title={tUi("label.banner.images")}
         subtitle="Manage the colored header banners printed on A4 bale labels. Add custom colors, upload your own images, or revert to defaults."
         showBackButton
       />
@@ -287,7 +289,7 @@ export default function LabelBannersSettings() {
                   </div>
                   {isEditing ? (
                     <div className="flex items-center gap-2 mt-1">
-                      <Label className="text-xs text-muted-foreground shrink-0">Color</Label>
+                      <Label className="text-xs text-muted-foreground shrink-0">{tUi("color")}</Label>
                       <input
                         type="color"
                         value={editColorHex}
@@ -310,11 +312,7 @@ export default function LabelBannersSettings() {
                         Custom images use the original URL with stable ?t= cache key (now immutable-cached). */}
                     <img
                       key={ts}
-                      src={
-                        ts > 0
-                          ? `/labels/hmd-${c.slug}.jpg?t=${ts}`
-                          : `/labels/previews/hmd-${c.slug}-preview.webp`
-                      }
+                      src={ts > 0 ? `/labels/hmd-${c.slug}.jpg?t=${ts}` : `/labels/previews/hmd-${c.slug}-preview.webp`}
                       alt={`${c.label} banner`}
                       className="w-full h-full object-cover"
                       loading="lazy"
@@ -376,7 +374,7 @@ export default function LabelBannersSettings() {
                       </Button>
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">JPG, PNG or WEBP · max 5 MB</p>
+                  <p className="text-xs text-muted-foreground">{tUi("jpg.png.or.webp.max.5.mb")}</p>
                 </CardContent>
               </Card>
             );
@@ -391,7 +389,7 @@ export default function LabelBannersSettings() {
             >
               <div className="flex flex-col items-center gap-2 text-muted-foreground p-6">
                 <Plus className="h-8 w-8" />
-                <span className="text-sm font-medium">Add Color</span>
+                <span className="text-sm font-medium">{tUi("add.color")}</span>
               </div>
             </Card>
           ) : (
@@ -415,7 +413,7 @@ export default function LabelBannersSettings() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="space-y-1">
-                  <Label className="text-xs">Name</Label>
+                  <Label className="text-xs">{tUi("name")}</Label>
                   <Input
                     placeholder="e.g. Blue Ocean"
                     value={addLabel}
@@ -430,7 +428,7 @@ export default function LabelBannersSettings() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs">Dot Color</Label>
+                  <Label className="text-xs">{tUi("dot.color")}</Label>
                   <div className="flex items-center gap-2">
                     <input
                       type="color"

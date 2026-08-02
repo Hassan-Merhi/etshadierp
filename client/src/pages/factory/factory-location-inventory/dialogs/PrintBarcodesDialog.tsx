@@ -15,6 +15,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Printer } from "lucide-react";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function PrintBarcodesDialog({
   handleDoPrint,
@@ -37,6 +38,7 @@ export function PrintBarcodesDialog({
   setReprintDialogOpen: any;
   setReprintProduct: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog
       open={reprintDialogOpen}
@@ -70,7 +72,7 @@ export function PrintBarcodesDialog({
             <table className="text-sm w-full">
               <thead className="bg-muted/50">
                 <tr className="h-9">
-                  <th className="text-left px-3 font-medium">Reference No.</th>
+                  <th className="text-left px-3 font-medium">{tUi("reference.no")}</th>
                   <th className="text-right px-3 font-medium">KG</th>
                   <th className="text-right px-3 font-medium">Pcs</th>
                 </tr>

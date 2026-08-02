@@ -21,6 +21,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface Worker {
   id: number;
@@ -57,6 +58,7 @@ function WorkerCombobox({
   workers: Worker[];
   entryKey: string;
 }) {
+  const tUi = useFactoryText();
   const [open, setOpen] = useState(false);
   const selected = workers.find((w) => w.id === value);
   const displayName = selected?.fullName ?? (value ? `Worker #${value}` : "Select worker…");
@@ -76,9 +78,9 @@ function WorkerCombobox({
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0" align="start">
         <Command>
-          <CommandInput placeholder="Search worker…" className="h-9" />
+          <CommandInput placeholder={tUi("search.worker")} className="h-9" />
           <CommandList>
-            <CommandEmpty>No workers found.</CommandEmpty>
+            <CommandEmpty>{tUi("no.workers.found")}</CommandEmpty>
             <CommandGroup>
               {workers.map((w) => (
                 <CommandItem
@@ -105,6 +107,7 @@ function WorkerCombobox({
 }
 
 export default function ProductionPlannerDialog() {
+  const tUi = useFactoryText();
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [entries, setEntries] = useState<(PlanEntry & { _key: string })[]>([]);
@@ -236,7 +239,7 @@ export default function ProductionPlannerDialog() {
           {/* Controls row */}
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Date</span>
+              <span className="text-sm font-medium">{tUi("date")}</span>
               <Input
                 type="date"
                 value={date}
@@ -280,11 +283,11 @@ export default function ProductionPlannerDialog() {
           {entries.length > 0 && (
             <div className="flex gap-4 p-3 rounded-md bg-muted/50 text-sm">
               <div>
-                <span className="text-muted-foreground">Total Target: </span>
+                <span className="text-muted-foreground">{tUi("total.target")} </span>
                 <span className="font-semibold">{totalTarget} bales</span>
               </div>
               <div>
-                <span className="text-muted-foreground">Total Actual: </span>
+                <span className="text-muted-foreground">{tUi("total.actual")} </span>
                 <span
                   className={`font-semibold ${totalActual >= totalTarget && totalTarget > 0 ? "text-green-600 dark:text-green-400" : ""}`}
                 >
@@ -317,11 +320,11 @@ export default function ProductionPlannerDialog() {
               <table className="w-full text-sm">
                 <thead className="bg-muted/50 border-b">
                   <tr>
-                    <th className="text-left px-3 py-2 font-semibold">Worker</th>
-                    <th className="text-right px-3 py-2 font-semibold w-28">Workers</th>
-                    <th className="text-right px-3 py-2 font-semibold w-28">Target</th>
-                    <th className="text-right px-3 py-2 font-semibold w-24">Actual</th>
-                    <th className="text-center px-3 py-2 font-semibold w-20">Status</th>
+                    <th className="text-left px-3 py-2 font-semibold">{tUi("worker")}</th>
+                    <th className="text-right px-3 py-2 font-semibold w-28">{tUi("workers")}</th>
+                    <th className="text-right px-3 py-2 font-semibold w-28">{tUi("target")}</th>
+                    <th className="text-right px-3 py-2 font-semibold w-24">{tUi("actual")}</th>
+                    <th className="text-center px-3 py-2 font-semibold w-20">{tUi("status")}</th>
                     <th className="w-10 px-2" />
                   </tr>
                 </thead>
@@ -442,7 +445,7 @@ export default function ProductionPlannerDialog() {
 
           {/* Notes */}
           <div className="space-y-1">
-            <label className="text-sm font-medium">Notes (optional)</label>
+            <label className="text-sm font-medium">{tUi("notes.optional")}</label>
             <Input
               value={notes}
               onChange={(e) => setNotes(e.target.value)}

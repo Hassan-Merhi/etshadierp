@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Satellite, AlertTriangle, RefreshCw, History, Loader2, ExternalLink, Clock, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EnrichedContainerRow, fmtSkipReason, UIPriority, getContainerPriority } from "./gitContainerTypes";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface ContainerDrawerTrackingProps {
   container: EnrichedContainerRow;
@@ -49,6 +50,7 @@ export function ContainerDrawerTracking({
   eventsLoading,
   canEdit,
 }: ContainerDrawerTrackingProps) {
+  const tUi = useErpText();
   const isContainerInactive = ["offloaded", "closed", "completed"].includes(container.status.toLowerCase());
   const priority = getContainerPriority(container);
 
@@ -94,7 +96,7 @@ export function ContainerDrawerTracking({
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <Satellite className="h-3.5 w-3.5 text-muted-foreground" />
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Auto Tracking</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{tUi("auto.tracking")}</p>
         </div>
 
         {/* Inactive container warning */}
@@ -113,7 +115,7 @@ export function ContainerDrawerTracking({
         {/* Tracking provider chain */}
         {trackingStatus && (
           <div className="rounded-md border bg-muted/20 px-3 py-2 space-y-2.5" data-testid="panel-provider-chain">
-            <p className="text-xs font-medium text-muted-foreground">Tracking providers (tried in order)</p>
+            <p className="text-xs font-medium text-muted-foreground">{tUi("tracking.providers.tried.in.order")}</p>
 
             <div className="space-y-1.5">
               <Row
@@ -207,7 +209,7 @@ export function ContainerDrawerTracking({
         {/* Priority & Scheduling */}
         <div className="rounded-md border bg-muted/20 px-3 py-2 space-y-1.5" data-testid="panel-priority">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-muted-foreground">Auto-update scheduler</p>
+            <p className="text-xs font-medium text-muted-foreground">{tUi("auto.update.scheduler")}</p>
             <div
               className={cn(
                 "text-[10px] font-bold px-1.5 py-0.5 rounded-sm uppercase",
@@ -223,22 +225,22 @@ export function ContainerDrawerTracking({
           </div>
           <div className="space-y-1">
             <div className="flex justify-between text-[11px]">
-              <span className="text-muted-foreground">Status:</span>
+              <span className="text-muted-foreground">{tUi("status.2")}</span>
               <span className="font-medium">{priority.reason}</span>
             </div>
             <div className="flex justify-between text-[11px]">
-              <span className="text-muted-foreground">Interval:</span>
+              <span className="text-muted-foreground">{tUi("interval")}</span>
               <span className="font-medium">Every {priority.intervalHours} hours</span>
             </div>
             <div className="flex justify-between text-[11px]">
-              <span className="text-muted-foreground">Next Check:</span>
+              <span className="text-muted-foreground">{tUi("next.check")}</span>
               <span className="font-medium">
                 {container.trackingNextCheckAt ? new Date(container.trackingNextCheckAt).toLocaleString() : "—"}
               </span>
             </div>
             {container.trackingLastSkipReason && (
               <div className="flex justify-between text-[11px]">
-                <span className="text-muted-foreground">Last Run:</span>
+                <span className="text-muted-foreground">{tUi("last.run")}</span>
                 <span className="font-medium text-amber-700 italic">
                   {fmtSkipReason(container.trackingLastSkipReason)}
                 </span>
@@ -251,8 +253,8 @@ export function ContainerDrawerTracking({
         <div className="space-y-3 pt-1">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label className="text-xs">Enabled</Label>
-              <p className="text-[10px] text-muted-foreground">Allow system to track this container</p>
+              <Label className="text-xs">{tUi("enabled")}</Label>
+              <p className="text-[10px] text-muted-foreground">{tUi("allow.system.to.track.this.container")}</p>
             </div>
             <Switch
               checked={trackEnabled}
@@ -264,8 +266,8 @@ export function ContainerDrawerTracking({
 
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label className="text-xs">Auto-update</Label>
-              <p className="text-[10px] text-muted-foreground">Automatically poll for status changes</p>
+              <Label className="text-xs">{tUi("auto.update")}</Label>
+              <p className="text-[10px] text-muted-foreground">{tUi("automatically.poll.for.status.changes")}</p>
             </div>
             <Switch
               checked={trackAutoUpdate}
@@ -276,7 +278,7 @@ export function ContainerDrawerTracking({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs">Carrier Hint (Optional)</Label>
+            <Label className="text-xs">{tUi("carrier.hint.optional")}</Label>
             <Input
               placeholder="e.g. MAEU, MSCU, CMDU"
               value={trackCarrierHint}
@@ -323,7 +325,7 @@ export function ContainerDrawerTracking({
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin text-sky-600" />
-                  <span className="text-sm font-medium">Tracking in progress...</span>
+                  <span className="text-sm font-medium">{tUi("tracking.in.progress")}</span>
                 </div>
                 <span className="text-[10px] text-sky-600 font-mono">STEP {trackProgress.length}</span>
               </div>
@@ -376,7 +378,7 @@ export function ContainerDrawerTracking({
           {container.trackingLastStatus && !trackNowMutation.isPending && (
             <div className="rounded-md border p-2.5 space-y-2" data-testid="panel-last-tracking">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-medium text-muted-foreground">Last Status</span>
+                <span className="text-[11px] font-medium text-muted-foreground">{tUi("last.status")}</span>
                 <span className="text-[10px] text-muted-foreground uppercase font-mono">
                   {container.trackingProvider}
                 </span>
@@ -413,7 +415,7 @@ export function ContainerDrawerTracking({
           >
             <div className="flex items-center gap-2">
               <History className="h-3.5 w-3.5" />
-              <span>TRACKING EVENTS HISTORY</span>
+              <span>{tUi("tracking.events.history")}</span>
             </div>
             <ChevronDown className={cn("h-4 w-4 transition-transform", showEvents && "rotate-180")} />
           </Button>
@@ -429,7 +431,7 @@ export function ContainerDrawerTracking({
               ) : !events || events.length === 0 ? (
                 <div className="text-center py-6 border rounded-md border-dashed">
                   <Clock className="h-6 w-6 text-muted-foreground/30 mx-auto mb-2" />
-                  <p className="text-xs text-muted-foreground">No tracking events found yet.</p>
+                  <p className="text-xs text-muted-foreground">{tUi("no.tracking.events.found.yet")}</p>
                 </div>
               ) : (
                 <div className="relative space-y-0 pb-2">
@@ -477,7 +479,12 @@ export function ContainerDrawerTracking({
               )}
 
               {container.trackingLink && (
-                <Button variant="ghost" size="sm" className="w-full text-[10px] h-auto py-0 text-sky-600 underline" asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-[10px] h-auto py-0 text-sky-600 underline"
+                  asChild
+                >
                   <a href={container.trackingLink} target="_blank" rel="noopener noreferrer">
                     View on carrier website <ExternalLink className="ml-1 h-2.5 w-2.5" />
                   </a>

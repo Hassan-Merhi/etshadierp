@@ -17,6 +17,7 @@ import { factoryApiRequest } from "@/lib/factoryApi";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
 import * as XLSX from "xlsx";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface CustomerInfo {
   id: number;
@@ -82,6 +83,7 @@ function fmtNum(value: number | null | undefined): string {
 }
 
 export default function FactoryCustomerStatement() {
+  const tUi = useFactoryText();
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -391,7 +393,7 @@ export default function FactoryCustomerStatement() {
       {/* Balance cards */}
       <div className={`grid grid-cols-1 gap-4 mb-6 ${hasOpeningBalance ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
         <div className="rounded-xl border p-4">
-          <p className="text-xs text-muted-foreground mb-1">Current Balance</p>
+          <p className="text-xs text-muted-foreground mb-1">{tUi("current.balance")}</p>
           <p className="text-2xl font-bold font-mono" data-testid="text-current-balance">
             {fmtMoney(currentBalance)}
           </p>
@@ -401,7 +403,7 @@ export default function FactoryCustomerStatement() {
         </div>
         {hasOpeningBalance && (
           <div className="rounded-xl border p-4">
-            <p className="text-xs text-muted-foreground mb-1">Opening Balance</p>
+            <p className="text-xs text-muted-foreground mb-1">{tUi("opening.balance")}</p>
             <p className="text-xl font-semibold font-mono" data-testid="text-opening-balance">
               {fmtMoney(Number(openingBalance || 0))}
             </p>
@@ -411,7 +413,7 @@ export default function FactoryCustomerStatement() {
           </div>
         )}
         <div className="rounded-xl border p-4">
-          <p className="text-xs text-muted-foreground mb-1">Total Invoices</p>
+          <p className="text-xs text-muted-foreground mb-1">{tUi("total.invoices")}</p>
           <p className="text-2xl font-bold" data-testid="text-total-invoices">
             {statement.invoices.length}
           </p>
@@ -442,17 +444,17 @@ export default function FactoryCustomerStatement() {
           {/* Filters */}
           <div className="flex flex-wrap items-end gap-3 mb-4">
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted-foreground font-medium">Destination</label>
+              <label className="text-xs text-muted-foreground font-medium">{tUi("destination")}</label>
               <Input
                 value={filterDestination}
                 onChange={(e) => setFilterDestination(e.target.value)}
-                placeholder="Filter by destination…"
+                placeholder={tUi("filter.by.destination")}
                 className="w-48"
                 data-testid="input-filter-destination"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted-foreground font-medium">Date From</label>
+              <label className="text-xs text-muted-foreground font-medium">{tUi("date.from")}</label>
               <Input
                 type="date"
                 value={filterDateFrom}
@@ -462,7 +464,7 @@ export default function FactoryCustomerStatement() {
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-muted-foreground font-medium">Date To</label>
+              <label className="text-xs text-muted-foreground font-medium">{tUi("date.to")}</label>
               <Input
                 type="date"
                 value={filterDateTo}
@@ -494,19 +496,19 @@ export default function FactoryCustomerStatement() {
           {/* Totals bar */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
             <div className="rounded-xl border p-3">
-              <p className="text-xs text-muted-foreground mb-0.5">Total Bales</p>
+              <p className="text-xs text-muted-foreground mb-0.5">{tUi("total.bales")}</p>
               <p className="text-lg font-bold font-mono" data-testid="text-total-bales">
                 {fmtNum(totals.totalBales)}
               </p>
             </div>
             <div className="rounded-xl border p-3">
-              <p className="text-xs text-muted-foreground mb-0.5">Total Invoiced</p>
+              <p className="text-xs text-muted-foreground mb-0.5">{tUi("total.invoiced")}</p>
               <p className="text-lg font-bold font-mono" data-testid="text-total-debit">
                 {fmtMoney(totals.totalAmountDebit)}
               </p>
             </div>
             <div className="rounded-xl border p-3">
-              <p className="text-xs text-muted-foreground mb-0.5">Total Paid</p>
+              <p className="text-xs text-muted-foreground mb-0.5">{tUi("total.paid")}</p>
               <p className="text-lg font-bold font-mono" data-testid="text-total-credit">
                 {fmtMoney(totals.totalAmountCredit)}
               </p>
@@ -639,7 +641,10 @@ export default function FactoryCustomerStatement() {
                           <input
                             type="text"
                             value={rowNotes[entry.id] ?? ""}
-                            onChange={(e) => typeof entry.id === "number" && setRowNotes((prev) => ({ ...prev, [entry.id]: e.target.value }))}
+                            onChange={(e) =>
+                              typeof entry.id === "number" &&
+                              setRowNotes((prev) => ({ ...prev, [entry.id]: e.target.value }))
+                            }
                             onBlur={() => saveRowNote(entry.id, rowNotes[entry.id] ?? "")}
                             placeholder={typeof entry.id === "string" ? "—" : "Add note…"}
                             disabled={savingRowNote === entry.id || typeof entry.id === "string"}
@@ -657,12 +662,12 @@ export default function FactoryCustomerStatement() {
 
           {/* Statement Note */}
           <div className="rounded-xl border p-4 mt-4 space-y-2">
-            <p className="text-sm font-semibold">Statement Note</p>
-            <p className="text-xs text-muted-foreground">This note appears on exported PDF and Excel statements.</p>
+            <p className="text-sm font-semibold">{tUi("statement.note")}</p>
+            <p className="text-xs text-muted-foreground">{tUi("this.note.appears.on.exported.pdf.and.excel.stat")}</p>
             <Textarea
               value={draftNote ?? ""}
               onChange={(e) => setDraftNote(e.target.value)}
-              placeholder="Add a note for this customer's statement..."
+              placeholder={tUi("add.a.note.for.this.customer.s.statement")}
               rows={3}
               data-testid="textarea-statement-note"
             />
@@ -681,7 +686,7 @@ export default function FactoryCustomerStatement() {
         <TabsContent value="pricelist">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div>
-              <p className="text-sm font-semibold">Customer Price List</p>
+              <p className="text-sm font-semibold">{tUi("customer.price.list")}</p>
               <p className="text-xs text-muted-foreground">
                 These prices are automatically applied when creating a proforma for this customer.
               </p>
@@ -808,7 +813,7 @@ export default function FactoryCustomerStatement() {
                 <TableRow data-testid="row-add-price">
                   <TableCell>
                     <Input
-                      placeholder="Article code…"
+                      placeholder={tUi("article.code.2")}
                       value={newCode}
                       onChange={(e) => setNewCode(e.target.value)}
                       className="font-mono"

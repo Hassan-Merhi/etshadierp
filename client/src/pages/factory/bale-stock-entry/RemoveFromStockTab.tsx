@@ -24,8 +24,10 @@ import {
 import type { FactoryBaleProduct, Location } from "@shared/schema";
 import { RemoveBaleAuthDialog, AssignWorkerDialog } from "./RemoveFromStockDialogs";
 import { RemoveFromStockTable } from "./RemoveFromStockTable";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function RemoveFromStockTab() {
+  const tUi = useFactoryText();
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
   const [dateFilter, setDateFilter] = useState<string>("");
   const [selectedBaleIds, setSelectedBaleIds] = useState<Set<number>>(new Set());
@@ -378,13 +380,15 @@ export function RemoveFromStockTab() {
       <div className="flex items-center justify-between gap-4 flex-wrap bg-muted/30 p-4 rounded-xl border">
         <div className="flex items-center gap-4 flex-wrap">
           <div className="w-48">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 ml-1">Location</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 ml-1">
+              {tUi("location")}
+            </p>
             <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
               <SelectTrigger className="h-9 rounded-lg" data-testid="select-remove-location">
-                <SelectValue placeholder="All Locations" />
+                <SelectValue placeholder={tUi("all.locations.2")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Locations</SelectItem>
+                <SelectItem value="all">{tUi("all.locations.2")}</SelectItem>
                 {activeLocations?.map((loc) => (
                   <SelectItem key={loc.id} value={loc.id.toString()}>
                     {loc.name}
@@ -492,7 +496,9 @@ export function RemoveFromStockTab() {
       <div className="flex items-center justify-between px-4 py-3 bg-muted/20 rounded-xl border border-dashed">
         <div className="flex items-center gap-6">
           <div className="flex flex-col">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Filtered Count</span>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              {tUi("filtered.count")}
+            </span>
             <span className="text-lg font-black tabular-nums">
               {totalQty} <span className="text-xs font-normal text-muted-foreground">bales</span>
             </span>

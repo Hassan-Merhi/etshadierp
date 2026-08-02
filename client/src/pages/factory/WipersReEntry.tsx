@@ -55,7 +55,9 @@ import * as XLSX from "@/lib/excelHelper";
 
 import type { CartItem, CreatedBale } from "./wipersreentry/types";
 import { isWipers, isWipersBale } from "./wipersreentry/utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function WipersReEntry() {
+  const tUi = useFactoryText();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { colors } = useLabelDesignColors();
@@ -356,8 +358,8 @@ export default function WipersReEntry() {
         {/* Header */}
         <div>
           <PageHeader
-            title="Wipers Re-Entry by Date"
-            subtitle="Create new wipers / garbage bales under a chosen entry date and print labels"
+            title={tUi("wipers.re.entry.by.date")}
+            subtitle={tUi("create.new.wipers.garbage.bales.under.a.chosen.e")}
           />
         </div>
 
@@ -381,7 +383,7 @@ export default function WipersReEntry() {
                 onChange={(e) => setEntryDate(e.target.value)}
                 data-testid="input-entry-date"
               />
-              <p className="text-xs text-muted-foreground">Bales will be recorded under this date</p>
+              <p className="text-xs text-muted-foreground">{tUi("bales.will.be.recorded.under.this.date")}</p>
             </div>
             <div className="space-y-1">
               <Label htmlFor="location">
@@ -389,7 +391,7 @@ export default function WipersReEntry() {
               </Label>
               <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
                 <SelectTrigger id="location" data-testid="select-location">
-                  <SelectValue placeholder="Select location..." />
+                  <SelectValue placeholder={tUi("select.location")} />
                 </SelectTrigger>
                 <SelectContent>
                   {activeLocations.map((l) => (
@@ -401,7 +403,7 @@ export default function WipersReEntry() {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Default Worker (optional)</Label>
+              <Label>{tUi("default.worker.optional")}</Label>
               <Select
                 value=""
                 onValueChange={(workerId) => {
@@ -410,7 +412,7 @@ export default function WipersReEntry() {
                 }}
               >
                 <SelectTrigger data-testid="select-default-worker">
-                  <SelectValue placeholder="Apply worker to all rows..." />
+                  <SelectValue placeholder={tUi("apply.worker.to.all.rows")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">— None —</SelectItem>
@@ -438,7 +440,7 @@ export default function WipersReEntry() {
             <div className="relative">
               <Input
                 ref={scanRef}
-                placeholder="Search wipers / garbage product by name or article code..."
+                placeholder={tUi("search.wipers.garbage.product.by.name.or.article")}
                 value={searchInput}
                 onChange={(e) => {
                   setSearchInput(e.target.value);
@@ -466,7 +468,7 @@ export default function WipersReEntry() {
                   ))}
                 </div>
               )}
-              {productsLoading && <p className="text-xs text-muted-foreground mt-1">Loading products...</p>}
+              {productsLoading && <p className="text-xs text-muted-foreground mt-1">{tUi("loading.products")}</p>}
               {!productsLoading && wiperProducts.length === 0 && (
                 <p className="text-xs text-muted-foreground mt-1">
                   No wipers/garbage products found. Ensure products are categorized as Wipers or Garbage.
@@ -480,12 +482,12 @@ export default function WipersReEntry() {
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
-                      <TableHead>Product</TableHead>
-                      <TableHead>Article Code</TableHead>
+                      <TableHead>{tUi("product")}</TableHead>
+                      <TableHead>{tUi("article.code")}</TableHead>
                       <TableHead className="w-32 text-right">Qty</TableHead>
-                      <TableHead className="w-32 text-right">Weight/Bale (kg)</TableHead>
-                      <TableHead className="text-right">Total Weight</TableHead>
-                      <TableHead>Worker</TableHead>
+                      <TableHead className="w-32 text-right">{tUi("weight.bale.kg")}</TableHead>
+                      <TableHead className="text-right">{tUi("total.weight")}</TableHead>
+                      <TableHead>{tUi("worker")}</TableHead>
                       <TableHead className="w-10"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -539,10 +541,10 @@ export default function WipersReEntry() {
                             onValueChange={(v) => assignWorker(item.productId, v === "none" ? null : parseInt(v))}
                           >
                             <SelectTrigger className="h-8 w-28" data-testid={`select-worker-${item.productId}`}>
-                              <SelectValue placeholder="None" />
+                              <SelectValue placeholder={tUi("none")} />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="none">None</SelectItem>
+                              <SelectItem value="none">{tUi("none")}</SelectItem>
                               {workers.map((w: any) => (
                                 <SelectItem key={w.id} value={w.id.toString()}>
                                   {w.fullName || w.name}
@@ -660,10 +662,10 @@ export default function WipersReEntry() {
                       <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
                           <TableHead className="w-10"></TableHead>
-                          <TableHead>Reference</TableHead>
-                          <TableHead>Product</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Weight (kg)</TableHead>
+                          <TableHead>{tUi("reference")}</TableHead>
+                          <TableHead>{tUi("product")}</TableHead>
+                          <TableHead>{tUi("status")}</TableHead>
+                          <TableHead className="text-right">{tUi("weight.kg")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -706,23 +708,23 @@ export default function WipersReEntry() {
                       </p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1">
-                          <Label htmlFor="sup-user">Supervisor Username</Label>
+                          <Label htmlFor="sup-user">{tUi("supervisor.username")}</Label>
                           <Input
                             id="sup-user"
                             value={supervisorUsername}
                             onChange={(e) => setSupervisorUsername(e.target.value)}
-                            placeholder="Username"
+                            placeholder={tUi("username")}
                             data-testid="input-supervisor-username"
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label htmlFor="sup-pass">Supervisor Password</Label>
+                          <Label htmlFor="sup-pass">{tUi("supervisor.password")}</Label>
                           <Input
                             id="sup-pass"
                             type="password"
                             value={supervisorPassword}
                             onChange={(e) => setSupervisorPassword(e.target.value)}
-                            placeholder="Password"
+                            placeholder={tUi("password")}
                             data-testid="input-supervisor-password"
                           />
                         </div>
@@ -758,19 +760,19 @@ export default function WipersReEntry() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div className="rounded-md border px-4 py-3">
-                  <p className="text-xs text-muted-foreground mb-1">Bales Created</p>
+                  <p className="text-xs text-muted-foreground mb-1">{tUi("bales.created")}</p>
                   <p className="text-2xl font-bold font-mono" data-testid="text-result-qty">
                     {createdBales.length}
                   </p>
                 </div>
                 <div className="rounded-md border px-4 py-3">
-                  <p className="text-xs text-muted-foreground mb-1">Entry Date</p>
+                  <p className="text-xs text-muted-foreground mb-1">{tUi("entry.date.2")}</p>
                   <p className="text-lg font-semibold" data-testid="text-result-date">
                     {entryDate}
                   </p>
                 </div>
                 <div className="rounded-md border px-4 py-3">
-                  <p className="text-xs text-muted-foreground mb-1">Total Weight</p>
+                  <p className="text-xs text-muted-foreground mb-1">{tUi("total.weight")}</p>
                   <p className="text-lg font-bold font-mono" data-testid="text-result-weight">
                     {formatLabelNum(createdBales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0))} kg
                   </p>
@@ -804,7 +806,9 @@ export default function WipersReEntry() {
 
               {/* Preview of first few labels */}
               <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Generated References</p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
+                  {tUi("generated.references")}
+                </p>
                 <div className="flex flex-wrap gap-1 max-h-40 overflow-y-auto">
                   {createdBales.map((b) => (
                     <Badge
@@ -827,18 +831,18 @@ export default function WipersReEntry() {
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Confirm Wipers Re-Entry</DialogTitle>
-            <DialogDescription>Review details before creating bales</DialogDescription>
+            <DialogTitle>{tUi("confirm.wipers.re.entry")}</DialogTitle>
+            <DialogDescription>{tUi("review.details.before.creating.bales")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 text-sm">
             <div className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2">
-              <span className="text-muted-foreground">Entry Date</span>
+              <span className="text-muted-foreground">{tUi("entry.date.2")}</span>
               <span className="font-semibold text-primary" data-testid="text-confirm-date">
                 {entryDate}
               </span>
             </div>
             <div className="flex items-center justify-between rounded-md bg-muted/50 px-3 py-2">
-              <span className="text-muted-foreground">Location</span>
+              <span className="text-muted-foreground">{tUi("location")}</span>
               <span className="font-semibold" data-testid="text-confirm-location">
                 {activeLocations.find((l) => l.id.toString() === selectedLocationId)?.name || "-"}
               </span>
@@ -847,10 +851,10 @@ export default function WipersReEntry() {
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead>Product</TableHead>
+                    <TableHead>{tUi("product")}</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Weight/Bale</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">{tUi("weight.bale")}</TableHead>
+                    <TableHead className="text-right">{tUi("total")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -878,7 +882,7 @@ export default function WipersReEntry() {
               <p>
                 Bales will be recorded under <strong>{entryDate}</strong>, not today's date.
               </p>
-              <p>New reference numbers continue from the existing REF sequence.</p>
+              <p>{tUi("new.reference.numbers.continue.from.the.existing")}</p>
             </div>
           </div>
           <DialogFooter className="gap-2">
@@ -900,7 +904,7 @@ export default function WipersReEntry() {
       <Dialog open={designPickerOpen} onOpenChange={setDesignPickerOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Choose A4 Label Design</DialogTitle>
+            <DialogTitle>{tUi("choose.a4.label.design")}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-2">
             {colors.map((opt) => (

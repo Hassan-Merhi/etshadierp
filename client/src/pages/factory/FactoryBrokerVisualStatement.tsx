@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileText, TrendingUp, CreditCard, DollarSign } from "lucide-react";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -40,6 +41,7 @@ function ccySymbol(cc: string) {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function FactoryBrokerVisualStatement() {
+  const tUi = useFactoryText();
   const { formatDisplayDate } = useDateFormat();
 
   const [brokerId, setBrokerId] = useState<string>("");
@@ -141,8 +143,8 @@ export default function FactoryBrokerVisualStatement() {
         <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
         <div>
           <PageHeader
-            title="Broker Statement"
-            subtitle="Container-level view of goods cost, freight, commission, and payments"
+            title={tUi("broker.statement")}
+            subtitle={tUi("container.level.view.of.goods.cost.freight.commi")}
           />
         </div>
       </div>
@@ -152,7 +154,7 @@ export default function FactoryBrokerVisualStatement() {
         <CardContent className="pt-4 pb-4">
           <div className="flex flex-wrap gap-4 items-end">
             <div className="space-y-1 min-w-[220px]">
-              <Label>Broker</Label>
+              <Label>{tUi("broker")}</Label>
               <Select value={brokerId} onValueChange={setBrokerId} disabled={brokers.length === 0}>
                 <SelectTrigger data-testid="select-broker">
                   <SelectValue placeholder={brokers.length === 0 ? "No brokers found" : "Select broker…"} />
@@ -168,7 +170,7 @@ export default function FactoryBrokerVisualStatement() {
             </div>
 
             <div className="space-y-1">
-              <Label>From date</Label>
+              <Label>{tUi("from.date.2")}</Label>
               <Input
                 type="date"
                 value={from}
@@ -178,7 +180,7 @@ export default function FactoryBrokerVisualStatement() {
               />
             </div>
             <div className="space-y-1">
-              <Label>To date</Label>
+              <Label>{tUi("to.date.2")}</Label>
               <Input
                 type="date"
                 value={to}
@@ -205,7 +207,7 @@ export default function FactoryBrokerVisualStatement() {
         </CardContent>
       </Card>
 
-      {!brokerId && <p className="text-sm text-muted-foreground">Select a broker to view the statement.</p>}
+      {!brokerId && <p className="text-sm text-muted-foreground">{tUi("select.a.broker.to.view.the.statement")}</p>}
 
       {brokerId && isLoading && (
         <div className="space-y-3">
@@ -215,7 +217,9 @@ export default function FactoryBrokerVisualStatement() {
         </div>
       )}
 
-      {brokerId && error && <p className="text-sm text-destructive">Failed to load statement. Please try again.</p>}
+      {brokerId && error && (
+        <p className="text-sm text-destructive">{tUi("failed.to.load.statement.please.try.again")}</p>
+      )}
 
       {statement && (
         <div className="space-y-6">
@@ -239,11 +243,11 @@ export default function FactoryBrokerVisualStatement() {
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow className="bg-muted/50 text-xs">
-                      <TableHead className="h-8 whitespace-nowrap">Supplier</TableHead>
-                      <TableHead className="h-8 whitespace-nowrap">Container</TableHead>
-                      <TableHead className="h-8 whitespace-nowrap">Date</TableHead>
-                      <TableHead className="h-8 text-right whitespace-nowrap">Unit Price</TableHead>
-                      <TableHead className="h-8 text-right whitespace-nowrap">Weight (kg)</TableHead>
+                      <TableHead className="h-8 whitespace-nowrap">{tUi("supplier")}</TableHead>
+                      <TableHead className="h-8 whitespace-nowrap">{tUi("container")}</TableHead>
+                      <TableHead className="h-8 whitespace-nowrap">{tUi("date")}</TableHead>
+                      <TableHead className="h-8 text-right whitespace-nowrap">{tUi("unit.price")}</TableHead>
+                      <TableHead className="h-8 text-right whitespace-nowrap">{tUi("weight.kg")}</TableHead>
                       {/* Goods Cost */}
                       {allCurrencies.map((cc) => (
                         <TableHead
@@ -392,19 +396,19 @@ export default function FactoryBrokerVisualStatement() {
             </CardHeader>
             <CardContent className="pt-0 overflow-x-auto">
               {statement.payments?.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No payments recorded.</p>
+                <p className="text-sm text-muted-foreground">{tUi("no.payments.recorded")}</p>
               ) : (
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow className="bg-muted/50 text-xs">
-                      <TableHead className="h-8">Date</TableHead>
-                      <TableHead className="h-8">Type</TableHead>
-                      <TableHead className="h-8">Supplier / Details</TableHead>
-                      <TableHead className="h-8">Currency</TableHead>
-                      <TableHead className="h-8 text-right">Amount</TableHead>
-                      <TableHead className="h-8 text-right">FX Rate</TableHead>
+                      <TableHead className="h-8">{tUi("date")}</TableHead>
+                      <TableHead className="h-8">{tUi("type")}</TableHead>
+                      <TableHead className="h-8">{tUi("supplier.details")}</TableHead>
+                      <TableHead className="h-8">{tUi("currency")}</TableHead>
+                      <TableHead className="h-8 text-right">{tUi("amount")}</TableHead>
+                      <TableHead className="h-8 text-right">{tUi("fx.rate")}</TableHead>
                       <TableHead className="h-8 text-right">$ USD</TableHead>
-                      <TableHead className="h-8">Notes</TableHead>
+                      <TableHead className="h-8">{tUi("notes")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -499,7 +503,7 @@ export default function FactoryBrokerVisualStatement() {
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow className="bg-muted/50 text-xs">
-                      <TableHead className="h-8">Item</TableHead>
+                      <TableHead className="h-8">{tUi("item")}</TableHead>
                       {allCurrencies.map((cc) => (
                         <TableHead key={cc} className="h-8 text-right">
                           {cc}
@@ -510,7 +514,7 @@ export default function FactoryBrokerVisualStatement() {
                   <TableBody>
                     {/* Total Credit */}
                     <TableRow className="text-xs">
-                      <TableCell className="py-2 font-medium">Total Credit (owed to broker)</TableCell>
+                      <TableCell className="py-2 font-medium">{tUi("total.credit.owed.to.broker")}</TableCell>
                       {allCurrencies.map((cc) => {
                         const t = containerTotals[cc];
                         const total = t ? t.goods + t.freight + t.commission : 0;
@@ -540,7 +544,7 @@ export default function FactoryBrokerVisualStatement() {
                     </TableRow>
                     {/* Remaining Balance */}
                     <TableRow className="text-xs bg-muted/40 font-semibold">
-                      <TableCell className="py-2">Remaining Balance</TableCell>
+                      <TableCell className="py-2">{tUi("remaining.balance")}</TableCell>
                       {allCurrencies.map((cc) => {
                         const t = containerTotals[cc];
                         const credit = t ? t.goods + t.freight + t.commission : 0;

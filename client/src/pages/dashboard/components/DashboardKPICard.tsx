@@ -3,9 +3,9 @@
  *
  * Extracted from Dashboard.tsx during the Phase 4 god-file split.
  */
-import {Card} from "@/components/ui/card";
-import {ArrowUpRight, ArrowDownRight, Minus, type LucideIcon} from "lucide-react";
-import {cn} from "@/lib/utils";
+import { Card } from "@/components/ui/card";
+import { ArrowUpRight, ArrowDownRight, Minus, type LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export function DashboardKPICard({
   title,

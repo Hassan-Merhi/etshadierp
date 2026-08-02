@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Search, BookOpen, PenLine } from "lucide-react";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function AddPriceLineDialog({
   addLineMode,
@@ -40,6 +41,7 @@ export function AddPriceLineDialog({
   setIsAddLineOpen: any;
   setNewLine: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog
       open={isAddLineOpen}
@@ -53,7 +55,7 @@ export function AddPriceLineDialog({
     >
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add Price Line</DialogTitle>
+          <DialogTitle>{tUi("add.price.line")}</DialogTitle>
         </DialogHeader>
 
         {/* Mode toggle */}
@@ -99,7 +101,7 @@ export function AddPriceLineDialog({
                   <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search by name or article code..."
+                      placeholder={tUi("search.by.name.or.article.code")}
                       value={catalogSearch}
                       onChange={(e) => setCatalogSearch(e.target.value)}
                       className="pl-8"
@@ -109,7 +111,7 @@ export function AddPriceLineDialog({
                   </div>
                   <div className="border rounded-md overflow-hidden max-h-64 overflow-y-auto">
                     {allStockItems.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-6">Loading items...</p>
+                      <p className="text-sm text-muted-foreground text-center py-6">{tUi("loading.items")}</p>
                     ) : (
                       (() => {
                         const q = catalogSearch.toLowerCase().trim();
@@ -193,7 +195,7 @@ export function AddPriceLineDialog({
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-sm font-medium mb-1 block">Quantity</label>
+                      <label className="text-sm font-medium mb-1 block">{tUi("quantity.2")}</label>
                       <Input
                         type="number"
                         placeholder="e.g. 10"
@@ -207,7 +209,7 @@ export function AddPriceLineDialog({
                       />
                     </div>
                     <div>
-                      <label className="text-sm font-medium mb-1 block">Price per Bale</label>
+                      <label className="text-sm font-medium mb-1 block">{tUi("price.per.bale.2")}</label>
                       <Input
                         type="number"
                         step="0.01"
@@ -233,7 +235,7 @@ export function AddPriceLineDialog({
             /* Manual mode — existing form */
             <>
               <div>
-                <label className="text-sm font-medium mb-1 block">Article Code</label>
+                <label className="text-sm font-medium mb-1 block">{tUi("article.code")}</label>
                 <Input
                   placeholder="e.g. 101"
                   value={newLine.articleCode}
@@ -242,7 +244,7 @@ export function AddPriceLineDialog({
                 />
               </div>
               <div>
-                <label className="text-sm font-medium mb-1 block">Product Name</label>
+                <label className="text-sm font-medium mb-1 block">{tUi("product.name")}</label>
                 <Input
                   placeholder="e.g. Mixed Cotton"
                   value={newLine.productName}
@@ -252,7 +254,7 @@ export function AddPriceLineDialog({
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium mb-1 block">Quantity</label>
+                  <label className="text-sm font-medium mb-1 block">{tUi("quantity.2")}</label>
                   <Input
                     type="number"
                     value={newLine.quantity}
@@ -264,7 +266,7 @@ export function AddPriceLineDialog({
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-1 block">Price per Bale</label>
+                  <label className="text-sm font-medium mb-1 block">{tUi("price.per.bale.2")}</label>
                   <Input
                     type="number"
                     step="0.01"

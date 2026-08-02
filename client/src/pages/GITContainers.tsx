@@ -56,8 +56,10 @@ import { ImportResultBanner } from "./git-containers/ImportResultBanner";
 import { useContainerSummaryStats } from "./git-containers/containerHelpers";
 import { useGITContainersData } from "./git-containers/useGITContainersData";
 import { useContainerFilters } from "./git-containers/useContainerFilters";
+import { useErpText } from "@/i18n/modules/erp";
 
 export default function GITContainers({ embedded = false }: { embedded?: boolean } = {}) {
+  const tUi = useErpText();
   const { data: user, isLoading: userLoading } = useQuery<AuthUser>({ queryKey: ["/api/auth/me"] });
   const { toast } = useToast();
 
@@ -236,9 +238,11 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   if (!user || isLoading) {
     return (
       <div className="flex flex-col h-full overflow-hidden">
-        {!embedded && <PageHeader title="Containers OTW" subtitle="Active container logistics and tracking" />}
+        {!embedded && (
+          <PageHeader title={tUi("containers.otw")} subtitle={tUi("active.container.logistics.and.tracking")} />
+        )}
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-sm text-muted-foreground">Loading containers…</p>
+          <p className="text-sm text-muted-foreground">{tUi("loading.containers")}</p>
         </div>
       </div>
     );
@@ -247,11 +251,13 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   if (isError) {
     return (
       <div className="flex flex-col h-full overflow-hidden">
-        {!embedded && <PageHeader title="Containers OTW" subtitle="Active container logistics and tracking" />}
+        {!embedded && (
+          <PageHeader title={tUi("containers.otw")} subtitle={tUi("active.container.logistics.and.tracking")} />
+        )}
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-center space-y-2">
             <AlertTriangle className="h-8 w-8 text-red-500 mx-auto" />
-            <p className="text-sm font-medium">Failed to load containers</p>
+            <p className="text-sm font-medium">{tUi("failed.to.load.containers")}</p>
             <p className="text-xs text-muted-foreground">{(error as any)?.message ?? "Unknown error"}</p>
           </div>
         </div>
@@ -263,7 +269,9 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {!embedded && <PageHeader title="Containers OTW" subtitle="Active container logistics and tracking" />}
+      {!embedded && (
+        <PageHeader title={tUi("containers.otw")} subtitle={tUi("active.container.logistics.and.tracking")} />
+      )}
 
       <div className="flex-1 overflow-hidden p-4 flex flex-col gap-4">
         {/* ── Company Mode ── */}
@@ -390,7 +398,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
           <div className="relative flex-1 min-w-48">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search container #, company, truck, transporter, agent…"
+              placeholder={tUi("search.container.company.truck.transporter.agent")}
               className="pl-8"
               value={search}
               onChange={(e) => setSearch(e.target.value)}

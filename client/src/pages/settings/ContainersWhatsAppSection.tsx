@@ -19,6 +19,7 @@ import {
   Send,
   Clock,
 } from "lucide-react";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface ContainersWaSettings {
   groupChatId: string;
@@ -41,6 +42,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => ({
 }));
 
 export function ContainersWhatsAppSection() {
+  const tUi = useErpText();
   const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [groupChatId, setGroupChatId] = useState("");
@@ -111,7 +113,7 @@ export function ContainersWhatsAppSection() {
         <div className="flex items-center gap-3">
           <MessageCircle className="h-4 w-4 text-green-500" />
           <div className="text-left">
-            <p className="text-sm font-medium">Containers OTW — WhatsApp</p>
+            <p className="text-sm font-medium">{tUi("containers.otw.whatsapp")}</p>
             <p className="text-xs text-muted-foreground">
               Send the containers table as an image to a WhatsApp group, manually or on a schedule.
             </p>
@@ -149,7 +151,7 @@ export function ContainersWhatsAppSection() {
                 {settings?.hasCredentials && settings?.waEnabled ? (
                   <>
                     <CheckCircle className="h-4 w-4 text-green-500" />
-                    <span className="text-muted-foreground">WhatsApp connected and enabled.</span>
+                    <span className="text-muted-foreground">{tUi("whatsapp.connected.and.enabled")}</span>
                   </>
                 ) : settings?.hasCredentials ? (
                   <>
@@ -195,7 +197,7 @@ export function ContainersWhatsAppSection() {
                     </Button>
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">No group selected.</p>
+                  <p className="text-xs text-muted-foreground">{tUi("no.group.selected")}</p>
                 )}
 
                 {!showGroupPicker && (
@@ -266,7 +268,7 @@ export function ContainersWhatsAppSection() {
 
                 {scheduleEnabled && (
                   <div className="flex items-center gap-3 flex-wrap">
-                    <Label className="text-xs text-muted-foreground">Send at</Label>
+                    <Label className="text-xs text-muted-foreground">{tUi("send.at")}</Label>
                     <Select value={String(scheduleHour)} onValueChange={(v) => setScheduleHour(Number(v))}>
                       <SelectTrigger className="w-28" data-testid="select-containers-wa-hour">
                         <SelectValue />

@@ -14,13 +14,7 @@ export function OtwFreightCell({ containerId, freightStatusMap }: OtwFreightCell
         <span className="text-xs text-muted-foreground">--</span>
       ) : (
         <Badge
-          variant={
-            fs.status === "PAID"
-              ? "default"
-              : fs.status === "PARTIAL"
-                ? "secondary"
-                : "destructive"
-          }
+          variant={fs.status === "PAID" ? "default" : fs.status === "PARTIAL" ? "secondary" : "destructive"}
           data-testid={`badge-freight-${containerId}`}
         >
           {fs.status}

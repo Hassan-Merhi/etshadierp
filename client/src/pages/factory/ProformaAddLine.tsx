@@ -14,6 +14,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
 import { PageHeader } from "@/components/PageHeader";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 const AUTOSAVE_KEY = "proforma-autosave-enabled";
 const AUTOSAVE_DELAY_MS = 1500;
@@ -47,6 +48,7 @@ interface Proforma {
 }
 
 export default function ProformaAddLine() {
+  const tUi = useFactoryText();
   const { proformaId } = useParams<{ proformaId: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -248,7 +250,7 @@ export default function ProformaAddLine() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1 min-w-0">
-          <p className="text-xs text-muted-foreground">Adding line to</p>
+          <p className="text-xs text-muted-foreground">{tUi("adding.line.to")}</p>
           <PageHeader title={proformaName} />
         </div>
         {/* Autosave toggle */}
@@ -263,7 +265,7 @@ export default function ProformaAddLine() {
           title={autoSave ? "Autosave ON — items added automatically" : "Autosave OFF — press Add manually"}
         >
           <Zap className={`h-4 w-4 ${autoSave ? "fill-green-500 text-green-500" : ""}`} />
-          <span className="hidden sm:inline">Autosave</span>
+          <span className="hidden sm:inline">{tUi("autosave")}</span>
           <span
             className={`w-8 h-4 rounded-full relative transition-colors ${autoSave ? "bg-green-500" : "bg-muted-foreground/30"}`}
           >
@@ -282,7 +284,7 @@ export default function ProformaAddLine() {
         <div className="relative">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
-            placeholder="Search by name or article code..."
+            placeholder={tUi("search.by.name.or.article.code")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -340,7 +342,7 @@ export default function ProformaAddLine() {
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
             <Search className="h-8 w-8 mb-2 opacity-30" />
-            <p className="text-sm">No items found</p>
+            <p className="text-sm">{tUi("no.items.found")}</p>
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 mt-2">
@@ -447,11 +449,11 @@ export default function ProformaAddLine() {
             </div>
             <div className="flex gap-3 items-end">
               <div className="flex-1">
-                <label className="text-xs font-medium mb-1 block text-muted-foreground">Quantity (bales)</label>
+                <label className="text-xs font-medium mb-1 block text-muted-foreground">{tUi("quantity.bales")}</label>
                 <Input
                   type="number"
                   min="1"
-                  placeholder="Qty"
+                  placeholder={tUi("qty.2")}
                   value={qty}
                   onChange={(e) => setQty(e.target.value)}
                   onKeyDown={(e) => {
@@ -462,7 +464,7 @@ export default function ProformaAddLine() {
                 />
               </div>
               <div className="flex-1">
-                <label className="text-xs font-medium mb-1 block text-muted-foreground">Price per bale</label>
+                <label className="text-xs font-medium mb-1 block text-muted-foreground">{tUi("price.per.bale")}</label>
                 <Input
                   type="number"
                   step="0.01"

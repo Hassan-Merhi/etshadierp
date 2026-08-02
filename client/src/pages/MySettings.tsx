@@ -149,7 +149,10 @@ export default function MySettings() {
               disabled={prefsPending}
               onCheckedChange={(val) => {
                 updatePref({ showChatWidget: val });
-                toast({ title: val ? "Chatbot enabled" : "Chatbot hidden", description: val ? "The AI chat widget is now visible." : "The AI chat widget has been hidden." });
+                toast({
+                  title: val ? "Chatbot enabled" : "Chatbot hidden",
+                  description: val ? "The AI chat widget is now visible." : "The AI chat widget has been hidden.",
+                });
               }}
               data-testid="switch-show-chat-widget"
             />
@@ -157,14 +160,19 @@ export default function MySettings() {
           <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
             <div>
               <p className="text-sm font-medium leading-none">Notebook</p>
-              <p className="text-xs text-muted-foreground mt-1">The floating notepad panel on the side of the screen.</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                The floating notepad panel on the side of the screen.
+              </p>
             </div>
             <Switch
               checked={prefs?.showNotesPanel !== false}
               disabled={prefsPending}
               onCheckedChange={(val) => {
                 updatePref({ showNotesPanel: val });
-                toast({ title: val ? "Notebook enabled" : "Notebook hidden", description: val ? "The notebook panel is now visible." : "The notebook panel has been hidden." });
+                toast({
+                  title: val ? "Notebook enabled" : "Notebook hidden",
+                  description: val ? "The notebook panel is now visible." : "The notebook panel has been hidden.",
+                });
               }}
               data-testid="switch-show-notes-panel"
             />

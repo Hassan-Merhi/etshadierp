@@ -91,8 +91,8 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
   const netPositionPath = isFactory
     ? "/factory/net-position-details"
     : isProperties
-    ? "/properties/net-position-details"
-    : "/net-position-details";
+      ? "/properties/net-position-details"
+      : "/net-position-details";
 
   const cards: ToolCard[] = [
     {
@@ -103,7 +103,8 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
       title: "Deleted Items",
       description: "Restore deleted records or permanently remove archived data.",
       actionLabel: "Open",
-      onAction: () => navigate(isFactory ? "/factory/deleted-items" : isProperties ? "/properties/deleted-items" : "/deleted-items"),
+      onAction: () =>
+        navigate(isFactory ? "/factory/deleted-items" : isProperties ? "/properties/deleted-items" : "/deleted-items"),
       testId: "card-deleted-items",
     },
     {
@@ -159,9 +160,16 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
           const result = await response.json();
           if (response.ok) {
             if (result.orphanedVoucherCount === 0) {
-              toast({ title: "No Orphaned Vouchers", description: "All OTW containers have no leftover charge vouchers." });
+              toast({
+                title: "No Orphaned Vouchers",
+                description: "All OTW containers have no leftover charge vouchers.",
+              });
             } else {
-              toast({ title: `Found ${result.orphanedVoucherCount} orphaned voucher(s)`, description: `Total impact: ${result.totalImpact}`, variant: "destructive" });
+              toast({
+                title: `Found ${result.orphanedVoucherCount} orphaned voucher(s)`,
+                description: `Total impact: ${result.totalImpact}`,
+                variant: "destructive",
+              });
             }
           } else {
             toast({ title: "Error", description: result.message, variant: "destructive" });
@@ -207,9 +215,7 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
             Admin Tools
           </Badge>
         </div>
-        <p className="text-muted-foreground text-sm">
-          Manage recovery, diagnostics, and financial position insights.
-        </p>
+        <p className="text-muted-foreground text-sm">Manage recovery, diagnostics, and financial position insights.</p>
       </div>
 
       {/* Warning banner */}
@@ -223,40 +229,40 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
 
       {/* Tool cards grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {cards.filter((card) => isDev || !card.devOnly).map((card) => (
-          <div
-            key={card.testId}
-            className="relative rounded-xl border bg-card p-5 flex flex-col gap-4"
-            data-testid={card.testId}
-          >
-            {/* Category badge */}
-            <span
-              className={`absolute top-4 right-4 text-xs font-medium px-2 py-0.5 rounded-full ${card.categoryColor}`}
+        {cards
+          .filter((card) => isDev || !card.devOnly)
+          .map((card) => (
+            <div
+              key={card.testId}
+              className="relative rounded-xl border bg-card p-5 flex flex-col gap-4"
+              data-testid={card.testId}
             >
-              {card.category}
-            </span>
+              {/* Category badge */}
+              <span
+                className={`absolute top-4 right-4 text-xs font-medium px-2 py-0.5 rounded-full ${card.categoryColor}`}
+              >
+                {card.category}
+              </span>
 
-            {/* Icon */}
-            <div className={`w-11 h-11 rounded-lg flex items-center justify-center ${card.iconBg}`}>
-              {card.icon}
+              {/* Icon */}
+              <div className={`w-11 h-11 rounded-lg flex items-center justify-center ${card.iconBg}`}>{card.icon}</div>
+
+              {/* Text */}
+              <div className="flex-1 space-y-1 pr-20">
+                <h4 className="font-semibold text-sm">{card.title}</h4>
+                <p className="text-sm text-muted-foreground leading-snug">{card.description}</p>
+              </div>
+
+              {/* Link-style action */}
+              <button
+                className="flex items-center gap-1 text-sm font-medium text-primary hover:underline w-fit"
+                onClick={card.onAction}
+                data-testid={`button-action-${card.testId}`}
+              >
+                {card.actionLabel} <span className="text-base leading-none">›</span>
+              </button>
             </div>
-
-            {/* Text */}
-            <div className="flex-1 space-y-1 pr-20">
-              <h4 className="font-semibold text-sm">{card.title}</h4>
-              <p className="text-sm text-muted-foreground leading-snug">{card.description}</p>
-            </div>
-
-            {/* Link-style action */}
-            <button
-              className="flex items-center gap-1 text-sm font-medium text-primary hover:underline w-fit"
-              onClick={card.onAction}
-              data-testid={`button-action-${card.testId}`}
-            >
-              {card.actionLabel} <span className="text-base leading-none">›</span>
-            </button>
-          </div>
-        ))}
+          ))}
       </div>
 
       {/* Global Settings */}
@@ -317,12 +323,7 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
               <p className="text-xs text-muted-foreground mb-3">
                 Clear vouchers and entries for a company (Preserves Master Data).
               </p>
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full"
-                onClick={() => setIsResetDataDialogOpen(true)}
-              >
+              <Button size="sm" variant="outline" className="w-full" onClick={() => setIsResetDataDialogOpen(true)}>
                 Reset Data
               </Button>
             </Card>
@@ -332,12 +333,7 @@ export function SystemToolsTab({ appMode, currentUser, selectedCompany, companie
               <p className="text-xs text-muted-foreground mb-3">
                 Bulk delete ledger accounts that have no transactions.
               </p>
-              <Button
-                size="sm"
-                variant="outline"
-                className="w-full"
-                onClick={() => setEmptyAccountsOpen(true)}
-              >
+              <Button size="sm" variant="outline" className="w-full" onClick={() => setEmptyAccountsOpen(true)}>
                 Clean Accounts
               </Button>
             </Card>

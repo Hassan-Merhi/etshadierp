@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { SoldContainer } from "./types";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface SoldContainersTableProps {
   isSoldLoading: boolean;
@@ -27,12 +28,13 @@ export function SoldContainersTable({
   formatDisplayDate,
   formatAmount,
 }: SoldContainersTableProps) {
+  const tUi = useErpText();
   return (
     <div className="space-y-4">
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by container number or customer..."
+          placeholder={tUi("search.by.container.number.or.customer")}
           value={soldSearchTerm}
           onChange={(e) => setSoldSearchTerm(e.target.value)}
           className="pl-10"
@@ -49,7 +51,7 @@ export function SoldContainersTable({
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <HandCoins className="w-16 h-16 text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">No sold containers found</h2>
+            <h2 className="text-xl font-semibold mb-2">{tUi("no.sold.containers.found")}</h2>
             <p className="text-muted-foreground">
               {soldContainers.length === 0 ? "No containers have been sold yet" : "Try adjusting your search"}
             </p>
@@ -61,13 +63,13 @@ export function SoldContainersTable({
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
-                  <TableHead>Container Number</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Sale Date</TableHead>
-                  <TableHead className="text-right">Container Cost</TableHead>
-                  <TableHead className="text-right">Commission</TableHead>
-                  <TableHead className="text-right">Total Amount</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{tUi("container.number")}</TableHead>
+                  <TableHead>{tUi("customer")}</TableHead>
+                  <TableHead>{tUi("sale.date")}</TableHead>
+                  <TableHead className="text-right">{tUi("container.cost")}</TableHead>
+                  <TableHead className="text-right">{tUi("commission")}</TableHead>
+                  <TableHead className="text-right">{tUi("total.amount")}</TableHead>
+                  <TableHead className="text-right">{tUi("actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

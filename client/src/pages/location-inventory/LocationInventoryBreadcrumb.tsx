@@ -1,5 +1,6 @@
 import { MapPin, ChevronRight } from "lucide-react";
 import type { InventoryLocation as Location, StockGroupSummary } from "./locationInventoryTypes";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface LocationInventoryBreadcrumbProps {
   selectedLocationLocal: Location | null;
@@ -16,26 +17,21 @@ export function LocationInventoryBreadcrumb({
   goBackToLocations,
   onBackToLocation,
 }: LocationInventoryBreadcrumbProps) {
+  const tUi = useErpText();
   return (
     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
       <MapPin className="h-3.5 w-3.5 shrink-0" />
       {!selectedLocationLocal ? (
-        <span>Select Location</span>
+        <span>{tUi("select.location.2")}</span>
       ) : (
         <>
-          <button
-            className="hover:underline hover:text-foreground transition-colors"
-            onClick={goBackToLocations}
-          >
+          <button className="hover:underline hover:text-foreground transition-colors" onClick={goBackToLocations}>
             Locations
           </button>
           <ChevronRight className="h-3.5 w-3.5" />
           {selectedGroup ? (
             <>
-              <button
-                className="hover:underline hover:text-foreground transition-colors"
-                onClick={onBackToLocation}
-              >
+              <button className="hover:underline hover:text-foreground transition-colors" onClick={onBackToLocation}>
                 {selectedLocationLocal.name}
               </button>
               <ChevronRight className="h-3.5 w-3.5" />
@@ -43,14 +39,11 @@ export function LocationInventoryBreadcrumb({
             </>
           ) : viewAllItems ? (
             <>
-              <button
-                className="hover:underline hover:text-foreground transition-colors"
-                onClick={onBackToLocation}
-              >
+              <button className="hover:underline hover:text-foreground transition-colors" onClick={onBackToLocation}>
                 {selectedLocationLocal.name}
               </button>
               <ChevronRight className="h-3.5 w-3.5" />
-              <span className="text-foreground font-medium">All Items</span>
+              <span className="text-foreground font-medium">{tUi("all.items")}</span>
             </>
           ) : (
             <span className="text-foreground font-medium">{selectedLocationLocal.name}</span>

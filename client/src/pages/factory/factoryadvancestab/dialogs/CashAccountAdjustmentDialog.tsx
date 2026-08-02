@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fmt } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function CashAccountAdjustmentDialog({
   cashAccounts,
@@ -34,6 +35,7 @@ export function CashAccountAdjustmentDialog({
   setCashAdjForm: any;
   setCashAdjOpen: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog
       open={cashAdjOpen}
@@ -43,7 +45,7 @@ export function CashAccountAdjustmentDialog({
     >
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Cash Account Balance Adjustment</DialogTitle>
+          <DialogTitle>{tUi("cash.account.balance.adjustment")}</DialogTitle>
           <DialogDescription>
             Posts a correcting journal entry against the cash account without modifying any existing records.
           </DialogDescription>
@@ -59,7 +61,7 @@ export function CashAccountAdjustmentDialog({
               onValueChange={(v) => setCashAdjForm((p: any) => ({ ...p, cashAccountId: v }))}
             >
               <SelectTrigger data-testid="select-cadj-account">
-                <SelectValue placeholder="Select cash account" />
+                <SelectValue placeholder={tUi("select.cash.account")} />
               </SelectTrigger>
               <SelectContent>
                 {(cashAccounts || []).map((a: any) => (
@@ -87,7 +89,7 @@ export function CashAccountAdjustmentDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label>Direction</Label>
+              <Label>{tUi("direction")}</Label>
               <Select
                 value={cashAdjForm.direction}
                 onValueChange={(v) => setCashAdjForm((p: any) => ({ ...p, direction: v }))}
@@ -96,8 +98,8 @@ export function CashAccountAdjustmentDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="credit">Credit — reduce balance ↓</SelectItem>
-                  <SelectItem value="debit">Debit — increase balance ↑</SelectItem>
+                  <SelectItem value="credit">{tUi("credit.reduce.balance")}</SelectItem>
+                  <SelectItem value="debit">{tUi("debit.increase.balance")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -116,7 +118,7 @@ export function CashAccountAdjustmentDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Narration</Label>
+            <Label>{tUi("narration")}</Label>
             <Input
               value={cashAdjForm.narration}
               onChange={(e) => setCashAdjForm((p: any) => ({ ...p, narration: e.target.value }))}
@@ -134,12 +136,12 @@ export function CashAccountAdjustmentDialog({
               return (
                 <div className="rounded-md border overflow-hidden text-sm">
                   <div className="grid grid-cols-3 px-3 py-1.5 bg-muted/20 text-xs font-medium text-muted-foreground">
-                    <span>Account</span>
+                    <span>{tUi("account")}</span>
                     <span className="text-right text-blue-600 dark:text-blue-400">DR</span>
                     <span className="text-right text-amber-600 dark:text-amber-400">CR</span>
                   </div>
                   <div className="grid grid-cols-3 px-3 py-2 border-t">
-                    <span className="text-muted-foreground">Advance Adjustments</span>
+                    <span className="text-muted-foreground">{tUi("advance.adjustments")}</span>
                     <span className="text-right font-mono text-blue-700 dark:text-blue-400">
                       {isCredit ? fmt(cashAdjForm.amount) : "—"}
                     </span>

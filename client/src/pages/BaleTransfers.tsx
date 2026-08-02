@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface TransferRow {
   id: number;
@@ -84,6 +85,7 @@ interface BaleRow {
 }
 
 export default function BaleTransfers() {
+  const tUi = useErpText();
   const { formatDisplayDate } = useDateFormat();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -277,8 +279,8 @@ export default function BaleTransfers() {
           {!transfers || transfers.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <ArrowRightLeft className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p className="text-sm">No transfers yet</p>
-              <p className="text-xs mt-1">Create a new transfer to move bales between locations</p>
+              <p className="text-sm">{tUi("no.transfers.yet")}</p>
+              <p className="text-xs mt-1">{tUi("create.a.new.transfer.to.move.bales.between.loca")}</p>
             </div>
           ) : (
             <div className="border rounded-md overflow-auto">
@@ -286,13 +288,13 @@ export default function BaleTransfers() {
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead></TableHead>
-                    <TableHead>Transfer Date</TableHead>
-                    <TableHead>From</TableHead>
+                    <TableHead>{tUi("transfer.date")}</TableHead>
+                    <TableHead>{tUi("from")}</TableHead>
                     <TableHead>To</TableHead>
-                    <TableHead className="text-right">Items</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created By</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="text-right">{tUi("items")}</TableHead>
+                    <TableHead>{tUi("status")}</TableHead>
+                    <TableHead>{tUi("created.by")}</TableHead>
+                    <TableHead className="text-right">{tUi("actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -373,10 +375,10 @@ export default function BaleTransfers() {
                                   <Table>
                                     <TableHeader className="sticky top-0 z-30 bg-background">
                                       <TableRow>
-                                        <TableHead>Bale Code</TableHead>
-                                        <TableHead>Product</TableHead>
-                                        <TableHead className="text-right">Weight (kg)</TableHead>
-                                        <TableHead className="text-right">Cost/kg</TableHead>
+                                        <TableHead>{tUi("bale.code")}</TableHead>
+                                        <TableHead>{tUi("product")}</TableHead>
+                                        <TableHead className="text-right">{tUi("weight.kg")}</TableHead>
+                                        <TableHead className="text-right">{tUi("cost.kg")}</TableHead>
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -398,7 +400,7 @@ export default function BaleTransfers() {
                                     </TableBody>
                                   </Table>
                                 ) : (
-                                  <p className="text-sm text-muted-foreground">No items in this transfer</p>
+                                  <p className="text-sm text-muted-foreground">{tUi("no.items.in.this.transfer")}</p>
                                 )
                               ) : (
                                 <Skeleton className="h-20 w-full" />
@@ -422,14 +424,14 @@ export default function BaleTransfers() {
       <Dialog open={dialogOpen} onOpenChange={handleCloseDialog}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>New Bale Transfer</DialogTitle>
-            <DialogDescription>Transfer bales from one location to another</DialogDescription>
+            <DialogTitle>{tUi("new.bale.transfer")}</DialogTitle>
+            <DialogDescription>{tUi("transfer.bales.from.one.location.to.another")}</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Source Location</Label>
+                <Label>{tUi("source.location")}</Label>
                 <Select
                   value={sourceLocationId}
                   onValueChange={(val) => {
@@ -438,7 +440,7 @@ export default function BaleTransfers() {
                   }}
                 >
                   <SelectTrigger data-testid="select-source-location">
-                    <SelectValue placeholder="Select source" />
+                    <SelectValue placeholder={tUi("select.source")} />
                   </SelectTrigger>
                   <SelectContent>
                     {locations?.map((loc) => (
@@ -450,10 +452,10 @@ export default function BaleTransfers() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Destination Location</Label>
+                <Label>{tUi("destination.location")}</Label>
                 <Select value={destLocationId} onValueChange={setDestLocationId}>
                   <SelectTrigger data-testid="select-dest-location">
-                    <SelectValue placeholder="Select destination" />
+                    <SelectValue placeholder={tUi("select.destination")} />
                   </SelectTrigger>
                   <SelectContent>
                     {locations
@@ -469,7 +471,7 @@ export default function BaleTransfers() {
             </div>
 
             <div className="space-y-2">
-              <Label>Transfer Date</Label>
+              <Label>{tUi("transfer.date")}</Label>
               <Input
                 type="date"
                 value={transferDate}
@@ -479,11 +481,11 @@ export default function BaleTransfers() {
             </div>
 
             <div className="space-y-2">
-              <Label>Notes (optional)</Label>
+              <Label>{tUi("notes.optional")}</Label>
               <Textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Optional notes about this transfer"
+                placeholder={tUi("optional.notes.about.this.transfer")}
                 rows={2}
                 data-testid="input-transfer-notes"
               />
@@ -503,17 +505,19 @@ export default function BaleTransfers() {
                   Select a source location to see available bales
                 </p>
               ) : availableBales.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">No finalized bales at this location</p>
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  {tUi("no.finalized.bales.at.this.location")}
+                </p>
               ) : (
                 <div className="border rounded-md max-h-60 overflow-auto">
                   <Table>
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead className="w-10"></TableHead>
-                        <TableHead>Bale Code</TableHead>
-                        <TableHead>Product</TableHead>
-                        <TableHead className="text-right">Weight (kg)</TableHead>
-                        <TableHead className="text-right">Cost/kg</TableHead>
+                        <TableHead>{tUi("bale.code")}</TableHead>
+                        <TableHead>{tUi("product")}</TableHead>
+                        <TableHead className="text-right">{tUi("weight.kg")}</TableHead>
+                        <TableHead className="text-right">{tUi("cost.kg")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -564,7 +568,7 @@ export default function BaleTransfers() {
       <Dialog open={deleteConfirm !== null} onOpenChange={() => setDeleteConfirm(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Transfer</DialogTitle>
+            <DialogTitle>{tUi("delete.transfer")}</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete this transfer? This action cannot be undone.
             </DialogDescription>

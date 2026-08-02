@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Book, ArrowLeftRight, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useHubQueryState } from "@/hooks/use-hub-query-state";
+import { useErpText } from "@/i18n/modules/erp";
 
 const POSDaybook = lazy(() => import("@/pages/pos/POSDaybook"));
 const StockTransfers = lazy(() => import("@/pages/StockTransfers"));
@@ -24,6 +25,7 @@ const POS_TAB_KEYS = POS_TABS.map((t) => t.key) as unknown as readonly ("daybook
 const ERP_TAB_KEYS = ERP_TABS.map((t) => t.key) as unknown as readonly ("transfers" | "pricelist")[];
 
 export default function SalesToolsHub() {
+  const tUi = useErpText();
   const { data: user } = useQuery<any>({
     queryKey: ["/api/auth/me"],
   });
@@ -74,7 +76,7 @@ export default function SalesToolsHub() {
       </div>
 
       <div className="flex-1 overflow-auto">
-        <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
+        <Suspense fallback={<div className="p-8 text-center text-muted-foreground">{tUi("loading")}</div>}>
           {activeTab === "daybook" && <POSDaybook />}
           {activeTab === "transfers" && <StockTransfers hideVoucherNotes />}
           {activeTab === "pricelist" && <POSPriceList />}

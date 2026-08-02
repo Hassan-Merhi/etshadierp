@@ -15,6 +15,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { fmt } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function ReverseAdvanceDialog({
   reverseMutation,
@@ -25,11 +26,12 @@ export function ReverseAdvanceDialog({
   reverseTarget: any;
   setReverseTarget: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog open={!!reverseTarget} onOpenChange={(open) => !open && setReverseTarget(null)}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Reverse Advance</DialogTitle>
+          <DialogTitle>{tUi("reverse.advance")}</DialogTitle>
           <DialogDescription>
             This will reverse the advance of <strong>{fmt(reverseTarget?.amount)}</strong> for{" "}
             <strong>{reverseTarget?.workerName}</strong>. All repayments linked to this advance will be removed and the

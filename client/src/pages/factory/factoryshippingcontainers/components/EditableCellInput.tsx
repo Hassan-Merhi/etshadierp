@@ -3,9 +3,9 @@
  *
  * Extracted from FactoryShippingContainers.tsx during the Phase 4 god-file split.
  */
-import {useState, useEffect} from "react";
-import {Input} from "@/components/ui/input";
-import {Loader2} from "lucide-react";
+import { useState, useEffect } from "react";
+import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react";
 
 export function EditableCellInput({
   value,

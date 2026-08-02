@@ -57,6 +57,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import type { Supplier, Customer, ContainerSale } from "@shared/schema";
 import { utils, writeFile, read as readExcel, ExcelJS } from "@/lib/excelHelper";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface ContainerDetailData {
   container: any;
@@ -75,6 +76,7 @@ const saleFormSchema = z.object({
 });
 
 export default function ContainerDetail({ id: idProp, forceErp }: { id?: string; forceErp?: boolean }) {
+  const tUi = useErpText();
   const { formatDisplayDate } = useDateFormat();
   const params = useParams();
   const containerId = idProp ?? params.id;
@@ -773,7 +775,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px]">
         <Package className="w-16 h-16 text-muted-foreground mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Container not found</h2>
+        <h2 className="text-xl font-semibold mb-2">{tUi("container.not.found")}</h2>
         <Link href={backUrl}>
           <Button variant="outline">
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -807,7 +809,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       return (
         <div className="flex flex-col items-center justify-center min-h-[400px]">
           <Package className="w-16 h-16 text-muted-foreground mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Container not found</h2>
+          <h2 className="text-xl font-semibold mb-2">{tUi("container.not.found")}</h2>
           <Link href="/containers">
             <Button variant="outline">
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -863,25 +865,25 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Card>
             <CardContent className="pt-4">
-              <p className="text-xs text-muted-foreground">Invoice Total</p>
+              <p className="text-xs text-muted-foreground">{tUi("invoice.total")}</p>
               <p className="font-semibold text-lg tabular-nums">{spFmt(spc.invoiceTotalUsd)}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4">
-              <p className="text-xs text-muted-foreground">Discount</p>
+              <p className="text-xs text-muted-foreground">{tUi("discount")}</p>
               <p className="font-semibold text-lg">{spc.discountPct || "0"}%</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4">
-              <p className="text-xs text-muted-foreground">Base Cost (discounted)</p>
+              <p className="text-xs text-muted-foreground">{tUi("base.cost.discounted")}</p>
               <p className="font-semibold text-lg tabular-nums">{spFmt(baseCost)}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4">
-              <p className="text-xs text-muted-foreground">Invoice Date</p>
+              <p className="text-xs text-muted-foreground">{tUi("invoice.date")}</p>
               <p className="font-semibold text-lg">{spc.invoiceDate}</p>
             </CardContent>
           </Card>
@@ -890,18 +892,18 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         {/* Line Items */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Line Items</CardTitle>
+            <CardTitle className="text-base">{tUi("line.items")}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Article Code</TableHead>
-                  <TableHead>Description</TableHead>
+                  <TableHead>{tUi("article.code")}</TableHead>
+                  <TableHead>{tUi("description")}</TableHead>
                   <TableHead className="text-right">Qty</TableHead>
-                  <TableHead className="text-right">Rate (USD)</TableHead>
-                  <TableHead className="text-right">Disc. Rate</TableHead>
-                  <TableHead className="text-right">Line Cost</TableHead>
+                  <TableHead className="text-right">{tUi("rate.usd")}</TableHead>
+                  <TableHead className="text-right">{tUi("disc.rate")}</TableHead>
+                  <TableHead className="text-right">{tUi("line.cost")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -940,16 +942,16 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         {(spc.prepaid || []).length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Prepaid Charges</CardTitle>
+              <CardTitle className="text-base">{tUi("prepaid.charges")}</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Amount (USD)</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead>{tUi("type")}</TableHead>
+                    <TableHead>{tUi("description")}</TableHead>
+                    <TableHead className="text-right">{tUi("amount.usd")}</TableHead>
+                    <TableHead>{tUi("date")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -971,20 +973,20 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         {spc.status === "offloaded" && spc.offload && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Offload Summary</CardTitle>
+              <CardTitle className="text-base">{tUi("offload.summary")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="mb-4">
-                <p className="text-xs text-muted-foreground">Offload Date</p>
+                <p className="text-xs text-muted-foreground">{tUi("offload.date")}</p>
                 <p className="font-medium">{spc.offload.offloadDate}</p>
               </div>
               {(spc.offloadCharges || []).length > 0 && (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead className="text-right">Amount (USD)</TableHead>
+                      <TableHead>{tUi("type")}</TableHead>
+                      <TableHead>{tUi("description")}</TableHead>
+                      <TableHead className="text-right">{tUi("amount.usd")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1006,7 +1008,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         {spc.notes && (
           <Card>
             <CardContent className="pt-4">
-              <p className="text-xs text-muted-foreground mb-1">Notes</p>
+              <p className="text-xs text-muted-foreground mb-1">{tUi("notes")}</p>
               <p className="text-sm">{spc.notes}</p>
             </CardContent>
           </Card>
@@ -1201,8 +1203,8 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
             data-testid="button-delete-container"
           >
             <Trash2 className="w-4 h-4" />
-            <span className="hidden sm:inline">Delete Container</span>
-            <span className="sm:hidden">Delete</span>
+            <span className="hidden sm:inline">{tUi("delete.container")}</span>
+            <span className="sm:hidden">{tUi("delete")}</span>
           </Button>
         </div>
       </div>
@@ -1219,7 +1221,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
             <div className="flex items-center gap-2">
               <User className="h-4 w-4 text-muted-foreground" />
               <div>
-                <p className="text-sm text-muted-foreground">Sold to</p>
+                <p className="text-sm text-muted-foreground">{tUi("sold.to")}</p>
                 <p className="font-semibold" data-testid="text-sale-customer">
                   {saleCustomer?.legalName || "Unknown Customer"}
                 </p>
@@ -1228,7 +1230,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               <div>
-                <p className="text-sm text-muted-foreground">Sale Date</p>
+                <p className="text-sm text-muted-foreground">{tUi("sale.date")}</p>
                 <p className="font-semibold" data-testid="text-sale-date">
                   {formatDisplayDate(containerSale.saleDate)}
                 </p>
@@ -1237,7 +1239,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
             <div className="flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-muted-foreground" />
               <div>
-                <p className="text-sm text-muted-foreground">Sale Price</p>
+                <p className="text-sm text-muted-foreground">{tUi("sale.price")}</p>
                 <p className="font-semibold" data-testid="text-sale-price">
                   {formatAmount(containerSale.containerCost)}
                 </p>
@@ -1246,14 +1248,14 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
             <div className="flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-muted-foreground" />
               <div>
-                <p className="text-sm text-muted-foreground">Commission</p>
+                <p className="text-sm text-muted-foreground">{tUi("commission")}</p>
                 <p className="font-semibold" data-testid="text-sale-commission">
                   {formatAmount(containerSale.commission)}
                 </p>
               </div>
             </div>
             <div className="pt-2 border-t">
-              <p className="text-sm text-muted-foreground">Total Amount</p>
+              <p className="text-sm text-muted-foreground">{tUi("total.amount")}</p>
               <p className="text-xl font-bold" data-testid="text-sale-total">
                 {formatAmount(containerSale.totalAmount)}
               </p>
@@ -1264,7 +1266,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="rounded-lg border bg-card p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Supplier</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{tUi("supplier")}</p>
           <p className="text-base font-semibold leading-tight" data-testid="text-supplier">
             {supplier ? supplier.legalName : "—"}
           </p>
@@ -1272,7 +1274,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         </div>
 
         <div className="rounded-lg border bg-card p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Items Total</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{tUi("items.total")}</p>
           <p className="text-2xl font-bold tabular-nums" data-testid="text-items-total">
             {formatAmount(itemsTotal)}
           </p>
@@ -1282,7 +1284,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         </div>
 
         <div className="rounded-lg border bg-card p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Grand Total</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{tUi("grand.total")}</p>
           <p className="text-2xl font-bold tabular-nums" data-testid="text-grand-total">
             {formatAmount(grandTotal)}
           </p>
@@ -1293,7 +1295,9 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       </div>
 
       <div className="space-y-1">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide px-0.5">Purchase Orders</h2>
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide px-0.5">
+          {tUi("purchase.orders")}
+        </h2>
       </div>
       {pos.length === 0 ? (
         <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
@@ -1382,11 +1386,11 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                         <span className="font-mono font-medium text-foreground">{fmtQty(item.quantity)}</span>
                       </div>
                       <div>
-                        <span className="block">Rate</span>
+                        <span className="block">{tUi("rate")}</span>
                         <span className="font-mono font-medium text-foreground">{formatAmount(item.rate)}</span>
                       </div>
                       <div>
-                        <span className="block">Total</span>
+                        <span className="block">{tUi("total")}</span>
                         <span className="font-mono font-semibold text-foreground">{formatAmount(item.lineTotal)}</span>
                       </div>
                     </div>
@@ -1401,7 +1405,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       {charges.length > 0 && (
         <div className="rounded-lg border bg-card overflow-x-auto">
           <div className="px-4 py-3 bg-muted/40 border-b">
-            <p className="text-sm font-semibold">Extra Charges</p>
+            <p className="text-sm font-semibold">{tUi("extra.charges")}</p>
           </div>
           <table className="w-full text-sm min-w-[360px]">
             <thead>
@@ -1426,7 +1430,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
             </tbody>
             <tfoot>
               <tr className="border-t bg-muted/20">
-                <td className="px-4 py-2.5 font-semibold">Total Charges</td>
+                <td className="px-4 py-2.5 font-semibold">{tUi("total.charges")}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums font-semibold">{formatAmount(chargesTotal)}</td>
               </tr>
             </tfoot>
@@ -1435,24 +1439,24 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       )}
 
       <div className="rounded-lg border bg-card p-4 space-y-2">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Summary</p>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{tUi("summary")}</p>
         <div className="space-y-1.5 text-sm">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Items Total</span>
+            <span className="text-muted-foreground">{tUi("items.total")}</span>
             <span className="tabular-nums font-medium">{formatAmount(itemsTotal)}</span>
           </div>
           {chargesTotal !== 0 && (
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Charges Total</span>
+              <span className="text-muted-foreground">{tUi("charges.total")}</span>
               <span className="tabular-nums font-medium">{formatAmount(chargesTotal)}</span>
             </div>
           )}
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Total Qty</span>
+            <span className="text-muted-foreground">{tUi("total.qty")}</span>
             <span className="tabular-nums font-medium">{fmtQty(totalBales)}</span>
           </div>
           <div className="flex justify-between pt-2 border-t font-bold">
-            <span>Grand Total</span>
+            <span>{tUi("grand.total")}</span>
             <span className="tabular-nums text-base">{formatAmount(grandTotal)}</span>
           </div>
         </div>
@@ -1469,7 +1473,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       <Dialog open={showSellDialog} onOpenChange={setShowSellDialog}>
         <DialogContent data-testid="dialog-sell-container">
           <DialogHeader>
-            <DialogTitle>Sell Container</DialogTitle>
+            <DialogTitle>{tUi("sell.container")}</DialogTitle>
             <DialogDescription>
               Record the sale of container {container.containerNumber} to a customer.
             </DialogDescription>
@@ -1481,11 +1485,11 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                 name="customerId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Customer</FormLabel>
+                    <FormLabel>{tUi("customer")}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-customer">
-                          <SelectValue placeholder="Select a customer" />
+                          <SelectValue placeholder={tUi("select.a.customer")} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -1506,7 +1510,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                 name="saleDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Sale Date</FormLabel>
+                    <FormLabel>{tUi("sale.date")}</FormLabel>
                     <FormControl>
                       <Input type="date" {...field} data-testid="input-sale-date" />
                     </FormControl>
@@ -1517,10 +1521,10 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
 
               <div className="rounded-md border p-4 bg-muted/50">
                 <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-medium">Container Cost</span>
+                  <span className="text-sm font-medium">{tUi("container.cost")}</span>
                   <span className="text-lg font-bold">{formatAmount(grandTotal)}</span>
                 </div>
-                <p className="text-xs text-muted-foreground">Full balance will be charged to customer</p>
+                <p className="text-xs text-muted-foreground">{tUi("full.balance.will.be.charged.to.customer")}</p>
               </div>
 
               <FormField
@@ -1528,7 +1532,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                 name="commission"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Commission</FormLabel>
+                    <FormLabel>{tUi("commission")}</FormLabel>
                     <FormControl>
                       <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-commission" />
                     </FormControl>
@@ -1542,11 +1546,11 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                 name="commissionAccountId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Commission Account (Optional)</FormLabel>
+                    <FormLabel>{tUi("commission.account.optional")}</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-commission-account">
-                          <SelectValue placeholder="Default commission account" />
+                          <SelectValue placeholder={tUi("default.commission.account")} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -1586,15 +1590,15 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
         <DialogContent data-testid="dialog-upload-doc">
           <DialogHeader>
-            <DialogTitle>Upload Document</DialogTitle>
-            <DialogDescription>Upload a document for this container</DialogDescription>
+            <DialogTitle>{tUi("upload.document")}</DialogTitle>
+            <DialogDescription>{tUi("upload.a.document.for.this.container")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">Document Type</label>
+              <label className="text-sm font-medium">{tUi("document.type")}</label>
               <Select value={uploadDocTypeId} onValueChange={setUploadDocTypeId}>
                 <SelectTrigger data-testid="select-doc-type">
-                  <SelectValue placeholder="Select document type" />
+                  <SelectValue placeholder={tUi("select.document.type")} />
                 </SelectTrigger>
                 <SelectContent>
                   {(docsData?.docTypes || []).map((dt: any) => (
@@ -1607,7 +1611,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
               </Select>
             </div>
             <div>
-              <label className="text-sm font-medium">File</label>
+              <label className="text-sm font-medium">{tUi("file")}</label>
               <Input
                 type="file"
                 ref={fileInputRef}
@@ -1634,8 +1638,8 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       <Dialog open={showFreightDialog} onOpenChange={setShowFreightDialog}>
         <DialogContent data-testid="dialog-add-freight">
           <DialogHeader>
-            <DialogTitle>Add Freight Charge</DialogTitle>
-            <DialogDescription>Record a freight/shipping charge for this container</DialogDescription>
+            <DialogTitle>{tUi("add.freight.charge")}</DialogTitle>
+            <DialogDescription>{tUi("record.a.freight.shipping.charge.for.this.contai")}</DialogDescription>
           </DialogHeader>
           <form
             noValidate
@@ -1643,16 +1647,16 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
             className="space-y-4"
           >
             <div>
-              <label className="text-sm font-medium">Vendor Name</label>
+              <label className="text-sm font-medium">{tUi("vendor.name")}</label>
               <Input
                 {...freightForm.register("vendorName")}
-                placeholder="Shipping company"
+                placeholder={tUi("shipping.company")}
                 data-testid="input-freight-vendor"
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-sm font-medium">Amount</label>
+                <label className="text-sm font-medium">{tUi("amount")}</label>
                 <Input
                   {...freightForm.register("freightAmount")}
                   type="number"
@@ -1662,7 +1666,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">Currency</label>
+                <label className="text-sm font-medium">{tUi("currency")}</label>
                 <Select
                   value={freightForm.watch("currency")}
                   onValueChange={(v) => freightForm.setValue("currency", v)}
@@ -1672,21 +1676,21 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="USD">USD</SelectItem>
-                    <SelectItem value="XOF">XOF (CFA)</SelectItem>
+                    <SelectItem value="XOF">{tUi("xof.cfa")}</SelectItem>
                     <SelectItem value="EUR">EUR</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium">Due Date (optional)</label>
+              <label className="text-sm font-medium">{tUi("due.date.optional")}</label>
               <Input {...freightForm.register("dueDate")} type="date" data-testid="input-freight-due" />
             </div>
             <div>
-              <label className="text-sm font-medium">Notes (optional)</label>
+              <label className="text-sm font-medium">{tUi("notes.optional")}</label>
               <Textarea
                 {...freightForm.register("notes")}
-                placeholder="Additional details"
+                placeholder={tUi("additional.details")}
                 data-testid="input-freight-notes"
               />
             </div>
@@ -1715,8 +1719,8 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       >
         <DialogContent data-testid="dialog-add-payment">
           <DialogHeader>
-            <DialogTitle>Record Payment</DialogTitle>
-            <DialogDescription>Record a payment toward this freight charge</DialogDescription>
+            <DialogTitle>{tUi("record.payment")}</DialogTitle>
+            <DialogDescription>{tUi("record.a.payment.toward.this.freight.charge")}</DialogDescription>
           </DialogHeader>
           <form
             noValidate
@@ -1727,11 +1731,11 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
           >
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-sm font-medium">Payment Date</label>
+                <label className="text-sm font-medium">{tUi("payment.date")}</label>
                 <Input {...paymentForm.register("paymentDate")} type="date" data-testid="input-payment-date" />
               </div>
               <div>
-                <label className="text-sm font-medium">Amount</label>
+                <label className="text-sm font-medium">{tUi("amount")}</label>
                 <Input
                   {...paymentForm.register("amount")}
                   type="number"
@@ -1743,24 +1747,24 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-sm font-medium">Method</label>
+                <label className="text-sm font-medium">{tUi("method")}</label>
                 <Select value={paymentForm.watch("method")} onValueChange={(v) => paymentForm.setValue("method", v)}>
                   <SelectTrigger data-testid="select-payment-method">
-                    <SelectValue placeholder="Select method" />
+                    <SelectValue placeholder={tUi("select.method")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Cash">Cash</SelectItem>
-                    <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                    <SelectItem value="Mobile Money">Mobile Money</SelectItem>
-                    <SelectItem value="Check">Check</SelectItem>
+                    <SelectItem value="Cash">{tUi("cash")}</SelectItem>
+                    <SelectItem value="Bank Transfer">{tUi("bank.transfer")}</SelectItem>
+                    <SelectItem value="Mobile Money">{tUi("mobile.money")}</SelectItem>
+                    <SelectItem value="Check">{tUi("check")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <label className="text-sm font-medium">Reference</label>
+                <label className="text-sm font-medium">{tUi("reference")}</label>
                 <Input
                   {...paymentForm.register("reference")}
-                  placeholder="Transaction ref"
+                  placeholder={tUi("transaction.ref")}
                   data-testid="input-payment-reference"
                 />
               </div>
@@ -1805,7 +1809,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       >
         <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Import Pricing from Excel</DialogTitle>
+            <DialogTitle>{tUi("import.pricing.from.excel")}</DialogTitle>
             <DialogDescription>
               Upload an Excel file with columns <strong>barcode</strong> and <strong>price</strong>. Review the preview,
               then save to apply.
@@ -1848,7 +1852,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
             </div>
 
             {(priceImportParsing || pricePreviewMutation.isPending) && (
-              <p className="text-sm text-muted-foreground text-center">Reading file and fetching preview…</p>
+              <p className="text-sm text-muted-foreground text-center">{tUi("reading.file.and.fetching.preview")}</p>
             )}
 
             {priceImportError && <p className="text-sm text-destructive">{priceImportError}</p>}
@@ -1859,11 +1863,11 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
-                      <TableHead>Code / Barcode</TableHead>
-                      <TableHead>Item Name</TableHead>
-                      <TableHead>Current Rate</TableHead>
-                      <TableHead>New Rate</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>{tUi("code.barcode")}</TableHead>
+                      <TableHead>{tUi("item.name")}</TableHead>
+                      <TableHead>{tUi("current.rate")}</TableHead>
+                      <TableHead>{tUi("new.rate")}</TableHead>
+                      <TableHead>{tUi("status")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1917,7 +1921,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
             )}
 
             {priceImportPreview && priceImportPreview.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center">No rows found in the file.</p>
+              <p className="text-sm text-muted-foreground text-center">{tUi("no.rows.found.in.the.file")}</p>
             )}
           </div>
 

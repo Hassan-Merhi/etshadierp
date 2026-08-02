@@ -3,14 +3,14 @@
  *
  * Extracted from TransporterStatement.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {useDateFormat} from "@/contexts/DateFormatContext";
-import {Button} from "@/components/ui/button";
-import {Pencil, Check, X} from "lucide-react";
-import {cn} from "@/lib/utils";
+import { useState } from "react";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import { Button } from "@/components/ui/button";
+import { Pencil, Check, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-import type {StatementRow} from "../types";
-import {today} from "../utils";
+import type { StatementRow } from "../types";
+import { today } from "../utils";
 
 export function DueDateCell({
   row,

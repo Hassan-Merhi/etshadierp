@@ -109,11 +109,7 @@ export default function SmartStockTransferOrderPage() {
             <Sparkles className="mr-2 h-4 w-4" />
             Smart Generate
           </Button>
-          <SmartTransferGeneratorDialog
-            open={generatorOpen}
-            onOpenChange={setGeneratorOpen}
-            onImport={importPreview}
-          />
+          <SmartTransferGeneratorDialog open={generatorOpen} onOpenChange={setGeneratorOpen} onImport={importPreview} />
         </>
       )}
     </>

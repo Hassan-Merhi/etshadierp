@@ -51,7 +51,9 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 import type { BatchDetail, InvoicePreview } from "./factorydispatchbatchdetail/types";
 import { BATCH_STATUS_CONFIG, fmt } from "./factorydispatchbatchdetail/utils";
 import { RideStatusBadge } from "./factorydispatchbatchdetail/components/RideStatusBadge";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactoryDispatchBatchDetail() {
+  const tUi = useFactoryText();
   const [, navigate] = useLocation();
   const [, params] = useRoute("/factory/dispatch-batches/:id");
   const batchId = params?.id ? parseInt(params.id) : null;
@@ -203,7 +205,7 @@ export default function FactoryDispatchBatchDetail() {
   if (me && !isDeveloper) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
-        <p className="text-sm">Dispatch Batches is only available in Developer mode.</p>
+        <p className="text-sm">{tUi("dispatch.batches.is.only.available.in.developer.")}</p>
       </div>
     );
   }
@@ -312,7 +314,7 @@ export default function FactoryDispatchBatchDetail() {
             <CardContent className="pt-4">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <Truck className="w-4 h-4" />
-                <span className="text-xs">Rides</span>
+                <span className="text-xs">{tUi("rides")}</span>
               </div>
               <p className="text-2xl font-bold" data-testid="text-total-rides">
                 {rides.length}
@@ -326,7 +328,7 @@ export default function FactoryDispatchBatchDetail() {
             <CardContent className="pt-4">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <Package className="w-4 h-4" />
-                <span className="text-xs">Bales</span>
+                <span className="text-xs">{tUi("bales")}</span>
               </div>
               <p className="text-2xl font-bold" data-testid="text-total-bales">
                 {fmt(totalBales, 0)}
@@ -337,7 +339,7 @@ export default function FactoryDispatchBatchDetail() {
             <CardContent className="pt-4">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <Scale className="w-4 h-4" />
-                <span className="text-xs">Weight (kg)</span>
+                <span className="text-xs">{tUi("weight.kg")}</span>
               </div>
               <p className="text-2xl font-bold" data-testid="text-total-weight">
                 {fmt(totalWeight)}
@@ -348,7 +350,7 @@ export default function FactoryDispatchBatchDetail() {
             <CardContent className="pt-4">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
                 <DollarSign className="w-4 h-4" />
-                <span className="text-xs">Total Value</span>
+                <span className="text-xs">{tUi("total.value")}</span>
               </div>
               <p className="text-2xl font-bold" data-testid="text-total-value">
                 {batch.currency} {fmt(totalValue)}
@@ -361,40 +363,40 @@ export default function FactoryDispatchBatchDetail() {
           <div className="md:col-span-1 space-y-3">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Batch Info</CardTitle>
+                <CardTitle className="text-sm">{tUi("batch.info")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Customer</span>
+                  <span className="text-muted-foreground">{tUi("customer")}</span>
                   <span className="font-medium">{customerName || "—"}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Proforma</span>
+                  <span className="text-muted-foreground">{tUi("proforma")}</span>
                   <span>{proforma?.name || "None"}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Currency</span>
+                  <span className="text-muted-foreground">{tUi("currency")}</span>
                   <span>{batch.currency}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Price Mode</span>
+                  <span className="text-muted-foreground">{tUi("price.mode")}</span>
                   <span>{batch.priceMode === "PER_KG" ? "Per Kg" : "Per Bale"}</span>
                 </div>
                 {batch.destination && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Destination</span>
+                    <span className="text-muted-foreground">{tUi("destination")}</span>
                     <span>{batch.destination}</span>
                   </div>
                 )}
                 {batch.notes && (
                   <div>
-                    <span className="text-muted-foreground text-xs">Notes</span>
+                    <span className="text-muted-foreground text-xs">{tUi("notes")}</span>
                     <p className="text-sm mt-0.5">{batch.notes}</p>
                   </div>
                 )}
                 {finalInvoice && (
                   <div className="flex justify-between pt-1 border-t">
-                    <span className="text-muted-foreground">Invoice</span>
+                    <span className="text-muted-foreground">{tUi("invoice")}</span>
                     <span className="font-mono font-medium text-green-700 dark:text-green-400">
                       {finalInvoice.invoiceNumber}
                     </span>
@@ -415,10 +417,10 @@ export default function FactoryDispatchBatchDetail() {
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="border-b">
-                          <th className="text-left px-3 py-2 font-medium text-muted-foreground">Article</th>
-                          <th className="text-right px-3 py-2 font-medium text-muted-foreground">Target</th>
-                          <th className="text-right px-3 py-2 font-medium text-muted-foreground">Scanned</th>
-                          <th className="text-right px-3 py-2 font-medium text-muted-foreground">Rem.</th>
+                          <th className="text-left px-3 py-2 font-medium text-muted-foreground">{tUi("article")}</th>
+                          <th className="text-right px-3 py-2 font-medium text-muted-foreground">{tUi("target")}</th>
+                          <th className="text-right px-3 py-2 font-medium text-muted-foreground">{tUi("scanned.2")}</th>
+                          <th className="text-right px-3 py-2 font-medium text-muted-foreground">{tUi("rem")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -470,7 +472,7 @@ export default function FactoryDispatchBatchDetail() {
                 {rides.length === 0 ? (
                   <div className="flex flex-col items-center gap-2 py-10 text-muted-foreground">
                     <Truck className="w-8 h-8 opacity-40" />
-                    <p className="text-sm">No truck rides yet</p>
+                    <p className="text-sm">{tUi("no.truck.rides.yet")}</p>
                     {!isReadOnly && (
                       <Button size="sm" variant="outline" onClick={() => setAddRideOpen(true)}>
                         <Plus className="w-4 h-4 mr-1" /> Add first ride
@@ -482,12 +484,12 @@ export default function FactoryDispatchBatchDetail() {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-12">#</TableHead>
-                        <TableHead>Truck</TableHead>
-                        <TableHead>Driver</TableHead>
-                        <TableHead className="text-right">Bales</TableHead>
-                        <TableHead className="text-right">Weight</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead>{tUi("truck")}</TableHead>
+                        <TableHead>{tUi("driver")}</TableHead>
+                        <TableHead className="text-right">{tUi("bales")}</TableHead>
+                        <TableHead className="text-right">{tUi("weight")}</TableHead>
+                        <TableHead className="text-right">{tUi("amount")}</TableHead>
+                        <TableHead>{tUi("status")}</TableHead>
                         <TableHead />
                       </TableRow>
                     </TableHeader>
@@ -580,18 +582,18 @@ export default function FactoryDispatchBatchDetail() {
             {showBales && (
               <div className="mt-3 border-t pt-3">
                 {auditScans.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">No active bale scans found.</p>
+                  <p className="text-sm text-muted-foreground py-4 text-center">{tUi("no.active.bale.scans.found")}</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="text-xs">Ride #</TableHead>
-                          <TableHead className="text-xs">Reference</TableHead>
-                          <TableHead className="text-xs">Article</TableHead>
-                          <TableHead className="text-xs">Product</TableHead>
-                          <TableHead className="text-xs text-right">Weight (kg)</TableHead>
-                          <TableHead className="text-xs text-right">Amount</TableHead>
+                          <TableHead className="text-xs">{tUi("ride")}</TableHead>
+                          <TableHead className="text-xs">{tUi("reference")}</TableHead>
+                          <TableHead className="text-xs">{tUi("article")}</TableHead>
+                          <TableHead className="text-xs">{tUi("product")}</TableHead>
+                          <TableHead className="text-xs text-right">{tUi("weight.kg")}</TableHead>
+                          <TableHead className="text-xs text-right">{tUi("amount")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -620,11 +622,11 @@ export default function FactoryDispatchBatchDetail() {
       <Dialog open={addRideOpen} onOpenChange={setAddRideOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Truck Ride</DialogTitle>
+            <DialogTitle>{tUi("add.truck.ride")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label>Truck Plate</Label>
+              <Label>{tUi("truck.plate")}</Label>
               <Input
                 placeholder="e.g. LEB-1234"
                 value={rideForm.truckPlate}
@@ -633,25 +635,25 @@ export default function FactoryDispatchBatchDetail() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Driver Name</Label>
+              <Label>{tUi("driver.name")}</Label>
               <Input
-                placeholder="Driver name"
+                placeholder={tUi("driver.name.2")}
                 value={rideForm.driverName}
                 onChange={(e) => setRideForm((f) => ({ ...f, driverName: e.target.value }))}
                 data-testid="input-driver-name"
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Destination</Label>
+              <Label>{tUi("destination")}</Label>
               <Input
-                placeholder="Destination"
+                placeholder={tUi("destination")}
                 value={rideForm.destination}
                 onChange={(e) => setRideForm((f) => ({ ...f, destination: e.target.value }))}
                 data-testid="input-ride-destination"
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Notes</Label>
+              <Label>{tUi("notes")}</Label>
               <Textarea
                 rows={2}
                 value={rideForm.notes}
@@ -679,7 +681,7 @@ export default function FactoryDispatchBatchDetail() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Invoice Preview — {batch.batchNumber}</DialogTitle>
-            <DialogDescription>Review all dispatched bales before generating the final invoice.</DialogDescription>
+            <DialogDescription>{tUi("review.all.dispatched.bales.before.generating.th")}</DialogDescription>
           </DialogHeader>
 
           {previewLoading ? (
@@ -705,16 +707,16 @@ export default function FactoryDispatchBatchDetail() {
 
               {preview.proformaProgress.length > 0 && (
                 <div>
-                  <p className="text-sm font-medium mb-2">Proforma Progress</p>
+                  <p className="text-sm font-medium mb-2">{tUi("proforma.progress")}</p>
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Article</TableHead>
-                        <TableHead>Product</TableHead>
-                        <TableHead className="text-right">Target</TableHead>
-                        <TableHead className="text-right">Scanned</TableHead>
-                        <TableHead className="text-right">Remaining</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead>{tUi("article")}</TableHead>
+                        <TableHead>{tUi("product")}</TableHead>
+                        <TableHead className="text-right">{tUi("target")}</TableHead>
+                        <TableHead className="text-right">{tUi("scanned.2")}</TableHead>
+                        <TableHead className="text-right">{tUi("remaining")}</TableHead>
+                        <TableHead className="text-right">{tUi("amount")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -744,15 +746,15 @@ export default function FactoryDispatchBatchDetail() {
               )}
 
               <div>
-                <p className="text-sm font-medium mb-2">Article Breakdown</p>
+                <p className="text-sm font-medium mb-2">{tUi("article.breakdown")}</p>
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Article</TableHead>
-                      <TableHead>Product</TableHead>
-                      <TableHead className="text-right">Bales</TableHead>
-                      <TableHead className="text-right">Weight (kg)</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>{tUi("article")}</TableHead>
+                      <TableHead>{tUi("product")}</TableHead>
+                      <TableHead className="text-right">{tUi("bales")}</TableHead>
+                      <TableHead className="text-right">{tUi("weight.kg")}</TableHead>
+                      <TableHead className="text-right">{tUi("amount")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -780,7 +782,7 @@ export default function FactoryDispatchBatchDetail() {
 
               {preview.canGenerate && (
                 <div className="space-y-2">
-                  <Label>Invoice Date</Label>
+                  <Label>{tUi("invoice.date")}</Label>
                   <Input
                     type="date"
                     value={invoiceDate}
@@ -812,7 +814,7 @@ export default function FactoryDispatchBatchDetail() {
       <AlertDialog open={generateOpen} onOpenChange={setGenerateOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Generate Final Invoice?</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("generate.final.invoice")}</AlertDialogTitle>
             <AlertDialogDescription>
               This will create an invoice for <strong>{preview?.totals?.totalBales || 0} bales</strong> totalling{" "}
               <strong>
@@ -822,7 +824,7 @@ export default function FactoryDispatchBatchDetail() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => generateMutation.mutate()}
               disabled={generateMutation.isPending}
@@ -837,13 +839,13 @@ export default function FactoryDispatchBatchDetail() {
       <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancel Dispatch Batch?</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("cancel.dispatch.batch")}</AlertDialogTitle>
             <AlertDialogDescription>
               All scanned bales will be returned to IN_STOCK. All truck rides will be cancelled. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep Batch</AlertDialogCancel>
+            <AlertDialogCancel>{tUi("keep.batch")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => cancelMutation.mutate()}
               disabled={cancelMutation.isPending}
@@ -867,8 +869,8 @@ export default function FactoryDispatchBatchDetail() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reopen Truck Ride</DialogTitle>
-            <DialogDescription>Admin action. Provide a reason to reopen this dispatched ride.</DialogDescription>
+            <DialogTitle>{tUi("reopen.truck.ride")}</DialogTitle>
+            <DialogDescription>{tUi("admin.action.provide.a.reason.to.reopen.this.dis")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <Label>
@@ -876,7 +878,7 @@ export default function FactoryDispatchBatchDetail() {
             </Label>
             <Textarea
               rows={3}
-              placeholder="Reason for reopening..."
+              placeholder={tUi("reason.for.reopening")}
               value={reopenReason}
               onChange={(e) => setReopenReason(e.target.value)}
               data-testid="textarea-reopen-reason"

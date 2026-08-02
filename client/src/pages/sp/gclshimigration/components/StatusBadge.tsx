@@ -3,7 +3,7 @@
  *
  * Extracted from GcLshiMigration.tsx during the Phase 4 god-file split.
  */
-import {Badge} from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 
 export function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {

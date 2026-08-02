@@ -2,6 +2,7 @@ import { ArrowUpDown, ArrowRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { InventoryLocation as Location } from "./locationInventoryTypes";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface LocationInventoryMovementFilterProps {
   selectedLocationLocal: Location | null;
@@ -20,15 +21,18 @@ export function LocationInventoryMovementFilter({
   asOfDate,
   setAsOfDate,
 }: LocationInventoryMovementFilterProps) {
+  const tUi = useErpText();
   if (!selectedLocationLocal || viewAllItems) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-3 px-6 py-2.5 border-b bg-muted/10 shrink-0">
       <div className="flex items-center gap-1.5 shrink-0">
         <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">MOVEMENT</span>
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          {tUi("movement.2")}
+        </span>
       </div>
-      <span className="text-xs text-muted-foreground">From</span>
+      <span className="text-xs text-muted-foreground">{tUi("from")}</span>
       <div className="relative">
         <Input
           type="date"

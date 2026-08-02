@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { formatNumber } from "@/lib/formatNumber";
 import { BaleLogoPickerPopover } from "./BaleLogoPickerPopover";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface CartItem {
   productId: number;
@@ -46,6 +47,7 @@ export function StockEntryCart({
   onLogoPickerOpenChange: (productId: number | null) => void;
   filteredWorkers: any[];
 }) {
+  const tUi = useFactoryText();
   // Navigate between qty/weight cells with arrow keys
   const handleCellKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>, productId: number, col: "qty" | "weight") => {
@@ -88,10 +90,10 @@ export function StockEntryCart({
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/30">
-            <TableHead className="w-[40%]">Product</TableHead>
-            <TableHead className="w-[15%] text-center">Bale Qty</TableHead>
-            <TableHead className="w-[15%] text-right">Kg / Bale</TableHead>
-            <TableHead className="w-[20%]">Finalized By</TableHead>
+            <TableHead className="w-[40%]">{tUi("product")}</TableHead>
+            <TableHead className="w-[15%] text-center">{tUi("bale.qty")}</TableHead>
+            <TableHead className="w-[15%] text-right">{tUi("kg.bale")}</TableHead>
+            <TableHead className="w-[20%]">{tUi("finalized.by")}</TableHead>
             <TableHead className="w-[10%] text-right"></TableHead>
           </TableRow>
         </TableHeader>
@@ -175,10 +177,10 @@ export function StockEntryCart({
                     onValueChange={(val) => onAssignWorker(item.productId, val === "none" ? null : parseInt(val))}
                   >
                     <SelectTrigger className="h-7 text-xs py-0" data-testid={`select-worker-${item.productId}`}>
-                      <SelectValue placeholder="Select worker..." />
+                      <SelectValue placeholder={tUi("select.worker.2")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Unassigned</SelectItem>
+                      <SelectItem value="none">{tUi("unassigned")}</SelectItem>
                       {filteredWorkers.map((w: any) => (
                         <SelectItem key={w.id} value={String(w.id)}>
                           {w.fullName || w.name}

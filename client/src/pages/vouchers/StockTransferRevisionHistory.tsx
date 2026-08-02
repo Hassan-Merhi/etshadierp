@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { EmptyState } from "@/components/ui/empty-state";
 import { History, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface StockTransferRevisionHistoryProps {
   voucherIdToEdit: number | null;
@@ -35,6 +36,7 @@ export function StockTransferRevisionHistory({
   lastKnownTransferIdRef,
   formatNumber,
 }: StockTransferRevisionHistoryProps) {
+  const tUi = useErpText();
   if (!voucherIdToEdit || !stableTransferId) return null;
 
   return (
@@ -46,7 +48,7 @@ export function StockTransferRevisionHistory({
       >
         <div className="flex items-center gap-2">
           <GitBranch className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-semibold">Revision History</span>
+          <span className="text-sm font-semibold">{tUi("revision.history")}</span>
           {transferRevisions.length > 0 && (
             <Badge variant="secondary" className="ml-1 text-xs no-default-active-elevate">
               {transferRevisions.length}
@@ -64,7 +66,7 @@ export function StockTransferRevisionHistory({
           {transferRevisions.length === 0 ? (
             <EmptyState
               icon={History}
-              title="No revisions yet"
+              title={tUi("no.revisions.yet")}
               description='Use "Save as Revision" to record tracked changes to this transfer.'
             />
           ) : (
@@ -72,7 +74,7 @@ export function StockTransferRevisionHistory({
               <div key={rev.id} className="border rounded-md overflow-hidden">
                 {rev.optional && (
                   <div className="flex items-center justify-between gap-3 px-3 py-2 status-warning border-b">
-                    <span className="text-xs font-medium">Pending POS adjustment — awaiting admin approval</span>
+                    <span className="text-xs font-medium">{tUi("pending.pos.adjustment.awaiting.admin.approval")}</span>
                     <Button
                       size="sm"
                       variant="default"
@@ -97,7 +99,7 @@ export function StockTransferRevisionHistory({
                     {rev.note && <span className="text-xs italic text-muted-foreground">"{rev.note}"</span>}
                   </div>
                   <div className="flex items-center gap-2 text-xs">
-                    <span className="text-muted-foreground">Reference only:</span>
+                    <span className="text-muted-foreground">{tUi("reference.only")}</span>
                     <Switch
                       checked={rev.optional}
                       onCheckedChange={async (checked) => {
@@ -121,10 +123,10 @@ export function StockTransferRevisionHistory({
                     <table className="w-full text-sm">
                       <thead className="bg-muted/30">
                         <tr>
-                          <th className="text-left p-2 font-medium">Item</th>
-                          <th className="text-left p-2 font-medium hidden sm:table-cell">From</th>
+                          <th className="text-left p-2 font-medium">{tUi("item")}</th>
+                          <th className="text-left p-2 font-medium hidden sm:table-cell">{tUi("from")}</th>
                           <th className="text-right p-2 font-medium">Was</th>
-                          <th className="text-right p-2 font-medium">Change</th>
+                          <th className="text-right p-2 font-medium">{tUi("change")}</th>
                           <th className="text-right p-2 font-medium">Now</th>
                         </tr>
                       </thead>

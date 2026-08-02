@@ -3,12 +3,13 @@
  *
  * Extracted from PosTransferOrders.tsx during the Phase 4 god-file split.
  */
-import {useRef, useEffect} from "react";
-import {X} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {cn} from "@/lib/utils";
+import { useRef, useEffect } from "react";
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
-import {fmtQty} from "../utils";
+import { fmtQty } from "../utils";
+import { usePosText } from "@/i18n/modules/pos";
 
 export // ─── Right-side item search panel (results only — input lives in the bar) ──────
 function ItemSearchPanel({
@@ -26,6 +27,7 @@ function ItemSearchPanel({
   onPick: (item: { stockItemId: number; name: string }) => void;
   onClose: () => void;
 }) {
+  const tUi = usePosText();
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,7 +42,7 @@ function ItemSearchPanel({
       {/* Panel header */}
       <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-b bg-muted/30">
         <div className="min-w-0">
-          <div className="font-semibold text-sm leading-tight">Add Items</div>
+          <div className="font-semibold text-sm leading-tight">{tUi("add.items")}</div>
           <div className="text-xs text-muted-foreground truncate">{locationName}</div>
         </div>
         <Button
@@ -57,7 +59,7 @@ function ItemSearchPanel({
       {/* Items list */}
       <div ref={listRef} className="flex-1 overflow-y-auto">
         {matches.length === 0 ? (
-          <div className="text-center py-10 text-xs text-muted-foreground">No items found</div>
+          <div className="text-center py-10 text-xs text-muted-foreground">{tUi("no.items.found.2")}</div>
         ) : (
           matches.map((item, i) => {
             const qty = parseFloat(item.quantity) || 0;

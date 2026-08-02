@@ -17,6 +17,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function RecordAdvanceDialog({
   addOpen,
@@ -35,19 +36,20 @@ export function RecordAdvanceDialog({
   setForm: any;
   workers: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog open={addOpen} onOpenChange={setAddOpen}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Record Advance</DialogTitle>
-          <DialogDescription>Give a cash advance to a factory worker</DialogDescription>
+          <DialogTitle>{tUi("record.advance")}</DialogTitle>
+          <DialogDescription>{tUi("give.a.cash.advance.to.a.factory.worker")}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>Worker</Label>
+            <Label>{tUi("worker")}</Label>
             <Select value={form.workerId} onValueChange={(v) => setForm({ ...form, workerId: v })}>
               <SelectTrigger data-testid="select-advance-worker">
-                <SelectValue placeholder="Select worker" />
+                <SelectValue placeholder={tUi("select.worker")} />
               </SelectTrigger>
               <SelectContent>
                 {(workers || []).map((w: any) => (
@@ -60,7 +62,7 @@ export function RecordAdvanceDialog({
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Date</Label>
+              <Label>{tUi("date")}</Label>
               <Input
                 type="date"
                 value={form.advanceDate}
@@ -69,7 +71,7 @@ export function RecordAdvanceDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label>Amount ($)</Label>
+              <Label>{tUi("amount.4")}</Label>
               <Input
                 type="number"
                 min="0"
@@ -82,10 +84,10 @@ export function RecordAdvanceDialog({
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Cash Account</Label>
+            <Label>{tUi("cash.account.2")}</Label>
             <Select value={form.cashAccountId} onValueChange={(v) => setForm({ ...form, cashAccountId: v })}>
               <SelectTrigger data-testid="select-advance-cash-account">
-                <SelectValue placeholder="Select cash account (optional)" />
+                <SelectValue placeholder={tUi("select.cash.account.optional")} />
               </SelectTrigger>
               <SelectContent>
                 {(cashAccounts || []).map((a: any) => (
@@ -97,21 +99,21 @@ export function RecordAdvanceDialog({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Repayment Type</Label>
+            <Label>{tUi("repayment.type")}</Label>
             <Select value={form.repaymentType} onValueChange={(v) => setForm({ ...form, repaymentType: v })}>
               <SelectTrigger data-testid="select-advance-repayment-type">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="salary_deduction">Deduct from Salary</SelectItem>
-                <SelectItem value="manual_repayment">Manual Repayment (Loan)</SelectItem>
+                <SelectItem value="salary_deduction">{tUi("deduct.from.salary")}</SelectItem>
+                <SelectItem value="manual_repayment">{tUi("manual.repayment.loan")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Notes</Label>
+            <Label>{tUi("notes")}</Label>
             <Textarea
-              placeholder="Optional notes"
+              placeholder={tUi("optional.notes")}
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
               className="resize-none"

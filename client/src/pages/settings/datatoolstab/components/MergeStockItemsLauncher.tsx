@@ -3,17 +3,19 @@
  *
  * Extracted from DataToolsTab.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {Card, CardHeader, CardTitle, CardContent, CardDescription} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "@/components/ui/dialog";
-import {Tabs, TabsList, TabsTrigger, TabsContent} from "@/components/ui/tabs";
-import {ArrowLeftRight} from "lucide-react";
-import {MergeStockItemsCard} from "./MergeStockItemsCard";
-import {BulkMergeStockItemsCard} from "./BulkMergeStockItemsCard";
-import {MergeHistoryCard} from "./MergeHistoryCard";
+import { useState } from "react";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ArrowLeftRight } from "lucide-react";
+import { MergeStockItemsCard } from "./MergeStockItemsCard";
+import { BulkMergeStockItemsCard } from "./BulkMergeStockItemsCard";
+import { MergeHistoryCard } from "./MergeHistoryCard";
+import { useErpText } from "@/i18n/modules/erp";
 
 export function MergeStockItemsLauncher() {
+  const tUi = useErpText();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("single");
 
@@ -48,7 +50,7 @@ export function MergeStockItemsLauncher() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Merge Duplicate Stock Items</DialogTitle>
+            <DialogTitle>{tUi("merge.duplicate.stock.items")}</DialogTitle>
             <DialogDescription>
               Choose a merge method below. Quantities and values are preserved exactly to the cent.
             </DialogDescription>

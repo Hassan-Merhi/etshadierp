@@ -19,6 +19,7 @@ import { Plus, Check, ChevronsUpDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/formatNumber";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface OpeningBalanceDialogProps {
   open: boolean;
@@ -35,6 +36,7 @@ export function OpeningBalanceDialog({
   openingBalanceMutation,
   wrapAdminAction,
 }: OpeningBalanceDialogProps) {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [obSupplierName, setObSupplierName] = useState("");
   const [obSupplierId, setObSupplierId] = useState<number | null>(null);
@@ -95,14 +97,14 @@ export function OpeningBalanceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Opening Balance Stock</DialogTitle>
+          <DialogTitle>{tUi("add.opening.balance.stock")}</DialogTitle>
           <DialogDescription>
             Register raw material that is already in stock but was not offloaded from a container in this system.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <Label>Supplier / Broker</Label>
+            <Label>{tUi("supplier.broker")}</Label>
             <Popover open={obSupplierOpen} onOpenChange={setObSupplierOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -119,12 +121,12 @@ export function OpeningBalanceDialog({
               <PopoverContent className="w-full p-0">
                 <Command>
                   <CommandInput
-                    placeholder="Search supplier..."
+                    placeholder={tUi("search.supplier")}
                     value={obSupplierSearch}
                     onValueChange={setObSupplierSearch}
                   />
                   <CommandList>
-                    <CommandEmpty>No supplier found.</CommandEmpty>
+                    <CommandEmpty>{tUi("no.supplier.found")}</CommandEmpty>
                     <CommandGroup heading="Existing Suppliers">
                       {(factorySuppliers ?? []).map((s) => (
                         <CommandItem
@@ -168,13 +170,13 @@ export function OpeningBalanceDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Operation Date</Label>
+            <Label>{tUi("operation.date")}</Label>
             <Input type="date" value={obTxDate} onChange={(e) => setObTxDate(e.target.value)} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Weight (KG)</Label>
+              <Label>{tUi("weight.kg.2")}</Label>
               <Input
                 type="number"
                 step="0.001"
@@ -184,7 +186,7 @@ export function OpeningBalanceDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label>Cost per KG</Label>
+              <Label>{tUi("cost.per.kg")}</Label>
               <Input
                 type="number"
                 step="0.0001"
@@ -197,7 +199,7 @@ export function OpeningBalanceDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Currency</Label>
+              <Label>{tUi("currency")}</Label>
               <Select
                 value={obCurrency}
                 onValueChange={(v) => {
@@ -218,7 +220,7 @@ export function OpeningBalanceDialog({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>FX Rate to USD</Label>
+              <Label>{tUi("fx.rate.to.usd")}</Label>
               <Input
                 type="number"
                 step="0.0001"
@@ -231,10 +233,10 @@ export function OpeningBalanceDialog({
 
           <Separator />
           <div>
-            <Label className="text-sm font-semibold">Commission (optional)</Label>
+            <Label className="text-sm font-semibold">{tUi("commission.optional")}</Label>
             <div className="grid grid-cols-2 gap-4 mt-2">
               <div className="space-y-1">
-                <Label className="text-xs">Amount</Label>
+                <Label className="text-xs">{tUi("amount")}</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -244,7 +246,7 @@ export function OpeningBalanceDialog({
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Currency</Label>
+                <Label className="text-xs">{tUi("currency")}</Label>
                 <Select
                   value={obCommissionCurrency}
                   onValueChange={(v) => {
@@ -268,22 +270,22 @@ export function OpeningBalanceDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Notes (optional)</Label>
+            <Label>{tUi("notes.optional")}</Label>
             <Input value={obNotes} onChange={(e) => setObNotes(e.target.value)} placeholder="e.g. Opening stock..." />
           </div>
 
           {obKg > 0 && obRate >= 0 && (
             <div className="rounded-md border p-3 space-y-1.5 text-sm bg-muted/30">
-              <p className="font-semibold">Summary</p>
+              <p className="font-semibold">{tUi("summary")}</p>
               <div className="flex justify-between">
-                <span>Total Value</span>
+                <span>{tUi("total.value")}</span>
                 <span className="font-mono">
                   {obCurrency !== "USD" ? `${obCurrency} ${formatNumber(obTotal)}` : `$${formatNumber(obTotal)}`}
                 </span>
               </div>
               {obCurrency !== "USD" && (
                 <div className="flex justify-between text-muted-foreground">
-                  <span>In USD</span>
+                  <span>{tUi("in.usd")}</span>
                   <span className="font-mono">${formatNumber(obTotalUsd)}</span>
                 </div>
               )}

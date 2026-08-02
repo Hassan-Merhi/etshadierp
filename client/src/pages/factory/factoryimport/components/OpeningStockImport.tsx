@@ -3,21 +3,23 @@
  *
  * Extracted from FactoryImport.tsx during the Phase 4 god-file split.
  */
-import {useState, useCallback} from "react";
-import {useMutation} from "@tanstack/react-query";
-import {AlertCircle, CheckCircle2, X, Loader2} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {useToast} from "@/hooks/use-toast";
-import {factoryApiRequest} from "@/lib/factoryApi";
+import { useState, useCallback } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { AlertCircle, CheckCircle2, X, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import Papa from "papaparse";
 
-import type {OpeningStockRow} from "../types";
-import {ImportModeChooser} from "./ImportModeChooser";
+import type { OpeningStockRow } from "../types";
+import { ImportModeChooser } from "./ImportModeChooser";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function OpeningStockImport() {
+  const tUi = useFactoryText();
   const [mode, setMode] = useState<"choose" | "csv">("choose");
   const [csvData, setCsvData] = useState<OpeningStockRow[]>([]);
   const [result, setResult] = useState<{ imported: number; errors: string[]; recalcStats?: any } | null>(null);
@@ -97,7 +99,7 @@ export function OpeningStockImport() {
               </div>
             )}
             <div className="text-center">
-              <h3 className="text-lg font-semibold">Import Complete</h3>
+              <h3 className="text-lg font-semibold">{tUi("import.complete")}</h3>
               <div className="flex items-center gap-3 mt-2 justify-center flex-wrap">
                 {result.imported > 0 && <Badge variant="secondary">{result.imported} records created</Badge>}
                 {result.errors.length > 0 && <Badge variant="destructive">{result.errors.length} errors</Badge>}
@@ -108,7 +110,7 @@ export function OpeningStockImport() {
             </div>
             {result.errors.length > 0 && (
               <div className="w-full max-w-lg border rounded-md p-3 bg-destructive/5 max-h-48 overflow-auto">
-                <p className="text-sm font-medium text-destructive mb-2">Errors:</p>
+                <p className="text-sm font-medium text-destructive mb-2">{tUi("errors")}</p>
                 <ul className="text-sm space-y-1">
                   {result.errors.map((err, i) => (
                     <li key={i} className="text-muted-foreground flex items-start gap-2">
@@ -138,7 +140,7 @@ export function OpeningStockImport() {
   if (mode === "choose") {
     return (
       <ImportModeChooser
-        title="Import Opening Raw Stock"
+        title={tUi("import.opening.raw.stock")}
         description="Import opening stock by supplier with per-supplier currency and rate. Existing bale consumption will be auto-deducted via FIFO allocation."
         templateType="opening-raw-stock"
         onFileUpload={handleFileUpload}
@@ -179,13 +181,13 @@ export function OpeningStockImport() {
           <Table>
             <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
-                <TableHead>Supplier</TableHead>
+                <TableHead>{tUi("supplier")}</TableHead>
                 <TableHead>KG</TableHead>
-                <TableHead>Cost/kg</TableHead>
-                <TableHead>Currency</TableHead>
-                <TableHead>FX Rate</TableHead>
-                <TableHead>Opening Date</TableHead>
-                <TableHead>Notes</TableHead>
+                <TableHead>{tUi("cost.kg.3")}</TableHead>
+                <TableHead>{tUi("currency")}</TableHead>
+                <TableHead>{tUi("fx.rate")}</TableHead>
+                <TableHead>{tUi("opening.date")}</TableHead>
+                <TableHead>{tUi("notes")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

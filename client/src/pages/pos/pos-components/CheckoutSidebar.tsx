@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Textarea } from "@/components/ui/textarea";
 import { User, ChevronDown, Check, Save } from "lucide-react";
+import { usePosText } from "@/i18n/modules/pos";
 
 export interface CheckoutSidebarProps {
   posUser?: any;
@@ -74,13 +75,16 @@ export function CheckoutSidebar({
   formatDisplayAmount,
   cn,
 }: CheckoutSidebarProps) {
+  const tUi = usePosText();
   const lockedCashAccount =
     posUser && paymentAccountId ? cashLedgerAccounts.find((a) => String(a.id) === paymentAccountId) : null;
   return (
     <div className="w-full lg:w-80 flex flex-col gap-4">
       <div className="bg-muted/10 p-4 rounded-lg border border-muted/50 space-y-4">
         <div className="flex flex-col items-end border-b border-muted pb-4 mb-2">
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Grand Total</span>
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+            {tUi("grand.total")}
+          </span>
           <span className="text-3xl font-black font-mono tracking-tighter text-primary" data-testid="text-grand-total">
             {formatDisplayAmount(total)}
           </span>
@@ -88,13 +92,15 @@ export function CheckoutSidebar({
 
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Items</span>
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">{tUi("items")}</span>
             <span className="text-lg font-bold font-mono" data-testid="text-item-count">
               {rows.filter((r) => r.amount > 0).length}
             </span>
           </div>
           <div className="flex flex-col">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Total Qty</span>
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+              {tUi("total.qty")}
+            </span>
             <span className="text-lg font-bold font-mono" data-testid="text-total-qty">
               {totalQty.toFixed(2)}
             </span>
@@ -111,7 +117,9 @@ export function CheckoutSidebar({
           if (!anyConfig) return null;
           return (
             <div className="flex flex-col pt-2 border-t border-muted/50">
-              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Total P/L</span>
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                {tUi("total.p.l")}
+              </span>
               <span
                 className={cn(
                   "text-lg font-bold font-mono",
@@ -128,7 +136,7 @@ export function CheckoutSidebar({
 
       <div className="flex flex-col gap-4 p-1">
         <div className="flex flex-col gap-2">
-          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Date</Label>
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{tUi("date")}</Label>
           {posUser ? (
             <div
               className="h-9 flex items-center px-3 rounded-md border border-muted bg-muted/30 text-sm font-mono text-muted-foreground"
@@ -148,7 +156,9 @@ export function CheckoutSidebar({
         </div>
 
         <div className="flex flex-col gap-2">
-          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Payment Account</Label>
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            {tUi("payment.account")}
+          </Label>
           {posUser ? (
             <div className="flex items-center gap-2">
               <div
@@ -172,11 +182,11 @@ export function CheckoutSidebar({
                   onValueChange={(value: "bank" | "cash") => setPaymentAccountType(value)}
                 >
                   <SelectTrigger className="w-24 h-9" data-testid="select-account-type">
-                    <SelectValue placeholder="Type" />
+                    <SelectValue placeholder={tUi("type")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="bank">Bank</SelectItem>
-                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="bank">{tUi("bank")}</SelectItem>
+                    <SelectItem value="cash">{tUi("cash")}</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={paymentAccountId || ""} onValueChange={setPaymentAccountId}>
@@ -237,9 +247,9 @@ export function CheckoutSidebar({
                 </PopoverTrigger>
                 <PopoverContent className="w-64 p-0" align="start">
                   <Command>
-                    <CommandInput placeholder="Search customer…" data-testid="input-customer-search" />
+                    <CommandInput placeholder={tUi("search.customer")} data-testid="input-customer-search" />
                     <CommandList>
-                      <CommandEmpty>No customer found.</CommandEmpty>
+                      <CommandEmpty>{tUi("no.customer.found")}</CommandEmpty>
                       <CommandGroup>
                         {customerAccounts.map((acc: any) => (
                           <CommandItem
@@ -284,9 +294,9 @@ export function CheckoutSidebar({
         </div>
 
         <div className="flex flex-col gap-2">
-          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Notes</Label>
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{tUi("notes")}</Label>
           <Textarea
-            placeholder="Sale notes..."
+            placeholder={tUi("sale.notes")}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             className="resize-none h-20 min-h-[80px]"

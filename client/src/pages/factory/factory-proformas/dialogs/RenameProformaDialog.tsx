@@ -7,6 +7,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function RenameProformaDialog({
   renameProformaMutation,
@@ -21,6 +22,7 @@ export function RenameProformaDialog({
   setRenameValue: any;
   setRenamingProforma: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog
       open={!!renamingProforma}
@@ -33,11 +35,11 @@ export function RenameProformaDialog({
     >
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Rename Proforma</DialogTitle>
+          <DialogTitle>{tUi("rename.proforma")}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div>
-            <label className="text-sm font-medium mb-1 block">New Name</label>
+            <label className="text-sm font-medium mb-1 block">{tUi("new.name")}</label>
             <Input
               value={renameValue}
               onChange={(e) => setRenameValue(e.target.value)}

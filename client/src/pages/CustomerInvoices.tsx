@@ -15,6 +15,7 @@ import { Eye, Trash2 } from "lucide-react";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import { PageHeader } from "@/components/PageHeader";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface Customer {
   id: number;
@@ -40,6 +41,7 @@ interface CustomerOrder {
 }
 
 export default function CustomerInvoices() {
+  const tUi = useErpText();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const { formatDisplayDate } = useDateFormat();
@@ -141,37 +143,37 @@ export default function CustomerInvoices() {
     <div className="flex flex-col h-full p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div>
-          <PageHeader title="Customer Invoices" subtitle="View and manage customer orders and invoices" />
+          <PageHeader title={tUi("customer.invoices")} subtitle={tUi("view.and.manage.customer.orders.and.invoices")} />
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-4 mb-6">
         <div className="w-48">
-          <label className="text-sm font-medium mb-1 block">Status</label>
+          <label className="text-sm font-medium mb-1 block">{tUi("status")}</label>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger data-testid="select-status-filter">
-              <SelectValue placeholder="All statuses" />
+              <SelectValue placeholder={tUi("all.statuses")} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All</SelectItem>
-              <SelectItem value="DRAFT">Draft</SelectItem>
-              <SelectItem value="LOADING">Loading</SelectItem>
-              <SelectItem value="PENDING_VERIFICATION">Pending Verification</SelectItem>
-              <SelectItem value="VERIFIED">Verified</SelectItem>
-              <SelectItem value="FINALIZED">Finalized</SelectItem>
-              <SelectItem value="CANCELLED">Cancelled</SelectItem>
+              <SelectItem value="DRAFT">{tUi("draft")}</SelectItem>
+              <SelectItem value="LOADING">{tUi("loading.2")}</SelectItem>
+              <SelectItem value="PENDING_VERIFICATION">{tUi("pending.verification")}</SelectItem>
+              <SelectItem value="VERIFIED">{tUi("verified")}</SelectItem>
+              <SelectItem value="FINALIZED">{tUi("finalized")}</SelectItem>
+              <SelectItem value="CANCELLED">{tUi("cancelled")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div className="w-56">
-          <label className="text-sm font-medium mb-1 block">Customer</label>
+          <label className="text-sm font-medium mb-1 block">{tUi("customer")}</label>
           <Select value={customerFilter} onValueChange={setCustomerFilter}>
             <SelectTrigger data-testid="select-customer-filter">
-              <SelectValue placeholder="All customers" />
+              <SelectValue placeholder={tUi("all.customers")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Customers</SelectItem>
+              <SelectItem value="all">{tUi("all.customers.2")}</SelectItem>
               {customers.map((c) => (
                 <SelectItem key={c.id} value={c.id.toString()} data-testid={`select-customer-option-${c.id}`}>
                   {c.legalName}
@@ -193,14 +195,14 @@ export default function CustomerInvoices() {
           <Table>
             <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
-                <TableHead>Invoice #</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Total Bales</TableHead>
-                <TableHead className="text-right">Total Weight (kg)</TableHead>
-                <TableHead className="text-right">Grand Total</TableHead>
-                <TableHead className="w-[100px]">Actions</TableHead>
+                <TableHead>{tUi("invoice")}</TableHead>
+                <TableHead>{tUi("customer")}</TableHead>
+                <TableHead>{tUi("date")}</TableHead>
+                <TableHead>{tUi("status")}</TableHead>
+                <TableHead className="text-right">{tUi("total.bales")}</TableHead>
+                <TableHead className="text-right">{tUi("total.weight.kg")}</TableHead>
+                <TableHead className="text-right">{tUi("grand.total")}</TableHead>
+                <TableHead className="w-[100px]">{tUi("actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -267,7 +269,7 @@ export default function CustomerInvoices() {
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
                             }
-                            title="Delete Invoice"
+                            title={tUi("delete.invoice")}
                             description={`This will permanently delete invoice ${order.invoiceNumber || `#${order.id}`} for ${order.customerName}. Any bales assigned to this order will be returned to stock. This cannot be undone.`}
                             tone="destructive"
                             confirmText="Delete"

@@ -16,6 +16,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function GenerateMissingAccountingEntryDialog({
   cashAccounts,
@@ -38,6 +39,7 @@ export function GenerateMissingAccountingEntryDialog({
   setFixAcctTargetId: any;
   wrapAdminAction: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog
       open={fixAcctOpen}
@@ -62,10 +64,10 @@ export function GenerateMissingAccountingEntryDialog({
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
-            <Label className="text-xs">Cash Account</Label>
+            <Label className="text-xs">{tUi("cash.account.2")}</Label>
             <Select value={fixAcctCashId} onValueChange={setFixAcctCashId}>
               <SelectTrigger data-testid="select-fix-acct-cash">
-                <SelectValue placeholder="Select account" />
+                <SelectValue placeholder={tUi("select.account")} />
               </SelectTrigger>
               <SelectContent>
                 {cashAccounts?.map((a: any) => (

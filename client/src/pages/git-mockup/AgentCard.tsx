@@ -82,7 +82,8 @@ export function AgentCard({
     }
   });
   const saveOrder = (order: number[] | null) => {
-    if (order === null) localStorage.removeItem(storageKey); else localStorage.setItem(storageKey, JSON.stringify(order));
+    if (order === null) localStorage.removeItem(storageKey);
+    else localStorage.setItem(storageKey, JSON.stringify(order));
     setCustomOrder(order);
   };
   const resetOrder = () => saveOrder(null);

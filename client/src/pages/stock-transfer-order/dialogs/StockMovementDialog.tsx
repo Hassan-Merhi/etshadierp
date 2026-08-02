@@ -16,6 +16,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { MapPin, ExternalLink } from "lucide-react";
 import { PeriodFilter } from "@/components/ui/period-filter";
+import { useErpText } from "@/i18n/modules/erp";
 
 export function StockMovementDialog({
   formatAmount,
@@ -52,6 +53,7 @@ export function StockMovementDialog({
   setHistoryDialogOpen: any;
   setHistoryPeriod: any;
 }) {
+  const tUi = useErpText();
   return (
     <Dialog
       open={historyDialogOpen}
@@ -85,7 +87,9 @@ export function StockMovementDialog({
           ) : !historyData?.monthlyData?.some(
               (m: any) => m.inwardQty > 0 || m.outwardQty > 0 || m.openingQty !== 0 || m.closingQty !== 0
             ) ? (
-            <div className="text-center py-12 text-muted-foreground text-sm">No stock movement for this period</div>
+            <div className="text-center py-12 text-muted-foreground text-sm">
+              {tUi("no.stock.movement.for.this.period")}
+            </div>
           ) : (
             <table className="w-full text-sm border-collapse" style={{ minWidth: "700px" }}>
               <thead className="sticky top-0 z-10">
@@ -114,8 +118,8 @@ export function StockMovementDialog({
                 </tr>
                 <tr className="bg-muted/70 border-b text-xs">
                   <th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Qty</th>
-                  <th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Rate</th>
-                  <th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Value</th>
+                  <th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">{tUi("rate")}</th>
+                  <th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">{tUi("value")}</th>
                   <th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">
                     Qty
                   </th>
@@ -126,11 +130,15 @@ export function StockMovementDialog({
                     Value
                   </th>
                   <th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">Qty</th>
-                  <th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">Rate</th>
-                  <th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">Value</th>
+                  <th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">
+                    {tUi("rate")}
+                  </th>
+                  <th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">
+                    {tUi("value")}
+                  </th>
                   <th className="text-right px-3 py-1.5 font-medium text-primary">Qty</th>
-                  <th className="text-right px-3 py-1.5 font-medium text-primary">Rate</th>
-                  <th className="text-right px-3 py-1.5 font-medium text-primary">Value</th>
+                  <th className="text-right px-3 py-1.5 font-medium text-primary">{tUi("rate")}</th>
+                  <th className="text-right px-3 py-1.5 font-medium text-primary">{tUi("value")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -211,7 +219,7 @@ export function StockMovementDialog({
               {historyData?.grandTotal && (
                 <tfoot className="sticky bottom-0 z-10">
                   <tr className="bg-muted font-bold border-t-2">
-                    <td className="px-3 py-2 border-r">Total</td>
+                    <td className="px-3 py-2 border-r">{tUi("total")}</td>
                     <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">
                       {historyData.grandTotal.openingQty === 0
                         ? "—"

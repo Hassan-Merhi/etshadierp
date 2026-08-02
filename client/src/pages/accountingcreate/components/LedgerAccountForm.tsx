@@ -3,23 +3,23 @@
  *
  * Extracted from AccountingCreate.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {Card} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage} from "@/components/ui/form";
-import {Input} from "@/components/ui/input";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Checkbox} from "@/components/ui/checkbox";
-import {useToast} from "@/hooks/use-toast";
-import {useQuery} from "@tanstack/react-query";
-import {useAppMode} from "@/contexts/AppModeContext";
-import {getApiRequest} from "@/lib/factoryApi";
-import {ChevronsUpDown, Check, type LucideIcon} from "lucide-react";
-import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
-import {Command, CommandEmpty, CommandGroup, CommandInput, CommandItem} from "@/components/ui/command";
-import {cn} from "@/lib/utils";
-import {useCompany} from "@/contexts/CompanyContext";
-import {FormButtons} from "./FormButtons";
+import { useState } from "react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
+import { ChevronsUpDown, Check, type LucideIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { cn } from "@/lib/utils";
+import { useCompany } from "@/contexts/CompanyContext";
+import { FormButtons } from "./FormButtons";
 
 export // Ledger Account Form Component
 function LedgerAccountForm({

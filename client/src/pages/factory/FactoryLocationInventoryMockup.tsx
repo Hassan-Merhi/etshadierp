@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 // ─── Sample data (mockup only — no real backend calls) ───────────────────────
 
@@ -205,6 +206,7 @@ function StatCard({ icon, label, value, sub, accent }: StatCardProps) {
 
 // ─── Main mockup page ─────────────────────────────────────────────────────────
 export default function FactoryLocationInventoryMockup() {
+  const tUi = useFactoryText();
   const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("__all__");
@@ -268,7 +270,7 @@ export default function FactoryLocationInventoryMockup() {
       {/* Mockup banner */}
       <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-amber-500/10 border border-amber-500/25 text-xs text-amber-700 dark:text-amber-400">
         <BarChart3 className="h-3.5 w-3.5 shrink-0" />
-        <span className="font-medium">MOCKUP PREVIEW</span>
+        <span className="font-medium">{tUi("mockup.preview")}</span>
         <span className="text-amber-600/70 dark:text-amber-500/70">— Uses sample data only. Real page at</span>
         <button
           className="underline underline-offset-2 hover:text-amber-800 dark:hover:text-amber-200"
@@ -293,7 +295,9 @@ export default function FactoryLocationInventoryMockup() {
             <h1 className="text-xl md:text-2xl font-bold tracking-tight" data-testid="mockup-title">
               Location Inventory
             </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Physical bales on ground by category and product</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {tUi("physical.bales.on.ground.by.category.and.product")}
+            </p>
             <div className="flex items-center gap-1.5 mt-1.5">
               <Badge variant="outline" className="text-xs font-medium no-default-active-elevate">
                 <Package className="h-3 w-3 mr-1" />
@@ -304,7 +308,7 @@ export default function FactoryLocationInventoryMockup() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="ghost" size="icon" title="Refresh" data-testid="mockup-button-refresh">
+          <Button variant="ghost" size="icon" title={tUi("refresh")} data-testid="mockup-button-refresh">
             <RefreshCw className="h-4 w-4" />
           </Button>
           <Button variant="outline" size="sm" data-testid="mockup-button-export">
@@ -367,7 +371,7 @@ export default function FactoryLocationInventoryMockup() {
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search products or article codes…"
+            placeholder={tUi("search.products.or.article.codes")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -377,10 +381,10 @@ export default function FactoryLocationInventoryMockup() {
 
         <Select value={catFilter} onValueChange={setCatFilter}>
           <SelectTrigger className="w-[160px]" data-testid="mockup-select-category">
-            <SelectValue placeholder="All Categories" />
+            <SelectValue placeholder={tUi("all.categories")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all__">All Categories</SelectItem>
+            <SelectItem value="__all__">{tUi("all.categories")}</SelectItem>
             {categories.map((c) => (
               <SelectItem key={c} value={c}>
                 {c}
@@ -391,14 +395,14 @@ export default function FactoryLocationInventoryMockup() {
 
         <Select value={sortField} onValueChange={(v) => setSortField(v as SortField)}>
           <SelectTrigger className="w-[140px]" data-testid="mockup-select-sort">
-            <SelectValue placeholder="Sort by" />
+            <SelectValue placeholder={tUi("sort.by")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="name">Name</SelectItem>
-            <SelectItem value="bales">Bales</SelectItem>
-            <SelectItem value="kg">Total KG</SelectItem>
-            <SelectItem value="sell">Sell Value</SelectItem>
-            <SelectItem value="cost">Cost Value</SelectItem>
+            <SelectItem value="name">{tUi("name")}</SelectItem>
+            <SelectItem value="bales">{tUi("bales")}</SelectItem>
+            <SelectItem value="kg">{tUi("total.kg.2")}</SelectItem>
+            <SelectItem value="sell">{tUi("sell.value.2")}</SelectItem>
+            <SelectItem value="cost">{tUi("cost.value")}</SelectItem>
           </SelectContent>
         </Select>
 
@@ -449,7 +453,7 @@ export default function FactoryLocationInventoryMockup() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40">
-                <TableHead className="w-[120px]">Category</TableHead>
+                <TableHead className="w-[120px]">{tUi("category")}</TableHead>
                 <TableHead>
                   <button
                     className="flex items-center gap-1 font-semibold"
@@ -464,14 +468,14 @@ export default function FactoryLocationInventoryMockup() {
                     Bales <SortIcon field="bales" />
                   </button>
                 </TableHead>
-                <TableHead className="text-right w-[100px]">Avg KG/Bale</TableHead>
-                <TableHead className="text-right w-[100px]">Sell Price</TableHead>
+                <TableHead className="text-right w-[100px]">{tUi("avg.kg.bale")}</TableHead>
+                <TableHead className="text-right w-[100px]">{tUi("sell.price")}</TableHead>
                 <TableHead className="text-right w-[120px]">
                   <button className="flex items-center gap-1 ml-auto" onClick={() => toggleSort("sell")}>
                     Sell Value <SortIcon field="sell" />
                   </button>
                 </TableHead>
-                <TableHead className="text-right w-[100px]">Cost Price</TableHead>
+                <TableHead className="text-right w-[100px]">{tUi("cost.price")}</TableHead>
                 <TableHead className="text-right w-[120px]">
                   <button className="flex items-center gap-1 ml-auto" onClick={() => toggleSort("cost")}>
                     Cost Value <SortIcon field="cost" />
@@ -632,19 +636,19 @@ export default function FactoryLocationInventoryMockup() {
                   </div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm mt-3">
                     <div>
-                      <span className="text-muted-foreground text-xs">Bales</span>
+                      <span className="text-muted-foreground text-xs">{tUi("bales")}</span>
                       <div className="font-mono font-bold">{prod.baleCount > 0 ? prod.baleCount : "—"}</div>
                     </div>
                     <div>
-                      <span className="text-muted-foreground text-xs">Avg KG/Bale</span>
+                      <span className="text-muted-foreground text-xs">{tUi("avg.kg.bale")}</span>
                       <div className="font-mono">{avgKg > 0 ? fmt(avgKg) : "—"}</div>
                     </div>
                     <div>
-                      <span className="text-muted-foreground text-xs">Total KG</span>
+                      <span className="text-muted-foreground text-xs">{tUi("total.kg.2")}</span>
                       <div className="font-mono">{prod.totalWeight > 0 ? fmt(prod.totalWeight) : "—"}</div>
                     </div>
                     <div>
-                      <span className="text-muted-foreground text-xs">Sell Value</span>
+                      <span className="text-muted-foreground text-xs">{tUi("sell.value.2")}</span>
                       <div className="font-mono font-semibold text-green-600 dark:text-green-400">
                         {sellValue > 0 ? money(sellValue) : "—"}
                       </div>

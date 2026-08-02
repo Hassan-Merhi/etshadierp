@@ -26,6 +26,7 @@ import { StatementResponse, SupplierWithBalance } from "./factorySupplierTypes";
 import { LinkedSupplierExposure } from "./LinkedSupplierExposure";
 import { CurrencyPools } from "./CurrencyPools";
 import { SupplierStatementRows } from "./SupplierStatementRows";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface SupplierStatementProps {
   statementSupplierId: number;
@@ -128,6 +129,7 @@ export function SupplierStatement({
   onRenameSupplier,
   onDeleteSupplier,
 }: SupplierStatementProps) {
+  const tUi = useFactoryText();
   const [showRename, setShowRename] = useState(false);
   const [renameDraft, setRenameDraft] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -136,7 +138,7 @@ export function SupplierStatement({
       <div className="space-y-4">
         <div className="text-center py-8 text-muted-foreground">
           <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-sm">Loading statement...</p>
+          <p className="text-sm">{tUi("loading.statement")}</p>
         </div>
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-64 w-full" />
@@ -148,8 +150,8 @@ export function SupplierStatement({
     return (
       <div className="rounded-xl border p-8 text-center text-muted-foreground">
         <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
-        <p className="text-lg font-medium">Could not load statement</p>
-        <p className="text-sm mt-1">Please go back and try again</p>
+        <p className="text-lg font-medium">{tUi("could.not.load.statement")}</p>
+        <p className="text-sm mt-1">{tUi("please.go.back.and.try.again")}</p>
       </div>
     );
   }
@@ -187,7 +189,7 @@ export function SupplierStatement({
         >
           {isSettled ? (
             <>
-              {ccPrefix}— <span className="text-sm font-normal">Settled</span>
+              {ccPrefix}— <span className="text-sm font-normal">{tUi("settled")}</span>
             </>
           ) : isOverpaid ? (
             <>
@@ -242,7 +244,7 @@ export function SupplierStatement({
                   <Button
                     size="icon"
                     variant="ghost"
-                    title="Rename supplier"
+                    title={tUi("rename.supplier")}
                     data-testid="button-rename-linked-supplier"
                     onClick={() => {
                       setRenameDraft(statementData.supplier.name);
@@ -256,7 +258,7 @@ export function SupplierStatement({
                   <Button
                     size="icon"
                     variant="ghost"
-                    title="Delete supplier"
+                    title={tUi("delete.supplier")}
                     data-testid="button-delete-linked-supplier"
                     onClick={() => setShowDeleteConfirm(true)}
                   >
@@ -273,7 +275,7 @@ export function SupplierStatement({
               </Badge>
             ) : null}
           </div>
-          <p className="text-muted-foreground text-sm">Settlement Statement</p>
+          <p className="text-muted-foreground text-sm">{tUi("settlement.statement")}</p>
         </div>
         {!isBrokerStatement && (
           <label
@@ -285,7 +287,7 @@ export function SupplierStatement({
               onCheckedChange={setSupplierIncludeOtw}
               data-testid="switch-supplier-include-otw"
             />
-            <span className="text-xs font-normal text-muted-foreground">Include OTW containers</span>
+            <span className="text-xs font-normal text-muted-foreground">{tUi("include.otw.containers")}</span>
           </label>
         )}
       </div>
@@ -294,7 +296,7 @@ export function SupplierStatement({
         {!isBrokerStatement && (
           <>
             <div className="rounded-xl border p-4">
-              <div className="text-xs text-muted-foreground">Active Containers</div>
+              <div className="text-xs text-muted-foreground">{tUi("active.containers")}</div>
               <div className="text-xl font-bold mt-1" data-testid="text-statement-total-containers">
                 {activeContainerCount}
                 {statementData.summary.totalContainers > activeContainerCount && (
@@ -305,7 +307,7 @@ export function SupplierStatement({
               </div>
             </div>
             <div className="rounded-xl border p-4">
-              <div className="text-xs text-muted-foreground">Active Weight</div>
+              <div className="text-xs text-muted-foreground">{tUi("active.weight")}</div>
               <div className="text-xl font-bold mt-1" data-testid="text-statement-total-kg">
                 {formatKg(String(activeKg.toFixed(3)))}
               </div>
@@ -323,7 +325,7 @@ export function SupplierStatement({
             className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-muted/20 cursor-pointer hover-elevate"
             onClick={() => toggleStmtSection("supplierDetails")}
           >
-            <span className="text-sm font-semibold">Supplier Details</span>
+            <span className="text-sm font-semibold">{tUi("supplier.details.2")}</span>
             <ChevronDown
               className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("supplierDetails") ? "" : "rotate-180"}`}
             />
@@ -408,7 +410,7 @@ export function SupplierStatement({
           >
             <span className="flex items-center gap-2 flex-1">
               <ArrowRightLeft className="h-4 w-4" />
-              <span className="text-sm font-semibold">FX Settlement Log</span>
+              <span className="text-sm font-semibold">{tUi("fx.settlement.log")}</span>
               <ChevronDown
                 className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("fxTransfers") ? "" : "rotate-180"}`}
               />
@@ -420,10 +422,10 @@ export function SupplierStatement({
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
-                      <TableHead className="w-32">Date</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead className="text-right">From</TableHead>
-                      <TableHead className="text-right">Cost (USD)</TableHead>
+                      <TableHead className="w-32">{tUi("date")}</TableHead>
+                      <TableHead>{tUi("type")}</TableHead>
+                      <TableHead className="text-right">{tUi("from")}</TableHead>
+                      <TableHead className="text-right">{tUi("cost.usd")}</TableHead>
                       <TableHead className="w-12"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -475,7 +477,7 @@ export function SupplierStatement({
         >
           <span className="flex items-center gap-2 flex-1">
             <BookOpen className="h-4 w-4" />
-            <span className="text-sm font-semibold">Account Ledger</span>
+            <span className="text-sm font-semibold">{tUi("account.ledger")}</span>
             <ChevronDown
               className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("allActivity") ? "" : "rotate-180"}`}
             />
@@ -511,12 +513,12 @@ export function SupplierStatement({
       <Dialog open={showRename} onOpenChange={(v) => !v && setShowRename(false)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Rename Supplier</DialogTitle>
+            <DialogTitle>{tUi("rename.supplier.2")}</DialogTitle>
           </DialogHeader>
           <Input
             value={renameDraft}
             onChange={(e) => setRenameDraft(e.target.value)}
-            placeholder="New name"
+            placeholder={tUi("new.name.2")}
             data-testid="input-rename-supplier"
             onKeyDown={(e) => {
               if (e.key === "Enter" && renameDraft.trim()) {
@@ -526,7 +528,9 @@ export function SupplierStatement({
             }}
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRename(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowRename(false)}>
+              {tUi("cancel")}
+            </Button>
             <Button
               onClick={() => {
                 if (renameDraft.trim()) {
@@ -547,14 +551,16 @@ export function SupplierStatement({
       <Dialog open={showDeleteConfirm} onOpenChange={(v) => !v && setShowDeleteConfirm(false)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Delete Supplier</DialogTitle>
+            <DialogTitle>{tUi("delete.supplier.2")}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             Permanently delete <span className="font-semibold text-foreground">{statementData.supplier.name}</span>?
             This cannot be undone.
           </p>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+              {tUi("cancel")}
+            </Button>
             <Button
               variant="destructive"
               onClick={() => {

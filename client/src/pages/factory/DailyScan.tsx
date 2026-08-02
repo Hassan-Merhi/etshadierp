@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
 import * as XLSX from "@/lib/excelHelper";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 function toLocalDateStr(d: Date): string {
   return d.toLocaleDateString("en-CA");
@@ -60,13 +61,14 @@ function StatusBadge({
   isInLoadingOrder: boolean;
   isDeleted: boolean;
 }) {
-  if (isDeleted) return <Badge className="bg-red-600 text-white border-0">Deleted</Badge>;
+  const tUi = useFactoryText();
+  if (isDeleted) return <Badge className="bg-red-600 text-white border-0">{tUi("deleted")}</Badge>;
   const s = (status || "").toUpperCase();
   if (isInLoadingOrder || s === "LOADING" || s === "LOADED")
-    return <Badge className="bg-amber-500 text-white border-0">Pending Loading</Badge>;
-  if (s === "IN_STOCK") return <Badge className="bg-green-600 text-white border-0">In Stock</Badge>;
-  if (s === "SOLD") return <Badge className="bg-red-600 text-white border-0">Sold</Badge>;
-  if (s === "RESERVED_FOR_ORDER") return <Badge className="bg-blue-600 text-white border-0">Reserved</Badge>;
+    return <Badge className="bg-amber-500 text-white border-0">{tUi("pending.loading")}</Badge>;
+  if (s === "IN_STOCK") return <Badge className="bg-green-600 text-white border-0">{tUi("in.stock")}</Badge>;
+  if (s === "SOLD") return <Badge className="bg-red-600 text-white border-0">{tUi("sold")}</Badge>;
+  if (s === "RESERVED_FOR_ORDER") return <Badge className="bg-blue-600 text-white border-0">{tUi("reserved")}</Badge>;
   return <Badge variant="outline">{status || "—"}</Badge>;
 }
 
@@ -89,6 +91,7 @@ interface ScanFeedback {
 }
 
 export default function DailyScan() {
+  const tUi = useFactoryText();
   const today = toLocalDateStr(new Date());
   const [selectedDate, setSelectedDate] = useState(today);
   const [scanInput, setScanInput] = useState("");
@@ -374,7 +377,7 @@ export default function DailyScan() {
           value={scanInput}
           onChange={(e) => setScanInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleScan()}
-          placeholder="Scan bale ref code / barcode…"
+          placeholder={tUi("scan.bale.ref.code.barcode")}
           className="font-mono"
           data-testid="input-daily-scan-ref"
           disabled={scanning}
@@ -393,7 +396,7 @@ export default function DailyScan() {
 
       {/* ── Body ── */}
       {isLoading ? (
-        <div className="py-10 text-center text-sm text-muted-foreground">Loading…</div>
+        <div className="py-10 text-center text-sm text-muted-foreground">{tUi("loading")}</div>
       ) : totalBales === 0 ? (
         <div className="py-14 text-center text-sm text-muted-foreground">
           No bales produced on {formatDisplay(selectedDate)}
@@ -422,13 +425,13 @@ export default function DailyScan() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-10">#</TableHead>
-                      <TableHead>Ref Code</TableHead>
-                      <TableHead>Article Code</TableHead>
-                      <TableHead>Product Name</TableHead>
-                      <TableHead className="text-right">Weight (kg)</TableHead>
-                      <TableHead>Date Produced</TableHead>
-                      <TableHead>Worker</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>{tUi("ref.code")}</TableHead>
+                      <TableHead>{tUi("article.code")}</TableHead>
+                      <TableHead>{tUi("product.name")}</TableHead>
+                      <TableHead className="text-right">{tUi("weight.kg")}</TableHead>
+                      <TableHead>{tUi("date.produced")}</TableHead>
+                      <TableHead>{tUi("worker")}</TableHead>
+                      <TableHead>{tUi("status")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -497,14 +500,14 @@ export default function DailyScan() {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-10">#</TableHead>
-                        <TableHead>Ref Code</TableHead>
-                        <TableHead>Article Code</TableHead>
-                        <TableHead>Product Name</TableHead>
-                        <TableHead className="text-right">Weight (kg)</TableHead>
-                        <TableHead>Date Produced</TableHead>
-                        <TableHead>Worker</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Scanned At</TableHead>
+                        <TableHead>{tUi("ref.code")}</TableHead>
+                        <TableHead>{tUi("article.code")}</TableHead>
+                        <TableHead>{tUi("product.name")}</TableHead>
+                        <TableHead className="text-right">{tUi("weight.kg")}</TableHead>
+                        <TableHead>{tUi("date.produced")}</TableHead>
+                        <TableHead>{tUi("worker")}</TableHead>
+                        <TableHead>{tUi("status")}</TableHead>
+                        <TableHead className="text-right">{tUi("scanned.at")}</TableHead>
                         <TableHead className="w-10" />
                       </TableRow>
                     </TableHeader>

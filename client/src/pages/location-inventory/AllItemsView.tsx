@@ -2,6 +2,7 @@ import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { InventoryTable } from "./InventoryTable";
 import type { InventoryItem } from "./locationInventoryTypes";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface AllItemsViewProps {
   totalItems: number;
@@ -36,16 +37,15 @@ export function AllItemsView({
   navigate,
   inventory,
 }: AllItemsViewProps) {
+  const tUi = useErpText();
   return (
     <>
       {/* Stats */}
       <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
         <span className="font-semibold text-foreground">{totalItems}</span> Items
         <span className="text-muted-foreground">·</span>
-        <span className="font-semibold text-foreground font-mono">
-          {Math.floor(totalQty).toLocaleString()}
-        </span>{" "}
-        BL total
+        <span className="font-semibold text-foreground font-mono">{Math.floor(totalQty).toLocaleString()}</span> BL
+        total
         {!posUser && (
           <>
             <span className="text-muted-foreground">·</span>
@@ -58,7 +58,7 @@ export function AllItemsView({
       <div className="relative max-w-sm">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search items by name..."
+          placeholder={tUi("search.items.by.name")}
           value={itemSearchTerm}
           onChange={(e) => setItemSearchTerm(e.target.value)}
           className="pl-9"

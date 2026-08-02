@@ -3,14 +3,23 @@
  *
  * Extracted from GcLshiMigration.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {useMutation} from "@tanstack/react-query";
-import {apiRequest} from "@/lib/queryClient";
-import {useToast} from "@/hooks/use-toast";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle} from "@/components/ui/alert-dialog";
-import {AlertTriangle, Play, Lock, type LucideIcon} from "lucide-react";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { AlertTriangle, Play, Lock, type LucideIcon } from "lucide-react";
 
 export function Stage2StepRunner({
   label,

@@ -10,6 +10,7 @@ import { AlertTriangle, Loader2, CheckCircle2, Save, Trash2 } from "lucide-react
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface ArticleRow {
   articleCode: string;
@@ -57,6 +58,7 @@ interface Props {
 }
 
 export default function EditProformaV5Drawer({ open, onClose, proformaId, articleRows, onSuccess }: Props) {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -388,12 +390,12 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
                   data-testid="input-edit-v5-proforma-name"
                   value={proformaName}
                   onChange={(e) => setProformaName(e.target.value)}
-                  placeholder="Proforma name"
+                  placeholder={tUi("proforma.name")}
                 />
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <Label className="text-xs font-medium">Status</Label>
+                <Label className="text-xs font-medium">{tUi("status")}</Label>
                 <div className="flex items-center gap-2 h-9">
                   <Switch
                     checked={isActive}
@@ -522,7 +524,7 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
                             {hasExistingLine && qty > 0 && (
                               <div
                                 className="w-1.5 h-1.5 rounded-full bg-primary shrink-0"
-                                title="Line exists in proforma"
+                                title={tUi("line.exists.in.proforma")}
                               />
                             )}
                             <div>
@@ -609,7 +611,7 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
                                       setPricingModes((prev) => ({ ...prev, [row.articleCode]: "per_bale" }))
                                     }
                                     data-testid={`button-edit-v5-mode-bale-${row.articleCode}`}
-                                    title="Price per bale"
+                                    title={tUi("price.per.bale")}
                                   >
                                     /bale
                                   </button>
@@ -624,7 +626,7 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
                                       setPricingModes((prev) => ({ ...prev, [row.articleCode]: "per_kg" }))
                                     }
                                     data-testid={`button-edit-v5-mode-kg-${row.articleCode}`}
-                                    title="Price per kg"
+                                    title={tUi("price.per.kg")}
                                   >
                                     /kg
                                   </button>
@@ -666,7 +668,7 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
                           {hasExistingLine && qty > 0 && (
                             <button
                               className="text-muted-foreground/40 hover:text-destructive transition-colors"
-                              title="Remove line (set qty to 0)"
+                              title={tUi("remove.line.set.qty.to.0")}
                               onClick={() => setQuantities((prev) => ({ ...prev, [row.articleCode]: "0" }))}
                               data-testid={`button-edit-v5-clear-${row.articleCode}`}
                             >
@@ -681,7 +683,7 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
                 <tfoot>
                   <tr className="bg-muted border-t-2 sticky bottom-0 z-20 text-xs font-semibold">
                     <td className="px-3 py-2 border-r sticky left-0 bg-muted z-10">
-                      <span className="text-foreground">Totals</span>
+                      <span className="text-foreground">{tUi("totals")}</span>
                       <span className="font-normal text-muted-foreground ml-1.5">({visibleRows.length} products)</span>
                     </td>
                     <td
@@ -744,7 +746,7 @@ export default function EditProformaV5Drawer({ open, onClose, proformaId, articl
                     {warningCount} product{warningCount !== 1 ? "s" : ""} with shortage
                   </span>
                 )}
-                <span className="text-[10px] text-muted-foreground/60">Ctrl/⌘+S to save</span>
+                <span className="text-[10px] text-muted-foreground/60">{tUi("ctrl.s.to.save")}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" onClick={onClose} data-testid="button-edit-v5-cancel">

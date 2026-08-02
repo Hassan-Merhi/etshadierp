@@ -41,7 +41,10 @@ export default function SpSetup() {
       </div>
 
       <Tabs value={tab} onValueChange={(value) => setTab(value as AdminTab)}>
-        <TabsList className={`grid w-full max-w-lg ${canMigrate ? "grid-cols-2" : "grid-cols-1"}`} data-testid="tabs-sp-administration">
+        <TabsList
+          className={`grid w-full max-w-lg ${canMigrate ? "grid-cols-2" : "grid-cols-1"}`}
+          data-testid="tabs-sp-administration"
+        >
           <TabsTrigger value="setup" data-testid="tab-sp-administration-setup">
             <Wrench className="mr-2 h-4 w-4" /> Setup
           </TabsTrigger>
@@ -52,8 +55,14 @@ export default function SpSetup() {
           )}
         </TabsList>
 
-        <TabsContent value="setup" className="mt-4"><SpSetupPanel /></TabsContent>
-        {canMigrate && <TabsContent value="migration" className="mt-4"><GcLshiMigration /></TabsContent>}
+        <TabsContent value="setup" className="mt-4">
+          <SpSetupPanel />
+        </TabsContent>
+        {canMigrate && (
+          <TabsContent value="migration" className="mt-4">
+            <GcLshiMigration />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

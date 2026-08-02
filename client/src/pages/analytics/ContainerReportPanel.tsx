@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PeriodFilter, PeriodFilterValue } from "@/components/ui/period-filter";
 import { Container as ContainerIcon } from "lucide-react";
 import { ReportContainer, ContainerData, Supplier } from "./analyticsTypes";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface ContainerReportPanelProps {
   appMode: string;
@@ -44,6 +45,7 @@ export function ContainerReportPanel({
   loadingContainers,
   containerData,
 }: ContainerReportPanelProps) {
+  const tUi = useErpText();
   if (appMode === "factory") {
     return (
       <Card className="p-6">
@@ -52,31 +54,31 @@ export function ContainerReportPanel({
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
               <ContainerIcon className="h-4 w-4" />
             </div>
-            <h3 className="font-semibold text-base">Factory Container Report</h3>
+            <h3 className="font-semibold text-base">{tUi("factory.container.report")}</h3>
           </div>
         </div>
 
         {loadingFactoryContainerSales ? (
-          <div className="text-center py-8 text-muted-foreground">Loading...</div>
+          <div className="text-center py-8 text-muted-foreground">{tUi("loading.3")}</div>
         ) : factoryContainerSales ? (
           <div className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="border rounded-md p-3">
-                <div className="text-xs text-muted-foreground">Containers</div>
+                <div className="text-xs text-muted-foreground">{tUi("containers")}</div>
                 <div className="text-xl font-bold">{factoryContainerSales.summary.count}</div>
               </div>
               <div className="border rounded-md p-3">
-                <div className="text-xs text-muted-foreground">Total Value</div>
+                <div className="text-xs text-muted-foreground">{tUi("total.value")}</div>
                 <div className="text-xl font-bold font-mono">{formatAmount(factoryContainerSales.summary.total)}</div>
               </div>
               <div className="border rounded-md p-3">
-                <div className="text-xs text-muted-foreground">Paid</div>
+                <div className="text-xs text-muted-foreground">{tUi("paid")}</div>
                 <div className="text-xl font-bold font-mono text-green-600 dark:text-green-400">
                   {formatAmount(factoryContainerSales.summary.paid)}
                 </div>
               </div>
               <div className="border rounded-md p-3">
-                <div className="text-xs text-muted-foreground">Outstanding</div>
+                <div className="text-xs text-muted-foreground">{tUi("outstanding")}</div>
                 <div className="text-xl font-bold font-mono text-amber-600 dark:text-amber-400">
                   {formatAmount(factoryContainerSales.summary.outstanding)}
                 </div>
@@ -87,15 +89,15 @@ export function ContainerReportPanel({
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead>Container #</TableHead>
-                    <TableHead>Customer</TableHead>
-                    <TableHead>Invoice</TableHead>
-                    <TableHead>Sale Date</TableHead>
-                    <TableHead>Container Status</TableHead>
-                    <TableHead>Payment</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="text-right">Paid</TableHead>
-                    <TableHead className="text-right">Outstanding</TableHead>
+                    <TableHead>{tUi("container.2")}</TableHead>
+                    <TableHead>{tUi("customer")}</TableHead>
+                    <TableHead>{tUi("invoice.2")}</TableHead>
+                    <TableHead>{tUi("sale.date")}</TableHead>
+                    <TableHead>{tUi("container.status")}</TableHead>
+                    <TableHead>{tUi("payment")}</TableHead>
+                    <TableHead className="text-right">{tUi("total")}</TableHead>
+                    <TableHead className="text-right">{tUi("paid")}</TableHead>
+                    <TableHead className="text-right">{tUi("outstanding")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -150,17 +152,17 @@ export function ContainerReportPanel({
                     </div>
                     <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t">
                       <div>
-                        <span className="text-muted-foreground block">Total</span>
+                        <span className="text-muted-foreground block">{tUi("total")}</span>
                         <span className="font-mono">{formatAmount(parseFloat(row.totalAmount))}</span>
                       </div>
                       <div>
-                        <span className="text-muted-foreground block">Paid</span>
+                        <span className="text-muted-foreground block">{tUi("paid")}</span>
                         <span className="font-mono text-green-600 dark:text-green-400">
                           {formatAmount(parseFloat(row.paidAmount))}
                         </span>
                       </div>
                       <div className="text-right">
-                        <span className="text-muted-foreground block">Outstanding</span>
+                        <span className="text-muted-foreground block">{tUi("outstanding")}</span>
                         <span className="font-mono text-amber-600 dark:text-amber-400">
                           {formatAmount(parseFloat(row.totalAmount) - parseFloat(row.paidAmount))}
                         </span>
@@ -174,8 +176,8 @@ export function ContainerReportPanel({
         ) : (
           <div className="flex flex-col items-center justify-center gap-3 py-14 text-muted-foreground">
             <ContainerIcon className="h-10 w-10 opacity-25" />
-            <p className="text-sm font-medium">No data yet</p>
-            <p className="text-xs opacity-60">Adjust the filters above to load the report</p>
+            <p className="text-sm font-medium">{tUi("no.data.yet")}</p>
+            <p className="text-xs opacity-60">{tUi("adjust.the.filters.above.to.load.the.report")}</p>
           </div>
         )}
       </Card>
@@ -189,13 +191,13 @@ export function ContainerReportPanel({
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
             <ContainerIcon className="h-4 w-4" />
           </div>
-          <h3 className="font-semibold text-base">Container Report</h3>
+          <h3 className="font-semibold text-base">{tUi("container.report")}</h3>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-4 mb-6 items-end">
         <div className="flex flex-col gap-1.5">
-          <Label>Period</Label>
+          <Label>{tUi("period")}</Label>
           <PeriodFilter
             value={containerPeriodFilter}
             onChange={setContainerPeriodFilter}
@@ -203,13 +205,13 @@ export function ContainerReportPanel({
           />
         </div>
         <div className="flex flex-col gap-1.5 min-w-[160px]">
-          <Label htmlFor="container-supplier">Supplier</Label>
+          <Label htmlFor="container-supplier">{tUi("supplier")}</Label>
           <Select value={reportSupplierId} onValueChange={setReportSupplierId}>
             <SelectTrigger id="container-supplier">
-              <SelectValue placeholder="All Suppliers" />
+              <SelectValue placeholder={tUi("all.suppliers")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Suppliers</SelectItem>
+              <SelectItem value="all">{tUi("all.suppliers")}</SelectItem>
               {suppliers.map((supplier) => (
                 <SelectItem key={supplier.id} value={supplier.id.toString()}>
                   {supplier.name}
@@ -219,25 +221,25 @@ export function ContainerReportPanel({
           </Select>
         </div>
         <div className="flex flex-col gap-1.5 min-w-[140px]">
-          <Label htmlFor="container-status">Status</Label>
+          <Label htmlFor="container-status">{tUi("status")}</Label>
           <Select value={reportContainerStatus} onValueChange={setReportContainerStatus}>
             <SelectTrigger id="container-status">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Offloaded">Offloaded</SelectItem>
+              <SelectItem value="Offloaded">{tUi("offloaded")}</SelectItem>
               <SelectItem value="OTW">OTW</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div className="flex flex-col gap-1.5 min-w-[160px]">
-          <Label htmlFor="container-company">Company</Label>
+          <Label htmlFor="container-company">{tUi("company.2")}</Label>
           <Select value={reportAllCompanies} onValueChange={setReportAllCompanies}>
             <SelectTrigger id="container-company">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Companies</SelectItem>
+              <SelectItem value="all">{tUi("all.companies")}</SelectItem>
               {userCompanies.map((c: any) => (
                 <SelectItem key={c.companyId} value={String(c.companyId)}>
                   {c.companyName}
@@ -249,7 +251,7 @@ export function ContainerReportPanel({
       </div>
 
       {loadingContainers ? (
-        <div className="text-center py-8 text-muted-foreground">Loading...</div>
+        <div className="text-center py-8 text-muted-foreground">{tUi("loading.3")}</div>
       ) : containerData ? (
         (() => {
           const isAllCompanies = reportAllCompanies === "all";
@@ -284,12 +286,12 @@ export function ContainerReportPanel({
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
-                      <TableHead>Container #</TableHead>
-                      <TableHead>Supplier</TableHead>
-                      {isAllCompanies && <TableHead>Company</TableHead>}
-                      <TableHead>Status</TableHead>
+                      <TableHead>{tUi("container.2")}</TableHead>
+                      <TableHead>{tUi("supplier")}</TableHead>
+                      {isAllCompanies && <TableHead>{tUi("company.2")}</TableHead>}
+                      <TableHead>{tUi("status")}</TableHead>
                       <TableHead>{dateCol}</TableHead>
-                      <TableHead className="text-right">Grand Total</TableHead>
+                      <TableHead className="text-right">{tUi("grand.total")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   {isAllCompanies ? (
@@ -426,8 +428,8 @@ export function ContainerReportPanel({
       ) : (
         <div className="flex flex-col items-center justify-center gap-3 py-14 text-muted-foreground">
           <ContainerIcon className="h-10 w-10 opacity-25" />
-          <p className="text-sm font-medium">No data yet</p>
-          <p className="text-xs opacity-60">Adjust the filters above to load the report</p>
+          <p className="text-sm font-medium">{tUi("no.data.yet")}</p>
+          <p className="text-xs opacity-60">{tUi("adjust.the.filters.above.to.load.the.report")}</p>
         </div>
       )}
     </Card>

@@ -81,14 +81,20 @@ function getHeaderSentence(log: any): string {
         ? `User #${String(log.userId).slice(0, 8)}`
         : "Unknown user";
 
-  if (log.tableName === "security_events" || String(log.action || "").toUpperCase().startsWith("SECURITY:")) {
+  if (
+    log.tableName === "security_events" ||
+    String(log.action || "")
+      .toUpperCase()
+      .startsWith("SECURITY:")
+  ) {
     return `${user}: ${securityActionSummary(log)} on ${fmtDate(log.createdAt)}.`;
   }
 
   const changes = normalizeAuditChanges(log);
   const actionKey = String(log.action || "").toLowerCase();
   const verb = ACTION_VERBS[actionKey] || "recorded activity for";
-  const voucherType = changes.voucherType?.new ?? changes.voucherType?.old ?? changes.type?.new ?? changes.type?.old ?? "";
+  const voucherType =
+    changes.voucherType?.new ?? changes.voucherType?.old ?? changes.type?.new ?? changes.type?.old ?? "";
   const moduleName = tableShortName(log.tableName).replace(/s$/, "");
   const subject = voucherType ? `${voucherType} ${moduleName.toLowerCase()}` : moduleName.toLowerCase();
   const record = getRecordLabel(log);
@@ -99,9 +105,9 @@ function getHeaderSentence(log: any): string {
 function isChangePair(value: any): boolean {
   return Boolean(
     value &&
-      typeof value === "object" &&
-      !Array.isArray(value) &&
-      (Object.prototype.hasOwnProperty.call(value, "old") || Object.prototype.hasOwnProperty.call(value, "new")),
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    (Object.prototype.hasOwnProperty.call(value, "old") || Object.prototype.hasOwnProperty.call(value, "new"))
   );
 }
 
@@ -245,22 +251,14 @@ export function AuditLogDialog({ log, onClose }: { log: any; onClose: () => void
         <div key={field} className="flex gap-2 text-sm py-2 items-start min-w-0">
           <span
             className={`font-bold shrink-0 select-none ${
-              isAdded
-                ? "text-green-600 dark:text-green-400"
-                : isRemoved
-                  ? "text-destructive"
-                  : "text-muted-foreground"
+              isAdded ? "text-green-600 dark:text-green-400" : isRemoved ? "text-destructive" : "text-muted-foreground"
             }`}
           >
             {isAdded ? "+" : isRemoved ? "−" : "~"}
           </span>
           <span
             className={`break-words whitespace-pre-wrap min-w-0 ${
-              isAdded
-                ? "text-green-700 dark:text-green-300"
-                : isRemoved
-                  ? "text-destructive/90"
-                  : ""
+              isAdded ? "text-green-700 dark:text-green-300" : isRemoved ? "text-destructive/90" : ""
             }`}
           >
             {String(text)}

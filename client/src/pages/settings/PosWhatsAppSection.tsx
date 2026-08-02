@@ -74,7 +74,11 @@ function InstanceStateBadge({ state, loading }: { state: InstanceState | undefin
   if (!state) return null;
   if (state === "authorized") {
     return (
-      <Badge variant="secondary" className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300" data-testid="badge-instance-state">
+      <Badge
+        variant="secondary"
+        className="gap-1 text-green-700 bg-green-100 dark:bg-green-950 dark:text-green-300"
+        data-testid="badge-instance-state"
+      >
         <CheckCircle className="h-3 w-3" />
         Authorized
       </Badge>
@@ -82,7 +86,11 @@ function InstanceStateBadge({ state, loading }: { state: InstanceState | undefin
   }
   if (state === "sleepMode") {
     return (
-      <Badge variant="secondary" className="gap-1 text-amber-700 bg-amber-100 dark:bg-amber-950 dark:text-amber-300" data-testid="badge-instance-state">
+      <Badge
+        variant="secondary"
+        className="gap-1 text-amber-700 bg-amber-100 dark:bg-amber-950 dark:text-amber-300"
+        data-testid="badge-instance-state"
+      >
         <Moon className="h-3 w-3" />
         Sleeping — messages won't send
       </Badge>
@@ -90,7 +98,11 @@ function InstanceStateBadge({ state, loading }: { state: InstanceState | undefin
   }
   if (state === "notAuthorized") {
     return (
-      <Badge variant="secondary" className="gap-1 text-red-700 bg-red-100 dark:bg-red-950 dark:text-red-300" data-testid="badge-instance-state">
+      <Badge
+        variant="secondary"
+        className="gap-1 text-red-700 bg-red-100 dark:bg-red-950 dark:text-red-300"
+        data-testid="badge-instance-state"
+      >
         <XCircle className="h-3 w-3" />
         Not authorized — scan QR code
       </Badge>
@@ -98,7 +110,11 @@ function InstanceStateBadge({ state, loading }: { state: InstanceState | undefin
   }
   if (state === "yellowCard") {
     return (
-      <Badge variant="secondary" className="gap-1 text-orange-700 bg-orange-100 dark:bg-orange-950 dark:text-orange-300" data-testid="badge-instance-state">
+      <Badge
+        variant="secondary"
+        className="gap-1 text-orange-700 bg-orange-100 dark:bg-orange-950 dark:text-orange-300"
+        data-testid="badge-instance-state"
+      >
         <AlertTriangle className="h-3 w-3" />
         Warning — account at risk
       </Badge>
@@ -106,7 +122,11 @@ function InstanceStateBadge({ state, loading }: { state: InstanceState | undefin
   }
   if (state === "starting") {
     return (
-      <Badge variant="secondary" className="gap-1 text-blue-700 bg-blue-100 dark:bg-blue-950 dark:text-blue-300" data-testid="badge-instance-state">
+      <Badge
+        variant="secondary"
+        className="gap-1 text-blue-700 bg-blue-100 dark:bg-blue-950 dark:text-blue-300"
+        data-testid="badge-instance-state"
+      >
         <Loader2 className="h-3 w-3 animate-spin" />
         Starting up…
       </Badge>
@@ -318,7 +338,12 @@ export function PosWhatsAppSection() {
           {instanceStateData?.state === "sleepMode" && (
             <p className="text-xs text-amber-700 dark:text-amber-400 mt-2 bg-amber-50 dark:bg-amber-950/40 rounded px-2 py-1.5">
               Your Green API instance is in sleep mode. Log in to{" "}
-              <a href="https://console.green-api.com" target="_blank" rel="noreferrer" className="underline font-medium">
+              <a
+                href="https://console.green-api.com"
+                target="_blank"
+                rel="noreferrer"
+                className="underline font-medium"
+              >
                 console.green-api.com
               </a>{" "}
               and wake up your instance — messages are queued but not delivered while asleep.
@@ -327,7 +352,12 @@ export function PosWhatsAppSection() {
           {instanceStateData?.state === "notAuthorized" && (
             <p className="text-xs text-red-700 dark:text-red-400 mt-2 bg-red-50 dark:bg-red-950/40 rounded px-2 py-1.5">
               Your WhatsApp session has expired. Go to{" "}
-              <a href="https://console.green-api.com" target="_blank" rel="noreferrer" className="underline font-medium">
+              <a
+                href="https://console.green-api.com"
+                target="_blank"
+                rel="noreferrer"
+                className="underline font-medium"
+              >
                 console.green-api.com
               </a>{" "}
               and scan the QR code to reconnect.

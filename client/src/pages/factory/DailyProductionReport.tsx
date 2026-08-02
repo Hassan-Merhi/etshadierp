@@ -1,35 +1,75 @@
-import {useState, useMemo, useCallback, useEffect} from "react";
-import {useSearch} from "wouter";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { useSearch } from "wouter";
 import FactoryFinancialSnapshot from "@/pages/factory/FactoryFinancialSnapshot";
 import FactoryShippingContainers from "@/pages/factory/FactoryShippingContainers";
 import FactoryStatusBuilder from "@/pages/factory/FactoryStatusBuilder";
 import FactoryContainerTracking from "@/pages/factory/FactoryContainerTracking";
 import FactoryOtwTrackingTab from "@/pages/factory/FactoryOtwTrackingTab";
 import ProductionComparison from "@/pages/factory/ProductionComparison";
-import {addDays, format} from "date-fns";
-import {useQuery} from "@tanstack/react-query";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
-import {Button} from "@/components/ui/button";
-import {Skeleton} from "@/components/ui/skeleton";
-import {PageHeader} from "@/components/PageHeader";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
-import {Collapsible, CollapsibleContent, CollapsibleTrigger} from "@/components/ui/collapsible";
-import {ChevronDown, ChevronRight, ChevronLeft, FlaskConical, PackageCheck, Scale, TrendingUp, TrendingDown, Minus, Tag, Trash2, Package, ShoppingCart, AlertTriangle, Truck, RefreshCw, Ship} from "lucide-react";
-import {type WeightEditBale} from "@/components/BaleWeightEditDialog";
+import { addDays, format } from "date-fns";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/PageHeader";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+  ChevronDown,
+  ChevronRight,
+  ChevronLeft,
+  FlaskConical,
+  PackageCheck,
+  Scale,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  Tag,
+  Trash2,
+  Package,
+  ShoppingCart,
+  AlertTriangle,
+  Truck,
+  RefreshCw,
+  Ship,
+} from "lucide-react";
+import { type WeightEditBale } from "@/components/BaleWeightEditDialog";
 
-import type {LedgerData, Preset, ReportData} from "./dailyproductionreport/types";
-import {GRADE_COLORS, GRADE_ORDER, classifyByGrade, computeWorkerExpectedSalary, fmtKg, fmtL, fmtML, fmtMoney, fmtNL, fmtRate, fmtSalary, lastMonthRange, monthEnd, monthStart, todayStr, weekEnd, weekStart, yearStart, yesterdayStr} from "./dailyproductionreport/utils";
-import {StatRow} from "./dailyproductionreport/components/StatRow";
-import {SkeletonBox} from "./dailyproductionreport/components/SkeletonBox";
-import {ExpandableCard} from "./dailyproductionreport/components/ExpandableCard";
-import {CategoryProductBreakdown} from "./dailyproductionreport/components/CategoryProductBreakdown";
-import {CategoryPieChart} from "./dailyproductionreport/components/CategoryPieChart";
-import {MiniPieChart} from "./dailyproductionreport/components/MiniPieChart";
-import {LedgerSection} from "./dailyproductionreport/components/LedgerSection";
+import type { LedgerData, Preset, ReportData } from "./dailyproductionreport/types";
+import {
+  GRADE_COLORS,
+  GRADE_ORDER,
+  classifyByGrade,
+  computeWorkerExpectedSalary,
+  fmtKg,
+  fmtL,
+  fmtML,
+  fmtMoney,
+  fmtNL,
+  fmtRate,
+  fmtSalary,
+  lastMonthRange,
+  monthEnd,
+  monthStart,
+  todayStr,
+  weekEnd,
+  weekStart,
+  yearStart,
+  yesterdayStr,
+} from "./dailyproductionreport/utils";
+import { StatRow } from "./dailyproductionreport/components/StatRow";
+import { SkeletonBox } from "./dailyproductionreport/components/SkeletonBox";
+import { ExpandableCard } from "./dailyproductionreport/components/ExpandableCard";
+import { CategoryProductBreakdown } from "./dailyproductionreport/components/CategoryProductBreakdown";
+import { CategoryPieChart } from "./dailyproductionreport/components/CategoryPieChart";
+import { MiniPieChart } from "./dailyproductionreport/components/MiniPieChart";
+import { LedgerSection } from "./dailyproductionreport/components/LedgerSection";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function DailyProductionReport() {
+  const tUi = useFactoryText();
   const search = useSearch();
   const initialTab = new URLSearchParams(search).get("tab") || "production";
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -215,7 +255,7 @@ export default function DailyProductionReport() {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b flex-shrink-0">
-        <PageHeader title="Overview" subtitle="Manufacturing overview — output metrics &amp; bale lifecycle" />
+        <PageHeader title={tUi("overview")} subtitle={tUi("manufacturing.overview.output.metrics.amp.bale.l")} />
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 overflow-hidden">
@@ -265,7 +305,7 @@ export default function DailyProductionReport() {
                 variant="outline"
                 onClick={() => stepDates(-1)}
                 data-testid="button-date-prev"
-                title="Previous day"
+                title={tUi("previous.day")}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -308,7 +348,7 @@ export default function DailyProductionReport() {
                 variant="outline"
                 onClick={() => stepDates(1)}
                 data-testid="button-date-next"
-                title="Next day"
+                title={tUi("next.day")}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -340,7 +380,7 @@ export default function DailyProductionReport() {
                       wipersGarbageKg={data.wipersGarbage.totalWeightKg}
                     />
                     <MiniPieChart
-                      title="By Grade"
+                      title={tUi("by.grade")}
                       allRows={gradeRows}
                       classifyFn={classifyByGrade}
                       order={GRADE_ORDER}
@@ -422,21 +462,21 @@ export default function DailyProductionReport() {
                     return (
                       <div className="flex flex-wrap items-center gap-5 pt-2 border-t border-border">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-muted-foreground">Productions</span>
+                          <span className="text-sm font-semibold text-muted-foreground">{tUi("productions")}</span>
                           <span className="text-base font-bold" data-testid="text-weight-productions">
                             {fmtKg(productionsKg)}
                           </span>
                         </div>
                         <span className="text-muted-foreground text-base font-semibold">&#8722;</span>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-muted-foreground">Original Batches</span>
+                          <span className="text-sm font-semibold text-muted-foreground">{tUi("original.batches")}</span>
                           <span className="text-base font-bold" data-testid="text-weight-batches">
                             {fmtKg(origKg)}
                           </span>
                         </div>
                         <span className="text-muted-foreground text-base font-semibold">=</span>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-muted-foreground">Total</span>
+                          <span className="text-sm font-semibold text-muted-foreground">{tUi("total")}</span>
                           <span
                             className={`text-base font-bold ${isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
                             data-testid="text-weight-total"
@@ -526,10 +566,10 @@ export default function DailyProductionReport() {
                           {salaryKpi && salaryKpi.perWorker.length > 0 ? (
                             <>
                               <div className="grid grid-cols-4 gap-1 text-xs font-medium text-muted-foreground mb-1.5 px-0.5">
-                                <span>Worker</span>
-                                <span className="text-right">Salary</span>
-                                <span className="text-right">Transport/d</span>
-                                <span className="text-right">Daily</span>
+                                <span>{tUi("worker")}</span>
+                                <span className="text-right">{tUi("salary")}</span>
+                                <span className="text-right">{tUi("transport.d")}</span>
+                                <span className="text-right">{tUi("daily")}</span>
                               </div>
                               {salaryKpi.perWorker.map((w) => {
                                 const dailyTransport = ms && ms.daysInMonth > 0 ? w.transport / ms.daysInMonth : 0;
@@ -555,7 +595,7 @@ export default function DailyProductionReport() {
                                 );
                               })}
                               <div className="grid grid-cols-4 gap-1 text-xs pt-1.5 border-t mt-1">
-                                <span className="font-medium text-muted-foreground">Total</span>
+                                <span className="font-medium text-muted-foreground">{tUi("total")}</span>
                                 <span className="text-right tabular-nums font-semibold text-foreground">
                                   {fmtSalary(attSalaryTotal ?? 0)}
                                 </span>
@@ -572,7 +612,7 @@ export default function DailyProductionReport() {
                               </div>
                             </>
                           ) : (
-                            <p className="text-xs text-muted-foreground">No monthly workers found.</p>
+                            <p className="text-xs text-muted-foreground">{tUi("no.monthly.workers.found")}</p>
                           )}
                         </div>
                       </CollapsibleContent>
@@ -695,9 +735,9 @@ export default function DailyProductionReport() {
                           {ms?.employeeBreakdown && ms.employeeBreakdown.length > 0 ? (
                             <>
                               <div className="grid grid-cols-3 gap-1 text-xs font-medium text-muted-foreground mb-1.5 px-0.5">
-                                <span>Employee</span>
-                                <span className="text-right">Expected</span>
-                                <span className="text-right">Daily</span>
+                                <span>{tUi("employee")}</span>
+                                <span className="text-right">{tUi("expected")}</span>
+                                <span className="text-right">{tUi("daily")}</span>
                               </div>
                               {ms.employeeBreakdown.map((e) => {
                                 const daily = ms.daysInMonth > 0 ? e.monthlySalary / ms.daysInMonth : 0;
@@ -714,7 +754,7 @@ export default function DailyProductionReport() {
                                 );
                               })}
                               <div className="grid grid-cols-3 gap-1 text-xs pt-1.5 border-t mt-1">
-                                <span className="font-medium text-muted-foreground">Total</span>
+                                <span className="font-medium text-muted-foreground">{tUi("total")}</span>
                                 <span className="text-right tabular-nums font-semibold text-foreground">
                                   {fmtSalary(ms.employeeBreakdown.reduce((sum, e) => sum + e.expected, 0))}
                                 </span>
@@ -724,7 +764,7 @@ export default function DailyProductionReport() {
                               </div>
                             </>
                           ) : (
-                            <p className="text-xs text-muted-foreground">No employees found.</p>
+                            <p className="text-xs text-muted-foreground">{tUi("no.employees.found")}</p>
                           )}
                         </div>
                       </CollapsibleContent>
@@ -1023,7 +1063,7 @@ export default function DailyProductionReport() {
             const mergedTotalValue = (data?.production.totalValue ?? 0) + wgCats.reduce((s, c) => s + c.totalValue, 0);
             return (
               <ExpandableCard
-                title="Production by Category"
+                title={tUi("production.by.category")}
                 badge={
                   isLoading ? undefined : `${mergedCategories.length} categories · ${mergedProducts.length} products`
                 }
@@ -1037,7 +1077,9 @@ export default function DailyProductionReport() {
                     ))}
                   </div>
                 ) : !data || mergedCategories.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-6 text-sm">No bales produced in this period</p>
+                  <p className="text-center text-muted-foreground py-6 text-sm">
+                    {tUi("no.bales.produced.in.this.period")}
+                  </p>
                 ) : (
                   <CategoryProductBreakdown
                     categories={mergedCategories}
@@ -1053,7 +1095,7 @@ export default function DailyProductionReport() {
 
           {/* Mix Batches */}
           <ExpandableCard
-            title="Mix Batches"
+            title={tUi("mix.batches")}
             badge={
               isLoading
                 ? undefined
@@ -1069,18 +1111,18 @@ export default function DailyProductionReport() {
                 ))}
               </div>
             ) : !data || data.rawMaterial.batches.length === 0 ? (
-              <p className="text-center text-muted-foreground py-6 text-sm">No mix batches in this period</p>
+              <p className="text-center text-muted-foreground py-6 text-sm">{tUi("no.mix.batches.in.this.period")}</p>
             ) : (
               <div className="table-responsive">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Batch Code</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Weight (kg)</TableHead>
-                      <TableHead className="text-right">Cost / kg</TableHead>
-                      <TableHead className="text-right">Total Cost</TableHead>
+                      <TableHead>{tUi("batch.code")}</TableHead>
+                      <TableHead>{tUi("name")}</TableHead>
+                      <TableHead>{tUi("date")}</TableHead>
+                      <TableHead className="text-right">{tUi("weight.kg")}</TableHead>
+                      <TableHead className="text-right">{tUi("cost.kg")}</TableHead>
+                      <TableHead className="text-right">{tUi("total.cost")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1166,24 +1208,24 @@ export default function DailyProductionReport() {
           ) : (
             <>
               <LedgerSection
-                title="Current Stock — In Hand"
-                subtitle="Bales in stock (IN_STOCK / FINALIZED), excluding wipers and garbages"
+                title={tUi("current.stock.in.hand")}
+                subtitle={tUi("bales.in.stock.in.stock.finalized.excluding.wipe")}
                 icon={<Package className="w-4 h-4 text-green-600" />}
                 badgeColor="text-green-700 border-green-200"
                 rows={ledger?.currentStock || []}
                 total={ledger?.totals.currentStock || { baleCount: 0, totalWeightKg: 0, totalCost: 0 }}
               />
               <LedgerSection
-                title="Wipers & Garbages — In Hand"
-                subtitle="Waste-category bales currently in stock (IN_STOCK / FINALIZED)"
+                title={tUi("wipers.garbages.in.hand")}
+                subtitle={tUi("waste.category.bales.currently.in.stock.in.stock")}
                 icon={<AlertTriangle className="w-4 h-4 text-amber-500" />}
                 badgeColor="text-amber-700 border-amber-200"
                 rows={ledger?.wasteStock || []}
                 total={ledger?.totals.wasteStock || { baleCount: 0, totalWeightKg: 0, totalCost: 0 }}
               />
               <LedgerSection
-                title="Stock Sold"
-                subtitle="Bales that have been dispatched and sold to customers"
+                title={tUi("stock.sold")}
+                subtitle={tUi("bales.that.have.been.dispatched.and.sold.to.cust")}
                 icon={<ShoppingCart className="w-4 h-4 text-blue-600" />}
                 badgeColor="text-blue-700 border-blue-200"
                 rows={ledger?.sold || []}
@@ -1191,7 +1233,7 @@ export default function DailyProductionReport() {
                 showSoldPrice={true}
               />
               <LedgerSection
-                title="Pending Loading / Verified"
+                title={tUi("pending.loading.verified")}
                 subtitle="Bales reserved for orders currently in Loading, Pending Verification, or Verified status"
                 icon={<Truck className="w-4 h-4 text-purple-500" />}
                 badgeColor="text-purple-700 border-purple-200"
@@ -1199,8 +1241,8 @@ export default function DailyProductionReport() {
                 total={ledger?.totals.pendingLoading || { baleCount: 0, totalWeightKg: 0, totalCost: 0 }}
               />
               <LedgerSection
-                title="Waste Dispatched"
-                subtitle="Bales removed from stock via waste disposal (Waste Dispatch records)"
+                title={tUi("waste.dispatched")}
+                subtitle={tUi("bales.removed.from.stock.via.waste.disposal.wast")}
                 icon={<Trash2 className="w-4 h-4 text-destructive" />}
                 badgeColor="text-destructive border-destructive/30"
                 rows={ledger?.wasteDispatched || []}
@@ -1212,7 +1254,7 @@ export default function DailyProductionReport() {
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between gap-4 flex-wrap">
                       <div>
-                        <p className="font-bold text-sm">Total Production (All Time)</p>
+                        <p className="font-bold text-sm">{tUi("total.production.all.time")}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           Sum of all sections — complete production output
                         </p>

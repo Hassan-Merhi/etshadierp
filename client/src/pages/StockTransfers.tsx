@@ -30,6 +30,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { PageHeader } from "@/components/PageHeader";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { useDateJump } from "@/hooks/use-date-jump";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface StockTransferRow {
   transferId: number;
@@ -51,6 +52,7 @@ interface StockTransfersProps {
 }
 
 export default function StockTransfers({ hideVoucherNotes = false }: StockTransfersProps) {
+  const tUi = useErpText();
   const [, setLocation] = useLocation();
   const { formatAmount } = useCurrencyContext();
   const { formatShortDate: formatDate } = useDateFormat();
@@ -138,8 +140,8 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
   return (
     <div className="p-4 md:p-6 space-y-5 w-full">
       <PageHeader
-        title="Stock Transfers"
-        subtitle="All stock movement vouchers between locations"
+        title={tUi("stock.transfers")}
+        subtitle={tUi("all.stock.movement.vouchers.between.locations")}
         icon={<ArrowLeftRight className="h-5 w-5" />}
       />
 
@@ -148,7 +150,7 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
         <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
           <ArrowLeftRight className="h-4 w-4 text-muted-foreground shrink-0" />
           <div>
-            <p className="text-xs text-muted-foreground leading-none mb-0.5">Transfers</p>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">{tUi("transfers")}</p>
             {isLoading ? (
               <Skeleton className="h-5 w-10 mt-0.5" />
             ) : (
@@ -159,7 +161,7 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
         <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
           <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
           <div>
-            <p className="text-xs text-muted-foreground leading-none mb-0.5">Total Value</p>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">{tUi("total.value")}</p>
             {isLoading ? (
               <Skeleton className="h-5 w-20 mt-0.5" />
             ) : (
@@ -170,7 +172,7 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
         <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
           <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
           <div>
-            <p className="text-xs text-muted-foreground leading-none mb-0.5">Pending</p>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">{tUi("pending")}</p>
             {isLoading ? (
               <Skeleton className="h-5 w-10 mt-0.5" />
             ) : (
@@ -186,7 +188,7 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
         <div className="relative flex-1 min-w-48 max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by voucher, location, notes…"
+            placeholder={tUi("search.by.voucher.location.notes")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-8"
@@ -210,7 +212,7 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <ArrowLeftRight className="h-12 w-12 mx-auto mb-4 opacity-40" />
-          <p className="text-base font-medium">No transfers found</p>
+          <p className="text-base font-medium">{tUi("no.transfers.found")}</p>
           <p className="text-sm mt-1">
             {search ? "Try adjusting your search or date range" : "No stock transfers in the selected period"}
           </p>
@@ -223,14 +225,16 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
-                    {!hideVoucherNotes && <TableHead className="text-xs whitespace-nowrap">Voucher</TableHead>}
-                    <TableHead className="text-xs whitespace-nowrap">Date</TableHead>
-                    <TableHead className="text-xs whitespace-nowrap">Route</TableHead>
-                    <TableHead className="text-xs whitespace-nowrap">Items</TableHead>
-                    <TableHead className="text-xs whitespace-nowrap text-right">Total</TableHead>
-                    <TableHead className="text-xs whitespace-nowrap">Status</TableHead>
-                    {!hideVoucherNotes && <TableHead className="text-xs whitespace-nowrap">Notes</TableHead>}
-                    <TableHead className="text-xs whitespace-nowrap text-right">Actions</TableHead>
+                    {!hideVoucherNotes && (
+                      <TableHead className="text-xs whitespace-nowrap">{tUi("voucher.2")}</TableHead>
+                    )}
+                    <TableHead className="text-xs whitespace-nowrap">{tUi("date")}</TableHead>
+                    <TableHead className="text-xs whitespace-nowrap">{tUi("route")}</TableHead>
+                    <TableHead className="text-xs whitespace-nowrap">{tUi("items")}</TableHead>
+                    <TableHead className="text-xs whitespace-nowrap text-right">{tUi("total")}</TableHead>
+                    <TableHead className="text-xs whitespace-nowrap">{tUi("status")}</TableHead>
+                    {!hideVoucherNotes && <TableHead className="text-xs whitespace-nowrap">{tUi("notes")}</TableHead>}
+                    <TableHead className="text-xs whitespace-nowrap text-right">{tUi("actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -302,7 +306,7 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
                           <Button
                             size="icon"
                             variant="ghost"
-                            title="Edit notes"
+                            title={tUi("edit.notes")}
                             onClick={() => startEdit(t)}
                             data-testid={`button-edit-${t.transferId}`}
                           >
@@ -311,7 +315,7 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
                           <Button
                             size="icon"
                             variant="ghost"
-                            title="Open voucher"
+                            title={tUi("open.voucher")}
                             onClick={() => openVoucher(t.voucherId)}
                             data-testid={`button-open-${t.transferId}`}
                           >
@@ -376,7 +380,7 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
                       <Button
                         size="icon"
                         variant="ghost"
-                        title="Edit notes"
+                        title={tUi("edit.notes")}
                         onClick={() => startEdit(t)}
                         data-testid={`button-edit-mobile-${t.transferId}`}
                       >
@@ -385,7 +389,7 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
                       <Button
                         size="icon"
                         variant="ghost"
-                        title="Open voucher"
+                        title={tUi("open.voucher")}
                         onClick={() => openVoucher(t.voucherId)}
                         data-testid={`button-open-mobile-${t.transferId}`}
                       >
@@ -400,7 +404,7 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
                       <Button
                         size="icon"
                         variant="ghost"
-                        title="Edit notes"
+                        title={tUi("edit.notes")}
                         onClick={() => startEdit(t)}
                         data-testid={`button-edit-mobile-${t.transferId}`}
                       >
@@ -409,7 +413,7 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
                       <Button
                         size="icon"
                         variant="ghost"
-                        title="Open voucher"
+                        title={tUi("open.voucher")}
                         onClick={() => openVoucher(t.voucherId)}
                         data-testid={`button-open-mobile-${t.transferId}`}
                       >
@@ -463,7 +467,7 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
             <Textarea
               value={editNotes}
               onChange={(e) => setEditNotes(e.target.value)}
-              placeholder="Transfer notes…"
+              placeholder={tUi("transfer.notes")}
               className="min-h-28 resize-none"
               data-testid="input-edit-notes"
             />

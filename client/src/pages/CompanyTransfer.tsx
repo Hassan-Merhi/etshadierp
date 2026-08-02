@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Plus, Trash2, Undo2, Zap } from "lucide-react";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface LedgerAccount {
   id: number;
@@ -74,6 +75,7 @@ const MODULE_PREFIXES: Record<string, string> = {
 const MODULES = ["PROPERTIES", "ERP", "FACTORY"] as const;
 
 export default function CompanyTransfer() {
+  const tUi = useErpText();
   const { companies, selectedCompany: currentCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();
   const { toast } = useToast();
@@ -89,7 +91,7 @@ export default function CompanyTransfer() {
   const fromCompanyId = currentCompany?.id;
   const otherCompanies = useMemo(
     () => companies.filter((company) => company.id !== fromCompanyId),
-    [companies, fromCompanyId],
+    [companies, fromCompanyId]
   );
 
   const { data: fromAccounts = [] } = useQuery<LedgerAccount[]>({
@@ -182,7 +184,7 @@ export default function CompanyTransfer() {
 
   const toggleCashAccount = (id: number) => {
     setRuleCashAccountIds((previous) =>
-      previous.includes(id) ? previous.filter((accountId) => accountId !== id) : [...previous, id],
+      previous.includes(id) ? previous.filter((accountId) => accountId !== id) : [...previous, id]
     );
   };
 
@@ -214,7 +216,7 @@ export default function CompanyTransfer() {
     <div className="flex h-full flex-col overflow-auto">
       <div className="shrink-0 border-b px-6 py-4">
         <PageHeader
-          title="Company Transfer"
+          title={tUi("company.transfer")}
           subtitle="Move a balance from one company to another. The amount is removed from the source and added to the destination."
         />
       </div>
@@ -308,10 +310,10 @@ export default function CompanyTransfer() {
 
                   {isAdding && (
                     <div className="mt-2 space-y-3 border-t pt-2">
-                      <p className="text-xs font-medium text-muted-foreground">New rule</p>
+                      <p className="text-xs font-medium text-muted-foreground">{tUi("new.rule")}</p>
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="space-y-1.5">
-                          <Label className="text-xs">Destination Company</Label>
+                          <Label className="text-xs">{tUi("destination.company")}</Label>
                           <Select
                             value={ruleDestCompanyId}
                             onValueChange={(value) => {
@@ -321,7 +323,7 @@ export default function CompanyTransfer() {
                             data-testid={`select-rule-dest-company-${module}`}
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Select company" />
+                              <SelectValue placeholder={tUi("select.company")} />
                             </SelectTrigger>
                             <SelectContent>
                               {otherCompanies.map((company) => (
@@ -333,7 +335,7 @@ export default function CompanyTransfer() {
                           </Select>
                         </div>
                         <div className="space-y-1.5">
-                          <Label className="text-xs">Destination Account</Label>
+                          <Label className="text-xs">{tUi("destination.account")}</Label>
                           <Select
                             value={ruleDestAccountId}
                             onValueChange={setRuleDestAccountId}
@@ -381,7 +383,7 @@ export default function CompanyTransfer() {
                             </label>
                           ))}
                           {accountOptions(fromAccounts).length === 0 && (
-                            <span className="text-xs text-muted-foreground">No accounts found</span>
+                            <span className="text-xs text-muted-foreground">{tUi("no.accounts.found")}</span>
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground">
@@ -420,25 +422,25 @@ export default function CompanyTransfer() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Transfer History</CardTitle>
+            <CardTitle className="text-base">{tUi("transfer.history")}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {isLoading ? (
-              <p className="p-4 text-sm text-muted-foreground">Loading…</p>
+              <p className="p-4 text-sm text-muted-foreground">{tUi("loading")}</p>
             ) : transfers.length === 0 ? (
-              <p className="p-4 text-sm text-muted-foreground">No transfers yet.</p>
+              <p className="p-4 text-sm text-muted-foreground">{tUi("no.transfers.yet.2")}</p>
             ) : (
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>From</TableHead>
-                    <TableHead>From Account</TableHead>
+                    <TableHead>{tUi("date")}</TableHead>
+                    <TableHead>{tUi("from")}</TableHead>
+                    <TableHead>{tUi("from.account")}</TableHead>
                     <TableHead>To</TableHead>
-                    <TableHead>To Account</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Note</TableHead>
-                    <TableHead className="text-right">Undo</TableHead>
+                    <TableHead>{tUi("to.account")}</TableHead>
+                    <TableHead>{tUi("amount")}</TableHead>
+                    <TableHead>{tUi("note")}</TableHead>
+                    <TableHead className="text-right">{tUi("undo")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -475,22 +477,23 @@ export default function CompanyTransfer() {
       <AlertDialog open={!!undoTarget} onOpenChange={(open) => !open && setUndoTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Reverse this transfer?</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("reverse.this.transfer")}</AlertDialogTitle>
             <AlertDialogDescription>
               {undoTarget && (
                 <>
-                  This will reverse the <strong>{formatAmount(Number.parseFloat(undoTarget.amount))}</strong> transfer from{" "}
-                  <strong>{undoTarget.fromCompanyName}</strong> to <strong>{undoTarget.toCompanyName}</strong> on{" "}
+                  This will reverse the <strong>{formatAmount(Number.parseFloat(undoTarget.amount))}</strong> transfer
+                  from <strong>{undoTarget.fromCompanyName}</strong> to <strong>{undoTarget.toCompanyName}</strong> on{" "}
                   <strong>{undoTarget.transferDate}</strong>.
                   <br />
                   <br />
-                  Both company balances will return to their prior values and the transfer history entry will be removed.
+                  Both company balances will return to their prior values and the transfer history entry will be
+                  removed.
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground"
               onClick={() => undoTarget && undoMutation.mutate(undoTarget.id)}
@@ -505,13 +508,13 @@ export default function CompanyTransfer() {
       <AlertDialog open={!!deleteConfirmRuleId} onOpenChange={(open) => !open && setDeleteConfirmRuleId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove this auto-transfer rule?</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("remove.this.auto.transfer.rule")}</AlertDialogTitle>
             <AlertDialogDescription>
               This rule will be deleted. Payments already processed are not affected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground"
               onClick={() => deleteConfirmRuleId && deleteRuleMutation.mutate(deleteConfirmRuleId)}

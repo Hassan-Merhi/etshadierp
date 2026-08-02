@@ -3,17 +3,18 @@
  *
  * Extracted from PosTransferOrders.tsx during the Phase 4 god-file split.
  */
-import {useQuery} from "@tanstack/react-query";
-import {CheckCircle2, Clock, Lock} from "lucide-react";
-import {Card, CardContent} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
-import {Skeleton} from "@/components/ui/skeleton";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription} from "@/components/ui/dialog";
-import {cn} from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { CheckCircle2, Clock, Lock } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
-import type {TransferDetail} from "../types";
-import {fmtQty, formatDate, formatDateTime} from "../utils";
+import type { TransferDetail } from "../types";
+import { fmtQty, formatDate, formatDateTime } from "../utils";
+import { usePosText } from "@/i18n/modules/pos";
 
 export // ─── View-only dialog ─────────────────────────────────────────────────────────
 function ViewTransferDialog({
@@ -25,6 +26,7 @@ function ViewTransferDialog({
   open: boolean;
   onClose: () => void;
 }) {
+  const tUi = usePosText();
   const { data: detail, isLoading } = useQuery<TransferDetail>({
     queryKey: ["/api/pos-transfer-detail", voucherId],
     queryFn: async () => {
@@ -73,7 +75,7 @@ function ViewTransferDialog({
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-8 text-xs py-2">#</TableHead>
-                    <TableHead className="text-xs py-2">Item</TableHead>
+                    <TableHead className="text-xs py-2">{tUi("item")}</TableHead>
                     <TableHead className="text-right text-xs py-2">Qty</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -87,7 +89,7 @@ function ViewTransferDialog({
                   ))}
                   <TableRow className="bg-muted/20 font-semibold">
                     <TableCell />
-                    <TableCell className="text-xs py-2">Total</TableCell>
+                    <TableCell className="text-xs py-2">{tUi("total")}</TableCell>
                     <TableCell className="text-right font-mono text-sm py-2">
                       {fmtQty(detail.items.reduce((s, i) => s + parseFloat(i.quantity), 0))}
                     </TableCell>
@@ -133,10 +135,10 @@ function ViewTransferDialog({
                         {rev.note && <p className="text-xs text-muted-foreground italic">{rev.note}</p>}
                         <div className="rounded-md border overflow-hidden">
                           <div className="grid grid-cols-[1fr_auto_auto_auto] bg-muted/30 border-b px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide gap-x-4">
-                            <span>Item</span>
+                            <span>{tUi("item")}</span>
                             <span className="text-right">Was</span>
                             <span className="text-right">Now</span>
-                            <span className="text-right">Change</span>
+                            <span className="text-right">{tUi("change")}</span>
                           </div>
                           {rev.items
                             .filter((ri) => parseFloat(ri.delta) !== 0)
@@ -173,7 +175,7 @@ function ViewTransferDialog({
             )}
           </div>
         ) : (
-          <p className="text-sm text-destructive py-4">Failed to load order.</p>
+          <p className="text-sm text-destructive py-4">{tUi("failed.to.load.order")}</p>
         )}
       </DialogContent>
     </Dialog>

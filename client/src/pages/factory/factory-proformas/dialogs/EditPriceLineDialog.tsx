@@ -7,6 +7,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function EditPriceLineDialog({
   editLineMutation,
@@ -23,11 +24,12 @@ export function EditPriceLineDialog({
   setEditLineValues: any;
   setEditingLine: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog open={!!editingLine} onOpenChange={(open) => !open && setEditingLine(null)}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Edit Price Line</DialogTitle>
+          <DialogTitle>{tUi("edit.price.line")}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="bg-muted p-3 rounded-md mb-2">
@@ -35,7 +37,7 @@ export function EditPriceLineDialog({
             <p className="text-xs text-muted-foreground">{editingLine?.productName}</p>
           </div>
           <div>
-            <label className="text-sm font-medium mb-1 block">Product Name</label>
+            <label className="text-sm font-medium mb-1 block">{tUi("product.name")}</label>
             <Input
               value={editLineValues.productName}
               onChange={(e) => setEditLineValues({ ...editLineValues, productName: e.target.value })}
@@ -44,7 +46,7 @@ export function EditPriceLineDialog({
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">Quantity</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("quantity.2")}</label>
               <Input
                 type="number"
                 value={editLineValues.quantity}
@@ -56,7 +58,7 @@ export function EditPriceLineDialog({
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Price per Bale</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("price.per.bale.2")}</label>
               <Input
                 type="number"
                 step="0.01"
@@ -69,7 +71,7 @@ export function EditPriceLineDialog({
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">KG / Bale</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("kg.bale.2")}</label>
               <Input
                 type="number"
                 step="0.01"

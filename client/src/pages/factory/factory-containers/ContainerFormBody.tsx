@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatNumber } from "@/lib/formatNumber";
 import type { FactorySupplier } from "@shared/schema";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 type FormData = {
   containerNumber: string;
@@ -69,6 +70,7 @@ export function ContainerFormBody({
   brokerMismatch,
   ledgerAccounts,
 }: ContainerFormBodyProps) {
+  const tUi = useFactoryText();
   const updateOtherChargeLine = (idx: number, field: keyof OtherChargeLine, value: string) =>
     setOtherChargeLines((prev) => prev.map((l, i) => (i === idx ? { ...l, [field]: value } : l)));
 
@@ -77,11 +79,11 @@ export function ContainerFormBody({
       {/* ── Section 1: Basic ───────────────────────────────────────────── */}
       <div className="space-y-3">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold">Basic</p>
+          <p className="text-sm font-semibold">{tUi("basic")}</p>
           <Separator className="flex-1" />
         </div>
         <div>
-          <Label>Container Number *</Label>
+          <Label>{tUi("container.number.2")}</Label>
           <Input
             value={formData.containerNumber}
             onChange={(e) => setFormData((f) => ({ ...f, containerNumber: e.target.value }))}
@@ -91,7 +93,7 @@ export function ContainerFormBody({
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <Label>Arrival Date</Label>
+            <Label>{tUi("arrival.date")}</Label>
             <Input
               type="date"
               value={formData.arrivalDate}
@@ -100,16 +102,16 @@ export function ContainerFormBody({
             />
           </div>
           <div>
-            <Label>Status</Label>
+            <Label>{tUi("status")}</Label>
             <Select value={formData.status} onValueChange={(val) => setFormData((f) => ({ ...f, status: val }))}>
               <SelectTrigger data-testid="select-container-status">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="PENDING">Pending</SelectItem>
-                <SelectItem value="IN_TRANSIT">In Transit</SelectItem>
-                <SelectItem value="AVAILABLE">Available</SelectItem>
-                <SelectItem value="OFFLOADED">Offloaded</SelectItem>
+                <SelectItem value="PENDING">{tUi("pending")}</SelectItem>
+                <SelectItem value="IN_TRANSIT">{tUi("in.transit")}</SelectItem>
+                <SelectItem value="AVAILABLE">{tUi("available")}</SelectItem>
+                <SelectItem value="OFFLOADED">{tUi("offloaded")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -119,7 +121,7 @@ export function ContainerFormBody({
       {/* ── Section 2: Supplier & Broker ───────────────────────────────── */}
       <div className="space-y-3">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold">Supplier &amp; Broker</p>
+          <p className="text-sm font-semibold">{tUi("supplier.amp.broker")}</p>
           <Separator className="flex-1" />
         </div>
         <div>
@@ -143,10 +145,10 @@ export function ContainerFormBody({
             }}
           >
             <SelectTrigger data-testid="select-container-broker">
-              <SelectValue placeholder="Select broker..." />
+              <SelectValue placeholder={tUi("select.broker")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__none__">None</SelectItem>
+              <SelectItem value="__none__">{tUi("none")}</SelectItem>
               {activeSuppliers.map((s) => (
                 <SelectItem key={s.id} value={s.id.toString()}>
                   {s.name}
@@ -156,16 +158,16 @@ export function ContainerFormBody({
           </Select>
         </div>
         <div>
-          <Label>Purchase Supplier</Label>
+          <Label>{tUi("purchase.supplier")}</Label>
           <Select
             value={formData.supplierId || "__none__"}
             onValueChange={(val) => setFormData((f) => ({ ...f, supplierId: val === "__none__" ? "" : val }))}
           >
             <SelectTrigger data-testid="select-container-supplier">
-              <SelectValue placeholder="Select supplier..." />
+              <SelectValue placeholder={tUi("select.supplier")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__none__">None</SelectItem>
+              <SelectItem value="__none__">{tUi("none")}</SelectItem>
               {filteredSupplierList.map((s) => (
                 <SelectItem key={s.id} value={s.id.toString()}>
                   {s.name}
@@ -206,12 +208,12 @@ export function ContainerFormBody({
       {/* ── Section 3: Money & Commission ──────────────────────────────── */}
       <div className="space-y-3">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold">Money &amp; Commission</p>
+          <p className="text-sm font-semibold">{tUi("money.amp.commission")}</p>
           <Separator className="flex-1" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <Label>Total Kg</Label>
+            <Label>{tUi("total.kg")}</Label>
             <Input
               type="text"
               inputMode="decimal"
@@ -222,7 +224,7 @@ export function ContainerFormBody({
             />
           </div>
           <div>
-            <Label>Rate per Kg</Label>
+            <Label>{tUi("rate.per.kg")}</Label>
             <Input
               type="text"
               inputMode="decimal"
@@ -248,10 +250,13 @@ export function ContainerFormBody({
               data-testid="text-edit-container-value-preview"
             >
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Estimated total value</span>
+                <span className="text-muted-foreground">{tUi("estimated.total.value")}</span>
                 <span className="font-semibold font-mono tabular-nums">
-                  {sym}{total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  {currency !== "USD" && <span className="text-xs text-muted-foreground font-normal ml-1"> {currency}</span>}
+                  {sym}
+                  {total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {currency !== "USD" && (
+                    <span className="text-xs text-muted-foreground font-normal ml-1"> {currency}</span>
+                  )}
                   <span className="text-xs text-muted-foreground font-normal ml-1.5">
                     ({rate.toLocaleString("en-US", { maximumFractionDigits: 7 })} ×{" "}
                     {kg.toLocaleString("en-US", { maximumFractionDigits: 2 })} kg)
@@ -264,7 +269,8 @@ export function ContainerFormBody({
                   <span className="font-mono tabular-nums text-xs text-muted-foreground">
                     ${totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
                     <span className="ml-1.5 opacity-70">
-                      ({sym}{total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} × {fx} FX)
+                      ({sym}
+                      {total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} × {fx} FX)
                     </span>
                   </span>
                 </div>
@@ -274,7 +280,7 @@ export function ContainerFormBody({
         })()}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <Label>Currency</Label>
+            <Label>{tUi("currency")}</Label>
             <Select value={currency} onValueChange={setCurrency}>
               <SelectTrigger data-testid="select-container-currency">
                 <SelectValue />
@@ -337,7 +343,7 @@ export function ContainerFormBody({
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <Label>Commission Amount</Label>
+            <Label>{tUi("commission.amount")}</Label>
             <Input
               type="number"
               value={formData.commissionAmount}
@@ -347,7 +353,7 @@ export function ContainerFormBody({
             />
           </div>
           <div>
-            <Label>Commission Currency</Label>
+            <Label>{tUi("commission.currency")}</Label>
             <Select
               value={formData.commissionCurrencyCode}
               onValueChange={(val) => setFormData((f) => ({ ...f, commissionCurrencyCode: val }))}
@@ -374,10 +380,10 @@ export function ContainerFormBody({
             onValueChange={(val) => setFormData((f) => ({ ...f, commissionAccountId: val === "__none__" ? "" : val }))}
           >
             <SelectTrigger data-testid="select-commission-account">
-              <SelectValue placeholder="None (leave empty)" />
+              <SelectValue placeholder={tUi("none.leave.empty")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__none__">None</SelectItem>
+              <SelectItem value="__none__">{tUi("none")}</SelectItem>
               {ledgerAccounts.map((acc: any) => (
                 <SelectItem key={acc.id} value={String(acc.id)}>
                   {acc.name}
@@ -395,7 +401,7 @@ export function ContainerFormBody({
       {/* ── Section 4: Freight & Other Charges ─────────────────────────── */}
       <div className="space-y-3">
         <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold">Freight &amp; Other Charges</p>
+          <p className="text-sm font-semibold">{tUi("freight.amp.other.charges")}</p>
           <Separator className="flex-1" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-[1fr_0.85fr_1.25fr] gap-3 items-end">
@@ -412,7 +418,7 @@ export function ContainerFormBody({
             />
           </div>
           <div>
-            <Label className="whitespace-nowrap">Freight Currency</Label>
+            <Label className="whitespace-nowrap">{tUi("freight.currency")}</Label>
             <Select
               value={formData.freightCurrencyCode}
               onValueChange={(val) => setFormData((f) => ({ ...f, freightCurrencyCode: val }))}
@@ -438,10 +444,10 @@ export function ContainerFormBody({
               onValueChange={(val) => setFormData((f) => ({ ...f, freightAccountId: val === "__none__" ? "" : val }))}
             >
               <SelectTrigger data-testid="select-freight-account">
-                <SelectValue placeholder="None" />
+                <SelectValue placeholder={tUi("none")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">None</SelectItem>
+                <SelectItem value="__none__">{tUi("none")}</SelectItem>
                 {ledgerAccounts.map((acc: any) => (
                   <SelectItem key={acc.id} value={String(acc.id)}>
                     {acc.name}
@@ -454,7 +460,7 @@ export function ContainerFormBody({
         </div>
         {parseFloat(formData.freight || "0") > 0 && (
           <div className="space-y-2">
-            <Label>Freight Paid By</Label>
+            <Label>{tUi("freight.paid.by")}</Label>
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -490,10 +496,10 @@ export function ContainerFormBody({
                   }
                 >
                   <SelectTrigger data-testid="select-freight-own-account">
-                    <SelectValue placeholder="Select account..." />
+                    <SelectValue placeholder={tUi("select.account.2")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none__">Select account...</SelectItem>
+                    <SelectItem value="__none__">{tUi("select.account.2")}</SelectItem>
                     {ledgerAccounts.map((acc: any) => (
                       <SelectItem key={acc.id} value={String(acc.id)}>
                         {acc.name}
@@ -505,7 +511,7 @@ export function ContainerFormBody({
               </div>
             )}
             {formData.freightPaidBy === "supplier" && (
-              <p className="text-xs text-muted-foreground">Freight will be added to the supplier's payable balance.</p>
+              <p className="text-xs text-muted-foreground">{tUi("freight.will.be.added.to.the.supplier.s.payable.")}</p>
             )}
           </div>
         )}
@@ -520,7 +526,10 @@ export function ContainerFormBody({
               variant="outline"
               className="h-7 px-2 text-xs"
               onClick={() =>
-                setOtherChargeLines((prev) => [...prev, { amount: "", currencyCode: currency, ledgerAccountId: "", narration: "" }])
+                setOtherChargeLines((prev) => [
+                  ...prev,
+                  { amount: "", currencyCode: currency, ledgerAccountId: "", narration: "" },
+                ])
               }
               data-testid="button-add-other-charge"
             >
@@ -528,14 +537,14 @@ export function ContainerFormBody({
             </Button>
           </div>
           {otherChargeLines.length === 0 && (
-            <p className="text-xs text-muted-foreground py-1">No other charges. Click "Add Line" to add one.</p>
+            <p className="text-xs text-muted-foreground py-1">{tUi("no.other.charges.click.add.line.to.add.one")}</p>
           )}
           {otherChargeLines.length > 0 && (
             <div className="grid grid-cols-[1fr_auto_2fr_2fr_auto] gap-x-2 gap-y-1 items-center">
-              <div className="text-xs text-muted-foreground font-medium">Amount</div>
+              <div className="text-xs text-muted-foreground font-medium">{tUi("amount")}</div>
               <div className="text-xs text-muted-foreground font-medium">CCY</div>
-              <div className="text-xs text-muted-foreground font-medium">Account</div>
-              <div className="text-xs text-muted-foreground font-medium">Narration</div>
+              <div className="text-xs text-muted-foreground font-medium">{tUi("account")}</div>
+              <div className="text-xs text-muted-foreground font-medium">{tUi("narration")}</div>
               <div />
               {otherChargeLines.map((line, idx) => (
                 <>
@@ -571,10 +580,10 @@ export function ContainerFormBody({
                     }
                   >
                     <SelectTrigger data-testid={`select-other-charge-account-${idx}`}>
-                      <SelectValue placeholder="No account" />
+                      <SelectValue placeholder={tUi("no.account")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__none__">No account</SelectItem>
+                      <SelectItem value="__none__">{tUi("no.account")}</SelectItem>
                       {ledgerAccounts.map((acc: any) => (
                         <SelectItem key={acc.id} value={String(acc.id)}>
                           {acc.name}
@@ -587,7 +596,7 @@ export function ContainerFormBody({
                     key={`nar-${idx}`}
                     value={line.narration}
                     onChange={(e) => updateOtherChargeLine(idx, "narration", e.target.value)}
-                    placeholder="Narration (optional)"
+                    placeholder={tUi("narration.optional")}
                     data-testid={`input-other-charge-narration-${idx}`}
                   />
                   <Button

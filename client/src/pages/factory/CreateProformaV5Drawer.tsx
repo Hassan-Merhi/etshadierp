@@ -27,7 +27,9 @@ import { useToast } from "@/hooks/use-toast";
 
 import type { ArticleRow, BaleProduct, Draft, FactoryCustomer, Props } from "./createproformav5drawer/types";
 import { clearDraft, loadDraft, saveDraft } from "./createproformav5drawer/utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function CreateProformaV5Drawer({ open, onClose, articleRows, onSuccess }: Props) {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -518,7 +520,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
                   data-testid="select-v5-proforma-customer"
                   className={cn(errors.customerId && "border-destructive")}
                 >
-                  <SelectValue placeholder="Select customer…" />
+                  <SelectValue placeholder={tUi("select.customer")} />
                 </SelectTrigger>
                 <SelectContent>
                   {customersQuery.isLoading && (
@@ -559,7 +561,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs font-medium">Status</Label>
+              <Label className="text-xs font-medium">{tUi("status")}</Label>
               <div className="flex items-center gap-2 h-9">
                 <Switch checked={isActive} onCheckedChange={setIsActive} data-testid="switch-v5-proforma-active" />
                 <span className="text-sm text-muted-foreground">{isActive ? "Active" : "Inactive"}</span>
@@ -583,7 +585,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
 
             {sendToLoading && (
               <div className="flex flex-col gap-1.5">
-                <Label className="text-xs font-medium">Containers</Label>
+                <Label className="text-xs font-medium">{tUi("containers")}</Label>
                 <Input
                   type="number"
                   min={1}
@@ -739,7 +741,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
         {sendToLoading && (
           <div className="px-5 py-3 border-b shrink-0 bg-muted/20">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-muted-foreground">Container names — click to rename</p>
+              <p className="text-xs font-medium text-muted-foreground">{tUi("container.names.click.to.rename")}</p>
               <Button size="sm" variant="outline" onClick={addContainer} data-testid="button-v5-add-container">
                 <Plus className="h-3.5 w-3.5 mr-1" />
                 Add
@@ -784,7 +786,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
             <Input
               value={articleSearch}
               onChange={(e) => setArticleSearch(e.target.value)}
-              placeholder="Search product or code…"
+              placeholder={tUi("search.product.or.code")}
               className="pl-8 h-8 text-sm"
               data-testid="input-v5-create-search"
             />
@@ -822,7 +824,9 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
                     Expected Total ({n}×)
                   </th>
                 )}
-                <th className="text-center px-3 py-2 font-medium border-b whitespace-nowrap min-w-[130px]">Price</th>
+                <th className="text-center px-3 py-2 font-medium border-b whitespace-nowrap min-w-[130px]">
+                  {tUi("price")}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -955,7 +959,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
                                 )}
                                 onClick={() => setPricingModes((prev) => ({ ...prev, [row.articleCode]: "per_bale" }))}
                                 data-testid={`button-v5-mode-bale-${row.articleCode}`}
-                                title="Price per bale"
+                                title={tUi("price.per.bale")}
                               >
                                 /bale
                               </button>
@@ -968,7 +972,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
                                 )}
                                 onClick={() => setPricingModes((prev) => ({ ...prev, [row.articleCode]: "per_kg" }))}
                                 data-testid={`button-v5-mode-kg-${row.articleCode}`}
-                                title="Price per kg"
+                                title={tUi("price.per.kg")}
                               >
                                 /kg
                               </button>
@@ -1013,7 +1017,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
             <tfoot>
               <tr className="bg-muted border-t-2 sticky bottom-0 z-20 text-xs font-semibold">
                 <td className="px-3 py-2 border-r sticky left-0 bg-muted z-10">
-                  <span className="text-foreground">Totals</span>
+                  <span className="text-foreground">{tUi("totals")}</span>
                   <span className="font-normal text-muted-foreground ml-1.5">({visibleRows.length} products)</span>
                 </td>
                 <td
@@ -1086,7 +1090,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
                 {warningCount} product{warningCount !== 1 ? "s" : ""} with shortage
               </span>
             )}
-            <span className="text-[10px] text-muted-foreground/60">Ctrl/⌘+S to save</span>
+            <span className="text-[10px] text-muted-foreground/60">{tUi("ctrl.s.to.save")}</span>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="default" onClick={onClose} data-testid="button-v5-cancel-proforma">

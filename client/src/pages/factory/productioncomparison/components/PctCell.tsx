@@ -3,8 +3,8 @@
  *
  * Extracted from ProductionComparison.tsx during the Phase 4 god-file split.
  */
-import {TrendingUp, TrendingDown, Minus} from "lucide-react";
-import {fmtPct} from "../utils";
+import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { fmtPct } from "../utils";
 
 export function PctCell({ pct }: { pct: number | null }) {
   if (pct === null) return <span className="text-xs text-muted-foreground">N/A</span>;

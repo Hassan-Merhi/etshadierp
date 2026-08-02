@@ -51,7 +51,9 @@ import { PageHeader } from "@/components/PageHeader";
 
 import type { V5Data, V5Row } from "./factorystockallocationv5/types";
 import { STATUS_LABELS } from "./factorystockallocationv5/utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactoryStockAllocationV5() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const searchString = useSearch();
   const focusProformaId = useMemo(() => {
@@ -636,7 +638,7 @@ export default function FactoryStockAllocationV5() {
       {/* ── Row 1: Title + action buttons ─────────────────────────────────── */}
       <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-3 border-b flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
-          <PageHeader title="Stock Allocation" />
+          <PageHeader title={tUi("stock.allocation")} />
           <Badge variant="secondary" className="text-[11px] font-semibold tracking-wide">
             v5
           </Badge>
@@ -673,7 +675,7 @@ export default function FactoryStockAllocationV5() {
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search product or code…"
+              placeholder={tUi("search.product.or.code")}
               className="pl-8 h-9 w-52 text-sm"
               data-testid="input-v5-search"
             />
@@ -827,7 +829,7 @@ export default function FactoryStockAllocationV5() {
                 <FileDown className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Export Excel</TooltipContent>
+            <TooltipContent>{tUi("export.excel")}</TooltipContent>
           </Tooltip>
 
           <Tooltip>
@@ -1141,7 +1143,9 @@ export default function FactoryStockAllocationV5() {
                                     ))}
                                   </div>
                                 ) : (
-                                  <p className="text-[11px] text-muted-foreground italic">No containers linked yet</p>
+                                  <p className="text-[11px] text-muted-foreground italic">
+                                    {tUi("no.containers.linked.yet")}
+                                  </p>
                                 )}
                               </div>
                             </td>
@@ -1217,7 +1221,7 @@ export default function FactoryStockAllocationV5() {
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Containers</DialogTitle>
+            <DialogTitle>{tUi("add.containers")}</DialogTitle>
           </DialogHeader>
 
           {addCtDialog && (
@@ -1229,7 +1233,7 @@ export default function FactoryStockAllocationV5() {
 
               {/* Number of containers */}
               <div className="flex items-center gap-3">
-                <label className="text-sm font-medium w-36 shrink-0">Number to add</label>
+                <label className="text-sm font-medium w-36 shrink-0">{tUi("number.to.add")}</label>
                 <Input
                   type="number"
                   min={1}
@@ -1308,14 +1312,14 @@ export default function FactoryStockAllocationV5() {
               </p>
 
               {editDraftDialog.articles.length === 0 ? (
-                <p className="text-sm text-muted-foreground italic">No eligible draft containers found.</p>
+                <p className="text-sm text-muted-foreground italic">{tUi("no.eligible.draft.containers.found")}</p>
               ) : (
                 <div className="rounded-md border text-xs overflow-hidden">
                   <div className="grid grid-cols-[1fr_60px_80px_64px] bg-muted px-3 py-2 gap-3 font-medium text-muted-foreground border-b">
-                    <span>Article</span>
-                    <span className="text-right">Current</span>
-                    <span className="text-right">New Qty</span>
-                    <span className="text-right">Ctrs</span>
+                    <span>{tUi("article")}</span>
+                    <span className="text-right">{tUi("current")}</span>
+                    <span className="text-right">{tUi("new.qty")}</span>
+                    <span className="text-right">{tUi("ctrs")}</span>
                   </div>
                   {editDraftDialog.articles.map((a) => (
                     <div
@@ -1471,7 +1475,7 @@ export default function FactoryStockAllocationV5() {
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
               ) : unlinkedQuery.isError ? (
-                <p className="text-sm text-destructive">Failed to load unlinked containers.</p>
+                <p className="text-sm text-destructive">{tUi("failed.to.load.unlinked.containers")}</p>
               ) : (unlinkedQuery.data?.orders ?? []).length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4 italic">
                   No unlinked LOADING containers found.
@@ -1480,9 +1484,9 @@ export default function FactoryStockAllocationV5() {
                 <div className="rounded-md border overflow-hidden max-h-72 overflow-y-auto">
                   <div className="grid grid-cols-[20px_1fr_80px_64px_56px] bg-muted px-3 py-2 gap-2 text-xs font-medium text-muted-foreground border-b sticky top-0">
                     <span />
-                    <span>Container / Customer</span>
-                    <span className="text-right">Loaded</span>
-                    <span className="text-right">Date</span>
+                    <span>{tUi("container.customer")}</span>
+                    <span className="text-right">{tUi("loaded")}</span>
+                    <span className="text-right">{tUi("date")}</span>
                     <span />
                   </div>
                   {(unlinkedQuery.data?.orders ?? []).map((order) => {
@@ -1523,7 +1527,7 @@ export default function FactoryStockAllocationV5() {
                           <div className="font-medium truncate">{order.containerNumber}</div>
                           <div className="text-muted-foreground truncate">{order.customerName}</div>
                           {customerMismatch && (
-                            <div className="text-destructive text-[10px]">Customer mismatch — cannot link</div>
+                            <div className="text-destructive text-[10px]">{tUi("customer.mismatch.cannot.link")}</div>
                           )}
                         </div>
                         <div className="text-right font-mono tabular-nums">
@@ -1602,7 +1606,7 @@ export default function FactoryStockAllocationV5() {
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : cancelledContainersQuery.isError ? (
-              <p className="text-sm text-destructive text-center py-4">Failed to load cancelled containers.</p>
+              <p className="text-sm text-destructive text-center py-4">{tUi("failed.to.load.cancelled.containers")}</p>
             ) : (cancelledContainersQuery.data?.orders ?? []).length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-6">
                 No recently cancelled containers found (last 30 days).
@@ -1689,7 +1693,7 @@ export default function FactoryStockAllocationV5() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel data-testid="button-v5-cancel-ct-dismiss">Keep Container</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-v5-cancel-ct-dismiss">{tUi("keep.container")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => cancelDialog && cancelContainerMut.mutate({ orderId: cancelDialog.orderId })}
@@ -1737,7 +1741,7 @@ export default function FactoryStockAllocationV5() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel data-testid="button-v5-cancel-ct-dismiss">Keep Container</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-v5-cancel-ct-dismiss">{tUi("keep.container")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => cancelDialog && cancelContainerMut.mutate({ orderId: cancelDialog.orderId })}
@@ -1765,7 +1769,7 @@ export default function FactoryStockAllocationV5() {
               <FileDown className="h-4 w-4 text-muted-foreground" />
               Export Stock Allocation
             </DialogTitle>
-            <DialogDescription>Choose which rows to include in the Excel export.</DialogDescription>
+            <DialogDescription>{tUi("choose.which.rows.to.include.in.the.excel.export")}</DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-4 py-1">
@@ -1781,8 +1785,10 @@ export default function FactoryStockAllocationV5() {
               >
                 <Checkbox checked={exportIncludePositive} onCheckedChange={(v) => setExportIncludePositive(!!v)} />
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-sm font-medium text-green-700 dark:text-green-400">Positive balance</span>
-                  <span className="text-xs text-muted-foreground">More stock than required</span>
+                  <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                    {tUi("positive.balance")}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{tUi("more.stock.than.required")}</span>
                 </div>
                 <span className="ml-auto text-xs font-mono text-green-700 dark:text-green-400">
                   {rows.filter((r) => r.freeToPromise > 0).length} rows
@@ -1795,8 +1801,8 @@ export default function FactoryStockAllocationV5() {
               >
                 <Checkbox checked={exportIncludeNegative} onCheckedChange={(v) => setExportIncludeNegative(!!v)} />
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-sm font-medium text-destructive">Negative balance (shortages)</span>
-                  <span className="text-xs text-muted-foreground">Stock is below what is needed</span>
+                  <span className="text-sm font-medium text-destructive">{tUi("negative.balance.shortages")}</span>
+                  <span className="text-xs text-muted-foreground">{tUi("stock.is.below.what.is.needed")}</span>
                 </div>
                 <span className="ml-auto text-xs font-mono text-destructive">
                   {rows.filter((r) => r.freeToPromise < 0).length} rows
@@ -1809,8 +1815,8 @@ export default function FactoryStockAllocationV5() {
               >
                 <Checkbox checked={exportIncludeZero} onCheckedChange={(v) => setExportIncludeZero(!!v)} />
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-sm font-medium text-muted-foreground">Zero balance</span>
-                  <span className="text-xs text-muted-foreground">Exactly meets requirements</span>
+                  <span className="text-sm font-medium text-muted-foreground">{tUi("zero.balance")}</span>
+                  <span className="text-xs text-muted-foreground">{tUi("exactly.meets.requirements")}</span>
                 </div>
                 <span className="ml-auto text-xs font-mono text-muted-foreground">
                   {rows.filter((r) => r.freeToPromise === 0).length} rows
@@ -1832,7 +1838,7 @@ export default function FactoryStockAllocationV5() {
                     <span className="font-semibold text-foreground">{count}</span> rows will be exported
                   </span>
                 ) : (
-                  <span className="text-destructive font-medium">Select at least one filter above</span>
+                  <span className="text-destructive font-medium">{tUi("select.at.least.one.filter.above")}</span>
                 );
               })()}
             </div>

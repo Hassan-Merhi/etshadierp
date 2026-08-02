@@ -15,6 +15,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { fmt } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function ReconcileBalancesDialog({
   formatDate,
@@ -31,11 +32,12 @@ export function ReconcileBalancesDialog({
   reconcilePreviewLoading: any;
   setReconcileOpen: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog open={reconcileOpen} onOpenChange={setReconcileOpen}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Reconcile Advance Balances — Preview</DialogTitle>
+          <DialogTitle>{tUi("reconcile.advance.balances.preview")}</DialogTitle>
           <DialogDescription>
             Replays all payroll deductions and manual repayments in order to recalculate every Salary Deduction advance
             balance from scratch. Review the changes below before confirming.
@@ -56,15 +58,15 @@ export function ReconcileBalancesDialog({
                 {/* Summary */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                   <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
-                    <p className="text-xs text-muted-foreground mb-1">Total Advances</p>
+                    <p className="text-xs text-muted-foreground mb-1">{tUi("total.advances")}</p>
                     <p className="font-bold">{reconcilePreview.totalAdvances}</p>
                   </div>
                   <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-center">
-                    <p className="text-xs text-muted-foreground mb-1">Will Change</p>
+                    <p className="text-xs text-muted-foreground mb-1">{tUi("will.change")}</p>
                     <p className="font-bold text-amber-700 dark:text-amber-400">{dirty.length}</p>
                   </div>
                   <div className="rounded-md bg-green-50 dark:bg-green-900/20 px-3 py-2 text-center">
-                    <p className="text-xs text-muted-foreground mb-1">Already Correct</p>
+                    <p className="text-xs text-muted-foreground mb-1">{tUi("already.correct")}</p>
                     <p className="font-bold text-green-700 dark:text-green-400">{clean.length}</p>
                   </div>
                 </div>
@@ -76,11 +78,11 @@ export function ReconcileBalancesDialog({
                 ) : (
                   <div className="border rounded-md overflow-hidden">
                     <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-x-4 px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20">
-                      <span>Worker</span>
-                      <span className="text-right">Date</span>
-                      <span className="text-right">Original</span>
-                      <span className="text-right">Current Balance</span>
-                      <span className="text-right">New Balance</span>
+                      <span>{tUi("worker")}</span>
+                      <span className="text-right">{tUi("date")}</span>
+                      <span className="text-right">{tUi("original")}</span>
+                      <span className="text-right">{tUi("current.balance")}</span>
+                      <span className="text-right">{tUi("new.balance")}</span>
                     </div>
                     <div className="divide-y">
                       {dirty.map((c: any) => (

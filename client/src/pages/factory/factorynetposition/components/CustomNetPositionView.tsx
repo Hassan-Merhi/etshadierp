@@ -3,16 +3,18 @@
  *
  * Extracted from FactoryNetPosition.tsx during the Phase 4 god-file split.
  */
-import {useState, useCallback, useMemo} from "react";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
-import {Button} from "@/components/ui/button";
-import {Equal, EyeOff, Eye, RotateCcw} from "lucide-react";
+import { useState, useCallback, useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Equal, EyeOff, Eye, RotateCcw } from "lucide-react";
 
-import type {CustomViewAccount, NetPositionData} from "../types";
-import {fmt, loadCustomViewHidden, saveCustomViewHidden} from "../utils";
+import type { CustomViewAccount, NetPositionData } from "../types";
+import { fmt, loadCustomViewHidden, saveCustomViewHidden } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function CustomNetPositionView({ data }: { data: NetPositionData }) {
+  const tUi = useFactoryText();
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(() => loadCustomViewHidden());
 
   const allAccounts = useMemo<CustomViewAccount[]>(() => {
@@ -70,7 +72,7 @@ export function CustomNetPositionView({ data }: { data: NetPositionData }) {
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <Equal className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-base">Custom Net Position View</CardTitle>
+            <CardTitle className="text-base">{tUi("custom.net.position.view")}</CardTitle>
             <Badge variant="outline" className="text-xs">
               View only
             </Badge>
@@ -98,7 +100,7 @@ export function CustomNetPositionView({ data }: { data: NetPositionData }) {
         {/* Mini totals banner */}
         <div className="px-4 py-3 border-b border-border bg-muted/20 flex items-center gap-6 flex-wrap">
           <div>
-            <p className="text-xs text-muted-foreground mb-0.5">Custom Net</p>
+            <p className="text-xs text-muted-foreground mb-0.5">{tUi("custom.net")}</p>
             <p
               className={`text-2xl font-bold font-mono ${netPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
               data-testid="text-custom-net-position"
@@ -108,7 +110,7 @@ export function CustomNetPositionView({ data }: { data: NetPositionData }) {
             </p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground mb-0.5">Have</p>
+            <p className="text-xs text-muted-foreground mb-0.5">{tUi("have")}</p>
             <p className="font-mono font-semibold text-green-600 dark:text-green-400">{fmt(visibleForUsTotal)}</p>
           </div>
           <div>
@@ -124,7 +126,7 @@ export function CustomNetPositionView({ data }: { data: NetPositionData }) {
 
         {/* Account rows */}
         {allAccounts.length === 0 ? (
-          <p className="px-4 py-6 text-sm text-muted-foreground text-center">No accounts to display.</p>
+          <p className="px-4 py-6 text-sm text-muted-foreground text-center">{tUi("no.accounts.to.display")}</p>
         ) : (
           <div className="divide-y divide-border">
             {allAccounts.map((acc) => {
@@ -176,7 +178,7 @@ export function CustomNetPositionView({ data }: { data: NetPositionData }) {
         {/* Footer total */}
         <div className="border-t border-border px-4 py-3 flex items-center justify-between bg-muted/30">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold">Custom Net Position</span>
+            <span className="text-sm font-semibold">{tUi("custom.net.position")}</span>
             {hiddenCount > 0 && (
               <span className="text-xs text-muted-foreground">
                 ({visibleCount} of {allAccounts.length} accounts)

@@ -13,6 +13,7 @@ import { useDateJump } from "@/hooks/use-date-jump";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface Transaction {
   date: string;
@@ -60,6 +61,7 @@ interface VouchersData {
 }
 
 export default function StockItemVouchers() {
+  const tUi = useErpText();
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
   const params = useParams();
@@ -159,7 +161,7 @@ export default function StockItemVouchers() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <PageHeader title="Stock Item Vouchers" />
+            <PageHeader title={tUi("stock.item.vouchers")} />
             {data?.stockItem && (
               <p className="text-sm text-muted-foreground" data-testid="text-item-name">
                 {data.stockItem.name} ({data.stockItem.code}) - {data.monthName} {data.year}
@@ -202,14 +204,14 @@ export default function StockItemVouchers() {
                 </TableRow>
                 <TableRow>
                   <TableHead className="text-right w-[60px]">Qty</TableHead>
-                  <TableHead className="text-right w-[60px]">Rate</TableHead>
-                  <TableHead className="text-right border-r w-[80px]">Value</TableHead>
+                  <TableHead className="text-right w-[60px]">{tUi("rate")}</TableHead>
+                  <TableHead className="text-right border-r w-[80px]">{tUi("value")}</TableHead>
                   <TableHead className="text-right w-[60px]">Qty</TableHead>
-                  <TableHead className="text-right w-[60px]">Rate</TableHead>
-                  <TableHead className="text-right border-r w-[80px]">Value</TableHead>
+                  <TableHead className="text-right w-[60px]">{tUi("rate")}</TableHead>
+                  <TableHead className="text-right border-r w-[80px]">{tUi("value")}</TableHead>
                   <TableHead className="text-right w-[60px]">Qty</TableHead>
-                  <TableHead className="text-right w-[60px]">Rate</TableHead>
-                  <TableHead className="text-right w-[80px]">Value</TableHead>
+                  <TableHead className="text-right w-[60px]">{tUi("rate")}</TableHead>
+                  <TableHead className="text-right w-[80px]">{tUi("value")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -290,7 +292,7 @@ export default function StockItemVouchers() {
 
           <div className="md:hidden space-y-2">
             {data?.transactions.length === 0 && (
-              <p className="text-center text-muted-foreground py-8">No transactions found for this month</p>
+              <p className="text-center text-muted-foreground py-8">{tUi("no.transactions.found.for.this.month")}</p>
             )}
             {data?.transactions.map((txn, idx) => (
               <div
@@ -338,7 +340,7 @@ export default function StockItemVouchers() {
                     </div>
                   )}
                   <div>
-                    <div className="text-muted-foreground">Closing</div>
+                    <div className="text-muted-foreground">{tUi("closing")}</div>
                     <div className="font-mono font-medium">{formatNumber(txn.closingQty, 0)}</div>
                     <div className="font-mono text-muted-foreground">{formatAmount(txn.closingValue)}</div>
                   </div>
@@ -348,24 +350,24 @@ export default function StockItemVouchers() {
 
             {data && data.transactions.length > 0 && (
               <div className="p-3 rounded-md border bg-muted/50 text-sm font-bold">
-                <div className="mb-2">Totals</div>
+                <div className="mb-2">{tUi("totals")}</div>
                 <div className="grid grid-cols-3 gap-2 text-xs">
                   <div>
-                    <div className="text-muted-foreground font-normal">Inward</div>
+                    <div className="text-muted-foreground font-normal">{tUi("inward")}</div>
                     <div className="font-mono">{formatNumber(data.totals.inwardQty, 0)}</div>
                     <div className="font-mono text-muted-foreground font-normal">
                       {formatAmount(data.totals.inwardValue)}
                     </div>
                   </div>
                   <div>
-                    <div className="text-muted-foreground font-normal">Outward</div>
+                    <div className="text-muted-foreground font-normal">{tUi("outward")}</div>
                     <div className="font-mono">{formatNumber(data.totals.outwardQty, 0)}</div>
                     <div className="font-mono text-muted-foreground font-normal">
                       {formatAmount(data.totals.outwardValue)}
                     </div>
                   </div>
                   <div>
-                    <div className="text-muted-foreground font-normal">Closing</div>
+                    <div className="text-muted-foreground font-normal">{tUi("closing")}</div>
                     <div className="font-mono">{formatNumber(data.totals.closingQty, 0)}</div>
                     <div className="font-mono text-muted-foreground font-normal">
                       {formatAmount(data.totals.closingValue)}

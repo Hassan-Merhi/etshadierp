@@ -68,6 +68,7 @@ import {
 import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 import type { FactoryMixBatch, FactoryBaleProduct } from "@shared/schema";
 import { BaleWeightEditDialog, type WeightEditBale } from "@/components/BaleWeightEditDialog";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING_PRESSING: "outline",
@@ -81,6 +82,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function BalesHistory() {
+  const tUi = useFactoryText();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportFrom, setExportFrom] = useState("");
@@ -182,7 +184,9 @@ export default function BalesHistory() {
   type BalesPage = { items: any[]; total: number; page: number; limit: number; totalPages: number };
   const { data: balesResponse, isLoading } = useQuery<BalesPage>({
     queryKey: [
-      "/api/factory/bales", dateFilter, currentPage,
+      "/api/factory/bales",
+      dateFilter,
+      currentPage,
       statusFilter !== "all" ? statusFilter : undefined,
       batchFilter !== "all" ? batchFilter : undefined,
       debouncedSearch || undefined,
@@ -576,8 +580,8 @@ export default function BalesHistory() {
       const baleDate = bale.stockEntryDate
         ? bale.stockEntryDate
         : bale.createdAt
-        ? new Date(bale.createdAt).toLocaleDateString("en-CA")
-        : null;
+          ? new Date(bale.createdAt).toLocaleDateString("en-CA")
+          : null;
       if (baleDate !== dateFilter) return false;
     }
 
@@ -657,8 +661,8 @@ export default function BalesHistory() {
     const baleDate = bale.stockEntryDate
       ? bale.stockEntryDate
       : bale.createdAt
-      ? new Date(bale.createdAt).toLocaleDateString("en-CA")
-      : null;
+        ? new Date(bale.createdAt).toLocaleDateString("en-CA")
+        : null;
     return baleDate === summaryDate;
   });
 
@@ -708,8 +712,10 @@ export default function BalesHistory() {
             <Package className="h-4.5 w-4.5 text-emerald-500" />
           </div>
           <div>
-            <h1 className="text-lg font-bold leading-tight">Bales</h1>
-            <p className="text-xs text-muted-foreground leading-tight">Stock history, status management and removal</p>
+            <h1 className="text-lg font-bold leading-tight">{tUi("bales")}</h1>
+            <p className="text-xs text-muted-foreground leading-tight">
+              {tUi("stock.history.status.management.and.removal")}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -742,7 +748,7 @@ export default function BalesHistory() {
             data-testid="input-summary-date"
           />
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">In Stock</span>
+            <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{tUi("in.stock")}</span>
             <span className="text-sm font-bold font-mono tabular-nums" data-testid="text-today-qty">
               {regularQty}
             </span>
@@ -752,7 +758,7 @@ export default function BalesHistory() {
           </div>
           <div className="w-px h-4 bg-border" />
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Garbage</span>
+            <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{tUi("garbage")}</span>
             <span className="text-sm font-bold font-mono tabular-nums" data-testid="text-today-garbage-qty">
               {garbageQty}
             </span>
@@ -762,7 +768,7 @@ export default function BalesHistory() {
           </div>
           <div className="w-px h-4 bg-border" />
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Wipers</span>
+            <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{tUi("wipers")}</span>
             <span className="text-sm font-bold font-mono tabular-nums" data-testid="text-today-wipers-qty">
               {wipersQty}
             </span>
@@ -780,7 +786,7 @@ export default function BalesHistory() {
           <div className="relative flex-1 min-w-[180px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
-              placeholder="Search by ref #, code, product, batch..."
+              placeholder={tUi("search.by.ref.code.product.batch")}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-8 h-8 text-sm"
@@ -825,18 +831,18 @@ export default function BalesHistory() {
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[150px] h-8 text-sm" data-testid="select-status-filter">
-              <SelectValue placeholder="All Status" />
+              <SelectValue placeholder={tUi("all.status")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="PENDING_PRESSING">Pending Pressing</SelectItem>
-              <SelectItem value="LABEL_PRINTED">Label Printed</SelectItem>
-              <SelectItem value="PRESSED">Pressed</SelectItem>
-              <SelectItem value="FINALIZED">Finalized</SelectItem>
-              <SelectItem value="IN_STOCK">In Stock</SelectItem>
-              <SelectItem value="RESERVED">Reserved</SelectItem>
-              <SelectItem value="SOLD">Sold</SelectItem>
-              <SelectItem value="REPACKED">Repacked</SelectItem>
+              <SelectItem value="all">{tUi("all.status")}</SelectItem>
+              <SelectItem value="PENDING_PRESSING">{tUi("pending.pressing")}</SelectItem>
+              <SelectItem value="LABEL_PRINTED">{tUi("label.printed")}</SelectItem>
+              <SelectItem value="PRESSED">{tUi("pressed")}</SelectItem>
+              <SelectItem value="FINALIZED">{tUi("finalized")}</SelectItem>
+              <SelectItem value="IN_STOCK">{tUi("in.stock")}</SelectItem>
+              <SelectItem value="RESERVED">{tUi("reserved")}</SelectItem>
+              <SelectItem value="SOLD">{tUi("sold")}</SelectItem>
+              <SelectItem value="REPACKED">{tUi("repacked")}</SelectItem>
             </SelectContent>
           </Select>
           <LabelPrintSettings />
@@ -848,7 +854,7 @@ export default function BalesHistory() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Export / Import</DropdownMenuLabel>
+              <DropdownMenuLabel>{tUi("export.import")}</DropdownMenuLabel>
               <DropdownMenuItem
                 onClick={() => {
                   const exportDate = dateFilter || new Date().toLocaleDateString("en-CA");
@@ -924,17 +930,17 @@ export default function BalesHistory() {
             <span className="text-sm font-medium">{selectedIds.size} selected</span>
             <Select value={bulkStatus} onValueChange={setBulkStatus}>
               <SelectTrigger className="w-[170px] h-7 text-xs" data-testid="select-bulk-status">
-                <SelectValue placeholder="Change status to..." />
+                <SelectValue placeholder={tUi("change.status.to")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="PENDING_PRESSING">Pending Pressing</SelectItem>
-                <SelectItem value="LABEL_PRINTED">Label Printed</SelectItem>
-                <SelectItem value="PRESSED">Pressed</SelectItem>
-                <SelectItem value="FINALIZED">Finalized</SelectItem>
-                <SelectItem value="IN_STOCK">In Stock</SelectItem>
-                <SelectItem value="RESERVED">Reserved</SelectItem>
-                <SelectItem value="SOLD">Sold</SelectItem>
-                <SelectItem value="REPACKED">Repacked</SelectItem>
+                <SelectItem value="PENDING_PRESSING">{tUi("pending.pressing")}</SelectItem>
+                <SelectItem value="LABEL_PRINTED">{tUi("label.printed")}</SelectItem>
+                <SelectItem value="PRESSED">{tUi("pressed")}</SelectItem>
+                <SelectItem value="FINALIZED">{tUi("finalized")}</SelectItem>
+                <SelectItem value="IN_STOCK">{tUi("in.stock")}</SelectItem>
+                <SelectItem value="RESERVED">{tUi("reserved")}</SelectItem>
+                <SelectItem value="SOLD">{tUi("sold")}</SelectItem>
+                <SelectItem value="REPACKED">{tUi("repacked")}</SelectItem>
               </SelectContent>
             </Select>
             <Button
@@ -984,8 +990,8 @@ export default function BalesHistory() {
         {filtered.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <Package className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p className="text-sm">No bales found</p>
-            {searchTerm && <p className="text-xs mt-1">Try a different search term</p>}
+            <p className="text-sm">{tUi("no.bales.found")}</p>
+            {searchTerm && <p className="text-xs mt-1">{tUi("try.a.different.search.term")}</p>}
           </div>
         ) : (
           <div>
@@ -1157,8 +1163,15 @@ export default function BalesHistory() {
                               <TableCell className="text-right font-mono">
                                 <button
                                   className="group flex items-center gap-1 ml-auto hover:text-foreground"
-                                  onClick={(e) => { e.stopPropagation(); setWeightEditBale({ id: bale.id, referenceNumber: bale.referenceNumber, weightKg: bale.weightKg }); }}
-                                  title="Correct weight"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setWeightEditBale({
+                                      id: bale.id,
+                                      referenceNumber: bale.referenceNumber,
+                                      weightKg: bale.weightKg,
+                                    });
+                                  }}
+                                  title={tUi("correct.weight")}
                                 >
                                   {formatLabelNum(bale.weightKg)}
                                   <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 shrink-0" />
@@ -1186,14 +1199,14 @@ export default function BalesHistory() {
                                     </Badge>
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="PENDING_PRESSING">Pending Pressing</SelectItem>
-                                    <SelectItem value="LABEL_PRINTED">Label Printed</SelectItem>
-                                    <SelectItem value="PRESSED">Pressed</SelectItem>
-                                    <SelectItem value="FINALIZED">Finalized</SelectItem>
-                                    <SelectItem value="IN_STOCK">In Stock</SelectItem>
-                                    <SelectItem value="RESERVED">Reserved</SelectItem>
-                                    <SelectItem value="SOLD">Sold</SelectItem>
-                                    <SelectItem value="REPACKED">Repacked</SelectItem>
+                                    <SelectItem value="PENDING_PRESSING">{tUi("pending.pressing")}</SelectItem>
+                                    <SelectItem value="LABEL_PRINTED">{tUi("label.printed")}</SelectItem>
+                                    <SelectItem value="PRESSED">{tUi("pressed")}</SelectItem>
+                                    <SelectItem value="FINALIZED">{tUi("finalized")}</SelectItem>
+                                    <SelectItem value="IN_STOCK">{tUi("in.stock")}</SelectItem>
+                                    <SelectItem value="RESERVED">{tUi("reserved")}</SelectItem>
+                                    <SelectItem value="SOLD">{tUi("sold")}</SelectItem>
+                                    <SelectItem value="REPACKED">{tUi("repacked")}</SelectItem>
                                   </SelectContent>
                                 </Select>
                               </TableCell>
@@ -1212,7 +1225,7 @@ export default function BalesHistory() {
                                       size="icon"
                                       variant="ghost"
                                       onClick={() => setReturnToStockBale(row)}
-                                      title="Return bale to stock"
+                                      title={tUi("return.bale.to.stock")}
                                       data-testid={`button-return-to-stock-${bale.id}`}
                                     >
                                       <Undo2 className="h-4 w-4 text-blue-500" />
@@ -1224,7 +1237,7 @@ export default function BalesHistory() {
                                       variant="ghost"
                                       onClick={() => setRepackConfirm(row)}
                                       disabled={bale.status === "REPACKED" || bale.status === "SOLD"}
-                                      title="Repack bale"
+                                      title={tUi("repack.bale")}
                                       data-testid={`button-repack-${bale.id}`}
                                     >
                                       <RefreshCw className="h-4 w-4" />
@@ -1306,19 +1319,19 @@ export default function BalesHistory() {
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Supervisor Username</p>
+              <p className="text-sm text-muted-foreground mb-1">{tUi("supervisor.username")}</p>
               <Input
                 value={supervisorUsername}
                 onChange={(e) => {
                   setSupervisorUsername(e.target.value);
                   setAuthError("");
                 }}
-                placeholder="Enter supervisor username..."
+                placeholder={tUi("enter.supervisor.username")}
                 data-testid="input-supervisor-username"
               />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Supervisor Password</p>
+              <p className="text-sm text-muted-foreground mb-1">{tUi("supervisor.password")}</p>
               <Input
                 type="password"
                 value={supervisorPassword}
@@ -1326,16 +1339,16 @@ export default function BalesHistory() {
                   setSupervisorPassword(e.target.value);
                   setAuthError("");
                 }}
-                placeholder="Enter supervisor password..."
+                placeholder={tUi("enter.supervisor.password")}
                 data-testid="input-supervisor-password"
               />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Reason for Removal</p>
+              <p className="text-sm text-muted-foreground mb-1">{tUi("reason.for.removal")}</p>
               <Input
                 value={removalReason}
                 onChange={(e) => setRemovalReason(e.target.value)}
-                placeholder="Entered by mistake, damaged, etc..."
+                placeholder={tUi("entered.by.mistake.damaged.etc")}
                 data-testid="input-removal-reason"
               />
             </div>
@@ -1375,7 +1388,7 @@ export default function BalesHistory() {
       <Dialog open={deleteConfirm !== null} onOpenChange={() => setDeleteConfirm(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Bale</DialogTitle>
+            <DialogTitle>{tUi("delete.bale")}</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete this bale? This action cannot be undone.
             </DialogDescription>
@@ -1399,7 +1412,7 @@ export default function BalesHistory() {
       <Dialog open={repackConfirm !== null} onOpenChange={() => setRepackConfirm(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Repack Bale</DialogTitle>
+            <DialogTitle>{tUi("repack.bale.2")}</DialogTitle>
             <DialogDescription>
               {repackConfirm && (
                 <>
@@ -1439,8 +1452,8 @@ export default function BalesHistory() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Choose Label Design</DialogTitle>
-            <DialogDescription>Select a brand color for the A4 label header banner.</DialogDescription>
+            <DialogTitle>{tUi("choose.label.design")}</DialogTitle>
+            <DialogDescription>{tUi("select.a.brand.color.for.the.a4.label.header.ban")}</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3 py-2">
             {designColors.map((opt) => (
@@ -1524,7 +1537,7 @@ export default function BalesHistory() {
       <Dialog open={showExportDialog} onOpenChange={setShowExportDialog}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Export Stock Register</DialogTitle>
+            <DialogTitle>{tUi("export.stock.register")}</DialogTitle>
             <DialogDescription>
               Exports all bales (all statuses) to Excel with reference numbers, article codes, product names, weights,
               dates and more. Leave dates blank to export everything.
@@ -1533,7 +1546,7 @@ export default function BalesHistory() {
           <div className="space-y-3 py-2">
             <div className="flex gap-3">
               <div className="flex-1">
-                <p className="text-sm text-muted-foreground mb-1">From Date</p>
+                <p className="text-sm text-muted-foreground mb-1">{tUi("from.date")}</p>
                 <Input
                   type="date"
                   value={exportFrom}
@@ -1542,7 +1555,7 @@ export default function BalesHistory() {
                 />
               </div>
               <div className="flex-1">
-                <p className="text-sm text-muted-foreground mb-1">To Date</p>
+                <p className="text-sm text-muted-foreground mb-1">{tUi("to.date")}</p>
                 <Input
                   type="date"
                   value={exportTo}
@@ -1587,30 +1600,30 @@ export default function BalesHistory() {
 
           <div className="space-y-3 py-1">
             {orderInfoLoading ? (
-              <div className="text-sm text-muted-foreground py-2">Loading order details...</div>
+              <div className="text-sm text-muted-foreground py-2">{tUi("loading.order.details")}</div>
             ) : returnToStockOrderInfo ? (
               <>
                 <div className="rounded-md border p-3 space-y-1.5 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Order status</span>
+                    <span className="text-muted-foreground">{tUi("order.status")}</span>
                     <Badge variant="secondary" className="text-xs">
                       {returnToStockOrderInfo.status}
                     </Badge>
                   </div>
                   {returnToStockOrderInfo.invoiceNumber && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Invoice</span>
+                      <span className="text-muted-foreground">{tUi("invoice")}</span>
                       <span className="font-mono font-semibold">{returnToStockOrderInfo.invoiceNumber}</span>
                     </div>
                   )}
                   {returnToStockOrderInfo.customerName && (
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Customer</span>
+                      <span className="text-muted-foreground">{tUi("customer")}</span>
                       <span>{returnToStockOrderInfo.customerName}</span>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Current total</span>
+                    <span className="text-muted-foreground">{tUi("current.total")}</span>
                     <span className="font-mono">
                       $
                       {parseFloat(returnToStockOrderInfo.grandTotal || "0").toLocaleString(undefined, {
@@ -1620,7 +1633,7 @@ export default function BalesHistory() {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Bales in order</span>
+                    <span className="text-muted-foreground">{tUi("bales.in.order")}</span>
                     <span>{returnToStockOrderInfo.totalBalesInOrder}</span>
                   </div>
                 </div>
@@ -1628,7 +1641,7 @@ export default function BalesHistory() {
                 {returnToStockOrderInfo.totalBalesInOrder <= 1 && (
                   <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
                     <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                    <p>This is the last bale in the order. You must cancel the entire order instead.</p>
+                    <p>{tUi("this.is.the.last.bale.in.the.order.you.must.canc")}</p>
                   </div>
                 )}
 

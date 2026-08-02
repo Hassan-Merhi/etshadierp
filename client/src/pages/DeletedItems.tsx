@@ -50,6 +50,7 @@ import {
 } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface DeletedItem {
   id: number;
@@ -132,6 +133,7 @@ const typeIcons: Record<string, any> = {
 };
 
 export default function DeletedItems() {
+  const tUi = useErpText();
   const { toast } = useToast();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
@@ -335,7 +337,7 @@ export default function DeletedItems() {
   if (error) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-destructive">Failed to load deleted items</p>
+        <p className="text-destructive">{tUi("failed.to.load.deleted.items")}</p>
       </div>
     );
   }
@@ -355,10 +357,10 @@ export default function DeletedItems() {
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Filter:</span>
+              <span className="text-sm text-muted-foreground">{tUi("filter")}</span>
               <Select value={filterType} onValueChange={setFilterType}>
                 <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-filter-type">
-                  <SelectValue placeholder="All types" />
+                  <SelectValue placeholder={tUi("all.types")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types ({data?.totalCount || 0})</SelectItem>
@@ -431,7 +433,7 @@ export default function DeletedItems() {
           {items.length === 0 ? (
             <div className="text-center py-12">
               <Trash2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium text-muted-foreground">No deleted items</h3>
+              <h3 className="text-lg font-medium text-muted-foreground">{tUi("no.deleted.items")}</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 {filterType === "all"
                   ? "Items you delete will appear here for recovery."
@@ -453,11 +455,11 @@ export default function DeletedItems() {
                           data-testid="checkbox-select-all"
                         />
                       </TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Code</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Deleted At</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead>{tUi("type")}</TableHead>
+                      <TableHead>{tUi("code")}</TableHead>
+                      <TableHead>{tUi("name")}</TableHead>
+                      <TableHead>{tUi("deleted.at")}</TableHead>
+                      <TableHead className="text-right">{tUi("actions")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -637,7 +639,7 @@ export default function DeletedItems() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-bulk-delete">Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-bulk-delete">{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
@@ -683,7 +685,7 @@ export default function DeletedItems() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-dialog">Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-dialog">{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmAction}
               className={
@@ -713,13 +715,13 @@ export default function DeletedItems() {
                 })()}
               {typeLabels[detailItem?.type || ""] || detailItem?.type} Details
             </SheetTitle>
-            <SheetDescription>Viewing deleted item information</SheetDescription>
+            <SheetDescription>{tUi("viewing.deleted.item.information")}</SheetDescription>
           </SheetHeader>
           {detailItem && (
             <div className="mt-6 space-y-4 overflow-y-auto max-h-[calc(100vh-10rem)] pr-1">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Type</p>
+                  <p className="text-sm text-muted-foreground">{tUi("type")}</p>
                   <p className="font-medium">{typeLabels[detailItem.type] || detailItem.type}</p>
                 </div>
                 <div>
@@ -729,40 +731,40 @@ export default function DeletedItems() {
               </div>
               <Separator />
               <div>
-                <p className="text-sm text-muted-foreground">Code</p>
+                <p className="text-sm text-muted-foreground">{tUi("code")}</p>
                 <p className="font-medium font-mono">{detailItem.code || "-"}</p>
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Name</p>
+                <p className="text-sm text-muted-foreground">{tUi("name")}</p>
                 <p className="font-medium">{detailItem.name}</p>
               </div>
               {detailItem.accountType && (
                 <div>
-                  <p className="text-sm text-muted-foreground">Account Type</p>
+                  <p className="text-sm text-muted-foreground">{tUi("account.type")}</p>
                   <p className="font-medium">{detailItem.accountType}</p>
                 </div>
               )}
               {detailItem.voucherType && (
                 <div>
-                  <p className="text-sm text-muted-foreground">Voucher Type</p>
+                  <p className="text-sm text-muted-foreground">{tUi("voucher.type")}</p>
                   <p className="font-medium">{detailItem.voucherType}</p>
                 </div>
               )}
               {detailItem.amount !== undefined && (
                 <div>
-                  <p className="text-sm text-muted-foreground">Amount</p>
+                  <p className="text-sm text-muted-foreground">{tUi("amount")}</p>
                   <p className="font-medium">${detailItem.amount?.toLocaleString() || "0"}</p>
                 </div>
               )}
               {detailItem.date && (
                 <div>
-                  <p className="text-sm text-muted-foreground">Date</p>
+                  <p className="text-sm text-muted-foreground">{tUi("date")}</p>
                   <p className="font-medium">{formatDisplayDate(detailItem.date)}</p>
                 </div>
               )}
               {detailItem.locationName && (
                 <div>
-                  <p className="text-sm text-muted-foreground">Location</p>
+                  <p className="text-sm text-muted-foreground">{tUi("location")}</p>
                   <p className="font-medium">{detailItem.locationName}</p>
                 </div>
               )}
@@ -770,7 +772,7 @@ export default function DeletedItems() {
                 <>
                   <Separator />
                   <div>
-                    <p className="text-sm font-medium mb-2">Journal Entries</p>
+                    <p className="text-sm font-medium mb-2">{tUi("journal.entries")}</p>
                     {entriesLoading ? (
                       <div className="space-y-2">
                         {[1, 2, 3].map((i) => (
@@ -778,15 +780,21 @@ export default function DeletedItems() {
                         ))}
                       </div>
                     ) : voucherEntries.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No entries found</p>
+                      <p className="text-sm text-muted-foreground">{tUi("no.entries.found")}</p>
                     ) : (
                       <div className="rounded-md border overflow-hidden">
                         <table className="w-full text-sm">
                           <thead className="sticky top-0 z-30 bg-muted/50">
                             <tr className="border-b bg-muted/40">
-                              <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Account</th>
-                              <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Debit</th>
-                              <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Credit</th>
+                              <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">
+                                {tUi("account")}
+                              </th>
+                              <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">
+                                {tUi("debit")}
+                              </th>
+                              <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">
+                                {tUi("credit")}
+                              </th>
                             </tr>
                           </thead>
                           <tbody>
@@ -813,7 +821,7 @@ export default function DeletedItems() {
                           </tbody>
                           <tfoot className="sticky bottom-0 z-20 bg-background">
                             <tr className="bg-muted/50 font-semibold">
-                              <td className="px-3 py-2 text-xs">Total</td>
+                              <td className="px-3 py-2 text-xs">{tUi("total")}</td>
                               <td className="px-3 py-2 text-right font-mono text-xs">
                                 $
                                 {voucherEntries
@@ -836,7 +844,7 @@ export default function DeletedItems() {
               )}
               <Separator />
               <div>
-                <p className="text-sm text-muted-foreground">Deleted At</p>
+                <p className="text-sm text-muted-foreground">{tUi("deleted.at")}</p>
                 <p className="font-medium">
                   {detailItem.deletedAt
                     ? `${formatDisplayDate(detailItem.deletedAt)} ${format(new Date(detailItem.deletedAt), "h:mm a")}`

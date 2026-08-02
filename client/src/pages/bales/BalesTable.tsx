@@ -3,14 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Bale } from "@shared/schema";
 import { Package, Search, Trash2, Upload } from "lucide-react";
 
@@ -99,9 +92,7 @@ export function BalesTable({
                 <TableCell>{formatDisplayDate(bale.datePressed)}</TableCell>
                 <TableCell>
                   <Badge
-                    variant={
-                      bale.status === "AVAILABLE" ? "default" : bale.status === "SOLD" ? "secondary" : "outline"
-                    }
+                    variant={bale.status === "AVAILABLE" ? "default" : bale.status === "SOLD" ? "secondary" : "outline"}
                   >
                     {bale.status}
                   </Badge>

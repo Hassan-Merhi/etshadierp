@@ -3,13 +3,13 @@
  *
  * Extracted from FactorySettings.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {useMutation} from "@tanstack/react-query";
-import {apiRequest} from "@/lib/queryClient";
-import {Card, CardContent, CardHeader, CardTitle, CardDescription} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {Loader2, Wrench} from "lucide-react";
-import {useToast} from "@/hooks/use-toast";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Loader2, Wrench } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export function MigrateVoucherDescriptionsCard() {
   const { toast } = useToast();

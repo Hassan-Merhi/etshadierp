@@ -3,27 +3,29 @@
  *
  * Extracted from FactoryImport.tsx during the Phase 4 god-file split.
  */
-import {useState, useCallback} from "react";
-import {useMutation, useQuery} from "@tanstack/react-query";
-import type {FactoryBaleProduct} from "@shared/schema";
-import {X, Loader2} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Input} from "@/components/ui/input";
-import {Badge} from "@/components/ui/badge";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {useToast} from "@/hooks/use-toast";
-import {factoryApiRequest} from "@/lib/factoryApi";
+import { useState, useCallback } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import type { FactoryBaleProduct } from "@shared/schema";
+import { X, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import Papa from "papaparse";
 
-import type {BaleRow} from "../types";
-import {EMPTY_BALE} from "../utils";
-import {ImportModeChooser} from "./ImportModeChooser";
-import {ManualEntryCard} from "./ManualEntryCard";
-import {ImportResult} from "./ImportResult";
+import type { BaleRow } from "../types";
+import { EMPTY_BALE } from "../utils";
+import { ImportModeChooser } from "./ImportModeChooser";
+import { ManualEntryCard } from "./ManualEntryCard";
+import { ImportResult } from "./ImportResult";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function BaleImport() {
+  const tUi = useFactoryText();
   const [mode, setMode] = useState<"choose" | "csv" | "manual">("choose");
   const [rows, setRows] = useState<BaleRow[]>([{ ...EMPTY_BALE }]);
   const [csvData, setCsvData] = useState<BaleRow[]>([]);
@@ -130,7 +132,7 @@ export function BaleImport() {
   if (mode === "choose") {
     return (
       <ImportModeChooser
-        title="Import Bales Inventory"
+        title={tUi("import.bales.inventory")}
         description="Import existing bales into the system. Reference numbers will be generated automatically."
         templateType="bales"
         onFileUpload={handleFileUpload}
@@ -172,16 +174,16 @@ export function BaleImport() {
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
-                  <TableHead>Bale Code</TableHead>
-                  <TableHead>Article Code</TableHead>
-                  <TableHead>Product</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Grade</TableHead>
-                  <TableHead>Weight (kg)</TableHead>
-                  <TableHead>Cost/Kg</TableHead>
-                  <TableHead className="text-right">Prod. Price</TableHead>
-                  <TableHead className="text-right">Sell Price</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>{tUi("bale.code")}</TableHead>
+                  <TableHead>{tUi("article.code")}</TableHead>
+                  <TableHead>{tUi("product")}</TableHead>
+                  <TableHead>{tUi("category")}</TableHead>
+                  <TableHead>{tUi("grade")}</TableHead>
+                  <TableHead>{tUi("weight.kg")}</TableHead>
+                  <TableHead>{tUi("cost.kg.4")}</TableHead>
+                  <TableHead className="text-right">{tUi("prod.price")}</TableHead>
+                  <TableHead className="text-right">{tUi("sell.price")}</TableHead>
+                  <TableHead>{tUi("status")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -226,7 +228,7 @@ export function BaleImport() {
 
   return (
     <ManualEntryCard
-      title="Add Bales"
+      title={tUi("add.bales")}
       columns={["Bale Code *", "Article Code", "Product", "Category", "Grade", "Weight (kg) *", "Cost/Kg", "Status"]}
       rows={rows}
       onAdd={() => setRows([...rows, { ...EMPTY_BALE }])}
@@ -245,7 +247,7 @@ export function BaleImport() {
             <Input
               value={row.baleCode}
               onChange={(e) => onChange(i, "baleCode", e.target.value)}
-              placeholder="Bale code"
+              placeholder={tUi("bale.code.2")}
               data-testid={`input-bale-code-${i}`}
             />
           </TableCell>
@@ -253,7 +255,7 @@ export function BaleImport() {
             <Input
               value={row.articleCode}
               onChange={(e) => onChange(i, "articleCode", e.target.value)}
-              placeholder="Article code"
+              placeholder={tUi("article.code.3")}
               data-testid={`input-bale-article-${i}`}
             />
           </TableCell>
@@ -261,7 +263,7 @@ export function BaleImport() {
             <Input
               value={row.productName}
               onChange={(e) => onChange(i, "productName", e.target.value)}
-              placeholder="Product name"
+              placeholder={tUi("product.name.3")}
               data-testid={`input-bale-product-${i}`}
             />
           </TableCell>
@@ -269,7 +271,7 @@ export function BaleImport() {
             <Input
               value={row.category}
               onChange={(e) => onChange(i, "category", e.target.value)}
-              placeholder="Category"
+              placeholder={tUi("category")}
               data-testid={`input-bale-category-${i}`}
             />
           </TableCell>
@@ -277,7 +279,7 @@ export function BaleImport() {
             <Input
               value={row.grade}
               onChange={(e) => onChange(i, "grade", e.target.value)}
-              placeholder="Grade"
+              placeholder={tUi("grade")}
               data-testid={`input-bale-grade-${i}`}
             />
           </TableCell>
@@ -307,8 +309,8 @@ export function BaleImport() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="FINALIZED">Finalized</SelectItem>
-                <SelectItem value="PENDING_PRESSING">Pending</SelectItem>
+                <SelectItem value="FINALIZED">{tUi("finalized")}</SelectItem>
+                <SelectItem value="PENDING_PRESSING">{tUi("pending")}</SelectItem>
               </SelectContent>
             </Select>
           </TableCell>

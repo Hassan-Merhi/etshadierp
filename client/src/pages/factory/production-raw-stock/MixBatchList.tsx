@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Layers, Pencil, Trash2, MessageCircle, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface MixBatchRow {
   id: number;
@@ -58,6 +59,7 @@ export function MixBatchList({
   mixBatchPrintRef,
   formatDisplayDate,
 }: MixBatchListProps) {
+  const tUi = useFactoryText();
   const [showAllMixBatches, setShowAllMixBatches] = useState(false);
   const BATCH_PREVIEW_COUNT = 15;
 
@@ -76,7 +78,7 @@ export function MixBatchList({
             <Layers className="h-4.5 w-4.5 text-amber-500" />
             Recent Mix Batches
           </CardTitle>
-          <p className="text-xs text-muted-foreground">Historical list of blends and their cost origins</p>
+          <p className="text-xs text-muted-foreground">{tUi("historical.list.of.blends.and.their.cost.origins")}</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -129,7 +131,7 @@ export function MixBatchList({
                 year: "numeric",
               })}
             </div>
-            <div style={{ fontSize: "18px", fontWeight: 700, color: "#f9fafb" }}>Mix Batch Details</div>
+            <div style={{ fontSize: "18px", fontWeight: 700, color: "#f9fafb" }}>{tUi("mix.batch.details")}</div>
           </div>
 
           {mixBatchesByDate.map((batch: any) => (
@@ -164,7 +166,10 @@ export function MixBatchList({
                 {[
                   { label: "Total Weight", value: formatNumber(batch.totalWeightKg) + " kg" },
                   { label: "Total Cost", value: "$" + formatNumber(batch.displayTotalCost ?? batch.totalCost) },
-                  { label: "Cost/kg", value: "$" + (parseFloat(batch.displayCostPerKg ?? batch.costPerKg) || 0).toFixed(2) },
+                  {
+                    label: "Cost/kg",
+                    value: "$" + (parseFloat(batch.displayCostPerKg ?? batch.costPerKg) || 0).toFixed(2),
+                  },
                 ].map((stat) => (
                   <div
                     key={stat.label}
@@ -257,11 +262,11 @@ export function MixBatchList({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="min-w-40">Batch Code</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="min-w-32 whitespace-nowrap">Date</TableHead>
-                  <TableHead className="min-w-32 text-right whitespace-nowrap">Total (kg)</TableHead>
-                  <TableHead className="min-w-36 text-right whitespace-nowrap">Blended Cost</TableHead>
+                  <TableHead className="min-w-40">{tUi("batch.code")}</TableHead>
+                  <TableHead>{tUi("name")}</TableHead>
+                  <TableHead className="min-w-32 whitespace-nowrap">{tUi("date")}</TableHead>
+                  <TableHead className="min-w-32 text-right whitespace-nowrap">{tUi("total.kg.4")}</TableHead>
+                  <TableHead className="min-w-36 text-right whitespace-nowrap">{tUi("blended.cost")}</TableHead>
                   <TableHead className="min-w-20"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -376,8 +381,8 @@ export function MixBatchList({
         ) : (
           <div className="text-center py-10">
             <Layers className="mx-auto h-10 w-10 text-muted-foreground" />
-            <h3 className="mt-3 text-base font-semibold">No mix batches</h3>
-            <p className="text-muted-foreground text-sm mt-1">No mix batches yet. Create one to get started.</p>
+            <h3 className="mt-3 text-base font-semibold">{tUi("no.mix.batches")}</h3>
+            <p className="text-muted-foreground text-sm mt-1">{tUi("no.mix.batches.yet.create.one.to.get.started")}</p>
           </div>
         )}
       </CardContent>

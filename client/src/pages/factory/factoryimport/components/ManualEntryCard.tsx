@@ -3,10 +3,10 @@
  *
  * Extracted from FactoryImport.tsx during the Phase 4 god-file split.
  */
-import {Plus, Trash2, X, Loader2} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
+import { Plus, Trash2, X, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export function ManualEntryCard<T>({
   title,

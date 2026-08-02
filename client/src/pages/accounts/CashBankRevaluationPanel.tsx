@@ -117,7 +117,13 @@ export function CashBankRevaluationPanel() {
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Historical financial reports are protected</AlertTitle>
             <AlertDescription>
-              {readiness.unresolvedEntryCount} foreign-currency entr{readiness.unresolvedEntryCount === 1 ? "y is" : "ies are"} unresolved across {readiness.unresolvedVoucherCount} voucher{readiness.unresolvedVoucherCount === 1 ? "" : "s"}. {unresolvedEntityValues} opening or acquisition value{unresolvedEntityValues === 1 ? " is" : "s are"} also unresolved across ledger, bank, customer, supplier, employee, and fixed-asset records. Net Position, Net Profit, and protected exports will not guess these values; review the backfill dry-run and the resolver below.
+              {readiness.unresolvedEntryCount} foreign-currency entr
+              {readiness.unresolvedEntryCount === 1 ? "y is" : "ies are"} unresolved across{" "}
+              {readiness.unresolvedVoucherCount} voucher{readiness.unresolvedVoucherCount === 1 ? "" : "s"}.{" "}
+              {unresolvedEntityValues} opening or acquisition value{unresolvedEntityValues === 1 ? " is" : "s are"} also
+              unresolved across ledger, bank, customer, supplier, employee, and fixed-asset records. Net Position, Net
+              Profit, and protected exports will not guess these values; review the backfill dry-run and the resolver
+              below.
             </AlertDescription>
           </Alert>
         )}
@@ -150,7 +156,9 @@ export function CashBankRevaluationPanel() {
                   <TableRow key={`${account.accountKind}-${account.id}`}>
                     <TableCell>
                       <div className="font-medium">{account.name}</div>
-                      <div className="text-xs text-muted-foreground">{account.code} · {account.accountType}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {account.code} · {account.accountType}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {Object.entries(account.nativeBalancesByCurrency).length === 0 ? (
@@ -182,7 +190,10 @@ export function CashBankRevaluationPanel() {
                           <Badge variant="destructive">Review</Badge>
                           {account.openingBalanceCurrencyUnresolved && <div>Opening currency missing</div>}
                           {account.unresolvedLegacyEntryCount > 0 && (
-                            <div>{account.unresolvedLegacyEntryCount} legacy entr{account.unresolvedLegacyEntryCount === 1 ? "y" : "ies"}</div>
+                            <div>
+                              {account.unresolvedLegacyEntryCount} legacy entr
+                              {account.unresolvedLegacyEntryCount === 1 ? "y" : "ies"}
+                            </div>
                           )}
                           {account.currentRateMissing && <div>Current CFA rate missing</div>}
                           {account.unresolvedTranslationCurrencies.length > 0 && (

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Loader2, Layers, ArrowRight } from "lucide-react";
+import { useErpText } from "@/i18n/modules/erp";
 
 function fmt(v: any, dec = 2) {
   const n = parseFloat(String(v ?? "0"));
@@ -18,6 +19,7 @@ function num(v: string) {
 }
 
 export default function SpOpeningStock() {
+  const tUi = useErpText();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -82,7 +84,7 @@ export default function SpOpeningStock() {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="text-xl font-semibold">Opening Stock</h1>
+        <h1 className="text-xl font-semibold">{tUi("opening.stock")}</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
           Import existing inventory before recording new containers. Supplier payable is not posted here — it is created
           when you sell.
@@ -91,7 +93,7 @@ export default function SpOpeningStock() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Add Opening Stock Entry</CardTitle>
+          <CardTitle className="text-sm">{tUi("add.opening.stock.entry")}</CardTitle>
           <CardDescription className="text-xs">
             Each entry creates a stock lot (FIFO-eligible) and posts: Dr SP-STOCK / Cr SP-COSTCLR (base) / Cr SP-OPNBAL
             (landed)
@@ -100,7 +102,7 @@ export default function SpOpeningStock() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
-              <label className="text-xs text-muted-foreground">Article Code *</label>
+              <label className="text-xs text-muted-foreground">{tUi("article.code.2")}</label>
               <Input
                 value={articleCode}
                 onChange={(e) => setArticleCode(e.target.value)}
@@ -110,7 +112,7 @@ export default function SpOpeningStock() {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Qty *</label>
+              <label className="text-xs text-muted-foreground">{tUi("qty.2")}</label>
               <Input
                 type="number"
                 step="0.01"
@@ -122,7 +124,7 @@ export default function SpOpeningStock() {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Base Unit Cost $ (supplier cost)</label>
+              <label className="text-xs text-muted-foreground">{tUi("base.unit.cost.supplier.cost")}</label>
               <Input
                 type="number"
                 step="0.0001"
@@ -134,7 +136,7 @@ export default function SpOpeningStock() {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Landed Unit Cost $ (freight/duty etc.)</label>
+              <label className="text-xs text-muted-foreground">{tUi("landed.unit.cost.freight.duty.etc")}</label>
               <Input
                 type="number"
                 step="0.0001"
@@ -146,7 +148,7 @@ export default function SpOpeningStock() {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Final Unit Cost $ (auto = base + landed) *</label>
+              <label className="text-xs text-muted-foreground">{tUi("final.unit.cost.auto.base.landed")}</label>
               <Input
                 type="number"
                 step="0.0001"
@@ -158,12 +160,12 @@ export default function SpOpeningStock() {
               />
             </div>
             <div className="col-span-2">
-              <label className="text-xs text-muted-foreground">Notes / Description</label>
+              <label className="text-xs text-muted-foreground">{tUi("notes.description")}</label>
               <Input
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 className="mt-1"
-                placeholder="Optional"
+                placeholder={tUi("optional")}
                 data-testid="input-sp-opn-notes"
               />
             </div>
@@ -176,20 +178,20 @@ export default function SpOpeningStock() {
                 Journal Preview
               </p>
               <div className="flex items-center gap-2 text-xs">
-                <span className="w-28 font-mono text-muted-foreground">Dr SP-STOCK</span>
+                <span className="w-28 font-mono text-muted-foreground">{tUi("dr.sp.stock")}</span>
                 <span className="font-semibold">{fmt(finalTotal)}</span>
                 <span className="text-muted-foreground text-xs">(final cost × {qtyN})</span>
               </div>
               <div className="flex items-center gap-2 text-xs pl-3">
                 <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                <span className="w-28 font-mono text-muted-foreground">Cr SP-COSTCLR</span>
+                <span className="w-28 font-mono text-muted-foreground">{tUi("cr.sp.costclr")}</span>
                 <span className="font-semibold">{fmt(baseTotal)}</span>
                 <span className="text-muted-foreground text-xs">(base — cleared to payable on sale)</span>
               </div>
               {landTotal > 0 && (
                 <div className="flex items-center gap-2 text-xs pl-3">
                   <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                  <span className="w-28 font-mono text-muted-foreground">Cr SP-OPNBAL</span>
+                  <span className="w-28 font-mono text-muted-foreground">{tUi("cr.sp.opnbal")}</span>
                   <span className="font-semibold">{fmt(landTotal)}</span>
                   <span className="text-muted-foreground text-xs">(landed — opening equity)</span>
                 </div>
@@ -220,42 +222,44 @@ export default function SpOpeningStock() {
             <Loader2 className="h-4 w-4 animate-spin" /> Loading...
           </div>
         ) : (past as any[]).length === 0 ? (
-          <p className="text-sm text-muted-foreground">No opening stock entries yet.</p>
+          <p className="text-sm text-muted-foreground">{tUi("no.opening.stock.entries.yet")}</p>
         ) : (
           <Card>
             <CardContent className="py-3">
               <div className="overflow-x-auto">
-              <div className="space-y-0.5 min-w-[360px]">
-                <div className="grid grid-cols-6 text-xs font-medium text-muted-foreground pb-1 border-b border-border/40">
-                  <span className="col-span-2">Article</span>
-                  <span className="text-right">Qty In</span>
-                  <span className="text-right">Remaining</span>
-                  <span className="text-right">Base/u</span>
-                  <span className="text-right">Final/u</span>
-                </div>
-                {(past as any[]).map((p: any, i: number) => (
-                  <div
-                    key={p.id}
-                    className="grid grid-cols-6 text-xs py-1.5 border-b border-border/30 last:border-0"
-                    data-testid={`row-sp-opn-${i}`}
-                  >
-                    <div className="col-span-2">
-                      <p className="font-mono">{p.article_code || p.articleCode}</p>
-                      {p.description && <p className="text-muted-foreground">{p.description}</p>}
-                    </div>
-                    <span className="text-right tabular-nums text-muted-foreground">
-                      {parseFloat(p.qty_in ?? p.qtyIn ?? "0").toFixed(2)}
-                    </span>
-                    <span className="text-right tabular-nums font-semibold text-green-600">
-                      {parseFloat(p.qty_remaining ?? p.qtyRemaining ?? "0").toFixed(2)}
-                    </span>
-                    <span className="text-right tabular-nums">{fmt(p.base_unit_cost_usd ?? p.baseUnitCostUsd, 4)}</span>
-                    <span className="text-right tabular-nums">
-                      {fmt(p.final_unit_cost_usd ?? p.finalUnitCostUsd, 4)}
-                    </span>
+                <div className="space-y-0.5 min-w-[360px]">
+                  <div className="grid grid-cols-6 text-xs font-medium text-muted-foreground pb-1 border-b border-border/40">
+                    <span className="col-span-2">{tUi("article")}</span>
+                    <span className="text-right">{tUi("qty.in")}</span>
+                    <span className="text-right">{tUi("remaining")}</span>
+                    <span className="text-right">{tUi("base.u")}</span>
+                    <span className="text-right">{tUi("final.u")}</span>
                   </div>
-                ))}
-              </div>
+                  {(past as any[]).map((p: any, i: number) => (
+                    <div
+                      key={p.id}
+                      className="grid grid-cols-6 text-xs py-1.5 border-b border-border/30 last:border-0"
+                      data-testid={`row-sp-opn-${i}`}
+                    >
+                      <div className="col-span-2">
+                        <p className="font-mono">{p.article_code || p.articleCode}</p>
+                        {p.description && <p className="text-muted-foreground">{p.description}</p>}
+                      </div>
+                      <span className="text-right tabular-nums text-muted-foreground">
+                        {parseFloat(p.qty_in ?? p.qtyIn ?? "0").toFixed(2)}
+                      </span>
+                      <span className="text-right tabular-nums font-semibold text-green-600">
+                        {parseFloat(p.qty_remaining ?? p.qtyRemaining ?? "0").toFixed(2)}
+                      </span>
+                      <span className="text-right tabular-nums">
+                        {fmt(p.base_unit_cost_usd ?? p.baseUnitCostUsd, 4)}
+                      </span>
+                      <span className="text-right tabular-nums">
+                        {fmt(p.final_unit_cost_usd ?? p.finalUnitCostUsd, 4)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </CardContent>
           </Card>

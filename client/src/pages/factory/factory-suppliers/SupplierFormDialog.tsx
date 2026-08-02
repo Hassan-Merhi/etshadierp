@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SupplierWithBalance } from "./factorySupplierTypes";
 import { FactorySupplier } from "@shared/schema";
 import { UseMutationResult } from "@tanstack/react-query";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface SupplierFormDialogProps {
   createOpen: boolean;
@@ -42,6 +43,7 @@ export function SupplierFormDialog({
   resetForm,
   wrapAdminAction,
 }: SupplierFormDialogProps) {
+  const tUi = useFactoryText();
   const brokers = allSuppliers.filter((s) => !s.parentId && s.isActive !== false);
 
   const handleSubmit = () => {
@@ -49,10 +51,10 @@ export function SupplierFormDialog({
     // is always persisted, regardless of whether we're creating or editing.
     const rolePayload =
       formRole === "broker"
-        ? { isBroker: true,  parentId: null }
+        ? { isBroker: true, parentId: null }
         : formRole === "linked"
-        ? { isBroker: false, parentId: formData.parentId ?? null }
-        : { isBroker: false, parentId: null };
+          ? { isBroker: false, parentId: formData.parentId ?? null }
+          : { isBroker: false, parentId: null };
 
     if (editingSupplier) {
       updateMutation.mutate({ id: editingSupplier.id, ...formData, ...rolePayload });
@@ -78,7 +80,7 @@ export function SupplierFormDialog({
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Account Type</Label>
+            <Label>{tUi("account.type")}</Label>
             <Select
               value={formRole}
               onValueChange={(v: any) => {
@@ -91,23 +93,23 @@ export function SupplierFormDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="standalone">Standalone Supplier</SelectItem>
-                <SelectItem value="broker">Broker (Parent Account)</SelectItem>
-                <SelectItem value="linked">Linked Supplier (Sub-Account)</SelectItem>
+                <SelectItem value="standalone">{tUi("standalone.supplier")}</SelectItem>
+                <SelectItem value="broker">{tUi("broker.parent.account")}</SelectItem>
+                <SelectItem value="linked">{tUi("linked.supplier.sub.account")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {formRole === "linked" && (
             <div className="space-y-2">
-              <Label>Parent Broker</Label>
+              <Label>{tUi("parent.broker")}</Label>
               <Select
                 value={String(formData.parentId || "")}
                 onValueChange={(v) => setFormData({ ...formData, parentId: parseInt(v) })}
                 disabled={!!createSubAccountParentId}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select broker" />
+                  <SelectValue placeholder={tUi("select.broker.2")} />
                 </SelectTrigger>
                 <SelectContent>
                   {brokers.map((b) => (
@@ -121,29 +123,29 @@ export function SupplierFormDialog({
           )}
 
           <div className="space-y-2">
-            <Label>Name</Label>
+            <Label>{tUi("name")}</Label>
             <Input
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Supplier or Broker name"
+              placeholder={tUi("supplier.or.broker.name")}
               data-testid="input-supplier-name"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Contact Person</Label>
+              <Label>{tUi("contact.person")}</Label>
               <Input
                 value={formData.contactPerson}
                 onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <Label>Phone</Label>
+              <Label>{tUi("phone")}</Label>
               <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Email</Label>
+            <Label>{tUi("email")}</Label>
             <Input
               type="email"
               value={formData.email}
@@ -151,11 +153,11 @@ export function SupplierFormDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label>Address</Label>
+            <Label>{tUi("address")}</Label>
             <Input value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} />
           </div>
           <div className="space-y-2">
-            <Label>Notes</Label>
+            <Label>{tUi("notes")}</Label>
             <Input value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
           </div>
         </div>

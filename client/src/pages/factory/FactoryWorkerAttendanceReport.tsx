@@ -1,17 +1,34 @@
-import {useState, useMemo, useCallback, useRef} from "react";
-import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
-import {Card, CardContent} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {Badge} from "@/components/ui/badge";
-import {PageHeader} from "@/components/PageHeader";
-import {Loader2, CalendarDays, Printer, ChevronLeft, ChevronRight, Pencil, EyeOff, Eye} from "lucide-react";
-import {cn} from "@/lib/utils";
-import {apiRequest} from "@/lib/queryClient";
+import { useState, useMemo, useCallback, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/PageHeader";
+import { Loader2, CalendarDays, Printer, ChevronLeft, ChevronRight, Pencil, EyeOff, Eye } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { apiRequest } from "@/lib/queryClient";
 
-import type {AttendanceFilter, AttendanceReportData, DateMode, WorkerReportRow} from "./factoryworkerattendancereport/types";
-import {CYCLE, MONTH_NAMES, computeWorkerExpectedSalary, fmtCurrency, isoMonthEnd, isoMonthStart, isoToday, isoYesterday, workerCodeNum} from "./factoryworkerattendancereport/utils";
-import {StatusPill} from "./factoryworkerattendancereport/components/StatusPill";
+import type {
+  AttendanceFilter,
+  AttendanceReportData,
+  DateMode,
+  WorkerReportRow,
+} from "./factoryworkerattendancereport/types";
+import {
+  CYCLE,
+  MONTH_NAMES,
+  computeWorkerExpectedSalary,
+  fmtCurrency,
+  isoMonthEnd,
+  isoMonthStart,
+  isoToday,
+  isoYesterday,
+  workerCodeNum,
+} from "./factoryworkerattendancereport/utils";
+import { StatusPill } from "./factoryworkerattendancereport/components/StatusPill";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactoryWorkerAttendanceReport() {
+  const tUi = useFactoryText();
   const qc = useQueryClient();
 
   /* Date mode state */
@@ -216,7 +233,7 @@ export default function FactoryWorkerAttendanceReport() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <CalendarDays className="h-5 w-5 text-muted-foreground" />
-          <h2 className="text-lg font-semibold">Attendance Report</h2>
+          <h2 className="text-lg font-semibold">{tUi("attendance.report")}</h2>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -235,7 +252,7 @@ export default function FactoryWorkerAttendanceReport() {
 
       {/* ── Date mode selector ──────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 flex-wrap print:hidden">
-        <span className="text-xs text-muted-foreground font-medium">Period:</span>
+        <span className="text-xs text-muted-foreground font-medium">{tUi("period.2")}</span>
         <div className="flex items-center gap-1 rounded-md border bg-background p-0.5">
           {(["today", "yesterday", "thisMonth", "custom"] as DateMode[]).map((m) => (
             <Button
@@ -308,7 +325,7 @@ export default function FactoryWorkerAttendanceReport() {
 
       {/* ── Filter + toggle bar ─────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 flex-wrap print:hidden">
-        <span className="text-xs text-muted-foreground font-medium">Show:</span>
+        <span className="text-xs text-muted-foreground font-medium">{tUi("show")}</span>
         <div className="flex items-center gap-1 rounded-md border bg-background p-0.5">
           <Button
             variant="ghost"
@@ -410,7 +427,7 @@ export default function FactoryWorkerAttendanceReport() {
         <>
           {/* ── Print header (hidden on screen) ─────────────────────────────── */}
           <div className="hidden print:block mb-4">
-            <PageHeader title="Worker Attendance Report" />
+            <PageHeader title={tUi("worker.attendance.report")} />
             <p className="text-sm text-gray-600">{rangeLabel}</p>
             {salaryKpi && (
               <div className="mt-2 text-sm text-gray-700 flex gap-6">
@@ -425,7 +442,7 @@ export default function FactoryWorkerAttendanceReport() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground font-medium mb-1">Workers</p>
+                <p className="text-xs text-muted-foreground font-medium mb-1">{tUi("workers")}</p>
                 <p className="text-2xl font-bold tabular-nums" data-testid="stat-total-workers">
                   {filteredWorkers.length}
                 </p>
@@ -433,7 +450,7 @@ export default function FactoryWorkerAttendanceReport() {
             </Card>
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground font-medium mb-1">Attendance Rate</p>
+                <p className="text-xs text-muted-foreground font-medium mb-1">{tUi("attendance.rate")}</p>
                 <p
                   className={cn(
                     "text-2xl font-bold tabular-nums",
@@ -453,7 +470,7 @@ export default function FactoryWorkerAttendanceReport() {
             </Card>
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground font-medium mb-1">Expected Salary</p>
+                <p className="text-xs text-muted-foreground font-medium mb-1">{tUi("expected.salary")}</p>
                 <p className="text-xl font-bold tabular-nums text-foreground" data-testid="stat-expected-salary">
                   {salaryKpi ? fmtCurrency(salaryKpi.totalExpected) : "—"}
                 </p>
@@ -461,7 +478,7 @@ export default function FactoryWorkerAttendanceReport() {
             </Card>
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground font-medium mb-1">Paid Salary</p>
+                <p className="text-xs text-muted-foreground font-medium mb-1">{tUi("paid.salary")}</p>
                 <p
                   className="text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400"
                   data-testid="stat-paid-salary"
@@ -472,7 +489,7 @@ export default function FactoryWorkerAttendanceReport() {
             </Card>
             <Card className="border-amber-300 dark:border-amber-700">
               <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground font-medium mb-1">Remaining Salary</p>
+                <p className="text-xs text-muted-foreground font-medium mb-1">{tUi("remaining.salary")}</p>
                 <p
                   className={cn(
                     "text-xl font-bold tabular-nums",
@@ -493,7 +510,7 @@ export default function FactoryWorkerAttendanceReport() {
                     : "—"}
                 </p>
                 {salaryKpi && salaryKpi.totalRemaining < 0 && (
-                  <p className="text-[10px] text-blue-500 dark:text-blue-400 mt-0.5">Overpaid</p>
+                  <p className="text-[10px] text-blue-500 dark:text-blue-400 mt-0.5">{tUi("overpaid")}</p>
                 )}
               </CardContent>
             </Card>

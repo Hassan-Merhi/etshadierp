@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import CreateProformaDrawer from "./CreateProformaDrawer";
 import { PageHeader } from "@/components/PageHeader";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
 interface StockTruthEntry {
@@ -45,6 +46,7 @@ interface AllocationDataV2 {
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
 export default function FactoryStockAllocationV2() {
+  const tUi = useFactoryText();
   const [visibleProformaIds, setVisibleProformaIds] = useState<Set<number>>(new Set());
   const [showInactiveProformas, setShowInactiveProformas] = useState(false);
   const [showZeroItems, setShowZeroItems] = useState(false);
@@ -150,7 +152,7 @@ export default function FactoryStockAllocationV2() {
       {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
-          <PageHeader title="Stock Allocation" />
+          <PageHeader title={tUi("stock.allocation")} />
           <Badge variant="secondary" className="text-[11px] font-semibold tracking-wide">
             v2
           </Badge>
@@ -205,7 +207,7 @@ export default function FactoryStockAllocationV2() {
           {computed.allProformas.length > 0 && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-3">
-                <p className="text-xs text-muted-foreground font-medium">Show proforma columns:</p>
+                <p className="text-xs text-muted-foreground font-medium">{tUi("show.proforma.columns")}</p>
                 <Button
                   variant={showInactiveProformas ? "default" : "outline"}
                   size="sm"

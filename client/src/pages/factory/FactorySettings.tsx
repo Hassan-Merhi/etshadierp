@@ -1,25 +1,43 @@
-import {useState, useEffect, useRef} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {queryClient} from "@/lib/queryClient";
-import {factoryApiRequest} from "@/lib/factoryApi";
-import {Card, CardContent, CardHeader, CardTitle, CardDescription} from "@/components/ui/card";
-import {Switch} from "@/components/ui/switch";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload, Download, WifiOff, ToggleRight, DollarSign, AlertTriangle, FileSpreadsheet, Images, MessageCircle} from "lucide-react";
-import {useToast} from "@/hooks/use-toast";
-import {OfflinePrepPanel} from "@/components/OfflinePrepPanel";
-import {ImportBalesTab} from "./bale-stock-entry/ImportBalesTab";
-import {PageHeader} from "@/components/PageHeader";
+import { useState, useEffect, useRef } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Loader2,
+  Save,
+  Search,
+  ArrowRight,
+  CheckCircle,
+  Wrench,
+  Upload,
+  Download,
+  WifiOff,
+  ToggleRight,
+  DollarSign,
+  AlertTriangle,
+  FileSpreadsheet,
+  Images,
+  MessageCircle,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
+import { ImportBalesTab } from "./bale-stock-entry/ImportBalesTab";
+import { PageHeader } from "@/components/PageHeader";
 
-import type {FactorySettingsData, Location, RenamePreviewItem, WaChat} from "./factorysettings/types";
-import {defaultSettings} from "./factorysettings/utils";
-import {RecalculateBaleCostsCard} from "./factorysettings/components/RecalculateBaleCostsCard";
-import {MigrateVoucherDescriptionsCard} from "./factorysettings/components/MigrateVoucherDescriptionsCard";
+import type { FactorySettingsData, Location, RenamePreviewItem, WaChat } from "./factorysettings/types";
+import { defaultSettings } from "./factorysettings/utils";
+import { RecalculateBaleCostsCard } from "./factorysettings/components/RecalculateBaleCostsCard";
+import { MigrateVoucherDescriptionsCard } from "./factorysettings/components/MigrateVoucherDescriptionsCard";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactorySettings() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const { data: currentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
   const isDeveloper = currentUser?.role === "Developer";
@@ -434,7 +452,7 @@ export default function FactorySettings() {
     return (
       <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        <span className="ml-2 text-muted-foreground">Loading factory settings...</span>
+        <span className="ml-2 text-muted-foreground">{tUi("loading.factory.settings")}</span>
       </div>
     );
   }
@@ -457,7 +475,10 @@ export default function FactorySettings() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <PageHeader title="Factory Settings" subtitle="Toggle factory intelligence features on or off" />
+          <PageHeader
+            title={tUi("factory.settings")}
+            subtitle={tUi("toggle.factory.intelligence.features.on.or.off")}
+          />
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -479,8 +500,8 @@ export default function FactorySettings() {
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle data-testid="text-section-production">Production Intelligence</CardTitle>
-            <CardDescription>Core production monitoring and analytics</CardDescription>
+            <CardTitle data-testid="text-section-production">{tUi("production.intelligence")}</CardTitle>
+            <CardDescription>{tUi("core.production.monitoring.and.analytics")}</CardDescription>
           </CardHeader>
           <CardContent className="divide-y">
             {toggleItem("Dashboard", "dashboardEnabled")}
@@ -491,8 +512,8 @@ export default function FactorySettings() {
 
         <Card>
           <CardHeader>
-            <CardTitle data-testid="text-section-financial">Financial Intelligence</CardTitle>
-            <CardDescription>Profitability and cash flow analysis</CardDescription>
+            <CardTitle data-testid="text-section-financial">{tUi("financial.intelligence")}</CardTitle>
+            <CardDescription>{tUi("profitability.and.cash.flow.analysis")}</CardDescription>
           </CardHeader>
           <CardContent className="divide-y">
             {toggleItem("Profitability Engine", "profitabilityEnabled")}
@@ -502,8 +523,8 @@ export default function FactorySettings() {
 
         <Card>
           <CardHeader>
-            <CardTitle data-testid="text-section-supply-chain">Supply Chain</CardTitle>
-            <CardDescription>Supplier management, optimization, and traceability</CardDescription>
+            <CardTitle data-testid="text-section-supply-chain">{tUi("supply.chain")}</CardTitle>
+            <CardDescription>{tUi("supplier.management.optimization.and.traceabilit")}</CardDescription>
           </CardHeader>
           <CardContent className="divide-y">
             {toggleItem("Supplier Scoring", "supplierScoringEnabled")}
@@ -515,8 +536,8 @@ export default function FactorySettings() {
 
         <Card>
           <CardHeader>
-            <CardTitle data-testid="text-section-operations">Operations</CardTitle>
-            <CardDescription>Alerts and access control</CardDescription>
+            <CardTitle data-testid="text-section-operations">{tUi("operations")}</CardTitle>
+            <CardDescription>{tUi("alerts.and.access.control")}</CardDescription>
           </CardHeader>
           <CardContent className="divide-y">
             {toggleItem("Alerts System", "alertsEnabled")}
@@ -526,8 +547,8 @@ export default function FactorySettings() {
 
         <Card>
           <CardHeader>
-            <CardTitle data-testid="text-section-reports">Reports</CardTitle>
-            <CardDescription>Toggle report pages on or off for all users</CardDescription>
+            <CardTitle data-testid="text-section-reports">{tUi("reports")}</CardTitle>
+            <CardDescription>{tUi("toggle.report.pages.on.or.off.for.all.users")}</CardDescription>
           </CardHeader>
           <CardContent className="divide-y">
             {toggleItem("Net Profit", "netProfitEnabled")}
@@ -539,42 +560,58 @@ export default function FactorySettings() {
 
         <Card>
           <CardHeader>
-            <CardTitle data-testid="text-section-pages">Page Visibility</CardTitle>
-            <CardDescription>Show or hide entire pages for all users</CardDescription>
+            <CardTitle data-testid="text-section-pages">{tUi("page.visibility")}</CardTitle>
+            <CardDescription>{tUi("show.or.hide.entire.pages.for.all.users")}</CardDescription>
           </CardHeader>
           <CardContent className="divide-y">{toggleItem("Daybook", "daybookEnabled")}</CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle data-testid="text-section-tabs">Page Tabs</CardTitle>
-            <CardDescription>Disable tabs you don't use — they will be hidden from all users</CardDescription>
+            <CardTitle data-testid="text-section-tabs">{tUi("page.tabs")}</CardTitle>
+            <CardDescription>{tUi("disable.tabs.you.don.t.use.they.will.be.hidden.f")}</CardDescription>
           </CardHeader>
           <CardContent className="divide-y">
-            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Workers Hub</p>
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">
+              {tUi("workers.hub")}
+            </p>
             {toggleItem("Payroll tab", "workersTabPayrollEnabled")}
             {toggleItem("Attendance tab", "workersTabAttendanceEnabled")}
             {toggleItem("Report tab", "workersTabReportEnabled")}
             {toggleItem("Advances tab", "workersTabAdvancesEnabled")}
             {toggleItem("Bonuses tab", "workersTabBonusesEnabled")}
-            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Bales Hub</p>
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">
+              {tUi("bales.hub")}
+            </p>
             {toggleItem("Barcode Lookup tab", "balesTabBarcodeEnabled")}
             {toggleItem("Remove from Stock tab", "balesTabRemoveEnabled")}
-            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Loadings Hub</p>
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">
+              {tUi("loadings.hub")}
+            </p>
             {toggleItem("Pending Loadings tab", "loadingsTabPendingEnabled")}
-            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Stock Entry</p>
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">
+              {tUi("stock.entry")}
+            </p>
             {toggleItem("Stock Entry tab", "stockEntryTabEntryEnabled")}
             {toggleItem("Stock Entry History tab", "stockEntryTabHistoryEnabled")}
-            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Advances</p>
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">
+              {tUi("advances")}
+            </p>
             {toggleItem("Repayments tab", "advancesTabRepaymentsEnabled")}
-            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">KPIs</p>
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">{tUi("kpis")}</p>
             {toggleItem("Worker Performance tab", "kpisTabWorkerPerformanceEnabled")}
             {toggleItem("Mix Efficiency tab", "kpisTabMixEfficiencyEnabled")}
-            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Payroll</p>
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">
+              {tUi("payroll")}
+            </p>
             {toggleItem("Worker Master tab", "payrollTabWorkerMasterEnabled")}
-            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Profitability</p>
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">
+              {tUi("profitability")}
+            </p>
             {toggleItem("Container Profitability tab", "profitabilityTabContainersEnabled")}
-            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Workers List</p>
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">
+              {tUi("workers.list")}
+            </p>
             {toggleItem("Categories tab", "workersTabCategoriesEnabled")}
             <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">
               Worker Profile
@@ -588,8 +625,8 @@ export default function FactorySettings() {
 
         <Card>
           <CardHeader>
-            <CardTitle data-testid="text-section-display">Display Options</CardTitle>
-            <CardDescription>Control what prices and values are visible to users</CardDescription>
+            <CardTitle data-testid="text-section-display">{tUi("display.options")}</CardTitle>
+            <CardDescription>{tUi("control.what.prices.and.values.are.visible.to.us")}</CardDescription>
           </CardHeader>
           <CardContent className="divide-y">
             {toggleItem("Hide Selling Price", "hideSellingPrice")}
@@ -599,13 +636,13 @@ export default function FactorySettings() {
 
         <Card className="md:col-span-2">
           <CardHeader>
-            <CardTitle data-testid="text-section-cost">Cost Configuration</CardTitle>
-            <CardDescription>Default cost parameters for profitability calculations</CardDescription>
+            <CardTitle data-testid="text-section-cost">{tUi("cost.configuration")}</CardTitle>
+            <CardDescription>{tUi("default.cost.parameters.for.profitability.calcul")}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-6 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="laborCostPerKg">Labor Cost per KG</Label>
+                <Label htmlFor="laborCostPerKg">{tUi("labor.cost.per.kg")}</Label>
                 <Input
                   id="laborCostPerKg"
                   type="number"
@@ -617,7 +654,7 @@ export default function FactorySettings() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="overheadPerKg">Overhead per KG</Label>
+                <Label htmlFor="overheadPerKg">{tUi("overhead.per.kg")}</Label>
                 <Input
                   id="overheadPerKg"
                   type="number"
@@ -637,14 +674,14 @@ export default function FactorySettings() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Wrench className="h-5 w-5 text-muted-foreground" />
-            <CardTitle data-testid="text-section-data-cleanup">Data Cleanup</CardTitle>
+            <CardTitle data-testid="text-section-data-cleanup">{tUi("data.cleanup")}</CardTitle>
           </div>
-          <CardDescription>Find products by code prefix and rename them in bulk</CardDescription>
+          <CardDescription>{tUi("find.products.by.code.prefix.and.rename.them.in.")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
-              <Label htmlFor="codePrefix">Code Prefix</Label>
+              <Label htmlFor="codePrefix">{tUi("code.prefix")}</Label>
               <Input
                 id="codePrefix"
                 value={codePrefix}
@@ -657,7 +694,7 @@ export default function FactorySettings() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="findStr">Find in Name</Label>
+              <Label htmlFor="findStr">{tUi("find.in.name")}</Label>
               <Input
                 id="findStr"
                 value={findStr}
@@ -670,7 +707,7 @@ export default function FactorySettings() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="replaceStr">Replace With</Label>
+              <Label htmlFor="replaceStr">{tUi("replace.with")}</Label>
               <Input
                 id="replaceStr"
                 value={replaceStr}
@@ -703,10 +740,10 @@ export default function FactorySettings() {
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
-                      <TableHead>Code</TableHead>
-                      <TableHead>Current Name</TableHead>
+                      <TableHead>{tUi("code")}</TableHead>
+                      <TableHead>{tUi("current.name")}</TableHead>
                       <TableHead className="w-8"></TableHead>
-                      <TableHead>New Name</TableHead>
+                      <TableHead>{tUi("new.name")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -744,7 +781,7 @@ export default function FactorySettings() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Upload className="h-5 w-5 text-muted-foreground" />
-            <CardTitle data-testid="text-section-excel-import">Excel Product Import</CardTitle>
+            <CardTitle data-testid="text-section-excel-import">{tUi("excel.product.import")}</CardTitle>
           </div>
           <CardDescription>
             Upload an Excel file to update bale product names, weights, and categories by matching on article code
@@ -752,7 +789,7 @@ export default function FactorySettings() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="text-sm text-muted-foreground space-y-1">
-            <p>Your Excel file should have these column headers:</p>
+            <p>{tUi("your.excel.file.should.have.these.column.headers")}</p>
             <ul className="list-disc list-inside ml-2 space-y-0.5">
               <li>
                 <span className="font-mono text-xs">articleCode</span> (required) - matches existing products
@@ -812,7 +849,7 @@ export default function FactorySettings() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Upload className="h-5 w-5 text-muted-foreground" />
-            <CardTitle data-testid="text-section-bale-import">Import Historical Bales</CardTitle>
+            <CardTitle data-testid="text-section-bale-import">{tUi("import.historical.bales")}</CardTitle>
           </div>
           <CardDescription>
             Upload an Excel file to import old stock as bales. Each row creates bales with automatic REF codes and the
@@ -821,17 +858,18 @@ export default function FactorySettings() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="text-sm text-muted-foreground space-y-1">
-            <p>Your Excel file should have these column headers:</p>
+            <p>{tUi("your.excel.file.should.have.these.column.headers")}</p>
             <ul className="list-disc list-inside ml-2 space-y-0.5">
               <li>
-                <span className="font-mono text-xs">ITEM BARCODE</span> (required) - article code to match existing
-                products (e.g. HMD11298)
+                <span className="font-mono text-xs">{tUi("item.barcode")}</span> (required) - article code to match
+                existing products (e.g. HMD11298)
               </li>
               <li>
-                <span className="font-mono text-xs">QUANTITY</span> - number of bales to create (default: 1)
+                <span className="font-mono text-xs">{tUi("quantity")}</span> - number of bales to create (default: 1)
               </li>
               <li>
-                <span className="font-mono text-xs">PRODUCTION DATE</span> - date the bales were produced (required)
+                <span className="font-mono text-xs">{tUi("production.date")}</span> - date the bales were produced
+                (required)
               </li>
             </ul>
             <p className="mt-2 text-xs">
@@ -839,10 +877,10 @@ export default function FactorySettings() {
             </p>
           </div>
           <div className="space-y-2">
-            <Label>Location / Warehouse</Label>
+            <Label>{tUi("location.warehouse")}</Label>
             <Select value={baleImportLocationId} onValueChange={setBaleImportLocationId}>
               <SelectTrigger className="w-64" data-testid="select-bale-import-location">
-                <SelectValue placeholder="Select location..." />
+                <SelectValue placeholder={tUi("select.location")} />
               </SelectTrigger>
               <SelectContent>
                 {locations?.map((loc) => (
@@ -929,11 +967,11 @@ export default function FactorySettings() {
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead className="w-12">Row</TableHead>
-                        <TableHead>Article Code</TableHead>
-                        <TableHead>Product Name</TableHead>
+                        <TableHead>{tUi("article.code")}</TableHead>
+                        <TableHead>{tUi("product.name")}</TableHead>
                         <TableHead className="text-right">Qty</TableHead>
-                        <TableHead className="text-right">Weight (kg)</TableHead>
-                        <TableHead>Production Date</TableHead>
+                        <TableHead className="text-right">{tUi("weight.kg")}</TableHead>
+                        <TableHead>{tUi("production.date.2")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -954,7 +992,7 @@ export default function FactorySettings() {
 
               {baleValidationResult.skippedRows.length > 0 && (
                 <div className="text-xs p-3 rounded-md border border-destructive/30 space-y-1">
-                  <p className="font-medium text-destructive text-sm">Skipped rows:</p>
+                  <p className="font-medium text-destructive text-sm">{tUi("skipped.rows")}</p>
                   {baleValidationResult.skippedRows.map((row, i) => (
                     <p key={i} className="text-muted-foreground">
                       Row {row.rowIndex}: {row.articleCode ? `"${row.articleCode}"` : "(empty)"} - {row.reason}
@@ -991,7 +1029,9 @@ export default function FactorySettings() {
                     Cancel
                   </Button>
                   {!baleImportLocationId && (
-                    <span className="text-xs text-destructive">Please select a location above before finalizing</span>
+                    <span className="text-xs text-destructive">
+                      {tUi("please.select.a.location.above.before.finalizing")}
+                    </span>
                   )}
                 </div>
               )}
@@ -1012,7 +1052,7 @@ export default function FactorySettings() {
               </div>
               {baleImportResult.skippedDetails.length > 0 && (
                 <div className="text-xs text-muted-foreground p-2 rounded-md border space-y-0.5">
-                  <p className="font-medium">Skipped rows:</p>
+                  <p className="font-medium">{tUi("skipped.rows")}</p>
                   {baleImportResult.skippedDetails.map((detail, i) => (
                     <p key={i}>{detail}</p>
                   ))}
@@ -1082,11 +1122,11 @@ export default function FactorySettings() {
                   <Table>
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
-                        <TableHead>Container</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead className="text-center">Current Currency</TableHead>
-                        <TableHead className="text-center">Will Become</TableHead>
+                        <TableHead>{tUi("container")}</TableHead>
+                        <TableHead>{tUi("description")}</TableHead>
+                        <TableHead className="text-right">{tUi("amount")}</TableHead>
+                        <TableHead className="text-center">{tUi("current.currency")}</TableHead>
+                        <TableHead className="text-center">{tUi("will.become")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1147,7 +1187,7 @@ export default function FactorySettings() {
             <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
             Import Bales
           </CardTitle>
-          <CardDescription>Bulk import bales from an Excel spreadsheet template.</CardDescription>
+          <CardDescription>{tUi("bulk.import.bales.from.an.excel.spreadsheet.temp")}</CardDescription>
         </CardHeader>
         <CardContent className="pt-0">
           <ImportBalesTab />
@@ -1246,7 +1286,7 @@ export default function FactorySettings() {
           {prodWaPickerOpen && (
             <div className="space-y-2">
               <Input
-                placeholder="Search chats…"
+                placeholder={tUi("search.chats")}
                 value={prodWaSearch}
                 onChange={(e) => setProdWaSearch(e.target.value)}
                 data-testid="input-prod-wa-search"
@@ -1259,7 +1299,7 @@ export default function FactorySettings() {
                   </p>
                 )}
                 {!waChatsLoading && filteredWaChats.length === 0 && (
-                  <p className="text-muted-foreground text-center py-4">No chats found</p>
+                  <p className="text-muted-foreground text-center py-4">{tUi("no.chats.found")}</p>
                 )}
                 {filteredWaChats.map((chat) => (
                   <button
@@ -1357,7 +1397,7 @@ export default function FactorySettings() {
           {weeklyWaPickerOpen && (
             <div className="space-y-2">
               <Input
-                placeholder="Search chats…"
+                placeholder={tUi("search.chats")}
                 value={weeklyWaSearch}
                 onChange={(e) => setWeeklyWaSearch(e.target.value)}
                 data-testid="input-weekly-wa-search"
@@ -1370,7 +1410,7 @@ export default function FactorySettings() {
                   </p>
                 )}
                 {!weeklyWaChatsLoading && filteredWeeklyWaChats.length === 0 && (
-                  <p className="text-muted-foreground text-center py-4">No chats found</p>
+                  <p className="text-muted-foreground text-center py-4">{tUi("no.chats.found")}</p>
                 )}
                 {filteredWeeklyWaChats.map((chat) => (
                   <button

@@ -36,7 +36,9 @@ import { formatNumber } from "@/lib/formatNumber";
 import type { GroundScanItem, ScannedBale, StockLocation } from "./groundscan/types";
 import { LOCATION_KEY, STORAGE_KEY, loadLocalBales, rowToScannedBale } from "./groundscan/utils";
 import { StatusBadge } from "./groundscan/components/StatusBadge";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function GroundScan() {
+  const tUi = useFactoryText();
   const [scanInput, setScanInput] = useState("");
   const [scanning, setScanning] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -645,17 +647,17 @@ export default function GroundScan() {
       {/* ── Location selector ── */}
       <div className="flex items-center gap-2 text-sm flex-wrap">
         <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-        <span className="text-muted-foreground shrink-0">Scanning location:</span>
+        <span className="text-muted-foreground shrink-0">{tUi("scanning.location")}</span>
         <Select
           value={selectedLocationId}
           onValueChange={setSelectedLocationId}
           data-testid="select-ground-scan-location"
         >
           <SelectTrigger className="w-60" data-testid="trigger-ground-scan-location">
-            <SelectValue placeholder="All locations" />
+            <SelectValue placeholder={tUi("all.locations")} />
           </SelectTrigger>
           <SelectContent>
-            {(stockLocations ?? []).length > 1 && <SelectItem value="all">All locations</SelectItem>}
+            {(stockLocations ?? []).length > 1 && <SelectItem value="all">{tUi("all.locations")}</SelectItem>}
             {(stockLocations ?? []).map((loc) => (
               <SelectItem key={loc.id} value={String(loc.id)}>
                 {loc.name} ({loc.count} bales)
@@ -688,7 +690,7 @@ export default function GroundScan() {
                 setScanError("");
               }}
               onKeyDown={(e) => e.key === "Enter" && handleScan()}
-              placeholder="Scan ref code / barcode..."
+              placeholder={tUi("scan.ref.code.barcode")}
               className="pl-9"
               disabled={scanning}
               data-testid="input-ground-scan"
@@ -730,15 +732,15 @@ export default function GroundScan() {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Clear all scans?</AlertDialogTitle>
+                  <AlertDialogTitle>{tUi("clear.all.scans")}</AlertDialogTitle>
                   <AlertDialogDescription>
                     This will remove all {scannedBales.length} scanned bales from the shared list for everyone. This
                     cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => clearMutation.mutate()}>Clear All</AlertDialogAction>
+                  <AlertDialogCancel>{tUi("cancel")}</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => clearMutation.mutate()}>{tUi("clear.all")}</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -756,7 +758,7 @@ export default function GroundScan() {
           <span data-testid="text-ground-scan-weight">
             <span className="font-semibold text-foreground">{formatNumber(totalWeight, 2)} kg</span> total weight
           </span>
-          {isLoading && <span className="text-xs text-muted-foreground">Syncing…</span>}
+          {isLoading && <span className="text-xs text-muted-foreground">{tUi("syncing")}</span>}
         </div>
       </div>
 
@@ -764,7 +766,7 @@ export default function GroundScan() {
       {scannedBales.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
           <Package className="h-10 w-10 opacity-30" />
-          <p className="text-sm">Scan a bale to add it to the list</p>
+          <p className="text-sm">{tUi("scan.a.bale.to.add.it.to.the.list")}</p>
         </div>
       ) : (
         <div className="rounded-md border overflow-x-auto">
@@ -772,13 +774,13 @@ export default function GroundScan() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-8">#</TableHead>
-                <TableHead>Ref Code</TableHead>
-                <TableHead>Article Code</TableHead>
-                <TableHead>Product Name</TableHead>
-                <TableHead className="text-right">Weight (kg)</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Date Produced</TableHead>
-                <TableHead>Worker</TableHead>
+                <TableHead>{tUi("ref.code")}</TableHead>
+                <TableHead>{tUi("article.code")}</TableHead>
+                <TableHead>{tUi("product.name")}</TableHead>
+                <TableHead className="text-right">{tUi("weight.kg")}</TableHead>
+                <TableHead>{tUi("status")}</TableHead>
+                <TableHead>{tUi("date.produced")}</TableHead>
+                <TableHead>{tUi("worker")}</TableHead>
                 <TableHead className="w-8" />
               </TableRow>
             </TableHeader>

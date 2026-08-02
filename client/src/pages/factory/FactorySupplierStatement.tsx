@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatNumber } from "@/lib/formatNumber";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 const CURRENCIES = ["USD", "EUR", "GBP", "AUD", "LBP", "XOF", "XAF"];
 
@@ -65,6 +66,7 @@ function rowCommissionDisplay(c: any): { amount: number; currency: string } {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function FactorySupplierStatement() {
+  const tUi = useFactoryText();
   const { formatDisplayDate } = useDateFormat();
   const [companyId, setCompanyId] = useState<number | null>(null);
   const [supplierId, setSupplierId] = useState<string>("");
@@ -125,18 +127,18 @@ export default function FactorySupplierStatement() {
   return (
     <div className="space-y-6">
       <div>
-        <PageHeader title="Supplier Statement" subtitle="Multi-currency supplier account statement" />
+        <PageHeader title={tUi("supplier.statement")} subtitle={tUi("multi.currency.supplier.account.statement")} />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Filters</CardTitle>
+          <CardTitle>{tUi("filters")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-end gap-4 flex-wrap">
             {companies.length > 1 && (
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Company</Label>
+                <Label className="text-xs text-muted-foreground">{tUi("company")}</Label>
                 <Select
                   value={companyId ? String(companyId) : ""}
                   onValueChange={(val) => {
@@ -145,7 +147,7 @@ export default function FactorySupplierStatement() {
                   }}
                 >
                   <SelectTrigger className="w-48" data-testid="select-company">
-                    <SelectValue placeholder="Select company" />
+                    <SelectValue placeholder={tUi("select.company")} />
                   </SelectTrigger>
                   <SelectContent>
                     {companies.map((c: any) => (
@@ -159,14 +161,14 @@ export default function FactorySupplierStatement() {
             )}
 
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Supplier</Label>
+              <Label className="text-xs text-muted-foreground">{tUi("supplier")}</Label>
               <Select
                 value={supplierId || ""}
                 onValueChange={(val) => setSupplierId(val)}
                 disabled={!companyId || suppliersLoading}
               >
                 <SelectTrigger className="w-56" data-testid="select-supplier">
-                  <SelectValue placeholder="Select supplier..." />
+                  <SelectValue placeholder={tUi("select.supplier")} />
                 </SelectTrigger>
                 <SelectContent>
                   {suppliers.map((s: any) => (
@@ -184,7 +186,7 @@ export default function FactorySupplierStatement() {
       {statementLoading && (
         <Card>
           <CardContent className="pt-6">
-            <p className="text-muted-foreground text-sm">Loading statement...</p>
+            <p className="text-muted-foreground text-sm">{tUi("loading.statement")}</p>
           </CardContent>
         </Card>
       )}
@@ -218,12 +220,12 @@ export default function FactorySupplierStatement() {
                     <Table>
                       <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
-                          <TableHead>Container</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Origin</TableHead>
-                          <TableHead>Status</TableHead>
+                          <TableHead>{tUi("container")}</TableHead>
+                          <TableHead>{tUi("date")}</TableHead>
+                          <TableHead>{tUi("origin")}</TableHead>
+                          <TableHead>{tUi("status")}</TableHead>
                           <TableHead className="text-right">Kg</TableHead>
-                          <TableHead className="text-right">Rate</TableHead>
+                          <TableHead className="text-right">{tUi("rate")}</TableHead>
                           <TableHead className="text-right">
                             Goods Value
                             <span className="block text-xs font-normal text-muted-foreground">
@@ -311,7 +313,7 @@ export default function FactorySupplierStatement() {
                   <div className="mt-4 flex justify-end">
                     <div className="space-y-1 text-sm text-right min-w-56">
                       <div className="flex justify-between gap-8">
-                        <span className="text-muted-foreground">Goods Value</span>
+                        <span className="text-muted-foreground">{tUi("goods.value")}</span>
                         <span className="font-mono font-medium">
                           {formatNumber(groupTotalValue)} {group.currencyCode}
                         </span>
@@ -337,7 +339,7 @@ export default function FactorySupplierStatement() {
                       )}
 
                       <div className="flex justify-between gap-8 border-t pt-1">
-                        <span className="font-medium">Net Owed to Supplier</span>
+                        <span className="font-medium">{tUi("net.owed.to.supplier")}</span>
                         <span
                           className="font-mono font-bold"
                           data-testid={`text-group-net-supplier-${group.currencyCode}`}
@@ -348,7 +350,7 @@ export default function FactorySupplierStatement() {
 
                       {groupPaid > 0 && (
                         <div className="flex justify-between gap-8">
-                          <span className="text-muted-foreground">Less: Paid</span>
+                          <span className="text-muted-foreground">{tUi("less.paid")}</span>
                           <span className="font-mono text-green-600 dark:text-green-400">
                             −{formatNumber(groupPaid)} {group.currencyCode}
                           </span>
@@ -356,7 +358,7 @@ export default function FactorySupplierStatement() {
                       )}
 
                       <div className={`flex justify-between gap-8 ${groupPaid > 0 ? "border-t pt-1" : ""}`}>
-                        <span className="font-medium">Outstanding Balance</span>
+                        <span className="font-medium">{tUi("outstanding.balance")}</span>
                         <span
                           className={`font-mono font-bold ${groupOutstanding < 0 ? "text-green-600 dark:text-green-400" : ""}`}
                           data-testid={`text-group-total-${group.currencyCode}`}
@@ -371,10 +373,11 @@ export default function FactorySupplierStatement() {
                   </div>
 
                   <p className="text-xs text-muted-foreground mt-3">
-                    <span className="font-medium">Row "Total Owed"</span>: post-offload rows show the all-in backend
-                    cost (base + freight + OC + commission + duty). Pre-offload rows show goods value only (est.).
-                    <span className="ml-1 font-medium">Group totals</span> are always computed by the server. Commission
-                    is a broker deduction — it reduces what this supplier receives.
+                    <span className="font-medium">{tUi("row.total.owed")}</span>: post-offload rows show the all-in
+                    backend cost (base + freight + OC + commission + duty). Pre-offload rows show goods value only
+                    (est.).
+                    <span className="ml-1 font-medium">{tUi("group.totals")}</span> are always computed by the server.
+                    Commission is a broker deduction — it reduces what this supplier receives.
                   </p>
                 </CardContent>
               </Card>
@@ -452,7 +455,7 @@ export default function FactorySupplierStatement() {
               <CardContent className="pt-6">
                 <div className="text-center py-8">
                   <FileText className="mx-auto h-10 w-10 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground mt-3">No containers found for this supplier.</p>
+                  <p className="text-sm text-muted-foreground mt-3">{tUi("no.containers.found.for.this.supplier")}</p>
                 </div>
               </CardContent>
             </Card>
@@ -475,12 +478,12 @@ export default function FactorySupplierStatement() {
                   <Table>
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
-                        <TableHead>Container</TableHead>
-                        <TableHead>Purchase Supplier</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Commission Earned</TableHead>
-                        <TableHead className="text-right">Currency</TableHead>
+                        <TableHead>{tUi("container")}</TableHead>
+                        <TableHead>{tUi("purchase.supplier")}</TableHead>
+                        <TableHead>{tUi("date")}</TableHead>
+                        <TableHead>{tUi("status")}</TableHead>
+                        <TableHead className="text-right">{tUi("commission.earned")}</TableHead>
+                        <TableHead className="text-right">{tUi("currency")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -529,7 +532,7 @@ export default function FactorySupplierStatement() {
       {!statement && !statementLoading && supplierId && (
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Failed to load statement.</p>
+            <p className="text-sm text-muted-foreground">{tUi("failed.to.load.statement")}</p>
           </CardContent>
         </Card>
       )}
@@ -539,7 +542,7 @@ export default function FactorySupplierStatement() {
           <CardContent className="pt-6">
             <div className="text-center py-8">
               <FileText className="mx-auto h-10 w-10 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground mt-3">Select a supplier to view their statement.</p>
+              <p className="text-sm text-muted-foreground mt-3">{tUi("select.a.supplier.to.view.their.statement")}</p>
             </div>
           </CardContent>
         </Card>

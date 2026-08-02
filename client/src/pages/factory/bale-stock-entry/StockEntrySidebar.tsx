@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Location } from "@shared/schema";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface StockEntrySidebarProps {
   selectedLocationId: string;
@@ -40,16 +41,17 @@ export function StockEntrySidebar({
   isPending,
   onConfirm,
 }: StockEntrySidebarProps) {
+  const tUi = useFactoryText();
   return (
     <div className="sticky top-6">
       <div className="p-5 rounded-2xl bg-card border shadow-sm space-y-5">
         <div className="space-y-4">
           <div className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Location & Date</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{tUi("location.date")}</p>
             <div className="grid grid-cols-1 gap-3">
               <Select value={selectedLocationId} onValueChange={onLocationChange}>
                 <SelectTrigger className="h-10 rounded-xl" data-testid="select-location">
-                  <SelectValue placeholder="Select Warehouse..." />
+                  <SelectValue placeholder={tUi("select.warehouse")} />
                 </SelectTrigger>
                 <SelectContent>
                   {activeLocations?.map((loc) => (
@@ -73,16 +75,18 @@ export function StockEntrySidebar({
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Filters & Options</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              {tUi("filters.options")}
+            </p>
             <div className="grid grid-cols-1 gap-3">
               <div className="space-y-1">
-                <Label className="text-[10px] font-semibold text-muted-foreground px-1">Worker Group</Label>
+                <Label className="text-[10px] font-semibold text-muted-foreground px-1">{tUi("worker.group")}</Label>
                 <Select value={workerCategoryFilter} onValueChange={onWorkerCategoryFilterChange}>
                   <SelectTrigger className="h-9 rounded-xl text-xs" data-testid="select-worker-group">
-                    <SelectValue placeholder="Filter workers..." />
+                    <SelectValue placeholder={tUi("filter.workers")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Workers</SelectItem>
+                    <SelectItem value="all">{tUi("all.workers.2")}</SelectItem>
                     {workerCategoryGroups.map((c: any) => (
                       <SelectItem key={c.id} value={String(c.id)}>
                         {c.name}
@@ -92,13 +96,15 @@ export function StockEntrySidebar({
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-[10px] font-semibold text-muted-foreground px-1">Customer Print Logo</Label>
+                <Label className="text-[10px] font-semibold text-muted-foreground px-1">
+                  {tUi("customer.print.logo")}
+                </Label>
                 <Select value={selectedCustomerId} onValueChange={onCustomerIdChange}>
                   <SelectTrigger className="h-9 rounded-xl text-xs" data-testid="select-customer-logo">
-                    <SelectValue placeholder="Global customer logo..." />
+                    <SelectValue placeholder={tUi("global.customer.logo")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No Global Logo</SelectItem>
+                    <SelectItem value="none">{tUi("no.global.logo")}</SelectItem>
                     {allCustomers
                       .filter((c: any) => c.active)
                       .map((c: any) => (
@@ -115,13 +121,13 @@ export function StockEntrySidebar({
 
         <div className="pt-4 border-t space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">Total Bales</span>
+            <span className="text-sm font-medium text-muted-foreground">{tUi("total.bales")}</span>
             <span className="text-xl font-black text-primary" data-testid="text-total-qty">
               {totalQty}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-muted-foreground">Total Weight</span>
+            <span className="text-sm font-medium text-muted-foreground">{tUi("total.weight")}</span>
             <div className="text-right">
               <span className="text-xl font-black text-primary" data-testid="text-total-kg">
                 {totalKg.toFixed(1)}

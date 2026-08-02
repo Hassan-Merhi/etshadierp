@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface FactoryUser {
   id: string;
@@ -54,6 +55,7 @@ const ALL_FACTORY_PAGES = FACTORY_NAV_PAGES;
 const PAGE_GROUPS = Array.from(new Set(ALL_FACTORY_PAGES.map((p) => p.group)));
 
 export default function FactoryUsers() {
+  const tUi = useFactoryText();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const [createOpen, setCreateOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<FactoryUser | null>(null);
@@ -277,7 +279,7 @@ export default function FactoryUsers() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <PageHeader title="Factory Users" subtitle="Create users and control which pages they can access" />
+          <PageHeader title={tUi("factory.users")} subtitle={tUi("create.users.and.control.which.pages.they.can.ac")} />
         </div>
         <Button
           onClick={() => {
@@ -304,14 +306,14 @@ export default function FactoryUsers() {
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead>Username</TableHead>
-                    <TableHead>Display Name</TableHead>
-                    <TableHead>ERP Access</TableHead>
-                    <TableHead>Factory Access</TableHead>
-                    <TableHead>Pages Access</TableHead>
-                    <TableHead>Cost Access</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-28">Actions</TableHead>
+                    <TableHead>{tUi("username")}</TableHead>
+                    <TableHead>{tUi("display.name")}</TableHead>
+                    <TableHead>{tUi("erp.access")}</TableHead>
+                    <TableHead>{tUi("factory.access")}</TableHead>
+                    <TableHead>{tUi("pages.access")}</TableHead>
+                    <TableHead>{tUi("cost.access")}</TableHead>
+                    <TableHead>{tUi("status")}</TableHead>
+                    <TableHead className="w-28">{tUi("actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -362,18 +364,18 @@ export default function FactoryUsers() {
                             )}
                           </div>
                         ) : (
-                          <span className="text-xs text-muted-foreground">Full access</span>
+                          <span className="text-xs text-muted-foreground">{tUi("full.access")}</span>
                         )}
                       </TableCell>
                       <TableCell>
                         {isAdminOrOwner(user) ? (
-                          <span className="text-xs text-muted-foreground">Full access</span>
+                          <span className="text-xs text-muted-foreground">{tUi("full.access")}</span>
                         ) : user.hideAllCosts ? (
-                          <Badge variant="secondary">No cost access</Badge>
+                          <Badge variant="secondary">{tUi("no.cost.access")}</Badge>
                         ) : user.hiddenCostFields.length > 0 ? (
                           <Badge variant="secondary">{user.hiddenCostFields.length} hidden</Badge>
                         ) : (
-                          <span className="text-xs text-muted-foreground">Full access</span>
+                          <span className="text-xs text-muted-foreground">{tUi("full.access")}</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -412,8 +414,8 @@ export default function FactoryUsers() {
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
-              <p className="text-lg font-medium">No users configured</p>
-              <p className="text-sm mt-1">Add users and assign them specific page access</p>
+              <p className="text-lg font-medium">{tUi("no.users.configured")}</p>
+              <p className="text-sm mt-1">{tUi("add.users.and.assign.them.specific.page.access")}</p>
             </div>
           )}
         </CardContent>
@@ -445,15 +447,15 @@ export default function FactoryUsers() {
           <div className="space-y-5">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Username *</Label>
+                <Label>{tUi("username.2")}</Label>
                 <Input
                   value={formData.username}
                   onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                  placeholder="Enter username"
+                  placeholder={tUi("enter.username")}
                   data-testid="input-factory-user-username"
                 />
                 {editingUser && formData.username !== editingUser.username && (
-                  <p className="text-xs text-muted-foreground mt-1">Username will be changed on save</p>
+                  <p className="text-xs text-muted-foreground mt-1">{tUi("username.will.be.changed.on.save")}</p>
                 )}
               </div>
               <div>
@@ -469,11 +471,11 @@ export default function FactoryUsers() {
             </div>
 
             <div>
-              <Label>Display Name</Label>
+              <Label>{tUi("display.name")}</Label>
               <Input
                 value={formData.displayName}
                 onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
-                placeholder="Name shown in the system (e.g., John, Warehouse Manager)"
+                placeholder={tUi("name.shown.in.the.system.e.g.john.warehouse.mana")}
                 data-testid="input-factory-user-display-name"
               />
             </div>
@@ -507,7 +509,7 @@ export default function FactoryUsers() {
 
             <div className="space-y-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
-                <Label className="text-base font-semibold">Page Access</Label>
+                <Label className="text-base font-semibold">{tUi("page.access")}</Label>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={selectAll} data-testid="button-select-all-pages">
                     <Check className="h-3 w-3 mr-1" />
@@ -570,7 +572,7 @@ export default function FactoryUsers() {
             {!(editingUser && isAdminOrOwner(editingUser)) && (
               <div className="space-y-3">
                 <div>
-                  <Label className="text-base font-semibold">Cost Pricing Visibility</Label>
+                  <Label className="text-base font-semibold">{tUi("cost.pricing.visibility")}</Label>
                   <p className="text-sm text-muted-foreground mt-1">
                     Toggle off to hide cost pricing fields from this user. On = visible, Off = hidden.
                   </p>
@@ -579,7 +581,7 @@ export default function FactoryUsers() {
                 <div className="border rounded-md">
                   <div className="flex items-center justify-between px-4 py-3 bg-muted/40 rounded-t-md">
                     <div>
-                      <span className="text-sm font-semibold">User</span>
+                      <span className="text-sm font-semibold">{tUi("user")}</span>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         Hide all costs in the app and in any downloaded/exported files
                       </p>
@@ -645,7 +647,7 @@ export default function FactoryUsers() {
       >
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Remove User</DialogTitle>
+            <DialogTitle>{tUi("remove.user")}</DialogTitle>
             <DialogDescription>
               Are you sure you want to remove <strong>{deletingUser?.username}</strong>? Their account will be
               deactivated and they will lose all access to this company.

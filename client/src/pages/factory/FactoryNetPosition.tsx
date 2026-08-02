@@ -1,17 +1,31 @@
-import {useState, useMemo} from "react";
-import {useQuery} from "@tanstack/react-query";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {Skeleton} from "@/components/ui/skeleton";
-import {PageHeader} from "@/components/PageHeader";
-import {ChevronRight, ChevronLeft, TrendingUp, TrendingDown, Equal, RefreshCw, AlertCircle, Clock, CheckCircle2, PackageOpen, CalendarDays} from "lucide-react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/PageHeader";
+import {
+  ChevronRight,
+  ChevronLeft,
+  TrendingUp,
+  TrendingDown,
+  Equal,
+  RefreshCw,
+  AlertCircle,
+  Clock,
+  CheckCircle2,
+  PackageOpen,
+  CalendarDays,
+} from "lucide-react";
 
-import type {NetPositionData} from "./factorynetposition/types";
-import {fmt, formatDateLabel, r2, shiftDate, todayStr} from "./factorynetposition/utils";
-import {Side} from "./factorynetposition/components/Side";
-import {OrderGroup} from "./factorynetposition/components/OrderGroup";
-import {CustomNetPositionView} from "./factorynetposition/components/CustomNetPositionView";
+import type { NetPositionData } from "./factorynetposition/types";
+import { fmt, formatDateLabel, r2, shiftDate, todayStr } from "./factorynetposition/utils";
+import { Side } from "./factorynetposition/components/Side";
+import { OrderGroup } from "./factorynetposition/components/OrderGroup";
+import { CustomNetPositionView } from "./factorynetposition/components/CustomNetPositionView";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactoryNetPosition() {
+  const tUi = useFactoryText();
   const [asOf, setAsOf] = useState<string>(todayStr);
   const isToday = asOf === todayStr();
 
@@ -149,7 +163,7 @@ export default function FactoryNetPosition() {
       <div className="p-6">
         <div className="flex items-center gap-2 text-destructive">
           <AlertCircle className="h-5 w-5" />
-          <p>Failed to load net position data.</p>
+          <p>{tUi("failed.to.load.net.position.data")}</p>
         </div>
       </div>
     );
@@ -161,7 +175,7 @@ export default function FactoryNetPosition() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <PageHeader
-            title="Net Position"
+            title={tUi("net.position")}
             subtitle={
               isToday
                 ? "What we have vs what we owe — current standing"
@@ -177,7 +191,7 @@ export default function FactoryNetPosition() {
               size="icon"
               onClick={() => setAsOf(shiftDate(asOf, -1))}
               data-testid="button-date-prev"
-              title="Previous day"
+              title={tUi("previous.day")}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -198,7 +212,7 @@ export default function FactoryNetPosition() {
               onClick={() => setAsOf(shiftDate(asOf, 1))}
               disabled={isToday}
               data-testid="button-date-next"
-              title="Next day"
+              title={tUi("next.day")}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -245,7 +259,7 @@ export default function FactoryNetPosition() {
           <CardContent className="p-6">
             <div className="flex flex-wrap items-center justify-between gap-6">
               <div>
-                <p className="text-sm text-muted-foreground mb-1">Net Position</p>
+                <p className="text-sm text-muted-foreground mb-1">{tUi("net.position")}</p>
                 <p
                   className={`text-4xl font-bold font-mono ${isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
                   data-testid="text-net-position"
@@ -257,14 +271,14 @@ export default function FactoryNetPosition() {
               </div>
               <div className="flex items-center gap-4 flex-wrap">
                 <div className="text-center">
-                  <p className="text-xs text-muted-foreground mb-1">What We Have</p>
+                  <p className="text-xs text-muted-foreground mb-1">{tUi("what.we.have")}</p>
                   <p className="text-lg font-semibold font-mono text-green-600 dark:text-green-400">
                     {fmt(data?.forUsTotal ?? 0)}
                   </p>
                 </div>
                 <div className="text-muted-foreground text-xl font-light">−</div>
                 <div className="text-center">
-                  <p className="text-xs text-muted-foreground mb-1">What We Owe</p>
+                  <p className="text-xs text-muted-foreground mb-1">{tUi("what.we.owe")}</p>
                   <p className="text-lg font-semibold font-mono text-red-600 dark:text-red-400">
                     {fmt(data?.onUsTotal ?? 0)}
                   </p>
@@ -321,8 +335,8 @@ export default function FactoryNetPosition() {
       {!isLoading && (data?.onUs.accounts ?? []).some((a) => a.code === "SUPPLIER" && a.breakdown?.length) && (
         <Card data-testid="card-broker-breakdown">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Broker Balance Breakdown</CardTitle>
-            <p className="text-xs text-muted-foreground">Step-by-step calculation for each broker supplier</p>
+            <CardTitle className="text-base">{tUi("broker.balance.breakdown")}</CardTitle>
+            <p className="text-xs text-muted-foreground">{tUi("step.by.step.calculation.for.each.broker.supplie")}</p>
           </CardHeader>
           <CardContent className="space-y-4">
             {(data?.onUs.accounts ?? [])
@@ -358,7 +372,7 @@ export default function FactoryNetPosition() {
                       );
                     })}
                     <div className="border-t-2 border-border pt-2 mt-1 flex justify-between text-sm font-bold">
-                      <span>Total Owed</span>
+                      <span>{tUi("total.owed")}</span>
                       <span className="font-mono text-red-600 dark:text-red-400">{fmt(broker.value)}</span>
                     </div>
                   </div>
@@ -377,7 +391,7 @@ export default function FactoryNetPosition() {
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-amber-500" />
-                <CardTitle className="text-base">Upcoming Receivables</CardTitle>
+                <CardTitle className="text-base">{tUi("upcoming.receivables")}</CardTitle>
               </div>
               <div className="flex items-center gap-3 flex-wrap">
                 {(data?.pendingTotal ?? 0) > 0 && (
@@ -465,62 +479,64 @@ export default function FactoryNetPosition() {
             <CardHeader className="pb-3">
               <div className="flex items-center gap-2">
                 <Equal className="h-4 w-4 text-muted-foreground" />
-                <CardTitle className="text-base">Composition</CardTitle>
+                <CardTitle className="text-base">{tUi("composition")}</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 text-sm">
                 {data.inventoryValue > 0 && (
                   <div className="space-y-1">
-                    <p className="text-muted-foreground text-xs uppercase tracking-wide">Stock In Hand</p>
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide">{tUi("stock.in.hand")}</p>
                     <p
                       className="font-mono font-semibold text-green-600 dark:text-green-400"
                       data-testid="text-inventory-value"
                     >
                       {fmt(data.inventoryValue)}
                     </p>
-                    <p className="text-xs text-muted-foreground">Location inventory sell value</p>
+                    <p className="text-xs text-muted-foreground">{tUi("location.inventory.sell.value")}</p>
                   </div>
                 )}
                 {data.rawMaterialValue > 0 && (
                   <div className="space-y-1">
-                    <p className="text-muted-foreground text-xs uppercase tracking-wide">Raw Material Stock</p>
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide">{tUi("raw.material.stock")}</p>
                     <p
                       className="font-mono font-semibold text-green-600 dark:text-green-400"
                       data-testid="text-raw-material-value"
                     >
                       {fmt(data.rawMaterialValue)}
                     </p>
-                    <p className="text-xs text-muted-foreground">Raw materials stock value</p>
+                    <p className="text-xs text-muted-foreground">{tUi("raw.materials.stock.value")}</p>
                   </div>
                 )}
                 <div className="space-y-1">
-                  <p className="text-muted-foreground text-xs uppercase tracking-wide">Ledger Assets</p>
+                  <p className="text-muted-foreground text-xs uppercase tracking-wide">{tUi("ledger.assets")}</p>
                   <p className="font-mono font-semibold text-green-600 dark:text-green-400">{fmt(data.ledgerAssets)}</p>
-                  <p className="text-xs text-muted-foreground">From accounting records</p>
+                  <p className="text-xs text-muted-foreground">{tUi("from.accounting.records")}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-muted-foreground text-xs uppercase tracking-wide">Supplier Balances</p>
+                  <p className="text-muted-foreground text-xs uppercase tracking-wide">{tUi("supplier.balances")}</p>
                   <p className="font-mono font-semibold text-red-600 dark:text-red-400">
                     {fmt(data.supplierLiabilities)}
                   </p>
-                  <p className="text-xs text-muted-foreground">Raw material suppliers owed</p>
+                  <p className="text-xs text-muted-foreground">{tUi("raw.material.suppliers.owed")}</p>
                 </div>
                 {(data.supplierOverpayments ?? 0) > 0 && (
                   <div className="space-y-1">
-                    <p className="text-muted-foreground text-xs uppercase tracking-wide">Supplier Overpayments</p>
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide">
+                      {tUi("supplier.overpayments")}
+                    </p>
                     <p className="font-mono font-semibold text-green-600 dark:text-green-400">
                       {fmt(data.supplierOverpayments ?? 0)}
                     </p>
-                    <p className="text-xs text-muted-foreground">Overpaid — recoverable from suppliers</p>
+                    <p className="text-xs text-muted-foreground">{tUi("overpaid.recoverable.from.suppliers")}</p>
                   </div>
                 )}
                 <div className="space-y-1">
-                  <p className="text-muted-foreground text-xs uppercase tracking-wide">Other Liabilities</p>
+                  <p className="text-muted-foreground text-xs uppercase tracking-wide">{tUi("other.liabilities")}</p>
                   <p className="font-mono font-semibold text-red-600 dark:text-red-400">
                     {fmt(data.ledgerLiabilities)}
                   </p>
-                  <p className="text-xs text-muted-foreground">From accounting records</p>
+                  <p className="text-xs text-muted-foreground">{tUi("from.accounting.records")}</p>
                 </div>
               </div>
             </CardContent>

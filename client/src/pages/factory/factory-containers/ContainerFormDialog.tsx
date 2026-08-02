@@ -244,9 +244,7 @@ export function ContainerFormDialog({
             ? parseInt(data.freightOwnAccountId)
             : null,
         freightSupplierId:
-          freightAmt > 0 && freightPaidBy === "supplier" && data.supplierId
-            ? parseInt(data.supplierId)
-            : null,
+          freightAmt > 0 && freightPaidBy === "supplier" && data.supplierId ? parseInt(data.supplierId) : null,
         otherCharges: "0",
         otherChargesAccountId: null,
       };
@@ -311,9 +309,7 @@ export function ContainerFormDialog({
             ? parseInt(data.freightOwnAccountId)
             : null,
         freightSupplierId:
-          freightAmt > 0 && freightPaidBy === "supplier" && data.supplierId
-            ? parseInt(data.supplierId)
-            : null,
+          freightAmt > 0 && freightPaidBy === "supplier" && data.supplierId ? parseInt(data.supplierId) : null,
         // Sync all legacy single-row other-charge columns from the first valid
         // charge line so the offload dialog pre-fills amount, account, and currency
         // correctly.  When there are multiple lines the offload dialog still shows
@@ -332,8 +328,7 @@ export function ContainerFormDialog({
         })(),
         // Keep the legacy single-row currency column in sync so the offload dialog
         // can read the correct currency when pre-filling the Other Charges field.
-        otherChargesCurrencyCode:
-          otherChargeLines.find((l) => parseFloat(l.amount || "0") > 0)?.currencyCode || null,
+        otherChargesCurrencyCode: otherChargeLines.find((l) => parseFloat(l.amount || "0") > 0)?.currencyCode || null,
       };
       const validCharges = otherChargeLines
         .filter((l) => parseFloat(l.amount || "0") > 0)

@@ -45,9 +45,11 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import type { LoadingSummaryResponse } from "./factoryinvoiceloadingscan/types";
 import { fmtTime } from "./factoryinvoiceloadingscan/utils";
 import { StatusBadge } from "./factoryinvoiceloadingscan/components/StatusBadge";
+import { useFactoryText } from "@/i18n/modules/factory";
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export default function FactoryInvoiceLoadingScan() {
+  const tUi = useFactoryText();
   const [, navigate] = useLocation();
   const [, params] = useRoute("/factory/invoices/:id/loading-scan");
   const invoiceId = params?.id ? parseInt(params.id) : null;
@@ -314,7 +316,7 @@ export default function FactoryInvoiceLoadingScan() {
             <h1 className="text-2xl font-bold" data-testid="text-invoice-title">
               {inv.invoiceNumber || `Order #${inv.id}`}
             </h1>
-            <Badge variant="default">Finalized</Badge>
+            <Badge variant="default">{tUi("finalized")}</Badge>
             <Badge variant="outline" className="text-xs">
               Scan Loading
             </Badge>
@@ -329,7 +331,7 @@ export default function FactoryInvoiceLoadingScan() {
       <div className="grid grid-cols-2 gap-3">
         <Card>
           <CardContent className="pt-5 pb-4 text-center">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Scanned</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{tUi("scanned.2")}</p>
             <p
               className="text-5xl font-bold text-green-600 dark:text-green-400 leading-none"
               data-testid="text-loaded-bales"
@@ -341,7 +343,7 @@ export default function FactoryInvoiceLoadingScan() {
         </Card>
         <Card>
           <CardContent className="pt-5 pb-4 text-center">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Remaining</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{tUi("remaining")}</p>
             <p
               className={`text-5xl font-bold leading-none ${
                 summary.totals.remaining === 0
@@ -376,7 +378,7 @@ export default function FactoryInvoiceLoadingScan() {
       <Card>
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle className="text-sm font-medium">Remaining Lines</CardTitle>
+            <CardTitle className="text-sm font-medium">{tUi("remaining.lines")}</CardTitle>
             {doneLineCount > 0 && (
               <span className="flex items-center gap-1 text-xs text-green-700 dark:text-green-400 font-medium">
                 <CheckCircle className="h-3.5 w-3.5" />
@@ -389,19 +391,19 @@ export default function FactoryInvoiceLoadingScan() {
           {pendingLines.length === 0 ? (
             <div className="flex items-center justify-center gap-2 py-6 text-green-700 dark:text-green-400">
               <CheckCircle className="h-5 w-5" />
-              <span className="font-medium text-sm">All lines fully loaded</span>
+              <span className="font-medium text-sm">{tUi("all.lines.fully.loaded")}</span>
             </div>
           ) : (
             <div className="table-responsive">
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead>Article Code</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead className="text-right">Invoice Qty</TableHead>
-                    <TableHead className="text-right">Loaded</TableHead>
-                    {activeSessionId && <TableHead className="text-right">This Session</TableHead>}
-                    <TableHead className="text-right">Remaining</TableHead>
+                    <TableHead>{tUi("article.code")}</TableHead>
+                    <TableHead>{tUi("product")}</TableHead>
+                    <TableHead className="text-right">{tUi("invoice.qty")}</TableHead>
+                    <TableHead className="text-right">{tUi("loaded")}</TableHead>
+                    {activeSessionId && <TableHead className="text-right">{tUi("this.session")}</TableHead>}
+                    <TableHead className="text-right">{tUi("remaining")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -413,7 +415,7 @@ export default function FactoryInvoiceLoadingScan() {
                           className="text-left hover-elevate rounded-md px-1 -mx-1 py-0.5 font-medium underline-offset-2 hover:underline"
                           onClick={() => setBaleRefLine({ code: line.articleCode, name: line.productName })}
                           data-testid={`button-scan-bale-refs-${line.lineId}`}
-                          title="Click to see all reference numbers"
+                          title={tUi("click.to.see.all.reference.numbers")}
                         >
                           {line.productName}
                         </button>
@@ -444,7 +446,7 @@ export default function FactoryInvoiceLoadingScan() {
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-sm font-medium">Start New Loading Session</CardTitle>
+              <CardTitle className="text-sm font-medium">{tUi("start.new.loading.session")}</CardTitle>
               {!showStartForm && (
                 <Button size="sm" onClick={() => setShowStartForm(true)} data-testid="button-show-start-form">
                   <Play className="h-4 w-4 mr-1" />
@@ -457,7 +459,7 @@ export default function FactoryInvoiceLoadingScan() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <Label htmlFor="input-truck-no">Truck No.</Label>
+                  <Label htmlFor="input-truck-no">{tUi("truck.no")}</Label>
                   <Input
                     id="input-truck-no"
                     placeholder="e.g. ABC-1234"
@@ -470,10 +472,10 @@ export default function FactoryInvoiceLoadingScan() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="input-driver-name">Driver Name</Label>
+                  <Label htmlFor="input-driver-name">{tUi("driver.name")}</Label>
                   <Input
                     id="input-driver-name"
-                    placeholder="Driver's name"
+                    placeholder={tUi("driver.s.name")}
                     value={driverName}
                     onChange={(e) => {
                       setDriverName(e.target.value);
@@ -484,10 +486,10 @@ export default function FactoryInvoiceLoadingScan() {
                 </div>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="input-notes">Notes</Label>
+                <Label htmlFor="input-notes">{tUi("notes")}</Label>
                 <Textarea
                   id="input-notes"
-                  placeholder="Optional notes..."
+                  placeholder={tUi("optional.notes.2")}
                   value={notes}
                   onChange={(e) => {
                     setNotes(e.target.value);
@@ -573,7 +575,7 @@ export default function FactoryInvoiceLoadingScan() {
                 ref={scanRef}
                 value={scanInput}
                 onChange={(e) => setScanInput(e.target.value)}
-                placeholder="Scan bale barcode / reference number…"
+                placeholder={tUi("scan.bale.barcode.reference.number")}
                 className="font-mono text-base h-12 text-lg"
                 autoComplete="off"
                 autoFocus
@@ -610,7 +612,7 @@ export default function FactoryInvoiceLoadingScan() {
               </span>
               <span>·</span>
               <span>
-                Press <kbd className="text-xs border rounded px-1">Enter</kbd> to submit
+                Press <kbd className="text-xs border rounded px-1">{tUi("enter")}</kbd> to submit
               </span>
             </div>
 
@@ -621,10 +623,10 @@ export default function FactoryInvoiceLoadingScan() {
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead className="w-8">#</TableHead>
-                      <TableHead>Reference</TableHead>
-                      <TableHead>Article</TableHead>
-                      <TableHead>Product</TableHead>
-                      <TableHead className="text-right">Weight (kg)</TableHead>
+                      <TableHead>{tUi("reference")}</TableHead>
+                      <TableHead>{tUi("article")}</TableHead>
+                      <TableHead>{tUi("product")}</TableHead>
+                      <TableHead className="text-right">{tUi("weight.kg")}</TableHead>
                       <TableHead className="text-right w-8"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -648,7 +650,7 @@ export default function FactoryInvoiceLoadingScan() {
                             }
                             disabled={removeBaleFromSessionMutation.isPending}
                             data-testid={`button-remove-bale-${b.baleId}`}
-                            title="Remove from session"
+                            title={tUi("remove.from.session")}
                           >
                             <Trash2 className="h-4 w-4 text-muted-foreground" />
                           </Button>
@@ -738,7 +740,7 @@ export default function FactoryInvoiceLoadingScan() {
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-sm font-medium">Loading Sessions</CardTitle>
+              <CardTitle className="text-sm font-medium">{tUi("loading.sessions")}</CardTitle>
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
@@ -768,12 +770,12 @@ export default function FactoryInvoiceLoadingScan() {
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead>Session</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Truck / Driver</TableHead>
-                    <TableHead>Started</TableHead>
-                    <TableHead>Completed</TableHead>
-                    <TableHead className="text-right">Bales</TableHead>
+                    <TableHead>{tUi("session")}</TableHead>
+                    <TableHead>{tUi("status")}</TableHead>
+                    <TableHead>{tUi("truck.driver")}</TableHead>
+                    <TableHead>{tUi("started")}</TableHead>
+                    <TableHead>{tUi("completed")}</TableHead>
+                    <TableHead className="text-right">{tUi("bales")}</TableHead>
                     <TableHead className="text-right w-16"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -806,7 +808,7 @@ export default function FactoryInvoiceLoadingScan() {
                               size="icon"
                               onClick={() => setViewSessionId(s.id)}
                               data-testid={`button-view-session-bales-${s.id}`}
-                              title="View & manage bales"
+                              title={tUi("view.manage.bales")}
                             >
                               <List className="h-3.5 w-3.5" />
                             </Button>
@@ -817,7 +819,7 @@ export default function FactoryInvoiceLoadingScan() {
                               size="sm"
                               onClick={() => setActiveSessionId(s.id)}
                               data-testid={`button-resume-session-${s.id}`}
-                              title="Resume this session"
+                              title={tUi("resume.this.session")}
                             >
                               <RotateCcw className="h-3.5 w-3.5 mr-1" />
                               Resume
@@ -826,7 +828,7 @@ export default function FactoryInvoiceLoadingScan() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            title="Export session Excel"
+                            title={tUi("export.session.excel")}
                             onClick={() =>
                               window.open(`/api/factory/invoice-loading-sessions/${s.id}/export/excel`, "_blank")
                             }
@@ -837,7 +839,7 @@ export default function FactoryInvoiceLoadingScan() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            title="Export session PDF"
+                            title={tUi("export.session.pdf")}
                             onClick={() =>
                               window.open(`/api/factory/invoice-loading-sessions/${s.id}/export/pdf`, "_blank")
                             }
@@ -861,7 +863,7 @@ export default function FactoryInvoiceLoadingScan() {
         <Card>
           <CardContent className="pt-8 pb-8 flex flex-col items-center gap-3 text-center">
             <Package className="h-10 w-10 text-muted-foreground" />
-            <p className="text-muted-foreground text-sm">No loading sessions yet for this invoice.</p>
+            <p className="text-muted-foreground text-sm">{tUi("no.loading.sessions.yet.for.this.invoice")}</p>
             {!isFullyLoaded && (
               <Button onClick={() => setShowStartForm(true)} data-testid="button-show-start-form-empty">
                 <Play className="h-4 w-4 mr-1" />
@@ -876,14 +878,14 @@ export default function FactoryInvoiceLoadingScan() {
       <AlertDialog open={completeDialogOpen} onOpenChange={setCompleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Complete loading session?</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("complete.loading.session")}</AlertDialogTitle>
             <AlertDialogDescription>
               This will mark session #{activeSessionId} as COMPLETED with {currentBales.length} bale
               {currentBales.length !== 1 ? "s" : ""}. You can start another session later for remaining bales.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-complete-dialog">Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-complete-dialog">{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 setCompleteDialogOpen(false);
@@ -901,14 +903,14 @@ export default function FactoryInvoiceLoadingScan() {
       <AlertDialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancel this loading session?</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("cancel.this.loading.session")}</AlertDialogTitle>
             <AlertDialogDescription>
               Session #{activeSessionId} will be cancelled. Scanned bales will be kept for audit history but will no
               longer count as loaded. Bales can be re-scanned in a new session.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-cancel-dialog">Keep Session</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-cancel-dialog">{tUi("keep.session")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground"
               onClick={() => {
@@ -950,7 +952,9 @@ export default function FactoryInvoiceLoadingScan() {
                   </DialogTitle>
                 </DialogHeader>
                 {sessionBales.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-6 text-center">No bales found in this session.</p>
+                  <p className="text-sm text-muted-foreground py-6 text-center">
+                    {tUi("no.bales.found.in.this.session")}
+                  </p>
                 ) : (
                   <div className="space-y-2">
                     <p className="text-xs text-muted-foreground">
@@ -961,10 +965,10 @@ export default function FactoryInvoiceLoadingScan() {
                       <Table>
                         <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow>
-                            <TableHead>Reference</TableHead>
-                            <TableHead>Article</TableHead>
-                            <TableHead>Product</TableHead>
-                            <TableHead className="text-right">Weight (kg)</TableHead>
+                            <TableHead>{tUi("reference")}</TableHead>
+                            <TableHead>{tUi("article")}</TableHead>
+                            <TableHead>{tUi("product")}</TableHead>
+                            <TableHead className="text-right">{tUi("weight.kg")}</TableHead>
                             <TableHead className="w-8"></TableHead>
                           </TableRow>
                         </TableHeader>
@@ -992,7 +996,7 @@ export default function FactoryInvoiceLoadingScan() {
                                       })
                                     }
                                     data-testid={`button-delete-session-bale-${b.baleId}`}
-                                    title="Remove bale and return to unloaded"
+                                    title={tUi("remove.bale.and.return.to.unloaded")}
                                   >
                                     <Trash2 className="h-4 w-4 text-destructive" />
                                   </Button>
@@ -1052,7 +1056,9 @@ export default function FactoryInvoiceLoadingScan() {
                   </p>
                   {loaded.length > 0 && (
                     <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Loaded</p>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                        {tUi("loaded")}
+                      </p>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {loaded.map((b) => (
                           <div

@@ -31,6 +31,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface Employee {
   id: number;
@@ -99,6 +100,7 @@ function fmt(val: string | number | null | undefined) {
 }
 
 export default function FactoryEmployeeDetail() {
+  const tUi = useFactoryText();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { data: currentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
   const isDeveloper = currentUser?.role === "Developer";
@@ -337,7 +339,7 @@ export default function FactoryEmployeeDetail() {
     },
   });
 
-  if (!employeeId) return <div className="p-8 text-muted-foreground">Invalid employee ID</div>;
+  if (!employeeId) return <div className="p-8 text-muted-foreground">{tUi("invalid.employee.id")}</div>;
 
   if (empLoading) {
     return (
@@ -357,7 +359,7 @@ export default function FactoryEmployeeDetail() {
         <Button variant="ghost" size="icon" onClick={() => navigate("/factory/payroll-hub?tab=employees")}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="flex items-center justify-center py-20 text-muted-foreground">Employee not found</div>
+        <div className="flex items-center justify-center py-20 text-muted-foreground">{tUi("employee.not.found")}</div>
       </div>
     );
   }
@@ -416,7 +418,7 @@ export default function FactoryEmployeeDetail() {
 
               <div className="border-t pt-3 space-y-1.5">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground text-xs">Code</span>
+                  <span className="text-muted-foreground text-xs">{tUi("code")}</span>
                   <span className="font-mono text-xs" data-testid="text-employee-code">
                     {employee.code}
                   </span>
@@ -443,7 +445,7 @@ export default function FactoryEmployeeDetail() {
 
               <div className="border-t pt-3 space-y-2">
                 <div className="text-center">
-                  <div className="text-xs text-muted-foreground mb-1">Current Balance</div>
+                  <div className="text-xs text-muted-foreground mb-1">{tUi("current.balance")}</div>
                   <div
                     className={`text-xl font-bold font-mono ${balance < 0 ? "text-red-600 dark:text-red-400" : balance > 0 ? "text-green-600 dark:text-green-400" : ""}`}
                     data-testid="text-employee-balance"
@@ -453,13 +455,13 @@ export default function FactoryEmployeeDetail() {
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs text-center">
                   <div>
-                    <div className="text-muted-foreground">Deposits</div>
+                    <div className="text-muted-foreground">{tUi("deposits")}</div>
                     <div className="font-mono font-medium text-green-600 dark:text-green-400">
                       {fmt(employee.totalDeposits)}
                     </div>
                   </div>
                   <div>
-                    <div className="text-muted-foreground">Withdrawn</div>
+                    <div className="text-muted-foreground">{tUi("withdrawn")}</div>
                     <div className="font-mono font-medium text-red-600 dark:text-red-400">
                       {fmt(employee.totalWithdrawals)}
                     </div>
@@ -513,7 +515,7 @@ export default function FactoryEmployeeDetail() {
         <div className="flex-1 min-w-0">
           <Card>
             <CardHeader className="pb-2 pt-4 px-5">
-              <CardTitle className="text-sm text-muted-foreground">Running Statement</CardTitle>
+              <CardTitle className="text-sm text-muted-foreground">{tUi("running.statement")}</CardTitle>
             </CardHeader>
             <CardContent className="px-5 pb-4 overflow-x-auto">
               {stmtLoading ? (
@@ -523,17 +525,17 @@ export default function FactoryEmployeeDetail() {
                   ))}
                 </div>
               ) : !statement?.rows || statement.rows.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-8 text-center">No transactions yet</p>
+                <p className="text-sm text-muted-foreground py-8 text-center">{tUi("no.transactions.yet")}</p>
               ) : (
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Voucher</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead className="text-right">Deposit</TableHead>
-                      <TableHead className="text-right">Withdrawal</TableHead>
-                      <TableHead className="text-right">Balance</TableHead>
+                      <TableHead>{tUi("date")}</TableHead>
+                      <TableHead>{tUi("voucher")}</TableHead>
+                      <TableHead>{tUi("description")}</TableHead>
+                      <TableHead className="text-right">{tUi("deposit")}</TableHead>
+                      <TableHead className="text-right">{tUi("withdrawal")}</TableHead>
+                      <TableHead className="text-right">{tUi("balance")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -577,12 +579,12 @@ export default function FactoryEmployeeDetail() {
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Employee</DialogTitle>
+            <DialogTitle>{tUi("edit.employee")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label>First Name</Label>
+                <Label>{tUi("first.name")}</Label>
                 <Input
                   value={editForm.firstName}
                   onChange={(e) => setEditForm((f) => ({ ...f, firstName: e.target.value }))}
@@ -590,7 +592,7 @@ export default function FactoryEmployeeDetail() {
                 />
               </div>
               <div className="space-y-1">
-                <Label>Last Name</Label>
+                <Label>{tUi("last.name")}</Label>
                 <Input
                   value={editForm.lastName}
                   onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))}
@@ -599,7 +601,7 @@ export default function FactoryEmployeeDetail() {
               </div>
             </div>
             <div className="space-y-1">
-              <Label>Department</Label>
+              <Label>{tUi("department")}</Label>
               <Input
                 value={editForm.department}
                 onChange={(e) => setEditForm((f) => ({ ...f, department: e.target.value }))}
@@ -607,7 +609,7 @@ export default function FactoryEmployeeDetail() {
               />
             </div>
             <div className="space-y-1">
-              <Label>Phone</Label>
+              <Label>{tUi("phone")}</Label>
               <Input
                 value={editForm.phone}
                 onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
@@ -615,7 +617,7 @@ export default function FactoryEmployeeDetail() {
               />
             </div>
             <div className="space-y-1">
-              <Label>Monthly Salary</Label>
+              <Label>{tUi("monthly.salary")}</Label>
               <Input
                 type="number"
                 min="0"
@@ -649,7 +651,7 @@ export default function FactoryEmployeeDetail() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1">
-              <Label>Amount *</Label>
+              <Label>{tUi("amount.2")}</Label>
               <Input
                 type="number"
                 min="0.01"
@@ -661,7 +663,7 @@ export default function FactoryEmployeeDetail() {
               />
             </div>
             <div className="space-y-1">
-              <Label>Entry Date *</Label>
+              <Label>{tUi("entry.date")}</Label>
               <Input
                 type="date"
                 value={depositDate}
@@ -681,18 +683,18 @@ export default function FactoryEmployeeDetail() {
               />
             </div>
             <div className="space-y-1">
-              <Label>Notes</Label>
+              <Label>{tUi("notes")}</Label>
               <Input
                 value={depositNotes}
                 onChange={(e) => setDepositNotes(e.target.value)}
-                placeholder="Optional notes"
+                placeholder={tUi("optional.notes")}
                 data-testid="input-deposit-notes"
               />
             </div>
             <div className="bg-muted/50 rounded-md p-3 text-sm space-y-1">
-              <div className="font-medium text-xs text-muted-foreground mb-1">Accounting Entry</div>
+              <div className="font-medium text-xs text-muted-foreground mb-1">{tUi("accounting.entry")}</div>
               <div className="flex justify-between">
-                <span>DR: Payroll Expense</span>
+                <span>{tUi("dr.payroll.expense")}</span>
                 <span className="font-mono">{fmt(depositAmount || 0)}</span>
               </div>
               <div className="flex justify-between">
@@ -734,7 +736,7 @@ export default function FactoryEmployeeDetail() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1">
-              <Label>Amount *</Label>
+              <Label>{tUi("amount.2")}</Label>
               <Input
                 type="number"
                 min="0.01"
@@ -746,7 +748,7 @@ export default function FactoryEmployeeDetail() {
               />
             </div>
             <div className="space-y-1">
-              <Label>Date *</Label>
+              <Label>{tUi("date.2")}</Label>
               <Input
                 type="date"
                 value={withdrawDate}
@@ -755,10 +757,10 @@ export default function FactoryEmployeeDetail() {
               />
             </div>
             <div className="space-y-1">
-              <Label>Cash Account *</Label>
+              <Label>{tUi("cash.account")}</Label>
               <Select value={withdrawCashAccountId} onValueChange={setWithdrawCashAccountId}>
                 <SelectTrigger data-testid="select-cash-account">
-                  <SelectValue placeholder="Select cash account" />
+                  <SelectValue placeholder={tUi("select.cash.account")} />
                 </SelectTrigger>
                 <SelectContent>
                   {cashAccounts.map((a) => (
@@ -770,22 +772,22 @@ export default function FactoryEmployeeDetail() {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Notes</Label>
+              <Label>{tUi("notes")}</Label>
               <Input
                 value={withdrawNotes}
                 onChange={(e) => setWithdrawNotes(e.target.value)}
-                placeholder="Optional notes"
+                placeholder={tUi("optional.notes")}
                 data-testid="input-withdraw-notes"
               />
             </div>
             <div className="bg-muted/50 rounded-md p-3 text-sm space-y-1">
-              <div className="font-medium text-xs text-muted-foreground mb-1">Accounting Entry</div>
+              <div className="font-medium text-xs text-muted-foreground mb-1">{tUi("accounting.entry")}</div>
               <div className="flex justify-between">
                 <span>DR: Employee Account ({employee.code})</span>
                 <span className="font-mono">{fmt(withdrawAmount || 0)}</span>
               </div>
               <div className="flex justify-between">
-                <span>CR: Cash</span>
+                <span>{tUi("cr.cash")}</span>
                 <span className="font-mono">{fmt(withdrawAmount || 0)}</span>
               </div>
             </div>

@@ -1,6 +1,7 @@
 import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface RemoveFromStockTableProps {
   viewMode: "condensed" | "detailed";
@@ -25,6 +26,7 @@ export function RemoveFromStockTable({
   formatDisplayDate,
   onPrintBale,
 }: RemoveFromStockTableProps) {
+  const tUi = useFactoryText();
   return (
     <div className="rounded-xl border bg-card overflow-hidden">
       <Table>
@@ -33,20 +35,20 @@ export function RemoveFromStockTable({
             <TableHead className="w-12"></TableHead>
             {viewMode === "detailed" ? (
               <>
-                <TableHead>Ref Number</TableHead>
-                <TableHead>Product</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Finalized At</TableHead>
-                <TableHead>Finalized By</TableHead>
-                <TableHead className="text-right">Weight</TableHead>
+                <TableHead>{tUi("ref.number")}</TableHead>
+                <TableHead>{tUi("product")}</TableHead>
+                <TableHead>{tUi("location")}</TableHead>
+                <TableHead>{tUi("finalized.at")}</TableHead>
+                <TableHead>{tUi("finalized.by")}</TableHead>
+                <TableHead className="text-right">{tUi("weight")}</TableHead>
                 <TableHead className="w-20"></TableHead>
               </>
             ) : (
               <>
-                <TableHead>Article Code</TableHead>
-                <TableHead>Product Name</TableHead>
-                <TableHead className="text-center">Count</TableHead>
-                <TableHead className="text-right">Total Weight</TableHead>
+                <TableHead>{tUi("article.code")}</TableHead>
+                <TableHead>{tUi("product.name")}</TableHead>
+                <TableHead className="text-center">{tUi("count")}</TableHead>
+                <TableHead className="text-right">{tUi("total.weight")}</TableHead>
               </>
             )}
           </TableRow>

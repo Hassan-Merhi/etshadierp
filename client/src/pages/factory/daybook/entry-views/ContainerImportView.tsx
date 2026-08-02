@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatNumber } from "@/lib/formatNumber";
 import { currencySymbol } from "../daybookUtils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function ContainerImportView({
   entry,
@@ -26,6 +27,7 @@ export function ContainerImportView({
   formatDisplayDate: any;
   onNavigate: any;
 }) {
+  const tUi = useFactoryText();
   const c = containerDetail;
   const csym = c ? currencySymbol(c.currencyCode || "USD") : "$";
   const fx = c ? parseFloat(c.fxRateToUsd || "1") || 1 : 1;
@@ -43,14 +45,14 @@ export function ContainerImportView({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Transaction Details</DialogTitle>
+        <DialogTitle>{tUi("transaction.details")}</DialogTitle>
         <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
       </DialogHeader>
       <div className="space-y-4">
         {/* Supplier card */}
         <div className="rounded-md border p-4 space-y-2">
           {!c ? (
-            <p className="text-sm text-muted-foreground">Loading container details…</p>
+            <p className="text-sm text-muted-foreground">{tUi("loading.container.details")}</p>
           ) : (
             <>
               <div className="flex items-start justify-between gap-2 flex-wrap">
@@ -66,7 +68,7 @@ export function ContainerImportView({
                   {c.origin && <p className="text-xs text-muted-foreground">Origin: {c.origin}</p>}
                   {totalKg > 0 && parseFloat(c.actualReceivedKg || "0") < totalKg && (
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                      <span className="text-xs text-muted-foreground">Total KG imported:</span>
+                      <span className="text-xs text-muted-foreground">{tUi("total.kg.imported")}</span>
                       <span className="font-mono text-sm font-semibold">{formatNumber(totalKg)} kg</span>
                       {parseFloat(c.actualReceivedKg || "0") === 0 ? (
                         <Badge
@@ -122,7 +124,7 @@ export function ContainerImportView({
               <tbody>
                 {/* Goods row */}
                 <tr className="border-b">
-                  <td className="px-3 py-2 font-medium">Goods (Raw Stock)</td>
+                  <td className="px-3 py-2 font-medium">{tUi("goods.raw.stock")}</td>
                   <td className="px-3 py-2 text-right font-mono text-muted-foreground">{formatNumber(totalKg)} kg</td>
                   <td className="px-3 py-2 text-right font-mono text-muted-foreground">
                     {csym}
@@ -136,7 +138,7 @@ export function ContainerImportView({
                 {/* Freight row */}
                 {freight > 0 && (
                   <tr className="border-b">
-                    <td className="px-3 py-2 font-medium">Freight</td>
+                    <td className="px-3 py-2 font-medium">{tUi("freight")}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground">—</td>
                     <td className="px-3 py-2 text-right text-muted-foreground">—</td>
                     <td className="px-3 py-2 text-right font-mono font-medium">
@@ -148,7 +150,7 @@ export function ContainerImportView({
                 {/* Commission row */}
                 {commission > 0 && (
                   <tr className="border-b">
-                    <td className="px-3 py-2 font-medium">Commission</td>
+                    <td className="px-3 py-2 font-medium">{tUi("commission")}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground">—</td>
                     <td className="px-3 py-2 text-right text-muted-foreground">—</td>
                     <td className="px-3 py-2 text-right font-mono font-medium">

@@ -3,10 +3,11 @@
  *
  * Extracted from FactoryOtwTrackingTab.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {Input} from "@/components/ui/input";
-import {cn} from "@/lib/utils";
-import {fmtDate} from "../utils";
+import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import { fmtDate } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export // ── Inline ETA cell ──────────────────────────────────────────────────────────
 function EtaCell({
@@ -20,6 +21,7 @@ function EtaCell({
   overdue: boolean;
   onSave: (id: number, val: string | null) => void;
 }) {
+  const tUi = useFactoryText();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
 
@@ -60,7 +62,7 @@ function EtaCell({
       )}
       onClick={startEdit}
       data-testid={`text-eta-${containerId}`}
-      title="Click to edit ETA"
+      title={tUi("click.to.edit.eta")}
     >
       {arrivalDate ? fmtDate(arrivalDate) : "Set ETA…"}
     </span>

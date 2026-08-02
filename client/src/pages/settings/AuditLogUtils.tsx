@@ -162,7 +162,8 @@ export function securityActionSummary(logOrAction: any): string {
   if (combined.includes("company") && combined.includes("context")) subject = "Company access";
   else if (combined.includes("privileged")) subject = "Privileged action";
   else if (combined.includes("sensitive") && combined.includes("input")) subject = "Sensitive input";
-  else if (combined.includes("protected") && (combined.includes("file") || combined.includes("asset"))) subject = "File access";
+  else if (combined.includes("protected") && (combined.includes("file") || combined.includes("asset")))
+    subject = "File access";
   else if (combined.includes("permission")) subject = "Permission check";
   else if (combined.includes("session")) subject = "Session check";
 
@@ -347,14 +348,27 @@ export function actionBadgeVariant(action: string): BadgeVariant {
 
 /** All action values accepted by the /api/audit-log endpoint. */
 export const ALL_SUPPORTED_ACTIONS = [
-  "create", "update", "delete",
-  "restore", "reverse", "void", "return",
-  "recalculate", "repair",
-  "import", "export",
-  "send_whatsapp", "send_email",
-  "approve", "cancel",
-  "offload", "transfer", "adjust",
-  "login", "permission_change", "settings_change",
+  "create",
+  "update",
+  "delete",
+  "restore",
+  "reverse",
+  "void",
+  "return",
+  "recalculate",
+  "repair",
+  "import",
+  "export",
+  "send_whatsapp",
+  "send_email",
+  "approve",
+  "cancel",
+  "offload",
+  "transfer",
+  "adjust",
+  "login",
+  "permission_change",
+  "settings_change",
 ] as const;
 
 // ── Record / diff helpers ────────────────────────────────────────────────────
@@ -364,7 +378,12 @@ export function isItemDiffKey(field: string): boolean {
 }
 
 export function getRecordLabel(log: any): string {
-  if (log?.tableName === "security_events" || String(log?.action || "").toUpperCase().startsWith("SECURITY:")) {
+  if (
+    log?.tableName === "security_events" ||
+    String(log?.action || "")
+      .toUpperCase()
+      .startsWith("SECURITY:")
+  ) {
     const changes = normalizeAuditChanges(log);
     const targetType = changeValue(changes, "targetType");
     const targetId = changeValue(changes, "targetId");
@@ -412,10 +431,17 @@ function fallbackDetails(action: string): string {
 }
 
 export function getDetailsSentence(log: any): string {
-  if (log?.tableName === "security_events" || String(log?.action || "").toUpperCase().startsWith("SECURITY:")) {
+  if (
+    log?.tableName === "security_events" ||
+    String(log?.action || "")
+      .toUpperCase()
+      .startsWith("SECURITY:")
+  ) {
     const changes = normalizeAuditChanges(log);
     const reason = changeValue(changes, "reasonCode") ?? changeValue(changes, "reason");
-    return reason ? `${securityActionSummary(log)} — ${fmtBusinessValue("reasonCode", reason)}` : securityActionSummary(log);
+    return reason
+      ? `${securityActionSummary(log)} — ${fmtBusinessValue("reasonCode", reason)}`
+      : securityActionSummary(log);
   }
 
   const changes = normalizeAuditChanges(log);

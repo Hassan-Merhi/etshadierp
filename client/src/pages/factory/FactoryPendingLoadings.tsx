@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/dialog";
 import { apiRequest, keyStartsWith } from "@/lib/queryClient";
 import { Textarea } from "@/components/ui/textarea";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 const UNDO_TIMEOUT_MS = 8000;
 
@@ -82,6 +83,7 @@ interface Proforma {
 }
 
 export default function FactoryPendingLoadings() {
+  const tUi = useFactoryText();
   const { formatDisplayDate } = useDateFormat();
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -319,8 +321,8 @@ export default function FactoryPendingLoadings() {
           data-testid="text-no-loads"
         >
           <Clock className="h-16 w-16 mb-4 opacity-30" />
-          <p className="text-lg font-medium">No pending loads</p>
-          <p className="text-sm mt-1">All container loadings are either complete or not yet started.</p>
+          <p className="text-lg font-medium">{tUi("no.pending.loads")}</p>
+          <p className="text-sm mt-1">{tUi("all.container.loadings.are.either.complete.or.no")}</p>
           <Button
             className="mt-6"
             onClick={() => navigate("/factory/sales/loading/new")}
@@ -403,7 +405,7 @@ export default function FactoryPendingLoadings() {
                               onClick={() => saveNoteMutation.mutate({ id: load.id, note: editingNoteText })}
                               disabled={saveNoteMutation.isPending}
                               data-testid={`button-save-note-${load.id}`}
-                              title="Save note"
+                              title={tUi("save.note")}
                             >
                               <Save className="h-4 w-4" />
                             </Button>
@@ -412,7 +414,7 @@ export default function FactoryPendingLoadings() {
                               variant="ghost"
                               onClick={() => setEditingNoteId(null)}
                               data-testid={`button-cancel-note-${load.id}`}
-                              title="Cancel"
+                              title={tUi("cancel")}
                             >
                               <X className="h-4 w-4" />
                             </Button>
@@ -435,7 +437,7 @@ export default function FactoryPendingLoadings() {
                               setEditingNoteText(load.containerNotes || "");
                             }}
                             data-testid={`button-edit-note-${load.id}`}
-                            title="Edit note"
+                            title={tUi("edit.note")}
                           >
                             <Pencil className="h-3 w-3" />
                           </Button>
@@ -448,7 +450,7 @@ export default function FactoryPendingLoadings() {
                         size="icon"
                         onClick={() => handleExport(load)}
                         data-testid={`button-export-${load.id}`}
-                        title="Export to Excel"
+                        title={tUi("export.to.excel")}
                       >
                         <Download className="h-4 w-4" />
                       </Button>
@@ -457,7 +459,7 @@ export default function FactoryPendingLoadings() {
                         size="sm"
                         onClick={() => handleOpenLink(load)}
                         data-testid={`button-link-proforma-${load.id}`}
-                        title="Link proforma"
+                        title={tUi("link.proforma")}
                       >
                         <Link className="h-4 w-4 mr-1.5" />
                         {load.proformaIdUsed ? "Change Proforma" : "Link Proforma"}
@@ -468,7 +470,7 @@ export default function FactoryPendingLoadings() {
                         onClick={() => handleDelete(load)}
                         disabled={cancelMutation.isPending}
                         data-testid={`button-delete-${load.id}`}
-                        title="Delete loading (returns bales to stock)"
+                        title={tUi("delete.loading.returns.bales.to.stock")}
                         className="text-destructive"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -551,14 +553,14 @@ export default function FactoryPendingLoadings() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete pending loading?</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("delete.pending.loading")}</AlertDialogTitle>
             <AlertDialogDescription>
               This will delete Loading #{deleteTarget?.id} for <strong>{deleteTarget?.customerName}</strong> and return
               all {deleteTarget?.totalQtyBales} scanned bales back to stock.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-delete">{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmDelete}
               className="bg-destructive text-destructive-foreground"
@@ -594,7 +596,9 @@ export default function FactoryPendingLoadings() {
                 ))}
               </div>
             ) : proformas.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-6">No proformas found for this customer.</p>
+              <p className="text-sm text-muted-foreground text-center py-6">
+                {tUi("no.proformas.found.for.this.customer")}
+              </p>
             ) : (
               <>
                 <button
@@ -607,7 +611,7 @@ export default function FactoryPendingLoadings() {
                 >
                   <div className="flex items-center gap-2">
                     <X className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium text-muted-foreground">No proforma (unlink)</span>
+                    <span className="text-sm font-medium text-muted-foreground">{tUi("no.proforma.unlink")}</span>
                   </div>
                 </button>
 

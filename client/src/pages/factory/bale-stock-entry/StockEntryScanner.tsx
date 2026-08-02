@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ScanLine, AlertCircle, Plus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { FactoryBaleProduct } from "@shared/schema";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface StockEntryScannerProps {
   scanRef: React.RefObject<HTMLInputElement>;
@@ -24,6 +25,7 @@ export function StockEntryScanner({
   filteredProducts,
   onSelectProduct,
 }: StockEntryScannerProps) {
+  const tUi = useFactoryText();
   const [activeIndex, setActiveIndex] = useState(-1);
   const listRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -82,7 +84,7 @@ export function StockEntryScanner({
         </div>
         <Input
           ref={scanRef}
-          placeholder="Scan article code or type product name..."
+          placeholder={tUi("scan.article.code.or.type.product.name")}
           value={scanInput}
           onChange={(e) => onScanInputChange(e.target.value)}
           onKeyDown={handleKeyDown}

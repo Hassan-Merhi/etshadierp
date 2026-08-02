@@ -77,7 +77,9 @@ import { RenameLocationDialog } from "./factory-location-inventory/dialogs/Renam
 import { StockOverloadWarningDialog } from "./factory-location-inventory/dialogs/StockOverloadWarningDialog";
 import { RemoveBalesDialog } from "./factory-location-inventory/dialogs/RemoveBalesDialog";
 import { PrintBarcodesDialog } from "./factory-location-inventory/dialogs/PrintBarcodesDialog";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactoryLocationInventory() {
+  const tUi = useFactoryText();
   const { colors } = useLabelDesignColors();
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [locationSearch, setLocationSearch] = useState("");
@@ -956,8 +958,8 @@ export default function FactoryLocationInventory() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight">Location Inventory</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Physical bales on ground by location</p>
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight">{tUi("location.inventory")}</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">{tUi("physical.bales.on.ground.by.location")}</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <Button
@@ -984,7 +986,7 @@ export default function FactoryLocationInventory() {
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
               <Input
-                placeholder="Search locations..."
+                placeholder={tUi("search.locations")}
                 value={locationSearch}
                 onChange={(e) => setLocationSearch(e.target.value)}
                 className="pl-8 h-8 bg-transparent border-0 focus-visible:ring-0 text-sm"
@@ -1005,7 +1007,9 @@ export default function FactoryLocationInventory() {
                 No locations found.
               </div>
             ) : filteredLocations.length === 0 ? (
-              <div className="text-center py-10 text-muted-foreground text-sm">No locations match your search.</div>
+              <div className="text-center py-10 text-muted-foreground text-sm">
+                {tUi("no.locations.match.your.search")}
+              </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 {filteredLocations.map((location) => (
@@ -1025,7 +1029,7 @@ export default function FactoryLocationInventory() {
                       className="absolute top-1.5 right-1.5 h-7 w-7 opacity-40"
                       onClick={(e) => openRenameDialog(location, e)}
                       data-testid={`button-rename-location-${location.id}`}
-                      title="Rename location"
+                      title={tUi("rename.location")}
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
@@ -1222,7 +1226,7 @@ export default function FactoryLocationInventory() {
                 size="icon"
                 variant="ghost"
                 className="h-7 w-7"
-                title="View details"
+                title={tUi("view.details")}
                 onClick={() => navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation.id}`)}
                 data-testid={`button-view-details${testIdSuffix}-${prod.productId}`}
               >
@@ -1233,7 +1237,7 @@ export default function FactoryLocationInventory() {
                   size="icon"
                   variant="ghost"
                   className="h-7 w-7"
-                  title="Print barcodes"
+                  title={tUi("print.barcodes")}
                   onClick={() => handleReprintProduct(prod)}
                   data-testid={`button-print-barcodes${testIdSuffix}-${prod.productId}`}
                 >
@@ -1244,7 +1248,7 @@ export default function FactoryLocationInventory() {
                 size="icon"
                 variant="ghost"
                 className="h-7 w-7 text-destructive"
-                title="Remove bales"
+                title={tUi("remove.bales")}
                 onClick={() => {
                   setDeleteProduct(prod);
                   setDeleteQty(1);
@@ -1327,20 +1331,20 @@ export default function FactoryLocationInventory() {
         </div>
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-muted-foreground">Bales: </span>
+            <span className="text-muted-foreground">{tUi("bales.2")} </span>
             <span className="font-mono">{prod.baleCount - (prod.loadingCount ?? 0)}</span>
           </div>
           <div className="text-right">
-            <span className="text-muted-foreground">Wt/Bale: </span>
+            <span className="text-muted-foreground">{tUi("wt.bale")} </span>
             <span className="font-mono">{fmt(weightPerBale)} KG</span>
           </div>
           <div>
-            <span className="text-muted-foreground">Total KG: </span>
+            <span className="text-muted-foreground">{tUi("total.kg.3")} </span>
             <span className="font-mono">{fmt(prod.totalWeight)}</span>
           </div>
           {!hideSellingPrice && (
             <div className="text-right">
-              <span className="text-muted-foreground">Sell Value: </span>
+              <span className="text-muted-foreground">{tUi("sell.value")} </span>
               <span className="font-mono font-medium">
                 {formatAmount((prod.baleCount - (prod.loadingCount ?? 0)) * parseFloat(prod.sellingPrice || "0"))}
               </span>
@@ -1349,7 +1353,7 @@ export default function FactoryLocationInventory() {
         </div>
         {proformaMode && isSelected && selection && (
           <div className="mt-2 pt-2 border-t flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-muted-foreground">Qty:</span>
+            <span className="text-xs text-muted-foreground">{tUi("qty")}</span>
             <Input
               type="number"
               value={selection.selectedQty}
@@ -1359,7 +1363,7 @@ export default function FactoryLocationInventory() {
               data-testid={`input-qty-mobile${testIdSuffix}-${prod.productId}`}
             />
             <span className="text-xs text-muted-foreground">/ {prod.baleCount}</span>
-            <span className="text-xs text-muted-foreground ml-2">Price:</span>
+            <span className="text-xs text-muted-foreground ml-2">{tUi("price.2")}</span>
             <Input
               type="number"
               value={selection.pricePerBale}
@@ -1384,7 +1388,7 @@ export default function FactoryLocationInventory() {
             size="icon"
             onClick={handleBackToLocations}
             data-testid="breadcrumb-locations"
-            title="Back to locations"
+            title={tUi("back.to.locations")}
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -1398,7 +1402,7 @@ export default function FactoryLocationInventory() {
                 size="icon"
                 onClick={(e) => openRenameDialog(selectedLocation, e)}
                 data-testid="button-rename-selected-location"
-                title="Rename location"
+                title={tUi("rename.location")}
               >
                 <Pencil className="h-4 w-4" />
               </Button>
@@ -1424,7 +1428,13 @@ export default function FactoryLocationInventory() {
             <ClipboardList className="h-4 w-4 mr-1.5" />
             {proformaMode ? "Exit Proforma" : "Proforma Mode"}
           </Button>
-          <Button variant="outline" size="icon" onClick={() => handlePrint()} data-testid="button-print" title="Print">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => handlePrint()}
+            data-testid="button-print"
+            title={tUi("print")}
+          >
             <Printer className="h-4 w-4" />
           </Button>
           <Button
@@ -1441,7 +1451,7 @@ export default function FactoryLocationInventory() {
               );
             }}
             data-testid="button-export-location-excel"
-            title="Export Excel"
+            title={tUi("export.excel")}
           >
             <FileSpreadsheet className="h-4 w-4" />
           </Button>
@@ -1502,7 +1512,8 @@ export default function FactoryLocationInventory() {
           <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
           <span>
             Available quantities shown do not subtract V5 reserved allocations. Check the{" "}
-            <span className="font-medium">Stock Allocation V5</span> page for net availability before committing.
+            <span className="font-medium">{tUi("stock.allocation.v5")}</span> page for net availability before
+            committing.
           </span>
         </div>
       )}
@@ -1597,7 +1608,7 @@ export default function FactoryLocationInventory() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search product or article code..."
+              placeholder={tUi("search.product.or.article.code")}
               value={productSearch}
               onChange={(e) => setProductSearch(e.target.value)}
               className="pl-9"
@@ -1629,7 +1640,7 @@ export default function FactoryLocationInventory() {
                       onCheckedChange={() => setCategoryFilter([])}
                       className="h-3 w-3 shrink-0"
                     />
-                    <span className="font-medium">All Categories</span>
+                    <span className="font-medium">{tUi("all.categories")}</span>
                   </div>
                   <div className="border-t my-1" />
                   {allCategoryNames.map((name) => (
@@ -2127,8 +2138,8 @@ export default function FactoryLocationInventory() {
       <Dialog open={reprintDesignPickerOpen} onOpenChange={setReprintDesignPickerOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Choose A4 Label Design</DialogTitle>
-            <DialogDescription>Pick a color design for the A4 label sheet.</DialogDescription>
+            <DialogTitle>{tUi("choose.a4.label.design")}</DialogTitle>
+            <DialogDescription>{tUi("pick.a.color.design.for.the.a4.label.sheet")}</DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-2 py-2">
             {colors.map((opt) => (

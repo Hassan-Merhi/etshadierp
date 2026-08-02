@@ -37,7 +37,9 @@ import type {
   PriceListItem,
 } from "./pospricelist/types";
 import { ALL_LOCATIONS_ID, formatQty } from "./pospricelist/utils";
+import { usePosText } from "@/i18n/modules/pos";
 export default function POSPriceList({ posUser }: POSPriceListProps) {
+  const tUi = usePosText();
   const { formatAmount } = useCurrencyContext();
   const { toast } = useToast();
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
@@ -599,7 +601,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       <div className="hidden sm:flex w-52 shrink-0 border-r flex-col overflow-hidden bg-sidebar">
         <div className="flex items-center gap-2 px-3 py-3 border-b">
           <MapPin className="w-4 h-4 text-muted-foreground shrink-0" />
-          <span className="text-sm font-semibold text-sidebar-foreground">Locations</span>
+          <span className="text-sm font-semibold text-sidebar-foreground">{tUi("locations")}</span>
           {!locationsLoading && locations.length > 0 && (
             <Badge variant="secondary" className="ml-auto text-xs px-1.5 py-0">
               {locations.length}
@@ -614,7 +616,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
               ))}
             </div>
           ) : locations.length === 0 ? (
-            <p className="text-xs text-muted-foreground px-3 py-4">No locations.</p>
+            <p className="text-xs text-muted-foreground px-3 py-4">{tUi("no.locations")}</p>
           ) : (
             <div className="flex flex-col gap-0.5 px-2 py-1">
               {!posUser && (
@@ -703,7 +705,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
         <div className="flex items-center gap-3 px-4 py-3 border-b shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <Tag className="w-4 h-4 text-muted-foreground shrink-0" />
-            <h1 className="text-base font-semibold truncate">Price List</h1>
+            <h1 className="text-base font-semibold truncate">{tUi("price.list")}</h1>
             {isAllMode ? (
               <Badge variant="secondary" className="gap-1 shrink-0">
                 <Layers className="w-3 h-3" />
@@ -729,7 +731,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                     className="gap-1.5 text-muted-foreground"
                   >
                     <FileSpreadsheet className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Template</span>
+                    <span className="hidden sm:inline">{tUi("template")}</span>
                   </Button>
                   <Button
                     variant="ghost"
@@ -742,7 +744,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                     className="gap-1.5 text-muted-foreground"
                   >
                     <Upload className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Upload</span>
+                    <span className="hidden sm:inline">{tUi("upload")}</span>
                   </Button>
                   <input
                     ref={importFileRef}
@@ -772,7 +774,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
         {/* ── Locations visibility strip ── */}
         {isAllMode && selectedLocationId && (
           <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b shrink-0">
-            <span className="text-xs font-medium text-muted-foreground shrink-0">Locations</span>
+            <span className="text-xs font-medium text-muted-foreground shrink-0">{tUi("locations")}</span>
             <div className="w-px h-3.5 bg-border shrink-0" />
             <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
               {masters.map((m) => {
@@ -835,7 +837,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
               <Input
                 data-testid="input-price-search"
                 className="pl-9 h-9"
-                placeholder="Search by name or code…"
+                placeholder={tUi("search.by.name.or.code")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -843,10 +845,10 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
             {stockGroups.length > 0 && !showUnpriced && (
               <Select value={groupFilter} onValueChange={setGroupFilter}>
                 <SelectTrigger data-testid="select-group-filter" className="w-40 h-9">
-                  <SelectValue placeholder="All groups" />
+                  <SelectValue placeholder={tUi("all.groups")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All groups</SelectItem>
+                  <SelectItem value="all">{tUi("all.groups")}</SelectItem>
                   {stockGroups.map((g) => (
                     <SelectItem key={g} value={g}>
                       {g}
@@ -892,7 +894,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
         {/* ── Unpriced group chips ── */}
         {selectedLocationId && showUnpriced && unpricedByGroup.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b shrink-0">
-            <span className="text-xs font-medium text-muted-foreground shrink-0">Groups</span>
+            <span className="text-xs font-medium text-muted-foreground shrink-0">{tUi("groups")}</span>
             <div className="w-px h-3.5 bg-border shrink-0" />
             <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
               {unpricedByGroup.map(({ name, count }) => {
@@ -961,9 +963,11 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
             <div className="flex flex-col items-center justify-center h-full text-center gap-3 text-muted-foreground">
               <MapPin className="w-12 h-12 opacity-25" />
               <div>
-                <p className="text-base font-medium">Select a location</p>
-                <p className="text-sm mt-1 opacity-70 hidden sm:block">Choose a location from the panel on the left.</p>
-                <p className="text-sm mt-1 opacity-70 sm:hidden">Tap a location above to view prices.</p>
+                <p className="text-base font-medium">{tUi("select.a.location")}</p>
+                <p className="text-sm mt-1 opacity-70 hidden sm:block">
+                  {tUi("choose.a.location.from.the.panel.on.the.left")}
+                </p>
+                <p className="text-sm mt-1 opacity-70 sm:hidden">{tUi("tap.a.location.above.to.view.prices")}</p>
               </div>
             </div>
           )}
@@ -1001,14 +1005,14 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                   <div className="rounded-lg border bg-muted/40 px-4 py-2 flex items-center gap-3">
                     <Tag className="w-4 h-4 text-muted-foreground shrink-0" />
                     <div>
-                      <p className="text-xs text-muted-foreground leading-none mb-0.5">Total Items</p>
+                      <p className="text-xs text-muted-foreground leading-none mb-0.5">{tUi("total.items")}</p>
                       <p className="text-base font-semibold leading-none">{locationPricedList.length}</p>
                     </div>
                   </div>
                   <div className="rounded-lg border bg-muted/40 px-4 py-2 flex items-center gap-3">
                     <Check className="w-4 h-4 text-muted-foreground shrink-0" />
                     <div>
-                      <p className="text-xs text-muted-foreground leading-none mb-0.5">Priced</p>
+                      <p className="text-xs text-muted-foreground leading-none mb-0.5">{tUi("priced")}</p>
                       <p className="text-base font-semibold leading-none">
                         {locationPricedList.length - unpricedCount}
                       </p>
@@ -1018,7 +1022,9 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                     <div className="rounded-lg border bg-amber-500/10 border-amber-500/30 px-4 py-2 flex items-center gap-3">
                       <EyeOff className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
                       <div>
-                        <p className="text-xs text-amber-700 dark:text-amber-400 leading-none mb-0.5">Unpriced</p>
+                        <p className="text-xs text-amber-700 dark:text-amber-400 leading-none mb-0.5">
+                          {tUi("unpriced")}
+                        </p>
                         <p className="text-base font-semibold leading-none text-amber-700 dark:text-amber-400">
                           {unpricedCount}
                         </p>
@@ -1061,11 +1067,13 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                     <Table wrapperClassName="max-h-[calc(100vh-320px)] sm:max-h-[calc(100vh-280px)]">
                       <TableHeader>
                         <TableRow className="bg-muted/40 hover:bg-muted/40">
-                          <TableHead className="w-28 text-xs">Code</TableHead>
-                          <TableHead className="text-xs">Item Name</TableHead>
-                          <TableHead className="text-xs hidden sm:table-cell">Group</TableHead>
+                          <TableHead className="w-28 text-xs">{tUi("code")}</TableHead>
+                          <TableHead className="text-xs">{tUi("item.name")}</TableHead>
+                          <TableHead className="text-xs hidden sm:table-cell">{tUi("group")}</TableHead>
                           {showCostPrice && (
-                            <TableHead className="text-xs text-right hidden sm:table-cell w-32">Cost Price</TableHead>
+                            <TableHead className="text-xs text-right hidden sm:table-cell w-32">
+                              {tUi("cost.price")}
+                            </TableHead>
                           )}
                           {showCostPrice && (
                             <TableHead className="text-xs text-right hidden sm:table-cell w-32">
@@ -1082,10 +1090,14 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                             ))}
 
                           {/* Single-location mode: one Selling Price column */}
-                          {!isAllMode && <TableHead className="text-xs text-right w-48">Selling Price</TableHead>}
+                          {!isAllMode && (
+                            <TableHead className="text-xs text-right w-48">{tUi("selling.price")}</TableHead>
+                          )}
 
                           {!isAllMode && (
-                            <TableHead className="text-xs text-right hidden sm:table-cell w-28">Qty in Stock</TableHead>
+                            <TableHead className="text-xs text-right hidden sm:table-cell w-28">
+                              {tUi("qty.in.stock")}
+                            </TableHead>
                           )}
                         </TableRow>
                       </TableHeader>
@@ -1344,10 +1356,10 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-28">Code</TableHead>
-                      <TableHead>Item Name</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead className="text-right">New Price</TableHead>
+                      <TableHead className="w-28">{tUi("code")}</TableHead>
+                      <TableHead>{tUi("item.name")}</TableHead>
+                      <TableHead>{tUi("location")}</TableHead>
+                      <TableHead className="text-right">{tUi("new.price")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1376,7 +1388,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                   </TableBody>
                 </Table>
                 {importPreview.length > 200 && (
-                  <p className="text-xs text-muted-foreground text-center py-2">Showing first 200 items…</p>
+                  <p className="text-xs text-muted-foreground text-center py-2">{tUi("showing.first.200.items")}</p>
                 )}
               </ScrollArea>
             </>

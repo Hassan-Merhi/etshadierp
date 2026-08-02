@@ -3,18 +3,19 @@
  *
  * Extracted from FactoryStockAllocationV3.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {useMutation} from "@tanstack/react-query";
-import {queryClient} from "@/lib/queryClient";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Textarea} from "@/components/ui/textarea";
-import {useToast} from "@/hooks/use-toast";
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter} from "@/components/ui/dialog";
-import {AlertTriangle, Loader2} from "lucide-react";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertTriangle, Loader2 } from "lucide-react";
 
-import type {Proforma} from "../types";
+import type { Proforma } from "../types";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function CreateLoadDialog({
   proforma,
@@ -25,6 +26,7 @@ export function CreateLoadDialog({
   open: boolean;
   onClose: () => void;
 }) {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [loadName, setLoadName] = useState("");
   const [expectedDate, setExpectedDate] = useState(new Date().toLocaleDateString("en-CA"));
@@ -63,7 +65,7 @@ export function CreateLoadDialog({
     >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Send to Expected to Load</DialogTitle>
+          <DialogTitle>{tUi("send.to.expected.to.load")}</DialogTitle>
         </DialogHeader>
         {proforma && proforma.v3ActiveCount > 0 && (
           <div className="flex items-start gap-2 p-3 rounded-md bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800">
@@ -76,7 +78,7 @@ export function CreateLoadDialog({
         )}
         <div className="space-y-4 py-1">
           <div>
-            <Label className="text-xs text-muted-foreground mb-1 block">Proforma</Label>
+            <Label className="text-xs text-muted-foreground mb-1 block">{tUi("proforma")}</Label>
             <p className="text-sm font-medium">
               {proforma?.name} · {proforma?.customerName}
             </p>
@@ -113,7 +115,7 @@ export function CreateLoadDialog({
               id="v3-load-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Optional notes..."
+              placeholder={tUi("optional.notes.2")}
               rows={2}
               data-testid="input-v3-load-notes"
             />

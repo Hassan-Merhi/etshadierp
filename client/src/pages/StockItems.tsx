@@ -69,10 +69,12 @@ import type {
   StockItem,
 } from "./stockitems/types";
 import { PAGE_SIZE } from "./stockitems/utils";
+import { useErpText } from "@/i18n/modules/erp";
 // Note: excelHelper (ExcelJS) is imported lazily inside exportToExcel / exportSalesHistory
 // so the 1.3 MB ExcelJS bundle is not loaded on every page startup.
 
 export default function StockItems() {
+  const tUi = useErpText();
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hideStockRates = (myErpPages?.hiddenErpCostFields ?? []).includes("stock_rates");
 
@@ -500,7 +502,7 @@ export default function StockItems() {
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
       {/* ── Header ── */}
-      <PageHeader title="Stock Items" subtitle="Manage all stock items in your company">
+      <PageHeader title={tUi("stock.items")} subtitle={tUi("manage.all.stock.items.in.your.company")}>
         <div className="flex flex-wrap items-center gap-2">
           {selectedIds.length > 0 && (
             <>
@@ -514,8 +516,8 @@ export default function StockItems() {
                 data-testid="button-assign-category"
               >
                 <Package className="h-4 w-4" />
-                <span className="hidden sm:inline">Assign Category</span>
-                <span className="sm:hidden">Category</span>
+                <span className="hidden sm:inline">{tUi("assign.category")}</span>
+                <span className="sm:hidden">{tUi("category")}</span>
                 <Badge variant="secondary" className="ml-1">
                   {selectedIds.length}
                 </Badge>
@@ -598,12 +600,12 @@ export default function StockItems() {
       <div className="flex flex-wrap gap-3">
         <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex items-center gap-2">
           <Package className="h-4 w-4 text-muted-foreground" />
-          <span className="text-muted-foreground">Total</span>
+          <span className="text-muted-foreground">{tUi("total")}</span>
           <span className="font-semibold">{totalItems.toLocaleString()}</span>
         </div>
         <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex items-center gap-2">
           <Layers className="h-4 w-4 text-muted-foreground" />
-          <span className="text-muted-foreground">Categories</span>
+          <span className="text-muted-foreground">{tUi("categories")}</span>
           <span className="font-semibold">{stockCategories.length}</span>
         </div>
       </div>
@@ -613,7 +615,7 @@ export default function StockItems() {
         <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name or code..."
+            placeholder={tUi("search.by.name.or.code")}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-9"
@@ -625,10 +627,10 @@ export default function StockItems() {
           onValueChange={(v) => setSelectedGroupFilter(v === "all" ? null : parseInt(v))}
         >
           <SelectTrigger className="w-40" data-testid="select-stock-group">
-            <SelectValue placeholder="All Groups" />
+            <SelectValue placeholder={tUi("all.groups")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Groups</SelectItem>
+            <SelectItem value="all">{tUi("all.groups")}</SelectItem>
             {stockGroups.map((g) => (
               <SelectItem key={g.id} value={String(g.id)}>
                 {g.name}
@@ -642,10 +644,10 @@ export default function StockItems() {
             onValueChange={(v) => setSelectedGradeFilter(v === "all" ? null : parseInt(v))}
           >
             <SelectTrigger className="w-36" data-testid="select-grade-filter">
-              <SelectValue placeholder="All Grades" />
+              <SelectValue placeholder={tUi("all.grades")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Grades</SelectItem>
+              <SelectItem value="all">{tUi("all.grades")}</SelectItem>
               {stockGrades.map((g) => (
                 <SelectItem key={g.id} value={String(g.id)}>
                   {g.name}
@@ -660,11 +662,11 @@ export default function StockItems() {
             onValueChange={(v) => setSelectedCategoryFilter(v === "all" ? null : v === "none" ? "none" : parseInt(v))}
           >
             <SelectTrigger className="w-40" data-testid="select-category-filter">
-              <SelectValue placeholder="All Categories" />
+              <SelectValue placeholder={tUi("all.categories")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              <SelectItem value="none">No Category</SelectItem>
+              <SelectItem value="all">{tUi("all.categories")}</SelectItem>
+              <SelectItem value="none">{tUi("no.category")}</SelectItem>
               {stockCategories.map((c) => (
                 <SelectItem key={c.id} value={String(c.id)}>
                   {c.name}
@@ -698,12 +700,12 @@ export default function StockItems() {
                       data-testid="checkbox-select-all"
                     />
                   </th>
-                  <th className="text-left px-3 font-medium">Name</th>
-                  <th className="text-left px-3 font-medium">Group</th>
-                  {stockGrades.length > 0 && <th className="text-left px-3 font-medium">Grade</th>}
-                  {stockCategories.length > 0 && <th className="text-left px-3 font-medium">Category</th>}
-                  <th className="text-left px-3 font-medium">Aliases</th>
-                  <th className="text-left px-3 font-medium">Status</th>
+                  <th className="text-left px-3 font-medium">{tUi("name")}</th>
+                  <th className="text-left px-3 font-medium">{tUi("group")}</th>
+                  {stockGrades.length > 0 && <th className="text-left px-3 font-medium">{tUi("grade")}</th>}
+                  {stockCategories.length > 0 && <th className="text-left px-3 font-medium">{tUi("category")}</th>}
+                  <th className="text-left px-3 font-medium">{tUi("aliases")}</th>
+                  <th className="text-left px-3 font-medium">{tUi("status")}</th>
                   <th className="w-20 px-3" />
                 </tr>
               </thead>
@@ -848,7 +850,7 @@ export default function StockItems() {
                 onCheckedChange={handleSelectAll}
                 data-testid="checkbox-select-all-mobile"
               />
-              <span className="text-sm text-muted-foreground">Select All</span>
+              <span className="text-sm text-muted-foreground">{tUi("select.all")}</span>
             </div>
             {displayItems.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
@@ -971,14 +973,14 @@ export default function StockItems() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent data-testid="dialog-confirm-delete">
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("confirm.deletion")}</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete {selectedIds.length} stock {selectedIds.length === 1 ? "item" : "items"}?
               This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-delete">{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 deleteMutation.mutate(selectedIds);
@@ -996,17 +998,17 @@ export default function StockItems() {
       <Dialog open={assignCategoryDialogOpen} onOpenChange={setAssignCategoryDialogOpen}>
         <DialogContent data-testid="dialog-assign-category">
           <DialogHeader>
-            <DialogTitle>Assign Category</DialogTitle>
+            <DialogTitle>{tUi("assign.category")}</DialogTitle>
             <DialogDescription>
               Choose a category to assign to the {selectedIds.length} selected{" "}
               {selectedIds.length === 1 ? "item" : "items"}.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Label className="mb-2 block">Category</Label>
+            <Label className="mb-2 block">{tUi("category")}</Label>
             <Select value={pendingCategoryId} onValueChange={setPendingCategoryId}>
               <SelectTrigger data-testid="select-assign-category">
-                <SelectValue placeholder="Select a category..." />
+                <SelectValue placeholder={tUi("select.a.category")} />
               </SelectTrigger>
               <SelectContent>
                 {stockCategories.map((cat) => (
@@ -1043,15 +1045,15 @@ export default function StockItems() {
       <Dialog open={adjustDialogOpen} onOpenChange={setAdjustDialogOpen}>
         <DialogContent data-testid="dialog-adjust-stock">
           <DialogHeader>
-            <DialogTitle>Adjust Stock Manually</DialogTitle>
-            <DialogDescription>Add or subtract quantity from a stock item at a specific location</DialogDescription>
+            <DialogTitle>{tUi("adjust.stock.manually")}</DialogTitle>
+            <DialogDescription>{tUi("add.or.subtract.quantity.from.a.stock.item.at.a.")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Stock Item</Label>
+              <Label>{tUi("stock.item")}</Label>
               <Select value={adjustStockItemId} onValueChange={setAdjustStockItemId}>
                 <SelectTrigger data-testid="select-adjust-stock-item">
-                  <SelectValue placeholder="Select stock item..." />
+                  <SelectValue placeholder={tUi("select.stock.item")} />
                 </SelectTrigger>
                 <SelectContent>
                   {allStockItems.map((item) => (
@@ -1063,10 +1065,10 @@ export default function StockItems() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Location</Label>
+              <Label>{tUi("location")}</Label>
               <Select value={adjustLocationId} onValueChange={setAdjustLocationId}>
                 <SelectTrigger data-testid="select-adjust-location">
-                  <SelectValue placeholder="Select location..." />
+                  <SelectValue placeholder={tUi("select.location")} />
                 </SelectTrigger>
                 <SelectContent>
                   {locations.map((loc) => (
@@ -1078,7 +1080,7 @@ export default function StockItems() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Adjustment Type</Label>
+              <Label>{tUi("adjustment.type")}</Label>
               <div className="flex gap-2">
                 <Button
                   type="button"
@@ -1101,14 +1103,14 @@ export default function StockItems() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Quantity</Label>
+              <Label>{tUi("quantity")}</Label>
               <Input
                 type="number"
                 min="0"
                 step="0.01"
                 value={adjustQuantity}
                 onChange={(e) => setAdjustQuantity(e.target.value)}
-                placeholder="Enter quantity..."
+                placeholder={tUi("enter.quantity")}
                 data-testid="input-adjust-quantity"
               />
             </div>
@@ -1135,11 +1137,11 @@ export default function StockItems() {
             <DialogTitle className="flex items-center gap-2">
               <Tag className="h-4 w-4" /> Manage Grades
             </DialogTitle>
-            <DialogDescription>Add, rename, or remove stock grades.</DialogDescription>
+            <DialogDescription>{tUi("add.rename.or.remove.stock.grades")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2 max-h-72 overflow-y-auto pr-1">
             {stockGrades.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">No grades yet. Add one below.</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{tUi("no.grades.yet.add.one.below")}</p>
             )}
             {stockGrades.map((grade) => (
               <div key={grade.id} className="flex items-center gap-2 group">
@@ -1216,7 +1218,7 @@ export default function StockItems() {
           </div>
           <div className="flex gap-2 pt-2 border-t">
             <Input
-              placeholder="New grade name..."
+              placeholder={tUi("new.grade.name")}
               value={newGradeName}
               onChange={(e) => setNewGradeName(e.target.value)}
               onKeyDown={(e) => {
@@ -1247,11 +1249,11 @@ export default function StockItems() {
             <DialogTitle className="flex items-center gap-2">
               <Layers className="h-4 w-4" /> Manage Categories
             </DialogTitle>
-            <DialogDescription>Add, rename, or remove stock categories.</DialogDescription>
+            <DialogDescription>{tUi("add.rename.or.remove.stock.categories")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2 max-h-72 overflow-y-auto pr-1">
             {stockCategories.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">No categories yet. Add one below.</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{tUi("no.categories.yet.add.one.below")}</p>
             )}
             {stockCategories.map((cat) => (
               <div key={cat.id} className="flex items-center gap-2 group">
@@ -1328,7 +1330,7 @@ export default function StockItems() {
           </div>
           <div className="flex gap-2 pt-2 border-t">
             <Input
-              placeholder="New category name..."
+              placeholder={tUi("new.category.name")}
               value={newCategoryName}
               onChange={(e) => setNewCategoryName(e.target.value)}
               onKeyDown={(e) => {

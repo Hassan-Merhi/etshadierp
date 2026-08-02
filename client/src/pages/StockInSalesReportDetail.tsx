@@ -31,6 +31,7 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useToast } from "@/hooks/use-toast";
 import { ExcelJS, writeFile } from "@/lib/excelHelper";
 import { formatNumber } from "@/lib/formatNumber";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface Metrics {
   stockInQty: number;
@@ -142,6 +143,7 @@ function Pagination({
 }
 
 export default function StockInSalesReportDetail() {
+  const tUi = useErpText();
   const { selectedCompany } = useCompany();
   const { formatAmount, selectedCurrency, convertToDisplay } = useCurrencyContext();
   const { formatDisplayDate } = useDateFormat();
@@ -309,7 +311,7 @@ export default function StockInSalesReportDetail() {
   if (!startDate || !endDate) {
     return (
       <div className="container mx-auto p-6">
-        <PageHeader title="Stock In & Sales Details" />
+        <PageHeader title={tUi("stock.in.sales.details")} />
         <p className="mt-3 text-sm text-muted-foreground">A valid report period is required.</p>
         <Button className="mt-4" variant="outline" onClick={() => (window.location.href = "/stock-in-sales-report")}>
           Back to report
@@ -322,13 +324,19 @@ export default function StockInSalesReportDetail() {
     <div className="container mx-auto space-y-6 p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-2">
-          <Button variant="ghost" size="sm" className="mt-0.5 gap-1.5 print:hidden" onClick={() => window.history.back()}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-0.5 gap-1.5 print:hidden"
+            onClick={() => window.history.back()}
+          >
             <ArrowLeft className="h-4 w-4" /> Back
           </Button>
           <div>
-            <PageHeader title="Stock In & Sales Details" />
+            <PageHeader title={tUi("stock.in.sales.details")} />
             <p className="text-sm text-muted-foreground">
-              {periodLabel}{selectedCompany?.name ? ` · ${selectedCompany.name}` : ""}
+              {periodLabel}
+              {selectedCompany?.name ? ` · ${selectedCompany.name}` : ""}
             </p>
           </div>
         </div>
@@ -351,25 +359,23 @@ export default function StockInSalesReportDetail() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {isLoading ? (
-          Array.from({ length: 8 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-xl" />)
-        ) : (
-          [
-            ["Stock In Qty", formatNumber(summary.stockInQty, 3)],
-            ["Stock In Value", formatAmount(summary.stockInValue)],
-            ["Avg In Rate", rate(summary.stockInAvgRate)],
-            ["Stock Out Qty", formatNumber(summary.stockOutQty, 3)],
-            ["Total Sales", formatAmount(summary.totalSales)],
-            ["Cost", formatAmount(summary.costOfSales)],
-            ["Cost Profit", money(summary.costProfit)],
-            ["Avg Profit / Bale", money(summary.avgProfitPerBale)],
-          ].map(([label, value]) => (
-            <div key={label} className="rounded-xl border bg-muted/30 p-3">
-              <p className="text-xs text-muted-foreground">{label}</p>
-              <p className="mt-1 font-mono text-lg font-semibold">{value}</p>
-            </div>
-          ))
-        )}
+        {isLoading
+          ? Array.from({ length: 8 }).map((_, index) => <Skeleton key={index} className="h-20 rounded-xl" />)
+          : [
+              ["Stock In Qty", formatNumber(summary.stockInQty, 3)],
+              ["Stock In Value", formatAmount(summary.stockInValue)],
+              ["Avg In Rate", rate(summary.stockInAvgRate)],
+              ["Stock Out Qty", formatNumber(summary.stockOutQty, 3)],
+              ["Total Sales", formatAmount(summary.totalSales)],
+              ["Cost", formatAmount(summary.costOfSales)],
+              ["Cost Profit", money(summary.costProfit)],
+              ["Avg Profit / Bale", money(summary.avgProfitPerBale)],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-xl border bg-muted/30 p-3">
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className="mt-1 font-mono text-lg font-semibold">{value}</p>
+              </div>
+            ))}
       </div>
 
       {isFetching && !isLoading && (
@@ -381,81 +387,166 @@ export default function StockInSalesReportDetail() {
       {isError ? (
         <div className="rounded-xl border border-destructive/30 p-8 text-center">
           <TrendingDown className="mx-auto h-6 w-6 text-destructive" />
-          <p className="mt-3 text-sm font-medium">Unable to load details</p>
+          <p className="mt-3 text-sm font-medium">{tUi("unable.to.load.details")}</p>
           <p className="mt-1 text-xs text-muted-foreground">{error?.message}</p>
-          <Button variant="outline" size="sm" className="mt-4" onClick={() => refetch()}>Retry</Button>
+          <Button variant="outline" size="sm" className="mt-4" onClick={() => refetch()}>
+            {tUi("retry")}
+          </Button>
         </div>
       ) : (
         <>
           <section className="space-y-2">
             <div className="flex items-center gap-2">
               <PackagePlus className="h-5 w-5" />
-              <h2 className="text-lg font-semibold">Container Stock In</h2>
+              <h2 className="text-lg font-semibold">{tUi("container.stock.in")}</h2>
               <span className="text-xs text-muted-foreground">{formatNumber(data?.stockIn.total || 0, 0)} lines</span>
             </div>
             <div className="overflow-hidden rounded-xl border">
               <div className="overflow-x-auto">
                 <Table className="min-w-[1050px]">
-                  <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40">
-                    <TableHead>Date</TableHead><TableHead>Container</TableHead><TableHead>Location</TableHead>
-                    <TableHead>Group</TableHead><TableHead>Item</TableHead><TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Avg Rate</TableHead><TableHead className="text-right">Value</TableHead>
-                  </TableRow></TableHeader>
+                  <TableHeader>
+                    <TableRow className="bg-muted/40 hover:bg-muted/40">
+                      <TableHead>{tUi("date")}</TableHead>
+                      <TableHead>{tUi("container")}</TableHead>
+                      <TableHead>{tUi("location")}</TableHead>
+                      <TableHead>{tUi("group")}</TableHead>
+                      <TableHead>{tUi("item")}</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">{tUi("avg.rate")}</TableHead>
+                      <TableHead className="text-right">{tUi("value")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
                   <TableBody>
-                    {isLoading ? Array.from({ length: 5 }).map((_, index) => <TableRow key={index}><TableCell colSpan={8}><Skeleton className="h-5 w-full" /></TableCell></TableRow>) :
-                    (data?.stockIn.rows.length || 0) === 0 ? <TableRow><TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">No direct container offloads found.</TableCell></TableRow> :
-                    data?.stockIn.rows.map((row) => <TableRow key={row.id}>
-                      <TableCell>{displayDate(row.activityDate)}</TableCell><TableCell className="font-mono">{row.containerNumber}</TableCell>
-                      <TableCell>{row.locationName}</TableCell><TableCell>{row.stockGroupName}</TableCell>
-                      <TableCell><div className="font-medium">{row.stockItemName}</div><div className="text-xs text-muted-foreground">{row.stockItemCode}</div></TableCell>
-                      <TableCell className="text-right font-mono">{formatNumber(row.quantity, 3)}</TableCell>
-                      <TableCell className="text-right font-mono">{rate(row.avgRate)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatAmount(row.totalValue)}</TableCell>
-                    </TableRow>)}
+                    {isLoading ? (
+                      Array.from({ length: 5 }).map((_, index) => (
+                        <TableRow key={index}>
+                          <TableCell colSpan={8}>
+                            <Skeleton className="h-5 w-full" />
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (data?.stockIn.rows.length || 0) === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                          {tUi("no.direct.container.offloads.found")}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      data?.stockIn.rows.map((row) => (
+                        <TableRow key={row.id}>
+                          <TableCell>{displayDate(row.activityDate)}</TableCell>
+                          <TableCell className="font-mono">{row.containerNumber}</TableCell>
+                          <TableCell>{row.locationName}</TableCell>
+                          <TableCell>{row.stockGroupName}</TableCell>
+                          <TableCell>
+                            <div className="font-medium">{row.stockItemName}</div>
+                            <div className="text-xs text-muted-foreground">{row.stockItemCode}</div>
+                          </TableCell>
+                          <TableCell className="text-right font-mono">{formatNumber(row.quantity, 3)}</TableCell>
+                          <TableCell className="text-right font-mono">{rate(row.avgRate)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(row.totalValue)}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               </div>
-              {data?.stockIn && <Pagination page={data.stockIn.page} totalPages={data.stockIn.totalPages} total={data.stockIn.total} onChange={setStockInPage} />}
+              {data?.stockIn && (
+                <Pagination
+                  page={data.stockIn.page}
+                  totalPages={data.stockIn.totalPages}
+                  total={data.stockIn.total}
+                  onChange={setStockInPage}
+                />
+              )}
             </div>
           </section>
 
           <section className="space-y-2">
             <div className="flex items-center gap-2">
               <PackageMinus className="h-5 w-5" />
-              <h2 className="text-lg font-semibold">Stock Out / Sales</h2>
+              <h2 className="text-lg font-semibold">{tUi("stock.out.sales")}</h2>
               <span className="text-xs text-muted-foreground">{formatNumber(data?.stockOut.total || 0, 0)} lines</span>
             </div>
             <div className="overflow-hidden rounded-xl border">
               <div className="overflow-x-auto">
                 <Table className="min-w-[1350px]">
-                  <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40">
-                    <TableHead>Date</TableHead><TableHead>Type</TableHead><TableHead>Voucher</TableHead><TableHead>Location</TableHead>
-                    <TableHead>Group</TableHead><TableHead>Item</TableHead><TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Sales</TableHead><TableHead className="text-right">Cost</TableHead>
-                    <TableHead className="text-right">Profit</TableHead><TableHead className="text-right">Profit/Bale</TableHead>
-                  </TableRow></TableHeader>
+                  <TableHeader>
+                    <TableRow className="bg-muted/40 hover:bg-muted/40">
+                      <TableHead>{tUi("date")}</TableHead>
+                      <TableHead>{tUi("type")}</TableHead>
+                      <TableHead>{tUi("voucher.2")}</TableHead>
+                      <TableHead>{tUi("location")}</TableHead>
+                      <TableHead>{tUi("group")}</TableHead>
+                      <TableHead>{tUi("item")}</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">{tUi("sales.2")}</TableHead>
+                      <TableHead className="text-right">{tUi("cost.2")}</TableHead>
+                      <TableHead className="text-right">{tUi("profit")}</TableHead>
+                      <TableHead className="text-right">{tUi("profit.bale")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
                   <TableBody>
-                    {isLoading ? Array.from({ length: 5 }).map((_, index) => <TableRow key={index}><TableCell colSpan={11}><Skeleton className="h-5 w-full" /></TableCell></TableRow>) :
-                    (data?.stockOut.rows.length || 0) === 0 ? <TableRow><TableCell colSpan={11} className="py-8 text-center text-sm text-muted-foreground">No sales, credit notes, or debit notes found.</TableCell></TableRow> :
-                    data?.stockOut.rows.map((row) => {
-                      const positive = row.costProfit >= 0;
-                      return <TableRow key={`${row.sourceType}-${row.id}`}>
-                        <TableCell>{displayDate(row.activityDate)}</TableCell>
-                        <TableCell>{row.sourceType === "Sale" && row.isCreditSale ? "Credit Sale" : row.sourceType}</TableCell>
-                        <TableCell className="font-mono">{row.voucherNumber}</TableCell><TableCell>{row.locationName}</TableCell>
-                        <TableCell>{row.stockGroupName}</TableCell>
-                        <TableCell><div className="font-medium">{row.stockItemName}</div><div className="text-xs text-muted-foreground">{row.stockItemCode}</div></TableCell>
-                        <TableCell className="text-right font-mono">{formatNumber(row.quantity, 3)}</TableCell>
-                        <TableCell className="text-right font-mono">{money(row.totalSales)}</TableCell>
-                        <TableCell className="text-right font-mono text-muted-foreground">{money(row.totalCost)}</TableCell>
-                        <TableCell className={`text-right font-mono font-semibold ${positive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>{money(row.costProfit)}</TableCell>
-                        <TableCell className={`text-right font-mono ${row.avgProfitPerBale >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>{money(row.avgProfitPerBale)}</TableCell>
-                      </TableRow>;
-                    })}
+                    {isLoading ? (
+                      Array.from({ length: 5 }).map((_, index) => (
+                        <TableRow key={index}>
+                          <TableCell colSpan={11}>
+                            <Skeleton className="h-5 w-full" />
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (data?.stockOut.rows.length || 0) === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={11} className="py-8 text-center text-sm text-muted-foreground">
+                          {tUi("no.sales.credit.notes.or.debit.notes.found")}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      data?.stockOut.rows.map((row) => {
+                        const positive = row.costProfit >= 0;
+                        return (
+                          <TableRow key={`${row.sourceType}-${row.id}`}>
+                            <TableCell>{displayDate(row.activityDate)}</TableCell>
+                            <TableCell>
+                              {row.sourceType === "Sale" && row.isCreditSale ? "Credit Sale" : row.sourceType}
+                            </TableCell>
+                            <TableCell className="font-mono">{row.voucherNumber}</TableCell>
+                            <TableCell>{row.locationName}</TableCell>
+                            <TableCell>{row.stockGroupName}</TableCell>
+                            <TableCell>
+                              <div className="font-medium">{row.stockItemName}</div>
+                              <div className="text-xs text-muted-foreground">{row.stockItemCode}</div>
+                            </TableCell>
+                            <TableCell className="text-right font-mono">{formatNumber(row.quantity, 3)}</TableCell>
+                            <TableCell className="text-right font-mono">{money(row.totalSales)}</TableCell>
+                            <TableCell className="text-right font-mono text-muted-foreground">
+                              {money(row.totalCost)}
+                            </TableCell>
+                            <TableCell
+                              className={`text-right font-mono font-semibold ${positive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
+                            >
+                              {money(row.costProfit)}
+                            </TableCell>
+                            <TableCell
+                              className={`text-right font-mono ${row.avgProfitPerBale >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
+                            >
+                              {money(row.avgProfitPerBale)}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
                   </TableBody>
                 </Table>
               </div>
-              {data?.stockOut && <Pagination page={data.stockOut.page} totalPages={data.stockOut.totalPages} total={data.stockOut.total} onChange={setStockOutPage} />}
+              {data?.stockOut && (
+                <Pagination
+                  page={data.stockOut.page}
+                  totalPages={data.stockOut.totalPages}
+                  total={data.stockOut.total}
+                  onChange={setStockOutPage}
+                />
+              )}
             </div>
           </section>
         </>

@@ -19,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, Truck, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ContainerDetailERP from "./ContainerDetail";
+import { useErpText } from "@/i18n/modules/erp";
 
 function fmt2(v: any) {
   const n = parseFloat(String(v ?? "0"));
@@ -60,6 +61,7 @@ export default function ContainerDetailPage() {
 }
 
 function SpContainerDetailView() {
+  const tUi = useErpText();
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
   const [showOffloadDialog, setShowOffloadDialog] = useState(false);
@@ -249,18 +251,18 @@ function SpContainerDetailView() {
         {/* Line Items */}
         <Card>
           <CardHeader className="px-4 pt-4 pb-2">
-            <CardTitle className="text-sm">Line Items</CardTitle>
+            <CardTitle className="text-sm">{tUi("line.items")}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Article Code</TableHead>
-                  <TableHead>Description</TableHead>
+                  <TableHead>{tUi("article.code")}</TableHead>
+                  <TableHead>{tUi("description")}</TableHead>
                   <TableHead className="text-right">Qty</TableHead>
-                  <TableHead className="text-right">Unit Rate (USD)</TableHead>
-                  <TableHead className="text-right">Disc. Rate</TableHead>
-                  <TableHead className="text-right">Line Cost</TableHead>
+                  <TableHead className="text-right">{tUi("unit.rate.usd")}</TableHead>
+                  <TableHead className="text-right">{tUi("disc.rate")}</TableHead>
+                  <TableHead className="text-right">{tUi("line.cost")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -296,16 +298,16 @@ function SpContainerDetailView() {
         {(spc.prepaid ?? []).length > 0 && (
           <Card>
             <CardHeader className="px-4 pt-4 pb-2">
-              <CardTitle className="text-sm">Prepaid Charges</CardTitle>
+              <CardTitle className="text-sm">{tUi("prepaid.charges")}</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Amount (USD)</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead>{tUi("type")}</TableHead>
+                    <TableHead>{tUi("description")}</TableHead>
+                    <TableHead className="text-right">{tUi("amount.usd")}</TableHead>
+                    <TableHead>{tUi("date")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -343,9 +345,9 @@ function SpContainerDetailView() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead className="text-right">Amount (USD)</TableHead>
+                      <TableHead>{tUi("type")}</TableHead>
+                      <TableHead>{tUi("description")}</TableHead>
+                      <TableHead className="text-right">{tUi("amount.usd")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -363,7 +365,7 @@ function SpContainerDetailView() {
                   </TableBody>
                 </Table>
               ) : (
-                <p className="px-4 pb-4 text-sm text-muted-foreground">No charges recorded.</p>
+                <p className="px-4 pb-4 text-sm text-muted-foreground">{tUi("no.charges.recorded")}</p>
               )}
             </CardContent>
           </Card>
@@ -373,7 +375,7 @@ function SpContainerDetailView() {
         {spc.notes && (
           <Card>
             <CardHeader className="px-4 pt-4 pb-2">
-              <CardTitle className="text-sm">Notes</CardTitle>
+              <CardTitle className="text-sm">{tUi("notes")}</CardTitle>
             </CardHeader>
             <CardContent className="px-4 pb-4">
               <p className="text-sm text-muted-foreground whitespace-pre-wrap">{spc.notes}</p>
@@ -397,7 +399,7 @@ function SpContainerDetailView() {
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Container</DialogTitle>
+            <DialogTitle>{tUi("edit.container")}</DialogTitle>
             <DialogDescription>
               Update the container details. The accounting voucher (Dr Goods OTW / Cr OTW Clearing) will be regenerated
               automatically.
@@ -410,7 +412,7 @@ function SpContainerDetailView() {
                 name="supplierId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Supplier</FormLabel>
+                    <FormLabel>{tUi("supplier")}</FormLabel>
                     <Select
                       value={field.value ? String(field.value) : ""}
                       onValueChange={(val) => {
@@ -422,7 +424,7 @@ function SpContainerDetailView() {
                     >
                       <FormControl>
                         <SelectTrigger data-testid="select-edit-supplier">
-                          <SelectValue placeholder="Select supplier…" />
+                          <SelectValue placeholder={tUi("select.supplier")} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -460,7 +462,7 @@ function SpContainerDetailView() {
                   name="invoiceNumber"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Invoice Number</FormLabel>
+                      <FormLabel>{tUi("invoice.number")}</FormLabel>
                       <FormControl>
                         <Input {...field} data-testid="input-edit-invoice-number" />
                       </FormControl>
@@ -477,7 +479,7 @@ function SpContainerDetailView() {
                         Container No. <span className="text-muted-foreground text-xs font-normal">(opt.)</span>
                       </FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="ABCD1234567" data-testid="input-edit-container-number" />
+                        <Input {...field} placeholder={tUi("abcd1234567")} data-testid="input-edit-container-number" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -488,7 +490,7 @@ function SpContainerDetailView() {
                   name="invoiceDate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Invoice Date</FormLabel>
+                      <FormLabel>{tUi("invoice.date")}</FormLabel>
                       <FormControl>
                         <Input type="date" {...field} data-testid="input-edit-invoice-date" />
                       </FormControl>
@@ -501,7 +503,7 @@ function SpContainerDetailView() {
                   name="invoiceTotalUsd"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Invoice Total (USD)</FormLabel>
+                      <FormLabel>{tUi("invoice.total.usd")}</FormLabel>
                       <FormControl>
                         <Input type="number" step="0.01" {...field} data-testid="input-edit-invoice-total" />
                       </FormControl>
@@ -514,7 +516,7 @@ function SpContainerDetailView() {
                   name="discountPct"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Discount %</FormLabel>
+                      <FormLabel>{tUi("discount.2")}</FormLabel>
                       <FormControl>
                         <Input type="number" step="0.01" {...field} data-testid="input-edit-discount-pct" />
                       </FormControl>
@@ -527,7 +529,7 @@ function SpContainerDetailView() {
                   name="freightEstimateUsd"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Freight Estimate (USD)</FormLabel>
+                      <FormLabel>{tUi("freight.estimate.usd")}</FormLabel>
                       <FormControl>
                         <Input type="number" step="0.01" {...field} data-testid="input-edit-freight-estimate" />
                       </FormControl>

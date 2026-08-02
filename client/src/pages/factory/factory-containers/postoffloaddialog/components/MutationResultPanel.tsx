@@ -3,11 +3,13 @@
  *
  * Extracted from PostOffloadDialog.tsx during the Phase 4 god-file split.
  */
-import {CheckCircle2} from "lucide-react";
-import {formatNumber} from "@/lib/formatNumber";
-import type {MutationResult} from "../types";
+import { CheckCircle2 } from "lucide-react";
+import { formatNumber } from "@/lib/formatNumber";
+import type { MutationResult } from "../types";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function MutationResultPanel({ result }: { result: MutationResult }) {
+  const tUi = useFactoryText();
   const oldRate = result.supplierLockedRateBefore || result.supplierLockedRateOldExact;
   const newRate = result.supplierLockedRateAfter || result.supplierLockedRateNewExact;
   const supDelta = result.supplierInventoryValueDeltaUsd;
@@ -27,12 +29,12 @@ export function MutationResultPanel({ result }: { result: MutationResult }) {
 
       <div className="rounded-md border text-sm divide-y">
         <div className="grid grid-cols-3 gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium bg-muted/30">
-          <span>Metric</span>
-          <span className="text-right">Previous</span>
+          <span>{tUi("metric")}</span>
+          <span className="text-right">{tUi("previous")}</span>
           <span className="text-right">New</span>
         </div>
         <div className="grid grid-cols-3 gap-2 px-3 py-2">
-          <span className="text-muted-foreground">Container cost/kg (USD)</span>
+          <span className="text-muted-foreground">{tUi("container.cost.kg.usd")}</span>
           <span className="text-right font-mono">${result.oldContainerCostPerKgUsd.toFixed(6)}</span>
           <span className="text-right font-mono font-semibold text-green-700 dark:text-green-400">
             ${result.newContainerCostPerKgUsd.toFixed(6)}
@@ -40,7 +42,7 @@ export function MutationResultPanel({ result }: { result: MutationResult }) {
         </div>
         {oldRate && (
           <div className="grid grid-cols-3 gap-2 px-3 py-2">
-            <span className="text-muted-foreground">Supplier locked rate</span>
+            <span className="text-muted-foreground">{tUi("supplier.locked.rate")}</span>
             <span className="text-right font-mono">${parseFloat(oldRate).toFixed(8)}</span>
             <span className="text-right font-mono font-semibold">
               {newRate ? `$${parseFloat(newRate).toFixed(8)}` : "—"}
@@ -50,11 +52,11 @@ export function MutationResultPanel({ result }: { result: MutationResult }) {
         {supDelta && result.supplierRemainingKg != null && (
           <div className="px-3 py-2 bg-muted/30 text-xs text-muted-foreground space-y-0.5">
             <div className="flex justify-between">
-              <span>Supplier remaining</span>
+              <span>{tUi("supplier.remaining")}</span>
               <span className="font-mono">{formatNumber(result.supplierRemainingKg)} kg</span>
             </div>
             <div className="flex justify-between">
-              <span>Inventory value applied</span>
+              <span>{tUi("inventory.value.applied")}</span>
               <span className="font-mono">
                 ${parseFloat(supDelta).toLocaleString("en", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
@@ -67,12 +69,12 @@ export function MutationResultPanel({ result }: { result: MutationResult }) {
           </div>
         )}
         <div className="grid grid-cols-3 gap-2 px-3 py-2 text-muted-foreground">
-          <span>Raw-stock rows updated</span>
+          <span>{tUi("raw.stock.rows.updated")}</span>
           <span className="text-right">—</span>
           <span className="text-right font-mono">{result.rawStockRowsUpdated ?? 0}</span>
         </div>
         <div className="grid grid-cols-3 gap-2 px-3 py-2 text-muted-foreground">
-          <span>Bales updated</span>
+          <span>{tUi("bales.updated")}</span>
           <span className="text-right">—</span>
           <span className="text-right font-mono">{result.affectedBalesCount}</span>
         </div>
@@ -80,13 +82,13 @@ export function MutationResultPanel({ result }: { result: MutationResult }) {
 
       {result.affectedBatches.length > 0 && (
         <div className="space-y-2">
-          <p className="text-sm font-semibold">Affected Mix Batches</p>
+          <p className="text-sm font-semibold">{tUi("affected.mix.batches")}</p>
           <div className="border rounded-md divide-y text-sm">
             <div className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium bg-muted/30">
-              <span>Batch</span>
-              <span className="text-right">Old Cost/kg</span>
-              <span className="text-right">New Cost/kg</span>
-              <span className="text-right">Wt from container</span>
+              <span>{tUi("batch")}</span>
+              <span className="text-right">{tUi("old.cost.kg")}</span>
+              <span className="text-right">{tUi("new.cost.kg")}</span>
+              <span className="text-right">{tUi("wt.from.container")}</span>
             </div>
             {result.affectedBatches.map((b) => (
               <div key={b.batchId} className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-2 px-3 py-2 items-center">

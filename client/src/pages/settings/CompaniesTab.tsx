@@ -66,7 +66,14 @@ export function CompaniesTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
       setIsCompanyDialogOpen(false);
       setEditingCompany(null);
-      companyForm.reset({ name: "", code: "", companyType: "erp", active: true, baseCurrency: "USD", displayCurrency: "none" });
+      companyForm.reset({
+        name: "",
+        code: "",
+        companyType: "erp",
+        active: true,
+        baseCurrency: "USD",
+        displayCurrency: "none",
+      });
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to save company.", variant: "destructive" });
@@ -118,18 +125,35 @@ export function CompaniesTab() {
             {companies.length} {companies.length === 1 ? "company" : "companies"} configured
           </p>
         </div>
-        <Dialog open={isCompanyDialogOpen} onOpenChange={(open) => {
-          setIsCompanyDialogOpen(open);
-          if (!open) {
-            setEditingCompany(null);
-            companyForm.reset({ name: "", code: "", companyType: "erp", active: true, baseCurrency: "USD", displayCurrency: "none" });
-          }
-        }}>
+        <Dialog
+          open={isCompanyDialogOpen}
+          onOpenChange={(open) => {
+            setIsCompanyDialogOpen(open);
+            if (!open) {
+              setEditingCompany(null);
+              companyForm.reset({
+                name: "",
+                code: "",
+                companyType: "erp",
+                active: true,
+                baseCurrency: "USD",
+                displayCurrency: "none",
+              });
+            }
+          }}
+        >
           <DialogTrigger asChild>
             <Button
               onClick={() => {
                 setEditingCompany(null);
-                companyForm.reset({ name: "", code: "", companyType: "erp", active: true, baseCurrency: "USD", displayCurrency: "none" });
+                companyForm.reset({
+                  name: "",
+                  code: "",
+                  companyType: "erp",
+                  active: true,
+                  baseCurrency: "USD",
+                  displayCurrency: "none",
+                });
               }}
               data-testid="button-add-company"
             >
@@ -336,9 +360,21 @@ export function CompaniesTab() {
                 const isFactory = company.companyType === "factory" || company.companyType === "factory_v2";
                 const isProperties = company.companyType === "properties";
                 const isSupplierPartner = company.companyType === "supplier_partner";
-                const typeLabel = isFactory ? "Factory" : isProperties ? "Properties" : isSupplierPartner ? "Supplier Partner" : "ERP";
+                const typeLabel = isFactory
+                  ? "Factory"
+                  : isProperties
+                    ? "Properties"
+                    : isSupplierPartner
+                      ? "Supplier Partner"
+                      : "ERP";
 
-                const accentClass = isFactory ? "bg-orange-500" : isProperties ? "bg-green-500" : isSupplierPartner ? "bg-rose-500" : "bg-indigo-500";
+                const accentClass = isFactory
+                  ? "bg-orange-500"
+                  : isProperties
+                    ? "bg-green-500"
+                    : isSupplierPartner
+                      ? "bg-rose-500"
+                      : "bg-indigo-500";
 
                 const typeBadgeClass = isFactory
                   ? "border-orange-200 text-orange-700 bg-orange-50 dark:border-orange-800 dark:text-orange-300 dark:bg-orange-950"

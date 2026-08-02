@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Package, Send, ChevronDown, ChevronRight, Loader2, Users, Clock, Calendar } from "lucide-react";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface Company {
   id: number;
@@ -65,6 +66,7 @@ function scheduleLabel(cfg: StockSettings | undefined): string {
 }
 
 export function StockReportSection() {
+  const tUi = useErpText();
   const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
 
@@ -145,7 +147,7 @@ export function StockReportSection() {
         <div className="flex items-center gap-3">
           <Package className="h-5 w-5 text-blue-600" />
           <div>
-            <p className="font-semibold">Stock + Net Position Report</p>
+            <p className="font-semibold">{tUi("stock.net.position.report")}</p>
             <p className="text-sm text-muted-foreground">
               Send stock-with-cost PDF &amp; net position Excel to one WhatsApp group on your own schedule
             </p>
@@ -165,11 +167,11 @@ export function StockReportSection() {
         <div className="border-t p-4 space-y-5">
           {/* ── Company ──────────────────────────────────────────────────── */}
           <div className="space-y-1">
-            <Label className="text-sm font-medium">Company</Label>
-            <p className="text-xs text-muted-foreground">Which company's stock and net position to report on</p>
+            <Label className="text-sm font-medium">{tUi("company.2")}</Label>
+            <p className="text-xs text-muted-foreground">{tUi("which.company.s.stock.and.net.position.to.report")}</p>
             <Select value={String(rCompanyId ?? "")} onValueChange={(v) => setCompanyId(v ? parseInt(v) : null)}>
               <SelectTrigger data-testid="select-stock-company" className="w-full sm:w-72">
-                <SelectValue placeholder="Select a company…" />
+                <SelectValue placeholder={tUi("select.a.company")} />
               </SelectTrigger>
               <SelectContent>
                 {companies.map((c) => (
@@ -183,7 +185,7 @@ export function StockReportSection() {
 
           {/* ── WhatsApp Group ───────────────────────────────────────────── */}
           <div className="space-y-1">
-            <Label className="text-sm font-medium">WhatsApp Group</Label>
+            <Label className="text-sm font-medium">{tUi("whatsapp.group")}</Label>
             <p className="text-xs text-muted-foreground">
               Reports are sent to this group. Only active groups you've added appear here.
             </p>
@@ -194,7 +196,7 @@ export function StockReportSection() {
             ) : (
               <Select value={String(rRecipientId ?? "")} onValueChange={(v) => setRecipientId(v ? parseInt(v) : null)}>
                 <SelectTrigger data-testid="select-stock-recipient" className="w-full sm:w-72">
-                  <SelectValue placeholder="Select a group…" />
+                  <SelectValue placeholder={tUi("select.a.group")} />
                 </SelectTrigger>
                 <SelectContent>
                   {groups.map((r) => (
@@ -216,21 +218,21 @@ export function StockReportSection() {
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
-              <Label className="text-sm font-medium">Send Schedule</Label>
+              <Label className="text-sm font-medium">{tUi("send.schedule")}</Label>
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {/* Frequency */}
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Frequency</Label>
+                <Label className="text-xs text-muted-foreground">{tUi("frequency")}</Label>
                 <Select value={rFrequency} onValueChange={(v) => setFrequency(v)}>
                   <SelectTrigger data-testid="select-stock-frequency">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="daily">Daily</SelectItem>
-                    <SelectItem value="weekly">Weekly</SelectItem>
-                    <SelectItem value="monthly">Monthly (1st of month)</SelectItem>
+                    <SelectItem value="daily">{tUi("daily")}</SelectItem>
+                    <SelectItem value="weekly">{tUi("weekly")}</SelectItem>
+                    <SelectItem value="monthly">{tUi("monthly.1st.of.month")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -238,7 +240,7 @@ export function StockReportSection() {
               {/* Day of week — only for weekly */}
               {rFrequency === "weekly" && (
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Day of Week</Label>
+                  <Label className="text-xs text-muted-foreground">{tUi("day.of.week")}</Label>
                   <Select value={String(rSendDayOfWeek)} onValueChange={(v) => setSendDayOfWeek(parseInt(v))}>
                     <SelectTrigger data-testid="select-stock-day">
                       <SelectValue />
@@ -293,8 +295,8 @@ export function StockReportSection() {
           {/* ── Auto-send toggle ─────────────────────────────────────────── */}
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium">Auto-Send</p>
-              <p className="text-xs text-muted-foreground">Automatically send reports on the schedule above</p>
+              <p className="text-sm font-medium">{tUi("auto.send")}</p>
+              <p className="text-xs text-muted-foreground">{tUi("automatically.send.reports.on.the.schedule.above")}</p>
             </div>
             <Switch
               data-testid="switch-stock-auto-send"
@@ -346,19 +348,19 @@ export function StockReportSection() {
               )}
             </Button>
 
-            {!canSend && <p className="text-xs text-muted-foreground">Select a company and group first.</p>}
+            {!canSend && <p className="text-xs text-muted-foreground">{tUi("select.a.company.and.group.first")}</p>}
           </div>
 
           {/* ── What gets sent ───────────────────────────────────────────── */}
           <div className="rounded-md bg-muted/40 p-3 space-y-1">
-            <p className="text-xs font-medium text-muted-foreground">What gets sent:</p>
+            <p className="text-xs font-medium text-muted-foreground">{tUi("what.gets.sent")}</p>
             <ul className="text-xs text-muted-foreground list-disc list-inside space-y-0.5">
               <li>
-                <span className="font-medium text-foreground">Stock PDF</span> — current inventory with cost (code,
-                name, group, location, qty, unit cost, total value)
+                <span className="font-medium text-foreground">{tUi("stock.pdf")}</span> — current inventory with cost
+                (code, name, group, location, qty, unit cost, total value)
               </li>
               <li>
-                <span className="font-medium text-foreground">Net Position Excel</span> — 01 Jan{" "}
+                <span className="font-medium text-foreground">{tUi("net.position.excel")}</span> — 01 Jan{" "}
                 {new Date().getFullYear()} → today (revenue, expenses, net profit by month)
               </li>
             </ul>

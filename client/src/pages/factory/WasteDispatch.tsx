@@ -30,7 +30,9 @@ import {
 
 import type { Bale, ProductGroup } from "./wastedispatch/types";
 import { fmt, fmtKg, today } from "./wastedispatch/utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function WasteDispatch() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
@@ -209,12 +211,12 @@ export default function WasteDispatch() {
       th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}
       th{background:#f3f4f6;font-weight:bold}.footer{margin-top:24px;font-size:10px;color:#777}</style>
       </head><body>
-      <h1>Waste Disposal Record</h1>
+      <h1>{tUi("waste.disposal.record")}</h1>
       <p class="sub">Dispatch No: ${d.dispatchNumber}&nbsp;|&nbsp;Date: ${d.dispatchDate}${d.notes ? `&nbsp;|&nbsp;Note: ${d.notes}` : ""}</p>
       <table><thead><tr>
-        <th>Reference</th><th>Product</th>
-        <th style="text-align:right">Weight (kg)</th>
-        <th style="text-align:right">Cost Written Off</th>
+        <th>{tUi("reference")}</th><th>{tUi("product")}</th>
+        <th style="text-align:right">{tUi("weight.kg")}</th>
+        <th style="text-align:right">{tUi("cost.written.off")}</th>
       </tr></thead>
       <tbody>${baleRows}</tbody>
       <tfoot><tr>
@@ -314,8 +316,8 @@ export default function WasteDispatch() {
       <div className="flex items-center justify-between gap-3 px-6 py-3 border-b flex-wrap">
         <div>
           <PageHeader
-            title="Waste Dispatch"
-            subtitle="Manage waste bales — dispatch or create new entries"
+            title={tUi("waste.dispatch")}
+            subtitle={tUi("manage.waste.bales.dispatch.or.create.new.entrie")}
             icon={<Trash2 className="h-5 w-5" />}
           />
         </div>
@@ -345,7 +347,7 @@ export default function WasteDispatch() {
                     Notes (optional)
                   </label>
                   <Textarea
-                    placeholder="Reason for disposal..."
+                    placeholder={tUi("reason.for.disposal")}
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     rows={1}
@@ -370,13 +372,13 @@ export default function WasteDispatch() {
                   value={scanInput}
                   onChange={(e) => setScanInput(e.target.value)}
                   onKeyDown={handleScan}
-                  placeholder="REF123456 + Enter"
+                  placeholder={tUi("ref123456.enter")}
                   className="pl-9 font-mono text-sm"
                   data-testid="input-scan-ref"
                   autoComplete="off"
                 />
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Press Enter to select a bale</p>
+              <p className="text-xs text-muted-foreground mt-1">{tUi("press.enter.to.select.a.bale")}</p>
             </CardContent>
           </Card>
         </div>
@@ -386,7 +388,7 @@ export default function WasteDispatch() {
           <CardHeader className="pb-2 px-4 pt-3">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-3">
-                <CardTitle className="text-sm">Available Waste Bales</CardTitle>
+                <CardTitle className="text-sm">{tUi("available.waste.bales")}</CardTitle>
                 {!isLoading && (
                   <Badge variant="outline" className="text-xs">
                     {bales.length} bales · {productGroups.length} products
@@ -397,7 +399,7 @@ export default function WasteDispatch() {
                 <div className="relative">
                   <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    placeholder="Filter products..."
+                    placeholder={tUi("filter.products")}
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="pl-8 w-48 h-8 text-xs"
@@ -420,8 +422,8 @@ export default function WasteDispatch() {
             ) : productGroups.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Trash2 className="w-10 h-10 mx-auto mb-3 opacity-25" />
-                <p className="text-sm">No Garbage or Wiper bales in stock.</p>
-                <p className="text-xs mt-1">Only bales with Garbage or Wiper category are eligible.</p>
+                <p className="text-sm">{tUi("no.garbage.or.wiper.bales.in.stock")}</p>
+                <p className="text-xs mt-1">{tUi("only.bales.with.garbage.or.wiper.category.are.el")}</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -429,12 +431,12 @@ export default function WasteDispatch() {
                   <TableHeader>
                     <TableRow className="bg-muted/40">
                       <TableHead className="w-8 py-2 px-3"></TableHead>
-                      <TableHead className="py-2 px-3 text-xs">Product</TableHead>
-                      <TableHead className="py-2 px-3 text-xs">Category</TableHead>
-                      <TableHead className="py-2 px-3 text-right text-xs">Bales</TableHead>
-                      <TableHead className="py-2 px-3 text-right text-xs">Weight (kg)</TableHead>
-                      <TableHead className="py-2 px-3 text-right text-xs">Avg Rate</TableHead>
-                      <TableHead className="py-2 px-3 text-right text-xs">Total Cost</TableHead>
+                      <TableHead className="py-2 px-3 text-xs">{tUi("product")}</TableHead>
+                      <TableHead className="py-2 px-3 text-xs">{tUi("category")}</TableHead>
+                      <TableHead className="py-2 px-3 text-right text-xs">{tUi("bales")}</TableHead>
+                      <TableHead className="py-2 px-3 text-right text-xs">{tUi("weight.kg")}</TableHead>
+                      <TableHead className="py-2 px-3 text-right text-xs">{tUi("avg.rate")}</TableHead>
+                      <TableHead className="py-2 px-3 text-right text-xs">{tUi("total.cost")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -631,7 +633,7 @@ export default function WasteDispatch() {
           </CardHeader>
           <CardContent className="p-0">
             {history.length === 0 ? (
-              <p className="text-sm text-muted-foreground p-4">No dispatches yet.</p>
+              <p className="text-sm text-muted-foreground p-4">{tUi("no.dispatches.yet")}</p>
             ) : (
               <div className="divide-y">
                 {(showAllHistory ? history : history.slice(0, 10)).map((d: any) => {
@@ -694,17 +696,25 @@ export default function WasteDispatch() {
                         <div className="bg-muted/30 px-4 pb-4 pt-1">
                           {d.notes && (
                             <p className="text-xs text-muted-foreground mb-2">
-                              <span className="font-medium">Note:</span> {d.notes}
+                              <span className="font-medium">{tUi("note.2")}</span> {d.notes}
                             </p>
                           )}
                           {dispatchBales.length > 0 ? (
                             <table className="w-full text-xs mt-1 border-collapse">
                               <thead>
                                 <tr className="border-b">
-                                  <th className="text-left py-1.5 font-semibold text-muted-foreground">Reference</th>
-                                  <th className="text-left py-1.5 font-semibold text-muted-foreground">Product</th>
-                                  <th className="text-right py-1.5 font-semibold text-muted-foreground">Weight (kg)</th>
-                                  <th className="text-right py-1.5 font-semibold text-muted-foreground">Cost W/O</th>
+                                  <th className="text-left py-1.5 font-semibold text-muted-foreground">
+                                    {tUi("reference")}
+                                  </th>
+                                  <th className="text-left py-1.5 font-semibold text-muted-foreground">
+                                    {tUi("product")}
+                                  </th>
+                                  <th className="text-right py-1.5 font-semibold text-muted-foreground">
+                                    {tUi("weight.kg")}
+                                  </th>
+                                  <th className="text-right py-1.5 font-semibold text-muted-foreground">
+                                    {tUi("cost.w.o")}
+                                  </th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -736,7 +746,7 @@ export default function WasteDispatch() {
                               </tfoot>
                             </table>
                           ) : (
-                            <p className="text-xs text-muted-foreground">No bale details available.</p>
+                            <p className="text-xs text-muted-foreground">{tUi("no.bale.details.available")}</p>
                           )}
                         </div>
                       )}
@@ -782,24 +792,24 @@ export default function WasteDispatch() {
             </p>
             <div className="bg-destructive/5 border border-destructive/20 rounded-md p-3 space-y-1.5">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Bales</span>
+                <span className="text-muted-foreground">{tUi("bales")}</span>
                 <span className="font-medium">{selected.size}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Total Weight</span>
+                <span className="text-muted-foreground">{tUi("total.weight")}</span>
                 <span className="font-medium">{fmtKg(totalWeight)} kg</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Cost Written Off</span>
+                <span className="text-muted-foreground">{tUi("cost.written.off")}</span>
                 <span className="font-medium text-destructive">{fmt(totalCost)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Date</span>
+                <span className="text-muted-foreground">{tUi("date")}</span>
                 <span className="font-medium">{dispatchDate}</span>
               </div>
               {notes && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Notes</span>
+                  <span className="text-muted-foreground">{tUi("notes")}</span>
                   <span className="font-medium max-w-xs text-right">{notes}</span>
                 </div>
               )}
@@ -897,7 +907,7 @@ export default function WasteDispatch() {
             </DialogHeader>
             <div ref={printRef} className="space-y-3">
               <div>
-                <h1 style={{ fontSize: 18, fontWeight: "bold", marginBottom: 4 }}>Waste Disposal Record</h1>
+                <h1 style={{ fontSize: 18, fontWeight: "bold", marginBottom: 4 }}>{tUi("waste.disposal.record")}</h1>
                 <p style={{ color: "#555", fontSize: 11, marginBottom: 16 }}>
                   Dispatch No: {printData.dispatch.dispatchNumber}&nbsp;|&nbsp;Date: {printData.dispatch.dispatchDate}
                   {printData.dispatch.notes && <>&nbsp;|&nbsp;Note: {printData.dispatch.notes}</>}

@@ -22,6 +22,7 @@ import {
   formatTxType,
   getFactoryTxTypeBadge,
 } from "./daybookUtils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function ViewEntryModal({
   entry,
@@ -34,6 +35,7 @@ export function ViewEntryModal({
   onNavigate: (path: string) => void;
   formatDisplayDate: (d: string) => string;
 }) {
+  const tUi = useFactoryText();
   const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
   const isBaleStockEntry = entry.txType === "BALE_STOCK_ENTRY";
   const isBaleRemoval = entry.txType === "BALE_REMOVAL";
@@ -233,27 +235,27 @@ export function ViewEntryModal({
     return (
       <>
         <DialogHeader>
-          <DialogTitle>Voucher Details</DialogTitle>
-          <DialogDescription>View voucher information</DialogDescription>
+          <DialogTitle>{tUi("voucher.details")}</DialogTitle>
+          <DialogDescription>{tUi("view.voucher.information")}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 md:space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <p className="text-sm text-muted-foreground">Date</p>
+              <p className="text-sm text-muted-foreground">{tUi("date")}</p>
               <p className="font-medium">{formatDisplayDate(entry.txDate + "T00:00:00")}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Type</p>
+              <p className="text-sm text-muted-foreground">{tUi("type")}</p>
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant={badgeVariant} className={badgeClass}>
                   {voucherType}
                 </Badge>
-                {entry.optional && <span className="text-sm text-muted-foreground">Optional</span>}
+                {entry.optional && <span className="text-sm text-muted-foreground">{tUi("optional")}</span>}
               </div>
             </div>
           </div>
           <div>
-            <p className="text-sm text-muted-foreground mb-1">Description</p>
+            <p className="text-sm text-muted-foreground mb-1">{tUi("description")}</p>
             <p className="text-sm font-medium">{formatDaybookDescription(entry)}</p>
           </div>
 
@@ -272,7 +274,7 @@ export function ViewEntryModal({
                   )}
                 </div>
                 <div className="sm:text-right">
-                  <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
+                  <p className="text-sm text-muted-foreground mb-1">{tUi("total.amount")}</p>
                   <p className="text-xl md:text-2xl font-bold font-mono">
                     {sym} {formatNumber(totalAmount)}
                   </p>
@@ -283,9 +285,9 @@ export function ViewEntryModal({
 
           {/* Entries table */}
           <div>
-            <h3 className="font-semibold mb-3">Entries</h3>
+            <h3 className="font-semibold mb-3">{tUi("entries")}</h3>
             {viewEntries.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">No entries found</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{tUi("no.entries.found")}</p>
             ) : (
               <div className="rounded-md border overflow-x-auto">
                 <table className="w-full text-sm">
@@ -348,7 +350,7 @@ export function ViewEntryModal({
                   </tbody>
                   <tfoot>
                     <tr className="bg-muted/50 font-bold border-t">
-                      <td className="px-3 py-2">Total</td>
+                      <td className="px-3 py-2">{tUi("total")}</td>
                       {isPaymentOrReceipt || isJournal ? (
                         <td className="px-3 py-2 text-right font-mono">
                           {sym}
@@ -449,7 +451,7 @@ export function ViewEntryModal({
       <>
         <DialogHeader>
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <DialogTitle>Bale Stock Entry</DialogTitle>
+            <DialogTitle>{tUi("bale.stock.entry")}</DialogTitle>
             <Badge variant={badgeVariant} className={badgeClass}>
               Bale Stock Entry
             </Badge>
@@ -486,7 +488,7 @@ export function ViewEntryModal({
               </tbody>
               <tfoot>
                 <tr className="bg-muted/50 border-t font-semibold">
-                  <td className="px-3 py-2 text-xs">Total</td>
+                  <td className="px-3 py-2 text-xs">{tUi("total")}</td>
                   <td className="px-3 py-2 text-right font-mono">{bales.length}</td>
                   <td className="px-3 py-2 text-right font-mono">
                     {sym}
@@ -508,7 +510,7 @@ export function ViewEntryModal({
       <>
         <DialogHeader>
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <DialogTitle>Offload Raw Stock</DialogTitle>
+            <DialogTitle>{tUi("offload.raw.stock")}</DialogTitle>
             <Badge variant={badgeVariant} className={badgeClass}>
               Offload Raw Stock
             </Badge>
@@ -518,7 +520,7 @@ export function ViewEntryModal({
         <div className="space-y-4">
           <div className="rounded-md border p-4 space-y-2">
             {!c && metaContainerId ? (
-              <p className="text-sm text-muted-foreground">Loading container details…</p>
+              <p className="text-sm text-muted-foreground">{tUi("loading.container.details")}</p>
             ) : c ? (
               <div className="flex items-start justify-between gap-2 flex-wrap">
                 <div>
@@ -543,7 +545,7 @@ export function ViewEntryModal({
             ) : null}
           </div>
           <div className="rounded-md border px-4 py-3 space-y-1">
-            <p className="text-xs text-muted-foreground">Amount</p>
+            <p className="text-xs text-muted-foreground">{tUi("amount")}</p>
             <p className="text-lg font-bold font-mono">
               {sym}
               {formatNumber(amt)}
@@ -567,7 +569,7 @@ export function ViewEntryModal({
       <>
         <DialogHeader>
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <DialogTitle>Commission</DialogTitle>
+            <DialogTitle>{tUi("commission")}</DialogTitle>
             <Badge variant={badgeVariant} className={badgeClass}>
               Commission
             </Badge>
@@ -577,7 +579,7 @@ export function ViewEntryModal({
         <div className="space-y-4">
           <div className="rounded-md border p-4 space-y-2">
             {!c && metaContainerId ? (
-              <p className="text-sm text-muted-foreground">Loading container details…</p>
+              <p className="text-sm text-muted-foreground">{tUi("loading.container.details")}</p>
             ) : c ? (
               <div className="flex items-start justify-between gap-2 flex-wrap">
                 <div>
@@ -599,7 +601,7 @@ export function ViewEntryModal({
             ) : null}
           </div>
           <div className="rounded-md border px-4 py-3 space-y-1">
-            <p className="text-xs text-muted-foreground">Commission Amount</p>
+            <p className="text-xs text-muted-foreground">{tUi("commission.amount")}</p>
             <p className="text-lg font-bold font-mono">
               {sym}
               {formatNumber(amt)}
@@ -617,7 +619,7 @@ export function ViewEntryModal({
       <>
         <DialogHeader>
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <DialogTitle>Waste Disposal</DialogTitle>
+            <DialogTitle>{tUi("waste.disposal")}</DialogTitle>
             <Badge variant={badgeVariant} className={badgeClass}>
               Waste Disposal
             </Badge>
@@ -631,7 +633,7 @@ export function ViewEntryModal({
             </div>
           )}
           <div className="rounded-md border px-4 py-3">
-            <p className="text-xs text-muted-foreground">Written Off Value</p>
+            <p className="text-xs text-muted-foreground">{tUi("written.off.value")}</p>
             <p className="text-lg font-bold font-mono">
               {sym}
               {formatNumber(amt)}
@@ -649,7 +651,7 @@ export function ViewEntryModal({
       <>
         <DialogHeader>
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <DialogTitle>Other Charge</DialogTitle>
+            <DialogTitle>{tUi("other.charge")}</DialogTitle>
             <Badge variant={badgeVariant} className={badgeClass}>
               Other Charge
             </Badge>
@@ -681,7 +683,7 @@ export function ViewEntryModal({
             </div>
           )}
           <div className="rounded-md border px-4 py-3 space-y-1">
-            <p className="text-xs text-muted-foreground">Amount</p>
+            <p className="text-xs text-muted-foreground">{tUi("amount")}</p>
             <p className="text-lg font-bold font-mono">
               {sym}
               {formatNumber(amt)}
@@ -697,7 +699,7 @@ export function ViewEntryModal({
     <>
       <DialogHeader>
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <DialogTitle>Transaction Details</DialogTitle>
+          <DialogTitle>{tUi("transaction.details")}</DialogTitle>
           <Badge variant={badgeVariant} className={badgeClass}>
             {formatTxType(entry.txType)}
           </Badge>
@@ -706,12 +708,12 @@ export function ViewEntryModal({
       </DialogHeader>
       <div className="space-y-4">
         <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Description</p>
+          <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{tUi("description")}</p>
           <p className="text-sm font-medium">{formatDaybookDescription(entry)}</p>
         </div>
         <div className="rounded-md border px-4 py-3 flex items-center justify-between gap-4">
           <div>
-            <p className="text-xs text-muted-foreground">Amount</p>
+            <p className="text-xs text-muted-foreground">{tUi("amount")}</p>
             <p className="text-lg font-bold font-mono">
               {sym}
               {formatNumber(amt)}
@@ -719,7 +721,7 @@ export function ViewEntryModal({
           </div>
           {entry.currencyCode !== "USD" && parseFloat(entry.fxRateToUsd) !== 1 && (
             <div className="text-right">
-              <p className="text-xs text-muted-foreground">USD Equivalent</p>
+              <p className="text-xs text-muted-foreground">{tUi("usd.equivalent")}</p>
               <p className="text-sm font-mono">${formatNumber(parseFloat(entry.amountUsd || "0"))}</p>
             </div>
           )}

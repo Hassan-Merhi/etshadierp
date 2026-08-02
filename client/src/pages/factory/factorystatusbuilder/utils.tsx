@@ -4,7 +4,7 @@
  * Extracted from FactoryStatusBuilder.tsx during the Phase 4 god-file split.
  */
 
-import type {ApiSheet, Cell, CellValue, ColumnDef, SheetRow, StatusBuilderSheet} from "./types";
+import type { ApiSheet, Cell, CellValue, ColumnDef, SheetRow, StatusBuilderSheet } from "./types";
 
 export function makeId(): string {
   return Math.random().toString(36).slice(2, 9);

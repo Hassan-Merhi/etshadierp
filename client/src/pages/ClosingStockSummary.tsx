@@ -25,6 +25,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { EmptyState, LoadingRows } from "@/components/ui/display-state";
 import { PageActions, PageShell, financialNumberClassName } from "@/components/ui/page-shell";
 import { cn } from "@/lib/utils";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface StockGroupSummary {
   id: number;
@@ -64,6 +65,7 @@ function formatQty(value: number): string {
 }
 
 export default function ClosingStockSummary() {
+  const tUi = useErpText();
   const [, navigate] = useLocation();
   const { selectedCompany } = useCompany();
   const { formatAmount } = useCurrencyContext();
@@ -115,7 +117,7 @@ export default function ClosingStockSummary() {
   return (
     <PageShell>
       <PageHeader
-        title="Closing Stock Summary"
+        title={tUi("closing.stock.summary")}
         subtitle={`Current inventory values${selectedCompany?.name ? ` — ${selectedCompany.name}` : ""}`}
         icon={<Package className="h-5 w-5" />}
       >
@@ -133,7 +135,7 @@ export default function ClosingStockSummary() {
       <Dialog open={showCarryForwardDialog} onOpenChange={setShowCarryForwardDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Set Closing Stock as Opening Stock</DialogTitle>
+            <DialogTitle>{tUi("set.closing.stock.as.opening.stock")}</DialogTitle>
             <DialogDescription>
               Select a date to calculate inventory as of that date. This will replace the current opening stock values.
             </DialogDescription>
@@ -157,14 +159,12 @@ export default function ClosingStockSummary() {
             </div>
             <div className="space-y-2 border-t pt-4">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Company:</span>
+                <span className="text-muted-foreground">{tUi("company")}</span>
                 <span className="font-medium">{selectedCompany?.name}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Current Inventory Value:</span>
-                <span className="font-mono font-medium tabular-nums">
-                  {formatAmount(data?.grandTotal?.value ?? 0)}
-                </span>
+                <span className="text-muted-foreground">{tUi("current.inventory.value")}</span>
+                <span className="font-mono font-medium tabular-nums">{formatAmount(data?.grandTotal?.value ?? 0)}</span>
               </div>
             </div>
           </div>
@@ -186,17 +186,19 @@ export default function ClosingStockSummary() {
       <Card className="overflow-hidden">
         <div className="bg-primary text-primary-foreground">
           <div className="grid grid-cols-2 p-2 text-xs font-semibold sm:grid-cols-4 sm:p-3 sm:text-sm">
-            <div>Particulars</div>
+            <div>{tUi("particulars")}</div>
             <div className="hidden border-l border-primary-foreground/30 text-center sm:col-span-3 sm:block">
               Closing Balance
             </div>
-            <div className="border-l border-primary-foreground/30 pl-2 text-right sm:hidden">Quantity</div>
+            <div className="border-l border-primary-foreground/30 pl-2 text-right sm:hidden">{tUi("quantity")}</div>
           </div>
           <div className="grid grid-cols-2 px-2 pb-2 text-xs sm:grid-cols-4 sm:px-3">
             <div />
-            <div className="hidden border-l border-primary-foreground/30 pl-2 text-right sm:block">Quantity</div>
-            <div className="hidden text-right sm:block">Rate</div>
-            <div className="hidden text-right sm:block">Value</div>
+            <div className="hidden border-l border-primary-foreground/30 pl-2 text-right sm:block">
+              {tUi("quantity")}
+            </div>
+            <div className="hidden text-right sm:block">{tUi("rate")}</div>
+            <div className="hidden text-right sm:block">{tUi("value")}</div>
           </div>
         </div>
 
@@ -227,7 +229,7 @@ export default function ClosingStockSummary() {
             ))
           ) : (
             <EmptyState
-              title="No closing stock data"
+              title={tUi("no.closing.stock.data")}
               description="Closing stock balances will appear here for the selected period once inventory values are available."
               icon={<Package className="h-5 w-5" />}
             />
@@ -237,10 +239,14 @@ export default function ClosingStockSummary() {
         {data?.grandTotal ? (
           <div className="border-t-2 border-primary bg-muted/50">
             <div className="grid grid-cols-2 p-2 font-bold sm:grid-cols-4 sm:p-3">
-              <div className="text-xs sm:text-sm">Grand Total</div>
+              <div className="text-xs sm:text-sm">{tUi("grand.total")}</div>
               <div className={financialNumberClassName}>{formatNumber(data.grandTotal.quantity)} BL</div>
-              <div className={cn(financialNumberClassName, "hidden sm:block")}>{formatAmount(data.grandTotal.rate)}</div>
-              <div className={cn(financialNumberClassName, "hidden sm:block")}>{formatAmount(data.grandTotal.value)}</div>
+              <div className={cn(financialNumberClassName, "hidden sm:block")}>
+                {formatAmount(data.grandTotal.rate)}
+              </div>
+              <div className={cn(financialNumberClassName, "hidden sm:block")}>
+                {formatAmount(data.grandTotal.value)}
+              </div>
             </div>
           </div>
         ) : null}

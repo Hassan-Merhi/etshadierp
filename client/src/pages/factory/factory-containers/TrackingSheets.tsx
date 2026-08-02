@@ -12,6 +12,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { useToast } from "@/hooks/use-toast";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import type { ContainerWithSupplier } from "./otwHelpers";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export interface TrackingEvent {
   id: number;
@@ -78,6 +79,7 @@ export function EventTimelineSheet({
   open: boolean;
   onClose: () => void;
 }) {
+  const tUi = useFactoryText();
   const { data: events = [], isLoading } = useQuery<TrackingEvent[]>({
     queryKey: ["/api/factory/container-tracking", containerId, "events"],
     queryFn: async () => {
@@ -120,8 +122,8 @@ export function EventTimelineSheet({
             ) : events.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
                 <Activity className="h-10 w-10 opacity-20" />
-                <p className="text-sm">No tracking events yet.</p>
-                <p className="text-xs">Click "Track Now" to fetch live data from the carrier.</p>
+                <p className="text-sm">{tUi("no.tracking.events.yet")}</p>
+                <p className="text-xs">{tUi("click.track.now.to.fetch.live.data.from.the.carr")}</p>
               </div>
             ) : (
               <ol className="relative border-l border-border ml-2 space-y-0">
@@ -170,6 +172,7 @@ export function TrackingSettingsSheet({
   open: boolean;
   onClose: () => void;
 }) {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const tqClient = useTQClient();
   const [enabled, setEnabled] = useState(true);
@@ -224,7 +227,7 @@ export function TrackingSettingsSheet({
         <div className="flex-1 px-6 py-5 space-y-6">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium">Enable Tracking</p>
+              <p className="text-sm font-medium">{tUi("enable.tracking")}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Allow this container to be tracked via carrier APIs
               </p>
@@ -234,7 +237,7 @@ export function TrackingSettingsSheet({
           <Separator />
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-medium">Auto Update</p>
+              <p className="text-sm font-medium">{tUi("auto.update")}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Let the scheduler check this container automatically
               </p>

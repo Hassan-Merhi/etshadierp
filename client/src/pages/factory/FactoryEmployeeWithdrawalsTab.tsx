@@ -22,6 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface Employee {
   id: number;
@@ -45,6 +46,7 @@ function fmt(v: string | number | null | undefined) {
 const today = () => new Date().toLocaleDateString("en-CA");
 
 export default function FactoryEmployeeWithdrawalsTab() {
+  const tUi = useFactoryText();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { toast } = useToast();
   const [mode, setMode] = useState<"single" | "bulk">("single");
@@ -161,8 +163,8 @@ export default function FactoryEmployeeWithdrawalsTab() {
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3 items-center justify-between">
         <div>
-          <h3 className="font-medium">Employee Withdrawals</h3>
-          <p className="text-sm text-muted-foreground">Deduct cash from one or multiple employees.</p>
+          <h3 className="font-medium">{tUi("employee.withdrawals")}</h3>
+          <p className="text-sm text-muted-foreground">{tUi("deduct.cash.from.one.or.multiple.employees")}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setSingleOpen(true)} data-testid="button-withdraw-single">
@@ -180,7 +182,7 @@ export default function FactoryEmployeeWithdrawalsTab() {
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <Users className="h-10 w-10 mx-auto mb-3 opacity-40" />
-            <p>No active employees found.</p>
+            <p>{tUi("no.active.employees.found")}</p>
           </CardContent>
         </Card>
       ) : (
@@ -196,9 +198,9 @@ export default function FactoryEmployeeWithdrawalsTab() {
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead>Employee</TableHead>
-                    <TableHead>Code</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
+                    <TableHead>{tUi("employee")}</TableHead>
+                    <TableHead>{tUi("code")}</TableHead>
+                    <TableHead className="text-right">{tUi("balance")}</TableHead>
                     <TableHead />
                   </TableRow>
                 </TableHeader>
@@ -279,18 +281,18 @@ export default function FactoryEmployeeWithdrawalsTab() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Withdraw — Single Employee</DialogTitle>
-            <DialogDescription>Record a cash withdrawal deducted from an employee.</DialogDescription>
+            <DialogTitle>{tUi("withdraw.single.employee")}</DialogTitle>
+            <DialogDescription>{tUi("record.a.cash.withdrawal.deducted.from.an.employ")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Employee</Label>
+              <Label>{tUi("employee")}</Label>
               <Select
                 value={singleForm.employeeId}
                 onValueChange={(v) => setSingleForm((f) => ({ ...f, employeeId: v }))}
               >
                 <SelectTrigger data-testid="select-single-employee">
-                  <SelectValue placeholder="Select employee" />
+                  <SelectValue placeholder={tUi("select.employee")} />
                 </SelectTrigger>
                 <SelectContent>
                   {employees.map((e) => (
@@ -312,7 +314,7 @@ export default function FactoryEmployeeWithdrawalsTab() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Date</Label>
+                <Label>{tUi("date")}</Label>
                 <Input
                   type="date"
                   value={singleForm.date}
@@ -321,7 +323,7 @@ export default function FactoryEmployeeWithdrawalsTab() {
                 />
               </div>
               <div>
-                <Label>Amount</Label>
+                <Label>{tUi("amount")}</Label>
                 <Input
                   type="number"
                   placeholder="0.00"
@@ -334,13 +336,13 @@ export default function FactoryEmployeeWithdrawalsTab() {
               </div>
             </div>
             <div>
-              <Label>Cash Account</Label>
+              <Label>{tUi("cash.account.2")}</Label>
               <Select
                 value={singleForm.cashAccountId}
                 onValueChange={(v) => setSingleForm((f) => ({ ...f, cashAccountId: v }))}
               >
                 <SelectTrigger data-testid="select-cash-account">
-                  <SelectValue placeholder="Select account" />
+                  <SelectValue placeholder={tUi("select.account")} />
                 </SelectTrigger>
                 <SelectContent>
                   {cashAccounts.map((a) => (
@@ -352,9 +354,9 @@ export default function FactoryEmployeeWithdrawalsTab() {
               </Select>
             </div>
             <div>
-              <Label>Notes (optional)</Label>
+              <Label>{tUi("notes.optional")}</Label>
               <Textarea
-                placeholder="Optional notes…"
+                placeholder={tUi("optional.notes.3")}
                 rows={2}
                 value={singleForm.notes}
                 onChange={(e) => setSingleForm((f) => ({ ...f, notes: e.target.value }))}
@@ -389,13 +391,13 @@ export default function FactoryEmployeeWithdrawalsTab() {
       >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Bulk Withdrawal — All Employees</DialogTitle>
-            <DialogDescription>Enter withdrawal amounts for each employee. Leave blank to skip.</DialogDescription>
+            <DialogTitle>{tUi("bulk.withdrawal.all.employees")}</DialogTitle>
+            <DialogDescription>{tUi("enter.withdrawal.amounts.for.each.employee.leave")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Date</Label>
+                <Label>{tUi("date")}</Label>
                 <Input
                   type="date"
                   value={bulkForm.date}
@@ -404,13 +406,13 @@ export default function FactoryEmployeeWithdrawalsTab() {
                 />
               </div>
               <div>
-                <Label>Cash Account</Label>
+                <Label>{tUi("cash.account.2")}</Label>
                 <Select
                   value={bulkForm.cashAccountId}
                   onValueChange={(v) => setBulkForm((f) => ({ ...f, cashAccountId: v }))}
                 >
                   <SelectTrigger data-testid="select-bulk-cash-account">
-                    <SelectValue placeholder="Select account" />
+                    <SelectValue placeholder={tUi("select.account")} />
                   </SelectTrigger>
                   <SelectContent>
                     {cashAccounts.map((a) => (
@@ -423,9 +425,9 @@ export default function FactoryEmployeeWithdrawalsTab() {
               </div>
             </div>
             <div>
-              <Label>Notes (optional)</Label>
+              <Label>{tUi("notes.optional")}</Label>
               <Textarea
-                placeholder="Optional notes for all entries…"
+                placeholder={tUi("optional.notes.for.all.entries")}
                 rows={2}
                 value={bulkForm.notes}
                 onChange={(e) => setBulkForm((f) => ({ ...f, notes: e.target.value }))}
@@ -435,7 +437,7 @@ export default function FactoryEmployeeWithdrawalsTab() {
             <Separator />
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">Employee Amounts</p>
+                <p className="text-sm font-medium">{tUi("employee.amounts")}</p>
                 <Badge variant="outline">Total: {fmt(bulkTotal)}</Badge>
               </div>
               {employees.map((emp) => (

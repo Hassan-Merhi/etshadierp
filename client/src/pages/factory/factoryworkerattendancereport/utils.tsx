@@ -4,7 +4,7 @@
  * Extracted from FactoryWorkerAttendanceReport.tsx during the Phase 4 god-file split.
  */
 
-import type {DateEntry, WorkerReportRow} from "./types";
+import type { DateEntry, WorkerReportRow } from "./types";
 
 export /* ── Helpers ────────────────────────────────────────────────────────────────── */
 function isoToday() {

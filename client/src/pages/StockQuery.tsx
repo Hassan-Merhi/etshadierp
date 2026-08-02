@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, Package } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface StockItem {
   id: number;
@@ -34,6 +35,7 @@ interface PagedStockItems {
 }
 
 export default function StockQuery() {
+  const tUi = useErpText();
   const appMode = useAppMode();
   const isFactory = appMode === "factory";
   const search = useSearch();
@@ -88,12 +90,12 @@ export default function StockQuery() {
       {/* ── Header + Search ── */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex-1">
-          <PageHeader title="Stock Query" subtitle="Click any item to view purchase history, sales, and inventory" />
+          <PageHeader title={tUi("stock.query")} subtitle={tUi("click.any.item.to.view.purchase.history.sales.an")} />
         </div>
         <div className="relative w-full sm:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by code or name..."
+            placeholder={tUi("search.by.code.or.name")}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-9"
@@ -130,7 +132,7 @@ export default function StockQuery() {
           <p className="text-sm font-medium">
             {hasSearch ? "No items match your search" : "Search for a stock item to get started"}
           </p>
-          {hasSearch && <p className="text-xs">Try a different name or code</p>}
+          {hasSearch && <p className="text-xs">{tUi("try.a.different.name.or.code")}</p>}
         </div>
       ) : (
         <>
@@ -139,9 +141,9 @@ export default function StockQuery() {
             <table className="w-full text-sm">
               <thead className="sticky top-0 z-30 bg-muted/40">
                 <tr className="h-11 bg-muted/40 border-b">
-                  <th className="text-left px-4 font-medium w-32">Code</th>
-                  <th className="text-left px-4 font-medium">Name</th>
-                  <th className="text-left px-4 font-medium w-24">Status</th>
+                  <th className="text-left px-4 font-medium w-32">{tUi("code")}</th>
+                  <th className="text-left px-4 font-medium">{tUi("name")}</th>
+                  <th className="text-left px-4 font-medium w-24">{tUi("status")}</th>
                 </tr>
               </thead>
               <tbody>

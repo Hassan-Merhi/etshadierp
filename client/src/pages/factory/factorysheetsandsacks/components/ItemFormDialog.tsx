@@ -3,21 +3,22 @@
  *
  * Extracted from FactorySheetsAndSacks.tsx during the Phase 4 god-file split.
  */
-import {useState, useMemo} from "react";
-import {useMutation} from "@tanstack/react-query";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {useToast} from "@/hooks/use-toast";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter} from "@/components/ui/dialog";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Textarea} from "@/components/ui/textarea";
-import {Loader2} from "lucide-react";
+import { useState, useMemo } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Loader2 } from "lucide-react";
 
-import type {SheetsAndSacksItem} from "../types";
-import {TYPES, fmt} from "../utils";
-import {ColorPicker} from "./ColorPicker";
+import type { SheetsAndSacksItem } from "../types";
+import { TYPES, fmt } from "../utils";
+import { ColorPicker } from "./ColorPicker";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export // ─── Item Form Dialog ─────────────────────────────────────────────────────────
 function ItemFormDialog({
@@ -29,6 +30,7 @@ function ItemFormDialog({
   onClose: () => void;
   existing?: SheetsAndSacksItem | null;
 }) {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [type, setType] = useState<string>(existing?.type ?? "Sheet");
   const [name, setName] = useState(existing?.name ?? "");
@@ -81,7 +83,7 @@ function ItemFormDialog({
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label>Type</Label>
+            <Label>{tUi("type")}</Label>
             <Select value={type} onValueChange={setType}>
               <SelectTrigger>
                 <SelectValue />
@@ -102,12 +104,12 @@ function ItemFormDialog({
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Purple Sheet 50kg" />
           </div>
           <div className="space-y-1.5">
-            <Label>Size / Weight</Label>
+            <Label>{tUi("size.weight")}</Label>
             <Input value={size} onChange={(e) => setSize(e.target.value)} placeholder="e.g. 50kg, 100×80cm" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Qty (packs)</Label>
+              <Label>{tUi("qty.packs")}</Label>
               <Input
                 type="number"
                 min="0"
@@ -128,11 +130,11 @@ function ItemFormDialog({
             </div>
           </div>
           <div className="rounded-md bg-muted/50 px-3 py-2 flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Total pcs</span>
+            <span className="text-muted-foreground">{tUi("total.pcs.2")}</span>
             <span className="font-mono font-semibold">{totalPcs.toLocaleString("en-US")}</span>
           </div>
           <div className="space-y-1.5">
-            <Label>Price per piece ($)</Label>
+            <Label>{tUi("price.per.piece")}</Label>
             <Input
               type="number"
               min="0"
@@ -143,19 +145,19 @@ function ItemFormDialog({
             />
           </div>
           <div className="rounded-md bg-muted/50 px-3 py-2 flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Total value</span>
+            <span className="text-muted-foreground">{tUi("total.value.2")}</span>
             <span className="font-mono font-semibold">${fmt(totalValue)}</span>
           </div>
           <div className="space-y-1.5">
-            <Label>Row Color</Label>
+            <Label>{tUi("row.color")}</Label>
             <ColorPicker value={rowColor} onChange={setRowColor} />
           </div>
           <div className="space-y-1.5">
-            <Label>Notes</Label>
+            <Label>{tUi("notes")}</Label>
             <Textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Optional notes..."
+              placeholder={tUi("optional.notes.2")}
               className="resize-none"
               rows={2}
             />

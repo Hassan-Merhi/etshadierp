@@ -18,6 +18,7 @@ import { factoryApiRequest } from "@/lib/factoryApi";
 import { useAdminOverride } from "@/hooks/use-admin-override";
 import { ContainerStatusBadge } from "./ContainerBadges";
 import type { ContainerWithSupplier } from "./otwHelpers";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 // ── Import Dialog ─────────────────────────────────────────────────────────────
 
@@ -77,6 +78,7 @@ interface BulkDeleteDialogProps {
 }
 
 export function BulkDeleteDialog({ open, selectedIds, onClose, onDeleted }: BulkDeleteDialogProps) {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
 
@@ -127,17 +129,17 @@ export function BulkDeleteDialog({ open, selectedIds, onClose, onDeleted }: Bulk
             </DialogDescription>
           </DialogHeader>
           <div className="py-2 space-y-2 text-sm text-muted-foreground">
-            <p>For each selected container, all of the following will be permanently removed:</p>
+            <p>{tUi("for.each.selected.container.all.of.the.following")}</p>
             <ul className="list-disc pl-5 space-y-1">
-              <li>Daybook / journal entries</li>
-              <li>Vouchers and accounting entries</li>
-              <li>FX allocation records</li>
-              <li>Mix batch source links</li>
-              <li>Offload charges (additional and pre-registered)</li>
-              <li>Commission records</li>
-              <li>Raw stock entries</li>
+              <li>{tUi("daybook.journal.entries")}</li>
+              <li>{tUi("vouchers.and.accounting.entries")}</li>
+              <li>{tUi("fx.allocation.records")}</li>
+              <li>{tUi("mix.batch.source.links")}</li>
+              <li>{tUi("offload.charges.additional.and.pre.registered")}</li>
+              <li>{tUi("commission.records")}</li>
+              <li>{tUi("raw.stock.entries")}</li>
             </ul>
-            <p className="text-destructive font-medium pt-1">Tip: Export All first if you need a backup.</p>
+            <p className="text-destructive font-medium pt-1">{tUi("tip.export.all.first.if.you.need.a.backup")}</p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={onClose} disabled={bulkDeleteMutation.isPending}>
@@ -245,6 +247,7 @@ interface ReverseOffloadDialogProps {
 }
 
 export function ReverseOffloadDialog({ container, onClose }: ReverseOffloadDialogProps) {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
 
@@ -285,20 +288,20 @@ export function ReverseOffloadDialog({ container, onClose }: ReverseOffloadDialo
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Reverse Offload</DialogTitle>
+            <DialogTitle>{tUi("reverse.offload")}</DialogTitle>
             <DialogDescription>
               This will permanently undo the offload for container <strong>{container?.containerNumber}</strong>.
             </DialogDescription>
           </DialogHeader>
           <div className="py-2 space-y-2 text-sm text-muted-foreground">
-            <p>The following offload data will be permanently removed:</p>
+            <p>{tUi("the.following.offload.data.will.be.permanently.r")}</p>
             <ul className="list-disc pl-5 space-y-1">
-              <li>Raw stock entry from Raw Production</li>
-              <li>Commission record and daybook entry</li>
-              <li>Freight, other charges, and additional charge entries (fields cleared to zero)</li>
-              <li>Duty amount and status (reset to NONE)</li>
-              <li>Mix-batch source allocations linked to this container</li>
-              <li>All accounting journal vouchers (freight, other charges, commission)</li>
+              <li>{tUi("raw.stock.entry.from.raw.production")}</li>
+              <li>{tUi("commission.record.and.daybook.entry")}</li>
+              <li>{tUi("freight.other.charges.and.additional.charge.entr")}</li>
+              <li>{tUi("duty.amount.and.status.reset.to.none")}</li>
+              <li>{tUi("mix.batch.source.allocations.linked.to.this.cont")}</li>
+              <li>{tUi("all.accounting.journal.vouchers.freight.other.ch")}</li>
               <li>All related daybook entries (OFFLOAD_RAW_STOCK, FREIGHT, OTHER_CHARGE, DUTY, COMMISSION)</li>
             </ul>
             <p className="text-foreground font-medium pt-1">

@@ -30,6 +30,7 @@ import {
   Scale,
   DollarSign,
 } from "lucide-react";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface BatchDetail {
   batch: {
@@ -93,6 +94,7 @@ function fmt(n: number | string, decimals = 2) {
 }
 
 export default function FactoryDispatchBatchScan() {
+  const tUi = useFactoryText();
   const [, navigate] = useLocation();
   const [, params] = useRoute("/factory/dispatch-batches/:batchId/rides/:rideId/scan");
   const batchId = params?.batchId ? parseInt(params.batchId) : null;
@@ -237,7 +239,7 @@ export default function FactoryDispatchBatchScan() {
     return (
       <div className="p-6 flex flex-col items-center gap-3 py-16 text-muted-foreground">
         <AlertTriangle className="w-8 h-8" />
-        <p>Ride or batch not found</p>
+        <p>{tUi("ride.or.batch.not.found")}</p>
         <Button
           variant="outline"
           onClick={() => navigate(batchId ? `/factory/dispatch-batches/${batchId}` : "/factory/dispatch-batches")}
@@ -358,7 +360,7 @@ export default function FactoryDispatchBatchScan() {
                   value={scanInput}
                   onChange={(e) => setScanInput(e.target.value)}
                   onKeyDown={handleScanKey}
-                  placeholder="Scan barcode or type reference number and press Enter..."
+                  placeholder={tUi("scan.barcode.or.type.reference.number.and.press.")}
                   className="pl-10 text-base h-12 font-mono"
                   disabled={scanMutation.isPending}
                   autoFocus
@@ -410,19 +412,19 @@ export default function FactoryDispatchBatchScan() {
                 {rideScans.length === 0 ? (
                   <div className="flex flex-col items-center gap-2 py-10 text-muted-foreground">
                     <ScanLine className="w-8 h-8 opacity-40" />
-                    <p className="text-sm">No bales scanned yet</p>
-                    {canScan && <p className="text-xs">Scan a barcode above to get started</p>}
+                    <p className="text-sm">{tUi("no.bales.scanned.yet")}</p>
+                    {canScan && <p className="text-xs">{tUi("scan.a.barcode.above.to.get.started")}</p>}
                   </div>
                 ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Reference</TableHead>
-                        <TableHead>Article</TableHead>
-                        <TableHead>Product</TableHead>
-                        <TableHead className="text-right">Weight (kg)</TableHead>
-                        <TableHead className="text-right">Price</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead>{tUi("reference")}</TableHead>
+                        <TableHead>{tUi("article")}</TableHead>
+                        <TableHead>{tUi("product")}</TableHead>
+                        <TableHead className="text-right">{tUi("weight.kg")}</TableHead>
+                        <TableHead className="text-right">{tUi("price")}</TableHead>
+                        <TableHead className="text-right">{tUi("amount")}</TableHead>
                         {canScan && <TableHead />}
                       </TableRow>
                     </TableHeader>
@@ -461,7 +463,7 @@ export default function FactoryDispatchBatchScan() {
         {proformaProgress.length > 0 && (
           <div className="w-56 border-l flex flex-col overflow-hidden">
             <div className="px-3 py-2 border-b">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Proforma</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{tUi("proforma")}</p>
               <p className="text-xs text-muted-foreground mt-0.5">{batchData.proforma?.name}</p>
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
@@ -480,11 +482,11 @@ export default function FactoryDispatchBatchScan() {
                   <p className="font-mono font-semibold">{p.articleCode}</p>
                   <p className="text-muted-foreground truncate text-xs">{p.productName}</p>
                   <div className="flex justify-between mt-1">
-                    <span className="text-muted-foreground">Target</span>
+                    <span className="text-muted-foreground">{tUi("target")}</span>
                     <span>{p.proformaQty}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Scanned</span>
+                    <span className="text-muted-foreground">{tUi("scanned.2")}</span>
                     <span
                       className={
                         p.isOver
@@ -518,14 +520,14 @@ export default function FactoryDispatchBatchScan() {
       <AlertDialog open={dispatchOpen} onOpenChange={setDispatchOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Mark Truck as Dispatched?</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("mark.truck.as.dispatched")}</AlertDialogTitle>
             <AlertDialogDescription>
               Ride #{thisRide.rideNumber} has <strong>{rideScans.length}</strong> bales ({fmt(totalWeight)} kg). After
               dispatching, scanning will be locked for this ride.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => dispatchMutation.mutate()}
               disabled={dispatchMutation.isPending}
@@ -545,13 +547,13 @@ export default function FactoryDispatchBatchScan() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove Bale?</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("remove.bale")}</AlertDialogTitle>
             <AlertDialogDescription>
               This bale will be removed from the scan list and returned to IN_STOCK.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep</AlertDialogCancel>
+            <AlertDialogCancel>{tUi("keep")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => removeScanId && removeMutation.mutate(removeScanId)}
               disabled={removeMutation.isPending}

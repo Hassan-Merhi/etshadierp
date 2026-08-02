@@ -3,7 +3,7 @@
  *
  * Extracted from FactoryOtwTrackingTab.tsx during the Phase 4 god-file split.
  */
-import {cn} from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 export // ── Summary Card (mirrors ERP SummaryCard) ───────────────────────────────────
 function SummaryCard({

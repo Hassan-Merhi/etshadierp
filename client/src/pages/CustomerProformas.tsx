@@ -29,6 +29,7 @@ import {
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { PageHeader } from "@/components/PageHeader";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface ProformaLine {
   id: number;
@@ -58,6 +59,7 @@ interface Customer {
 }
 
 export default function CustomerProformas() {
+  const tUi = useErpText();
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
   const appMode = useAppMode();
@@ -303,7 +305,10 @@ export default function CustomerProformas() {
     <div className="flex flex-col h-full p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div>
-          <PageHeader title="Customer Proformas" subtitle="Manage customer-specific price lists for bale sales" />
+          <PageHeader
+            title={tUi("customer.proformas")}
+            subtitle={tUi("manage.customer.specific.price.lists.for.bale.sa")}
+          />
         </div>
         {customerId && (
           <Button data-testid="button-create-proforma" onClick={() => setIsCreateOpen(true)}>
@@ -314,7 +319,7 @@ export default function CustomerProformas() {
       </div>
 
       <div className="mb-6 max-w-sm">
-        <label className="text-sm font-medium mb-2 block">Select Customer</label>
+        <label className="text-sm font-medium mb-2 block">{tUi("select.customer.2")}</label>
         {customersLoading ? (
           <Skeleton className="h-9 w-full" />
         ) : (
@@ -326,7 +331,7 @@ export default function CustomerProformas() {
             }}
           >
             <SelectTrigger data-testid="select-customer">
-              <SelectValue placeholder="Choose a customer..." />
+              <SelectValue placeholder={tUi("choose.a.customer")} />
             </SelectTrigger>
             <SelectContent>
               {customers.map((c) => (
@@ -350,15 +355,15 @@ export default function CustomerProformas() {
       {customerId && !proformasLoading && proformas.length === 0 && (
         <div className="text-center py-12 text-muted-foreground" data-testid="text-no-proformas">
           <FileText className="h-12 w-12 mx-auto mb-3 opacity-40" />
-          <p>No proformas found for this customer</p>
-          <p className="text-sm mt-1">Create one to get started</p>
+          <p>{tUi("no.proformas.found.for.this.customer")}</p>
+          <p className="text-sm mt-1">{tUi("create.one.to.get.started")}</p>
         </div>
       )}
 
       {!customerId && !customersLoading && (
         <div className="text-center py-12 text-muted-foreground" data-testid="text-select-customer">
           <FileText className="h-12 w-12 mx-auto mb-3 opacity-40" />
-          <p>Select a customer to manage their proformas</p>
+          <p>{tUi("select.a.customer.to.manage.their.proformas")}</p>
         </div>
       )}
 
@@ -398,7 +403,7 @@ export default function CustomerProformas() {
                           onClick={() => activateProformaMutation.mutate(proforma.id)}
                           disabled={activateProformaMutation.isPending}
                           data-testid={`button-activate-proforma-${proforma.id}`}
-                          title="Set as active"
+                          title={tUi("set.as.active")}
                         >
                           <Star className="h-4 w-4" />
                         </Button>
@@ -411,7 +416,7 @@ export default function CustomerProformas() {
                           setRenameValue(proforma.name);
                         }}
                         data-testid={`button-rename-proforma-${proforma.id}`}
-                        title="Rename proforma"
+                        title={tUi("rename.proforma")}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -423,7 +428,7 @@ export default function CustomerProformas() {
                         }}
                         disabled={deleteProformaMutation.isPending}
                         data-testid={`button-delete-proforma-${proforma.id}`}
-                        title="Delete proforma"
+                        title={tUi("delete.proforma")}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -433,7 +438,7 @@ export default function CustomerProformas() {
                   {isExpanded && (
                     <div className="mt-4">
                       <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-                        <span className="text-sm font-medium text-muted-foreground">Price Lines</span>
+                        <span className="text-sm font-medium text-muted-foreground">{tUi("price.lines")}</span>
                         <div className="flex items-center gap-2 flex-wrap">
                           <Button
                             size="sm"
@@ -505,11 +510,11 @@ export default function CustomerProformas() {
                           <Table>
                             <TableHeader className="sticky top-0 z-30 bg-background">
                               <TableRow>
-                                <TableHead>Article Code</TableHead>
-                                <TableHead>Product Name</TableHead>
+                                <TableHead>{tUi("article.code")}</TableHead>
+                                <TableHead>{tUi("product.name")}</TableHead>
                                 <TableHead className="text-right">Qty</TableHead>
-                                <TableHead className="text-right">Kg/Bale</TableHead>
-                                <TableHead className="text-right">Price/Bale</TableHead>
+                                <TableHead className="text-right">{tUi("kg.bale")}</TableHead>
+                                <TableHead className="text-right">{tUi("price.bale")}</TableHead>
                                 <TableHead className="w-[100px]"></TableHead>
                               </TableRow>
                             </TableHeader>
@@ -603,13 +608,13 @@ export default function CustomerProformas() {
                             return (
                               <div className="flex items-center gap-4 mt-3 pt-3 border-t flex-wrap">
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-xs text-muted-foreground">Total Bales:</span>
+                                  <span className="text-xs text-muted-foreground">{tUi("total.bales.2")}</span>
                                   <span className="text-sm font-semibold" data-testid={`text-total-qty-${proforma.id}`}>
                                     {totalQty.toLocaleString()}
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-xs text-muted-foreground">Total Weight:</span>
+                                  <span className="text-xs text-muted-foreground">{tUi("total.weight.2")}</span>
                                   <span
                                     className="text-sm font-semibold"
                                     data-testid={`text-total-weight-${proforma.id}`}
@@ -622,7 +627,7 @@ export default function CustomerProformas() {
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-xs text-muted-foreground">Total Amount:</span>
+                                  <span className="text-xs text-muted-foreground">{tUi("total.amount.2")}</span>
                                   <span
                                     className="text-sm font-semibold"
                                     data-testid={`text-total-amount-${proforma.id}`}
@@ -654,11 +659,11 @@ export default function CustomerProformas() {
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Create New Proforma</DialogTitle>
+            <DialogTitle>{tUi("create.new.proforma")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">Proforma Name</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("proforma.name")}</label>
               <Input
                 value={newProformaName}
                 onChange={(e) => setNewProformaName(e.target.value)}
@@ -693,11 +698,11 @@ export default function CustomerProformas() {
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Rename Proforma</DialogTitle>
+            <DialogTitle>{tUi("rename.proforma.2")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">New Name</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("new.name")}</label>
               <Input
                 value={renameValue}
                 onChange={(e) => setRenameValue(e.target.value)}
@@ -746,11 +751,11 @@ export default function CustomerProformas() {
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Price Line</DialogTitle>
+            <DialogTitle>{tUi("add.price.line")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">Article Code</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("article.code")}</label>
               <Input
                 value={newLine.articleCode}
                 onChange={(e) => setNewLine({ ...newLine, articleCode: e.target.value })}
@@ -759,7 +764,7 @@ export default function CustomerProformas() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Product Name</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("product.name")}</label>
               <Input
                 value={newLine.productName}
                 onChange={(e) => setNewLine({ ...newLine, productName: e.target.value })}
@@ -768,7 +773,7 @@ export default function CustomerProformas() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Quantity</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("quantity")}</label>
               <Input
                 type="number"
                 step="1"
@@ -780,7 +785,7 @@ export default function CustomerProformas() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Price Per Bale</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("price.per.bale")}</label>
               <Input
                 type="number"
                 step="0.01"
@@ -820,15 +825,15 @@ export default function CustomerProformas() {
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Price Line</DialogTitle>
+            <DialogTitle>{tUi("edit.price.line")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">Article Code</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("article.code")}</label>
               <Input value={editingLine?.articleCode || ""} disabled data-testid="input-edit-article-code" />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Product Name</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("product.name")}</label>
               <Input
                 value={editLineValues.productName}
                 onChange={(e) => setEditLineValues({ ...editLineValues, productName: e.target.value })}
@@ -836,7 +841,7 @@ export default function CustomerProformas() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Quantity</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("quantity")}</label>
               <Input
                 type="number"
                 step="1"
@@ -847,7 +852,7 @@ export default function CustomerProformas() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Price Per Bale</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("price.per.bale")}</label>
               <Input
                 type="number"
                 step="0.01"

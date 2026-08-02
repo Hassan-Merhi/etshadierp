@@ -30,7 +30,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { PageHeader } from "@/components/PageHeader";
 
 import type { Customer, Location, OrderBale, OrderDetail, Proforma } from "./containerloadingscan/types";
+import { useErpText } from "@/i18n/modules/erp";
 export default function ContainerLoadingScan() {
+  const tUi = useErpText();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const appMode = useAppMode();
@@ -454,16 +456,16 @@ export default function ContainerLoadingScan() {
       {showScanSuccessPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="bg-green-500 text-white rounded-xl px-16 py-10 shadow-2xl border-4 border-green-300 text-center">
-            <div className="text-5xl font-black tracking-wide drop-shadow-md">SCANNED</div>
-            <div className="text-5xl font-black tracking-wide drop-shadow-md">SUCCESSFULLY</div>
+            <div className="text-5xl font-black tracking-wide drop-shadow-md">{tUi("scanned")}</div>
+            <div className="text-5xl font-black tracking-wide drop-shadow-md">{tUi("successfully")}</div>
           </div>
         </div>
       )}
       {showScanErrorPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="bg-red-600 text-white rounded-xl px-16 py-10 shadow-2xl border-4 border-red-300 text-center">
-            <div className="text-5xl font-black tracking-wide drop-shadow-md">SCAN ERROR</div>
-            <div className="text-5xl font-black tracking-wide drop-shadow-md">TRY AGAIN</div>
+            <div className="text-5xl font-black tracking-wide drop-shadow-md">{tUi("scan.error")}</div>
+            <div className="text-5xl font-black tracking-wide drop-shadow-md">{tUi("try.again")}</div>
           </div>
         </div>
       )}
@@ -473,8 +475,8 @@ export default function ContainerLoadingScan() {
           style={{ top: "4rem" }}
         >
           <div className="bg-orange-500 text-white rounded-xl px-12 py-6 shadow-2xl border-4 border-orange-700 text-center">
-            <div className="text-3xl font-black tracking-wide">QUANTITY EXCEEDED</div>
-            <div className="text-2xl font-bold mt-1">Scan again to bypass</div>
+            <div className="text-3xl font-black tracking-wide">{tUi("quantity.exceeded")}</div>
+            <div className="text-2xl font-bold mt-1">{tUi("scan.again.to.bypass")}</div>
           </div>
         </div>
       )}
@@ -484,14 +486,14 @@ export default function ContainerLoadingScan() {
           style={{ top: "4rem" }}
         >
           <div className="bg-amber-400 text-amber-950 rounded-xl px-12 py-6 shadow-2xl border-4 border-amber-600 text-center">
-            <div className="text-3xl font-black tracking-wide">ITEM NOT REQUESTED</div>
-            <div className="text-2xl font-bold mt-1">Scan again to bypass</div>
+            <div className="text-3xl font-black tracking-wide">{tUi("item.not.requested")}</div>
+            <div className="text-2xl font-bold mt-1">{tUi("scan.again.to.bypass")}</div>
           </div>
         </div>
       )}
       <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
         <div>
-          <PageHeader title="Container Loading" subtitle="Floor loader bale scanning" />
+          <PageHeader title={tUi("container.loading")} subtitle={tUi("floor.loader.bale.scanning")} />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {isResuming && orderId && (
@@ -554,7 +556,7 @@ export default function ContainerLoadingScan() {
                   value={scanCode}
                   onChange={(e) => setScanCode(e.target.value)}
                   onKeyDown={handleScan}
-                  placeholder="Scan barcode, ref number, or article code…"
+                  placeholder={tUi("scan.barcode.ref.number.or.article.code")}
                   disabled={!orderId || !selectedLocationId || addBaleMutation.isPending}
                   className={`text-lg h-12 font-mono ${scanInputClass}`}
                   autoFocus
@@ -568,7 +570,9 @@ export default function ContainerLoadingScan() {
                 className="mb-3 flex items-center gap-3 rounded-md status-success px-3 py-2"
                 data-testid="banner-last-scanned"
               >
-                <div className="text-xs font-medium uppercase tracking-wide shrink-0 opacity-80">Last Scanned</div>
+                <div className="text-xs font-medium uppercase tracking-wide shrink-0 opacity-80">
+                  {tUi("last.scanned")}
+                </div>
                 <div className="min-w-0">
                   <div className="font-mono font-bold text-sm truncate">{lastScannedRef.baleReference}</div>
                   {lastScannedRef.baleName && (
@@ -585,7 +589,7 @@ export default function ContainerLoadingScan() {
                   data-testid="text-no-bales"
                 >
                   <Package className="h-12 w-12 mb-3 opacity-40" />
-                  <p>No bales scanned yet</p>
+                  <p>{tUi("no.bales.scanned.yet")}</p>
                   <p className="text-sm mt-1">
                     {!orderId
                       ? "Set up the loading order first, then scan bales"
@@ -656,10 +660,10 @@ export default function ContainerLoadingScan() {
           {/* Setup card — hidden once order started and proforma is showing */}
           <Card className="p-4 space-y-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">Customer</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("customer")}</label>
               <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId} disabled={!!orderId}>
                 <SelectTrigger data-testid="select-customer">
-                  <SelectValue placeholder="Select customer..." />
+                  <SelectValue placeholder={tUi("select.customer")} />
                 </SelectTrigger>
                 <SelectContent>
                   {customers.map((c) => (
@@ -678,7 +682,7 @@ export default function ContainerLoadingScan() {
               </label>
               <Select value={selectedLocationId} onValueChange={setSelectedLocationId} disabled={!!orderId}>
                 <SelectTrigger data-testid="select-location">
-                  <SelectValue placeholder="Select location..." />
+                  <SelectValue placeholder={tUi("select.location")} />
                 </SelectTrigger>
                 <SelectContent>
                   {locations.map((loc) => (
@@ -699,7 +703,7 @@ export default function ContainerLoadingScan() {
                 >
                   {activeProforma.name}
                 </Badge>
-                <span className="text-sm text-muted-foreground">Active proforma</span>
+                <span className="text-sm text-muted-foreground">{tUi("active.proforma")}</span>
               </div>
             )}
 
@@ -716,7 +720,7 @@ export default function ContainerLoadingScan() {
               </label>
               {!orderId ? (
                 <Textarea
-                  placeholder="Optional note for this loading..."
+                  placeholder={tUi("optional.note.for.this.loading")}
                   value={loadingNote}
                   onChange={(e) => setLoadingNote(e.target.value)}
                   className="resize-none text-sm"
@@ -726,7 +730,7 @@ export default function ContainerLoadingScan() {
               ) : (
                 <div className="flex gap-2 items-start">
                   <Textarea
-                    placeholder="Add a note..."
+                    placeholder={tUi("add.a.note")}
                     value={loadingNote}
                     onChange={(e) => setLoadingNote(e.target.value)}
                     className="resize-none text-sm flex-1"
@@ -738,7 +742,7 @@ export default function ContainerLoadingScan() {
                     variant="outline"
                     onClick={() => saveNoteMutation.mutate(loadingNote)}
                     disabled={saveNoteMutation.isPending}
-                    title="Save note"
+                    title={tUi("save.note")}
                     data-testid="button-save-note"
                   >
                     <Save className="h-4 w-4" />
@@ -787,9 +791,9 @@ export default function ContainerLoadingScan() {
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
-                      <TableHead className="text-xs">Article</TableHead>
+                      <TableHead className="text-xs">{tUi("article")}</TableHead>
                       <TableHead className="text-xs text-right">Exp</TableHead>
-                      <TableHead className="text-xs text-right">Loaded</TableHead>
+                      <TableHead className="text-xs text-right">{tUi("loaded")}</TableHead>
                       <TableHead className="text-xs text-right">Rem</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -856,7 +860,7 @@ export default function ContainerLoadingScan() {
                       <TableRow key={code} className="bg-red-50 dark:bg-red-950/30" data-testid={`row-extra-${code}`}>
                         <TableCell className="text-xs font-mono py-1.5">
                           <div className="text-red-700 dark:text-red-400">{code}</div>
-                          <div className="text-red-500 dark:text-red-500 text-[10px]">Not on proforma</div>
+                          <div className="text-red-500 dark:text-red-500 text-[10px]">{tUi("not.on.proforma")}</div>
                         </TableCell>
                         <TableCell className="text-xs text-right py-1.5 text-muted-foreground">—</TableCell>
                         <TableCell className="text-xs text-right font-mono py-1.5 text-red-600 dark:text-red-400 font-semibold">
@@ -884,21 +888,21 @@ export default function ContainerLoadingScan() {
             </Card>
           ) : orderId ? (
             <Card className="p-4 space-y-2">
-              <h3 className="font-semibold text-sm">Order Summary</h3>
+              <h3 className="font-semibold text-sm">{tUi("order.summary")}</h3>
               <div className="flex items-center justify-between gap-2 text-sm">
-                <span>Total Bales</span>
+                <span>{tUi("total.bales")}</span>
                 <span className="font-mono" data-testid="text-total-bales">
                   {bales.length}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-2 text-sm">
-                <span>Total Weight</span>
+                <span>{tUi("total.weight")}</span>
                 <span className="font-mono" data-testid="text-total-weight">
                   {totalWeight.toFixed(2)} kg
                 </span>
               </div>
               <div className="flex items-center justify-between gap-2 text-sm">
-                <span>Article Groups</span>
+                <span>{tUi("article.groups")}</span>
                 <span className="font-mono" data-testid="text-article-groups">
                   {Object.keys(groupedBalesMap).length}
                 </span>
@@ -937,7 +941,7 @@ export default function ContainerLoadingScan() {
       <Dialog open={showFinalizeDialog} onOpenChange={setShowFinalizeDialog}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Validate Loading</DialogTitle>
+            <DialogTitle>{tUi("validate.loading")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             {linkedProforma && proformaProgress.length > 0 ? (
@@ -949,10 +953,10 @@ export default function ContainerLoadingScan() {
                   <Table>
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
-                        <TableHead>Article / Product</TableHead>
-                        <TableHead className="text-right">Expected</TableHead>
-                        <TableHead className="text-right">Loaded</TableHead>
-                        <TableHead className="text-right">Status</TableHead>
+                        <TableHead>{tUi("article.product")}</TableHead>
+                        <TableHead className="text-right">{tUi("expected")}</TableHead>
+                        <TableHead className="text-right">{tUi("loaded")}</TableHead>
+                        <TableHead className="text-right">{tUi("status")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -996,7 +1000,7 @@ export default function ContainerLoadingScan() {
                         <TableRow key={code} className="bg-red-50 dark:bg-red-950/30">
                           <TableCell className="text-sm">
                             <div className="font-mono text-xs text-red-700 dark:text-red-400">{code}</div>
-                            <div className="text-red-500 text-xs">Not on proforma</div>
+                            <div className="text-red-500 text-xs">{tUi("not.on.proforma")}</div>
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm text-muted-foreground">—</TableCell>
                           <TableCell className="text-right font-mono text-sm text-red-600 dark:text-red-400 font-semibold">
@@ -1048,13 +1052,13 @@ export default function ContainerLoadingScan() {
                 </p>
                 <div className="space-y-1 text-sm">
                   <div className="flex items-center justify-between gap-2">
-                    <span>Total Bales:</span>
+                    <span>{tUi("total.bales.2")}</span>
                     <span className="font-mono font-semibold" data-testid="text-dialog-total-bales">
                       {bales.length}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
-                    <span>Total Weight:</span>
+                    <span>{tUi("total.weight.2")}</span>
                     <span className="font-mono font-semibold" data-testid="text-dialog-total-weight">
                       {totalWeight.toFixed(2)} kg
                     </span>
@@ -1086,10 +1090,10 @@ export default function ContainerLoadingScan() {
       <Dialog open={showLastScannedPopup} onOpenChange={setShowLastScannedPopup}>
         <DialogContent className="max-w-sm" data-testid="dialog-last-scanned">
           <DialogHeader>
-            <DialogTitle className="text-base">Resuming Loading</DialogTitle>
+            <DialogTitle className="text-base">{tUi("resuming.loading")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Last bale scanned in this session:</p>
+            <p className="text-sm text-muted-foreground">{tUi("last.bale.scanned.in.this.session")}</p>
             <div
               className="bg-muted rounded-md px-4 py-3 font-mono text-lg font-semibold text-center"
               data-testid="text-last-scanned-ref"

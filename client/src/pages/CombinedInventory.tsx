@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Layers, Search, ChevronRight, ArrowLeft, List, FolderOpen, Download, Loader2, RefreshCw } from "lucide-react";
 import { formatNumber } from "@/lib/formatNumber";
 import { PageHeader } from "@/components/PageHeader";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface Container {
   id: number;
@@ -66,6 +67,7 @@ interface StockGroupSummary {
 type ViewMode = "groups" | "all";
 
 export default function CombinedInventory() {
+  const tUi = useErpText();
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("groups");
   const [selectedGroupId, setSelectedGroupId] = useState<number | null | undefined>(undefined);
@@ -394,8 +396,8 @@ export default function CombinedInventory() {
         </div>
       ) : (
         <PageHeader
-          title="Combined Inventory"
-          subtitle="In-transit (OTW) + in-hand stock combined per item"
+          title={tUi("combined.inventory")}
+          subtitle={tUi("in.transit.otw.in.hand.stock.combined.per.item")}
           icon={<Layers className="h-5 w-5" />}
         >
           <Button
@@ -421,7 +423,7 @@ export default function CombinedInventory() {
           <span className="text-sm font-semibold" data-testid="stat-items">
             {totals.items.toLocaleString()}
           </span>
-          <span className="text-xs text-muted-foreground">Items</span>
+          <span className="text-xs text-muted-foreground">{tUi("items")}</span>
         </div>
         <div className="flex items-center gap-2 bg-blue-500/10 rounded-lg px-3 py-2">
           {isLoadingOtw ? <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" /> : null}
@@ -436,17 +438,17 @@ export default function CombinedInventory() {
           <span className="text-sm font-semibold font-mono" data-testid="stat-inhand">
             {formatNumber(totals.inHandQty, 0)}
           </span>
-          <span className="text-xs text-muted-foreground">In-Hand Qty</span>
+          <span className="text-xs text-muted-foreground">{tUi("in.hand.qty")}</span>
         </div>
         <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
           <span className="text-sm font-semibold font-mono" data-testid="stat-total">
             {formatNumber(totals.totalQty, 0)}
           </span>
-          <span className="text-xs text-muted-foreground">Total Qty</span>
+          <span className="text-xs text-muted-foreground">{tUi("total.qty")}</span>
         </div>
         <div className="flex items-center gap-2 bg-primary/10 rounded-lg px-3 py-2">
           <span className="text-sm font-semibold font-mono text-primary">{formatAmount(totals.combinedValue)}</span>
-          <span className="text-xs text-muted-foreground">Total Value</span>
+          <span className="text-xs text-muted-foreground">{tUi("total.value")}</span>
         </div>
       </div>
 
@@ -489,7 +491,7 @@ export default function CombinedInventory() {
         )}
         <label className="flex items-center gap-2 cursor-pointer select-none" data-testid="toggle-include-zero">
           <Checkbox checked={includeZero} onCheckedChange={(v) => setIncludeZero(!!v)} id="include-zero" />
-          <span className="text-sm text-muted-foreground">Include zero stock</span>
+          <span className="text-sm text-muted-foreground">{tUi("include.zero.stock")}</span>
         </label>
         {isDrillMode && (
           <Button variant="outline" size="sm" onClick={handleExport} data-testid="button-export-excel">
@@ -502,8 +504,8 @@ export default function CombinedInventory() {
       {/* Partial-load notice — only shown when total rows exceed the first page */}
       {inventoryTotalPages > 1 && (
         <p className="text-xs text-muted-foreground -mt-2">
-          Showing first {inventoryRows.length.toLocaleString()} of {inventoryTotal.toLocaleString()} inventory rows.
-          Use search to narrow results, or click Refresh to reload.
+          Showing first {inventoryRows.length.toLocaleString()} of {inventoryTotal.toLocaleString()} inventory rows. Use
+          search to narrow results, or click Refresh to reload.
         </p>
       )}
 
@@ -543,14 +545,15 @@ function GroupsView({
   formatAmount: (v: number) => string;
   isLoadingOtw: boolean;
 }) {
+  const tUi = useErpText();
   if (groups.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <div className="w-14 h-14 rounded-xl bg-muted/60 flex items-center justify-center mb-4">
           <Layers className="w-7 h-7 text-muted-foreground" />
         </div>
-        <h2 className="text-lg font-semibold mb-1">No stock groups found</h2>
-        <p className="text-sm text-muted-foreground">Try adjusting your search.</p>
+        <h2 className="text-lg font-semibold mb-1">{tUi("no.stock.groups.found")}</h2>
+        <p className="text-sm text-muted-foreground">{tUi("try.adjusting.your.search")}</p>
       </div>
     );
   }
@@ -590,22 +593,22 @@ function GroupsView({
               )}
             </div>
             <div className="text-right">
-              <p className="text-xs text-muted-foreground">In-Hand</p>
+              <p className="text-xs text-muted-foreground">{tUi("in.hand")}</p>
               <p className="text-sm font-mono">{formatNumber(g.inHandQty, 0)}</p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-muted-foreground">Total</p>
+              <p className="text-xs text-muted-foreground">{tUi("total")}</p>
               <p className="text-sm font-mono font-semibold">{formatNumber(g.totalQty, 0)}</p>
             </div>
             <div className="text-right hidden md:block">
-              <p className="text-xs text-muted-foreground">Value</p>
+              <p className="text-xs text-muted-foreground">{tUi("value")}</p>
               <p className="text-sm font-mono">{g.combinedValue > 0 ? formatAmount(g.combinedValue) : "—"}</p>
             </div>
           </div>
 
           {/* Mobile: show total qty only */}
           <div className="sm:hidden text-right flex-shrink-0">
-            <p className="text-xs text-muted-foreground">Total</p>
+            <p className="text-xs text-muted-foreground">{tUi("total")}</p>
             <p className="text-sm font-mono font-semibold">{formatNumber(g.totalQty, 0)}</p>
           </div>
 
@@ -631,7 +634,7 @@ function GroupsView({
             </p>
           </div>
           <div className="text-right w-20">
-            <p className="text-xs text-muted-foreground">In-Hand</p>
+            <p className="text-xs text-muted-foreground">{tUi("in.hand")}</p>
             <p className="text-sm font-mono font-semibold" data-testid="total-inhand-qty">
               {formatNumber(
                 groups.reduce((s, g) => s + g.inHandQty, 0),
@@ -640,7 +643,7 @@ function GroupsView({
             </p>
           </div>
           <div className="text-right w-20">
-            <p className="text-xs text-muted-foreground">Total</p>
+            <p className="text-xs text-muted-foreground">{tUi("total")}</p>
             <p className="text-sm font-mono font-semibold" data-testid="total-combined-qty">
               {formatNumber(
                 groups.reduce((s, g) => s + g.totalQty, 0),
@@ -649,7 +652,7 @@ function GroupsView({
             </p>
           </div>
           <div className="text-right hidden md:block w-28">
-            <p className="text-xs text-muted-foreground">Value</p>
+            <p className="text-xs text-muted-foreground">{tUi("value")}</p>
             <p className="text-sm font-mono font-semibold" data-testid="total-combined-value">
               {formatAmount(groups.reduce((s, g) => s + g.combinedValue, 0))}
             </p>
@@ -670,6 +673,7 @@ function ItemsTable({
   formatAmount: (v: number) => string;
   emptyMessage: string;
 }) {
+  const tUi = useErpText();
   const totals = useMemo(
     () => ({
       otwQty: rows.reduce((s, r) => s + r.otwQty, 0),
@@ -686,7 +690,7 @@ function ItemsTable({
         <div className="w-14 h-14 rounded-xl bg-muted/60 flex items-center justify-center mb-4">
           <Layers className="w-7 h-7 text-muted-foreground" />
         </div>
-        <h2 className="text-lg font-semibold mb-1">No stock items found</h2>
+        <h2 className="text-lg font-semibold mb-1">{tUi("no.stock.items.found")}</h2>
         <p className="text-sm text-muted-foreground">{emptyMessage}</p>
       </div>
     );
@@ -699,12 +703,12 @@ function ItemsTable({
         <Table wrapperClassName="max-h-[calc(100vh-300px)]">
           <TableHeader className="bg-muted/40">
             <TableRow>
-              <TableHead>Item Name</TableHead>
-              <TableHead className="text-right">OTW Qty</TableHead>
-              <TableHead className="text-right">In-Hand Qty</TableHead>
-              <TableHead className="text-right">Total Qty</TableHead>
-              <TableHead className="text-right">Avg Rate</TableHead>
-              <TableHead className="text-right">Total Value</TableHead>
+              <TableHead>{tUi("item.name")}</TableHead>
+              <TableHead className="text-right">{tUi("otw.qty")}</TableHead>
+              <TableHead className="text-right">{tUi("in.hand.qty")}</TableHead>
+              <TableHead className="text-right">{tUi("total.qty")}</TableHead>
+              <TableHead className="text-right">{tUi("avg.rate")}</TableHead>
+              <TableHead className="text-right">{tUi("total.value")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -790,7 +794,7 @@ function ItemsTable({
             <div className="flex gap-4 mt-2 text-xs">
               {row.otwQty > 0 && (
                 <div>
-                  <span className="text-muted-foreground">OTW </span>
+                  <span className="text-muted-foreground">{tUi("otw")} </span>
                   <span className="font-mono font-semibold text-blue-600 dark:text-blue-400">
                     {formatNumber(row.otwQty, 0)}
                   </span>
@@ -798,12 +802,12 @@ function ItemsTable({
               )}
               {row.inHandQty > 0 && (
                 <div>
-                  <span className="text-muted-foreground">In-Hand </span>
+                  <span className="text-muted-foreground">{tUi("in.hand")} </span>
                   <span className="font-mono">{formatNumber(row.inHandQty, 0)}</span>
                 </div>
               )}
               <div>
-                <span className="text-muted-foreground">Total </span>
+                <span className="text-muted-foreground">{tUi("total")} </span>
                 <span className="font-mono font-semibold">{formatNumber(row.totalQty, 0)}</span>
               </div>
             </div>

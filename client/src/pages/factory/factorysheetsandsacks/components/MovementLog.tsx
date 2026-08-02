@@ -3,20 +3,31 @@
  *
  * Extracted from FactorySheetsAndSacks.tsx during the Phase 4 god-file split.
  */
-import {useState, useMemo} from "react";
-import {useQuery} from "@tanstack/react-query";
-import {apiRequest} from "@/lib/queryClient";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Badge} from "@/components/ui/badge";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Loader2, History, ArrowDownCircle, ArrowUpCircle, TrendingDown, TrendingUp, BarChart3, Calendar} from "lucide-react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Loader2,
+  History,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  TrendingDown,
+  TrendingUp,
+  BarChart3,
+  Calendar,
+} from "lucide-react";
 
-import type {LogEntry, SheetsAndSacksItem} from "../types";
-import {DATE_PRESETS, fmt, fmtDate, fmtDateTime, getPresetDates, localDayOf} from "../utils";
+import type { LogEntry, SheetsAndSacksItem } from "../types";
+import { DATE_PRESETS, fmt, fmtDate, fmtDateTime, getPresetDates, localDayOf } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function MovementLog({ items }: { items: SheetsAndSacksItem[] }) {
+  const tUi = useFactoryText();
   const [preset, setPreset] = useState("week");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -139,19 +150,19 @@ export function MovementLog({ items }: { items: SheetsAndSacksItem[] }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Moves</SelectItem>
-              <SelectItem value="IN">Stock In ↑</SelectItem>
-              <SelectItem value="OUT">Stock Out ↓</SelectItem>
+              <SelectItem value="all">{tUi("all.moves")}</SelectItem>
+              <SelectItem value="IN">{tUi("stock.in")}</SelectItem>
+              <SelectItem value="OUT">{tUi("stock.out")}</SelectItem>
             </SelectContent>
           </Select>
 
           {/* Item filter */}
           <Select value={filterItemId} onValueChange={setFilterItemId}>
             <SelectTrigger className="h-7 text-xs w-40">
-              <SelectValue placeholder="All Items" />
+              <SelectValue placeholder={tUi("all.items")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Items</SelectItem>
+              <SelectItem value="all">{tUi("all.items")}</SelectItem>
               {items.map((i) => (
                 <SelectItem key={i.id} value={String(i.id)}>
                   {i.name}
@@ -168,7 +179,7 @@ export function MovementLog({ items }: { items: SheetsAndSacksItem[] }) {
           <div className="rounded-lg border bg-green-50 dark:bg-green-950/20 px-3 py-2.5">
             <div className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-400 mb-1">
               <ArrowUpCircle className="h-3.5 w-3.5" />
-              <span className="font-medium">Total In</span>
+              <span className="font-medium">{tUi("total.in")}</span>
             </div>
             <p className="font-mono font-bold text-sm text-green-700 dark:text-green-300">
               {totals.inPcs.toLocaleString()} pcs
@@ -178,7 +189,7 @@ export function MovementLog({ items }: { items: SheetsAndSacksItem[] }) {
           <div className="rounded-lg border bg-red-50 dark:bg-red-950/20 px-3 py-2.5">
             <div className="flex items-center gap-1.5 text-xs text-red-700 dark:text-red-400 mb-1">
               <ArrowDownCircle className="h-3.5 w-3.5" />
-              <span className="font-medium">Total Out</span>
+              <span className="font-medium">{tUi("total.out")}</span>
             </div>
             <p className="font-mono font-bold text-sm text-red-700 dark:text-red-300">
               {totals.outPcs.toLocaleString()} pcs
@@ -192,7 +203,7 @@ export function MovementLog({ items }: { items: SheetsAndSacksItem[] }) {
               className={`flex items-center gap-1.5 text-xs mb-1 ${totals.net >= 0 ? "text-blue-700 dark:text-blue-400" : "text-amber-700 dark:text-amber-400"}`}
             >
               {totals.net >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-              <span className="font-medium">Net Change</span>
+              <span className="font-medium">{tUi("net.change")}</span>
             </div>
             <p
               className={`font-mono font-bold text-sm ${totals.net >= 0 ? "text-blue-700 dark:text-blue-300" : "text-amber-700 dark:text-amber-300"}`}
@@ -204,7 +215,7 @@ export function MovementLog({ items }: { items: SheetsAndSacksItem[] }) {
           <div className="rounded-lg border bg-muted/30 px-3 py-2.5">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
               <BarChart3 className="h-3.5 w-3.5" />
-              <span className="font-medium">Transactions</span>
+              <span className="font-medium">{tUi("transactions")}</span>
             </div>
             <p className="font-bold text-sm">{logEntries.length}</p>
           </div>
@@ -219,8 +230,8 @@ export function MovementLog({ items }: { items: SheetsAndSacksItem[] }) {
       ) : logEntries.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
           <History className="h-10 w-10 mb-3 opacity-25" />
-          <p className="text-sm font-medium">No movement records for this period.</p>
-          <p className="text-xs mt-1 opacity-70">Use "Add Stock" (↑) or "Deduct" (↓) buttons to log movements.</p>
+          <p className="text-sm font-medium">{tUi("no.movement.records.for.this.period")}</p>
+          <p className="text-xs mt-1 opacity-70">{tUi("use.add.stock.or.deduct.buttons.to.log.movements")}</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -255,15 +266,15 @@ export function MovementLog({ items }: { items: SheetsAndSacksItem[] }) {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/20">
-                        <TableHead className="w-36 text-xs">Time</TableHead>
-                        <TableHead className="text-xs">Item</TableHead>
-                        <TableHead className="text-xs">Type</TableHead>
-                        <TableHead className="text-xs w-20">Action</TableHead>
-                        <TableHead className="text-right text-xs">Packs</TableHead>
+                        <TableHead className="w-36 text-xs">{tUi("time")}</TableHead>
+                        <TableHead className="text-xs">{tUi("item")}</TableHead>
+                        <TableHead className="text-xs">{tUi("type")}</TableHead>
+                        <TableHead className="text-xs w-20">{tUi("action")}</TableHead>
+                        <TableHead className="text-right text-xs">{tUi("packs")}</TableHead>
                         <TableHead className="text-right text-xs">Pcs</TableHead>
-                        <TableHead className="text-right text-xs">Unit $</TableHead>
-                        <TableHead className="text-right text-xs">Value</TableHead>
-                        <TableHead className="text-xs">Notes</TableHead>
+                        <TableHead className="text-right text-xs">{tUi("unit")}</TableHead>
+                        <TableHead className="text-right text-xs">{tUi("value")}</TableHead>
+                        <TableHead className="text-xs">{tUi("notes")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>

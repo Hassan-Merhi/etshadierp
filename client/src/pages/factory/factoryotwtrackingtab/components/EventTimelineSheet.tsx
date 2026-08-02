@@ -3,12 +3,13 @@
  *
  * Extracted from FactoryOtwTrackingTab.tsx during the Phase 4 god-file split.
  */
-import {useQuery, useQueryClient as useTQClient} from "@tanstack/react-query";
-import {Sheet, SheetContent, SheetHeader, SheetTitle} from "@/components/ui/sheet";
-import {ScrollArea} from "@/components/ui/scroll-area";
-import {MapPin, Activity} from "lucide-react";
-import {factoryApiRequest} from "@/lib/factoryApi";
-import type {TrackingEvent} from "../types";
+import { useQuery, useQueryClient as useTQClient } from "@tanstack/react-query";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { MapPin, Activity } from "lucide-react";
+import { factoryApiRequest } from "@/lib/factoryApi";
+import type { TrackingEvent } from "../types";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function EventTimelineSheet({
   containerId,
@@ -21,6 +22,7 @@ export function EventTimelineSheet({
   open: boolean;
   onClose: () => void;
 }) {
+  const tUi = useFactoryText();
   const { data: events = [], isLoading } = useQuery<TrackingEvent[]>({
     queryKey: ["/api/factory/container-tracking", containerId, "events"],
     queryFn: async () => {
@@ -63,8 +65,8 @@ export function EventTimelineSheet({
             ) : events.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
                 <Activity className="h-10 w-10 opacity-20" />
-                <p className="text-sm">No tracking events yet.</p>
-                <p className="text-xs">Click the refresh icon on the row to fetch live data.</p>
+                <p className="text-sm">{tUi("no.tracking.events.yet")}</p>
+                <p className="text-xs">{tUi("click.the.refresh.icon.on.the.row.to.fetch.live.")}</p>
               </div>
             ) : (
               <ol className="relative border-l border-border ml-2 space-y-0">

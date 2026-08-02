@@ -1,30 +1,69 @@
-import {useState, useRef, useEffect, useMemo} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {apiRequest, queryClient} from "@/lib/queryClient";
-import {Button} from "@/components/ui/button";
-import {Badge} from "@/components/ui/badge";
-import {Input} from "@/components/ui/input";
-import {Checkbox} from "@/components/ui/checkbox";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle} from "@/components/ui/alert-dialog";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
-import {Search, Filter, ChevronDown, ChevronRight, CheckCircle2, XCircle, MessageCircle, Eye, Trash2, RotateCcw, Check, RefreshCw, Loader2, SlidersHorizontal} from "lucide-react";
-import {useToast} from "@/hooks/use-toast";
-import {cn} from "@/lib/utils";
-import {useLocation} from "wouter";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Search,
+  Filter,
+  ChevronDown,
+  ChevronRight,
+  CheckCircle2,
+  XCircle,
+  MessageCircle,
+  Eye,
+  Trash2,
+  RotateCcw,
+  Check,
+  RefreshCw,
+  Loader2,
+  SlidersHorizontal,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { useLocation } from "wouter";
 
-import type {DisplayRow, ShippingColId, ShippingRow, TrackingRow} from "./factoryshippingcontainers/types";
-import {CLI_LEFT, CTR_LEFT, DEFAULT_COL_VIS, INV_LEFT, LIST_KEY, SHIPPING_COLS, STATUS_ORDER, fmtDate, statusColor, statusLabel, stickyCellBase, stickyHeadBase} from "./factoryshippingcontainers/utils";
-import {DocIndicator} from "./factoryshippingcontainers/components/DocIndicator";
-import {EditableCellInput} from "./factoryshippingcontainers/components/EditableCellInput";
-import {DateCellInput} from "./factoryshippingcontainers/components/DateCellInput";
-import {DocumentsModal} from "./factoryshippingcontainers/components/DocumentsModal";
-import {WhatsAppModal} from "./factoryshippingcontainers/components/WhatsAppModal";
-import {ShippingAvailabilityTable} from "./factoryshippingcontainers/components/ShippingAvailabilityTable";
+import type { DisplayRow, ShippingColId, ShippingRow, TrackingRow } from "./factoryshippingcontainers/types";
+import {
+  CLI_LEFT,
+  CTR_LEFT,
+  DEFAULT_COL_VIS,
+  INV_LEFT,
+  LIST_KEY,
+  SHIPPING_COLS,
+  STATUS_ORDER,
+  fmtDate,
+  statusColor,
+  statusLabel,
+  stickyCellBase,
+  stickyHeadBase,
+} from "./factoryshippingcontainers/utils";
+import { DocIndicator } from "./factoryshippingcontainers/components/DocIndicator";
+import { EditableCellInput } from "./factoryshippingcontainers/components/EditableCellInput";
+import { DateCellInput } from "./factoryshippingcontainers/components/DateCellInput";
+import { DocumentsModal } from "./factoryshippingcontainers/components/DocumentsModal";
+import { WhatsAppModal } from "./factoryshippingcontainers/components/WhatsAppModal";
+import { ShippingAvailabilityTable } from "./factoryshippingcontainers/components/ShippingAvailabilityTable";
+import { useFactoryText } from "@/i18n/modules/factory";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export default function FactoryShippingContainers() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
@@ -239,7 +278,7 @@ export default function FactoryShippingContainers() {
           <div className="relative flex-1 min-w-48">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search invoice, client, container, destination…"
+              placeholder={tUi("search.invoice.client.container.destination")}
               className="pl-8"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -304,29 +343,29 @@ export default function FactoryShippingContainers() {
         {showFilters && (
           <div className="flex flex-wrap gap-3 items-center p-3 rounded-md border bg-muted/30">
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Documents</p>
+              <p className="text-xs text-muted-foreground">{tUi("documents")}</p>
               <Select value={filterDocs} onValueChange={(v: any) => setFilterDocs(v)}>
                 <SelectTrigger className="h-8 text-xs w-36" data-testid="select-filter-docs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="has">Has Documents</SelectItem>
-                  <SelectItem value="missing">Missing Documents</SelectItem>
+                  <SelectItem value="has">{tUi("has.documents")}</SelectItem>
+                  <SelectItem value="missing">{tUi("missing.documents")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
-              <p className="text-xs text-muted-foreground">Status</p>
+              <p className="text-xs text-muted-foreground">{tUi("status")}</p>
               <Select value={filterStatus} onValueChange={setFilterStatus}>
                 <SelectTrigger className="h-8 text-xs w-44" data-testid="select-filter-status">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="LOADING">Loading</SelectItem>
-                  <SelectItem value="VERIFIED">Verified</SelectItem>
-                  <SelectItem value="FINALIZED">Finalized</SelectItem>
+                  <SelectItem value="all">{tUi("all.statuses.2")}</SelectItem>
+                  <SelectItem value="LOADING">{tUi("loading.3")}</SelectItem>
+                  <SelectItem value="VERIFIED">{tUi("verified")}</SelectItem>
+                  <SelectItem value="FINALIZED">{tUi("finalized")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -367,28 +406,30 @@ export default function FactoryShippingContainers() {
           >
             <TableHeader>
               <TableRow>
-                {colVis.orderDate && <TableHead className="text-xs w-20 min-w-[80px]">Order Date</TableHead>}
+                {colVis.orderDate && <TableHead className="text-xs w-20 min-w-[80px]">{tUi("order.date")}</TableHead>}
                 <TableHead className={stickyHeadBase} style={{ left: INV_LEFT, minWidth: "130px", width: "130px" }}>
                   Invoice #
                 </TableHead>
                 <TableHead className={stickyHeadBase} style={{ left: CLI_LEFT, minWidth: "144px", width: "144px" }}>
                   Client
                 </TableHead>
-                {colVis.status && <TableHead className="text-xs w-24 min-w-[96px]">Status</TableHead>}
+                {colVis.status && <TableHead className="text-xs w-24 min-w-[96px]">{tUi("status")}</TableHead>}
                 <TableHead className={stickyHeadBase} style={{ left: CTR_LEFT, minWidth: "120px", width: "120px" }}>
                   Container #
                 </TableHead>
-                {colVis.destination && <TableHead className="text-xs min-w-[120px]">Destination</TableHead>}
+                {colVis.destination && <TableHead className="text-xs min-w-[120px]">{tUi("destination")}</TableHead>}
                 {colVis.eta && <TableHead className="text-xs min-w-[100px]">ETA</TableHead>}
-                {colVis.arrived && <TableHead className="text-xs min-w-[90px]">Arrived</TableHead>}
-                {colVis.finalized && <TableHead className="text-xs min-w-[90px]">Finalized</TableHead>}
-                {colVis.shippingCo && <TableHead className="text-xs min-w-[110px]">Shipping Co.</TableHead>}
-                {colVis.documents && <TableHead className="text-xs min-w-[90px]">Documents</TableHead>}
-                {colVis.containerCost && <TableHead className="text-xs min-w-[100px]">Container Cost</TableHead>}
-                {colVis.ciNumber && <TableHead className="text-xs min-w-[100px]">CI No.</TableHead>}
-                {colVis.note && <TableHead className="text-xs min-w-[110px]">Note</TableHead>}
-                {colVis.whatsapp && <TableHead className="text-xs min-w-[90px]">WhatsApp</TableHead>}
-                {colVis.done && <TableHead className="text-xs min-w-[80px]">Done</TableHead>}
+                {colVis.arrived && <TableHead className="text-xs min-w-[90px]">{tUi("arrived")}</TableHead>}
+                {colVis.finalized && <TableHead className="text-xs min-w-[90px]">{tUi("finalized")}</TableHead>}
+                {colVis.shippingCo && <TableHead className="text-xs min-w-[110px]">{tUi("shipping.co")}</TableHead>}
+                {colVis.documents && <TableHead className="text-xs min-w-[90px]">{tUi("documents")}</TableHead>}
+                {colVis.containerCost && (
+                  <TableHead className="text-xs min-w-[100px]">{tUi("container.cost")}</TableHead>
+                )}
+                {colVis.ciNumber && <TableHead className="text-xs min-w-[100px]">{tUi("ci.no")}</TableHead>}
+                {colVis.note && <TableHead className="text-xs min-w-[110px]">{tUi("note")}</TableHead>}
+                {colVis.whatsapp && <TableHead className="text-xs min-w-[90px]">{tUi("whatsapp")}</TableHead>}
+                {colVis.done && <TableHead className="text-xs min-w-[80px]">{tUi("done")}</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -428,7 +469,7 @@ export default function FactoryShippingContainers() {
                       <TableCell>
                         <button
                           className="focus:outline-none"
-                          title="Open order"
+                          title={tUi("open.order")}
                           onClick={() => {
                             if (!r.customerOrderId) return;
                             if (r.status === "FINALIZED") {
@@ -450,7 +491,7 @@ export default function FactoryShippingContainers() {
                     <TableCell className={stickyCellBase} style={{ left: CTR_LEFT }}>
                       <EditableCellInput
                         value={r.containerNumber || ""}
-                        placeholder="Enter #"
+                        placeholder={tUi("enter.2")}
                         onSave={(v) => syncOrderMutation.mutate({ id: r.id, patch: { containerNumber: v || null } })}
                         testId={`cell-container-${r.id}`}
                         saving={syncOrderMutation.isPending}
@@ -461,7 +502,7 @@ export default function FactoryShippingContainers() {
                       <TableCell>
                         <EditableCellInput
                           value={r.destination || ""}
-                          placeholder="Enter destination"
+                          placeholder={tUi("enter.destination")}
                           onSave={(v) => syncOrderMutation.mutate({ id: r.id, patch: { destination: v || null } })}
                           testId={`cell-destination-${r.id}`}
                         />
@@ -473,14 +514,14 @@ export default function FactoryShippingContainers() {
                         {r._trackedEta ? (
                           <span
                             className="text-xs text-blue-600 dark:text-blue-400 font-medium whitespace-nowrap"
-                            title="Auto from tracking"
+                            title={tUi("auto.from.tracking")}
                           >
                             {fmtDate(r._trackedEta)}
                           </span>
                         ) : (
                           <DateCellInput
                             value={r.eta || ""}
-                            placeholder="Set ETA"
+                            placeholder={tUi("set.eta")}
                             onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { eta: v || null } })}
                             testId={`cell-eta-${r.id}`}
                           />
@@ -492,7 +533,7 @@ export default function FactoryShippingContainers() {
                       <TableCell>
                         <DateCellInput
                           value={r.containerArrivedDate || ""}
-                          placeholder="Not arrived"
+                          placeholder={tUi("not.arrived")}
                           onSave={(v) =>
                             patchRowMutation.mutate({ id: r.id, patch: { containerArrivedDate: v || null } })
                           }
@@ -508,7 +549,9 @@ export default function FactoryShippingContainers() {
                             {fmtDate(r.finalizedDate)}
                           </span>
                         ) : (
-                          <span className="text-amber-600 dark:text-amber-400 italic text-xs">Not finalized</span>
+                          <span className="text-amber-600 dark:text-amber-400 italic text-xs">
+                            {tUi("not.finalized")}
+                          </span>
                         )}
                       </TableCell>
                     )}
@@ -517,7 +560,7 @@ export default function FactoryShippingContainers() {
                       <TableCell>
                         <EditableCellInput
                           value={r.shippingCompany || ""}
-                          placeholder="Enter company"
+                          placeholder={tUi("enter.company")}
                           onSave={(v) => syncOrderMutation.mutate({ id: r.id, patch: { shippingCompany: v || null } })}
                           testId={`cell-shipping-${r.id}`}
                         />
@@ -544,7 +587,7 @@ export default function FactoryShippingContainers() {
                       <TableCell>
                         <EditableCellInput
                           value={r.ciNumber || ""}
-                          placeholder="Enter CI #"
+                          placeholder={tUi("enter.ci")}
                           onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { ciNumber: v || null } })}
                           testId={`cell-ci-${r.id}`}
                         />
@@ -555,7 +598,7 @@ export default function FactoryShippingContainers() {
                       <TableCell>
                         <EditableCellInput
                           value={r.note || ""}
-                          placeholder="Add note"
+                          placeholder={tUi("add.note")}
                           onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { note: v || null } })}
                           testId={`cell-note-${r.id}`}
                         />
@@ -622,24 +665,24 @@ export default function FactoryShippingContainers() {
                 {done.length}
               </Badge>
             </span>
-            <span className="text-xs">Collapse to keep workspace clean</span>
+            <span className="text-xs">{tUi("collapse.to.keep.workspace.clean")}</span>
           </button>
 
           {doneExpanded &&
             (done.length === 0 ? (
-              <div className="px-4 py-6 text-center text-xs text-muted-foreground">No done containers yet.</div>
+              <div className="px-4 py-6 text-center text-xs text-muted-foreground">{tUi("no.done.containers.yet")}</div>
             ) : (
               <div className="overflow-x-auto">
                 <Table className="text-xs">
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="text-xs">Invoice #</TableHead>
-                      <TableHead className="text-xs">Client</TableHead>
-                      <TableHead className="text-xs">Container #</TableHead>
-                      <TableHead className="text-xs">Destination</TableHead>
-                      <TableHead className="text-xs">Done Date</TableHead>
-                      <TableHead className="text-xs">WA Sent</TableHead>
-                      <TableHead className="text-xs">Done By</TableHead>
+                      <TableHead className="text-xs">{tUi("invoice.2")}</TableHead>
+                      <TableHead className="text-xs">{tUi("client")}</TableHead>
+                      <TableHead className="text-xs">{tUi("container.2")}</TableHead>
+                      <TableHead className="text-xs">{tUi("destination")}</TableHead>
+                      <TableHead className="text-xs">{tUi("done.date")}</TableHead>
+                      <TableHead className="text-xs">{tUi("wa.sent")}</TableHead>
+                      <TableHead className="text-xs">{tUi("done.by")}</TableHead>
                       <TableHead className="w-28" />
                     </TableRow>
                   </TableHeader>
@@ -731,14 +774,14 @@ export default function FactoryShippingContainers() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this record?</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("delete.this.record")}</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently delete the shipping container record and all its attached documents. This cannot be
               undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground"
               onClick={() => {
@@ -764,13 +807,13 @@ export default function FactoryShippingContainers() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Mark as Done?</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("mark.as.done")}</AlertDialogTitle>
             <AlertDialogDescription>
               This will move the shipment to the Done / Hidden section. You can restore it later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (pendingDoneId) {

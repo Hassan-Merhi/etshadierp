@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Factory } from "lucide-react";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function formatDailyNum(val: number): string {
   if (val === 0) return "0";
@@ -7,6 +8,7 @@ export function formatDailyNum(val: number): string {
 }
 
 export function DailyStockSummary({ date }: { date: string }) {
+  const tUi = useFactoryText();
   const todayStr = new Date().toLocaleDateString("en-CA");
 
   const { data: summaryRows = [] } = useQuery<any[]>({
@@ -70,7 +72,7 @@ export function DailyStockSummary({ date }: { date: string }) {
 
       {/* Garbage */}
       <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-orange-500/10 border-orange-500/20">
-        <span className="text-xs font-semibold text-orange-500">Garbage</span>
+        <span className="text-xs font-semibold text-orange-500">{tUi("garbage")}</span>
         <span
           className="text-sm font-bold tabular-nums text-orange-600 dark:text-orange-400"
           data-testid="text-entry-today-garbage-qty"
@@ -90,7 +92,7 @@ export function DailyStockSummary({ date }: { date: string }) {
 
       {/* Wipers */}
       <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-blue-500/10 border-blue-500/20">
-        <span className="text-xs font-semibold text-blue-500">Wipers</span>
+        <span className="text-xs font-semibold text-blue-500">{tUi("wipers")}</span>
         <span
           className="text-sm font-bold tabular-nums text-blue-600 dark:text-blue-400"
           data-testid="text-entry-today-wipers-qty"

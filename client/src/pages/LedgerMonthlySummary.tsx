@@ -226,33 +226,33 @@ export default function LedgerMonthlySummary() {
                         const startYear = parseISO(data.dateRange.startDate).getFullYear();
                         const startMonthNum = parseISO(data.dateRange.startDate).getMonth() + 1;
                         return (Array.isArray(data.months) ? data.months : []).map((month) => {
-                        const year = month.month >= startMonthNum ? startYear : startYear + 1;
-                        return (
-                          <TableRow
-                            key={month.month}
-                            className="cursor-pointer hover-elevate"
-                            onClick={() => handleMonthClick(month.month, year)}
-                            data-testid={`row-month-${month.month}`}
-                          >
-                            <TableCell className="font-medium">{month.monthName}</TableCell>
-                            <TableCell className="text-right font-mono hidden sm:table-cell">
-                              {month.debit > 0 ? formatAmount(month.debit) : ""}
-                            </TableCell>
-                            <TableCell className="text-right font-mono hidden sm:table-cell">
-                              {month.credit > 0 ? formatAmount(month.credit) : ""}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              {formatAmount(Math.abs(month.closingBalance))}{" "}
-                              <span className={`font-semibold ${drCrClass(month.closingBalance >= 0 ? "Cr" : "Dr")}`}>
-                                {month.closingBalance >= 0 ? "Cr" : "Dr"}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                            </TableCell>
-                          </TableRow>
-                        );
-                      });
+                          const year = month.month >= startMonthNum ? startYear : startYear + 1;
+                          return (
+                            <TableRow
+                              key={month.month}
+                              className="cursor-pointer hover-elevate"
+                              onClick={() => handleMonthClick(month.month, year)}
+                              data-testid={`row-month-${month.month}`}
+                            >
+                              <TableCell className="font-medium">{month.monthName}</TableCell>
+                              <TableCell className="text-right font-mono hidden sm:table-cell">
+                                {month.debit > 0 ? formatAmount(month.debit) : ""}
+                              </TableCell>
+                              <TableCell className="text-right font-mono hidden sm:table-cell">
+                                {month.credit > 0 ? formatAmount(month.credit) : ""}
+                              </TableCell>
+                              <TableCell className="text-right font-mono">
+                                {formatAmount(Math.abs(month.closingBalance))}{" "}
+                                <span className={`font-semibold ${drCrClass(month.closingBalance >= 0 ? "Cr" : "Dr")}`}>
+                                  {month.closingBalance >= 0 ? "Cr" : "Dr"}
+                                </span>
+                              </TableCell>
+                              <TableCell>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </TableCell>
+                            </TableRow>
+                          );
+                        });
                       })()}
 
                       {/* Grand Total */}

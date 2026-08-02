@@ -8,6 +8,7 @@
 import { DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { formatNumber } from "@/lib/formatNumber";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function PayrollPaymentView({
   entry,
@@ -22,6 +23,7 @@ export function PayrollPaymentView({
   badgeVariant: any;
   badgeClass: any;
 }) {
+  const tUi = useFactoryText();
   const p = payrollSummary;
   const n = (v: any) => parseFloat(v || "0");
 
@@ -36,12 +38,12 @@ export function PayrollPaymentView({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Payroll Payment</DialogTitle>
+        <DialogTitle>{tUi("payroll.payment")}</DialogTitle>
         <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
       </DialogHeader>
       <div className="space-y-4">
         {!p ? (
-          <p className="text-sm text-muted-foreground">Loading payroll details…</p>
+          <p className="text-sm text-muted-foreground">{tUi("loading.payroll.details")}</p>
         ) : (
           <>
             {/* Worker + period card */}
@@ -74,11 +76,11 @@ export function PayrollPaymentView({
                 </thead>
                 <tbody>
                   <tr className="border-b">
-                    <td className="px-3 py-2 text-muted-foreground w-1/3">Paid From</td>
+                    <td className="px-3 py-2 text-muted-foreground w-1/3">{tUi("paid.from")}</td>
                     <td className="px-3 py-2 font-medium">{p.cashAccountName || "Cash"}</td>
                   </tr>
                   <tr>
-                    <td className="px-3 py-2 text-muted-foreground">Paid To</td>
+                    <td className="px-3 py-2 text-muted-foreground">{tUi("paid.to")}</td>
                     <td className="px-3 py-2 font-medium">{p.workerName || `Worker #${p.workerId}`}</td>
                   </tr>
                 </tbody>
@@ -101,7 +103,7 @@ export function PayrollPaymentView({
                 <tbody>
                   {n(p.baseSalary) > 0 && (
                     <tr className="border-b">
-                      <td className="px-3 py-2">Base Salary</td>
+                      <td className="px-3 py-2">{tUi("base.salary")}</td>
                       <td className="px-3 py-2 text-right font-mono">${formatNumber(n(p.baseSalary))}</td>
                     </tr>
                   )}
@@ -144,23 +146,23 @@ export function PayrollPaymentView({
                   )}
                   {n(p.bonuses) > 0 && (
                     <tr className="border-b">
-                      <td className="px-3 py-2">Bonuses</td>
+                      <td className="px-3 py-2">{tUi("bonuses")}</td>
                       <td className="px-3 py-2 text-right font-mono">${formatNumber(n(p.bonuses))}</td>
                     </tr>
                   )}
                   {n(p.transport) > 0 && (
                     <tr className="border-b">
-                      <td className="px-3 py-2">Transport</td>
+                      <td className="px-3 py-2">{tUi("transport")}</td>
                       <td className="px-3 py-2 text-right font-mono">${formatNumber(n(p.transport))}</td>
                     </tr>
                   )}
                   <tr className="border-b bg-muted/20">
-                    <td className="px-3 py-2 font-medium">Gross Earnings</td>
+                    <td className="px-3 py-2 font-medium">{tUi("gross.earnings")}</td>
                     <td className="px-3 py-2 text-right font-mono font-medium">${formatNumber(grossEarnings)}</td>
                   </tr>
                   {n(p.deductions) > 0 && (
                     <tr className="border-b">
-                      <td className="px-3 py-2 text-destructive">Deductions</td>
+                      <td className="px-3 py-2 text-destructive">{tUi("deductions.2")}</td>
                       <td className="px-3 py-2 text-right font-mono text-destructive">
                         −${formatNumber(n(p.deductions))}
                       </td>
@@ -168,7 +170,7 @@ export function PayrollPaymentView({
                   )}
                   {n(p.advances) > 0 && (
                     <tr className="border-b">
-                      <td className="px-3 py-2 text-destructive">Advance Recovery</td>
+                      <td className="px-3 py-2 text-destructive">{tUi("advance.recovery")}</td>
                       <td className="px-3 py-2 text-right font-mono text-destructive">
                         −${formatNumber(n(p.advances))}
                       </td>
@@ -177,7 +179,7 @@ export function PayrollPaymentView({
                 </tbody>
                 <tfoot>
                   <tr className="bg-muted/50 font-bold border-t">
-                    <td className="px-3 py-2">Net Pay</td>
+                    <td className="px-3 py-2">{tUi("net.pay")}</td>
                     <td className="px-3 py-2 text-right font-mono">${formatNumber(netPay)}</td>
                   </tr>
                 </tfoot>
@@ -188,16 +190,16 @@ export function PayrollPaymentView({
             {(n(p.presentDays) > 0 || n(p.absentDays) > 0) && (
               <div className="flex gap-4 text-sm">
                 <div className="flex-1 rounded-md border px-3 py-2 text-center">
-                  <p className="text-xs text-muted-foreground">Days Present</p>
+                  <p className="text-xs text-muted-foreground">{tUi("days.present")}</p>
                   <p className="font-semibold">{p.presentDays}</p>
                 </div>
                 <div className="flex-1 rounded-md border px-3 py-2 text-center">
-                  <p className="text-xs text-muted-foreground">Days Absent</p>
+                  <p className="text-xs text-muted-foreground">{tUi("days.absent")}</p>
                   <p className="font-semibold">{p.absentDays}</p>
                 </div>
                 {p.totalWorkingDays > 0 && (
                   <div className="flex-1 rounded-md border px-3 py-2 text-center">
-                    <p className="text-xs text-muted-foreground">Working Days</p>
+                    <p className="text-xs text-muted-foreground">{tUi("working.days")}</p>
                     <p className="font-semibold">{p.totalWorkingDays}</p>
                   </div>
                 )}

@@ -1,15 +1,23 @@
-import {useState} from "react";
-import {useLocation} from "wouter";
-import {PageHeader} from "@/components/PageHeader";
-import {Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {useAppMode} from "@/contexts/AppModeContext";
-import {getApiRequest} from "@/lib/factoryApi";
-import {MapPin, BookOpen, Users, Truck, FolderTree, Package, type LucideIcon} from "lucide-react";
+import { useState } from "react";
+import { useLocation } from "wouter";
+import { PageHeader } from "@/components/PageHeader";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
+import { MapPin, BookOpen, Users, Truck, FolderTree, Package, type LucideIcon } from "lucide-react";
 import {} from "@shared/schema";
 
-import type {EntityType, SidebarGroup} from "./accountingcreate/types";
-import {entityConfig} from "./accountingcreate/utils";
-import {EntityFormWrapper} from "./accountingcreate/components/EntityFormWrapper";
+import type { EntityType, SidebarGroup } from "./accountingcreate/types";
+import { entityConfig } from "./accountingcreate/utils";
+import { EntityFormWrapper } from "./accountingcreate/components/EntityFormWrapper";
 export default function AccountingCreate() {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);

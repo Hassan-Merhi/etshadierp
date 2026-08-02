@@ -22,7 +22,11 @@ export default function PartiesHub() {
 
   return (
     <div className="flex flex-col h-full">
-      <Tabs value={activeTab} onValueChange={(value) => setTab(value as (typeof TAB_KEYS)[number])} className="flex flex-col h-full">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setTab(value as (typeof TAB_KEYS)[number])}
+        className="flex flex-col h-full"
+      >
         <div className="border-b bg-background px-4 pt-3">
           <TabsList className="h-9">
             {TABS.map((t) => (

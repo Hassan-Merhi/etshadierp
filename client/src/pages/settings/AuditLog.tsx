@@ -169,7 +169,7 @@ export function AuditLog({
   // display another company's activity.
   const auditLogs = useMemo(
     () => rawAuditLogs.filter((log: any) => Number(log.companyId) === activeCompanyId),
-    [rawAuditLogs, activeCompanyId],
+    [rawAuditLogs, activeCompanyId]
   );
 
   const totalPages = data?.totalPages || 1;
@@ -198,8 +198,12 @@ export function AuditLog({
   const errorCode = (error as any)?.code;
   const isPermissionError =
     errorStatus === 403 ||
-    String((error as any)?.message || "").toLowerCase().includes("access denied") ||
-    String((error as any)?.message || "").toLowerCase().includes("permission");
+    String((error as any)?.message || "")
+      .toLowerCase()
+      .includes("access denied") ||
+    String((error as any)?.message || "")
+      .toLowerCase()
+      .includes("permission");
   const isCompanyError = errorStatus === 409 || errorCode === "AUDIT_COMPANY_REQUIRED";
 
   return (

@@ -15,6 +15,7 @@ import { factoryApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
 import { getContainerStatusLabel } from "./otwHelpers";
 import type { ContainerWithSupplier } from "./otwHelpers";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface ContainerDetailDialogProps {
   container: ContainerWithSupplier | null;
@@ -31,6 +32,7 @@ export function ContainerDetailDialog({
   onClose,
   onEdit,
 }: ContainerDetailDialogProps) {
+  const tUi = useFactoryText();
   const { data: viewContainerCharges = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/containers", container?.id, "other-charges"],
     queryFn: async () => {
@@ -91,23 +93,23 @@ export function ContainerDetailDialog({
 
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Goods</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{tUi("goods")}</p>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-              <span className="text-muted-foreground">Weight</span>
+              <span className="text-muted-foreground">{tUi("weight")}</span>
               <span className="font-mono text-right">{formatNumber(totalKg)} kg</span>
-              <span className="text-muted-foreground">Rate</span>
+              <span className="text-muted-foreground">{tUi("rate")}</span>
               <span className="font-mono text-right">
                 {ccy} {formatNumber(ratePerKg)} / kg
               </span>
               {ccy !== "USD" && fxRate !== 1 && (
                 <>
-                  <span className="text-muted-foreground">FX Rate</span>
+                  <span className="text-muted-foreground">{tUi("fx.rate")}</span>
                   <span className="font-mono text-right">
                     1 {ccy} = {fxRate} USD
                   </span>
                 </>
               )}
-              <span className="text-muted-foreground font-medium">Base Value</span>
+              <span className="text-muted-foreground font-medium">{tUi("base.value")}</span>
               <span className="font-mono font-semibold text-right">
                 {ccy} {formatNumber(baseValue)}
               </span>
@@ -117,15 +119,15 @@ export function ContainerDetailDialog({
           {freightAmt > 0 && (
             <>
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Freight</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{tUi("freight")}</p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                  <span className="text-muted-foreground">Amount</span>
+                  <span className="text-muted-foreground">{tUi("amount")}</span>
                   <span className="font-mono text-right">
                     {freightCcy} {formatNumber(freightAmt)}
                   </span>
                   {freightAccName && (
                     <>
-                      <span className="text-muted-foreground">Account</span>
+                      <span className="text-muted-foreground">{tUi("account")}</span>
                       <span className="text-right truncate">{freightAccName}</span>
                     </>
                   )}
@@ -137,17 +139,19 @@ export function ContainerDetailDialog({
           {(legacyOtherAmt > 0 || viewContainerCharges.length > 0) && (
             <>
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Other Charges</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  {tUi("other.charges")}
+                </p>
                 <div className="space-y-2">
                   {legacyOtherAmt > 0 && (
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                      <span className="text-muted-foreground">Other Charges (legacy)</span>
+                      <span className="text-muted-foreground">{tUi("other.charges.legacy")}</span>
                       <span className="font-mono text-right">
                         {ccy} {formatNumber(legacyOtherAmt)}
                       </span>
                       {legacyOtherAccName && (
                         <>
-                          <span className="text-muted-foreground">Account</span>
+                          <span className="text-muted-foreground">{tUi("account")}</span>
                           <span className="text-right truncate">{legacyOtherAccName}</span>
                         </>
                       )}
@@ -180,27 +184,27 @@ export function ContainerDetailDialog({
           )}
           {commAmt > 0 && (
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Commission</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{tUi("commission")}</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                <span className="text-muted-foreground">Amount</span>
+                <span className="text-muted-foreground">{tUi("amount")}</span>
                 <span className="font-mono text-right">
                   {commCcy} {formatNumber(commAmt)}
                 </span>
                 {brokerName && (
                   <>
-                    <span className="text-muted-foreground">Broker</span>
+                    <span className="text-muted-foreground">{tUi("broker")}</span>
                     <span className="text-right">{brokerName}</span>
                   </>
                 )}
                 {commAccName && (
                   <>
-                    <span className="text-muted-foreground">Account</span>
+                    <span className="text-muted-foreground">{tUi("account")}</span>
                     <span className="text-right truncate">{commAccName}</span>
                   </>
                 )}
                 {vc.commissionNotes && (
                   <>
-                    <span className="text-muted-foreground">Notes</span>
+                    <span className="text-muted-foreground">{tUi("notes")}</span>
                     <span className="text-right">{vc.commissionNotes}</span>
                   </>
                 )}

@@ -13,6 +13,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
+import { useErpText } from "@/i18n/modules/erp";
 
 // ─── New Items tab types ──────────────────────────────────────────────────────
 
@@ -42,6 +43,7 @@ interface BarcodeRow {
 // ═════════════════════════════════════════════════════════════════════════════
 
 function NewItemsTab() {
+  const tUi = useErpText();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [file, setFile] = useState<File | null>(null);
@@ -168,8 +170,8 @@ function NewItemsTab() {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Upload Excel File</CardTitle>
-          <CardDescription>Download the template, fill in your stock items data, and upload it here</CardDescription>
+          <CardTitle>{tUi("upload.excel.file")}</CardTitle>
+          <CardDescription>{tUi("download.the.template.fill.in.your.stock.items.d")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Button variant="outline" onClick={downloadTemplate} data-testid="button-download-template">
@@ -177,7 +179,7 @@ function NewItemsTab() {
             Download Template
           </Button>
           <div className="space-y-2">
-            <Label htmlFor="file-upload">Select Excel File</Label>
+            <Label htmlFor="file-upload">{tUi("select.excel.file")}</Label>
             <Input
               id="file-upload"
               type="file"
@@ -221,17 +223,17 @@ function NewItemsTab() {
         <Card>
           <CardHeader>
             <CardTitle>Preview ({previewData.length} items)</CardTitle>
-            <CardDescription>Review the data before importing</CardDescription>
+            <CardDescription>{tUi("review.the.data.before.importing")}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="border rounded-md overflow-auto max-h-96">
               <table className="w-full">
                 <thead className="sticky top-0 z-30 bg-muted/50">
                   <tr className="border-b">
-                    <th className="text-left p-2 text-sm font-medium">Code</th>
-                    <th className="text-left p-2 text-sm font-medium">Name</th>
-                    <th className="text-left p-2 text-sm font-medium">Unit</th>
-                    <th className="text-left p-2 text-sm font-medium">Stock Group</th>
+                    <th className="text-left p-2 text-sm font-medium">{tUi("code")}</th>
+                    <th className="text-left p-2 text-sm font-medium">{tUi("name")}</th>
+                    <th className="text-left p-2 text-sm font-medium">{tUi("unit")}</th>
+                    <th className="text-left p-2 text-sm font-medium">{tUi("stock.group")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -287,6 +289,7 @@ function NewItemsTab() {
 // ═════════════════════════════════════════════════════════════════════════════
 
 function BarcodesTab() {
+  const tUi = useErpText();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -411,7 +414,7 @@ function BarcodesTab() {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Upload Barcode File</CardTitle>
+          <CardTitle>{tUi("upload.barcode.file")}</CardTitle>
           <CardDescription>
             Match barcodes to existing items using their Item Code. Each row assigns one barcode to one item — you can
             have multiple rows for the same item.
@@ -419,14 +422,14 @@ function BarcodesTab() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-md border bg-muted/40 p-4 text-sm space-y-1">
-            <p className="font-medium">Required columns</p>
+            <p className="font-medium">{tUi("required.columns")}</p>
             <p className="text-muted-foreground">
-              <span className="font-mono bg-background px-1 rounded">Item Code</span> — must match the primary code of
-              an existing item exactly
+              <span className="font-mono bg-background px-1 rounded">{tUi("item.code")}</span> — must match the primary
+              code of an existing item exactly
             </p>
             <p className="text-muted-foreground">
-              <span className="font-mono bg-background px-1 rounded">Barcode</span> — the barcode/alias to register
-              (e.g. EAN-13, UPC)
+              <span className="font-mono bg-background px-1 rounded">{tUi("barcode")}</span> — the barcode/alias to
+              register (e.g. EAN-13, UPC)
             </p>
             <p className="text-muted-foreground">
               One item can have many barcodes — just add multiple rows with the same Item Code.
@@ -439,7 +442,7 @@ function BarcodesTab() {
           </Button>
 
           <div className="space-y-2">
-            <Label htmlFor="barcode-file-upload">Select Excel File</Label>
+            <Label htmlFor="barcode-file-upload">{tUi("select.excel.file")}</Label>
             <Input
               id="barcode-file-upload"
               ref={fileInputRef}
@@ -500,9 +503,9 @@ function BarcodesTab() {
                 <thead className="sticky top-0 z-30 bg-muted/50">
                   <tr className="border-b">
                     <th className="text-left p-2 text-sm font-medium w-8">#</th>
-                    <th className="text-left p-2 text-sm font-medium">Item Code</th>
-                    <th className="text-left p-2 text-sm font-medium">Barcode</th>
-                    <th className="text-left p-2 text-sm font-medium">Status</th>
+                    <th className="text-left p-2 text-sm font-medium">{tUi("item.code")}</th>
+                    <th className="text-left p-2 text-sm font-medium">{tUi("barcode")}</th>
+                    <th className="text-left p-2 text-sm font-medium">{tUi("status")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -520,9 +523,11 @@ function BarcodesTab() {
                         {row.barcode || <span className="text-muted-foreground italic">empty</span>}
                       </td>
                       <td className="p-2">
-                        {row.status === "ok" && <Badge className="bg-green-600 text-white border-0">Valid</Badge>}
-                        {row.status === "duplicate" && <Badge variant="outline">Duplicate</Badge>}
-                        {row.status === "empty" && <Badge variant="outline">Empty</Badge>}
+                        {row.status === "ok" && (
+                          <Badge className="bg-green-600 text-white border-0">{tUi("valid")}</Badge>
+                        )}
+                        {row.status === "duplicate" && <Badge variant="outline">{tUi("duplicate")}</Badge>}
+                        {row.status === "empty" && <Badge variant="outline">{tUi("empty")}</Badge>}
                       </td>
                     </tr>
                   ))}
@@ -577,6 +582,7 @@ interface CategoryRow {
 }
 
 function UpdateCategoriesTab() {
+  const tUi = useErpText();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<CategoryRow[]>([]);
@@ -682,21 +688,21 @@ function UpdateCategoriesTab() {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Update Item Categories</CardTitle>
+          <CardTitle>{tUi("update.item.categories")}</CardTitle>
           <CardDescription>
             Upload an Excel file to bulk-assign categories (stock groups) to existing stock items by their item code.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-md border bg-muted/40 p-4 text-sm space-y-1">
-            <p className="font-medium">Required columns</p>
+            <p className="font-medium">{tUi("required.columns")}</p>
             <p className="text-muted-foreground">
-              <span className="font-mono bg-background px-1 rounded">Item Code</span> — must match an existing item's
-              code exactly
+              <span className="font-mono bg-background px-1 rounded">{tUi("item.code")}</span> — must match an existing
+              item's code exactly
             </p>
             <p className="text-muted-foreground">
-              <span className="font-mono bg-background px-1 rounded">Category Name</span> — must match an existing stock
-              group name exactly
+              <span className="font-mono bg-background px-1 rounded">{tUi("category.name")}</span> — must match an
+              existing stock group name exactly
             </p>
             <p className="text-muted-foreground">
               Each row updates one item. Duplicate item codes are skipped (first row wins).
@@ -708,7 +714,7 @@ function UpdateCategoriesTab() {
           </Button>
 
           <div className="space-y-2">
-            <Label htmlFor="cat-file-upload">Select Excel File</Label>
+            <Label htmlFor="cat-file-upload">{tUi("select.excel.file")}</Label>
             <Input
               id="cat-file-upload"
               ref={fileInputRef}
@@ -777,9 +783,9 @@ function UpdateCategoriesTab() {
                 <thead className="sticky top-0 z-30 bg-muted/50">
                   <tr className="border-b">
                     <th className="text-left p-2 text-sm font-medium w-8">#</th>
-                    <th className="text-left p-2 text-sm font-medium">Item Code</th>
-                    <th className="text-left p-2 text-sm font-medium">Category</th>
-                    <th className="text-left p-2 text-sm font-medium">Status</th>
+                    <th className="text-left p-2 text-sm font-medium">{tUi("item.code")}</th>
+                    <th className="text-left p-2 text-sm font-medium">{tUi("category")}</th>
+                    <th className="text-left p-2 text-sm font-medium">{tUi("status")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -793,9 +799,11 @@ function UpdateCategoriesTab() {
                         {row.categoryName || <span className="text-muted-foreground italic">empty</span>}
                       </td>
                       <td className="p-2">
-                        {row.status === "ok" && <Badge className="bg-green-600 text-white border-0">Valid</Badge>}
-                        {row.status === "duplicate" && <Badge variant="outline">Duplicate</Badge>}
-                        {row.status === "empty" && <Badge variant="outline">Empty</Badge>}
+                        {row.status === "ok" && (
+                          <Badge className="bg-green-600 text-white border-0">{tUi("valid")}</Badge>
+                        )}
+                        {row.status === "duplicate" && <Badge variant="outline">{tUi("duplicate")}</Badge>}
+                        {row.status === "empty" && <Badge variant="outline">{tUi("empty")}</Badge>}
                       </td>
                     </tr>
                   ))}
@@ -842,6 +850,7 @@ function UpdateCategoriesTab() {
 // ═════════════════════════════════════════════════════════════════════════════
 
 export default function ImportStockItems() {
+  const tUi = useErpText();
   const [_location, navigate] = useLocation();
 
   return (
@@ -850,7 +859,10 @@ export default function ImportStockItems() {
         <Button variant="ghost" size="icon" onClick={() => navigate("/accounting-create")} data-testid="button-back">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <PageHeader title="Import Stock Items" subtitle="Bulk import items or assign barcodes from Excel" />
+        <PageHeader
+          title={tUi("import.stock.items")}
+          subtitle={tUi("bulk.import.items.or.assign.barcodes.from.excel")}
+        />
       </div>
 
       <Tabs defaultValue="items">

@@ -31,9 +31,8 @@ export function MultiFilterSelect({
     onChange(selected.includes(val) ? selected.filter((v) => v !== val) : [...selected, val]);
   };
 
-  const visibleOptions = searchable && query.trim()
-    ? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()))
-    : options;
+  const visibleOptions =
+    searchable && query.trim() ? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase())) : options;
 
   const triggerLabel =
     selected.length === 0
@@ -43,7 +42,11 @@ export function MultiFilterSelect({
         : `${selected.length} selected`;
 
   return (
-    <Popover onOpenChange={(open) => { if (!open) setQuery(""); }}>
+    <Popover
+      onOpenChange={(open) => {
+        if (!open) setQuery("");
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           variant="outline"

@@ -4,7 +4,7 @@
  * Extracted from FactoryOtwTrackingTab.tsx during the Phase 4 god-file split.
  */
 
-import type {ContainerWithSupplier} from "./types";
+import type { ContainerWithSupplier } from "./types";
 
 export const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED"]);
 

@@ -3,11 +3,12 @@
  *
  * Extracted from AccountingCreate.tsx during the Phase 4 god-file split.
  */
-import {Card} from "@/components/ui/card";
-import {Form, FormControl, FormField, FormItem, FormLabel, FormMessage} from "@/components/ui/form";
-import {Input} from "@/components/ui/input";
-import {Checkbox} from "@/components/ui/checkbox";
-import {FormButtons} from "./FormButtons";
+import { Card } from "@/components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { FormButtons } from "./FormButtons";
+import { useErpText } from "@/i18n/modules/erp";
 
 export // Stock Group Form Component
 function StockGroupForm({
@@ -21,6 +22,7 @@ function StockGroupForm({
   onCancel: () => void;
   isPending: boolean;
 }) {
+  const tUi = useErpText();
   return (
     <Card className="p-4 md:p-6">
       <Form {...form}>
@@ -31,9 +33,9 @@ function StockGroupForm({
               name="code"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Code *</FormLabel>
+                  <FormLabel>{tUi("code.2")}</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="GRP001" data-testid="input-code" />
+                    <Input {...field} placeholder={tUi("grp001")} data-testid="input-code" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -45,9 +47,9 @@ function StockGroupForm({
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Name *</FormLabel>
+                  <FormLabel>{tUi("name.2")}</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="Cotton Bales" data-testid="input-name" />
+                    <Input {...field} placeholder={tUi("cotton.bales")} data-testid="input-name" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -62,7 +64,7 @@ function StockGroupForm({
                   <FormControl>
                     <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-active" />
                   </FormControl>
-                  <FormLabel className="!mt-0">Active</FormLabel>
+                  <FormLabel className="!mt-0">{tUi("active")}</FormLabel>
                 </FormItem>
               )}
             />

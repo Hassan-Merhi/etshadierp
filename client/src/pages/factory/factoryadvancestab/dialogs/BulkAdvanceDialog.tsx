@@ -19,6 +19,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fmt } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function BulkAdvanceDialog({
   bulkAmounts,
@@ -45,6 +46,7 @@ export function BulkAdvanceDialog({
   setBulkSelected: any;
   workers: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog
       open={bulkOpen}
@@ -58,14 +60,14 @@ export function BulkAdvanceDialog({
     >
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Bulk Advance</DialogTitle>
-          <DialogDescription>Record advances for multiple workers at once</DialogDescription>
+          <DialogTitle>{tUi("bulk.advance")}</DialogTitle>
+          <DialogDescription>{tUi("record.advances.for.multiple.workers.at.once")}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
           {/* Shared fields */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Date</Label>
+              <Label>{tUi("date")}</Label>
               <Input
                 type="date"
                 value={bulkForm.advanceDate}
@@ -74,13 +76,13 @@ export function BulkAdvanceDialog({
               />
             </div>
             <div className="space-y-2">
-              <Label>Cash Account</Label>
+              <Label>{tUi("cash.account.2")}</Label>
               <Select
                 value={bulkForm.cashAccountId}
                 onValueChange={(v) => setBulkForm((p: any) => ({ ...p, cashAccountId: v }))}
               >
                 <SelectTrigger data-testid="select-bulk-cash-account">
-                  <SelectValue placeholder="Optional" />
+                  <SelectValue placeholder={tUi("optional")} />
                 </SelectTrigger>
                 <SelectContent>
                   {(cashAccounts || []).map((a: any) => (
@@ -94,7 +96,7 @@ export function BulkAdvanceDialog({
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Repayment Type</Label>
+              <Label>{tUi("repayment.type")}</Label>
               <Select
                 value={bulkForm.repaymentType}
                 onValueChange={(v) => setBulkForm((p: any) => ({ ...p, repaymentType: v }))}
@@ -103,15 +105,15 @@ export function BulkAdvanceDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="salary_deduction">Deduct from Salary</SelectItem>
-                  <SelectItem value="manual_repayment">Manual Repayment (Loan)</SelectItem>
+                  <SelectItem value="salary_deduction">{tUi("deduct.from.salary")}</SelectItem>
+                  <SelectItem value="manual_repayment">{tUi("manual.repayment.loan")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Notes</Label>
+              <Label>{tUi("notes")}</Label>
               <Input
-                placeholder="Optional notes for all"
+                placeholder={tUi("optional.notes.for.all")}
                 value={bulkForm.notes}
                 onChange={(e) => setBulkForm((p: any) => ({ ...p, notes: e.target.value }))}
                 data-testid="input-bulk-notes"
@@ -122,7 +124,7 @@ export function BulkAdvanceDialog({
           {/* Worker table */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Workers & Amounts</Label>
+              <Label>{tUi("workers.amounts")}</Label>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
@@ -147,8 +149,8 @@ export function BulkAdvanceDialog({
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
                     <TableHead className="w-10"></TableHead>
-                    <TableHead>Worker</TableHead>
-                    <TableHead className="w-40">Amount ($)</TableHead>
+                    <TableHead>{tUi("worker")}</TableHead>
+                    <TableHead className="w-40">{tUi("amount.4")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

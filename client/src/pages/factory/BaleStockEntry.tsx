@@ -14,8 +14,10 @@ import DailyScan from "./DailyScan";
 import { StockEntryTab } from "./bale-stock-entry/StockEntryTab";
 import { DailyStockSummary } from "./bale-stock-entry/DailyStockSummary";
 import { WorkerCategoriesTab } from "./bale-stock-entry/WorkerCategoriesTab";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export default function BaleStockEntry() {
+  const tUi = useFactoryText();
   const todayStr = new Date().toLocaleDateString("en-CA");
   const [summaryDate, setSummaryDate] = useState<string>(todayStr);
   const { toast } = useToast();
@@ -77,8 +79,8 @@ export default function BaleStockEntry() {
             <ScanLine className="h-4.5 w-4.5 text-emerald-500" />
           </div>
           <div>
-            <h1 className="text-lg font-bold leading-tight">Bale Stock Entry</h1>
-            <p className="text-xs text-muted-foreground leading-tight">Scan and record bale production</p>
+            <h1 className="text-lg font-bold leading-tight">{tUi("bale.stock.entry")}</h1>
+            <p className="text-xs text-muted-foreground leading-tight">{tUi("scan.and.record.bale.production")}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">

@@ -1,24 +1,35 @@
 // LEGACY — Stock Allocation V3. Superseded by FactoryStockAllocationV5. Kept as fallback only. Route: /factory/stock-allocation-v3 (not in sidebar).
-import {useState} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {queryClient} from "@/lib/queryClient";
-import {Badge} from "@/components/ui/badge";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent} from "@/components/ui/card";
-import {useToast} from "@/hooks/use-toast";
-import {PageHeader} from "@/components/PageHeader";
-import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle} from "@/components/ui/alert-dialog";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Package, ScanLine, Play, CheckCircle, XCircle, Plus, Container, ChevronRight} from "lucide-react";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import { PageHeader } from "@/components/PageHeader";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Package, ScanLine, Play, CheckCircle, XCircle, Plus, Container, ChevronRight } from "lucide-react";
 
-import type {Proforma, StockRow, Tab, V3Load} from "./factorystockallocationv3/types";
-import {TABS, TAB_LABELS, fmtDate, fmtDateTime, fmtKg} from "./factorystockallocationv3/utils";
-import {StatusBadge} from "./factorystockallocationv3/components/StatusBadge";
-import {ScanningPanel} from "./factorystockallocationv3/components/ScanningPanel";
-import {CreateLoadDialog} from "./factorystockallocationv3/components/CreateLoadDialog";
+import type { Proforma, StockRow, Tab, V3Load } from "./factorystockallocationv3/types";
+import { TABS, TAB_LABELS, fmtDate, fmtDateTime, fmtKg } from "./factorystockallocationv3/utils";
+import { StatusBadge } from "./factorystockallocationv3/components/StatusBadge";
+import { ScanningPanel } from "./factorystockallocationv3/components/ScanningPanel";
+import { CreateLoadDialog } from "./factorystockallocationv3/components/CreateLoadDialog";
+import { useFactoryText } from "@/i18n/modules/factory";
 // ─────────────────────── Types ───────────────────────
 
 export default function FactoryStockAllocationV3() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [scanningLoad, setScanningLoad] = useState<V3Load | null>(null);
@@ -102,7 +113,7 @@ export default function FactoryStockAllocationV3() {
       {/* Page header */}
       <div className="px-6 pt-5 pb-3 border-b shrink-0">
         <div className="flex items-center gap-3 mb-4 flex-wrap">
-          <PageHeader title="Stock Allocation" />
+          <PageHeader title={tUi("stock.allocation")} />
           <Badge className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded">v3.0 TEST</Badge>
           <span className="text-xs text-muted-foreground hidden sm:inline">
             Factory 2.0 isolated module — not production
@@ -113,28 +124,28 @@ export default function FactoryStockAllocationV3() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
           <Card>
             <CardContent className="p-3">
-              <p className="text-xs text-muted-foreground">Stock in Hand</p>
+              <p className="text-xs text-muted-foreground">{tUi("stock.in.hand.2")}</p>
               <p className="text-2xl font-bold">{totalInStock}</p>
               <p className="text-xs text-muted-foreground">bales</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-3">
-              <p className="text-xs text-blue-600 dark:text-blue-400">Expected to Load</p>
+              <p className="text-xs text-blue-600 dark:text-blue-400">{tUi("expected.to.load")}</p>
               <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totalEtl}</p>
               <p className="text-xs text-muted-foreground">bales reserved</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-3">
-              <p className="text-xs text-orange-600 dark:text-orange-400">Loading</p>
+              <p className="text-xs text-orange-600 dark:text-orange-400">{tUi("loading.3")}</p>
               <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{totalLoading}</p>
               <p className="text-xs text-muted-foreground">bales in progress</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-3">
-              <p className="text-xs text-green-600 dark:text-green-400">Free to Promise</p>
+              <p className="text-xs text-green-600 dark:text-green-400">{tUi("free.to.promise")}</p>
               <p
                 className={`text-2xl font-bold ${totalFtp < 0 ? "text-red-500" : "text-green-600 dark:text-green-400"}`}
               >
@@ -182,20 +193,20 @@ export default function FactoryStockAllocationV3() {
             <p className="text-sm text-muted-foreground mb-3">
               Per-article breakdown. FTP = Stock in Hand − Expected to Load − Loading.
             </p>
-            {stockLoading && <p className="text-sm text-muted-foreground">Loading...</p>}
+            {stockLoading && <p className="text-sm text-muted-foreground">{tUi("loading.2")}</p>}
             {!stockLoading && stockRows.length === 0 && (
-              <p className="text-sm text-muted-foreground">No stock data available.</p>
+              <p className="text-sm text-muted-foreground">{tUi("no.stock.data.available")}</p>
             )}
             {stockRows.length > 0 && (
               <div className="rounded-md border table-responsive">
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
-                      <TableHead className="pl-4">Product</TableHead>
-                      <TableHead className="text-right">Stock in Hand</TableHead>
-                      <TableHead className="text-right">Expected to Load</TableHead>
-                      <TableHead className="text-right">Loading</TableHead>
-                      <TableHead className="text-right pr-4">Free to Promise</TableHead>
+                      <TableHead className="pl-4">{tUi("product")}</TableHead>
+                      <TableHead className="text-right">{tUi("stock.in.hand.2")}</TableHead>
+                      <TableHead className="text-right">{tUi("expected.to.load")}</TableHead>
+                      <TableHead className="text-right">{tUi("loading.3")}</TableHead>
+                      <TableHead className="text-right pr-4">{tUi("free.to.promise")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -242,8 +253,8 @@ export default function FactoryStockAllocationV3() {
             {expectedLoads.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
                 <Container className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                <p className="text-sm">No loads in Expected to Load.</p>
-                <p className="text-xs mt-1">Go to Proformas tab to create one.</p>
+                <p className="text-sm">{tUi("no.loads.in.expected.to.load")}</p>
+                <p className="text-xs mt-1">{tUi("go.to.proformas.tab.to.create.one")}</p>
               </div>
             )}
             {expectedLoads.length > 0 && (
@@ -251,12 +262,12 @@ export default function FactoryStockAllocationV3() {
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
-                      <TableHead className="pl-4">Load Name</TableHead>
-                      <TableHead>Proforma</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Expected Date</TableHead>
-                      <TableHead className="text-right">Bales</TableHead>
-                      <TableHead className="pr-4">Actions</TableHead>
+                      <TableHead className="pl-4">{tUi("load.name")}</TableHead>
+                      <TableHead>{tUi("proforma")}</TableHead>
+                      <TableHead>{tUi("customer")}</TableHead>
+                      <TableHead>{tUi("expected.date")}</TableHead>
+                      <TableHead className="text-right">{tUi("bales")}</TableHead>
+                      <TableHead className="pr-4">{tUi("actions")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -306,7 +317,7 @@ export default function FactoryStockAllocationV3() {
             {loadingLoads.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
                 <ScanLine className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                <p className="text-sm">No loads currently being loaded.</p>
+                <p className="text-sm">{tUi("no.loads.currently.being.loaded")}</p>
               </div>
             )}
             {loadingLoads.length > 0 && (
@@ -327,11 +338,11 @@ export default function FactoryStockAllocationV3() {
                         </div>
                         <div className="flex items-center gap-4 shrink-0">
                           <div className="text-right">
-                            <p className="text-xs text-muted-foreground">Scanned</p>
+                            <p className="text-xs text-muted-foreground">{tUi("scanned.2")}</p>
                             <p className="text-lg font-bold text-green-600 dark:text-green-400">{l.scannedBales}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-xs text-muted-foreground">Total Bales</p>
+                            <p className="text-xs text-muted-foreground">{tUi("total.bales")}</p>
                             <p className="text-lg font-bold">{l.totalBales}</p>
                           </div>
                           <Button
@@ -358,7 +369,7 @@ export default function FactoryStockAllocationV3() {
             {finalizedLoads.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
                 <CheckCircle className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                <p className="text-sm">No finalized loads yet.</p>
+                <p className="text-sm">{tUi("no.finalized.loads.yet")}</p>
               </div>
             )}
             {finalizedLoads.length > 0 && (
@@ -366,12 +377,12 @@ export default function FactoryStockAllocationV3() {
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
-                      <TableHead className="pl-4">Load Name</TableHead>
-                      <TableHead>Proforma</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Finalized At</TableHead>
-                      <TableHead className="text-right">Bales</TableHead>
-                      <TableHead className="text-right pr-4">Weight</TableHead>
+                      <TableHead className="pl-4">{tUi("load.name")}</TableHead>
+                      <TableHead>{tUi("proforma")}</TableHead>
+                      <TableHead>{tUi("customer")}</TableHead>
+                      <TableHead>{tUi("finalized.at")}</TableHead>
+                      <TableHead className="text-right">{tUi("bales")}</TableHead>
+                      <TableHead className="text-right pr-4">{tUi("weight")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -406,7 +417,7 @@ export default function FactoryStockAllocationV3() {
             {proformas.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
                 <Package className="h-10 w-10 mx-auto mb-3 opacity-30" />
-                <p className="text-sm">No active proformas found.</p>
+                <p className="text-sm">{tUi("no.active.proformas.found")}</p>
               </div>
             )}
             {proformas.length > 0 && (
@@ -414,12 +425,12 @@ export default function FactoryStockAllocationV3() {
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
-                      <TableHead className="pl-4">Proforma</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead className="text-right">Lines</TableHead>
-                      <TableHead className="text-right">Total Qty</TableHead>
+                      <TableHead className="pl-4">{tUi("proforma")}</TableHead>
+                      <TableHead>{tUi("customer")}</TableHead>
+                      <TableHead className="text-right">{tUi("lines")}</TableHead>
+                      <TableHead className="text-right">{tUi("total.qty")}</TableHead>
                       <TableHead>V3 Loads</TableHead>
-                      <TableHead className="pr-4">Actions</TableHead>
+                      <TableHead className="pr-4">{tUi("actions")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -476,13 +487,13 @@ export default function FactoryStockAllocationV3() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Cancel this load?</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("cancel.this.load")}</AlertDialogTitle>
             <AlertDialogDescription>
               This will cancel the expected load. Free to Promise will be restored. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep</AlertDialogCancel>
+            <AlertDialogCancel>{tUi("keep")}</AlertDialogCancel>
             <AlertDialogAction onClick={() => cancelTargetId && cancelMutation.mutate(cancelTargetId)}>
               Cancel Load
             </AlertDialogAction>

@@ -21,6 +21,7 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEscapeBack } from "@/hooks/use-escape-back";
 import { PageHeader } from "@/components/PageHeader";
+import { useErpText } from "@/i18n/modules/erp";
 
 type DatePreset =
   | "all"
@@ -132,6 +133,7 @@ const formatSmartNumber = (value: string | number) => {
 };
 
 export default function StockItemDetail() {
+  const tUi = useErpText();
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
   const appMode = useAppMode();
@@ -216,7 +218,7 @@ export default function StockItemDetail() {
           Back to Stock Query
         </Button>
         <Card>
-          <CardContent className="p-6 text-center text-muted-foreground">Stock item not found</CardContent>
+          <CardContent className="p-6 text-center text-muted-foreground">{tUi("stock.item.not.found")}</CardContent>
         </Card>
       </div>
     );
@@ -227,15 +229,15 @@ export default function StockItemDetail() {
       <div className="flex items-center gap-4">
         <Button variant="ghost" onClick={handleBack} data-testid="button-back-to-stock-query" className="gap-2">
           <ArrowLeft className="h-4 w-4" />
-          <span className="hidden sm:inline">Back to Stock Query</span>
-          <span className="sm:hidden">Back</span>
+          <span className="hidden sm:inline">{tUi("back.to.stock.query")}</span>
+          <span className="sm:hidden">{tUi("back")}</span>
         </Button>
       </div>
 
       <div>
         <PageHeader
           title={selectedItem?.name || "Loading..."}
-          subtitle="Purchase history, sales history, and current inventory locations"
+          subtitle={tUi("purchase.history.sales.history.and.current.inven")}
         />
       </div>
 
@@ -330,7 +332,7 @@ export default function StockItemDetail() {
           )}
 
           {preset !== "all" && (
-            <span className="text-xs text-muted-foreground">Filtering purchases &amp; sales by date</span>
+            <span className="text-xs text-muted-foreground">{tUi("filtering.purchases.amp.sales.by.date")}</span>
           )}
         </div>
       </Card>
@@ -344,7 +346,7 @@ export default function StockItemDetail() {
       ) : detailsError ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
           <Package className="h-10 w-10 opacity-25" />
-          <p className="text-sm font-medium text-foreground">Failed to load stock item details</p>
+          <p className="text-sm font-medium text-foreground">{tUi("failed.to.load.stock.item.details")}</p>
           {(detailsError as any)?.message && (
             <p className="text-xs text-destructive max-w-md text-center">{(detailsError as any).message}</p>
           )}
@@ -376,9 +378,9 @@ export default function StockItemDetail() {
                       <Table>
                         <TableHeader className="sticky top-0 bg-background">
                           <TableRow>
-                            <TableHead>Container</TableHead>
+                            <TableHead>{tUi("container")}</TableHead>
                             <TableHead className="text-right">Qty</TableHead>
-                            <TableHead className="text-right">Rate</TableHead>
+                            <TableHead className="text-right">{tUi("rate")}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -398,7 +400,7 @@ export default function StockItemDetail() {
                         </TableBody>
                         <TableFooter className="sticky bottom-0 bg-background border-t">
                           <TableRow className="font-semibold text-sm">
-                            <TableCell>Total</TableCell>
+                            <TableCell>{tUi("total")}</TableCell>
                             <TableCell className="text-right font-mono" data-testid="total-purchase-qty">
                               {formatSmartNumber(
                                 itemDetails.purchases.reduce((s, p) => s + parseFloat(p.quantity || "0"), 0)
@@ -427,7 +429,9 @@ export default function StockItemDetail() {
                   </div>
                 </>
               ) : (
-                <div className="h-64 flex items-center justify-center text-muted-foreground">No purchase history</div>
+                <div className="h-64 flex items-center justify-center text-muted-foreground">
+                  {tUi("no.purchase.history")}
+                </div>
               )}
             </CardContent>
           </Card>
@@ -448,10 +452,10 @@ export default function StockItemDetail() {
                       <Table>
                         <TableHeader className="sticky top-0 bg-background">
                           <TableRow>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Location</TableHead>
+                            <TableHead>{tUi("date")}</TableHead>
+                            <TableHead>{tUi("location")}</TableHead>
                             <TableHead className="text-right">Qty</TableHead>
-                            <TableHead className="text-right">Rate</TableHead>
+                            <TableHead className="text-right">{tUi("rate")}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -475,7 +479,7 @@ export default function StockItemDetail() {
                         </TableBody>
                         <TableFooter className="sticky bottom-0 bg-background border-t">
                           <TableRow className="font-semibold text-sm">
-                            <TableCell>Total</TableCell>
+                            <TableCell>{tUi("total")}</TableCell>
                             <TableCell></TableCell>
                             <TableCell className="text-right font-mono" data-testid="total-sales-qty">
                               {formatSmartNumber(
@@ -513,7 +517,9 @@ export default function StockItemDetail() {
                   </div>
                 </>
               ) : (
-                <div className="h-64 flex items-center justify-center text-muted-foreground">No sales history</div>
+                <div className="h-64 flex items-center justify-center text-muted-foreground">
+                  {tUi("no.sales.history")}
+                </div>
               )}
             </CardContent>
           </Card>
@@ -534,10 +540,10 @@ export default function StockItemDetail() {
                       <Table>
                         <TableHeader className="sticky top-0 bg-background">
                           <TableRow>
-                            <TableHead>Location</TableHead>
-                            <TableHead className="text-right">Quantity</TableHead>
-                            <TableHead className="text-right">Avg Rate</TableHead>
-                            <TableHead className="text-right">Total Value</TableHead>
+                            <TableHead>{tUi("location")}</TableHead>
+                            <TableHead className="text-right">{tUi("quantity")}</TableHead>
+                            <TableHead className="text-right">{tUi("avg.rate")}</TableHead>
+                            <TableHead className="text-right">{tUi("total.value")}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -558,7 +564,7 @@ export default function StockItemDetail() {
                         </TableBody>
                         <TableFooter className="sticky bottom-0 bg-background border-t">
                           <TableRow className="font-semibold text-sm">
-                            <TableCell>Total</TableCell>
+                            <TableCell>{tUi("total")}</TableCell>
                             <TableCell className="text-right font-mono" data-testid="total-inventory-qty">
                               {formatSmartNumber(
                                 itemDetails.inventoryLocations.reduce((s, l) => s + parseFloat(l.quantity || "0"), 0)
@@ -584,11 +590,11 @@ export default function StockItemDetail() {
                               <div className="font-mono">{formatSmartNumber(loc.quantity)}</div>
                             </div>
                             <div>
-                              <div className="text-xs">Avg Rate</div>
+                              <div className="text-xs">{tUi("avg.rate")}</div>
                               <div className="font-mono">{formatAmount(parseFloat(loc.averageRate))}</div>
                             </div>
                             <div>
-                              <div className="text-xs">Value</div>
+                              <div className="text-xs">{tUi("value")}</div>
                               <div className="font-mono font-medium">{formatAmount(parseFloat(loc.totalValue))}</div>
                             </div>
                           </div>

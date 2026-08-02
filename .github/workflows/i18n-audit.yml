@@ -19,3 +19,5 @@ jobs:
         uses: actions/checkout@v7
       - name: Run untranslated-text audit
         run: node scripts/audit-i18n-phase14.mjs
+      - name: Run missing-translation audit
+        run: node scripts/audit-i18n-missing-translations.mjs

@@ -14,6 +14,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function StockOverloadWarningDialog({
   overloadWarning,
@@ -22,6 +23,7 @@ export function StockOverloadWarningDialog({
   overloadWarning: any;
   setOverloadWarning: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog
       open={overloadWarning.open}
@@ -31,7 +33,7 @@ export function StockOverloadWarningDialog({
     >
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle data-testid="text-overload-warning-title">Stock Overload Warning</DialogTitle>
+          <DialogTitle data-testid="text-overload-warning-title">{tUi("stock.overload.warning")}</DialogTitle>
           <DialogDescription>
             The following items exceed available stock. You can still proceed, but the proforma will contain more bales
             than currently in stock.
@@ -41,10 +43,10 @@ export function StockOverloadWarningDialog({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Code</TableHead>
-                <TableHead>Product</TableHead>
-                <TableHead className="text-right">Requested</TableHead>
-                <TableHead className="text-right">Available</TableHead>
+                <TableHead>{tUi("code")}</TableHead>
+                <TableHead>{tUi("product")}</TableHead>
+                <TableHead className="text-right">{tUi("requested")}</TableHead>
+                <TableHead className="text-right">{tUi("available")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

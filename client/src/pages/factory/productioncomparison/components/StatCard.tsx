@@ -3,9 +3,9 @@
  *
  * Extracted from ProductionComparison.tsx during the Phase 4 god-file split.
  */
-import {Card, CardContent} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import React from "react";
-import {cn} from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 export function StatCard({
   title,

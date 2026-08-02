@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Trash2, Plus, ArrowLeft, Printer, TruckIcon } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 const API = "/api/factory/transporters";
 
@@ -83,6 +84,7 @@ function AccountSelect({
 // CHARGE DIALOG
 // ─────────────────────────────────────────────────────────────
 function ChargeDialog({ transporterId, open, onClose }: { transporterId: number; open: boolean; onClose: () => void }) {
+  const tUi = useFactoryText();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { toast } = useToast();
   const [amount, setAmount] = useState("");
@@ -119,12 +121,12 @@ function ChargeDialog({ transporterId, open, onClose }: { transporterId: number;
       <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Record Charge</DialogTitle>
+            <DialogTitle>{tUi("record.charge")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">Dr Expense Account / Cr Transporter Account</p>
+            <p className="text-xs text-muted-foreground">{tUi("dr.expense.account.cr.transporter.account")}</p>
             <div>
-              <Label>Amount ($) *</Label>
+              <Label>{tUi("amount.3")}</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -134,7 +136,7 @@ function ChargeDialog({ transporterId, open, onClose }: { transporterId: number;
               />
             </div>
             <div>
-              <Label>Date *</Label>
+              <Label>{tUi("date.2")}</Label>
               <Input
                 type="date"
                 value={txDate}
@@ -143,17 +145,17 @@ function ChargeDialog({ transporterId, open, onClose }: { transporterId: number;
               />
             </div>
             <div>
-              <Label>Expense Account *</Label>
+              <Label>{tUi("expense.account.2")}</Label>
               <AccountSelect
                 accounts={accounts}
                 value={expenseAccountId}
                 onChange={setExpenseAccountId}
-                placeholder="Select expense account…"
+                placeholder={tUi("select.expense.account")}
                 filter={(a) => ["Expense", "Direct Expense", "Indirect Expense"].includes(a.accountType)}
               />
             </div>
             <div>
-              <Label>Description</Label>
+              <Label>{tUi("description")}</Label>
               <Textarea
                 rows={2}
                 value={description}
@@ -194,6 +196,7 @@ function PaymentDialog({
   open: boolean;
   onClose: () => void;
 }) {
+  const tUi = useFactoryText();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { toast } = useToast();
   const [amount, setAmount] = useState("");
@@ -230,12 +233,12 @@ function PaymentDialog({
       <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Record Payment</DialogTitle>
+            <DialogTitle>{tUi("record.payment")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">Dr Transporter Account / Cr Cash</p>
+            <p className="text-xs text-muted-foreground">{tUi("dr.transporter.account.cr.cash")}</p>
             <div>
-              <Label>Amount ($) *</Label>
+              <Label>{tUi("amount.3")}</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -245,7 +248,7 @@ function PaymentDialog({
               />
             </div>
             <div>
-              <Label>Date *</Label>
+              <Label>{tUi("date.2")}</Label>
               <Input
                 type="date"
                 value={txDate}
@@ -254,17 +257,17 @@ function PaymentDialog({
               />
             </div>
             <div>
-              <Label>Cash / Bank Account *</Label>
+              <Label>{tUi("cash.bank.account.2")}</Label>
               <AccountSelect
                 accounts={accounts}
                 value={cashAccountId}
                 onChange={setCashAccountId}
-                placeholder="Select cash account…"
+                placeholder={tUi("select.cash.account.2")}
                 filter={(a) => ["Cash", "Bank"].includes(a.accountType)}
               />
             </div>
             <div>
-              <Label>Description</Label>
+              <Label>{tUi("description")}</Label>
               <Textarea
                 rows={2}
                 value={description}
@@ -297,6 +300,7 @@ function PaymentDialog({
 // STATEMENT VIEW (detail page)
 // ─────────────────────────────────────────────────────────────
 function TransporterStatement({ transporterId, onBack }: { transporterId: number; onBack: () => void }) {
+  const tUi = useFactoryText();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { toast } = useToast();
   const [chargeOpen, setChargeOpen] = useState(false);
@@ -321,8 +325,8 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
 
   const handlePrint = useReactToPrint({ contentRef: printRef });
 
-  if (isLoading) return <div className="p-8 text-center text-muted-foreground">Loading statement…</div>;
-  if (!data) return <div className="p-8 text-center text-muted-foreground">Transporter not found.</div>;
+  if (isLoading) return <div className="p-8 text-center text-muted-foreground">{tUi("loading.statement.2")}</div>;
+  if (!data) return <div className="p-8 text-center text-muted-foreground">{tUi("transporter.not.found")}</div>;
 
   return (
     <div className="space-y-4">
@@ -354,7 +358,7 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs text-muted-foreground font-normal">TOTAL CHARGED</CardTitle>
+            <CardTitle className="text-xs text-muted-foreground font-normal">{tUi("total.charged")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${fmt(data.totalCharged)}</div>
@@ -362,7 +366,7 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs text-muted-foreground font-normal">TOTAL PAID</CardTitle>
+            <CardTitle className="text-xs text-muted-foreground font-normal">{tUi("total.paid.3")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${data.totalPaid > 0 ? "text-green-600 dark:text-green-400" : ""}`}>
@@ -372,7 +376,7 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-xs text-muted-foreground font-normal">OUTSTANDING</CardTitle>
+            <CardTitle className="text-xs text-muted-foreground font-normal">{tUi("outstanding.2")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div
@@ -401,12 +405,12 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-30 bg-muted/50">
                   <tr className="border-b text-left text-muted-foreground">
-                    <th className="px-3 py-2 font-medium">Date</th>
-                    <th className="px-3 py-2 font-medium">Type</th>
-                    <th className="px-3 py-2 font-medium">Description</th>
-                    <th className="px-3 py-2 text-right font-medium">Charge</th>
-                    <th className="px-3 py-2 text-right font-medium">Payment</th>
-                    <th className="px-3 py-2 text-right font-medium">Balance</th>
+                    <th className="px-3 py-2 font-medium">{tUi("date")}</th>
+                    <th className="px-3 py-2 font-medium">{tUi("type")}</th>
+                    <th className="px-3 py-2 font-medium">{tUi("description")}</th>
+                    <th className="px-3 py-2 text-right font-medium">{tUi("charge")}</th>
+                    <th className="px-3 py-2 text-right font-medium">{tUi("payment")}</th>
+                    <th className="px-3 py-2 text-right font-medium">{tUi("balance")}</th>
                     <th className="px-3 py-2 print:hidden"></th>
                   </tr>
                 </thead>
@@ -497,6 +501,7 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
 // ADD TRANSPORTER DIALOG
 // ─────────────────────────────────────────────────────────────
 function AddTransporterDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const tUi = useFactoryText();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { toast } = useToast();
   const [name, setName] = useState("");
@@ -521,20 +526,20 @@ function AddTransporterDialog({ open, onClose }: { open: boolean; onClose: () =>
       <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Transporter</DialogTitle>
+            <DialogTitle>{tUi("add.transporter")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Name *</Label>
+              <Label>{tUi("name.2")}</Label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Transporter name"
+                placeholder={tUi("transporter.name")}
                 data-testid="input-transporter-name"
               />
             </div>
             <div>
-              <Label>Phone</Label>
+              <Label>{tUi("phone")}</Label>
               <Input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
@@ -543,7 +548,7 @@ function AddTransporterDialog({ open, onClose }: { open: boolean; onClose: () =>
               />
             </div>
             <div>
-              <Label>Notes</Label>
+              <Label>{tUi("notes")}</Label>
               <Textarea
                 rows={2}
                 value={notes}
@@ -578,6 +583,7 @@ function AddTransporterDialog({ open, onClose }: { open: boolean; onClose: () =>
 // MAIN PAGE — list
 // ─────────────────────────────────────────────────────────────
 export default function FactoryTransporters() {
+  const tUi = useFactoryText();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -601,7 +607,7 @@ export default function FactoryTransporters() {
         <div className="flex items-center gap-3">
           <TruckIcon className="h-6 w-6 text-orange-500" />
           <div>
-            <PageHeader title="Transporters" subtitle="Track charges and payments per transporter." />
+            <PageHeader title={tUi("transporters")} subtitle={tUi("track.charges.and.payments.per.transporter")} />
           </div>
         </div>
         <Button onClick={() => setAddOpen(true)} size="sm" data-testid="button-add-transporter">
@@ -614,7 +620,7 @@ export default function FactoryTransporters() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-xs text-muted-foreground font-normal">TOTAL TRANSPORTERS</CardTitle>
+              <CardTitle className="text-xs text-muted-foreground font-normal">{tUi("total.transporters")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{transporters.length}</div>
@@ -622,7 +628,7 @@ export default function FactoryTransporters() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-xs text-muted-foreground font-normal">TOTAL PAID</CardTitle>
+              <CardTitle className="text-xs text-muted-foreground font-normal">{tUi("total.paid.3")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div
@@ -634,7 +640,7 @@ export default function FactoryTransporters() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-xs text-muted-foreground font-normal">TOTAL OUTSTANDING</CardTitle>
+              <CardTitle className="text-xs text-muted-foreground font-normal">{tUi("total.outstanding")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div
@@ -659,46 +665,46 @@ export default function FactoryTransporters() {
           ) : transporters.length === 0 ? (
             <div className="p-12 text-center text-muted-foreground">
               <TruckIcon className="h-10 w-10 mx-auto mb-3 opacity-30" />
-              <p className="font-medium mb-1">No transporters yet</p>
-              <p className="text-xs">Add your first transporter to start tracking charges and payments.</p>
+              <p className="font-medium mb-1">{tUi("no.transporters.yet")}</p>
+              <p className="text-xs">{tUi("add.your.first.transporter.to.start.tracking.cha")}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 z-30 bg-muted/50">
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Transporter</th>
-                  <th className="px-4 py-3 font-medium">Phone</th>
-                  <th className="px-4 py-3 text-right font-medium">Total Charged</th>
-                  <th className="px-4 py-3 text-right font-medium">Total Paid</th>
-                  <th className="px-4 py-3 text-right font-medium">Outstanding</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transporters.map((t) => (
-                  <tr
-                    key={t.id}
-                    className="border-b hover-elevate cursor-pointer"
-                    onClick={() => setSelectedId(t.id)}
-                    data-testid={`row-transporter-${t.id}`}
-                  >
-                    <td className="px-4 py-3 font-medium">{t.name}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{t.phone || "—"}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">${fmt(t.totalCharged)}</td>
-                    <td
-                      className={`px-4 py-3 text-right tabular-nums ${t.totalPaid > 0 ? "text-green-600 dark:text-green-400" : ""}`}
-                    >
-                      ${fmt(t.totalPaid)}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-right tabular-nums font-medium ${t.outstanding > 0 ? "text-red-600 dark:text-red-400" : t.outstanding < 0 ? "text-green-600 dark:text-green-400" : ""}`}
-                    >
-                      ${fmt(t.outstanding)}
-                    </td>
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-30 bg-muted/50">
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="px-4 py-3 font-medium">{tUi("transporter")}</th>
+                    <th className="px-4 py-3 font-medium">{tUi("phone")}</th>
+                    <th className="px-4 py-3 text-right font-medium">{tUi("total.charged.2")}</th>
+                    <th className="px-4 py-3 text-right font-medium">{tUi("total.paid")}</th>
+                    <th className="px-4 py-3 text-right font-medium">{tUi("outstanding")}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {transporters.map((t) => (
+                    <tr
+                      key={t.id}
+                      className="border-b hover-elevate cursor-pointer"
+                      onClick={() => setSelectedId(t.id)}
+                      data-testid={`row-transporter-${t.id}`}
+                    >
+                      <td className="px-4 py-3 font-medium">{t.name}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{t.phone || "—"}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">${fmt(t.totalCharged)}</td>
+                      <td
+                        className={`px-4 py-3 text-right tabular-nums ${t.totalPaid > 0 ? "text-green-600 dark:text-green-400" : ""}`}
+                      >
+                        ${fmt(t.totalPaid)}
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-right tabular-nums font-medium ${t.outstanding > 0 ? "text-red-600 dark:text-red-400" : t.outstanding < 0 ? "text-green-600 dark:text-green-400" : ""}`}
+                      >
+                        ${fmt(t.outstanding)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </CardContent>

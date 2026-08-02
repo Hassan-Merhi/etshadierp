@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FileSpreadsheet, ChevronRight, Package, Weight, AlertCircle, User, Calendar } from "lucide-react";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 type ImportBatch = {
   id: number;
@@ -59,6 +60,7 @@ function formatDate(iso: string) {
 }
 
 export default function FactoryBaleImportHistory() {
+  const tUi = useFactoryText();
   const [selectedBatch, setSelectedBatch] = useState<ImportBatch | null>(null);
 
   const { data: batches = [], isLoading } = useQuery<ImportBatch[]>({
@@ -85,7 +87,7 @@ export default function FactoryBaleImportHistory() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Card>
           <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-muted-foreground mb-1">Total Imports</p>
+            <p className="text-xs text-muted-foreground mb-1">{tUi("total.imports")}</p>
             <p className="text-2xl font-semibold" data-testid="stat-import-count">
               {batches.length}
             </p>
@@ -93,7 +95,7 @@ export default function FactoryBaleImportHistory() {
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-muted-foreground mb-1">Total Bales Imported</p>
+            <p className="text-xs text-muted-foreground mb-1">{tUi("total.bales.imported")}</p>
             <p className="text-2xl font-semibold" data-testid="stat-total-bales">
               {fmt(totalBalesEver)}
             </p>
@@ -101,7 +103,7 @@ export default function FactoryBaleImportHistory() {
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3">
-            <p className="text-xs text-muted-foreground mb-1">Total Weight Imported</p>
+            <p className="text-xs text-muted-foreground mb-1">{tUi("total.weight.imported")}</p>
             <p className="text-2xl font-semibold" data-testid="stat-total-weight">
               {fmt(totalWeightEver)} <span className="text-sm font-normal text-muted-foreground">kg</span>
             </p>
@@ -119,12 +121,12 @@ export default function FactoryBaleImportHistory() {
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="p-8 text-center text-muted-foreground text-sm">Loading...</div>
+            <div className="p-8 text-center text-muted-foreground text-sm">{tUi("loading.2")}</div>
           ) : batches.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground text-sm space-y-2">
               <FileSpreadsheet className="h-8 w-8 mx-auto opacity-30" />
-              <p>No Excel imports found yet.</p>
-              <p className="text-xs">Future imports done from the Bales tab will appear here.</p>
+              <p>{tUi("no.excel.imports.found.yet")}</p>
+              <p className="text-xs">{tUi("future.imports.done.from.the.bales.tab.will.appe")}</p>
             </div>
           ) : (
             <div className="divide-y">
@@ -204,20 +206,22 @@ export default function FactoryBaleImportHistory() {
 
           <div className="flex-1 overflow-auto min-h-0 rounded-md border">
             {balesLoading ? (
-              <div className="p-8 text-center text-muted-foreground text-sm">Loading bales...</div>
+              <div className="p-8 text-center text-muted-foreground text-sm">{tUi("loading.bales")}</div>
             ) : batchBales.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground text-sm">No bales found for this batch.</div>
+              <div className="p-8 text-center text-muted-foreground text-sm">
+                {tUi("no.bales.found.for.this.batch")}
+              </div>
             ) : (
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead>Ref #</TableHead>
-                    <TableHead>Bale Code</TableHead>
-                    <TableHead>Article</TableHead>
-                    <TableHead>Product</TableHead>
-                    <TableHead>Grade</TableHead>
-                    <TableHead className="text-right">Weight (kg)</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>{tUi("ref")}</TableHead>
+                    <TableHead>{tUi("bale.code")}</TableHead>
+                    <TableHead>{tUi("article")}</TableHead>
+                    <TableHead>{tUi("product")}</TableHead>
+                    <TableHead>{tUi("grade")}</TableHead>
+                    <TableHead className="text-right">{tUi("weight.kg")}</TableHead>
+                    <TableHead>{tUi("status")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

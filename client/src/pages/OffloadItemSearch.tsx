@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Package, Container, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { PageHeader } from "@/components/PageHeader";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface OffloadResult {
   itemName: string;
@@ -22,6 +23,7 @@ interface OffloadResult {
 }
 
 export default function OffloadItemSearch() {
+  const tUi = useErpText();
   const [input, setInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -61,8 +63,8 @@ export default function OffloadItemSearch() {
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex-1">
           <PageHeader
-            title="Offload Item Search"
-            subtitle="Search any item name to see every offloaded container it arrived in"
+            title={tUi("offload.item.search")}
+            subtitle={tUi("search.any.item.name.to.see.every.offloaded.cont")}
           />
         </div>
         <div className="flex gap-2 w-full sm:w-auto">
@@ -79,7 +81,7 @@ export default function OffloadItemSearch() {
           </div>
           <Button onClick={handleSearch} disabled={!input.trim() || isLoading} data-testid="button-search">
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-            <span className="ml-1.5">Search</span>
+            <span className="ml-1.5">{tUi("search")}</span>
           </Button>
         </div>
       </div>
@@ -89,20 +91,20 @@ export default function OffloadItemSearch() {
         <div className="flex flex-wrap gap-3">
           <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex items-center gap-2">
             <Container className="h-4 w-4 text-muted-foreground" />
-            <span className="text-muted-foreground">Containers</span>
+            <span className="text-muted-foreground">{tUi("containers")}</span>
             <span className="font-semibold" data-testid="stat-containers">
               {uniqueContainers}
             </span>
           </div>
           <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex items-center gap-2">
             <Package className="h-4 w-4 text-muted-foreground" />
-            <span className="text-muted-foreground">Total Qty</span>
+            <span className="text-muted-foreground">{tUi("total.qty")}</span>
             <span className="font-semibold" data-testid="stat-qty">
               {fmtQty(totalQty)} BL
             </span>
           </div>
           <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex items-center gap-2">
-            <span className="text-muted-foreground">Total Value</span>
+            <span className="text-muted-foreground">{tUi("total.value")}</span>
             <span className="font-semibold" data-testid="stat-value">
               {fmtMoney(totalValue)}
             </span>
@@ -122,8 +124,8 @@ export default function OffloadItemSearch() {
       {!searchTerm && (
         <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
           <Search className="h-10 w-10 opacity-25" />
-          <p className="text-sm font-medium">Enter an item name above to search offloaded containers</p>
-          <p className="text-xs">Shows supplier price (Dubai price) — not the offloaded landed cost</p>
+          <p className="text-sm font-medium">{tUi("enter.an.item.name.above.to.search.offloaded.con")}</p>
+          <p className="text-xs">{tUi("shows.supplier.price.dubai.price.not.the.offload")}</p>
         </div>
       )}
 
@@ -132,7 +134,7 @@ export default function OffloadItemSearch() {
         <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
           <Package className="h-10 w-10 opacity-25" />
           <p className="text-sm font-medium">No offloaded containers found for &ldquo;{searchTerm}&rdquo;</p>
-          <p className="text-xs">Try a different item name or partial name</p>
+          <p className="text-xs">{tUi("try.a.different.item.name.or.partial.name")}</p>
         </div>
       )}
 
@@ -144,12 +146,12 @@ export default function OffloadItemSearch() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="h-11 bg-muted/40 border-b">
-                  <th className="text-left px-4 font-medium">Item Name</th>
-                  <th className="text-left px-4 font-medium">Container</th>
-                  <th className="text-left px-4 font-medium">Offload Date</th>
+                  <th className="text-left px-4 font-medium">{tUi("item.name")}</th>
+                  <th className="text-left px-4 font-medium">{tUi("container")}</th>
+                  <th className="text-left px-4 font-medium">{tUi("offload.date")}</th>
                   <th className="text-right px-4 font-medium">Qty</th>
-                  <th className="text-right px-4 font-medium">Price / BL</th>
-                  <th className="text-right px-4 font-medium">Total</th>
+                  <th className="text-right px-4 font-medium">{tUi("price.bl")}</th>
+                  <th className="text-right px-4 font-medium">{tUi("total")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -193,11 +195,11 @@ export default function OffloadItemSearch() {
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <div>
-                    <span className="text-foreground font-medium">Date:</span>{" "}
+                    <span className="text-foreground font-medium">{tUi("date.2")}</span>{" "}
                     {row.offloadDate ? format(new Date(row.offloadDate), "dd MMM yyyy") : "—"}
                   </div>
                   <div>
-                    <span className="text-foreground font-medium">Qty:</span> {fmtQty(row.quantity)} BL
+                    <span className="text-foreground font-medium">{tUi("qty")}</span> {fmtQty(row.quantity)} BL
                   </div>
                 </div>
                 <div className="flex justify-between items-center pt-1 border-t text-sm">

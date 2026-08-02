@@ -3,19 +3,20 @@
  *
  * Extracted from FactoryShippingContainers.tsx during the Phase 4 god-file split.
  */
-import {useState, useEffect} from "react";
-import {useQuery} from "@tanstack/react-query";
-import {Button} from "@/components/ui/button";
-import {Badge} from "@/components/ui/badge";
-import {Textarea} from "@/components/ui/textarea";
-import {Checkbox} from "@/components/ui/checkbox";
-import {Separator} from "@/components/ui/separator";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
-import {MessageCircle, Download, Copy, ExternalLink, Eye, Check, RefreshCw, Loader2} from "lucide-react";
-import {useToast} from "@/hooks/use-toast";
-import type {WaFileWithChecked, WhatsAppPreview} from "../types";
-import {LIST_KEY} from "../utils";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { MessageCircle, Download, Copy, ExternalLink, Eye, Check, RefreshCw, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import type { WaFileWithChecked, WhatsAppPreview } from "../types";
+import { LIST_KEY } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function WhatsAppModal({
   open,
@@ -28,6 +29,7 @@ export function WhatsAppModal({
   onClose: () => void;
   onMarkDone: (id: number, markWaSent: boolean) => void;
 }) {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [files, setFiles] = useState<WaFileWithChecked[]>([]);
   const [message, setMessage] = useState("");
@@ -166,29 +168,31 @@ export function WhatsAppModal({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 text-sm rounded-md border bg-muted/30 p-3">
                 <div>
-                  <span className="text-xs text-muted-foreground">Client</span>
+                  <span className="text-xs text-muted-foreground">{tUi("client")}</span>
                   <p className="font-medium">{p.clientName || "—"}</p>
                 </div>
                 <div>
-                  <span className="text-xs text-muted-foreground">Invoice</span>
+                  <span className="text-xs text-muted-foreground">{tUi("invoice")}</span>
                   <p className="font-mono font-medium">{p.invoiceNumber || "—"}</p>
                 </div>
                 <div>
-                  <span className="text-xs text-muted-foreground">Container</span>
+                  <span className="text-xs text-muted-foreground">{tUi("container")}</span>
                   <p className="font-mono">{p.containerNumber || "—"}</p>
                 </div>
                 <div>
-                  <span className="text-xs text-muted-foreground">Destination</span>
+                  <span className="text-xs text-muted-foreground">{tUi("destination")}</span>
                   <p>{p.destination || "—"}</p>
                 </div>
                 <div>
-                  <span className="text-xs text-muted-foreground">Shipping Company</span>
+                  <span className="text-xs text-muted-foreground">{tUi("shipping.company")}</span>
                   <p>{p.shippingCompany || "—"}</p>
                 </div>
                 <div>
-                  <span className="text-xs text-muted-foreground">WhatsApp Contact</span>
+                  <span className="text-xs text-muted-foreground">{tUi("whatsapp.contact")}</span>
                   <p>
-                    {preview?.whatsappContact || <span className="text-muted-foreground italic text-xs">Not set</span>}
+                    {preview?.whatsappContact || (
+                      <span className="text-muted-foreground italic text-xs">{tUi("not.set")}</span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -208,10 +212,10 @@ export function WhatsAppModal({
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-10 text-xs">Send</TableHead>
-                        <TableHead className="text-xs">File Name</TableHead>
-                        <TableHead className="text-xs">Type</TableHead>
-                        <TableHead className="text-xs">Source</TableHead>
+                        <TableHead className="w-10 text-xs">{tUi("send")}</TableHead>
+                        <TableHead className="text-xs">{tUi("file.name")}</TableHead>
+                        <TableHead className="text-xs">{tUi("type")}</TableHead>
+                        <TableHead className="text-xs">{tUi("source")}</TableHead>
                         <TableHead className="w-10" />
                       </TableRow>
                     </TableHeader>
@@ -261,7 +265,9 @@ export function WhatsAppModal({
               <Separator />
 
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">WhatsApp Message</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  {tUi("whatsapp.message")}
+                </p>
                 <Textarea
                   rows={10}
                   value={message}
@@ -272,13 +278,13 @@ export function WhatsAppModal({
               </div>
 
               <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 p-3 text-xs text-blue-800 dark:text-blue-300">
-                <p className="font-semibold mb-1">How to send:</p>
+                <p className="font-semibold mb-1">{tUi("how.to.send")}</p>
                 <ol className="list-decimal list-inside space-y-0.5">
-                  <li>Download the ZIP package below.</li>
-                  <li>Click "Open WhatsApp" — the message will pre-fill if a contact is set.</li>
-                  <li>Attach the downloaded files manually in WhatsApp.</li>
-                  <li>Review the message, then click Send.</li>
-                  <li>Come back here and click "I Sent It — Mark as Done".</li>
+                  <li>{tUi("download.the.zip.package.below")}</li>
+                  <li>{tUi("click.open.whatsapp.the.message.will.pre.fill.if")}</li>
+                  <li>{tUi("attach.the.downloaded.files.manually.in.whatsapp")}</li>
+                  <li>{tUi("review.the.message.then.click.send")}</li>
+                  <li>{tUi("come.back.here.and.click.i.sent.it.mark.as.done")}</li>
                 </ol>
               </div>
 

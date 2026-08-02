@@ -21,9 +21,7 @@ interface BalanceSheetSectionNavProps {
 export function BalanceSheetSectionNav({ activeSection, onSectionChange }: BalanceSheetSectionNavProps) {
   return (
     <nav aria-label="Balance sheet sections" className="w-full shrink-0 sm:w-56">
-      <h2 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Balance Sheet
-      </h2>
+      <h2 className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Balance Sheet</h2>
       <div className="grid grid-cols-3 gap-1 sm:block sm:space-y-1">
         {SECTION_ITEMS.map((item) => {
           const Icon = item.icon;

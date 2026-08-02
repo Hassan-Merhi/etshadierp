@@ -222,7 +222,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
   const isStockTransferVoucher = !!(
     selectedVoucher &&
-    (selectedVoucher.voucherType === "Stock Transfer" || selectedVoucher.voucherType === "StockTransfer" || selectedVoucher.voucherType === "Transfer")
+    (selectedVoucher.voucherType === "Stock Transfer" ||
+      selectedVoucher.voucherType === "StockTransfer" ||
+      selectedVoucher.voucherType === "Transfer")
   );
   const { data: voucherRevisions = [], isLoading: revisionsLoading } = useQuery<any[]>({
     queryKey:
@@ -312,12 +314,12 @@ export default function Daybook({ user }: { user?: any } = {}) {
       );
     });
 
-    const resolveUrl = (entry: typeof viewVoucherEntries[number]): string | null => {
+    const resolveUrl = (entry: (typeof viewVoucherEntries)[number]): string | null => {
       if (entry.ledgerAccountId) return `/api/accounts/ledger/${entry.ledgerAccountId}/balance`;
-      if (entry.bankAccountId)   return `/api/accounts/ledger/${entry.bankAccountId}/balance`;
-      if (entry.customerId)      return `/api/customers/${entry.customerId}/balance`;
-      if (entry.employeeId)      return `/api/employees/${entry.employeeId}/balance`;
-      if (entry.supplierId)      return `/api/suppliers/${entry.supplierId}/balance`;
+      if (entry.bankAccountId) return `/api/accounts/ledger/${entry.bankAccountId}/balance`;
+      if (entry.customerId) return `/api/customers/${entry.customerId}/balance`;
+      if (entry.employeeId) return `/api/employees/${entry.employeeId}/balance`;
+      if (entry.supplierId) return `/api/suppliers/${entry.supplierId}/balance`;
       if (entry.factorySupplierId) return `/api/factory/suppliers/${entry.factorySupplierId}/balance`;
       return null;
     };
@@ -442,7 +444,6 @@ export default function Daybook({ user }: { user?: any } = {}) {
     enabled: !!selectedCompany,
   });
 
-
   const filteredVouchers = useMemo(() => {
     return vouchers
       .filter((v) => {
@@ -491,8 +492,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   );
   const displayedRows = useMemo(() => visibleRows.slice(0, daybookRowLimit), [visibleRows, daybookRowLimit]);
 
-  const canEdit = (v: Voucher) =>
-    v.voucherType !== "Purchase" && user?.role !== "POS" && !isReadonlyMigratedVoucher(v);
+  const canEdit = (v: Voucher) => v.voucherType !== "Purchase" && user?.role !== "POS" && !isReadonlyMigratedVoucher(v);
   const canDelete = () => !!(user?.role === "Developer" || user?.role === "Admin" || user?.canDeleteRecords);
   const handleView = (v: Voucher) => {
     setSelectedVoucher(v);
@@ -583,11 +583,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
 
   return (
     <div className="flex flex-col gap-4 md:gap-6 p-3 md:p-6">
-      <PageHeader
-        title="Daybook"
-        subtitle="View all accounting transactions chronologically"
-        showBackButton
-      >
+      <PageHeader title="Daybook" subtitle="View all accounting transactions chronologically" showBackButton>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="gap-2">
@@ -608,153 +604,159 @@ export default function Daybook({ user }: { user?: any } = {}) {
       </PageHeader>
 
       {/* Tab selector: Transactions / Edits & Activity */}
-      <Tabs value={activeDaybookTab} onValueChange={(value) => setActiveDaybookTab(value as "transactions" | "activity")}>
+      <Tabs
+        value={activeDaybookTab}
+        onValueChange={(value) => setActiveDaybookTab(value as "transactions" | "activity")}
+      >
         <TabsList className="w-fit">
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="activity">Edits &amp; Activity</TabsTrigger>
         </TabsList>
 
         <TabsContent value="transactions" className="space-y-4 mt-0">
-      <DaybookFilters
-        periodFilter={periodFilter}
-        setPeriodFilter={setPeriodFilter}
-        filters={filters}
-        setFilters={setFilters}
-        onPrevDay={() => shiftDay(-1)}
-        onNextDay={() => shiftDay(1)}
-      />
+          <DaybookFilters
+            periodFilter={periodFilter}
+            setPeriodFilter={setPeriodFilter}
+            filters={filters}
+            setFilters={setFilters}
+            onPrevDay={() => shiftDay(-1)}
+            onNextDay={() => shiftDay(1)}
+          />
 
-      <div>
-        <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
           <div>
-            <h2 className="text-base font-semibold">Transactions</h2>
-            <p className="text-sm text-muted-foreground">All accounting vouchers and transactions</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowHidden(!showHidden)}
-              disabled={hiddenRowIds.size === 0}
-              className={cn("gap-1.5", showHidden && "text-foreground")}
-              data-testid="button-show-hidden"
-            >
-              <EyeOff className="w-4 h-4" />
-              {showHidden ? "Showing hidden" : "Show hidden"}
-            </Button>
-            <div className="flex border rounded-md overflow-hidden">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => { setViewMode("detailed"); saveDaybookState({ viewMode: "detailed" }); }}
-                className={cn("rounded-none gap-1.5", viewMode === "detailed" && "bg-muted font-medium")}
-                data-testid="button-view-detailed"
-              >
-                <LayoutList className="w-4 h-4" />
-                Detailed
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => { setViewMode("condensed"); saveDaybookState({ viewMode: "condensed" }); }}
-                className={cn("rounded-none gap-1.5", viewMode === "condensed" && "bg-muted font-medium")}
-                data-testid="button-view-condensed"
-              >
-                <Layers className="w-4 h-4" />
-                Condensed
-              </Button>
+            <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
+              <div>
+                <h2 className="text-base font-semibold">Transactions</h2>
+                <p className="text-sm text-muted-foreground">All accounting vouchers and transactions</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowHidden(!showHidden)}
+                  disabled={hiddenRowIds.size === 0}
+                  className={cn("gap-1.5", showHidden && "text-foreground")}
+                  data-testid="button-show-hidden"
+                >
+                  <EyeOff className="w-4 h-4" />
+                  {showHidden ? "Showing hidden" : "Show hidden"}
+                </Button>
+                <div className="flex border rounded-md overflow-hidden">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setViewMode("detailed");
+                      saveDaybookState({ viewMode: "detailed" });
+                    }}
+                    className={cn("rounded-none gap-1.5", viewMode === "detailed" && "bg-muted font-medium")}
+                    data-testid="button-view-detailed"
+                  >
+                    <LayoutList className="w-4 h-4" />
+                    Detailed
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setViewMode("condensed");
+                      saveDaybookState({ viewMode: "condensed" });
+                    }}
+                    className={cn("rounded-none gap-1.5", viewMode === "condensed" && "bg-muted font-medium")}
+                    data-testid="button-view-condensed"
+                  >
+                    <Layers className="w-4 h-4" />
+                    Condensed
+                  </Button>
+                </div>
+              </div>
             </div>
+            <DaybookTable
+              displayedRows={displayedRows}
+              visibleRows={visibleRows}
+              viewMode={viewMode}
+              selectedRowId={selectedRowId}
+              setSelectedRowId={setSelectedRowId}
+              hiddenRowIds={hiddenRowIds}
+              setHiddenRowIds={setHiddenRowIds}
+              showHidden={showHidden}
+              expandedVoucherId={expandedVoucherId}
+              setExpandedVoucherId={setExpandedVoucherId}
+              expandedCondensedGroups={expandedCondensedGroups}
+              setExpandedCondensedGroups={setExpandedCondensedGroups}
+              hideAmounts={hideAmounts}
+              accountNameCache={accountNameCache}
+              expandedLoading={expandedLoading}
+              expandedEntries={expandedEntries}
+              formatAmount={formatAmount}
+              formatDisplayDate={formatDisplayDate}
+              formatDisplayTime={formatDisplayTime}
+              handleView={handleView}
+              handleEdit={handleEdit}
+              handleDelete={(v) => {
+                setVoucherToDelete(v);
+                setDeleteDialogOpen(true);
+              }}
+              canEdit={canEdit}
+              canDelete={canDelete}
+              daybookRowLimit={daybookRowLimit}
+              setDaybookRowLimit={setDaybookRowLimit}
+              DAYBOOK_PAGE_SIZE={DAYBOOK_PAGE_SIZE}
+              navigate={navigate}
+            />
           </div>
-        </div>
-          <DaybookTable
-            displayedRows={displayedRows}
-            visibleRows={visibleRows}
-            viewMode={viewMode}
-            selectedRowId={selectedRowId}
-            setSelectedRowId={setSelectedRowId}
-            hiddenRowIds={hiddenRowIds}
-            setHiddenRowIds={setHiddenRowIds}
-            showHidden={showHidden}
-            expandedVoucherId={expandedVoucherId}
-            setExpandedVoucherId={setExpandedVoucherId}
-            expandedCondensedGroups={expandedCondensedGroups}
-            setExpandedCondensedGroups={setExpandedCondensedGroups}
-            hideAmounts={hideAmounts}
-            accountNameCache={accountNameCache}
-            expandedLoading={expandedLoading}
-            expandedEntries={expandedEntries}
+
+          <VoucherDetailsDialog
+            open={viewDialogOpen}
+            onOpenChange={setViewDialogOpen}
+            selectedVoucher={selectedVoucher}
+            viewEntriesLoading={viewEntriesLoading}
+            viewVoucherEntries={viewVoucherEntries}
+            isStockTransferVoucher={isStockTransferVoucher}
+            voucherRevisions={voucherRevisions}
+            revisionsLoading={revisionsLoading}
             formatAmount={formatAmount}
             formatDisplayDate={formatDisplayDate}
             formatDisplayTime={formatDisplayTime}
-            handleView={handleView}
+            cashAccountBalance={cashAccountBalance}
+            entryBalances={entryBalances}
+            purchaseOrderData={purchaseOrderData}
+            poSupplierBalance={poSupplierBalance}
+            selectedDialogRow={selectedDialogRow}
+            setSelectedDialogRow={setSelectedDialogRow}
+            viewProfitFilter={viewProfitFilter}
+            setViewProfitFilter={setViewProfitFilter}
+            user={user}
             handleEdit={handleEdit}
-            handleDelete={(v) => {
-              setVoucherToDelete(v);
-              setDeleteDialogOpen(true);
-            }}
             canEdit={canEdit}
-            canDelete={canDelete}
-            daybookRowLimit={daybookRowLimit}
-            setDaybookRowLimit={setDaybookRowLimit}
-            DAYBOOK_PAGE_SIZE={DAYBOOK_PAGE_SIZE}
             navigate={navigate}
+            employees={employees}
+            ledgerAccounts={ledgerAccounts}
+            bankAccounts={bankAccounts}
           />
-      </div>
 
-      <VoucherDetailsDialog
-        open={viewDialogOpen}
-        onOpenChange={setViewDialogOpen}
-        selectedVoucher={selectedVoucher}
-        viewEntriesLoading={viewEntriesLoading}
-        viewVoucherEntries={viewVoucherEntries}
-        isStockTransferVoucher={isStockTransferVoucher}
-        voucherRevisions={voucherRevisions}
-        revisionsLoading={revisionsLoading}
-        formatAmount={formatAmount}
-        formatDisplayDate={formatDisplayDate}
-        formatDisplayTime={formatDisplayTime}
-        cashAccountBalance={cashAccountBalance}
-        entryBalances={entryBalances}
-        purchaseOrderData={purchaseOrderData}
-        poSupplierBalance={poSupplierBalance}
-        selectedDialogRow={selectedDialogRow}
-        setSelectedDialogRow={setSelectedDialogRow}
-        viewProfitFilter={viewProfitFilter}
-        setViewProfitFilter={setViewProfitFilter}
-        user={user}
-        handleEdit={handleEdit}
-        canEdit={canEdit}
-        navigate={navigate}
-        employees={employees}
-        ledgerAccounts={ledgerAccounts}
-        bankAccounts={bankAccounts}
-      />
-
-      <VoucherEditDialog
-        open={editDialogOpen}
-        onOpenChange={setEditDialogOpen}
-        voucherToEdit={voucherToEdit}
-        entriesLoading={entriesLoading}
-        editForm={editForm}
-        editFields={editFields}
-        editAppend={editAppend}
-        editRemove={editRemove}
-        handleSaveEdit={(d) => voucherToEdit && editMutation.mutate({ id: voucherToEdit.id, updates: d })}
-        editMutationPending={editMutation.isPending}
-        ledgerAccounts={ledgerAccounts}
-        bankAccounts={bankAccounts}
-        suppliers={suppliers}
-        employees={employees}
-        fixedAssets={fixedAssets}
-        formatAmount={formatAmount}
-      />
-
+          <VoucherEditDialog
+            open={editDialogOpen}
+            onOpenChange={setEditDialogOpen}
+            voucherToEdit={voucherToEdit}
+            entriesLoading={entriesLoading}
+            editForm={editForm}
+            editFields={editFields}
+            editAppend={editAppend}
+            editRemove={editRemove}
+            handleSaveEdit={(d) => voucherToEdit && editMutation.mutate({ id: voucherToEdit.id, updates: d })}
+            editMutationPending={editMutation.isPending}
+            ledgerAccounts={ledgerAccounts}
+            bankAccounts={bankAccounts}
+            suppliers={suppliers}
+            employees={employees}
+            fixedAssets={fixedAssets}
+            formatAmount={formatAmount}
+          />
         </TabsContent>
 
         <TabsContent value="activity" className="mt-2">
-          {activeDaybookTab === "activity" && (
-            <AuditLog context="daybook" defaultActions="all" />
-          )}
+          {activeDaybookTab === "activity" && <AuditLog context="daybook" defaultActions="all" />}
         </TabsContent>
       </Tabs>
 

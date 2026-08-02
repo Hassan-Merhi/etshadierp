@@ -11,6 +11,7 @@ import { ArrowLeft, ArrowLeftRight, Check, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface BaleProduct {
   id: number;
@@ -25,6 +26,7 @@ interface BaleProduct {
 type Step = "select" | "confirm" | "done";
 
 export default function MergeBaleProducts() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [, navigate] = useLocation();
 
@@ -107,7 +109,7 @@ export default function MergeBaleProducts() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <PageHeader title="Merge Bale Products" icon={<ArrowLeftRight className="h-5 w-5" />} />
+          <PageHeader title={tUi("merge.bale.products")} icon={<ArrowLeftRight className="h-5 w-5" />} />
           <p className="text-sm text-muted-foreground">
             Select products to combine, then choose which one to keep as the primary. All bales move to the primary and
             the others are deactivated.
@@ -120,19 +122,19 @@ export default function MergeBaleProducts() {
         <div className="rounded-md border p-6 space-y-4">
           <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
             <Check className="h-5 w-5" />
-            <p className="font-semibold text-lg">Merge complete</p>
+            <p className="font-semibold text-lg">{tUi("merge.complete")}</p>
           </div>
           <div className="rounded-md border p-4 space-y-2 text-sm">
             <div>
-              <span className="text-muted-foreground">Primary product kept: </span>
+              <span className="text-muted-foreground">{tUi("primary.product.kept")} </span>
               <strong>{result.targetName}</strong>
             </div>
             <div>
-              <span className="text-muted-foreground">Duplicates deactivated: </span>
+              <span className="text-muted-foreground">{tUi("duplicates.deactivated")} </span>
               <strong>{result.mergedProducts}</strong>
             </div>
             <div>
-              <span className="text-muted-foreground">Bales reassigned: </span>
+              <span className="text-muted-foreground">{tUi("bales.reassigned")} </span>
               <strong>{result.movedBales}</strong>
             </div>
           </div>
@@ -155,7 +157,7 @@ export default function MergeBaleProducts() {
 
           <div className="space-y-3 text-sm">
             <div className="rounded-md border p-3 space-y-1">
-              <div className="text-xs text-muted-foreground mb-1">Keeping (primary)</div>
+              <div className="text-xs text-muted-foreground mb-1">{tUi("keeping.primary")}</div>
               <div className="font-semibold">{target?.name}</div>
               <div className="text-muted-foreground">
                 {target?.code}
@@ -222,7 +224,7 @@ export default function MergeBaleProducts() {
         /* Select step */
         <div className="space-y-4">
           <Input
-            placeholder="Search by name, code, or article code..."
+            placeholder={tUi("search.by.name.code.or.article.code")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             data-testid="input-merge-search"
@@ -335,7 +337,7 @@ export default function MergeBaleProducts() {
           )}
 
           {selected.size >= 2 && !targetId && (
-            <p className="text-xs text-muted-foreground">Pick which product to keep as primary above.</p>
+            <p className="text-xs text-muted-foreground">{tUi("pick.which.product.to.keep.as.primary.above")}</p>
           )}
 
           <div className="flex gap-2">

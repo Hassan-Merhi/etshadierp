@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { ChevronRight } from "lucide-react";
 import { LocationSales, POSTransaction } from "./analyticsTypes";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface SalesReportPanelProps {
   appMode: string;
@@ -67,14 +68,23 @@ export function SalesReportPanel({
   transactions,
   formatDisplayDate,
 }: SalesReportPanelProps) {
+  const tUi = useErpText();
   if (appMode === "factory") {
     return (
       <>
         <div className="flex flex-wrap items-center gap-3 mb-2">
-          <Label className="text-sm text-muted-foreground shrink-0">Date range:</Label>
-          <DatePickerInput value={factorySalesStartDate} onChange={setFactorySalesStartDate} placeholder="Start date" />
+          <Label className="text-sm text-muted-foreground shrink-0">{tUi("date.range")}</Label>
+          <DatePickerInput
+            value={factorySalesStartDate}
+            onChange={setFactorySalesStartDate}
+            placeholder={tUi("start.date")}
+          />
           <span className="text-muted-foreground text-sm">—</span>
-          <DatePickerInput value={factorySalesEndDate} onChange={setFactorySalesEndDate} placeholder="End date" />
+          <DatePickerInput
+            value={factorySalesEndDate}
+            onChange={setFactorySalesEndDate}
+            placeholder={tUi("end.date")}
+          />
           {(factorySalesStartDate || factorySalesEndDate) && (
             <Button
               variant="ghost"
@@ -91,7 +101,7 @@ export function SalesReportPanel({
 
         <Card className="p-6">
           <div className="mb-4">
-            <h3 className="text-lg font-medium">Factory OS — By Customer</h3>
+            <h3 className="text-lg font-medium">{tUi("factory.os.by.customer")}</h3>
             <p className="text-sm text-muted-foreground mt-1">
               Container sales from the factory system, grouped by customer
             </p>
@@ -103,17 +113,19 @@ export function SalesReportPanel({
               ))}
             </div>
           ) : factorySalesByCustomer.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">No factory OS sales data available</p>
+            <p className="text-sm text-muted-foreground text-center py-8">
+              {tUi("no.factory.os.sales.data.available")}
+            </p>
           ) : (
             <div className="table-responsive">
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead>Customer</TableHead>
-                    <TableHead className="text-right hidden sm:table-cell">Containers</TableHead>
-                    <TableHead className="text-right hidden sm:table-cell">Total Value</TableHead>
-                    <TableHead className="text-right hidden sm:table-cell">Paid</TableHead>
-                    <TableHead className="text-right">Outstanding</TableHead>
+                    <TableHead>{tUi("customer")}</TableHead>
+                    <TableHead className="text-right hidden sm:table-cell">{tUi("containers")}</TableHead>
+                    <TableHead className="text-right hidden sm:table-cell">{tUi("total.value")}</TableHead>
+                    <TableHead className="text-right hidden sm:table-cell">{tUi("paid")}</TableHead>
+                    <TableHead className="text-right">{tUi("outstanding")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -135,7 +147,7 @@ export function SalesReportPanel({
                 </TableBody>
                 <TableBody className="font-semibold border-t-2">
                   <TableRow>
-                    <TableCell>Total</TableCell>
+                    <TableCell>{tUi("total")}</TableCell>
                     <TableCell className="text-right hidden sm:table-cell">
                       {factorySalesByCustomer.reduce((s: number, r: any) => s + Number(r.containers), 0)}
                     </TableCell>
@@ -166,8 +178,8 @@ export function SalesReportPanel({
 
         <Card className="p-6">
           <div className="mb-4">
-            <h3 className="text-lg font-medium">Factory POS</h3>
-            <p className="text-sm text-muted-foreground mt-1">Point-of-sale transactions, by customer</p>
+            <h3 className="text-lg font-medium">{tUi("factory.pos")}</h3>
+            <p className="text-sm text-muted-foreground mt-1">{tUi("point.of.sale.transactions.by.customer")}</p>
           </div>
           {loadingFactoryPos ? (
             <div className="space-y-3">
@@ -176,18 +188,20 @@ export function SalesReportPanel({
               ))}
             </div>
           ) : !factoryPosSummary || (factoryPosSummary.byCustomer ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">No factory POS sales data available</p>
+            <p className="text-sm text-muted-foreground text-center py-8">
+              {tUi("no.factory.pos.sales.data.available")}
+            </p>
           ) : (
             <div className="table-responsive">
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead>Customer</TableHead>
-                    <TableHead className="text-right hidden sm:table-cell">Transactions</TableHead>
-                    <TableHead className="text-right">Total Sales</TableHead>
-                    <TableHead className="text-right hidden sm:table-cell">Cash Sales</TableHead>
-                    <TableHead className="text-right hidden sm:table-cell">Credit Sales</TableHead>
-                    <TableHead className="text-right hidden sm:table-cell">Deposit Collected</TableHead>
+                    <TableHead>{tUi("customer")}</TableHead>
+                    <TableHead className="text-right hidden sm:table-cell">{tUi("transactions")}</TableHead>
+                    <TableHead className="text-right">{tUi("total.sales")}</TableHead>
+                    <TableHead className="text-right hidden sm:table-cell">{tUi("cash.sales")}</TableHead>
+                    <TableHead className="text-right hidden sm:table-cell">{tUi("credit.sales")}</TableHead>
+                    <TableHead className="text-right hidden sm:table-cell">{tUi("deposit.collected")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -213,7 +227,7 @@ export function SalesReportPanel({
                 {factoryPosSummary.grand && (
                   <TableBody className="font-semibold border-t-2">
                     <TableRow>
-                      <TableCell>Total</TableCell>
+                      <TableCell>{tUi("total")}</TableCell>
                       <TableCell className="text-right hidden sm:table-cell">{factoryPosSummary.grand.sales}</TableCell>
                       <TableCell className="text-right font-mono">
                         {formatAmount(parseFloat(factoryPosSummary.grand.totalAmount))}
@@ -242,7 +256,7 @@ export function SalesReportPanel({
     <>
       <Card className="p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <h3 className="text-lg font-medium">Sales by Location</h3>
+          <h3 className="text-lg font-medium">{tUi("sales.by.location")}</h3>
           <div className="flex flex-wrap items-center gap-2">
             {selectedPeriod === "range" && (
               <>
@@ -268,11 +282,11 @@ export function SalesReportPanel({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Time</SelectItem>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="month">This Month</SelectItem>
-                <SelectItem value="year">This Year</SelectItem>
-                <SelectItem value="range">Custom Range</SelectItem>
+                <SelectItem value="all">{tUi("all.time")}</SelectItem>
+                <SelectItem value="today">{tUi("today")}</SelectItem>
+                <SelectItem value="month">{tUi("this.month")}</SelectItem>
+                <SelectItem value="year">{tUi("this.year")}</SelectItem>
+                <SelectItem value="range">{tUi("custom.range")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -285,18 +299,18 @@ export function SalesReportPanel({
             ))}
           </div>
         ) : salesData.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">No sales data available</p>
+          <p className="text-sm text-muted-foreground text-center py-8">{tUi("no.sales.data.available")}</p>
         ) : (
           <>
             <div className="hidden md:block">
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead>Location</TableHead>
-                    <TableHead className="text-right">Bales Sold</TableHead>
-                    <TableHead className="text-right">Total Sales</TableHead>
-                    <TableHead className="text-right">Transactions</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>{tUi("location")}</TableHead>
+                    <TableHead className="text-right">{tUi("bales.sold")}</TableHead>
+                    <TableHead className="text-right">{tUi("total.sales")}</TableHead>
+                    <TableHead className="text-right">{tUi("transactions")}</TableHead>
+                    <TableHead className="text-right">{tUi("actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -324,7 +338,7 @@ export function SalesReportPanel({
                 </TableBody>
                 <TableBody className="font-semibold border-t-2 bg-muted/40">
                   <TableRow>
-                    <TableCell>Total</TableCell>
+                    <TableCell>{tUi("total")}</TableCell>
                     <TableCell className="text-right font-mono">
                       {formatNumber(salesData.reduce((s, l) => s + (l.totalQuantity ?? 0), 0))}
                     </TableCell>
@@ -370,7 +384,7 @@ export function SalesReportPanel({
                 ))}
               <Card className="bg-muted/40">
                 <CardContent className="p-4">
-                  <div className="font-semibold mb-2">Total</div>
+                  <div className="font-semibold mb-2">{tUi("total")}</div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 text-sm gap-2">
                     <span className="text-muted-foreground">
                       Bales:{" "}
@@ -415,10 +429,10 @@ export function SalesReportPanel({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Time</SelectItem>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="month">This Month</SelectItem>
-                <SelectItem value="year">This Year</SelectItem>
+                <SelectItem value="all">{tUi("all.time")}</SelectItem>
+                <SelectItem value="today">{tUi("today")}</SelectItem>
+                <SelectItem value="month">{tUi("this.month")}</SelectItem>
+                <SelectItem value="year">{tUi("this.year")}</SelectItem>
               </SelectContent>
             </Select>
 
@@ -429,7 +443,7 @@ export function SalesReportPanel({
                 ))}
               </div>
             ) : transactions.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">No transactions found</p>
+              <p className="text-sm text-muted-foreground text-center py-8">{tUi("no.transactions.found")}</p>
             ) : (
               <>
                 <div className="overflow-y-auto flex-1 min-h-0">
@@ -437,12 +451,12 @@ export function SalesReportPanel({
                     <Table>
                       <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
-                          <TableHead>Date</TableHead>
-                          {selectedLocationForDetails === -1 && <TableHead>Customer</TableHead>}
-                          <TableHead>Cash Account</TableHead>
-                          <TableHead className="text-right">Items</TableHead>
-                          <TableHead className="text-right">Quantity</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
+                          <TableHead>{tUi("date")}</TableHead>
+                          {selectedLocationForDetails === -1 && <TableHead>{tUi("customer")}</TableHead>}
+                          <TableHead>{tUi("cash.account")}</TableHead>
+                          <TableHead className="text-right">{tUi("items")}</TableHead>
+                          <TableHead className="text-right">{tUi("quantity")}</TableHead>
+                          <TableHead className="text-right">{tUi("amount")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>

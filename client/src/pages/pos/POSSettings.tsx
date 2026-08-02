@@ -7,8 +7,10 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { KeyRound, Eye, EyeOff, CheckCircle2 } from "lucide-react";
+import { usePosText } from "@/i18n/modules/pos";
 
 export default function POSSettings() {
+  const tUi = usePosText();
   const { toast } = useToast();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -72,8 +74,8 @@ export default function POSSettings() {
   return (
     <div className="max-w-md mx-auto space-y-6">
       <div>
-        <h2 className="text-2xl font-semibold">Settings</h2>
-        <p className="text-muted-foreground text-sm mt-1">Manage your account settings.</p>
+        <h2 className="text-2xl font-semibold">{tUi("settings")}</h2>
+        <p className="text-muted-foreground text-sm mt-1">{tUi("manage.your.account.settings")}</p>
       </div>
 
       <Card>
@@ -82,19 +84,19 @@ export default function POSSettings() {
             <KeyRound className="h-4 w-4" />
             Change Password
           </CardTitle>
-          <CardDescription>Update your login password. Minimum 4 characters.</CardDescription>
+          <CardDescription>{tUi("update.your.login.password.minimum.4.characters")}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div className="space-y-1">
-              <Label htmlFor="current-password">Current Password</Label>
+              <Label htmlFor="current-password">{tUi("current.password")}</Label>
               <div className="relative">
                 <Input
                   id="current-password"
                   type={showCurrent ? "text" : "password"}
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  placeholder="Enter current password"
+                  placeholder={tUi("enter.current.password")}
                   data-testid="input-current-password"
                   required
                 />
@@ -110,14 +112,14 @@ export default function POSSettings() {
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="new-password">New Password</Label>
+              <Label htmlFor="new-password">{tUi("new.password")}</Label>
               <div className="relative">
                 <Input
                   id="new-password"
                   type={showNew ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Enter new password"
+                  placeholder={tUi("enter.new.password")}
                   data-testid="input-new-password"
                   required
                 />
@@ -133,14 +135,14 @@ export default function POSSettings() {
             </div>
 
             <div className="space-y-1">
-              <Label htmlFor="confirm-password">Confirm New Password</Label>
+              <Label htmlFor="confirm-password">{tUi("confirm.new.password")}</Label>
               <div className="relative">
                 <Input
                   id="confirm-password"
                   type={showConfirm ? "text" : "password"}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Repeat new password"
+                  placeholder={tUi("repeat.new.password")}
                   data-testid="input-confirm-password"
                   required
                 />
@@ -159,7 +161,7 @@ export default function POSSettings() {
                 </p>
               )}
               {confirmPassword && newPassword && confirmPassword !== newPassword && (
-                <p className="text-xs text-destructive mt-1">Passwords do not match</p>
+                <p className="text-xs text-destructive mt-1">{tUi("passwords.do.not.match")}</p>
               )}
             </div>
 

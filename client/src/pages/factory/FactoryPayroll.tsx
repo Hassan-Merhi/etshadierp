@@ -31,7 +31,9 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 
 import type { Company, PayrollRecord } from "./factorypayroll/types";
 import { getStatusBadge } from "./factorypayroll/utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactoryPayrollPage() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const today = new Date().toLocaleDateString("en-CA");
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-CA");
@@ -369,18 +371,21 @@ export default function FactoryPayrollPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <PageHeader title="Factory Worker Payroll" subtitle="Generate and manage factory worker payroll" />
+          <PageHeader
+            title={tUi("factory.worker.payroll")}
+            subtitle={tUi("generate.and.manage.factory.worker.payroll")}
+          />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {companies.length > 1 && (
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Company</Label>
+              <Label className="text-xs text-muted-foreground">{tUi("company")}</Label>
               <Select
                 value={selectedCompanyId ? String(selectedCompanyId) : ""}
                 onValueChange={(val) => setCompanyId(parseInt(val))}
               >
                 <SelectTrigger className="w-48" data-testid="select-company">
-                  <SelectValue placeholder="Select company" />
+                  <SelectValue placeholder={tUi("select.company")} />
                 </SelectTrigger>
                 <SelectContent>
                   {companies.map((c) => (
@@ -428,7 +433,7 @@ export default function FactoryPayrollPage() {
               onClick={handleMigrateCitySplit}
               disabled={!selectedCompanyId || migrating}
               data-testid="button-migrate-city-split"
-              title="One-time: split historical salary/bonus by city"
+              title={tUi("one.time.split.historical.salary.bonus.by.city")}
             >
               {migrating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <GitMerge className="h-4 w-4 mr-1" />}
               Split by City
@@ -456,7 +461,7 @@ export default function FactoryPayrollPage() {
             <CardContent className="pt-4">
               <div className="flex items-end gap-4 flex-wrap">
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">From</Label>
+                  <Label className="text-xs text-muted-foreground">{tUi("from")}</Label>
                   <Input
                     type="date"
                     value={filterStartDate}
@@ -476,16 +481,16 @@ export default function FactoryPayrollPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Status</Label>
+                  <Label className="text-xs text-muted-foreground">{tUi("status")}</Label>
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
                     <SelectTrigger className="w-40" data-testid="select-status-filter">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ALL">All Statuses</SelectItem>
-                      <SelectItem value="DRAFT">Draft</SelectItem>
-                      <SelectItem value="APPROVED">Approved</SelectItem>
-                      <SelectItem value="PAID">Paid</SelectItem>
+                      <SelectItem value="ALL">{tUi("all.statuses.2")}</SelectItem>
+                      <SelectItem value="DRAFT">{tUi("draft")}</SelectItem>
+                      <SelectItem value="APPROVED">{tUi("approved")}</SelectItem>
+                      <SelectItem value="PAID">{tUi("paid")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -498,7 +503,7 @@ export default function FactoryPayrollPage() {
               <CardContent className="pt-4">
                 <div className="flex items-center gap-2">
                   <Users className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Records</p>
+                  <p className="text-sm text-muted-foreground">{tUi("records")}</p>
                 </div>
                 <p className="text-2xl font-bold font-mono mt-1" data-testid="text-total-records">
                   {payrollRecords.length}
@@ -509,7 +514,7 @@ export default function FactoryPayrollPage() {
               <CardContent className="pt-4">
                 <div className="flex items-center gap-2">
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Total Net Salary</p>
+                  <p className="text-sm text-muted-foreground">{tUi("total.net.salary")}</p>
                 </div>
                 <p className="text-2xl font-bold font-mono mt-1" data-testid="text-total-net">
                   ${totals.netSalary.toFixed(2)}
@@ -520,7 +525,7 @@ export default function FactoryPayrollPage() {
               <CardContent className="pt-4">
                 <div className="flex items-center gap-2">
                   <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Total Base</p>
+                  <p className="text-sm text-muted-foreground">{tUi("total.base")}</p>
                 </div>
                 <p className="text-2xl font-bold font-mono mt-1" data-testid="text-total-base">
                   ${totals.baseSalary.toFixed(2)}
@@ -531,7 +536,7 @@ export default function FactoryPayrollPage() {
               <CardContent className="pt-4">
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Period</p>
+                  <p className="text-sm text-muted-foreground">{tUi("period")}</p>
                 </div>
                 <p className="text-sm font-mono mt-1" data-testid="text-period">
                   {filterStartDate} - {filterEndDate}
@@ -551,41 +556,43 @@ export default function FactoryPayrollPage() {
               {!selectedCompanyId ? (
                 <div className="text-center py-12">
                   <Users className="mx-auto h-12 w-12 text-muted-foreground" />
-                  <h3 className="mt-4 text-lg font-semibold">Select a company</h3>
-                  <p className="text-muted-foreground mt-2">Choose a company to view payroll records</p>
+                  <h3 className="mt-4 text-lg font-semibold">{tUi("select.a.company")}</h3>
+                  <p className="text-muted-foreground mt-2">{tUi("choose.a.company.to.view.payroll.records")}</p>
                 </div>
               ) : isLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  <span className="ml-2 text-muted-foreground">Loading payroll...</span>
+                  <span className="ml-2 text-muted-foreground">{tUi("loading.payroll")}</span>
                 </div>
               ) : isError ? (
                 <div className="text-center py-12">
-                  <p className="text-destructive">Failed to load payroll data. Please try again.</p>
+                  <p className="text-destructive">{tUi("failed.to.load.payroll.data.please.try.again")}</p>
                 </div>
               ) : payrollRecords.length === 0 ? (
                 <div className="text-center py-12">
                   <DollarSign className="mx-auto h-12 w-12 text-muted-foreground" />
-                  <h3 className="mt-4 text-lg font-semibold">No payroll records found</h3>
-                  <p className="text-muted-foreground mt-2">Generate payroll or adjust the filters to see records</p>
+                  <h3 className="mt-4 text-lg font-semibold">{tUi("no.payroll.records.found")}</h3>
+                  <p className="text-muted-foreground mt-2">
+                    {tUi("generate.payroll.or.adjust.the.filters.to.see.re")}
+                  </p>
                 </div>
               ) : (
                 <div className="table-responsive">
                   <Table>
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
-                        <TableHead>Employee Code</TableHead>
-                        <TableHead>Worker Name</TableHead>
-                        <TableHead>Position</TableHead>
-                        <TableHead className="text-right">Base Salary</TableHead>
-                        <TableHead className="text-right">Bale Earnings</TableHead>
-                        <TableHead className="text-right">KG Earnings</TableHead>
-                        <TableHead className="text-right">Overtime</TableHead>
-                        <TableHead className="text-right">Bonuses</TableHead>
-                        <TableHead className="text-right">Deductions</TableHead>
-                        <TableHead className="text-right">Advances</TableHead>
-                        <TableHead className="text-right">Net Salary</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead>{tUi("employee.code")}</TableHead>
+                        <TableHead>{tUi("worker.name")}</TableHead>
+                        <TableHead>{tUi("position")}</TableHead>
+                        <TableHead className="text-right">{tUi("base.salary")}</TableHead>
+                        <TableHead className="text-right">{tUi("bale.earnings")}</TableHead>
+                        <TableHead className="text-right">{tUi("kg.earnings")}</TableHead>
+                        <TableHead className="text-right">{tUi("overtime")}</TableHead>
+                        <TableHead className="text-right">{tUi("bonuses")}</TableHead>
+                        <TableHead className="text-right">{tUi("deductions.2")}</TableHead>
+                        <TableHead className="text-right">{tUi("advances")}</TableHead>
+                        <TableHead className="text-right">{tUi("net.salary")}</TableHead>
+                        <TableHead>{tUi("status")}</TableHead>
                         <TableHead></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -656,11 +663,11 @@ export default function FactoryPayrollPage() {
           <Dialog open={showGenerateDialog} onOpenChange={setShowGenerateDialog}>
             <DialogContent data-testid="dialog-generate-payroll">
               <DialogHeader>
-                <DialogTitle>Generate Payroll</DialogTitle>
+                <DialogTitle>{tUi("generate.payroll")}</DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
                 <div className="space-y-1">
-                  <Label>Start Date</Label>
+                  <Label>{tUi("start.date")}</Label>
                   <Input
                     type="date"
                     value={genStartDate}
@@ -669,7 +676,7 @@ export default function FactoryPayrollPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>End Date</Label>
+                  <Label>{tUi("end.date")}</Label>
                   <Input
                     type="date"
                     value={genEndDate}
@@ -720,7 +727,7 @@ export default function FactoryPayrollPage() {
           >
             <DialogContent data-testid="dialog-confirm-payment">
               <DialogHeader>
-                <DialogTitle>Confirm Payment</DialogTitle>
+                <DialogTitle>{tUi("confirm.payment")}</DialogTitle>
               </DialogHeader>
               {editRecord && (
                 <div className="space-y-4">
@@ -732,21 +739,21 @@ export default function FactoryPayrollPage() {
                     </span>
                   </p>
                   <div className="space-y-1">
-                    <Label>Payment Source</Label>
+                    <Label>{tUi("payment.source")}</Label>
                     <Select value={paySource} onValueChange={setPaySource}>
                       <SelectTrigger data-testid="select-pay-source">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Cash">Cash</SelectItem>
-                        <SelectItem value="Bank">Bank</SelectItem>
-                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                        <SelectItem value="Cheque">Cheque</SelectItem>
+                        <SelectItem value="Cash">{tUi("cash")}</SelectItem>
+                        <SelectItem value="Bank">{tUi("bank")}</SelectItem>
+                        <SelectItem value="Bank Transfer">{tUi("bank.transfer")}</SelectItem>
+                        <SelectItem value="Cheque">{tUi("cheque")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label>Payment Date</Label>
+                    <Label>{tUi("payment.date")}</Label>
                     <Input
                       type="date"
                       value={payDate}
@@ -807,7 +814,7 @@ export default function FactoryPayrollPage() {
           >
             <DialogContent data-testid="dialog-adjust-payroll">
               <DialogHeader>
-                <DialogTitle>Adjust Payroll</DialogTitle>
+                <DialogTitle>{tUi("adjust.payroll")}</DialogTitle>
               </DialogHeader>
               {editRecord && (
                 <div className="space-y-4">
@@ -817,7 +824,7 @@ export default function FactoryPayrollPage() {
                   </p>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <Label>Bonuses</Label>
+                      <Label>{tUi("bonuses")}</Label>
                       <Input
                         type="number"
                         step="0.01"
@@ -827,7 +834,7 @@ export default function FactoryPayrollPage() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label>Deductions</Label>
+                      <Label>{tUi("deductions.2")}</Label>
                       <Input
                         type="number"
                         step="0.01"
@@ -837,7 +844,7 @@ export default function FactoryPayrollPage() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label>Advances</Label>
+                      <Label>{tUi("advances")}</Label>
                       <Input
                         type="number"
                         step="0.01"
@@ -847,7 +854,7 @@ export default function FactoryPayrollPage() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label>Overtime Hours</Label>
+                      <Label>{tUi("overtime.hours")}</Label>
                       <Input
                         type="number"
                         step="0.01"
@@ -858,24 +865,24 @@ export default function FactoryPayrollPage() {
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <Label>Notes</Label>
+                    <Label>{tUi("notes")}</Label>
                     <Input
                       value={editNotes}
                       onChange={(e) => setEditNotes(e.target.value)}
-                      placeholder="Optional notes"
+                      placeholder={tUi("optional.notes")}
                       data-testid="input-edit-notes"
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label>Status</Label>
+                    <Label>{tUi("status")}</Label>
                     <Select value={editStatus} onValueChange={setEditStatus}>
                       <SelectTrigger data-testid="select-edit-status">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="DRAFT">Draft</SelectItem>
-                        <SelectItem value="APPROVED">Approved</SelectItem>
-                        <SelectItem value="PAID">Paid</SelectItem>
+                        <SelectItem value="DRAFT">{tUi("draft")}</SelectItem>
+                        <SelectItem value="APPROVED">{tUi("approved")}</SelectItem>
+                        <SelectItem value="PAID">{tUi("paid")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -909,7 +916,7 @@ export default function FactoryPayrollPage() {
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <Input
-                  placeholder="Search by name, code or phone..."
+                  placeholder={tUi("search.by.name.code.or.phone.2")}
                   value={workerSearch}
                   onChange={(e) => setWorkerSearch(e.target.value)}
                   className="max-w-sm"
@@ -958,22 +965,22 @@ export default function FactoryPayrollPage() {
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
-                      <TableHead className="whitespace-nowrap">Code</TableHead>
-                      <TableHead className="whitespace-nowrap">Full Name</TableHead>
-                      <TableHead className="whitespace-nowrap">Status</TableHead>
-                      <TableHead className="whitespace-nowrap">Position</TableHead>
-                      <TableHead className="whitespace-nowrap">Department</TableHead>
-                      <TableHead className="whitespace-nowrap">Phone 1</TableHead>
-                      <TableHead className="whitespace-nowrap">Phone 2</TableHead>
-                      <TableHead className="whitespace-nowrap">Emergency Contact</TableHead>
-                      <TableHead className="whitespace-nowrap">Date Joined</TableHead>
-                      <TableHead className="whitespace-nowrap">Contract Start</TableHead>
-                      <TableHead className="whitespace-nowrap">Salary Type</TableHead>
-                      <TableHead className="whitespace-nowrap">Pay Frequency</TableHead>
-                      <TableHead className="whitespace-nowrap text-right">Base Salary</TableHead>
-                      <TableHead className="whitespace-nowrap">Visa No.</TableHead>
-                      <TableHead className="whitespace-nowrap">Work Permit</TableHead>
-                      <TableHead className="whitespace-nowrap">Residential Permit</TableHead>
+                      <TableHead className="whitespace-nowrap">{tUi("code")}</TableHead>
+                      <TableHead className="whitespace-nowrap">{tUi("full.name")}</TableHead>
+                      <TableHead className="whitespace-nowrap">{tUi("status")}</TableHead>
+                      <TableHead className="whitespace-nowrap">{tUi("position")}</TableHead>
+                      <TableHead className="whitespace-nowrap">{tUi("department")}</TableHead>
+                      <TableHead className="whitespace-nowrap">{tUi("phone.1")}</TableHead>
+                      <TableHead className="whitespace-nowrap">{tUi("phone.2")}</TableHead>
+                      <TableHead className="whitespace-nowrap">{tUi("emergency.contact")}</TableHead>
+                      <TableHead className="whitespace-nowrap">{tUi("date.joined")}</TableHead>
+                      <TableHead className="whitespace-nowrap">{tUi("contract.start")}</TableHead>
+                      <TableHead className="whitespace-nowrap">{tUi("salary.type")}</TableHead>
+                      <TableHead className="whitespace-nowrap">{tUi("pay.frequency")}</TableHead>
+                      <TableHead className="whitespace-nowrap text-right">{tUi("base.salary")}</TableHead>
+                      <TableHead className="whitespace-nowrap">{tUi("visa.no")}</TableHead>
+                      <TableHead className="whitespace-nowrap">{tUi("work.permit")}</TableHead>
+                      <TableHead className="whitespace-nowrap">{tUi("residential.permit")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

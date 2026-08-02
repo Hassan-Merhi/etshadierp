@@ -23,8 +23,10 @@ import { DeductStockDialog } from "./production-raw-stock/DeductStockDialog";
 import { AddToBatchDialog } from "./production-raw-stock/AddToBatchDialog";
 import { CreateMixBatchDialog } from "@/components/CreateMixBatchDialog";
 import { EditMixBatchDialog } from "@/components/EditMixBatchDialog";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export default function ProductionRawStock() {
+  const tUi = useFactoryText();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
@@ -73,9 +75,7 @@ export default function ProductionRawStock() {
   const { data: availableContainersRaw = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/raw-stock/available-containers"],
   });
-  const availableContainers = availableContainersRaw.filter(
-    (c) => c.status !== "PARTIALLY_RECEIVED"
-  );
+  const availableContainers = availableContainersRaw.filter((c) => c.status !== "PARTIALLY_RECEIVED");
 
   const { data: mixBatchesByDate = [], isLoading: mixBatchesByDateLoading } = useQuery<any[]>({
     queryKey: [`/api/factory/mix-batches-by-date?date=${encodeURIComponent(mixBatchDate)}`],
@@ -244,18 +244,14 @@ export default function ProductionRawStock() {
             <FlaskConical className="h-4.5 w-4.5 text-amber-500" />
           </div>
           <div>
-            <h1 className="text-lg font-bold leading-tight">Raw Production</h1>
+            <h1 className="text-lg font-bold leading-tight">{tUi("raw.production")}</h1>
             <p className="text-xs text-muted-foreground leading-tight">
               Raw stock inventory and daily mix batch management
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            onClick={() => setCreateMixBatchOpen(true)}
-            className="gap-2"
-            data-testid="button-create-mix-batch"
-          >
+          <Button onClick={() => setCreateMixBatchOpen(true)} className="gap-2" data-testid="button-create-mix-batch">
             <Layers className="h-4 w-4" /> New Mix Batch
           </Button>
           <Button
@@ -337,7 +333,9 @@ export default function ProductionRawStock() {
       <EditMixBatchDialog
         batch={editBatch}
         open={editBatch !== null}
-        onOpenChange={(open) => { if (!open) setEditBatch(null); }}
+        onOpenChange={(open) => {
+          if (!open) setEditBatch(null);
+        }}
       />
 
       <OffloadDialog

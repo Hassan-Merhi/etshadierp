@@ -15,6 +15,7 @@ import { useLocation } from "wouter";
 import { Trash2, ScanLine, Plus, PackageCheck, MapPin } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/PageHeader";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface Customer {
   id: number;
@@ -79,6 +80,7 @@ interface OrderDetail {
 }
 
 export default function CustomerInvoiceCreate() {
+  const tUi = useErpText();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
@@ -307,7 +309,7 @@ export default function CustomerInvoiceCreate() {
     <div className="flex flex-col h-full p-4 lg:p-6">
       <div className="flex items-center justify-between gap-4 mb-4">
         <div>
-          <PageHeader title="Create Invoice" subtitle="POS-style bale sales invoice" />
+          <PageHeader title={tUi("create.invoice")} subtitle={tUi("pos.style.bale.sales.invoice")} />
         </div>
         {orderId && (
           <Badge variant="secondary" data-testid="badge-draft-order">
@@ -335,8 +337,8 @@ export default function CustomerInvoiceCreate() {
                   data-testid="text-no-bales"
                 >
                   <ScanLine className="h-12 w-12 mb-3 opacity-40" />
-                  <p>No bales scanned yet</p>
-                  <p className="text-sm mt-1">Select a customer and location, then scan bales</p>
+                  <p>{tUi("no.bales.scanned.yet")}</p>
+                  <p className="text-sm mt-1">{tUi("select.a.customer.and.location.then.scan.bales")}</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -419,7 +421,7 @@ export default function CustomerInvoiceCreate() {
 
             {bales.length > 0 && (
               <div className="border-t pt-3 mt-3 flex items-center justify-between gap-2">
-                <span className="font-medium">Subtotal</span>
+                <span className="font-medium">{tUi("subtotal")}</span>
                 <span className="font-mono font-semibold text-lg" data-testid="text-subtotal">
                   {subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                 </span>
@@ -431,10 +433,10 @@ export default function CustomerInvoiceCreate() {
         <div className="lg:w-[40%] flex flex-col gap-4">
           <Card className="p-4 space-y-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">Customer</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("customer")}</label>
               <Select value={selectedCustomerId} onValueChange={handleCustomerChange} disabled={!!orderId}>
                 <SelectTrigger data-testid="select-customer">
-                  <SelectValue placeholder="Select customer..." />
+                  <SelectValue placeholder={tUi("select.customer")} />
                 </SelectTrigger>
                 <SelectContent>
                   {customers.map((c) => (
@@ -447,7 +449,7 @@ export default function CustomerInvoiceCreate() {
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-1 block">Date</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("date")}</label>
               <Input
                 type="date"
                 value={orderDate}
@@ -483,7 +485,7 @@ export default function CustomerInvoiceCreate() {
               </label>
               <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
                 <SelectTrigger data-testid="select-location">
-                  <SelectValue placeholder="Select location..." />
+                  <SelectValue placeholder={tUi("select.location")} />
                 </SelectTrigger>
                 <SelectContent>
                   {locations.map((loc) => (
@@ -505,7 +507,7 @@ export default function CustomerInvoiceCreate() {
                 value={scanCode}
                 onChange={(e) => setScanCode(e.target.value)}
                 onKeyDown={handleScan}
-                placeholder="Scan or type bale code..."
+                placeholder={tUi("scan.or.type.bale.code")}
                 disabled={!orderId || !selectedLocationId}
                 className={scanInputClass}
                 data-testid="input-scan-code"
@@ -519,7 +521,7 @@ export default function CustomerInvoiceCreate() {
           </Card>
 
           <Card className="p-4 space-y-3">
-            <h3 className="font-semibold text-sm">Charges</h3>
+            <h3 className="font-semibold text-sm">{tUi("charges")}</h3>
 
             {charges.length > 0 && (
               <div className="space-y-1">
@@ -558,8 +560,8 @@ export default function CustomerInvoiceCreate() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="FREIGHT">Freight</SelectItem>
-                  <SelectItem value="OTHER">Other</SelectItem>
+                  <SelectItem value="FREIGHT">{tUi("freight")}</SelectItem>
+                  <SelectItem value="OTHER">{tUi("other")}</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -567,7 +569,7 @@ export default function CustomerInvoiceCreate() {
                 <Input
                   value={chargeName}
                   onChange={(e) => setChargeName(e.target.value)}
-                  placeholder="Charge name..."
+                  placeholder={tUi("charge.name")}
                   data-testid="input-charge-name"
                 />
               )}
@@ -578,7 +580,7 @@ export default function CustomerInvoiceCreate() {
                   step="0.01"
                   value={chargeAmount}
                   onChange={(e) => setChargeAmount(e.target.value)}
-                  placeholder="Amount"
+                  placeholder={tUi("amount")}
                   disabled={!orderId}
                   data-testid="input-charge-amount"
                 />
@@ -596,31 +598,31 @@ export default function CustomerInvoiceCreate() {
 
           <Card className="p-4 space-y-2">
             <div className="flex items-center justify-between gap-2 text-sm">
-              <span>Subtotal</span>
+              <span>{tUi("subtotal")}</span>
               <span className="font-mono" data-testid="text-summary-subtotal">
                 {subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex items-center justify-between gap-2 text-sm">
-              <span>Freight</span>
+              <span>{tUi("freight")}</span>
               <span className="font-mono" data-testid="text-summary-freight">
                 {freightCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex items-center justify-between gap-2 text-sm">
-              <span>Other Charges</span>
+              <span>{tUi("other.charges")}</span>
               <span className="font-mono" data-testid="text-summary-other">
                 {otherCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="border-t pt-2 flex items-center justify-between gap-2">
-              <span className="font-semibold">Grand Total</span>
+              <span className="font-semibold">{tUi("grand.total")}</span>
               <span className="font-mono font-bold text-lg" data-testid="text-grand-total">
                 {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-              <span>Total Bales</span>
+              <span>{tUi("total.bales")}</span>
               <span data-testid="text-total-bales">{bales.length}</span>
             </div>
           </Card>
@@ -641,7 +643,7 @@ export default function CustomerInvoiceCreate() {
       <Dialog open={showFinalizeDialog} onOpenChange={setShowFinalizeDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Confirm Finalize</DialogTitle>
+            <DialogTitle>{tUi("confirm.finalize")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
@@ -650,19 +652,19 @@ export default function CustomerInvoiceCreate() {
             </p>
             <div className="space-y-1 text-sm">
               <div className="flex justify-between gap-2">
-                <span>Customer</span>
+                <span>{tUi("customer")}</span>
                 <span className="font-medium" data-testid="text-confirm-customer">
                   {customers.find((c) => c.id === customerId)?.legalName || "-"}
                 </span>
               </div>
               <div className="flex justify-between gap-2">
-                <span>Bales</span>
+                <span>{tUi("bales")}</span>
                 <span className="font-medium" data-testid="text-confirm-bales">
                   {bales.length}
                 </span>
               </div>
               <div className="flex justify-between gap-2">
-                <span>Grand Total</span>
+                <span>{tUi("grand.total")}</span>
                 <span className="font-mono font-semibold" data-testid="text-confirm-total">
                   {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                 </span>

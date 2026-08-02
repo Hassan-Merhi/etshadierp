@@ -15,10 +15,12 @@ import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
 import type { FactorySupplier } from "@shared/schema";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 type OtherChargeLine = { amount: string; currencyCode: string; ledgerAccountId: string };
 
 export default function FactoryContainerCreate() {
+  const tUi = useFactoryText();
   const [, navigate] = useLocation();
   useEscapeToParent("/factory/containers");
   const { toast } = useToast();
@@ -225,13 +227,13 @@ export default function FactoryContainerCreate() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <PageHeader title="Add Factory Container" subtitle="Track a new incoming factory container" />
+          <PageHeader title={tUi("add.factory.container")} subtitle={tUi("track.a.new.incoming.factory.container")} />
         </div>
       </div>
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Basic</CardTitle>
+          <CardTitle className="text-base">{tUi("basic")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
@@ -252,7 +254,7 @@ export default function FactoryContainerCreate() {
             <Input
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="Additional notes"
+              placeholder={tUi("additional.notes")}
               data-testid="input-container-notes"
             />
           </div>
@@ -261,21 +263,21 @@ export default function FactoryContainerCreate() {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Supplier</CardTitle>
+          <CardTitle className="text-base">{tUi("supplier")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Purchase Supplier — always shown first */}
           <div>
-            <Label>Purchase Supplier</Label>
+            <Label>{tUi("purchase.supplier")}</Label>
             <Select
               value={formData.supplierId || "__none__"}
               onValueChange={(val) => setFormData({ ...formData, supplierId: val === "__none__" ? "" : val })}
             >
               <SelectTrigger data-testid="select-container-supplier">
-                <SelectValue placeholder="Select supplier..." />
+                <SelectValue placeholder={tUi("select.supplier")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">None</SelectItem>
+                <SelectItem value="__none__">{tUi("none")}</SelectItem>
                 {filteredSupplierList.map((s) => (
                   <SelectItem key={s.id} value={s.id.toString()}>
                     {s.name}
@@ -300,12 +302,12 @@ export default function FactoryContainerCreate() {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Money &amp; Commission</CardTitle>
+          <CardTitle className="text-base">{tUi("money.amp.commission")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Total Kg</Label>
+              <Label>{tUi("total.kg")}</Label>
               <Input
                 type="number"
                 value={totalKg}
@@ -315,7 +317,7 @@ export default function FactoryContainerCreate() {
               />
             </div>
             <div>
-              <Label>Rate per Kg</Label>
+              <Label>{tUi("rate.per.kg")}</Label>
               <Input
                 type="number"
                 value={ratePerKg}
@@ -329,7 +331,7 @@ export default function FactoryContainerCreate() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Currency</Label>
+              <Label>{tUi("currency")}</Label>
               <Select value={currency} onValueChange={(val) => setCurrency(val)}>
                 <SelectTrigger data-testid="select-container-currency">
                   <SelectValue />
@@ -359,7 +361,7 @@ export default function FactoryContainerCreate() {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Commission Amount</Label>
+              <Label>{tUi("commission.amount")}</Label>
               <Input
                 type="number"
                 value={formData.commissionAmount}
@@ -369,7 +371,7 @@ export default function FactoryContainerCreate() {
               />
             </div>
             <div>
-              <Label>Commission Currency</Label>
+              <Label>{tUi("commission.currency")}</Label>
               <Select
                 value={formData.commissionCurrencyCode}
                 onValueChange={(val) => setFormData({ ...formData, commissionCurrencyCode: val })}
@@ -393,7 +395,12 @@ export default function FactoryContainerCreate() {
               {commissionFxRateLoading
                 ? `Fetching ${commissionCcy}/USD rate…`
                 : parseFloat(commissionFxRate) > 0
-                  ? `1 ${commissionCcy} = ${parseFloat(commissionFxRate).toFixed(8).replace(/\.?0+$/, "")} USD${commissionCcy === currency.toUpperCase() ? " (using container rate)" : commissionFxRateDate ? ` · ${commissionFxRateDate}` : ""}`
+                  ? `1 ${commissionCcy} = ${parseFloat(commissionFxRate)
+                      .toFixed(8)
+                      .replace(
+                        /\.?0+$/,
+                        ""
+                      )} USD${commissionCcy === currency.toUpperCase() ? " (using container rate)" : commissionFxRateDate ? ` · ${commissionFxRateDate}` : ""}`
                   : `No ${commissionCcy}/USD rate available — container creation blocked until resolved.`}
             </div>
           )}
@@ -424,7 +431,7 @@ export default function FactoryContainerCreate() {
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Freight &amp; Other Charges</CardTitle>
+          <CardTitle className="text-base">{tUi("freight.amp.other.charges")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -441,7 +448,7 @@ export default function FactoryContainerCreate() {
               />
             </div>
             <div>
-              <Label>Freight Currency</Label>
+              <Label>{tUi("freight.currency")}</Label>
               <Select
                 value={formData.freightCurrencyCode}
                 onValueChange={(val) => setFormData({ ...formData, freightCurrencyCode: val })}
@@ -469,10 +476,10 @@ export default function FactoryContainerCreate() {
               onValueChange={(val) => setFormData({ ...formData, freightAccountId: val === "__none__" ? "" : val })}
             >
               <SelectTrigger data-testid="select-freight-account">
-                <SelectValue placeholder="Auto (Freight)" />
+                <SelectValue placeholder={tUi("auto.freight")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">Auto (Freight)</SelectItem>
+                <SelectItem value="__none__">{tUi("auto.freight")}</SelectItem>
                 {ledgerAccounts.map((acc: any) => (
                   <SelectItem key={acc.id} value={String(acc.id)}>
                     {acc.name}
@@ -503,13 +510,13 @@ export default function FactoryContainerCreate() {
               </Button>
             </div>
             {otherChargeLines.length === 0 && (
-              <p className="text-xs text-muted-foreground py-1">No other charges. Click "Add Line" to add one.</p>
+              <p className="text-xs text-muted-foreground py-1">{tUi("no.other.charges.click.add.line.to.add.one")}</p>
             )}
             {otherChargeLines.length > 0 && (
               <div className="grid grid-cols-[1fr_auto_2fr_auto] gap-x-2 gap-y-1 items-center">
-                <div className="text-xs text-muted-foreground font-medium">Amount</div>
+                <div className="text-xs text-muted-foreground font-medium">{tUi("amount")}</div>
                 <div className="text-xs text-muted-foreground font-medium">CCY</div>
-                <div className="text-xs text-muted-foreground font-medium">Account</div>
+                <div className="text-xs text-muted-foreground font-medium">{tUi("account")}</div>
                 <div />
                 {otherChargeLines.map((line, idx) => (
                   <>
@@ -545,10 +552,10 @@ export default function FactoryContainerCreate() {
                       }
                     >
                       <SelectTrigger data-testid={`select-other-charge-account-${idx}`}>
-                        <SelectValue placeholder="No account" />
+                        <SelectValue placeholder={tUi("no.account")} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__none__">No account</SelectItem>
+                        <SelectItem value="__none__">{tUi("no.account")}</SelectItem>
                         {ledgerAccounts.map((acc: any) => (
                           <SelectItem key={acc.id} value={String(acc.id)}>
                             {acc.name}
@@ -599,7 +606,9 @@ export default function FactoryContainerCreate() {
         if (entries.length === 0) return null;
         return (
           <div className="rounded-md border bg-muted/30 px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Container Total</span>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              {tUi("container.total")}
+            </span>
             {entries.map(([cc, amt]) => (
               <div key={cc} className="flex items-baseline gap-1">
                 <span className="text-xs text-muted-foreground">{cc}</span>

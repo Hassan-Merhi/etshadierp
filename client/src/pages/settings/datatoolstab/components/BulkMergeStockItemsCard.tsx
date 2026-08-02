@@ -3,19 +3,21 @@
  *
  * Extracted from DataToolsTab.tsx during the Phase 4 god-file split.
  */
-import {useState, useRef} from "react";
-import {Card, CardHeader, CardTitle, CardContent, CardDescription} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {Alert, AlertDescription} from "@/components/ui/alert";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Badge} from "@/components/ui/badge";
-import {useToast} from "@/hooks/use-toast";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {Loader2, AlertTriangle, Upload, Check, X, FileSpreadsheet, FileDown} from "lucide-react";
-import {utils, writeFile, readFile} from "@/lib/excelHelper";
-import type {BulkMergePairRow, BulkMergeResult} from "../types";
+import { useState, useRef } from "react";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Loader2, AlertTriangle, Upload, Check, X, FileSpreadsheet, FileDown } from "lucide-react";
+import { utils, writeFile, readFile } from "@/lib/excelHelper";
+import type { BulkMergePairRow, BulkMergeResult } from "../types";
+import { useErpText } from "@/i18n/modules/erp";
 
 export function BulkMergeStockItemsCard({ embedded }: { embedded?: boolean }) {
+  const tUi = useErpText();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parsedRows, setParsedRows] = useState<BulkMergePairRow[]>([]);
@@ -138,8 +140,8 @@ export function BulkMergeStockItemsCard({ embedded }: { embedded?: boolean }) {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-8">#</TableHead>
-                  <TableHead>Old code (to remove)</TableHead>
-                  <TableHead>Keep code</TableHead>
+                  <TableHead>{tUi("old.code.to.remove")}</TableHead>
+                  <TableHead>{tUi("keep.code")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -202,10 +204,10 @@ export function BulkMergeStockItemsCard({ embedded }: { embedded?: boolean }) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Old code</TableHead>
-                    <TableHead>Keep code</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Reason</TableHead>
+                    <TableHead>{tUi("old.code")}</TableHead>
+                    <TableHead>{tUi("keep.code")}</TableHead>
+                    <TableHead>{tUi("status")}</TableHead>
+                    <TableHead>{tUi("reason")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

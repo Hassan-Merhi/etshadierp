@@ -18,7 +18,6 @@ const TYPE_LABELS: Record<string, string> = {
   factoryWorker: "Worker",
 };
 
-
 const TYPE_ORDER = ["ledger", "supplier", "customer", "bank", "employee", "fixedAsset", "factoryWorker"];
 
 export function AccountTable({
@@ -132,7 +131,10 @@ export function AccountTable({
                         {onEdit && account.type === "ledger" && (
                           <button
                             className="opacity-0 group-hover/row:opacity-100 transition-opacity ml-1 p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
-                            onClick={(e) => { e.stopPropagation(); onEdit(account); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEdit(account);
+                            }}
                             title="Edit account"
                             data-testid={`button-edit-account-${account.accountId}`}
                           >
@@ -186,7 +188,10 @@ export function AccountTable({
                               {onEdit && child.type === "ledger" && (
                                 <button
                                   className="opacity-0 group-hover/child:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground shrink-0"
-                                  onClick={(e) => { e.stopPropagation(); onEdit(child); }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onEdit(child);
+                                  }}
                                   title="Edit account"
                                   data-testid={`button-edit-account-${child.accountId}`}
                                 >

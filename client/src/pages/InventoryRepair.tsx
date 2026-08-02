@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { Loader2, AlertTriangle, CheckCircle, Search, Wrench, ShieldAlert } from "lucide-react";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface Discrepancy {
   locationId: number;
@@ -61,6 +62,7 @@ interface ValueRepairRow {
 }
 
 export default function InventoryRepair() {
+  const tUi = useErpText();
   const { toast } = useToast();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
@@ -148,7 +150,7 @@ export default function InventoryRepair() {
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6">
       <div>
         <PageHeader
-          title="Inventory Repair Tool"
+          title={tUi("inventory.repair.tool")}
           subtitle="Recalculates expected inventory by replaying all voucher-backed operations and compares with current stock levels."
         />
       </div>
@@ -163,7 +165,7 @@ export default function InventoryRepair() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Run Inventory Audit</CardTitle>
+          <CardTitle>{tUi("run.inventory.audit")}</CardTitle>
           <CardDescription>
             Preview discrepancies first, then apply fixes if needed. The tool also detects and corrects stale transfer
             flags that could cause future issues.
@@ -197,7 +199,7 @@ export default function InventoryRepair() {
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Confirm Inventory Fix</AlertDialogTitle>
+                <AlertDialogTitle>{tUi("confirm.inventory.fix")}</AlertDialogTitle>
                 <AlertDialogDescription>
                   This will update {result?.discrepanciesFound || 0} inventory records to match the expected quantities
                   calculated from all voucher-backed operations. This action cannot be automatically undone.
@@ -210,7 +212,7 @@ export default function InventoryRepair() {
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel data-testid="button-cancel-fix">Cancel</AlertDialogCancel>
+                <AlertDialogCancel data-testid="button-cancel-fix">{tUi("cancel")}</AlertDialogCancel>
                 <AlertDialogAction onClick={() => runRebuild(false)} data-testid="button-confirm-fix">
                   Yes, Apply Fixes
                 </AlertDialogAction>
@@ -224,7 +226,7 @@ export default function InventoryRepair() {
         <>
           <Card>
             <CardHeader>
-              <CardTitle>Summary</CardTitle>
+              <CardTitle>{tUi("summary")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -289,14 +291,14 @@ export default function InventoryRepair() {
                   <Table>
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
-                        <TableHead>Location</TableHead>
-                        <TableHead>Stock Item</TableHead>
-                        <TableHead>Code</TableHead>
-                        <TableHead className="text-right">Current Qty</TableHead>
-                        <TableHead className="text-right">Expected Qty</TableHead>
-                        <TableHead className="text-right">Qty Diff</TableHead>
-                        <TableHead className="text-right">Current Value</TableHead>
-                        <TableHead className="text-right">Expected Value</TableHead>
+                        <TableHead>{tUi("location")}</TableHead>
+                        <TableHead>{tUi("stock.item")}</TableHead>
+                        <TableHead>{tUi("code")}</TableHead>
+                        <TableHead className="text-right">{tUi("current.qty")}</TableHead>
+                        <TableHead className="text-right">{tUi("expected.qty")}</TableHead>
+                        <TableHead className="text-right">{tUi("qty.diff")}</TableHead>
+                        <TableHead className="text-right">{tUi("current.value")}</TableHead>
+                        <TableHead className="text-right">{tUi("expected.value")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -397,14 +399,14 @@ export default function InventoryRepair() {
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Confirm Value Repair</AlertDialogTitle>
+                <AlertDialogTitle>{tUi("confirm.value.repair")}</AlertDialogTitle>
                 <AlertDialogDescription>
                   This will update {valueRepairRows.length} inventory row(s) to correct their average rate and total
                   value. Quantities will not be changed. This action cannot be automatically undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel data-testid="button-cancel-value-repair">Cancel</AlertDialogCancel>
+                <AlertDialogCancel data-testid="button-cancel-value-repair">{tUi("cancel")}</AlertDialogCancel>
                 <AlertDialogAction onClick={finalizeValueRepair} data-testid="button-confirm-value-repair">
                   Yes, Finalize Repair
                 </AlertDialogAction>
@@ -436,14 +438,14 @@ export default function InventoryRepair() {
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead>Location</TableHead>
-                    <TableHead>Item</TableHead>
+                    <TableHead>{tUi("location")}</TableHead>
+                    <TableHead>{tUi("item")}</TableHead>
                     <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Old Rate</TableHead>
-                    <TableHead className="text-right">Old Value</TableHead>
-                    <TableHead className="text-right">New Rate</TableHead>
-                    <TableHead className="text-right">New Value</TableHead>
-                    <TableHead>Reason</TableHead>
+                    <TableHead className="text-right">{tUi("old.rate")}</TableHead>
+                    <TableHead className="text-right">{tUi("old.value")}</TableHead>
+                    <TableHead className="text-right">{tUi("new.rate")}</TableHead>
+                    <TableHead className="text-right">{tUi("new.value")}</TableHead>
+                    <TableHead>{tUi("reason")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -491,7 +493,7 @@ export default function InventoryRepair() {
             <p className="text-lg font-medium" data-testid="text-no-corrupted-rows">
               No corrupted inventory rows found
             </p>
-            <p className="text-muted-foreground mt-1">All inventory value and rate fields are within valid ranges.</p>
+            <p className="text-muted-foreground mt-1">{tUi("all.inventory.value.and.rate.fields.are.within.v")}</p>
           </CardContent>
         </Card>
       )}

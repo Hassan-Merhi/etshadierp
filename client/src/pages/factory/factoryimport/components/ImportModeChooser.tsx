@@ -3,10 +3,11 @@
  *
  * Extracted from FactoryImport.tsx during the Phase 4 god-file split.
  */
-import {Upload, Plus, Download} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent} from "@/components/ui/card";
-import {downloadTemplate} from "../utils";
+import { Upload, Plus, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { downloadTemplate } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function ImportModeChooser({
   title,
@@ -21,6 +22,7 @@ export function ImportModeChooser({
   onFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onManual: () => void;
 }) {
+  const tUi = useFactoryText();
   return (
     <div className="space-y-4">
       <div>
@@ -36,8 +38,8 @@ export function ImportModeChooser({
                 <Upload className="h-6 w-6 text-primary" />
               </div>
               <div className="text-center">
-                <p className="font-medium">Upload CSV / Excel</p>
-                <p className="text-sm text-muted-foreground mt-1">Upload a .csv or .xlsx file with your data</p>
+                <p className="font-medium">{tUi("upload.csv.excel")}</p>
+                <p className="text-sm text-muted-foreground mt-1">{tUi("upload.a.csv.or.xlsx.file.with.your.data")}</p>
               </div>
               <input
                 type="file"
@@ -57,8 +59,8 @@ export function ImportModeChooser({
                 <Plus className="h-6 w-6 text-primary" />
               </div>
               <div className="text-center">
-                <p className="font-medium">Enter Manually</p>
-                <p className="text-sm text-muted-foreground mt-1">Add records one by one using a form</p>
+                <p className="font-medium">{tUi("enter.manually")}</p>
+                <p className="text-sm text-muted-foreground mt-1">{tUi("add.records.one.by.one.using.a.form")}</p>
               </div>
             </div>
           </CardContent>

@@ -14,6 +14,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function RenameLocationDialog({
   renameDialogOpen,
@@ -30,6 +31,7 @@ export function RenameLocationDialog({
   setRenameDialogOpen: any;
   setRenameInput: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog
       open={renameDialogOpen}
@@ -39,7 +41,7 @@ export function RenameLocationDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Rename Location</DialogTitle>
+          <DialogTitle>{tUi("rename.location.2")}</DialogTitle>
           <DialogDescription>
             Enter a new name for <strong>{renamingLocation?.name}</strong>.
           </DialogDescription>
@@ -48,7 +50,7 @@ export function RenameLocationDialog({
           <Input
             value={renameInput}
             onChange={(e) => setRenameInput(e.target.value)}
-            placeholder="Location name"
+            placeholder={tUi("location.name")}
             data-testid="input-rename-location"
             onKeyDown={(e) => {
               if (e.key === "Enter" && renameInput.trim() && renamingLocation) {

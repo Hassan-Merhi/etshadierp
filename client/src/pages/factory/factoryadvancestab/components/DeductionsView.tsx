@@ -3,26 +3,35 @@
  *
  * Extracted from FactoryAdvancesTab.tsx during the Phase 4 god-file split.
  */
-import {useState, useMemo} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {useDateFormat} from "@/contexts/DateFormatContext";
-import {Plus, Trash2, Loader2} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter} from "@/components/ui/dialog";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {useToast} from "@/hooks/use-toast";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import type {FactoryWorker} from "@shared/schema";
+import { useState, useMemo } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import { Plus, Trash2, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { FactoryWorker } from "@shared/schema";
 
-import type {DeductionRecord} from "../types";
-import {fmt} from "../utils";
+import type { DeductionRecord } from "../types";
+import { fmt } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function DeductionsView() {
+  const tUi = useFactoryText();
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
 
@@ -130,7 +139,7 @@ export function DeductionsView() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Card>
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Pending Deductions</p>
+            <p className="text-xs text-muted-foreground">{tUi("pending.deductions")}</p>
             <p className="text-xl font-bold font-mono text-destructive">{fmt(pendingTotal)}</p>
             <p className="text-xs text-muted-foreground">{pendingCount} item(s) — applied at next payroll run</p>
           </CardContent>
@@ -144,10 +153,10 @@ export function DeductionsView() {
         </Button>
         <Select value={filterWorker} onValueChange={setFilterWorker}>
           <SelectTrigger className="w-48" data-testid="select-filter-deduction-worker">
-            <SelectValue placeholder="All workers" />
+            <SelectValue placeholder={tUi("all.workers")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Workers</SelectItem>
+            <SelectItem value="all">{tUi("all.workers.2")}</SelectItem>
             {workers.map((w) => (
               <SelectItem key={w.id} value={String(w.id)}>
                 {w.fullName}
@@ -161,8 +170,8 @@ export function DeductionsView() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="applied">Applied</SelectItem>
+            <SelectItem value="pending">{tUi("pending")}</SelectItem>
+            <SelectItem value="applied">{tUi("applied")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -173,11 +182,11 @@ export function DeductionsView() {
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
-                  <TableHead>Worker</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Reason</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>{tUi("worker")}</TableHead>
+                  <TableHead>{tUi("date")}</TableHead>
+                  <TableHead>{tUi("reason")}</TableHead>
+                  <TableHead className="text-right">{tUi("amount")}</TableHead>
+                  <TableHead>{tUi("status")}</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
@@ -242,17 +251,17 @@ export function DeductionsView() {
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent data-testid="dialog-add-deduction">
           <DialogHeader>
-            <DialogTitle>Add Worker Deduction</DialogTitle>
+            <DialogTitle>{tUi("add.worker.deduction")}</DialogTitle>
             <DialogDescription>
               This deduction will be applied when payroll is next generated for this worker.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Worker</Label>
+              <Label>{tUi("worker")}</Label>
               <Select value={form.workerId} onValueChange={(v) => setForm((f) => ({ ...f, workerId: v }))}>
                 <SelectTrigger data-testid="select-deduction-worker">
-                  <SelectValue placeholder="Select worker" />
+                  <SelectValue placeholder={tUi("select.worker")} />
                 </SelectTrigger>
                 <SelectContent>
                   {(workers as FactoryWorker[])
@@ -267,7 +276,7 @@ export function DeductionsView() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label>Amount</Label>
+                <Label>{tUi("amount")}</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -279,7 +288,7 @@ export function DeductionsView() {
                 />
               </div>
               <div className="space-y-1">
-                <Label>Date</Label>
+                <Label>{tUi("date")}</Label>
                 <Input
                   type="date"
                   value={form.deductionDate}
@@ -289,7 +298,7 @@ export function DeductionsView() {
               </div>
             </div>
             <div className="space-y-1">
-              <Label>Reason (optional)</Label>
+              <Label>{tUi("reason.optional")}</Label>
               <Input
                 value={form.reason}
                 onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
@@ -317,7 +326,7 @@ export function DeductionsView() {
       <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <DialogContent data-testid="dialog-confirm-delete-deduction">
           <DialogHeader>
-            <DialogTitle>Delete Deduction</DialogTitle>
+            <DialogTitle>{tUi("delete.deduction")}</DialogTitle>
             <DialogDescription>
               Delete the {fmt(deleteTarget?.amount)} deduction for {deleteTarget?.workerName}? This cannot be undone.
             </DialogDescription>

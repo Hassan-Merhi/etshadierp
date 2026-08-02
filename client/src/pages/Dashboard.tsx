@@ -1,27 +1,64 @@
-import {KPICard} from "@/components/KPICard";
-import {CountryActivityKPI} from "@/components/CountryActivityKPI";
-import {Card} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {PageHeader} from "@/components/PageHeader";
-import {useCurrencyContext} from "@/contexts/CurrencyContext";
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger} from "@/components/ui/dialog";
-import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
-import {Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList} from "@/components/ui/command";
-import {TrendingUp, Plus, X, Wallet, ArrowUpRight, ArrowDownLeft, Check, ChevronsUpDown, Truck, Package, Scale, Layers, ChevronRight, ChevronDown, DollarSign, GripVertical, ReceiptText, BookOpen, BarChart2, Boxes, Factory, CheckCircle2, Zap} from "lucide-react";
-import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
-import {useLocation} from "wouter";
-import {cn} from "@/lib/utils";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {useCompany} from "@/contexts/CompanyContext";
-import {useState, useRef, useMemo} from "react";
-import {useToast} from "@/hooks/use-toast";
-import {queryClient} from "@/lib/queryClient";
-import {useAppMode, useModePrefix} from "@/contexts/AppModeContext";
-import {getApiRequest} from "@/lib/factoryApi";
+import { KPICard } from "@/components/KPICard";
+import { CountryActivityKPI } from "@/components/CountryActivityKPI";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/PageHeader";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import {
+  TrendingUp,
+  Plus,
+  X,
+  Wallet,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Check,
+  ChevronsUpDown,
+  Truck,
+  Package,
+  Scale,
+  Layers,
+  ChevronRight,
+  ChevronDown,
+  DollarSign,
+  GripVertical,
+  ReceiptText,
+  BookOpen,
+  BarChart2,
+  Boxes,
+  Factory,
+  CheckCircle2,
+  Zap,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useLocation } from "wouter";
+import { cn } from "@/lib/utils";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useState, useRef, useMemo } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
+import { useAppMode, useModePrefix } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
 
-import type {Account, DashboardCashAccount, FactoryDashboardKPIs, ImportCycleBalanceData, PayableAccount, ProfitData} from "./dashboard/types";
-import {getGreeting} from "./dashboard/utils";
-import {DashboardKPICard} from "./dashboard/components/DashboardKPICard";
+import type {
+  Account,
+  DashboardCashAccount,
+  FactoryDashboardKPIs,
+  ImportCycleBalanceData,
+  PayableAccount,
+  ProfitData,
+} from "./dashboard/types";
+import { getGreeting } from "./dashboard/utils";
+import { DashboardKPICard } from "./dashboard/components/DashboardKPICard";
 export default function Dashboard() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();

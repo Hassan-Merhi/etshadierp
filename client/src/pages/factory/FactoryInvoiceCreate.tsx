@@ -15,6 +15,7 @@ import { useLocation, useSearch } from "wouter";
 import { Trash2, ScanLine, Plus, PackageCheck, MapPin, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/PageHeader";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface Customer {
   id: number;
@@ -83,6 +84,7 @@ interface OrderDetail {
 }
 
 export default function FactoryInvoiceCreate() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
@@ -409,7 +411,7 @@ export default function FactoryInvoiceCreate() {
     <div className="flex flex-col h-full p-4 lg:p-6">
       <div className="flex items-center justify-between gap-4 mb-4">
         <div>
-          <PageHeader title="Create Invoice" subtitle="POS-style bale sales invoice" />
+          <PageHeader title={tUi("create.invoice")} subtitle={tUi("pos.style.bale.sales.invoice")} />
         </div>
         {orderId && (
           <Badge variant="secondary" data-testid="badge-draft-order">
@@ -437,8 +439,8 @@ export default function FactoryInvoiceCreate() {
                   data-testid="text-no-bales"
                 >
                   <ScanLine className="h-12 w-12 mb-3 opacity-40" />
-                  <p>No bales scanned yet</p>
-                  <p className="text-sm mt-1">Select a customer and location, then scan bales</p>
+                  <p>{tUi("no.bales.scanned.yet")}</p>
+                  <p className="text-sm mt-1">{tUi("select.a.customer.and.location.then.scan.bales")}</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -536,7 +538,7 @@ export default function FactoryInvoiceCreate() {
 
             {bales.length > 0 && (
               <div className="border-t pt-3 mt-3 flex items-center justify-between gap-2">
-                <span className="font-medium">Subtotal</span>
+                <span className="font-medium">{tUi("subtotal")}</span>
                 <span className="font-mono font-semibold text-lg" data-testid="text-subtotal">
                   {subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                 </span>
@@ -548,10 +550,10 @@ export default function FactoryInvoiceCreate() {
         <div className="lg:w-[40%] flex flex-col gap-4">
           <Card className="p-4 space-y-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">Customer</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("customer")}</label>
               <Select value={selectedCustomerId} onValueChange={handleCustomerChange} disabled={!!orderId}>
                 <SelectTrigger data-testid="select-customer">
-                  <SelectValue placeholder="Select customer..." />
+                  <SelectValue placeholder={tUi("select.customer.3")} />
                 </SelectTrigger>
                 <SelectContent>
                   {customers.map((c) => (
@@ -564,7 +566,7 @@ export default function FactoryInvoiceCreate() {
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-1 block">Date</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("date")}</label>
               <Input
                 type="date"
                 value={orderDate}
@@ -599,7 +601,7 @@ export default function FactoryInvoiceCreate() {
               </label>
               <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
                 <SelectTrigger data-testid="select-location">
-                  <SelectValue placeholder="Select location..." />
+                  <SelectValue placeholder={tUi("select.location")} />
                 </SelectTrigger>
                 <SelectContent>
                   {locations.map((loc) => (
@@ -621,7 +623,7 @@ export default function FactoryInvoiceCreate() {
                 value={scanCode}
                 onChange={(e) => setScanCode(e.target.value)}
                 onKeyDown={handleScan}
-                placeholder="Scan or type bale code..."
+                placeholder={tUi("scan.or.type.bale.code")}
                 disabled={!orderId || !selectedLocationId}
                 className={scanInputClass}
                 data-testid="input-scan-code"
@@ -636,7 +638,7 @@ export default function FactoryInvoiceCreate() {
 
           <Card className="p-4 space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <h3 className="font-semibold text-sm">Charges</h3>
+              <h3 className="font-semibold text-sm">{tUi("charges")}</h3>
               {orderDetail?.status === "FINALIZED" && charges.some((c) => !c.voucherId) && (
                 <Button
                   variant="outline"
@@ -687,8 +689,8 @@ export default function FactoryInvoiceCreate() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="FREIGHT">Freight</SelectItem>
-                  <SelectItem value="OTHER">Other</SelectItem>
+                  <SelectItem value="FREIGHT">{tUi("freight")}</SelectItem>
+                  <SelectItem value="OTHER">{tUi("other")}</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -696,7 +698,7 @@ export default function FactoryInvoiceCreate() {
                 <Input
                   value={chargeName}
                   onChange={(e) => setChargeName(e.target.value)}
-                  placeholder="Charge name..."
+                  placeholder={tUi("charge.name")}
                   data-testid="input-charge-name"
                 />
               )}
@@ -729,7 +731,7 @@ export default function FactoryInvoiceCreate() {
                   step="0.01"
                   value={chargeAmount}
                   onChange={(e) => setChargeAmount(e.target.value)}
-                  placeholder="Amount"
+                  placeholder={tUi("amount")}
                   disabled={!orderId}
                   data-testid="input-charge-amount"
                 />
@@ -752,31 +754,31 @@ export default function FactoryInvoiceCreate() {
 
           <Card className="p-4 space-y-2">
             <div className="flex items-center justify-between gap-2 text-sm">
-              <span>Subtotal</span>
+              <span>{tUi("subtotal")}</span>
               <span className="font-mono" data-testid="text-summary-subtotal">
                 {subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex items-center justify-between gap-2 text-sm">
-              <span>Freight</span>
+              <span>{tUi("freight")}</span>
               <span className="font-mono" data-testid="text-summary-freight">
                 {freightCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex items-center justify-between gap-2 text-sm">
-              <span>Other Charges</span>
+              <span>{tUi("other.charges")}</span>
               <span className="font-mono" data-testid="text-summary-other">
                 {otherCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="border-t pt-2 flex items-center justify-between gap-2">
-              <span className="font-semibold">Grand Total</span>
+              <span className="font-semibold">{tUi("grand.total")}</span>
               <span className="font-mono font-bold text-lg" data-testid="text-grand-total">
                 {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-              <span>Total Bales</span>
+              <span>{tUi("total.bales")}</span>
               <span data-testid="text-total-bales">{bales.length}</span>
             </div>
           </Card>
@@ -810,7 +812,7 @@ export default function FactoryInvoiceCreate() {
       <Dialog open={showFinalizeDialog} onOpenChange={setShowFinalizeDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Finalize Invoice</DialogTitle>
+            <DialogTitle>{tUi("finalize.invoice")}</DialogTitle>
           </DialogHeader>
           <div className="py-4">
             <p className="mb-4">
@@ -819,11 +821,11 @@ export default function FactoryInvoiceCreate() {
             </p>
             <div className="bg-muted p-4 rounded-lg space-y-2">
               <div className="flex justify-between">
-                <span>Total Bales:</span>
+                <span>{tUi("total.bales.2")}</span>
                 <span className="font-mono">{bales.length}</span>
               </div>
               <div className="flex justify-between font-bold border-t pt-2">
-                <span>Grand Total:</span>
+                <span>{tUi("grand.total.2")}</span>
                 <span className="font-mono">
                   {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                 </span>

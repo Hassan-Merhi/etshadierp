@@ -330,9 +330,7 @@ export default function VoucherDetail() {
                             <TableCell>
                               <div className="font-medium">{entry.ledgerAccountName}</div>
                               {entry.narration && (
-                                <div className="text-xs text-muted-foreground/80 mt-0.5 italic">
-                                  {entry.narration}
-                                </div>
+                                <div className="text-xs text-muted-foreground/80 mt-0.5 italic">{entry.narration}</div>
                               )}
                             </TableCell>
                             <TableCell className="text-right font-mono">

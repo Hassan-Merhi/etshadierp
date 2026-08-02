@@ -70,8 +70,10 @@ import {
 } from "./daybook/daybookUtils";
 import { FACTORY_DAYBOOK_STATE_KEY, loadFactoryDaybookState, saveFactoryDaybookState } from "./daybook/daybookUiState";
 import { ViewEntryModal } from "./daybook/ViewEntryModal";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export default function FactoryDaybook() {
+  const tUi = useFactoryText();
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { formatDisplayDate, formatDisplayTime } = useDateFormat();
   const { toast } = useToast();
@@ -676,7 +678,7 @@ export default function FactoryDaybook() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <PageHeader title="Factory Daybook" subtitle="All factory transactions in one view" />
+          <PageHeader title={tUi("factory.daybook")} subtitle={tUi("all.factory.transactions.in.one.view")} />
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -708,8 +710,8 @@ export default function FactoryDaybook() {
         onValueChange={(value) => setActiveDaybookTab(value as "transactions" | "activity")}
       >
         <TabsList className="w-fit">
-          <TabsTrigger value="transactions">Transactions</TabsTrigger>
-          <TabsTrigger value="activity">Edits &amp; Activity</TabsTrigger>
+          <TabsTrigger value="transactions">{tUi("transactions")}</TabsTrigger>
+          <TabsTrigger value="activity">{tUi("edits.amp.activity")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="transactions" className="space-y-4 mt-2">
@@ -718,7 +720,7 @@ export default function FactoryDaybook() {
             <CardContent className="pt-4 pb-3">
               <div className="flex flex-wrap items-center gap-3">
                 <Input
-                  placeholder="Search..."
+                  placeholder={tUi("search")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   data-testid="input-search"
@@ -735,7 +737,7 @@ export default function FactoryDaybook() {
                       preset: "custom",
                     }));
                   }}
-                  title="Previous day (−)"
+                  title={tUi("previous.day.2")}
                   data-testid="button-prev-day"
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -752,7 +754,7 @@ export default function FactoryDaybook() {
                       preset: "custom",
                     }));
                   }}
-                  title="Next day (+)"
+                  title={tUi("next.day.2")}
                   data-testid="button-next-day"
                 >
                   <ChevronRight className="h-4 w-4" />
@@ -762,25 +764,25 @@ export default function FactoryDaybook() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ALL">All Types</SelectItem>
-                    <SelectItem value="PAYMENT">Payment</SelectItem>
-                    <SelectItem value="RECEIPT">Receipt</SelectItem>
-                    <SelectItem value="JOURNAL">Journal</SelectItem>
-                    <SelectItem value="INVOICE">Invoice</SelectItem>
-                    <SelectItem value="BALE_TRANSFER">Bale Transfer</SelectItem>
-                    <SelectItem value="CONTAINER_IMPORT">Container Import</SelectItem>
-                    <SelectItem value="OFFLOAD_RAW_STOCK">Offload Raw Stock</SelectItem>
-                    <SelectItem value="COMMISSION">Commission</SelectItem>
-                    <SelectItem value="BALE_PRESSING">Bale Pressing</SelectItem>
-                    <SelectItem value="BALE_FINALIZE">Bale Finalize</SelectItem>
-                    <SelectItem value="BALE_STOCK_ENTRY">Bale Stock Entry</SelectItem>
-                    <SelectItem value="BALE_REMOVAL">Bale Removal</SelectItem>
-                    <SelectItem value="FREIGHT_PAYMENT">Freight Payment</SelectItem>
-                    <SelectItem value="SUPPLIER_PAYMENT">Supplier Payment</SelectItem>
-                    <SelectItem value="PAYROLL_PAYMENT">Payroll Payment</SelectItem>
-                    <SelectItem value="DOC_UPLOAD">Doc Upload</SelectItem>
-                    <SelectItem value="DOC_DELETE">Doc Delete</SelectItem>
-                    <SelectItem value="FREIGHT_ADD">Freight Add</SelectItem>
+                    <SelectItem value="ALL">{tUi("all.types")}</SelectItem>
+                    <SelectItem value="PAYMENT">{tUi("payment")}</SelectItem>
+                    <SelectItem value="RECEIPT">{tUi("receipt")}</SelectItem>
+                    <SelectItem value="JOURNAL">{tUi("journal")}</SelectItem>
+                    <SelectItem value="INVOICE">{tUi("invoice")}</SelectItem>
+                    <SelectItem value="BALE_TRANSFER">{tUi("bale.transfer")}</SelectItem>
+                    <SelectItem value="CONTAINER_IMPORT">{tUi("container.import")}</SelectItem>
+                    <SelectItem value="OFFLOAD_RAW_STOCK">{tUi("offload.raw.stock")}</SelectItem>
+                    <SelectItem value="COMMISSION">{tUi("commission")}</SelectItem>
+                    <SelectItem value="BALE_PRESSING">{tUi("bale.pressing")}</SelectItem>
+                    <SelectItem value="BALE_FINALIZE">{tUi("bale.finalize")}</SelectItem>
+                    <SelectItem value="BALE_STOCK_ENTRY">{tUi("bale.stock.entry")}</SelectItem>
+                    <SelectItem value="BALE_REMOVAL">{tUi("bale.removal")}</SelectItem>
+                    <SelectItem value="FREIGHT_PAYMENT">{tUi("freight.payment")}</SelectItem>
+                    <SelectItem value="SUPPLIER_PAYMENT">{tUi("supplier.payment")}</SelectItem>
+                    <SelectItem value="PAYROLL_PAYMENT">{tUi("payroll.payment")}</SelectItem>
+                    <SelectItem value="DOC_UPLOAD">{tUi("doc.upload")}</SelectItem>
+                    <SelectItem value="DOC_DELETE">{tUi("doc.delete")}</SelectItem>
+                    <SelectItem value="FREIGHT_ADD">{tUi("freight.add")}</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as "all" | "exclude" | "only")}>
@@ -788,9 +790,9 @@ export default function FactoryDaybook() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Entries</SelectItem>
-                    <SelectItem value="exclude">Exclude Optional</SelectItem>
-                    <SelectItem value="only">Only Optional</SelectItem>
+                    <SelectItem value="all">{tUi("all.entries")}</SelectItem>
+                    <SelectItem value="exclude">{tUi("exclude.optional")}</SelectItem>
+                    <SelectItem value="only">{tUi("only.optional")}</SelectItem>
                   </SelectContent>
                 </Select>
                 {hasActiveFilters && (
@@ -823,7 +825,7 @@ export default function FactoryDaybook() {
                   )}
                 </CardTitle>
               </div>
-              <CardDescription>All factory transactions in one view</CardDescription>
+              <CardDescription>{tUi("all.factory.transactions.in.one.view")}</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               {isLoading ? (
@@ -836,7 +838,7 @@ export default function FactoryDaybook() {
                 <div className="text-center py-12 text-muted-foreground">
                   {hasActiveFilters ? (
                     <div>
-                      <p className="mb-2">No transactions found matching your filters.</p>
+                      <p className="mb-2">{tUi("no.transactions.found.matching.your.filters")}</p>
                       <Button variant="outline" onClick={clearFilters} data-testid="button-clear-filters-empty">
                         Clear Filters
                       </Button>
@@ -844,8 +846,8 @@ export default function FactoryDaybook() {
                   ) : (
                     <>
                       <BookOpen className="mx-auto h-12 w-12 text-muted-foreground" />
-                      <h3 className="mt-4 text-lg font-semibold">No transactions found</h3>
-                      <p className="mt-2">Factory transactions will appear here as you perform operations</p>
+                      <h3 className="mt-4 text-lg font-semibold">{tUi("no.transactions.found")}</h3>
+                      <p className="mt-2">{tUi("factory.transactions.will.appear.here.as.you.per")}</p>
                     </>
                   )}
                 </div>
@@ -967,7 +969,7 @@ export default function FactoryDaybook() {
                                               <Button
                                                 size="icon"
                                                 variant="ghost"
-                                                title="View details"
+                                                title={tUi("view.details")}
                                                 onClick={(e) => {
                                                   e.stopPropagation();
                                                   setViewEntry(mergedEntry);
@@ -984,7 +986,7 @@ export default function FactoryDaybook() {
                                               <Button
                                                 size="icon"
                                                 variant="ghost"
-                                                title="View details"
+                                                title={tUi("view.details")}
                                                 onClick={(e) => {
                                                   e.stopPropagation();
                                                   setViewEntry(mergedEntry);
@@ -1069,7 +1071,7 @@ export default function FactoryDaybook() {
                                             <Button
                                               size="icon"
                                               variant="ghost"
-                                              title="View details"
+                                              title={tUi("view.details")}
                                               onClick={(e) => {
                                                 e.stopPropagation();
                                                 setViewEntry((de._source ?? entry) as DaybookEntry);
@@ -1082,7 +1084,7 @@ export default function FactoryDaybook() {
                                               <Button
                                                 size="icon"
                                                 variant="ghost"
-                                                title="Go to container"
+                                                title={tUi("go.to.container")}
                                                 onClick={(e) => {
                                                   e.stopPropagation();
                                                   navigate(pencilTarget!);
@@ -1096,7 +1098,7 @@ export default function FactoryDaybook() {
                                               <Button
                                                 size="icon"
                                                 variant="ghost"
-                                                title="Edit"
+                                                title={tUi("edit")}
                                                 onClick={(e) => {
                                                   e.stopPropagation();
                                                   editSourceRecord(entry);
@@ -1112,7 +1114,7 @@ export default function FactoryDaybook() {
                                                 <Button
                                                   size="icon"
                                                   variant="ghost"
-                                                  title="Void"
+                                                  title={tUi("void")}
                                                   onClick={(e) => {
                                                     e.stopPropagation();
                                                     setVoidEntry(entry);
@@ -1135,7 +1137,7 @@ export default function FactoryDaybook() {
                                                 <Button
                                                   size="icon"
                                                   variant="ghost"
-                                                  title="Delete entry"
+                                                  title={tUi("delete.entry")}
                                                   onClick={(e) => {
                                                     e.stopPropagation();
                                                     setDeleteEntry(de._source as DaybookEntry);
@@ -1151,7 +1153,7 @@ export default function FactoryDaybook() {
                                             <Button
                                               size="icon"
                                               variant="ghost"
-                                              title="View details"
+                                              title={tUi("view.details")}
                                               onClick={(e) => {
                                                 e.stopPropagation();
                                                 setViewEntry((de._source ?? entry) as DaybookEntry);
@@ -1164,7 +1166,7 @@ export default function FactoryDaybook() {
                                               <Button
                                                 size="icon"
                                                 variant="ghost"
-                                                title="Go to container"
+                                                title={tUi("go.to.container")}
                                                 onClick={(e) => {
                                                   e.stopPropagation();
                                                   navigate(pencilTarget!);
@@ -1200,7 +1202,7 @@ export default function FactoryDaybook() {
           >
             <DialogContent data-testid="dialog-edit-daybook">
               <DialogHeader>
-                <DialogTitle>Edit Daybook Entry</DialogTitle>
+                <DialogTitle>{tUi("edit.daybook.entry")}</DialogTitle>
                 <DialogDescription>
                   Modify the entry details. A reason is required for the audit trail.
                 </DialogDescription>
@@ -1220,7 +1222,7 @@ export default function FactoryDaybook() {
                         </div>
                       )}
                       <div>
-                        <Label className="text-sm font-medium">Description</Label>
+                        <Label className="text-sm font-medium">{tUi("description")}</Label>
                         <Textarea
                           value={editDescription}
                           onChange={(e) => setEditDescription(e.target.value)}
@@ -1228,7 +1230,7 @@ export default function FactoryDaybook() {
                         />
                       </div>
                       <div>
-                        <Label className="text-sm font-medium">Date</Label>
+                        <Label className="text-sm font-medium">{tUi("date")}</Label>
                         <Input
                           type="date"
                           value={editTxDate}
@@ -1249,7 +1251,7 @@ export default function FactoryDaybook() {
                             />
                           </div>
                           <div>
-                            <Label className="text-sm font-medium">Amount (USD)</Label>
+                            <Label className="text-sm font-medium">{tUi("amount.usd")}</Label>
                             <Input
                               type="number"
                               step="0.01"
@@ -1261,11 +1263,11 @@ export default function FactoryDaybook() {
                         </div>
                       )}
                       <div>
-                        <Label className="text-sm font-medium">Reason for edit *</Label>
+                        <Label className="text-sm font-medium">{tUi("reason.for.edit")}</Label>
                         <Textarea
                           value={editReason}
                           onChange={(e) => setEditReason(e.target.value)}
-                          placeholder="Why is this change needed?"
+                          placeholder={tUi("why.is.this.change.needed")}
                           data-testid="input-edit-reason"
                         />
                       </div>
@@ -1318,14 +1320,14 @@ export default function FactoryDaybook() {
           >
             <AlertDialogContent data-testid="dialog-void-voucher">
               <AlertDialogHeader>
-                <AlertDialogTitle>Delete this voucher?</AlertDialogTitle>
+                <AlertDialogTitle>{tUi("delete.this.voucher")}</AlertDialogTitle>
                 <AlertDialogDescription>
                   This will reverse all accounting entries. This action cannot be undone.
                   {voidEntry && <span className="block mt-2 font-medium text-foreground">{voidEntry.description}</span>}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel data-testid="button-cancel-void">Cancel</AlertDialogCancel>
+                <AlertDialogCancel data-testid="button-cancel-void">{tUi("cancel")}</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => wrapAdminAction(() => voidEntry && voidMutation.mutate(voidEntry.id), "Void Entry")}
                   disabled={voidMutation.isPending}
@@ -1346,7 +1348,7 @@ export default function FactoryDaybook() {
           >
             <AlertDialogContent data-testid="dialog-delete-entry">
               <AlertDialogHeader>
-                <AlertDialogTitle>Permanently delete this entry?</AlertDialogTitle>
+                <AlertDialogTitle>{tUi("permanently.delete.this.entry")}</AlertDialogTitle>
                 <AlertDialogDescription>
                   This will permanently remove the daybook entry. This action cannot be undone.
                   {deleteEntry && (
@@ -1357,7 +1359,7 @@ export default function FactoryDaybook() {
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+                <AlertDialogCancel data-testid="button-cancel-delete">{tUi("cancel")}</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => deleteEntry && deleteMutation.mutate(deleteEntry.id)}
                   disabled={deleteMutation.isPending}
@@ -1407,17 +1409,13 @@ export default function FactoryDaybook() {
                         <div className="flex items-start gap-2">
                           <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                           <div className="space-y-1">
-                            <p className="font-medium">This will cascade to inventory costs.</p>
+                            <p className="font-medium">{tUi("this.will.cascade.to.inventory.costs")}</p>
                             <p>
                               Saving updates the raw stock cost per kg and recalculates the weighted-average cost of all
                               mix batches that used this container.
                             </p>
-                            {isBaseMaterial && (
-                              <p>Editing the total cost will back-calculate a new base rate per kg.</p>
-                            )}
-                            {isDuty && (
-                              <p>Only confirmed duty can be edited here. A duty audit log entry will be written.</p>
-                            )}
+                            {isBaseMaterial && <p>{tUi("editing.the.total.cost.will.back.calculate.a.new")}</p>}
+                            {isDuty && <p>{tUi("only.confirmed.duty.can.be.edited.here.a.duty.au")}</p>}
                           </div>
                         </div>
                       </div>
@@ -1436,16 +1434,16 @@ export default function FactoryDaybook() {
                           min="0"
                           value={costEditAmount}
                           onChange={(e) => setCostEditAmount(e.target.value)}
-                          placeholder="Enter corrected amount"
+                          placeholder={tUi("enter.corrected.amount")}
                           data-testid="input-cost-edit-amount"
                         />
                       </div>
                       <div>
-                        <Label className="text-sm font-medium">Reason for edit *</Label>
+                        <Label className="text-sm font-medium">{tUi("reason.for.edit")}</Label>
                         <Textarea
                           value={costEditReason}
                           onChange={(e) => setCostEditReason(e.target.value)}
-                          placeholder="Why is this correction needed?"
+                          placeholder={tUi("why.is.this.correction.needed")}
                           data-testid="input-cost-edit-reason"
                         />
                       </div>

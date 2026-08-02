@@ -65,7 +65,9 @@ import { ImportDialog } from "./stock-transfer-order/dialogs/ImportDialog";
 import { QuantityPickerDialog } from "./stock-transfer-order/dialogs/QuantityPickerDialog";
 import { StockMovementDialog } from "./stock-transfer-order/dialogs/StockMovementDialog";
 import { DetailDialog } from "./stock-transfer-order/dialogs/DetailDialog";
+import { useErpText } from "@/i18n/modules/erp";
 export default function StockTransferOrder() {
+  const tUi = useErpText();
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
@@ -1410,13 +1412,13 @@ export default function StockTransferOrder() {
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
-            <Label className="text-sm whitespace-nowrap">Destination:</Label>
+            <Label className="text-sm whitespace-nowrap">{tUi("destination")}</Label>
             <Select
               value={destinationLocationId?.toString() || ""}
               onValueChange={(v) => setDestinationLocationId(parseInt(v))}
             >
               <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-destination">
-                <SelectValue placeholder="Choose destination" />
+                <SelectValue placeholder={tUi("choose.destination")} />
               </SelectTrigger>
               <SelectContent>
                 {availableDestinations.map((loc) => (
@@ -1439,7 +1441,7 @@ export default function StockTransferOrder() {
             </Button>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Select Source Locations</DialogTitle>
+                <DialogTitle>{tUi("select.source.locations")}</DialogTitle>
               </DialogHeader>
               <div className="space-y-2 max-h-[400px] overflow-y-auto">
                 {locations.map((loc) => (
@@ -1461,7 +1463,7 @@ export default function StockTransferOrder() {
                 ))}
               </div>
               <DialogFooter>
-                <Button onClick={() => setLocationDialogOpen(false)}>Done</Button>
+                <Button onClick={() => setLocationDialogOpen(false)}>{tUi("done")}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -1540,7 +1542,7 @@ export default function StockTransferOrder() {
             <div className="flex items-start gap-2">
               <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <p className="font-medium text-destructive">Validation Errors</p>
+                <p className="font-medium text-destructive">{tUi("validation.errors")}</p>
                 <ul className="text-sm text-muted-foreground space-y-1">
                   {validationErrors.map((error, idx) => (
                     <li key={idx}>{error}</li>
@@ -1558,7 +1560,7 @@ export default function StockTransferOrder() {
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2">
                 <MapPin className="h-5 w-5" />
-                <CardTitle className="text-base">Inventory Matrix</CardTitle>
+                <CardTitle className="text-base">{tUi("inventory.matrix")}</CardTitle>
               </div>
               <p className="text-xs text-muted-foreground">
                 Click to focus, then use arrow keys + spacebar to add / Enter to view history
@@ -1569,7 +1571,7 @@ export default function StockTransferOrder() {
             {selectedLocations.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <MapPin className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>Select source locations to view inventory</p>
+                <p>{tUi("select.source.locations.to.view.inventory")}</p>
                 <Button variant="outline" className="mt-4" onClick={() => setLocationDialogOpen(true)}>
                   Select Locations
                 </Button>
@@ -1704,17 +1706,17 @@ export default function StockTransferOrder() {
               </Button>
               <SheetContent side="bottom" className="h-[85vh] flex flex-col">
                 <SheetHeader className="border-b pb-3 shrink-0">
-                  <SheetTitle>Add Item to Order</SheetTitle>
+                  <SheetTitle>{tUi("add.item.to.order")}</SheetTitle>
                 </SheetHeader>
                 <div className="flex-1 overflow-y-auto py-4 space-y-4">
                   {/* Stock item search */}
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Stock Item</Label>
+                    <Label className="text-sm font-medium">{tUi("stock.item")}</Label>
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
                         className="pl-9"
-                        placeholder="Search stock items..."
+                        placeholder={tUi("search.stock.items")}
                         value={mobileSearchTerm}
                         onChange={(e) => setMobileSearchTerm(e.target.value)}
                         data-testid="input-mobile-search"
@@ -1750,7 +1752,7 @@ export default function StockTransferOrder() {
 
                   {/* Source location */}
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Source Location</Label>
+                    <Label className="text-sm font-medium">{tUi("source.location")}</Label>
                     {selectedLocations.length === 0 ? (
                       <div className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
                         No source locations selected. Close this sheet and tap "Source Locations" to add some.
@@ -1761,7 +1763,7 @@ export default function StockTransferOrder() {
                         onValueChange={(v) => setMobileSourceLocationId(parseInt(v))}
                       >
                         <SelectTrigger data-testid="select-mobile-source">
-                          <SelectValue placeholder="Pick source location" />
+                          <SelectValue placeholder={tUi("pick.source.location")} />
                         </SelectTrigger>
                         <SelectContent>
                           {selectedLocations.map((loc) => (
@@ -1780,7 +1782,7 @@ export default function StockTransferOrder() {
 
                   {/* Quantity */}
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Quantity</Label>
+                    <Label className="text-sm font-medium">{tUi("quantity")}</Label>
                     <Input
                       type="number"
                       step="0.001"
@@ -1808,7 +1810,7 @@ export default function StockTransferOrder() {
               <CardContent className="py-3">
                 <div className="flex items-center gap-2 text-sm">
                   <ArrowRight className="h-4 w-4 text-primary" />
-                  <span className="text-muted-foreground">Sending to:</span>
+                  <span className="text-muted-foreground">{tUi("sending.to")}</span>
                   <span className="font-medium">{locations.find((l) => l.id === destinationLocationId)?.name}</span>
                 </div>
               </CardContent>
@@ -1818,7 +1820,7 @@ export default function StockTransferOrder() {
           <Card>
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between gap-2">
-                <CardTitle className="text-base">Transfer Order</CardTitle>
+                <CardTitle className="text-base">{tUi("transfer.order")}</CardTitle>
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary">{orderItems.length} items</Badge>
                   <Badge variant="default" className="font-mono">
@@ -1832,7 +1834,7 @@ export default function StockTransferOrder() {
                       setImportDialogOpen(true);
                     }}
                     data-testid="button-open-import"
-                    title="Import from Excel"
+                    title={tUi("import.from.excel")}
                   >
                     <Upload className="h-4 w-4" />
                   </Button>
@@ -1846,7 +1848,7 @@ export default function StockTransferOrder() {
                   <p className="text-sm hidden lg:block">
                     Click on quantities or use arrow keys + spacebar to add items
                   </p>
-                  <p className="text-sm lg:hidden">Tap "Add Item" above to add items to the order</p>
+                  <p className="text-sm lg:hidden">{tUi("tap.add.item.above.to.add.items.to.the.order")}</p>
                 </div>
               ) : (
                 <>
@@ -1879,7 +1881,7 @@ export default function StockTransferOrder() {
 
                   <div className="pt-2 border-t space-y-3">
                     <div className="flex justify-between text-sm font-medium">
-                      <span>Total Bales:</span>
+                      <span>{tUi("total.bales.2")}</span>
                       <span className="font-mono text-lg">{formatNumber(totalBales, 0)}</span>
                     </div>
 
@@ -1950,7 +1952,7 @@ export default function StockTransferOrder() {
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <GitBranch className="h-4 w-4 text-muted-foreground" />
-                <CardTitle className="text-base">Revision History</CardTitle>
+                <CardTitle className="text-base">{tUi("revision.history")}</CardTitle>
                 {revisions.length > 0 && (
                   <Badge variant="secondary" className="ml-1">
                     {revisions.length}
@@ -1988,7 +1990,7 @@ export default function StockTransferOrder() {
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2 text-xs">
-                          <span className="text-muted-foreground">Reference only:</span>
+                          <span className="text-muted-foreground">{tUi("reference.only")}</span>
                           <Switch
                             checked={rev.optional}
                             onCheckedChange={async (checked) => {
@@ -2027,10 +2029,10 @@ export default function StockTransferOrder() {
                         <table className="w-full text-sm">
                           <thead className="bg-muted/30">
                             <tr>
-                              <th className="text-left p-2 font-medium">Item</th>
-                              <th className="text-left p-2 font-medium hidden sm:table-cell">From</th>
+                              <th className="text-left p-2 font-medium">{tUi("item")}</th>
+                              <th className="text-left p-2 font-medium hidden sm:table-cell">{tUi("from")}</th>
                               <th className="text-right p-2 font-medium">Was</th>
-                              <th className="text-right p-2 font-medium">Change</th>
+                              <th className="text-right p-2 font-medium">{tUi("change")}</th>
                               <th className="text-right p-2 font-medium">Now</th>
                             </tr>
                           </thead>

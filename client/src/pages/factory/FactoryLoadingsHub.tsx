@@ -3,10 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import FactoryContainerLoadingScan from "./FactoryContainerLoadingScan";
 import FactoryPendingLoadings from "./FactoryPendingLoadings";
 import { Truck } from "lucide-react";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 type LoadingsTab = "loadings" | "pending";
 
 export default function FactoryLoadingsHub() {
+  const tUi = useFactoryText();
   const hash = typeof window !== "undefined" ? window.location.hash.replace("#", "") : "";
 
   const { data: settings, isSuccess: settingsLoaded } = useQuery<any>({
@@ -18,7 +20,10 @@ export default function FactoryLoadingsHub() {
     staleTime: 60000,
   });
 
-  const { data: myAccess, isSuccess: accessLoaded } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
+  const { data: myAccess, isSuccess: accessLoaded } = useQuery<any>({
+    queryKey: ["/api/factory/my-access"],
+    staleTime: 5 * 60000,
+  });
   const hiddenTabs = myAccess?.hiddenCostFields ?? [];
 
   const showPending =
@@ -57,8 +62,8 @@ export default function FactoryLoadingsHub() {
             <Truck className="h-4 w-4 text-primary" />
           </div>
           <div>
-            <h1 className="text-base font-semibold leading-tight">Loadings</h1>
-            <p className="text-xs text-muted-foreground">Container loading and pending sessions</p>
+            <h1 className="text-base font-semibold leading-tight">{tUi("loadings")}</h1>
+            <p className="text-xs text-muted-foreground">{tUi("container.loading.and.pending.sessions")}</p>
           </div>
         </div>
         {/* Tab row */}

@@ -20,6 +20,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AdvanceRecord } from "../types";
 import { fmt } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function RepayByMonthDialog({
   advances,
@@ -48,6 +49,7 @@ export function RepayByMonthDialog({
   setRepayByMonthOpen: any;
   setRepayingMonth: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog
       open={repayByMonthOpen}
@@ -61,7 +63,7 @@ export function RepayByMonthDialog({
     >
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Repay by Month</DialogTitle>
+          <DialogTitle>{tUi("repay.by.month")}</DialogTitle>
           <DialogDescription>
             Bulk-repay all outstanding advances (Loans and Salary Deductions) grouped by the month they were given.
           </DialogDescription>
@@ -70,7 +72,7 @@ export function RepayByMonthDialog({
         {/* Shared repayment fields */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
           <div className="space-y-2">
-            <Label>Repayment Date</Label>
+            <Label>{tUi("repayment.date")}</Label>
             <Input
               type="date"
               value={repayByMonthForm.repaymentDate}
@@ -87,7 +89,7 @@ export function RepayByMonthDialog({
               onValueChange={(v) => setRepayByMonthForm((p: any) => ({ ...p, cashAccountId: v }))}
             >
               <SelectTrigger data-testid="select-rbm-cash-account">
-                <SelectValue placeholder="Select cash account" />
+                <SelectValue placeholder={tUi("select.cash.account")} />
               </SelectTrigger>
               <SelectContent>
                 {(cashAccounts || []).map((a: any) => (
@@ -106,7 +108,9 @@ export function RepayByMonthDialog({
 
           if (allOutstanding.length === 0) {
             return (
-              <div className="py-8 text-center text-muted-foreground text-sm">No outstanding advances to repay.</div>
+              <div className="py-8 text-center text-muted-foreground text-sm">
+                {tUi("no.outstanding.advances.to.repay")}
+              </div>
             );
           }
 
@@ -198,9 +202,9 @@ export function RepayByMonthDialog({
                     {isExpanded && (
                       <div className="divide-y">
                         <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-1 text-xs font-medium text-muted-foreground bg-muted/20">
-                          <span>Worker</span>
-                          <span className="text-right">Original</span>
-                          <span className="text-right">Remaining</span>
+                          <span>{tUi("worker")}</span>
+                          <span className="text-right">{tUi("original")}</span>
+                          <span className="text-right">{tUi("remaining")}</span>
                         </div>
                         {items.map((adv) => (
                           <div
@@ -216,7 +220,7 @@ export function RepayByMonthDialog({
                           </div>
                         ))}
                         <div className="grid grid-cols-[1fr_auto_auto] gap-x-4 px-4 py-2 text-sm bg-muted/20">
-                          <span className="font-semibold text-muted-foreground">Total</span>
+                          <span className="font-semibold text-muted-foreground">{tUi("total")}</span>
                           <span></span>
                           <span className="font-mono text-right font-bold">{fmt(total)}</span>
                         </div>

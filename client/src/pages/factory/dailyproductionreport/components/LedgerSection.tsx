@@ -3,16 +3,17 @@
  *
  * Extracted from DailyProductionReport.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Collapsible, CollapsibleContent, CollapsibleTrigger} from "@/components/ui/collapsible";
-import {ChevronDown, ChevronRight, Pencil} from "lucide-react";
-import {useQueryClient} from "@tanstack/react-query";
-import {BaleWeightEditDialog, type WeightEditBale} from "@/components/BaleWeightEditDialog";
-import type {LedgerSectionProps} from "../types";
-import {fmtL, fmtML, fmtNL, groupByCategory} from "../utils";
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, ChevronRight, Pencil } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { BaleWeightEditDialog, type WeightEditBale } from "@/components/BaleWeightEditDialog";
+import type { LedgerSectionProps } from "../types";
+import { fmtL, fmtML, fmtNL, groupByCategory } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function LedgerSection({
   title,
@@ -24,6 +25,7 @@ export function LedgerSection({
   defaultOpen = false,
   showSoldPrice = false,
 }: LedgerSectionProps) {
+  const tUi = useFactoryText();
   const [open, setOpen] = useState(defaultOpen);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [weightEditBale, setWeightEditBale] = useState<WeightEditBale | null>(null);
@@ -73,20 +75,20 @@ export function LedgerSection({
         <CollapsibleContent>
           <CardContent className="p-0">
             {rows.length === 0 ? (
-              <p className="text-sm text-muted-foreground p-4 pt-0 text-center">No records.</p>
+              <p className="text-sm text-muted-foreground p-4 pt-0 text-center">{tUi("no.records")}</p>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-xs py-2 px-3">Product</TableHead>
-                    <TableHead className="text-xs py-2 px-3 text-right">Bales</TableHead>
-                    <TableHead className="text-xs py-2 px-3 text-right">Weight (kg)</TableHead>
-                    <TableHead className="text-xs py-2 px-3 text-right">Avg Sell/Bale</TableHead>
-                    <TableHead className="text-xs py-2 px-3 text-right">Total Sell Value</TableHead>
+                    <TableHead className="text-xs py-2 px-3">{tUi("product")}</TableHead>
+                    <TableHead className="text-xs py-2 px-3 text-right">{tUi("bales")}</TableHead>
+                    <TableHead className="text-xs py-2 px-3 text-right">{tUi("weight.kg")}</TableHead>
+                    <TableHead className="text-xs py-2 px-3 text-right">{tUi("avg.sell.bale")}</TableHead>
+                    <TableHead className="text-xs py-2 px-3 text-right">{tUi("total.sell.value")}</TableHead>
                     {showSoldPrice && (
                       <>
-                        <TableHead className="text-xs py-2 px-3 text-right">Avg Sold Rate</TableHead>
-                        <TableHead className="text-xs py-2 px-3 text-right">Total Sold</TableHead>
+                        <TableHead className="text-xs py-2 px-3 text-right">{tUi("avg.sold.rate")}</TableHead>
+                        <TableHead className="text-xs py-2 px-3 text-right">{tUi("total.sold")}</TableHead>
                       </>
                     )}
                   </TableRow>
@@ -189,7 +191,7 @@ export function LedgerSection({
                                                     weightKg: d.weightKg,
                                                   })
                                                 }
-                                                title="Correct weight"
+                                                title={tUi("correct.weight")}
                                               >
                                                 {fmtL(d.weightKg)}
                                                 <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 shrink-0" />
@@ -206,7 +208,7 @@ export function LedgerSection({
                                         ))}
                                         {(r.baleDetails ?? []).length > 1 && (
                                           <tr className="font-semibold border-t border-border/50">
-                                            <td className="py-1 pr-4 text-muted-foreground">Total</td>
+                                            <td className="py-1 pr-4 text-muted-foreground">{tUi("total")}</td>
                                             <td className="py-1 pr-4 text-right">{fmtL(r.totalWeightKg)}</td>
                                             <td className="py-1 pr-4 text-right">{r.baleCount}</td>
                                             <td className="py-1 pr-4 text-right">
@@ -235,7 +237,7 @@ export function LedgerSection({
                     ];
                   })}
                   <TableRow className="bg-muted/30 font-semibold">
-                    <TableCell className="text-xs py-2 px-3">Subtotal</TableCell>
+                    <TableCell className="text-xs py-2 px-3">{tUi("subtotal")}</TableCell>
                     <TableCell className="text-right text-xs py-2 px-3">{fmtNL(total.baleCount)}</TableCell>
                     <TableCell className="text-right text-xs py-2 px-3">{fmtL(total.totalWeightKg)}</TableCell>
                     <TableCell className="text-right text-xs py-2 px-3 text-muted-foreground">

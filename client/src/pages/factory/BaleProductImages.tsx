@@ -8,6 +8,7 @@ import { Loader2, Upload, Trash2, ImagePlus, Search, Images, ChevronLeft } from 
 import { useToast } from "@/hooks/use-toast";
 import type { FactoryBaleProductImage } from "@shared/schema";
 import { PageHeader } from "@/components/PageHeader";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface BaleProduct {
   id: number;
@@ -19,6 +20,7 @@ interface BaleProduct {
 }
 
 export default function BaleProductImages() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<BaleProduct | null>(null);
@@ -128,7 +130,7 @@ export default function BaleProductImages() {
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               className="pl-8"
-              placeholder="Search products..."
+              placeholder={tUi("search.products")}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               data-testid="input-search-products"
@@ -142,7 +144,7 @@ export default function BaleProductImages() {
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : filteredProducts.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8 px-4">No products found</p>
+            <p className="text-sm text-muted-foreground text-center py-8 px-4">{tUi("no.products.found")}</p>
           ) : (
             <div className="divide-y">
               {filteredProducts.map((p) => (
@@ -171,7 +173,7 @@ export default function BaleProductImages() {
         {!selectedProduct ? (
           <div className="flex flex-col items-center justify-center flex-1 text-center p-8 text-muted-foreground">
             <Images className="h-12 w-12 mb-4 opacity-30" />
-            <p className="text-sm">Select a product to manage its images</p>
+            <p className="text-sm">{tUi("select.a.product.to.manage.its.images")}</p>
           </div>
         ) : (
           <div className="p-6 space-y-6">
@@ -231,7 +233,7 @@ export default function BaleProductImages() {
               <p className="text-sm text-muted-foreground">
                 Drag & drop images here, or <span className="text-primary font-medium">click to browse</span>
               </p>
-              <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WebP — max 10 MB each</p>
+              <p className="text-xs text-muted-foreground mt-1">{tUi("png.jpg.webp.max.10.mb.each")}</p>
             </div>
 
             {/* Image grid */}

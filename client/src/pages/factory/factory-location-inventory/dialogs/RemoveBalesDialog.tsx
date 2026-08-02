@@ -15,6 +15,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function RemoveBalesDialog({
   deleteDialogOpen,
@@ -47,6 +48,7 @@ export function RemoveBalesDialog({
   setDeleteSupervisorPass: any;
   setDeleteSupervisorUser: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog
       open={deleteDialogOpen}
@@ -62,7 +64,7 @@ export function RemoveBalesDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Remove Bales from Stock</DialogTitle>
+          <DialogTitle>{tUi("remove.bales.from.stock")}</DialogTitle>
           <DialogDescription>
             {deleteProduct && (
               <>
@@ -80,7 +82,7 @@ export function RemoveBalesDialog({
         )}
         <div className="space-y-4 py-2">
           <div className="space-y-1">
-            <Label htmlFor="delete-qty">Quantity to Remove</Label>
+            <Label htmlFor="delete-qty">{tUi("quantity.to.remove")}</Label>
             <Input
               id="delete-qty"
               type="number"
@@ -94,7 +96,7 @@ export function RemoveBalesDialog({
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="delete-reason">Reason</Label>
+            <Label htmlFor="delete-reason">{tUi("reason")}</Label>
             <Input
               id="delete-reason"
               placeholder="e.g. damaged, lost, correction"
@@ -104,21 +106,21 @@ export function RemoveBalesDialog({
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="delete-supervisor-user">Supervisor Username</Label>
+            <Label htmlFor="delete-supervisor-user">{tUi("supervisor.username")}</Label>
             <Input
               id="delete-supervisor-user"
-              placeholder="Admin/Owner/Manager username"
+              placeholder={tUi("admin.owner.manager.username")}
               value={deleteSupervisorUser}
               onChange={(e) => setDeleteSupervisorUser(e.target.value)}
               data-testid="input-delete-supervisor-user"
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="delete-supervisor-pass">Supervisor Password</Label>
+            <Label htmlFor="delete-supervisor-pass">{tUi("supervisor.password")}</Label>
             <Input
               id="delete-supervisor-pass"
               type="password"
-              placeholder="Password"
+              placeholder={tUi("password")}
               value={deleteSupervisorPass}
               onChange={(e) => setDeleteSupervisorPass(e.target.value)}
               data-testid="input-delete-supervisor-pass"

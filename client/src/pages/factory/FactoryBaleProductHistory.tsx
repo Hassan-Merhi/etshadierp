@@ -14,17 +14,12 @@ import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { BaleWeightEditDialog, type WeightEditBale } from "@/components/BaleWeightEditDialog";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface MonthlyBaleData {
   month: number;
@@ -88,6 +83,7 @@ interface BaleDetailResponse {
 
 // ── Main bale-product history page (monthly overview) ────────────────────────
 export function FactoryBaleProductHistory() {
+  const tUi = useFactoryText();
   const params = useParams();
   const [, navigate] = useLocation();
   const { formatDisplayDate } = useDateFormat();
@@ -102,10 +98,9 @@ export function FactoryBaleProductHistory() {
   const { data, isLoading } = useQuery<BaleProductHistoryResponse>({
     queryKey: ["/api/factory/bale-product-history", productId, locationId, year],
     queryFn: async () => {
-      const response = await fetch(
-        `/api/factory/bale-product-history/${productId}/${locationId}/${year}`,
-        { credentials: "include" }
-      );
+      const response = await fetch(`/api/factory/bale-product-history/${productId}/${locationId}/${year}`, {
+        credentials: "include",
+      });
       if (!response.ok) throw new Error("Failed to fetch");
       return response.json();
     },
@@ -133,7 +128,7 @@ export function FactoryBaleProductHistory() {
   const chartData = monthlyData.map((m) => ({
     month: m.monthName.slice(0, 3),
     "In Stock": m.balesIn,
-    "Out": m.balesOut,
+    Out: m.balesOut,
   }));
 
   return (
@@ -162,19 +157,21 @@ export function FactoryBaleProductHistory() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Card>
             <CardContent className="pt-4 pb-4">
-              <div className="text-sm text-muted-foreground">Total Bales</div>
-              <div className="text-2xl font-bold" data-testid="text-total-bales">{grandTotal.baleCount}</div>
+              <div className="text-sm text-muted-foreground">{tUi("total.bales")}</div>
+              <div className="text-2xl font-bold" data-testid="text-total-bales">
+                {grandTotal.baleCount}
+              </div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4 pb-4">
-              <div className="text-sm text-muted-foreground">Total Weight</div>
+              <div className="text-sm text-muted-foreground">{tUi("total.weight")}</div>
               <div className="text-2xl font-bold">{formatNumber(grandTotal.totalWeight)} kg</div>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4 pb-4">
-              <div className="text-sm text-muted-foreground">In Stock</div>
+              <div className="text-sm text-muted-foreground">{tUi("in.stock")}</div>
               <div className="text-2xl font-bold text-emerald-600">{grandTotal.balesIn}</div>
             </CardContent>
           </Card>
@@ -190,7 +187,7 @@ export function FactoryBaleProductHistory() {
       {chartData.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Monthly Movement</CardTitle>
+            <CardTitle className="text-base">{tUi("monthly.movement")}</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={200}>
@@ -213,10 +210,10 @@ export function FactoryBaleProductHistory() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Month</TableHead>
-                <TableHead className="text-right">Bales In</TableHead>
-                <TableHead className="text-right">Bales Out</TableHead>
-                <TableHead className="text-right">Weight (KG)</TableHead>
+                <TableHead>{tUi("month")}</TableHead>
+                <TableHead className="text-right">{tUi("bales.in")}</TableHead>
+                <TableHead className="text-right">{tUi("bales.out")}</TableHead>
+                <TableHead className="text-right">{tUi("weight.kg.2")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -237,8 +234,10 @@ export function FactoryBaleProductHistory() {
               ))}
               {grandTotal && (
                 <TableRow className="font-bold border-t-2" data-testid="row-grand-total">
-                  <TableCell>Grand Total</TableCell>
-                  <TableCell className="text-right font-mono" data-testid="text-total-bales-in">{grandTotal.balesIn}</TableCell>
+                  <TableCell>{tUi("grand.total")}</TableCell>
+                  <TableCell className="text-right font-mono" data-testid="text-total-bales-in">
+                    {grandTotal.balesIn}
+                  </TableCell>
                   <TableCell className="text-right font-mono">{grandTotal.balesOut}</TableCell>
                   <TableCell className="text-right font-mono">{formatNumber(grandTotal.totalWeight)}</TableCell>
                 </TableRow>
@@ -260,6 +259,7 @@ export function FactoryBaleProductHistory() {
 
 // ── Month-detail view ─────────────────────────────────────────────────────────
 export function FactoryBaleProductMonthDetail() {
+  const tUi = useFactoryText();
   const params = useParams();
   const [, navigate] = useLocation();
   const { formatDisplayDate } = useDateFormat();
@@ -307,8 +307,21 @@ export function FactoryBaleProductMonthDetail() {
     return true;
   });
 
-  const monthNames = ["", "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"];
+  const monthNames = [
+    "",
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
   const monthName = monthNames[parseInt(month)] || month;
 
   const formatNumber = (num: number) => {
@@ -323,7 +336,9 @@ export function FactoryBaleProductMonthDetail() {
   };
 
   const handleWeightSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-product-history", productId, locationId, year, month] });
+    queryClient.invalidateQueries({
+      queryKey: ["/api/factory/bale-product-history", productId, locationId, year, month],
+    });
     queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-product-history", productId, locationId, year] });
   };
 
@@ -371,7 +386,7 @@ export function FactoryBaleProductMonthDetail() {
             <div className="relative flex-1 min-w-[180px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search bale code or ref #..."
+                placeholder={tUi("search.bale.code.or.ref")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9"
@@ -380,22 +395,25 @@ export function FactoryBaleProductMonthDetail() {
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[160px]" data-testid="select-status-filter">
-                <SelectValue placeholder="All Status" />
+                <SelectValue placeholder={tUi("all.status")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="IN_STOCK">In Stock</SelectItem>
-                <SelectItem value="LOADING">Loading</SelectItem>
-                <SelectItem value="SOLD">Sold</SelectItem>
-                <SelectItem value="DISPATCHED">Dispatched</SelectItem>
-                <SelectItem value="DELETED">Deleted</SelectItem>
+                <SelectItem value="all">{tUi("all.status")}</SelectItem>
+                <SelectItem value="IN_STOCK">{tUi("in.stock")}</SelectItem>
+                <SelectItem value="LOADING">{tUi("loading.3")}</SelectItem>
+                <SelectItem value="SOLD">{tUi("sold")}</SelectItem>
+                <SelectItem value="DISPATCHED">{tUi("dispatched")}</SelectItem>
+                <SelectItem value="DELETED">{tUi("deleted")}</SelectItem>
               </SelectContent>
             </Select>
             {(searchTerm || statusFilter !== "all") && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { setSearchTerm(""); setStatusFilter("all"); }}
+                onClick={() => {
+                  setSearchTerm("");
+                  setStatusFilter("all");
+                }}
                 data-testid="button-clear-filters"
               >
                 Clear
@@ -409,20 +427,20 @@ export function FactoryBaleProductMonthDetail() {
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
-                  <TableHead>Bale Code</TableHead>
-                  <TableHead>Reference</TableHead>
-                  <TableHead className="text-right">Weight (KG)</TableHead>
+                  <TableHead>{tUi("bale.code")}</TableHead>
+                  <TableHead>{tUi("reference")}</TableHead>
+                  <TableHead className="text-right">{tUi("weight.kg.2")}</TableHead>
                   {!hiddenCost.includes("bale_history_cost_per_kg") && (
-                    <TableHead className="text-right">Cost/KG</TableHead>
+                    <TableHead className="text-right">{tUi("cost.kg.2")}</TableHead>
                   )}
                   {!hiddenCost.includes("bale_history_total_cost") && (
-                    <TableHead className="text-right">Cost Price</TableHead>
+                    <TableHead className="text-right">{tUi("cost.price")}</TableHead>
                   )}
                   {!hiddenCost.includes("bale_history_total_cost") && (
-                    <TableHead className="text-right">Sell Price</TableHead>
+                    <TableHead className="text-right">{tUi("sell.price")}</TableHead>
                   )}
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date/Time</TableHead>
+                  <TableHead>{tUi("status")}</TableHead>
+                  <TableHead>{tUi("date.time")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -436,7 +454,9 @@ export function FactoryBaleProductMonthDetail() {
                       <TableCell data-testid={`text-reference-${bale.id}`}>
                         <button
                           className="font-mono text-sm text-primary underline-offset-2 hover:underline cursor-pointer"
-                          onClick={() => navigate(`/factory/barcode-lookup?ref=${encodeURIComponent(bale.referenceNumber)}`)}
+                          onClick={() =>
+                            navigate(`/factory/barcode-lookup?ref=${encodeURIComponent(bale.referenceNumber)}`)
+                          }
                           data-testid={`button-ref-lookup-${bale.id}`}
                         >
                           {bale.referenceNumber}
@@ -447,8 +467,14 @@ export function FactoryBaleProductMonthDetail() {
                           {formatNumber(Number(bale.weightKg))}
                           <button
                             className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted"
-                            onClick={() => setWeightEditBale({ id: bale.id, referenceNumber: bale.referenceNumber, weightKg: bale.weightKg })}
-                            title="Correct weight"
+                            onClick={() =>
+                              setWeightEditBale({
+                                id: bale.id,
+                                referenceNumber: bale.referenceNumber,
+                                weightKg: bale.weightKg,
+                              })
+                            }
+                            title={tUi("correct.weight")}
                             data-testid={`button-edit-weight-${bale.id}`}
                           >
                             <Pencil className="h-3 w-3 text-muted-foreground" />
@@ -472,13 +498,19 @@ export function FactoryBaleProductMonthDetail() {
                       )}
                       <TableCell data-testid={`text-status-${bale.id}`}>
                         {isLoadingStatus ? (
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 border-amber-400 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 no-default-active-elevate">
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1.5 py-0.5 border-amber-400 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 no-default-active-elevate"
+                          >
                             Loading
                           </Badge>
                         ) : bale.status === "DELETED" || bale.status === "REMOVED" ? (
-                          <Badge variant="destructive">Deleted</Badge>
+                          <Badge variant="destructive">{tUi("deleted")}</Badge>
                         ) : bale.status === "DISPATCHED" ? (
-                          <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                          <Badge
+                            variant="secondary"
+                            className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                          >
                             Dispatched
                           </Badge>
                         ) : (
@@ -491,7 +523,11 @@ export function FactoryBaleProductMonthDetail() {
                 })}
                 {(!data || data.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8" data-testid="text-no-data">
+                    <TableCell
+                      colSpan={8}
+                      className="text-center text-muted-foreground py-8"
+                      data-testid="text-no-data"
+                    >
                       No bales found for this month
                     </TableCell>
                   </TableRow>
@@ -526,9 +562,15 @@ export function FactoryBaleProductMonthDetail() {
                     <div className="text-muted-foreground flex items-center gap-1">
                       Weight
                       <button
-                        onClick={() => setWeightEditBale({ id: bale.id, referenceNumber: bale.referenceNumber, weightKg: bale.weightKg })}
+                        onClick={() =>
+                          setWeightEditBale({
+                            id: bale.id,
+                            referenceNumber: bale.referenceNumber,
+                            weightKg: bale.weightKg,
+                          })
+                        }
                         className="p-0.5 rounded hover:bg-muted"
-                        title="Correct weight"
+                        title={tUi("correct.weight")}
                         data-testid={`button-edit-weight-mobile-${bale.id}`}
                       >
                         <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
@@ -538,20 +580,22 @@ export function FactoryBaleProductMonthDetail() {
                   </div>
                   {!hiddenCost.includes("bale_history_cost_per_kg") && (
                     <div>
-                      <div className="text-muted-foreground">Cost/KG</div>
+                      <div className="text-muted-foreground">{tUi("cost.kg.2")}</div>
                       <div className="font-mono">{formatAmount(bale.costPerKg)}</div>
                     </div>
                   )}
                   {!hiddenCost.includes("bale_history_total_cost") && (
                     <div>
-                      <div className="text-muted-foreground">Cost Price</div>
+                      <div className="text-muted-foreground">{tUi("cost.price")}</div>
                       <div className="font-mono">{formatAmount(bale.totalCost)}</div>
                     </div>
                   )}
                   {!hiddenCost.includes("bale_history_total_cost") && (
                     <div>
-                      <div className="text-muted-foreground">Sell Price</div>
-                      <div className="font-mono">{sellingPricePerBale > 0 ? formatAmount(sellingPricePerBale) : "—"}</div>
+                      <div className="text-muted-foreground">{tUi("sell.price")}</div>
+                      <div className="font-mono">
+                        {sellingPricePerBale > 0 ? formatAmount(sellingPricePerBale) : "—"}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -559,7 +603,7 @@ export function FactoryBaleProductMonthDetail() {
               </div>
             ))}
             {(!data || data.length === 0) && (
-              <div className="text-center text-muted-foreground py-8">No bales found for this month</div>
+              <div className="text-center text-muted-foreground py-8">{tUi("no.bales.found.for.this.month")}</div>
             )}
           </div>
         </CardContent>
@@ -570,6 +614,7 @@ export function FactoryBaleProductMonthDetail() {
 
 // ── All-months detail view ────────────────────────────────────────────────────
 export function FactoryBaleProductAllMonths() {
+  const tUi = useFactoryText();
   const params = useParams();
   const [, navigate] = useLocation();
   const { formatDisplayDate } = useDateFormat();
@@ -624,7 +669,9 @@ export function FactoryBaleProductAllMonths() {
   };
 
   const handleWeightSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-product-history", productId, locationId, year, "all"] });
+    queryClient.invalidateQueries({
+      queryKey: ["/api/factory/bale-product-history", productId, locationId, year, "all"],
+    });
     queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-product-history", productId, locationId, year] });
   };
 
@@ -669,15 +716,15 @@ export function FactoryBaleProductAllMonths() {
             </CardTitle>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[150px]" data-testid="select-status-filter-all">
-                <SelectValue placeholder="All statuses" />
+                <SelectValue placeholder={tUi("all.statuses")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="IN_STOCK">In Stock</SelectItem>
-                <SelectItem value="LOADING">Loading</SelectItem>
-                <SelectItem value="SOLD">Sold</SelectItem>
-                <SelectItem value="DISPATCHED">Dispatched</SelectItem>
-                <SelectItem value="DELETED">Deleted</SelectItem>
+                <SelectItem value="all">{tUi("all.statuses")}</SelectItem>
+                <SelectItem value="IN_STOCK">{tUi("in.stock")}</SelectItem>
+                <SelectItem value="LOADING">{tUi("loading.3")}</SelectItem>
+                <SelectItem value="SOLD">{tUi("sold")}</SelectItem>
+                <SelectItem value="DISPATCHED">{tUi("dispatched")}</SelectItem>
+                <SelectItem value="DELETED">{tUi("deleted")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -688,20 +735,20 @@ export function FactoryBaleProductAllMonths() {
             <Table wrapperClassName="overflow-visible">
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
-                  <TableHead>Bale Code</TableHead>
-                  <TableHead>Reference</TableHead>
-                  <TableHead className="text-right">Weight (KG)</TableHead>
+                  <TableHead>{tUi("bale.code")}</TableHead>
+                  <TableHead>{tUi("reference")}</TableHead>
+                  <TableHead className="text-right">{tUi("weight.kg.2")}</TableHead>
                   {!hiddenCost.includes("bale_history_cost_per_kg") && (
-                    <TableHead className="text-right">Cost/KG</TableHead>
+                    <TableHead className="text-right">{tUi("cost.kg.2")}</TableHead>
                   )}
                   {!hiddenCost.includes("bale_history_total_cost") && (
-                    <TableHead className="text-right">Cost Price</TableHead>
+                    <TableHead className="text-right">{tUi("cost.price")}</TableHead>
                   )}
                   {!hiddenCost.includes("bale_history_total_cost") && (
-                    <TableHead className="text-right">Sell Price</TableHead>
+                    <TableHead className="text-right">{tUi("sell.price")}</TableHead>
                   )}
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date/Time</TableHead>
+                  <TableHead>{tUi("status")}</TableHead>
+                  <TableHead>{tUi("date.time")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -713,7 +760,9 @@ export function FactoryBaleProductAllMonths() {
                     <TableCell data-testid={`text-reference-${bale.id}`}>
                       <button
                         className="font-mono text-sm text-primary underline-offset-2 hover:underline cursor-pointer"
-                        onClick={() => navigate(`/factory/barcode-lookup?ref=${encodeURIComponent(bale.referenceNumber)}`)}
+                        onClick={() =>
+                          navigate(`/factory/barcode-lookup?ref=${encodeURIComponent(bale.referenceNumber)}`)
+                        }
                         data-testid={`button-ref-lookup-${bale.id}`}
                       >
                         {bale.referenceNumber}
@@ -724,8 +773,14 @@ export function FactoryBaleProductAllMonths() {
                         {formatNumber(Number(bale.weightKg))}
                         <button
                           className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted"
-                          onClick={() => setWeightEditBale({ id: bale.id, referenceNumber: bale.referenceNumber, weightKg: bale.weightKg })}
-                          title="Correct weight"
+                          onClick={() =>
+                            setWeightEditBale({
+                              id: bale.id,
+                              referenceNumber: bale.referenceNumber,
+                              weightKg: bale.weightKg,
+                            })
+                          }
+                          title={tUi("correct.weight")}
                           data-testid={`button-edit-weight-${bale.id}`}
                         >
                           <Pencil className="h-3 w-3 text-muted-foreground" />
@@ -749,13 +804,19 @@ export function FactoryBaleProductAllMonths() {
                     )}
                     <TableCell data-testid={`text-status-${bale.id}`}>
                       {bale.status === "IN_STOCK" && bale.isInLoadingOrder ? (
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 border-amber-400 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 no-default-active-elevate">
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] px-1.5 py-0.5 border-amber-400 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 no-default-active-elevate"
+                        >
                           Loading
                         </Badge>
                       ) : bale.status === "DELETED" || bale.status === "REMOVED" ? (
-                        <Badge variant="destructive">Deleted</Badge>
+                        <Badge variant="destructive">{tUi("deleted")}</Badge>
                       ) : bale.status === "DISPATCHED" ? (
-                        <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                        <Badge
+                          variant="secondary"
+                          className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                        >
                           Dispatched
                         </Badge>
                       ) : (
@@ -769,7 +830,11 @@ export function FactoryBaleProductAllMonths() {
                 ))}
                 {filteredData.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8" data-testid="text-no-data">
+                    <TableCell
+                      colSpan={8}
+                      className="text-center text-muted-foreground py-8"
+                      data-testid="text-no-data"
+                    >
                       {statusFilter !== "all" ? "No bales match the selected status" : `No bales found for ${year}`}
                     </TableCell>
                   </TableRow>
@@ -804,9 +869,15 @@ export function FactoryBaleProductAllMonths() {
                     <div className="text-muted-foreground flex items-center gap-1">
                       Weight
                       <button
-                        onClick={() => setWeightEditBale({ id: bale.id, referenceNumber: bale.referenceNumber, weightKg: bale.weightKg })}
+                        onClick={() =>
+                          setWeightEditBale({
+                            id: bale.id,
+                            referenceNumber: bale.referenceNumber,
+                            weightKg: bale.weightKg,
+                          })
+                        }
                         className="p-0.5 rounded hover:bg-muted"
-                        title="Correct weight"
+                        title={tUi("correct.weight")}
                         data-testid={`button-edit-weight-mobile-${bale.id}`}
                       >
                         <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
@@ -816,20 +887,22 @@ export function FactoryBaleProductAllMonths() {
                   </div>
                   {!hiddenCost.includes("bale_history_cost_per_kg") && (
                     <div>
-                      <div className="text-muted-foreground">Cost/KG</div>
+                      <div className="text-muted-foreground">{tUi("cost.kg.2")}</div>
                       <div className="font-mono">{formatAmount(bale.costPerKg)}</div>
                     </div>
                   )}
                   {!hiddenCost.includes("bale_history_total_cost") && (
                     <div>
-                      <div className="text-muted-foreground">Cost Price</div>
+                      <div className="text-muted-foreground">{tUi("cost.price")}</div>
                       <div className="font-mono">{formatAmount(bale.totalCost)}</div>
                     </div>
                   )}
                   {!hiddenCost.includes("bale_history_total_cost") && (
                     <div>
-                      <div className="text-muted-foreground">Sell Price</div>
-                      <div className="font-mono">{sellingPricePerBale > 0 ? formatAmount(sellingPricePerBale) : "—"}</div>
+                      <div className="text-muted-foreground">{tUi("sell.price")}</div>
+                      <div className="font-mono">
+                        {sellingPricePerBale > 0 ? formatAmount(sellingPricePerBale) : "—"}
+                      </div>
                     </div>
                   )}
                 </div>

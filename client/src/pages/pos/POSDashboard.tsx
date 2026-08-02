@@ -38,6 +38,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { PageHeader } from "@/components/PageHeader";
+import { usePosText } from "@/i18n/modules/pos";
 
 /** Safely format a date-time value as "hh:mm a". Returns "—" for null/invalid values. */
 function safeFmtTime(dt: string | null | undefined): string {
@@ -90,6 +91,7 @@ interface POSDashboardProps {
 }
 
 export default function POSDashboard({ posUser }: POSDashboardProps) {
+  const tUi = usePosText();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
@@ -229,8 +231,8 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
         <Card className="max-w-md">
           <CardContent className="p-6 text-center">
             <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h2 className="text-lg font-medium mb-2">No Location Assigned</h2>
-            <p className="text-muted-foreground">Please contact your administrator to assign you to a location.</p>
+            <h2 className="text-lg font-medium mb-2">{tUi("no.location.assigned.2")}</h2>
+            <p className="text-muted-foreground">{tUi("please.contact.your.administrator.to.assign.you.")}</p>
           </CardContent>
         </Card>
       </div>
@@ -241,7 +243,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
       {/* Header row */}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageHeader title="POS Dashboard" subtitle={`${location?.name || "Loading..."} — ${posUser.username}`} />
+        <PageHeader title={tUi("pos.dashboard")} subtitle={`${location?.name || "Loading..."} — ${posUser.username}`} />
         {isOnline ? (
           <Badge variant="outline" className="gap-1">
             <Wifi className="h-3 w-3" />
@@ -260,7 +262,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
         <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3 min-w-[130px]">
           <ShoppingCart className="h-4 w-4 text-muted-foreground shrink-0" />
           <div>
-            <p className="text-xs text-muted-foreground leading-none mb-0.5">Today's Sales</p>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">{tUi("today.s.sales")}</p>
             {salesLoading ? (
               <Skeleton className="h-5 w-12 mt-0.5" />
             ) : (
@@ -273,7 +275,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
         <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3 min-w-[160px]">
           <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
           <div>
-            <p className="text-xs text-muted-foreground leading-none mb-0.5">Today's Revenue</p>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">{tUi("today.s.revenue")}</p>
             {salesLoading ? (
               <Skeleton className="h-5 w-20 mt-0.5" />
             ) : (
@@ -286,7 +288,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
         <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3 min-w-[160px]">
           <TrendingUp className="h-4 w-4 text-muted-foreground shrink-0" />
           <div>
-            <p className="text-xs text-muted-foreground leading-none mb-0.5">Avg per Transaction</p>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">{tUi("avg.per.transaction")}</p>
             {salesLoading ? (
               <Skeleton className="h-5 w-16 mt-0.5" />
             ) : (
@@ -304,17 +306,16 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
       >
         <div className="flex items-center gap-2 mb-3">
           <Clock className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-semibold">Shift Status</span>
+          <span className="text-sm font-semibold">{tUi("shift.status")}</span>
         </div>
         {shiftLoading ? (
           <Skeleton className="h-14 w-full" />
         ) : currentShift ? (
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="space-y-1">
-              <Badge variant="default">Active Shift</Badge>
+              <Badge variant="default">{tUi("active.shift")}</Badge>
               <p className="text-sm text-muted-foreground">
-                Started {formatDisplayDate(currentShift.openedAt)} at{" "}
-                {safeFmtTime(currentShift.openedAt)}
+                Started {formatDisplayDate(currentShift.openedAt)} at {safeFmtTime(currentShift.openedAt)}
               </p>
               <p className="text-sm">
                 Opening Cash:{" "}
@@ -334,8 +335,8 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
         ) : (
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="space-y-1">
-              <Badge variant="secondary">No Active Shift</Badge>
-              <p className="text-sm text-muted-foreground">Start a shift to begin making sales</p>
+              <Badge variant="secondary">{tUi("no.active.shift")}</Badge>
+              <p className="text-sm text-muted-foreground">{tUi("start.a.shift.to.begin.making.sales")}</p>
             </div>
             <Button onClick={() => setOpenShiftDialog(true)} className="gap-2" data-testid="button-start-shift">
               <Play className="h-4 w-4" />
@@ -347,7 +348,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
 
       {/* Quick Actions */}
       <div>
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Quick Actions</p>
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">{tUi("quick.actions")}</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Button
             variant="outline"
@@ -357,7 +358,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
             data-testid="button-new-sale"
           >
             <ShoppingCart className="h-5 w-5" />
-            <span className="text-sm">New Sale</span>
+            <span className="text-sm">{tUi("new.sale")}</span>
           </Button>
           <Button
             variant="outline"
@@ -366,7 +367,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
             data-testid="button-view-daybook"
           >
             <FileText className="h-5 w-5" />
-            <span className="text-sm">View Daybook</span>
+            <span className="text-sm">{tUi("view.daybook")}</span>
           </Button>
           <Button
             variant="outline"
@@ -375,11 +376,11 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
             data-testid="button-shift-history"
           >
             <History className="h-5 w-5" />
-            <span className="text-sm">Shift History</span>
+            <span className="text-sm">{tUi("shift.history")}</span>
           </Button>
           <Button variant="outline" className="h-20 flex-col gap-2" disabled data-testid="button-cash-drawer">
             <Wallet className="h-5 w-5" />
-            <span className="text-sm">Cash Drawer</span>
+            <span className="text-sm">{tUi("cash.drawer")}</span>
           </Button>
         </div>
       </div>
@@ -387,19 +388,21 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
       {/* Shift History */}
       {showHistory && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Recent Shifts</p>
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">
+            {tUi("recent.shifts")}
+          </p>
           <div className="border rounded-xl overflow-hidden">
             <div className="table-responsive">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
-                    <TableHead className="text-xs">Date</TableHead>
-                    <TableHead className="text-xs hidden sm:table-cell">Duration</TableHead>
-                    <TableHead className="text-xs text-right">Opening</TableHead>
-                    <TableHead className="text-xs text-right">Closing</TableHead>
-                    <TableHead className="text-xs text-right">Sales</TableHead>
-                    <TableHead className="text-xs hidden sm:table-cell text-right">Variance</TableHead>
-                    <TableHead className="text-xs">Status</TableHead>
+                    <TableHead className="text-xs">{tUi("date")}</TableHead>
+                    <TableHead className="text-xs hidden sm:table-cell">{tUi("duration")}</TableHead>
+                    <TableHead className="text-xs text-right">{tUi("opening")}</TableHead>
+                    <TableHead className="text-xs text-right">{tUi("closing")}</TableHead>
+                    <TableHead className="text-xs text-right">{tUi("sales")}</TableHead>
+                    <TableHead className="text-xs hidden sm:table-cell text-right">{tUi("variance")}</TableHead>
+                    <TableHead className="text-xs">{tUi("status")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -411,8 +414,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
                         <TableCell className="text-sm hidden sm:table-cell text-muted-foreground">
                           {shift.closedAt ? (
                             <>
-                              {safeFmtTime(shift.openedAt)} –{" "}
-                              {safeFmtTime(shift.closedAt)}
+                              {safeFmtTime(shift.openedAt)} – {safeFmtTime(shift.closedAt)}
                             </>
                           ) : (
                             safeFmtTime(shift.openedAt) + " – Active"
@@ -463,12 +465,12 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
       <Dialog open={openShiftDialog} onOpenChange={setOpenShiftDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Start New Shift</DialogTitle>
-            <DialogDescription>Enter the opening cash amount in your drawer to begin your shift.</DialogDescription>
+            <DialogTitle>{tUi("start.new.shift")}</DialogTitle>
+            <DialogDescription>{tUi("enter.the.opening.cash.amount.in.your.drawer.to.")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="openingCash">Opening Cash Amount</Label>
+              <Label htmlFor="openingCash">{tUi("opening.cash.amount")}</Label>
               <Input
                 id="openingCash"
                 type="number"
@@ -509,24 +511,24 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
       <Dialog open={closeShiftDialog} onOpenChange={setCloseShiftDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>End Shift</DialogTitle>
-            <DialogDescription>Count your cash drawer and enter the closing amount.</DialogDescription>
+            <DialogTitle>{tUi("end.shift")}</DialogTitle>
+            <DialogDescription>{tUi("count.your.cash.drawer.and.enter.the.closing.amo")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             {currentShift && (
               <div className="bg-muted p-4 rounded-lg space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span>Opening Cash:</span>
+                  <span>{tUi("opening.cash")}</span>
                   <span className="font-mono">{formatAmount(parseFloat(currentShift.openingCash))}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span>Shift Started:</span>
+                  <span>{tUi("shift.started")}</span>
                   <span>{safeFmtTime(currentShift.openedAt)}</span>
                 </div>
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="closingCash">Closing Cash Amount</Label>
+              <Label htmlFor="closingCash">{tUi("closing.cash.amount")}</Label>
               <Input
                 id="closingCash"
                 type="number"
@@ -538,10 +540,10 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="closeNotes">Notes (optional)</Label>
+              <Label htmlFor="closeNotes">{tUi("notes.optional")}</Label>
               <Textarea
                 id="closeNotes"
-                placeholder="Any notes about this shift..."
+                placeholder={tUi("any.notes.about.this.shift")}
                 value={closeNotes}
                 onChange={(e) => setCloseNotes(e.target.value)}
                 data-testid="input-close-notes"

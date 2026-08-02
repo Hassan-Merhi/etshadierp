@@ -3,26 +3,28 @@
  *
  * Extracted from FactoryAttendance.tsx during the Phase 4 god-file split.
  */
-import {useState, useEffect} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Checkbox} from "@/components/ui/checkbox";
-import {Skeleton} from "@/components/ui/skeleton";
-import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
-import {Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList} from "@/components/ui/command";
-import {useToast} from "@/hooks/use-toast";
-import {CalendarDays, CheckCircle, XCircle, Save, UserCheck, UserX, User, ChevronsUpDown, Check} from "lucide-react";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { useToast } from "@/hooks/use-toast";
+import { CalendarDays, CheckCircle, XCircle, Save, UserCheck, UserX, User, ChevronsUpDown, Check } from "lucide-react";
 
-import type {AttendanceRecord, WorkerRow} from "../types";
-import {generateDateRange, todayStr} from "../utils";
-import {SummaryCard} from "./SummaryCard";
+import type { AttendanceRecord, WorkerRow } from "../types";
+import { generateDateRange, todayStr } from "../utils";
+import { SummaryCard } from "./SummaryCard";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function PerWorkerView() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [selectedWorkerId, setSelectedWorkerId] = useState<string>("");
   const [workerComboOpen, setWorkerComboOpen] = useState(false);
@@ -135,7 +137,7 @@ export function PerWorkerView() {
         <CardContent className="pt-4">
           <div className="flex flex-wrap gap-3 items-end">
             <div className="flex flex-col gap-1 min-w-[200px]">
-              <Label className="text-xs text-muted-foreground">Worker</Label>
+              <Label className="text-xs text-muted-foreground">{tUi("worker")}</Label>
               <Popover open={workerComboOpen} onOpenChange={setWorkerComboOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -157,9 +159,9 @@ export function PerWorkerView() {
                 </PopoverTrigger>
                 <PopoverContent className="w-72 p-0" align="start">
                   <Command>
-                    <CommandInput placeholder="Search worker…" data-testid="input-worker-search" />
+                    <CommandInput placeholder={tUi("search.worker")} data-testid="input-worker-search" />
                     <CommandList>
-                      <CommandEmpty>No workers found.</CommandEmpty>
+                      <CommandEmpty>{tUi("no.workers.found")}</CommandEmpty>
                       <CommandGroup>
                         {(workersList ?? []).map((w) => (
                           <CommandItem
@@ -187,7 +189,7 @@ export function PerWorkerView() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <Label className="text-xs text-muted-foreground">From</Label>
+              <Label className="text-xs text-muted-foreground">{tUi("from")}</Label>
               <Input
                 type="date"
                 data-testid="input-start-date"
@@ -296,16 +298,18 @@ export function PerWorkerView() {
               ))}
             </div>
           ) : dates.length === 0 ? (
-            <div className="text-center text-muted-foreground py-12 text-sm">No dates in the selected range.</div>
+            <div className="text-center text-muted-foreground py-12 text-sm">
+              {tUi("no.dates.in.the.selected.range")}
+            </div>
           ) : (
             <div className="table-responsive">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-30 bg-muted/50">
                   <tr className="border-b bg-muted/40">
                     <th className="text-left px-4 py-2 font-medium text-muted-foreground w-8">#</th>
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground">Date</th>
+                    <th className="text-left px-4 py-2 font-medium text-muted-foreground">{tUi("date")}</th>
                     <th className="text-left px-4 py-2 font-medium text-muted-foreground w-24">Day</th>
-                    <th className="text-left px-4 py-2 font-medium text-muted-foreground w-28">Present</th>
+                    <th className="text-left px-4 py-2 font-medium text-muted-foreground w-28">{tUi("present")}</th>
                   </tr>
                 </thead>
                 <tbody>

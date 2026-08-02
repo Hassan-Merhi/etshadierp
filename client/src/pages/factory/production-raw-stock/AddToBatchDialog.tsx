@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatNumber } from "@/lib/formatNumber";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface AddToBatchDialogProps {
   open: boolean;
@@ -35,6 +36,7 @@ export function AddToBatchDialog({
   addToBatchMutation,
   wrapAdminAction,
 }: AddToBatchDialogProps) {
+  const tUi = useFactoryText();
   const [addToBatchTargetId, setAddToBatchTargetId] = useState("");
   const [addToBatchKg, setAddToBatchKg] = useState("");
   const [addToBatchCost, setAddToBatchCost] = useState("");
@@ -79,7 +81,7 @@ export function AddToBatchDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Add to Batch</DialogTitle>
+          <DialogTitle>{tUi("add.to.batch")}</DialogTitle>
           <DialogDescription>
             {addToBatchSource
               ? `Stock from ${addToBatchSource.supplierName} — ${formatNumber(parseFloat(addToBatchSource.remainingKg))} kg free`
@@ -89,10 +91,10 @@ export function AddToBatchDialog({
         <div className="space-y-4">
           {isNoSourcePreset && (
             <div className="space-y-2">
-              <Label>Source Supplier</Label>
+              <Label>{tUi("source.supplier")}</Label>
               <Select value={addToBatchSource?.supplierId?.toString() || ""} onValueChange={handleSupplierChange}>
                 <SelectTrigger data-testid="select-add-to-batch-supplier">
-                  <SelectValue placeholder="Select supplier..." />
+                  <SelectValue placeholder={tUi("select.supplier")} />
                 </SelectTrigger>
                 <SelectContent>
                   {supplierOptions.map((r) => (
@@ -110,10 +112,10 @@ export function AddToBatchDialog({
             </div>
           )}
           <div className="space-y-2">
-            <Label>Target Batch</Label>
+            <Label>{tUi("target.batch")}</Label>
             <Select value={addToBatchTargetId} onValueChange={setAddToBatchTargetId}>
               <SelectTrigger data-testid="select-add-to-batch-target">
-                <SelectValue placeholder="Select batch..." />
+                <SelectValue placeholder={tUi("select.batch")} />
               </SelectTrigger>
               <SelectContent>
                 {activeBatches.map((b) => (
@@ -131,7 +133,7 @@ export function AddToBatchDialog({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Weight to Add (kg)</Label>
+            <Label>{tUi("weight.to.add.kg")}</Label>
             <Input
               type="number"
               step="0.001"
@@ -144,7 +146,7 @@ export function AddToBatchDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label>Cost/kg (USD)</Label>
+            <Label>{tUi("cost.kg.usd")}</Label>
             <Input
               type="number"
               step="0.0001"

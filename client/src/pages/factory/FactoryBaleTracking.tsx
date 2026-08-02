@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
 import { Search, Package, Truck, FileText, CheckCircle, Clock, ArrowRight, ScanLine } from "lucide-react";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface BaleSearchResult {
   bale: {
@@ -63,6 +64,7 @@ function fmtNum(n: number | string) {
 }
 
 export default function FactoryBaleTracking() {
+  const tUi = useFactoryText();
   const [, navigate] = useLocation();
   const { data: me } = useQuery<{ role: string }>({ queryKey: ["/api/auth/me"] });
   const isDeveloper = me?.role === "Developer";
@@ -115,7 +117,7 @@ export default function FactoryBaleTracking() {
   if (me && !isDeveloper) {
     return (
       <div className="p-4 max-w-2xl mx-auto space-y-5">
-        <PageHeader title="Bale Tracking" />
+        <PageHeader title={tUi("bale.tracking")} />
         <Card>
           <CardContent className="pt-6 pb-6 text-center text-muted-foreground">
             You do not have access to this page.
@@ -127,7 +129,7 @@ export default function FactoryBaleTracking() {
 
   return (
     <div className="p-4 max-w-2xl mx-auto space-y-5">
-      <PageHeader title="Bale Tracking" />
+      <PageHeader title={tUi("bale.tracking")} />
 
       {/* Search box */}
       <Card>
@@ -141,7 +143,7 @@ export default function FactoryBaleTracking() {
               <Input
                 ref={inputRef}
                 className="pl-9"
-                placeholder="Bale reference (e.g. B-2025-001234)"
+                placeholder={tUi("bale.reference.e.g.b.2025.001234")}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleKey}
@@ -203,7 +205,7 @@ export default function FactoryBaleTracking() {
                 <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
                   {baleInfo.articleCode && (
                     <div>
-                      <p className="text-xs text-muted-foreground">Article Code</p>
+                      <p className="text-xs text-muted-foreground">{tUi("article.code")}</p>
                       <p className="font-mono font-medium" data-testid="text-bale-article">
                         {baleInfo.articleCode}
                       </p>
@@ -211,13 +213,13 @@ export default function FactoryBaleTracking() {
                   )}
                   {baleInfo.productName && (
                     <div>
-                      <p className="text-xs text-muted-foreground">Product</p>
+                      <p className="text-xs text-muted-foreground">{tUi("product")}</p>
                       <p data-testid="text-bale-product">{baleInfo.productName}</p>
                     </div>
                   )}
                   {baleInfo.weightKg && (
                     <div>
-                      <p className="text-xs text-muted-foreground">Weight</p>
+                      <p className="text-xs text-muted-foreground">{tUi("weight")}</p>
                       <p className="font-mono" data-testid="text-bale-weight">
                         {fmtNum(baleInfo.weightKg)} kg
                       </p>
@@ -240,7 +242,7 @@ export default function FactoryBaleTracking() {
               <CardContent className="pb-4">
                 <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                   <div>
-                    <p className="text-xs text-muted-foreground">Batch</p>
+                    <p className="text-xs text-muted-foreground">{tUi("batch")}</p>
                     <button
                       className="font-mono font-semibold text-blue-600 dark:text-blue-400 hover:underline text-left"
                       onClick={() => navigate(`/factory/dispatch-batches/${result.dispatch!.batchId}`)}
@@ -250,46 +252,46 @@ export default function FactoryBaleTracking() {
                     </button>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Batch Status</p>
+                    <p className="text-xs text-muted-foreground">{tUi("batch.status")}</p>
                     <Badge className={STATUS_CONFIG[result.status as keyof typeof STATUS_CONFIG]?.color || ""}>
                       {result.dispatch.batchStatus}
                     </Badge>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Customer</p>
+                    <p className="text-xs text-muted-foreground">{tUi("customer")}</p>
                     <p data-testid="text-dispatch-customer">{result.dispatch.customerName || "—"}</p>
                   </div>
                   {result.dispatch.proformaName && (
                     <div>
-                      <p className="text-xs text-muted-foreground">Proforma</p>
+                      <p className="text-xs text-muted-foreground">{tUi("proforma")}</p>
                       <p>{result.dispatch.proformaName}</p>
                     </div>
                   )}
                   <div>
-                    <p className="text-xs text-muted-foreground">Truck Ride</p>
+                    <p className="text-xs text-muted-foreground">{tUi("truck.ride")}</p>
                     <p className="font-mono">#{result.dispatch.rideNumber}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Ride Status</p>
+                    <p className="text-xs text-muted-foreground">{tUi("ride.status")}</p>
                     <Badge variant="outline" className="text-xs">
                       {result.dispatch.rideStatus}
                     </Badge>
                   </div>
                   {result.dispatch.truckPlate && (
                     <div>
-                      <p className="text-xs text-muted-foreground">Truck Plate</p>
+                      <p className="text-xs text-muted-foreground">{tUi("truck.plate")}</p>
                       <p className="font-mono">{result.dispatch.truckPlate}</p>
                     </div>
                   )}
                   {result.dispatch.driverName && (
                     <div>
-                      <p className="text-xs text-muted-foreground">Driver</p>
+                      <p className="text-xs text-muted-foreground">{tUi("driver")}</p>
                       <p>{result.dispatch.driverName}</p>
                     </div>
                   )}
                   {result.dispatch.amount && (
                     <div>
-                      <p className="text-xs text-muted-foreground">Amount</p>
+                      <p className="text-xs text-muted-foreground">{tUi("amount")}</p>
                       <p className="font-mono font-medium">
                         {result.dispatch.currency} {fmtNum(result.dispatch.amount)}
                       </p>
@@ -301,7 +303,7 @@ export default function FactoryBaleTracking() {
                 {result.dispatch.invoiceNumber && result.dispatch.orderId && (
                   <div className="mt-4 pt-3 border-t flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-muted-foreground">Invoice</p>
+                      <p className="text-xs text-muted-foreground">{tUi("invoice")}</p>
                       <p className="font-mono font-semibold" data-testid="text-invoice-number">
                         {result.dispatch.invoiceNumber}
                       </p>

@@ -25,6 +25,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { InvoiceSummaryBar } from "@/components/InvoiceSummaryBar";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface CustomerOrder {
   id: number;
@@ -46,6 +47,7 @@ interface CustomerOrder {
 }
 
 export default function FactoryPendingInvoices() {
+  const tUi = useFactoryText();
   const [, navigate] = useLocation();
   const { formatDisplayDate } = useDateFormat();
   const appMode = useAppMode();
@@ -142,8 +144,8 @@ export default function FactoryPendingInvoices() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div>
           <PageHeader
-            title="Pending &amp; Finalized Invoices"
-            subtitle="Orders awaiting or completed verification"
+            title={tUi("pending.amp.finalized.invoices")}
+            subtitle={tUi("orders.awaiting.or.completed.verification")}
             icon={<ClipboardCheck className="h-5 w-5" />}
           />
         </div>
@@ -175,16 +177,16 @@ export default function FactoryPendingInvoices() {
           <Table>
             <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
-                <TableHead>Order #</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Proforma</TableHead>
-                <TableHead>Container</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead className="text-right">Bales</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[100px]">Actions</TableHead>
+                <TableHead>{tUi("order")}</TableHead>
+                <TableHead>{tUi("customer")}</TableHead>
+                <TableHead>{tUi("proforma")}</TableHead>
+                <TableHead>{tUi("container")}</TableHead>
+                <TableHead>{tUi("notes")}</TableHead>
+                <TableHead>{tUi("date")}</TableHead>
+                <TableHead className="text-right">{tUi("bales")}</TableHead>
+                <TableHead className="text-right">{tUi("total")}</TableHead>
+                <TableHead>{tUi("status")}</TableHead>
+                <TableHead className="w-[100px]">{tUi("actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -197,7 +199,7 @@ export default function FactoryPendingInvoices() {
                   >
                     <div className="flex flex-col items-center gap-2">
                       <Package className="h-10 w-10 opacity-40" />
-                      <p>No invoices found</p>
+                      <p>{tUi("no.invoices.found")}</p>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -255,7 +257,7 @@ export default function FactoryPendingInvoices() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          title="Download Invoice PDF"
+                          title={tUi("download.invoice.pdf")}
                           onClick={() => window.open(`/api/factory/customer-orders/${order.id}/export-pdf`, "_blank")}
                           data-testid={`button-download-pdf-${order.id}`}
                         >
@@ -264,7 +266,7 @@ export default function FactoryPendingInvoices() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          title="Export to Excel"
+                          title={tUi("export.to.excel")}
                           onClick={() => {
                             const a = document.createElement("a");
                             a.href = `/api/factory/customer-orders/${order.id}/export/excel`;
@@ -279,7 +281,7 @@ export default function FactoryPendingInvoices() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            title="Loading Status + Bale Refs (Excel)"
+                            title={tUi("loading.status.bale.refs.excel")}
                             onClick={() => {
                               const a = document.createElement("a");
                               a.href = `/api/factory/customer-orders/${order.id}/loading-status-export`;
@@ -299,7 +301,7 @@ export default function FactoryPendingInvoices() {
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader>
-                              <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+                              <AlertDialogTitle>{tUi("delete.invoice")}</AlertDialogTitle>
                               <AlertDialogDescription>
                                 This will permanently delete invoice {order.invoiceNumber || `#${order.id}`} for{" "}
                                 {order.customerName}. Any bales assigned to this order will be returned to stock. This

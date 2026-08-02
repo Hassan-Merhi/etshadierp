@@ -4,10 +4,12 @@ import FactoryWorkersHub from "@/pages/factory/FactoryWorkersHub";
 import FactoryEmployeesHub from "@/pages/factory/FactoryEmployeesHub";
 import FactoryInsurance from "@/pages/factory/FactoryInsurance";
 import { useHubQueryState } from "@/hooks/use-hub-query-state";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 type Section = "workers" | "employees" | "insurance";
 
 export default function FactoryPayrollHub() {
+  const tUi = useFactoryText();
   const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
 
   const hasInsuranceAccess =
@@ -16,9 +18,7 @@ export default function FactoryPayrollHub() {
     !(myAccess.pageKeys?.length > 0) ||
     myAccess.pageKeys.includes("factory/insurance");
 
-  const sections: Section[] = hasInsuranceAccess
-    ? ["workers", "employees", "insurance"]
-    : ["workers", "employees"];
+  const sections: Section[] = hasInsuranceAccess ? ["workers", "employees", "insurance"] : ["workers", "employees"];
 
   const [activeSection, setActiveSection] = useHubQueryState<Section>({
     key: "section",
@@ -43,8 +43,8 @@ export default function FactoryPayrollHub() {
             <Users className="h-4 w-4 text-primary" />
           </div>
           <div>
-            <h1 className="text-base font-semibold leading-tight">Payroll & Benefits</h1>
-            <p className="text-xs text-muted-foreground">Workers, employees and insurance management</p>
+            <h1 className="text-base font-semibold leading-tight">{tUi("payroll.benefits")}</h1>
+            <p className="text-xs text-muted-foreground">{tUi("workers.employees.and.insurance.management")}</p>
           </div>
         </div>
 
@@ -60,7 +60,9 @@ export default function FactoryPayrollHub() {
                 onClick={() => setActiveSection(key)}
                 className={[
                   "flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
-                  active ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+                  active
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground",
                 ].join(" ")}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -72,8 +74,16 @@ export default function FactoryPayrollHub() {
       </div>
 
       <div className="flex-1 overflow-auto min-h-0">
-        {activeSection === "workers" && <div className="p-4"><FactoryWorkersHub /></div>}
-        {activeSection === "employees" && <div className="p-4"><FactoryEmployeesHub /></div>}
+        {activeSection === "workers" && (
+          <div className="p-4">
+            <FactoryWorkersHub />
+          </div>
+        )}
+        {activeSection === "employees" && (
+          <div className="p-4">
+            <FactoryEmployeesHub />
+          </div>
+        )}
         {activeSection === "insurance" && hasInsuranceAccess && <FactoryInsurance />}
       </div>
     </div>

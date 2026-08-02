@@ -3,7 +3,7 @@
  *
  * Extracted from FactoryAttendance.tsx during the Phase 4 god-file split.
  */
-import {Card, CardContent} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 
 export function SummaryCard({
   icon,

@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ArrowLeft, Package, Search } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface StockItemData {
   id: number;
@@ -89,6 +90,7 @@ function formatQty(value: number, uom: string = "BL"): string {
 }
 
 export default function OpeningStockDetail() {
+  const tUi = useErpText();
   const [, navigate] = useLocation();
   const params = useParams<{ groupId: string }>();
   useEscapeToParent();
@@ -133,7 +135,7 @@ export default function OpeningStockDetail() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <PageHeader title="Stock Group Summary" icon={<Package className="h-5 w-5" />} />
+          <PageHeader title={tUi("stock.group.summary")} icon={<Package className="h-5 w-5" />} />
           <p className="text-muted-foreground text-sm">
             {data?.stockGroup?.name || groupName} - {selectedCompany?.name}
           </p>
@@ -142,85 +144,89 @@ export default function OpeningStockDetail() {
 
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
-        {/* Header */}
-        <div className="bg-primary text-primary-foreground min-w-[560px]">
-          <div className="grid grid-cols-7 p-3 font-semibold text-sm">
-            <div className="col-span-1">Particulars</div>
-            <div className="col-span-3 text-center border-l border-primary-foreground/30">Opening Balance</div>
-            <div className="col-span-3 text-center border-l border-primary-foreground/30">Closing Balance</div>
-          </div>
-          <div className="grid grid-cols-7 px-3 pb-2 text-xs">
-            <div></div>
-            <div className="text-right">Quantity</div>
-            <div className="text-right">Rate</div>
-            <div className="text-right">Value</div>
-            <div className="text-right border-l border-primary-foreground/30 pl-2">Quantity</div>
-            <div className="text-right">Rate</div>
-            <div className="text-right">Value</div>
-          </div>
-        </div>
-
-        {/* Body */}
-        <div className="divide-y">
-          {isLoading ? (
-            <div className="p-4 space-y-3">
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
-            </div>
-          ) : data?.items && data.items.length > 0 ? (
-            <>
-              {data.items.map((item) => (
-                <div
-                  key={item.id}
-                  className="grid grid-cols-7 p-3 cursor-pointer hover-elevate"
-                  onClick={() => handleItemClick(item.id)}
-                  data-testid={`row-stock-item-${item.id}`}
-                >
-                  <div className="font-medium truncate flex items-center gap-1" title={item.name}>
-                    <Search className="h-3 w-3 text-muted-foreground" />
-                    {item.name}
-                  </div>
-                  {/* Opening Balance */}
-                  <div className="text-right font-mono text-sm">{formatQty(item.opening.quantity, item.uom)}</div>
-                  <div className="text-right font-mono text-sm">{formatNumber(item.opening.rate)}</div>
-                  <div className="text-right font-mono text-sm">
-                    {item.opening.value === 0 ? "" : formatAmount(item.opening.value)}
-                  </div>
-                  {/* Closing Balance */}
-                  <div className="text-right font-mono text-sm border-l pl-2">
-                    {formatQty(item.closing.quantity, item.uom)}
-                  </div>
-                  <div className="text-right font-mono text-sm">{formatNumber(item.closing.rate)}</div>
-                  <div className="text-right font-mono text-sm">
-                    {item.closing.value === 0 ? "" : formatAmount(item.closing.value)}
-                  </div>
-                </div>
-              ))}
-            </>
-          ) : (
-            <div className="p-8 text-center text-muted-foreground">No items in this stock group.</div>
-          )}
-        </div>
-
-        {/* Grand Total */}
-        {data?.grandTotal && (
-          <div className="bg-muted/50 border-t-2 border-primary min-w-[560px]">
-            <div className="grid grid-cols-7 p-3 font-bold">
-              <div>Grand Total</div>
-              {/* Opening Total */}
-              <div className="text-right font-mono">{formatNumber(data.grandTotal.opening.quantity)} BL</div>
-              <div className="text-right font-mono">{formatNumber(openingRate)}</div>
-              <div className="text-right font-mono">{formatAmount(data.grandTotal.opening.value)}</div>
-              {/* Closing Total */}
-              <div className="text-right font-mono border-l pl-2">
-                {formatNumber(data.grandTotal.closing.quantity)} BL
+          {/* Header */}
+          <div className="bg-primary text-primary-foreground min-w-[560px]">
+            <div className="grid grid-cols-7 p-3 font-semibold text-sm">
+              <div className="col-span-1">{tUi("particulars")}</div>
+              <div className="col-span-3 text-center border-l border-primary-foreground/30">
+                {tUi("opening.balance")}
               </div>
-              <div className="text-right font-mono">{formatNumber(closingRate)}</div>
-              <div className="text-right font-mono">{formatAmount(data.grandTotal.closing.value)}</div>
+              <div className="col-span-3 text-center border-l border-primary-foreground/30">
+                {tUi("closing.balance")}
+              </div>
+            </div>
+            <div className="grid grid-cols-7 px-3 pb-2 text-xs">
+              <div></div>
+              <div className="text-right">{tUi("quantity")}</div>
+              <div className="text-right">{tUi("rate")}</div>
+              <div className="text-right">{tUi("value")}</div>
+              <div className="text-right border-l border-primary-foreground/30 pl-2">{tUi("quantity")}</div>
+              <div className="text-right">{tUi("rate")}</div>
+              <div className="text-right">{tUi("value")}</div>
             </div>
           </div>
-        )}
+
+          {/* Body */}
+          <div className="divide-y">
+            {isLoading ? (
+              <div className="p-4 space-y-3">
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                  <Skeleton key={i} className="h-10 w-full" />
+                ))}
+              </div>
+            ) : data?.items && data.items.length > 0 ? (
+              <>
+                {data.items.map((item) => (
+                  <div
+                    key={item.id}
+                    className="grid grid-cols-7 p-3 cursor-pointer hover-elevate"
+                    onClick={() => handleItemClick(item.id)}
+                    data-testid={`row-stock-item-${item.id}`}
+                  >
+                    <div className="font-medium truncate flex items-center gap-1" title={item.name}>
+                      <Search className="h-3 w-3 text-muted-foreground" />
+                      {item.name}
+                    </div>
+                    {/* Opening Balance */}
+                    <div className="text-right font-mono text-sm">{formatQty(item.opening.quantity, item.uom)}</div>
+                    <div className="text-right font-mono text-sm">{formatNumber(item.opening.rate)}</div>
+                    <div className="text-right font-mono text-sm">
+                      {item.opening.value === 0 ? "" : formatAmount(item.opening.value)}
+                    </div>
+                    {/* Closing Balance */}
+                    <div className="text-right font-mono text-sm border-l pl-2">
+                      {formatQty(item.closing.quantity, item.uom)}
+                    </div>
+                    <div className="text-right font-mono text-sm">{formatNumber(item.closing.rate)}</div>
+                    <div className="text-right font-mono text-sm">
+                      {item.closing.value === 0 ? "" : formatAmount(item.closing.value)}
+                    </div>
+                  </div>
+                ))}
+              </>
+            ) : (
+              <div className="p-8 text-center text-muted-foreground">{tUi("no.items.in.this.stock.group")}</div>
+            )}
+          </div>
+
+          {/* Grand Total */}
+          {data?.grandTotal && (
+            <div className="bg-muted/50 border-t-2 border-primary min-w-[560px]">
+              <div className="grid grid-cols-7 p-3 font-bold">
+                <div>{tUi("grand.total")}</div>
+                {/* Opening Total */}
+                <div className="text-right font-mono">{formatNumber(data.grandTotal.opening.quantity)} BL</div>
+                <div className="text-right font-mono">{formatNumber(openingRate)}</div>
+                <div className="text-right font-mono">{formatAmount(data.grandTotal.opening.value)}</div>
+                {/* Closing Total */}
+                <div className="text-right font-mono border-l pl-2">
+                  {formatNumber(data.grandTotal.closing.quantity)} BL
+                </div>
+                <div className="text-right font-mono">{formatNumber(closingRate)}</div>
+                <div className="text-right font-mono">{formatAmount(data.grandTotal.closing.value)}</div>
+              </div>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -240,7 +246,7 @@ export default function OpeningStockDetail() {
             <div className="space-y-4">
               {/* Stock Item Info */}
               <div className="bg-muted/50 p-4 rounded-lg">
-                <h3 className="font-semibold mb-2">Stock Item Master Data</h3>
+                <h3 className="font-semibold mb-2">{tUi("stock.item.master.data")}</h3>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div>
                     Code: <span className="font-mono">{debugData.stockItem.code}</span>
@@ -268,12 +274,12 @@ export default function OpeningStockDetail() {
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>ID</TableHead>
-                        <TableHead>Location</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Quantity</TableHead>
-                        <TableHead className="text-right">Avg Rate</TableHead>
-                        <TableHead className="text-right">Total Value</TableHead>
-                        <TableHead>Last Updated</TableHead>
+                        <TableHead>{tUi("location")}</TableHead>
+                        <TableHead>{tUi("status")}</TableHead>
+                        <TableHead className="text-right">{tUi("quantity")}</TableHead>
+                        <TableHead className="text-right">{tUi("avg.rate")}</TableHead>
+                        <TableHead className="text-right">{tUi("total.value")}</TableHead>
+                        <TableHead>{tUi("last.updated")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -283,11 +289,13 @@ export default function OpeningStockDetail() {
                           <TableCell>{rec.locationName}</TableCell>
                           <TableCell>
                             {rec.locationStatus === "Active" ? (
-                              <span className="text-green-600 dark:text-green-400">Active</span>
+                              <span className="text-green-600 dark:text-green-400">{tUi("active")}</span>
                             ) : rec.locationStatus === "INACTIVE" ? (
-                              <span className="text-yellow-600 dark:text-yellow-400 font-semibold">INACTIVE</span>
+                              <span className="text-yellow-600 dark:text-yellow-400 font-semibold">
+                                {tUi("inactive")}
+                              </span>
                             ) : (
-                              <span className="text-destructive font-semibold">DELETED</span>
+                              <span className="text-destructive font-semibold">{tUi("deleted")}</span>
                             )}
                           </TableCell>
                           <TableCell className="text-right font-mono">{formatNumber(rec.quantity, 0)}</TableCell>
@@ -301,7 +309,9 @@ export default function OpeningStockDetail() {
                     </TableBody>
                   </Table>
                 ) : (
-                  <p className="text-muted-foreground text-center py-4">No inventory records found for this item.</p>
+                  <p className="text-muted-foreground text-center py-4">
+                    {tUi("no.inventory.records.found.for.this.item")}
+                  </p>
                 )}
               </div>
 
@@ -315,7 +325,7 @@ export default function OpeningStockDetail() {
                     <div className="text-2xl font-bold font-mono text-green-600 dark:text-green-400">
                       {formatNumber(debugData.totals.activeQuantity)}
                     </div>
-                    <div className="text-sm text-muted-foreground">Quantity</div>
+                    <div className="text-sm text-muted-foreground">{tUi("quantity")}</div>
                   </div>
                   <div>
                     <div className="text-2xl font-bold font-mono text-green-600 dark:text-green-400">
@@ -323,13 +333,13 @@ export default function OpeningStockDetail() {
                         ? formatNumber(debugData.totals.activeValue / debugData.totals.activeQuantity)
                         : "0.00"}
                     </div>
-                    <div className="text-sm text-muted-foreground">Avg Rate</div>
+                    <div className="text-sm text-muted-foreground">{tUi("avg.rate")}</div>
                   </div>
                   <div>
                     <div className="text-2xl font-bold font-mono text-green-600 dark:text-green-400">
                       {formatAmount(debugData.totals.activeValue)}
                     </div>
-                    <div className="text-sm text-muted-foreground">Value</div>
+                    <div className="text-sm text-muted-foreground">{tUi("value")}</div>
                   </div>
                 </div>
               </div>
@@ -343,15 +353,15 @@ export default function OpeningStockDetail() {
                   <div className="grid grid-cols-3 gap-4 text-center text-muted-foreground">
                     <div>
                       <div className="text-xl font-mono">{formatNumber(debugData.totals.totalQuantity)}</div>
-                      <div className="text-sm">Quantity</div>
+                      <div className="text-sm">{tUi("quantity")}</div>
                     </div>
                     <div>
                       <div className="text-xl font-mono">{formatNumber(debugData.totals.calculatedRate)}</div>
-                      <div className="text-sm">Avg Rate</div>
+                      <div className="text-sm">{tUi("avg.rate")}</div>
                     </div>
                     <div>
                       <div className="text-xl font-mono">{formatAmount(debugData.totals.totalValue)}</div>
-                      <div className="text-sm">Value</div>
+                      <div className="text-sm">{tUi("value")}</div>
                     </div>
                   </div>
                 </div>
@@ -363,7 +373,7 @@ export default function OpeningStockDetail() {
               </p>
             </div>
           ) : (
-            <p className="text-muted-foreground text-center py-8">Unable to load inventory details.</p>
+            <p className="text-muted-foreground text-center py-8">{tUi("unable.to.load.inventory.details")}</p>
           )}
         </DialogContent>
       </Dialog>

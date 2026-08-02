@@ -20,6 +20,7 @@ import { NoteCell } from "./property-rental/components/NoteCell";
 import { CreateUnitDialog } from "./property-rental/components/CreateUnitDialog";
 import { UnitActionDialog } from "./property-rental/components/UnitActionDialog";
 import { BulkPaymentDialog } from "./property-rental/components/BulkPaymentDialog";
+import { useErpText } from "@/i18n/modules/erp";
 export default function PropertyRentalPage({
   unitType,
   pageTitle,
@@ -28,6 +29,7 @@ export default function PropertyRentalPage({
   apiBase = "/api/properties/rental",
   paymentsLogUrl,
 }: Props) {
+  const tUi = useErpText();
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -259,7 +261,9 @@ export default function PropertyRentalPage({
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
           <Card>
             <CardHeader className="px-3 pt-3 pb-1">
-              <CardTitle className="text-[10px] text-muted-foreground font-normal tracking-wide">TOTAL UNITS</CardTitle>
+              <CardTitle className="text-[10px] text-muted-foreground font-normal tracking-wide">
+                {tUi("total.units")}
+              </CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3">
               <div className="text-lg font-bold" data-testid={`stat-${testIdPrefix}-total-units`}>
@@ -297,7 +301,9 @@ export default function PropertyRentalPage({
           </Card>
           <Card>
             <CardHeader className="px-3 pt-3 pb-1">
-              <CardTitle className="text-[10px] text-muted-foreground font-normal tracking-wide">TOTAL PAID</CardTitle>
+              <CardTitle className="text-[10px] text-muted-foreground font-normal tracking-wide">
+                {tUi("total.paid")}
+              </CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3">
               <div
@@ -311,7 +317,7 @@ export default function PropertyRentalPage({
           <Card>
             <CardContent className="p-0 flex h-full">
               <div className="flex-1 px-3 pt-3 pb-3">
-                <p className="text-[10px] text-muted-foreground font-normal tracking-wide">OUTSTANDING</p>
+                <p className="text-[10px] text-muted-foreground font-normal tracking-wide">{tUi("outstanding.2")}</p>
                 <div
                   className="text-lg font-bold text-red-600 dark:text-red-400 mt-1"
                   data-testid={`stat-${testIdPrefix}-total-outstanding`}
@@ -322,7 +328,7 @@ export default function PropertyRentalPage({
               </div>
               <div className="w-px bg-border self-stretch my-2" />
               <div className="flex-1 px-3 pt-3 pb-3">
-                <p className="text-[10px] text-muted-foreground font-normal tracking-wide">CREDIT</p>
+                <p className="text-[10px] text-muted-foreground font-normal tracking-wide">{tUi("credit.2")}</p>
                 <div
                   className="text-lg font-bold text-green-600 dark:text-green-400 mt-1"
                   data-testid={`stat-${testIdPrefix}-total-credit`}
@@ -340,7 +346,7 @@ export default function PropertyRentalPage({
           <CardContent className="p-0">
             <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)]">
               {isLoading ? (
-                <div className="p-8 text-center text-muted-foreground">Loading units…</div>
+                <div className="p-8 text-center text-muted-foreground">{tUi("loading.units")}</div>
               ) : grouped.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground">
                   No {unitType === "WAREHOUSE" ? "warehouses" : "shops"} yet. Add your first unit above.
@@ -354,19 +360,19 @@ export default function PropertyRentalPage({
                           checked={contractedUnits.length > 0 && selectedContractIds.size === contractedUnits.length}
                           onCheckedChange={toggleSelectAll}
                           data-testid={`checkbox-${testIdPrefix}-select-all`}
-                          aria-label="Select all"
+                          aria-label={tUi("select.all.2")}
                         />
                       </th>
-                      <th className="text-left px-3 py-2 font-semibold">Unit</th>
-                      <th className="text-left px-3 py-2 font-semibold">Dimensions</th>
-                      <th className="text-left px-3 py-2 font-semibold">Tenant</th>
-                      <th className="text-left px-3 py-2 font-semibold">Note</th>
-                      <th className="text-right px-3 py-2 font-semibold">Monthly Rent</th>
-                      <th className="text-right px-3 py-2 font-semibold">Guarantee</th>
-                      <th className="text-right px-3 py-2 font-semibold">Outstanding</th>
-                      <th className="text-right px-3 py-2 font-semibold text-muted-foreground">Scheduled</th>
-                      <th className="text-left px-3 py-2 font-semibold text-muted-foreground">Next Billing</th>
-                      <th className="text-left px-3 py-2 font-semibold">Start</th>
+                      <th className="text-left px-3 py-2 font-semibold">{tUi("unit")}</th>
+                      <th className="text-left px-3 py-2 font-semibold">{tUi("dimensions")}</th>
+                      <th className="text-left px-3 py-2 font-semibold">{tUi("tenant")}</th>
+                      <th className="text-left px-3 py-2 font-semibold">{tUi("note")}</th>
+                      <th className="text-right px-3 py-2 font-semibold">{tUi("monthly.rent")}</th>
+                      <th className="text-right px-3 py-2 font-semibold">{tUi("guarantee")}</th>
+                      <th className="text-right px-3 py-2 font-semibold">{tUi("outstanding")}</th>
+                      <th className="text-right px-3 py-2 font-semibold text-muted-foreground">{tUi("scheduled")}</th>
+                      <th className="text-left px-3 py-2 font-semibold text-muted-foreground">{tUi("next.billing")}</th>
+                      <th className="text-left px-3 py-2 font-semibold">{tUi("start")}</th>
                       <th className="px-2 py-2"></th>
                     </tr>
                   </thead>
@@ -441,7 +447,7 @@ export default function PropertyRentalPage({
                                   <span className="font-medium flex items-center gap-1.5 flex-wrap">
                                     {u.contract.tenantName}
                                     {u.contract.isInternal && (
-                                      <Badge className="text-xs bg-violet-600 text-white">Internal</Badge>
+                                      <Badge className="text-xs bg-violet-600 text-white">{tUi("internal")}</Badge>
                                     )}
                                     {u.isShared && (
                                       <Badge
@@ -585,7 +591,7 @@ export default function PropertyRentalPage({
                     This unit has an active contract — end it first before deleting.
                   </span>
                 ) : (
-                  <span className="block mt-1">The unit is currently vacant and can be safely deleted.</span>
+                  <span className="block mt-1">{tUi("the.unit.is.currently.vacant.and.can.be.safely.d")}</span>
                 )}
               </p>
               <DialogFooter>

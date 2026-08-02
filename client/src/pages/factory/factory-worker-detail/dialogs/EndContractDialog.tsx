@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fmtNum } from "../../factoryworkerdetail/utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function EndContractDialog({
   cashAccounts,
@@ -55,6 +56,7 @@ export function EndContractDialog({
   setEndStep: any;
   worker: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog
       open={endOpen}
@@ -76,7 +78,7 @@ export function EndContractDialog({
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">Period Start</Label>
+                <Label className="text-xs">{tUi("period.start")}</Label>
                 <Input
                   type="date"
                   value={endStart}
@@ -85,7 +87,7 @@ export function EndContractDialog({
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Period End</Label>
+                <Label className="text-xs">{tUi("period.end")}</Label>
                 <Input
                   type="date"
                   value={endEnd}
@@ -131,13 +133,13 @@ export function EndContractDialog({
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-md border p-3 text-center">
-                <p className="text-xs text-muted-foreground mb-1">Earned</p>
+                <p className="text-xs text-muted-foreground mb-1">{tUi("earned")}</p>
                 <p className="font-semibold text-sm" data-testid="text-earned">
                   ${fmtNum(endResult.earned)}
                 </p>
               </div>
               <div className="rounded-md border p-3 text-center">
-                <p className="text-xs text-muted-foreground mb-1">Already Paid</p>
+                <p className="text-xs text-muted-foreground mb-1">{tUi("already.paid")}</p>
                 <p className="font-semibold text-sm" data-testid="text-paid">
                   ${fmtNum(endResult.paid)}
                 </p>
@@ -145,7 +147,7 @@ export function EndContractDialog({
               <div
                 className={`rounded-md border p-3 text-center ${parseFloat(endResult.advances) > 0 ? "border-orange-300 bg-orange-50 dark:bg-orange-900/20" : ""}`}
               >
-                <p className="text-xs text-muted-foreground mb-1">Advances</p>
+                <p className="text-xs text-muted-foreground mb-1">{tUi("advances")}</p>
                 <p className="font-semibold text-sm" data-testid="text-advances">
                   ${fmtNum(endResult.advances)}
                 </p>
@@ -153,7 +155,7 @@ export function EndContractDialog({
               <div
                 className={`rounded-md border p-3 text-center ${payrollBalance > 0 ? "border-amber-300 bg-amber-50 dark:bg-amber-900/20" : "border-green-300 bg-green-50 dark:bg-green-900/20"}`}
               >
-                <p className="text-xs text-muted-foreground mb-1">Balance</p>
+                <p className="text-xs text-muted-foreground mb-1">{tUi("balance")}</p>
                 <p className="font-semibold text-sm" data-testid="text-balance">
                   ${fmtNum(endResult.balance)}
                 </p>
@@ -161,10 +163,10 @@ export function EndContractDialog({
             </div>
             {payrollBalance > 0 && (
               <div className="space-y-1">
-                <Label className="text-xs">Cash Account (Pay Now)</Label>
+                <Label className="text-xs">{tUi("cash.account.pay.now")}</Label>
                 <Select value={endCashAccountId} onValueChange={setEndCashAccountId}>
                   <SelectTrigger data-testid="select-cash-account">
-                    <SelectValue placeholder="Select account..." />
+                    <SelectValue placeholder={tUi("select.account.2")} />
                   </SelectTrigger>
                   <SelectContent>
                     {cashAccounts?.map((a: any) => (

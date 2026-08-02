@@ -18,6 +18,7 @@ import { format } from "date-fns";
 import * as XLSX from "@/lib/excelHelper";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { PageHeader } from "@/components/PageHeader";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface ProformaLine {
   id: number;
@@ -42,6 +43,7 @@ interface Proforma {
 }
 
 export default function SupplierProformas() {
+  const tUi = useErpText();
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const handleBack = useBackToParent();
@@ -330,7 +332,7 @@ export default function SupplierProformas() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <PageHeader title="Supplier Proformas" />
+            <PageHeader title={tUi("supplier.proformas")} />
             <p className="text-muted-foreground text-sm">Manage proformas for supplier #{supplierId}</p>
           </div>
         </div>
@@ -350,11 +352,11 @@ export default function SupplierProformas() {
         <div>
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm">Proformas</CardTitle>
+              <CardTitle className="text-sm">{tUi("proformas")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {(!proformas || proformas.length === 0) && (
-                <p className="text-sm text-muted-foreground">No proformas yet. Create one to get started.</p>
+                <p className="text-sm text-muted-foreground">{tUi("no.proformas.yet.create.one.to.get.started")}</p>
               )}
               {proformas?.map((p) => (
                 <div
@@ -402,7 +404,7 @@ export default function SupplierProformas() {
                       size="icon"
                       onClick={(e) => startRename(e, p)}
                       data-testid={`button-rename-proforma-${p.id}`}
-                      title="Rename"
+                      title={tUi("rename")}
                     >
                       <Pencil className="h-3 w-3 text-muted-foreground" />
                     </Button>
@@ -483,12 +485,12 @@ export default function SupplierProformas() {
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
-                      <TableHead>Barcode</TableHead>
-                      <TableHead>Item Name</TableHead>
+                      <TableHead>{tUi("barcode")}</TableHead>
+                      <TableHead>{tUi("item.name")}</TableHead>
                       <TableHead className="text-right">Qty</TableHead>
-                      <TableHead className="text-right">Weight/Bale</TableHead>
-                      <TableHead className="text-right">Price/Bale</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-right">{tUi("weight.bale")}</TableHead>
+                      <TableHead className="text-right">{tUi("price.bale")}</TableHead>
+                      <TableHead className="text-right">{tUi("actions")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -498,7 +500,7 @@ export default function SupplierProformas() {
                           <Input
                             value={newLine.barcode}
                             onChange={(e) => setNewLine({ ...newLine, barcode: e.target.value })}
-                            placeholder="Barcode"
+                            placeholder={tUi("barcode")}
                             className="h-8 text-xs"
                             data-testid="input-new-barcode"
                           />
@@ -507,7 +509,7 @@ export default function SupplierProformas() {
                           <Input
                             value={newLine.itemName}
                             onChange={(e) => setNewLine({ ...newLine, itemName: e.target.value })}
-                            placeholder="Item Name"
+                            placeholder={tUi("item.name")}
                             className="h-8 text-xs"
                             data-testid="input-new-itemname"
                           />
@@ -673,7 +675,7 @@ export default function SupplierProformas() {
               <CardContent className="flex items-center justify-center py-16">
                 <div className="text-center text-muted-foreground">
                   <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p className="text-sm">Select a proforma from the list or create a new one</p>
+                  <p className="text-sm">{tUi("select.a.proforma.from.the.list.or.create.a.new.")}</p>
                 </div>
               </CardContent>
             </Card>
@@ -695,11 +697,11 @@ export default function SupplierProformas() {
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Create Proforma</DialogTitle>
+            <DialogTitle>{tUi("create.proforma")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">Reference *</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("reference.2")}</label>
               <Input
                 value={createRef}
                 onChange={(e) => setCreateRef(e.target.value)}
@@ -708,11 +710,11 @@ export default function SupplierProformas() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Notes</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("notes")}</label>
               <Textarea
                 value={createNotes}
                 onChange={(e) => setCreateNotes(e.target.value)}
-                placeholder="Optional notes..."
+                placeholder={tUi("optional.notes")}
                 data-testid="input-proforma-notes"
               />
             </div>

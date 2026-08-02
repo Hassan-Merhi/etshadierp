@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface OtwContainerFiltersProps {
   otwSearchTerm: string;
@@ -65,12 +66,13 @@ export function OtwContainerFilters({
   uniqueOtwTrucks,
   getSupplierName,
 }: OtwContainerFiltersProps) {
+  const tUi = useErpText();
   return (
     <div className="flex flex-wrap gap-2">
       <div className="relative flex-1 min-w-[200px]">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by container, shop, or agent..."
+          placeholder={tUi("search.by.container.shop.or.agent")}
           value={otwSearchTerm}
           onChange={(e) => setOtwSearchTerm(e.target.value)}
           className="pl-10"
@@ -127,84 +129,92 @@ export function OtwContainerFilters({
 
       <Select value={otwLocationFilter} onValueChange={setOtwLocationFilter}>
         <SelectTrigger className="w-full sm:w-[130px]" data-testid="select-otw-location">
-          <SelectValue placeholder="Location" />
+          <SelectValue placeholder={tUi("location")} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="ALL">All Locations</SelectItem>
+          <SelectItem value="ALL">{tUi("all.locations")}</SelectItem>
           {uniqueOtwLocations.map((loc) => (
-            <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+            <SelectItem key={loc} value={loc}>
+              {loc}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
 
       <Select value={otwTruckFilter} onValueChange={setOtwTruckFilter}>
         <SelectTrigger className="w-full sm:w-[120px]" data-testid="select-otw-truck">
-          <SelectValue placeholder="Truck #" />
+          <SelectValue placeholder={tUi("truck")} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="ALL">All Trucks</SelectItem>
+          <SelectItem value="ALL">{tUi("all.trucks")}</SelectItem>
           {uniqueOtwTrucks.map((truck) => (
-            <SelectItem key={truck} value={truck}>{truck}</SelectItem>
+            <SelectItem key={truck} value={truck}>
+              {truck}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
 
       <Select value={otwAgentFilter} onValueChange={setOtwAgentFilter}>
         <SelectTrigger className="w-full sm:w-[100px]" data-testid="select-otw-agent">
-          <SelectValue placeholder="Agent" />
+          <SelectValue placeholder={tUi("agent")} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="ALL">All Agents</SelectItem>
+          <SelectItem value="ALL">{tUi("all.agents")}</SelectItem>
           {uniqueOtwAgents.map((agent) => (
-            <SelectItem key={agent} value={agent}>{agent}</SelectItem>
+            <SelectItem key={agent} value={agent}>
+              {agent}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
 
       <Select value={otwTransporterFilter} onValueChange={setOtwTransporterFilter}>
         <SelectTrigger className="w-full sm:w-[120px]" data-testid="select-otw-transporter">
-          <SelectValue placeholder="Transporter" />
+          <SelectValue placeholder={tUi("transporter")} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="ALL">All Transporters</SelectItem>
+          <SelectItem value="ALL">{tUi("all.transporters")}</SelectItem>
           {uniqueOtwTransporters.map((t) => (
-            <SelectItem key={t} value={t}>{t}</SelectItem>
+            <SelectItem key={t} value={t}>
+              {t}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
 
       <Select value={otwDocReceivedFilter} onValueChange={setOtwDocReceivedFilter}>
         <SelectTrigger className="w-full sm:w-[100px]" data-testid="select-otw-doc">
-          <SelectValue placeholder="Doc" />
+          <SelectValue placeholder={tUi("doc")} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="ALL">All Docs</SelectItem>
-          <SelectItem value="YES">Doc Received</SelectItem>
-          <SelectItem value="NO">No Doc</SelectItem>
+          <SelectItem value="ALL">{tUi("all.docs")}</SelectItem>
+          <SelectItem value="YES">{tUi("doc.received")}</SelectItem>
+          <SelectItem value="NO">{tUi("no.doc")}</SelectItem>
         </SelectContent>
       </Select>
 
       <Select value={otwFreightStatusFilter} onValueChange={setOtwFreightStatusFilter}>
         <SelectTrigger className="w-full sm:w-[120px]" data-testid="select-otw-freight">
-          <SelectValue placeholder="Freight" />
+          <SelectValue placeholder={tUi("freight")} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="ALL">All Freight</SelectItem>
-          <SelectItem value="Yes">Freight Yes</SelectItem>
-          <SelectItem value="No">Freight No</SelectItem>
-          <SelectItem value="Pending">Pending</SelectItem>
-          <SelectItem value="NONE">Not Set</SelectItem>
+          <SelectItem value="ALL">{tUi("all.freight")}</SelectItem>
+          <SelectItem value="Yes">{tUi("freight.yes")}</SelectItem>
+          <SelectItem value="No">{tUi("freight.no")}</SelectItem>
+          <SelectItem value="Pending">{tUi("pending")}</SelectItem>
+          <SelectItem value="NONE">{tUi("not.set")}</SelectItem>
         </SelectContent>
       </Select>
 
       <Select value={otwNotesFilter} onValueChange={setOtwNotesFilter}>
         <SelectTrigger className="w-full sm:w-[110px]" data-testid="select-otw-notes">
-          <SelectValue placeholder="Notes" />
+          <SelectValue placeholder={tUi("notes")} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="ALL">All Notes</SelectItem>
-          <SelectItem value="WITH">Has Notes</SelectItem>
-          <SelectItem value="WITHOUT">No Notes</SelectItem>
+          <SelectItem value="ALL">{tUi("all.notes")}</SelectItem>
+          <SelectItem value="WITH">{tUi("has.notes")}</SelectItem>
+          <SelectItem value="WITHOUT">{tUi("no.notes")}</SelectItem>
         </SelectContent>
       </Select>
     </div>

@@ -10,6 +10,7 @@ import {
   InlineBoolCell,
 } from "./InlineCells";
 import { cn } from "@/lib/utils";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface ContainerTableProps {
   containers: EnrichedContainerRow[];
@@ -20,6 +21,7 @@ interface ContainerTableProps {
 }
 
 export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDrawer, printRef }: ContainerTableProps) {
+  const tUi = useErpText();
   return (
     <div className="rounded-md border bg-card h-full flex flex-col shadow-sm overflow-clip">
       <div className="flex-1 overflow-auto custom-scrollbar relative">
@@ -28,26 +30,58 @@ export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDra
             <TableHeader className="sticky top-0 z-[50] bg-teal-800 dark:bg-teal-950">
               <TableRow className="!bg-transparent hover:!bg-transparent border-b border-teal-600 dark:border-teal-700">
                 <TableHead className="w-[40px] font-bold h-9 text-teal-50 text-center">#</TableHead>
-                <TableHead className="w-[110px] font-bold h-9 text-teal-50">Container #</TableHead>
-                {colVis.supplier && <TableHead className="w-[100px] font-bold h-9 text-teal-50">Supplier</TableHead>}
-                {colVis.company && <TableHead className="w-[120px] font-bold h-9 text-teal-50">Company</TableHead>}
-                {colVis.shopName && <TableHead className="w-[100px] font-bold h-9 text-teal-50">Shop Name</TableHead>}
-                {colVis.eta && <TableHead className="w-[100px] font-bold h-9 text-teal-50">ETA DAS</TableHead>}
-                {colVis.cost && <TableHead className="w-[85px] font-bold text-right h-9 text-teal-50">Cost ($)</TableHead>}
-                {colVis.freight && <TableHead className="w-[70px] font-bold text-center h-9 text-teal-50">Freight</TableHead>}
-                {colVis.truckNo && <TableHead className="w-[100px] font-bold h-9 text-teal-50">Truck #</TableHead>}
-                {colVis.location && <TableHead className="w-[110px] font-bold h-9 text-teal-50">Location</TableHead>}
-                {colVis.borderDate && <TableHead className="w-[100px] font-bold h-9 text-teal-50">Border Date</TableHead>}
-                {colVis.maxOffload && <TableHead className="w-[100px] font-bold h-9 text-teal-50">Max Offload</TableHead>}
-                {colVis.delayed && <TableHead className="w-[70px] font-bold text-center h-9 text-teal-50">Delayed</TableHead>}
-                {colVis.docs && <TableHead className="w-[50px] font-bold text-center h-9 text-teal-50">Docs</TableHead>}
-                {colVis.docsSent && <TableHead className="w-[100px] font-bold h-9 text-teal-50">Docs Sent</TableHead>}
-                {colVis.transporter && <TableHead className="w-[110px] font-bold h-9 text-teal-50">Transporter</TableHead>}
-                {colVis.transportFee && <TableHead className="w-[90px] font-bold text-right h-9 text-teal-50">Trans. Fee</TableHead>}
-                {colVis.agent && <TableHead className="w-[90px] font-bold h-9 text-teal-50">Agent</TableHead>}
-                {colVis.dutyFee && <TableHead className="w-[80px] font-bold text-right h-9 text-teal-50">Duty ($)</TableHead>}
-                {colVis.notes && <TableHead className="w-[120px] font-bold h-9 text-teal-50">Notes</TableHead>}
-                {colVis.blDocs && <TableHead className="w-[120px] font-bold h-9 text-teal-50">BL Docs</TableHead>}
+                <TableHead className="w-[110px] font-bold h-9 text-teal-50">{tUi("container.2")}</TableHead>
+                {colVis.supplier && (
+                  <TableHead className="w-[100px] font-bold h-9 text-teal-50">{tUi("supplier")}</TableHead>
+                )}
+                {colVis.company && (
+                  <TableHead className="w-[120px] font-bold h-9 text-teal-50">{tUi("company.2")}</TableHead>
+                )}
+                {colVis.shopName && (
+                  <TableHead className="w-[100px] font-bold h-9 text-teal-50">{tUi("shop.name")}</TableHead>
+                )}
+                {colVis.eta && <TableHead className="w-[100px] font-bold h-9 text-teal-50">{tUi("eta.das")}</TableHead>}
+                {colVis.cost && (
+                  <TableHead className="w-[85px] font-bold text-right h-9 text-teal-50">{tUi("cost.3")}</TableHead>
+                )}
+                {colVis.freight && (
+                  <TableHead className="w-[70px] font-bold text-center h-9 text-teal-50">{tUi("freight")}</TableHead>
+                )}
+                {colVis.truckNo && (
+                  <TableHead className="w-[100px] font-bold h-9 text-teal-50">{tUi("truck")}</TableHead>
+                )}
+                {colVis.location && (
+                  <TableHead className="w-[110px] font-bold h-9 text-teal-50">{tUi("location")}</TableHead>
+                )}
+                {colVis.borderDate && (
+                  <TableHead className="w-[100px] font-bold h-9 text-teal-50">{tUi("border.date")}</TableHead>
+                )}
+                {colVis.maxOffload && (
+                  <TableHead className="w-[100px] font-bold h-9 text-teal-50">{tUi("max.offload")}</TableHead>
+                )}
+                {colVis.delayed && (
+                  <TableHead className="w-[70px] font-bold text-center h-9 text-teal-50">{tUi("delayed")}</TableHead>
+                )}
+                {colVis.docs && (
+                  <TableHead className="w-[50px] font-bold text-center h-9 text-teal-50">{tUi("docs")}</TableHead>
+                )}
+                {colVis.docsSent && (
+                  <TableHead className="w-[100px] font-bold h-9 text-teal-50">{tUi("docs.sent")}</TableHead>
+                )}
+                {colVis.transporter && (
+                  <TableHead className="w-[110px] font-bold h-9 text-teal-50">{tUi("transporter")}</TableHead>
+                )}
+                {colVis.transportFee && (
+                  <TableHead className="w-[90px] font-bold text-right h-9 text-teal-50">{tUi("trans.fee")}</TableHead>
+                )}
+                {colVis.agent && <TableHead className="w-[90px] font-bold h-9 text-teal-50">{tUi("agent")}</TableHead>}
+                {colVis.dutyFee && (
+                  <TableHead className="w-[80px] font-bold text-right h-9 text-teal-50">{tUi("duty.2")}</TableHead>
+                )}
+                {colVis.notes && <TableHead className="w-[120px] font-bold h-9 text-teal-50">{tUi("notes")}</TableHead>}
+                {colVis.blDocs && (
+                  <TableHead className="w-[120px] font-bold h-9 text-teal-50">{tUi("bl.docs")}</TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody>

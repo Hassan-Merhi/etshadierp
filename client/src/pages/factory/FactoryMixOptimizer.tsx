@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface MaterialRow {
   supplierId: string;
@@ -34,6 +35,7 @@ interface Supplier {
 }
 
 export default function FactoryMixOptimizer() {
+  const tUi = useFactoryText();
   const [targetProduct, setTargetProduct] = useState("");
   const [desiredMargin, setDesiredMargin] = useState(20);
   const [materials, setMaterials] = useState<MaterialRow[]>([{ supplierId: "", kgAvailable: 0, costPerKg: 0 }]);
@@ -77,26 +79,26 @@ export default function FactoryMixOptimizer() {
   return (
     <div className="space-y-6">
       <div>
-        <PageHeader title="Mix Optimizer" subtitle="What-if calculator for optimizing bale mix ratios" />
+        <PageHeader title={tUi("mix.optimizer")} subtitle={tUi("what.if.calculator.for.optimizing.bale.mix.ratio")} />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Optimization Parameters</CardTitle>
+          <CardTitle>{tUi("optimization.parameters")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="target-product">Target Product</Label>
+              <Label htmlFor="target-product">{tUi("target.product")}</Label>
               {productsQuery.isLoading ? (
                 <div className="flex items-center gap-2" data-testid="loading-products">
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Loading products...</span>
+                  <span className="text-sm text-muted-foreground">{tUi("loading.products")}</span>
                 </div>
               ) : (
                 <Select value={targetProduct} onValueChange={setTargetProduct} data-testid="select-target-product">
                   <SelectTrigger data-testid="select-trigger-target-product">
-                    <SelectValue placeholder="Select a product" />
+                    <SelectValue placeholder={tUi("select.a.product")} />
                   </SelectTrigger>
                   <SelectContent>
                     {(productsQuery.data || []).map((product) => (
@@ -114,7 +116,7 @@ export default function FactoryMixOptimizer() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="desired-margin">Desired Margin %</Label>
+              <Label htmlFor="desired-margin">{tUi("desired.margin")}</Label>
               <Input
                 id="desired-margin"
                 type="number"
@@ -127,7 +129,7 @@ export default function FactoryMixOptimizer() {
 
           <div className="space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <Label className="text-base font-semibold">Available Materials</Label>
+              <Label className="text-base font-semibold">{tUi("available.materials")}</Label>
               <Button onClick={addMaterial} size="sm" data-testid="button-add-material">
                 <Plus className="mr-1 h-4 w-4" />
                 Add Material
@@ -137,7 +139,7 @@ export default function FactoryMixOptimizer() {
             {suppliersQuery.isLoading ? (
               <div className="flex items-center justify-center py-8" data-testid="loading-suppliers">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                <span className="ml-2 text-muted-foreground">Loading suppliers...</span>
+                <span className="ml-2 text-muted-foreground">{tUi("loading.suppliers")}</span>
               </div>
             ) : (
               <div className="space-y-3">
@@ -148,10 +150,10 @@ export default function FactoryMixOptimizer() {
                     data-testid={`row-material-${idx}`}
                   >
                     <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Supplier</Label>
+                      <Label className="text-xs text-muted-foreground">{tUi("supplier")}</Label>
                       <Select value={mat.supplierId} onValueChange={(val) => updateMaterial(idx, "supplierId", val)}>
                         <SelectTrigger data-testid={`select-trigger-supplier-${idx}`}>
-                          <SelectValue placeholder="Select supplier" />
+                          <SelectValue placeholder={tUi("select.supplier.2")} />
                         </SelectTrigger>
                         <SelectContent>
                           {(suppliersQuery.data || []).map((supplier) => (
@@ -168,7 +170,7 @@ export default function FactoryMixOptimizer() {
                     </div>
 
                     <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">KG Available</Label>
+                      <Label className="text-xs text-muted-foreground">{tUi("kg.available")}</Label>
                       <Input
                         type="number"
                         value={mat.kgAvailable}
@@ -178,7 +180,7 @@ export default function FactoryMixOptimizer() {
                     </div>
 
                     <div className="space-y-1">
-                      <Label className="text-xs text-muted-foreground">Cost per KG</Label>
+                      <Label className="text-xs text-muted-foreground">{tUi("cost.per.kg")}</Label>
                       <Input
                         type="number"
                         value={mat.costPerKg}
@@ -216,7 +218,7 @@ export default function FactoryMixOptimizer() {
       {optimizeMutation.isPending && (
         <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-muted-foreground">Calculating optimal mix...</span>
+          <span className="ml-2 text-muted-foreground">{tUi("calculating.optimal.mix")}</span>
         </div>
       )}
 
@@ -246,7 +248,7 @@ export default function FactoryMixOptimizer() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div>
-                      <Label className="text-xs text-muted-foreground">Sources</Label>
+                      <Label className="text-xs text-muted-foreground">{tUi("sources")}</Label>
                       <ul className="mt-1 space-y-1">
                         {suggestion.sources.map((source, sIdx) => (
                           <li
@@ -265,13 +267,13 @@ export default function FactoryMixOptimizer() {
 
                     <div className="grid grid-cols-2 gap-3 pt-2 border-t">
                       <div>
-                        <p className="text-xs text-muted-foreground">Expected Cost/Bale</p>
+                        <p className="text-xs text-muted-foreground">{tUi("expected.cost.bale")}</p>
                         <p className="font-mono font-medium" data-testid={`text-cost-${idx}`}>
                           ${suggestion.expectedCostPerBale.toFixed(2)}
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">Expected Profit</p>
+                        <p className="text-xs text-muted-foreground">{tUi("expected.profit")}</p>
                         <p
                           className="font-mono font-medium text-green-600 dark:text-green-400"
                           data-testid={`text-profit-${idx}`}

@@ -1,9 +1,4 @@
-import {
-  Search,
-  Filter,
-  X,
-  ChevronDown,
-} from "lucide-react";
+import { Search, Filter, X, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { Supplier } from "@shared/schema";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface ContainerFiltersProps {
   searchTerm: string;
@@ -39,13 +35,14 @@ export function ContainerFilters({
   getSupplierName,
   onClearFilters,
 }: ContainerFiltersProps) {
+  const tUi = useErpText();
   return (
     /* Inline filter row */
     <div className="flex flex-wrap gap-2 items-center">
       <div className="relative flex-1 min-w-[200px]">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by container number..."
+          placeholder={tUi("search.by.container.number")}
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           className="pl-10"
@@ -88,7 +85,9 @@ export function ContainerFilters({
                   className="flex items-center gap-2 cursor-pointer"
                   onSelect={(e) => {
                     e.preventDefault();
-                    onSupplierFilterChange(checked ? supplierFilter.filter((v) => v !== val) : [...supplierFilter, val]);
+                    onSupplierFilterChange(
+                      checked ? supplierFilter.filter((v) => v !== val) : [...supplierFilter, val]
+                    );
                   }}
                 >
                   <Checkbox checked={checked} className="pointer-events-none" />

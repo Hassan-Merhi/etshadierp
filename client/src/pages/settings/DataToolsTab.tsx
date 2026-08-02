@@ -1,29 +1,56 @@
-import {useState, useRef} from "react";
-import {Card, CardHeader, CardTitle, CardContent, CardDescription} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle} from "@/components/ui/dialog";
-import {Alert, AlertDescription} from "@/components/ui/alert";
+import { useState, useRef } from "react";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {} from "@/components/ui/alert-dialog";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-import {useToast} from "@/hooks/use-toast";
-import {useMutation, useQuery} from "@tanstack/react-query";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {useAppMode} from "@/contexts/AppModeContext";
-import {getApiRequest} from "@/lib/factoryApi";
-import {Plus, Edit, RefreshCw, Calculator, Loader2, AlertTriangle, Package, Upload, Download, Database, TrendingUp, TrendingDown, Check, X, ArrowLeftRight, CheckCircle2, FileSpreadsheet, FileDown, Search} from "lucide-react";
-import {utils, writeFile, readFile, read} from "@/lib/excelHelper";
-import {Link} from "wouter";
-import {BulkRenameTab} from "./BulkRenameTab";
-import {useCompany} from "@/contexts/CompanyContext";
-import {formatNumber} from "@/lib/formatNumber";
+import { useToast } from "@/hooks/use-toast";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest } from "@/lib/factoryApi";
+import {
+  Plus,
+  Edit,
+  RefreshCw,
+  Calculator,
+  Loader2,
+  AlertTriangle,
+  Package,
+  Upload,
+  Download,
+  Database,
+  TrendingUp,
+  TrendingDown,
+  Check,
+  X,
+  ArrowLeftRight,
+  CheckCircle2,
+  FileSpreadsheet,
+  FileDown,
+  Search,
+} from "lucide-react";
+import { utils, writeFile, readFile, read } from "@/lib/excelHelper";
+import { Link } from "wouter";
+import { BulkRenameTab } from "./BulkRenameTab";
+import { useCompany } from "@/contexts/CompanyContext";
+import { formatNumber } from "@/lib/formatNumber";
 
-import type {SilentImportRow} from "./datatoolstab/types";
-import {ReconcileOTWNamesCard} from "./datatoolstab/components/ReconcileOTWNamesCard";
-import {MergeStockItemsLauncher} from "./datatoolstab/components/MergeStockItemsLauncher";
+import type { SilentImportRow } from "./datatoolstab/types";
+import { ReconcileOTWNamesCard } from "./datatoolstab/components/ReconcileOTWNamesCard";
+import { MergeStockItemsLauncher } from "./datatoolstab/components/MergeStockItemsLauncher";
 export function DataToolsTab() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();

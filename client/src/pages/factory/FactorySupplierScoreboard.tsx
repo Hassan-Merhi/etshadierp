@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface SupplierScore {
   supplierName: string;
@@ -41,6 +42,7 @@ function getScoreClass(score: number): string {
 }
 
 export default function FactorySupplierScoreboard() {
+  const tUi = useFactoryText();
   const defaults = getDefaultDateRange();
   const [from, setFrom] = useState(defaults.from);
   const [to, setTo] = useState(defaults.to);
@@ -65,11 +67,11 @@ export default function FactorySupplierScoreboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <PageHeader title="Supplier Scoreboard" subtitle="Supplier performance ranking and scoring" />
+          <PageHeader title={tUi("supplier.scoreboard")} subtitle={tUi("supplier.performance.ranking.and.scoring")} />
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">From</Label>
+            <Label className="text-xs text-muted-foreground">{tUi("from")}</Label>
             <Input
               type="date"
               value={from}
@@ -94,7 +96,7 @@ export default function FactorySupplierScoreboard() {
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <Card data-testid="card-total-suppliers">
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Suppliers</CardTitle>
+            <CardTitle className="text-sm font-medium">{tUi("total.suppliers")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-suppliers">
@@ -104,7 +106,7 @@ export default function FactorySupplierScoreboard() {
         </Card>
         <Card data-testid="card-avg-score">
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Score</CardTitle>
+            <CardTitle className="text-sm font-medium">{tUi("avg.score")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-avg-score">
@@ -114,7 +116,7 @@ export default function FactorySupplierScoreboard() {
         </Card>
         <Card data-testid="card-best-supplier">
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Best Supplier</CardTitle>
+            <CardTitle className="text-sm font-medium">{tUi("best.supplier")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold truncate" data-testid="text-best-supplier">
@@ -129,7 +131,7 @@ export default function FactorySupplierScoreboard() {
         </Card>
         <Card data-testid="card-worst-supplier">
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Worst Supplier</CardTitle>
+            <CardTitle className="text-sm font-medium">{tUi("worst.supplier")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold truncate" data-testid="text-worst-supplier">
@@ -146,13 +148,13 @@ export default function FactorySupplierScoreboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Supplier Rankings</CardTitle>
+          <CardTitle>{tUi("supplier.rankings")}</CardTitle>
         </CardHeader>
         <CardContent>
           {query.isLoading ? (
             <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-muted-foreground">Loading supplier scores...</span>
+              <span className="ml-2 text-muted-foreground">{tUi("loading.supplier.scores")}</span>
             </div>
           ) : !Array.isArray(data) || data.length === 0 ? (
             <div className="text-center py-8">
@@ -165,14 +167,14 @@ export default function FactorySupplierScoreboard() {
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead>Rank</TableHead>
-                    <TableHead>Supplier Name</TableHead>
-                    <TableHead>Total KG</TableHead>
-                    <TableHead>Waste KG</TableHead>
-                    <TableHead>Waste %</TableHead>
-                    <TableHead>Avg Cost/KG</TableHead>
-                    <TableHead>Output Bales</TableHead>
-                    <TableHead>Score</TableHead>
+                    <TableHead>{tUi("rank")}</TableHead>
+                    <TableHead>{tUi("supplier.name")}</TableHead>
+                    <TableHead>{tUi("total.kg.2")}</TableHead>
+                    <TableHead>{tUi("waste.kg")}</TableHead>
+                    <TableHead>{tUi("waste.2")}</TableHead>
+                    <TableHead>{tUi("avg.cost.kg")}</TableHead>
+                    <TableHead>{tUi("output.bales")}</TableHead>
+                    <TableHead>{tUi("score")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

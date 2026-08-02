@@ -9,6 +9,7 @@ import { DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/di
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatNumber } from "@/lib/formatNumber";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function LoadingCreatedView({
   entry,
@@ -27,6 +28,7 @@ export function LoadingCreatedView({
   badgeClass: any;
   onNavigate: any;
 }) {
+  const tUi = useFactoryText();
   const lo = loadingOrder;
   const lines: any[] = lo?.lines ?? [];
   const balesList: any[] = lo?.bales ?? [];
@@ -43,7 +45,7 @@ export function LoadingCreatedView({
     <>
       <DialogHeader>
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <DialogTitle>Loading Started</DialogTitle>
+          <DialogTitle>{tUi("loading.started")}</DialogTitle>
           <Badge variant={badgeVariant} className={badgeClass}>
             Loading Started
           </Badge>
@@ -53,7 +55,7 @@ export function LoadingCreatedView({
 
       <div className="space-y-4">
         {!lo ? (
-          <p className="text-sm text-muted-foreground">Loading order details…</p>
+          <p className="text-sm text-muted-foreground">{tUi("loading.order.details.2")}</p>
         ) : (
           <>
             {/* Customer + status card */}
@@ -101,15 +103,15 @@ export function LoadingCreatedView({
             {/* Stats grid */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
-                <p className="text-xs text-muted-foreground">Expected Bales</p>
+                <p className="text-xs text-muted-foreground">{tUi("expected.bales")}</p>
                 <p className="font-semibold font-mono text-lg">{expectedBalesTotal > 0 ? expectedBalesTotal : "—"}</p>
               </div>
               <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
-                <p className="text-xs text-muted-foreground">Scanned Bales</p>
+                <p className="text-xs text-muted-foreground">{tUi("scanned.bales")}</p>
                 <p className="font-semibold font-mono text-lg">{scannedBales}</p>
               </div>
               <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
-                <p className="text-xs text-muted-foreground">Total Weight</p>
+                <p className="text-xs text-muted-foreground">{tUi("total.weight")}</p>
                 <p className="font-semibold font-mono text-lg">
                   {totalWeightKg > 0 ? `${formatNumber(totalWeightKg)} kg` : "—"}
                 </p>
@@ -165,7 +167,7 @@ export function LoadingCreatedView({
                     {lines.length > 1 && expectedBalesTotal > 0 && (
                       <tfoot>
                         <tr className="bg-muted/50 border-t font-semibold">
-                          <td className="px-3 py-2 text-xs">Total</td>
+                          <td className="px-3 py-2 text-xs">{tUi("total")}</td>
                           <td className="px-3 py-2 text-right font-mono">{expectedBalesTotal}</td>
                           <td />
                           <td className="px-3 py-2 text-right font-mono">
@@ -223,7 +225,7 @@ export function LoadingCreatedView({
                     </tbody>
                     <tfoot>
                       <tr className="bg-muted/50 border-t font-semibold">
-                        <td className="px-3 py-2 text-xs">Total</td>
+                        <td className="px-3 py-2 text-xs">{tUi("total")}</td>
                         <td className="px-3 py-2 text-right font-mono">{balesList.length}</td>
                         <td className="px-3 py-2 text-right font-mono text-muted-foreground">
                           {formatNumber(
@@ -247,19 +249,19 @@ export function LoadingCreatedView({
                   <tbody>
                     {subtotalBales > 0 && (
                       <tr className="border-b">
-                        <td className="px-3 py-2 text-muted-foreground">Subtotal (bales)</td>
+                        <td className="px-3 py-2 text-muted-foreground">{tUi("subtotal.bales.2")}</td>
                         <td className="px-3 py-2 text-right font-mono font-medium">${formatNumber(subtotalBales)}</td>
                       </tr>
                     )}
                     {freightAmount > 0 && (
                       <tr className="border-b">
-                        <td className="px-3 py-2 text-muted-foreground">Freight</td>
+                        <td className="px-3 py-2 text-muted-foreground">{tUi("freight")}</td>
                         <td className="px-3 py-2 text-right font-mono font-medium">${formatNumber(freightAmount)}</td>
                       </tr>
                     )}
                     {grandTotal > 0 && (
                       <tr className="bg-muted/50 font-bold">
-                        <td className="px-3 py-2">Grand Total</td>
+                        <td className="px-3 py-2">{tUi("grand.total")}</td>
                         <td className="px-3 py-2 text-right font-mono">${formatNumber(grandTotal)}</td>
                       </tr>
                     )}

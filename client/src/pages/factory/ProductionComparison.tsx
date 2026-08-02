@@ -1,25 +1,42 @@
-import {useState, useMemo} from "react";
-import {useQuery} from "@tanstack/react-query";
-import {PageHeader} from "@/components/PageHeader";
-import {Button} from "@/components/ui/button";
-import {Badge} from "@/components/ui/badge";
-import {Skeleton} from "@/components/ui/skeleton";
-import {Input} from "@/components/ui/input";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { PageHeader } from "@/components/PageHeader";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import {} from "@/components/ui/command";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {AlertTriangle, ChevronDown, Package, Scale} from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AlertTriangle, ChevronDown, Package, Scale } from "lucide-react";
 import React from "react";
-import {cn} from "@/lib/utils";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-import type {MergedRow, Preset, ReportData, SupplierDayRow} from "./productioncomparison/types";
-import {deriveGrade, fmtDateRange, fmtKg, fmtMoney, fmtNum, fmtPct, fmtUsd, lastMonthRange, lastYearRange, pctChange, thisMonthRange, thisYearRange, todayStr, yesterdayStr} from "./productioncomparison/utils";
-import {MultiSelectFilter} from "./productioncomparison/components/MultiSelectFilter";
-import {DiffCell} from "./productioncomparison/components/DiffCell";
-import {StatCard} from "./productioncomparison/components/StatCard";
+import type { MergedRow, Preset, ReportData, SupplierDayRow } from "./productioncomparison/types";
+import {
+  deriveGrade,
+  fmtDateRange,
+  fmtKg,
+  fmtMoney,
+  fmtNum,
+  fmtPct,
+  fmtUsd,
+  lastMonthRange,
+  lastYearRange,
+  pctChange,
+  thisMonthRange,
+  thisYearRange,
+  todayStr,
+  yesterdayStr,
+} from "./productioncomparison/utils";
+import { MultiSelectFilter } from "./productioncomparison/components/MultiSelectFilter";
+import { DiffCell } from "./productioncomparison/components/DiffCell";
+import { StatCard } from "./productioncomparison/components/StatCard";
+import { useFactoryText } from "@/i18n/modules/factory";
 // ── Date helpers ─────────────────────────────────────────────────────────────
 
 export default function ProductionComparison() {
+  const tUi = useFactoryText();
   const [preset, setPreset] = useState<Preset>("month");
 
   const [customA, setCustomA] = useState<[string, string]>([todayStr(), todayStr()]);
@@ -247,7 +264,7 @@ export default function ProductionComparison() {
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
       {/* Header + preset buttons */}
-      <PageHeader title="Production Comparison" subtitle="Compare output across two time periods">
+      <PageHeader title={tUi("production.comparison")} subtitle={tUi("compare.output.across.two.time.periods")}>
         <div className="flex flex-wrap gap-2">
           {(
             [
@@ -268,7 +285,7 @@ export default function ProductionComparison() {
       {preset === "custom" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-lg border bg-muted/40 p-4">
           <div className="space-y-2">
-            <p className="text-sm font-semibold">Period A</p>
+            <p className="text-sm font-semibold">{tUi("period.a")}</p>
             <div className="flex flex-wrap items-center gap-2">
               <input
                 type="date"
@@ -286,7 +303,7 @@ export default function ProductionComparison() {
             </div>
           </div>
           <div className="space-y-2">
-            <p className="text-sm font-semibold">Period B</p>
+            <p className="text-sm font-semibold">{tUi("period.b")}</p>
             <div className="flex flex-wrap items-center gap-2">
               <input
                 type="date"
@@ -323,7 +340,7 @@ export default function ProductionComparison() {
         <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
           <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
           <div>
-            <p className="font-medium">Failed to load production data</p>
+            <p className="font-medium">{tUi("failed.to.load.production.data")}</p>
             <p className="text-xs mt-0.5 opacity-80">{(fetchError as Error).message}</p>
           </div>
         </div>
@@ -353,7 +370,7 @@ export default function ProductionComparison() {
           {/* Row 2: bale diff, kg diff, % change */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <StatCard
-              title="Bale Difference"
+              title={tUi("bale.difference")}
               value={`${baleDiff > 0 ? "+" : ""}${fmtNum(baleDiff)}`}
               sub={`${labelA} vs ${labelB}`}
               accent={baleDiff > 0 ? "green" : baleDiff < 0 ? "red" : "neutral"}
@@ -361,7 +378,7 @@ export default function ProductionComparison() {
               valueClass={baleDiff > 0 ? "text-emerald-600" : baleDiff < 0 ? "text-red-500" : "text-muted-foreground"}
             />
             <StatCard
-              title="Kilogram Difference"
+              title={tUi("kilogram.difference")}
               value={`${kgDiff > 0 ? "+" : ""}${fmtKg(kgDiff)} kg`}
               sub={`${labelA} vs ${labelB}`}
               accent={kgDiff > 0 ? "green" : kgDiff < 0 ? "red" : "neutral"}
@@ -413,7 +430,7 @@ export default function ProductionComparison() {
                 }
               />
               <StatCard
-                title="Profit Difference"
+                title={tUi("profit.difference")}
                 value={profitDiff != null ? fmtMoney(profitDiff) : "—"}
                 sub={`${labelA} vs ${labelB}`}
                 accent={
@@ -438,7 +455,7 @@ export default function ProductionComparison() {
               {/* Header row */}
               <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-muted/30">
                 <div>
-                  <p className="text-sm font-semibold">Raw Material by Supplier</p>
+                  <p className="text-sm font-semibold">{tUi("raw.material.by.supplier")}</p>
                   <p className="text-xs text-muted-foreground">
                     Mix batch usage per supplier · {labelA}: {fmtKg(totalSupAKg)} kg / {fmtUsd(totalSupACost)}
                     {" · "}
@@ -449,7 +466,7 @@ export default function ProductionComparison() {
                   options={allSuppliers}
                   selected={filterSuppliers}
                   onChange={setFilterSuppliers}
-                  placeholder="Suppliers"
+                  placeholder={tUi("suppliers")}
                   allLabel="All Suppliers"
                   className="w-44 shrink-0"
                 />
@@ -459,13 +476,13 @@ export default function ProductionComparison() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Supplier</TableHead>
+                    <TableHead>{tUi("supplier")}</TableHead>
                     <TableHead className="text-right">{labelA} — kg</TableHead>
                     <TableHead className="text-right">{labelA} — cost</TableHead>
                     <TableHead className="text-right">{labelB} — kg</TableHead>
                     <TableHead className="text-right">{labelB} — cost</TableHead>
-                    <TableHead className="text-right">Kg Diff</TableHead>
-                    <TableHead className="text-right">Cost Diff</TableHead>
+                    <TableHead className="text-right">{tUi("kg.diff")}</TableHead>
+                    <TableHead className="text-right">{tUi("cost.diff")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -513,11 +530,11 @@ export default function ProductionComparison() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[110px]">Date</TableHead>
-                          <TableHead className="w-[80px]">Period</TableHead>
-                          <TableHead>Supplier</TableHead>
+                          <TableHead className="w-[110px]">{tUi("date")}</TableHead>
+                          <TableHead className="w-[80px]">{tUi("period")}</TableHead>
+                          <TableHead>{tUi("supplier")}</TableHead>
                           <TableHead className="text-right">kg Used</TableHead>
-                          <TableHead className="text-right">Cost</TableHead>
+                          <TableHead className="text-right">{tUi("cost")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -550,7 +567,7 @@ export default function ProductionComparison() {
               options={categories}
               selected={filterCategories}
               onChange={setFilterCategories}
-              placeholder="Categories"
+              placeholder={tUi("categories")}
               allLabel="All Categories"
               className="w-48"
             />
@@ -559,17 +576,17 @@ export default function ProductionComparison() {
               options={grades}
               selected={filterGrades}
               onChange={setFilterGrades}
-              placeholder="Grades"
+              placeholder={tUi("grades")}
               allLabel="All Grades"
               className="w-36"
             />
 
             <Select value={filterWorker || "__all__"} onValueChange={(v) => setFilterWorker(v === "__all__" ? "" : v)}>
               <SelectTrigger className="w-44">
-                <SelectValue placeholder="All Workers" />
+                <SelectValue placeholder={tUi("all.workers.2")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__all__">All Workers</SelectItem>
+                <SelectItem value="__all__">{tUi("all.workers.2")}</SelectItem>
                 {workers.map((w) => (
                   <SelectItem key={w.id} value={String(w.id)}>
                     {w.fullName}
@@ -579,7 +596,7 @@ export default function ProductionComparison() {
             </Select>
 
             <Input
-              placeholder="Search product…"
+              placeholder={tUi("search.product")}
               className="w-52"
               value={filterProduct}
               onChange={(e) => setFilterProduct(e.target.value)}
@@ -669,7 +686,7 @@ export default function ProductionComparison() {
                       <th className="px-4 py-2 text-right text-xs font-medium text-muted-foreground whitespace-nowrap">
                         {labelB}
                       </th>
-                      <th className="px-4 py-2 text-right text-xs font-semibold text-foreground">Diff</th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-foreground">{tUi("diff")}</th>
                     </tr>
                   </thead>
                   <tbody>

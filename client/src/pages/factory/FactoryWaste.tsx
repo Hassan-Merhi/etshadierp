@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2, Plus, Trash2, AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface WasteEntry {
   id: number;
@@ -44,6 +45,7 @@ function getDefaultDateRange() {
 }
 
 export default function FactoryWaste() {
+  const tUi = useFactoryText();
   const { formatDisplayDate } = useDateFormat();
   const defaults = getDefaultDateRange();
   const [from, setFrom] = useState(defaults.from);
@@ -148,11 +150,11 @@ export default function FactoryWaste() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <PageHeader title="Factory Waste" subtitle="Track and manage waste entries" />
+          <PageHeader title={tUi("factory.waste")} subtitle={tUi("track.and.manage.waste.entries")} />
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">From</Label>
+            <Label className="text-xs text-muted-foreground">{tUi("from")}</Label>
             <Input
               type="date"
               value={from}
@@ -177,7 +179,7 @@ export default function FactoryWaste() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <Card className="min-w-[200px]">
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Waste KG</CardTitle>
+            <CardTitle className="text-sm font-medium">{tUi("total.waste.kg")}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-mono" data-testid="text-total-waste-kg">
@@ -196,11 +198,11 @@ export default function FactoryWaste() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Add Waste Entry</DialogTitle>
+              <DialogTitle>{tUi("add.waste.entry")}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <div className="space-y-2">
-                <Label htmlFor="waste-date">Date</Label>
+                <Label htmlFor="waste-date">{tUi("date")}</Label>
                 <Input
                   id="waste-date"
                   type="date"
@@ -210,7 +212,7 @@ export default function FactoryWaste() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="waste-type">Waste Type</Label>
+                <Label htmlFor="waste-type">{tUi("waste.type")}</Label>
                 <select
                   id="waste-type"
                   value={formWasteType}
@@ -219,13 +221,13 @@ export default function FactoryWaste() {
                   data-testid="select-waste-type"
                 >
                   <option value="">— None —</option>
-                  <option value="GARBAGE">Garbage</option>
-                  <option value="WIPERS">Wipers</option>
-                  <option value="OTHER">Other</option>
+                  <option value="GARBAGE">{tUi("garbage")}</option>
+                  <option value="WIPERS">{tUi("wipers")}</option>
+                  <option value="OTHER">{tUi("other")}</option>
                 </select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="waste-kg">KG Waste *</Label>
+                <Label htmlFor="waste-kg">{tUi("kg.waste")}</Label>
                 <Input
                   id="waste-kg"
                   type="number"
@@ -237,7 +239,7 @@ export default function FactoryWaste() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="waste-reason">Reason</Label>
+                <Label htmlFor="waste-reason">{tUi("reason")}</Label>
                 <Textarea
                   id="waste-reason"
                   value={formReason}
@@ -246,7 +248,7 @@ export default function FactoryWaste() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="waste-mix-batch">Mix Batch ID (optional)</Label>
+                <Label htmlFor="waste-mix-batch">{tUi("mix.batch.id.optional")}</Label>
                 <Input
                   id="waste-mix-batch"
                   type="number"
@@ -256,7 +258,7 @@ export default function FactoryWaste() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="waste-supplier">Supplier ID (optional)</Label>
+                <Label htmlFor="waste-supplier">{tUi("supplier.id.optional")}</Label>
                 <Input
                   id="waste-supplier"
                   type="number"
@@ -266,7 +268,7 @@ export default function FactoryWaste() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="waste-container">Container ID (optional)</Label>
+                <Label htmlFor="waste-container">{tUi("container.id.optional")}</Label>
                 <Input
                   id="waste-container"
                   type="number"
@@ -286,13 +288,13 @@ export default function FactoryWaste() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Waste Entries</CardTitle>
+          <CardTitle>{tUi("waste.entries")}</CardTitle>
         </CardHeader>
         <CardContent>
           {wasteQuery.isLoading ? (
             <div className="flex items-center justify-center py-12" data-testid="loading-spinner">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-muted-foreground">Loading waste entries...</span>
+              <span className="ml-2 text-muted-foreground">{tUi("loading.waste.entries")}</span>
             </div>
           ) : !Array.isArray(wasteQuery.data) || wasteQuery.data.length === 0 ? (
             <div className="text-center py-8">
@@ -305,14 +307,14 @@ export default function FactoryWaste() {
               <Table>
                 <TableHeader className="sticky top-0 z-30 bg-background">
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
+                    <TableHead>{tUi("date")}</TableHead>
+                    <TableHead>{tUi("type")}</TableHead>
                     <TableHead>KG</TableHead>
-                    <TableHead>Reason</TableHead>
-                    <TableHead>Mix Batch</TableHead>
-                    <TableHead>Supplier</TableHead>
-                    <TableHead>Container</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead>{tUi("reason")}</TableHead>
+                    <TableHead>{tUi("mix.batch")}</TableHead>
+                    <TableHead>{tUi("supplier")}</TableHead>
+                    <TableHead>{tUi("container")}</TableHead>
+                    <TableHead>{tUi("actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -360,7 +362,7 @@ export default function FactoryWaste() {
               <AlertTriangle className="h-4 w-4" />
               Delete Waste Entry?
             </DialogTitle>
-            <DialogDescription>This will permanently remove the waste record. This cannot be undone.</DialogDescription>
+            <DialogDescription>{tUi("this.will.permanently.remove.the.waste.record.th")}</DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setPendingDeleteId(null)} disabled={deleteMutation.isPending}>

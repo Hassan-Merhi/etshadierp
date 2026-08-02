@@ -50,11 +50,7 @@ export function WorkersTable({
   setEditWorkerDialogOpen,
 }: WorkersTableProps) {
   if (workers.length === 0) {
-    return (
-      <div className="py-6 text-center text-sm text-muted-foreground">
-        No workers in this group
-      </div>
-    );
+    return <div className="py-6 text-center text-sm text-muted-foreground">No workers in this group</div>;
   }
 
   return (
@@ -78,7 +74,6 @@ export function WorkersTable({
           >
             <CardContent className="p-3">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-
                 {/* Checkbox + Avatar + Name */}
                 <div className="flex items-center gap-3 w-52 shrink-0 min-w-0">
                   <Checkbox
@@ -108,7 +103,12 @@ export function WorkersTable({
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Advances</p>
-                    <p className={cn("font-mono text-sm", advanceInfo.total > 0 ? "text-destructive" : "text-muted-foreground")}>
+                    <p
+                      className={cn(
+                        "font-mono text-sm",
+                        advanceInfo.total > 0 ? "text-destructive" : "text-muted-foreground"
+                      )}
+                    >
                       {advanceInfo.total > 0 ? (
                         <>
                           {formatAmount(advanceInfo.total)}
@@ -116,12 +116,19 @@ export function WorkersTable({
                             <span className="text-xs ml-1 opacity-70">({advanceInfo.count})</span>
                           )}
                         </>
-                      ) : "—"}
+                      ) : (
+                        "—"
+                      )}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Deductions</p>
-                    <p className={cn("font-mono text-sm", deductionInfo.total > 0 ? "text-orange-500" : "text-muted-foreground")}>
+                    <p
+                      className={cn(
+                        "font-mono text-sm",
+                        deductionInfo.total > 0 ? "text-orange-500" : "text-muted-foreground"
+                      )}
+                    >
                       {deductionInfo.total > 0 ? (
                         <>
                           {formatAmount(deductionInfo.total)}
@@ -129,7 +136,9 @@ export function WorkersTable({
                             <span className="text-xs ml-1 opacity-70">({deductionInfo.count})</span>
                           )}
                         </>
-                      ) : "—"}
+                      ) : (
+                        "—"
+                      )}
                     </p>
                   </div>
                   <div>
@@ -155,14 +164,18 @@ export function WorkersTable({
                 <div className="flex items-center gap-1 shrink-0">
                   {!groupId && workerGroups.length > 0 && addWorkerToWorkerGroupMutation && (
                     <Select
-                      onValueChange={(gid) => addWorkerToWorkerGroupMutation.mutate({ groupId: parseInt(gid), workerId: worker.id })}
+                      onValueChange={(gid) =>
+                        addWorkerToWorkerGroupMutation.mutate({ groupId: parseInt(gid), workerId: worker.id })
+                      }
                     >
                       <SelectTrigger className="h-8 w-28 text-xs" data-testid={`select-move-group-${worker.id}`}>
                         <SelectValue placeholder="Move to group" />
                       </SelectTrigger>
                       <SelectContent>
                         {workerGroups.map((g) => (
-                          <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
+                          <SelectItem key={g.id} value={String(g.id)}>
+                            {g.name}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -185,7 +198,10 @@ export function WorkersTable({
                       )}
                       {setSelectedWorkerForEdit && setEditWorkerDialogOpen && (
                         <DropdownMenuItem
-                          onClick={() => { setSelectedWorkerForEdit(worker); setEditWorkerDialogOpen(true); }}
+                          onClick={() => {
+                            setSelectedWorkerForEdit(worker);
+                            setEditWorkerDialogOpen(true);
+                          }}
                           data-testid={`button-edit-worker-${worker.id}`}
                         >
                           <Pencil className="h-4 w-4 mr-2" /> Edit

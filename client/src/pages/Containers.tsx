@@ -23,8 +23,10 @@ import { ContainerToolbar } from "./containers/ContainerToolbar";
 import { ContainerConfirmDialogs } from "./containers/ContainerConfirmDialogs";
 import { ContainerLoadingState } from "./containers/ContainerLoadingState";
 import { ContainerSpView } from "./containers/ContainerSpView";
+import { useErpText } from "@/i18n/modules/erp";
 
 export default function Containers() {
+  const tUi = useErpText();
   const { formatDisplayDate } = useDateFormat();
   const [activeTab, setActiveTab] = useState("active");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -33,8 +35,7 @@ export default function Containers() {
   const [, setLocation] = useLocation();
 
   const isSupplierPartner = selectedCompany?.companyType === "supplier_partner";
-  const isFactory =
-    selectedCompany?.companyType === "factory" || selectedCompany?.companyType === "factory_v2";
+  const isFactory = selectedCompany?.companyType === "factory" || selectedCompany?.companyType === "factory_v2";
 
   const {
     allContainers,
@@ -50,22 +51,42 @@ export default function Containers() {
   } = useContainerQueries(selectedCompany, isSupplierPartner, isFactory);
 
   const {
-    searchTerm, setSearchTerm,
-    soldSearchTerm, setSoldSearchTerm,
-    otwSearchTerm, setOtwSearchTerm,
-    statusFilter, setStatusFilter,
-    supplierFilter, setSupplierFilter,
-    otwLocationFilter, setOtwLocationFilter,
-    otwSupplierFilter, setOtwSupplierFilter,
-    otwAgentFilter, setOtwAgentFilter,
-    otwTransporterFilter, setOtwTransporterFilter,
-    otwTruckFilter, setOtwTruckFilter,
-    otwDocReceivedFilter, setOtwDocReceivedFilter,
-    otwFreightStatusFilter, setOtwFreightStatusFilter,
-    otwNotesFilter, setOtwNotesFilter,
-    uniqueOtwLocations, uniqueOtwAgents, uniqueOtwTransporters, uniqueOtwSuppliers, uniqueOtwTrucks,
-    otwContainers, filteredOtwContainers, filteredSoldContainers,
-    containers, clearFilters,
+    searchTerm,
+    setSearchTerm,
+    soldSearchTerm,
+    setSoldSearchTerm,
+    otwSearchTerm,
+    setOtwSearchTerm,
+    statusFilter,
+    setStatusFilter,
+    supplierFilter,
+    setSupplierFilter,
+    otwLocationFilter,
+    setOtwLocationFilter,
+    otwSupplierFilter,
+    setOtwSupplierFilter,
+    otwAgentFilter,
+    setOtwAgentFilter,
+    otwTransporterFilter,
+    setOtwTransporterFilter,
+    otwTruckFilter,
+    setOtwTruckFilter,
+    otwDocReceivedFilter,
+    setOtwDocReceivedFilter,
+    otwFreightStatusFilter,
+    setOtwFreightStatusFilter,
+    otwNotesFilter,
+    setOtwNotesFilter,
+    uniqueOtwLocations,
+    uniqueOtwAgents,
+    uniqueOtwTransporters,
+    uniqueOtwSuppliers,
+    uniqueOtwTrucks,
+    otwContainers,
+    filteredOtwContainers,
+    filteredSoldContainers,
+    containers,
+    clearFilters,
   } = useContainerFilters(allContainers, soldContainers);
 
   const getSupplierName = (supplierId: number) => {
@@ -107,7 +128,7 @@ export default function Containers() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <PageHeader title="Container Tracking" subtitle="Track containers and manage offloading">
+      <PageHeader title={tUi("container.tracking")} subtitle={tUi("track.containers.and.manage.offloading")}>
         <ContainerToolbar
           isDeveloper={isDeveloper}
           syncAllIsPending={syncAll.syncAllMutation.isPending}
@@ -129,7 +150,7 @@ export default function Containers() {
             <span className="text-sm font-semibold" data-testid="text-total-containers">
               {allContainers.length.toLocaleString()}
             </span>
-            <span className="text-xs text-muted-foreground">Containers</span>
+            <span className="text-xs text-muted-foreground">{tUi("containers")}</span>
           </div>
           {(() => {
             const otwCount = allContainers.filter((c) => c.status === "OTW").length;
@@ -148,14 +169,14 @@ export default function Containers() {
                   <div className="flex items-center gap-2 bg-amber-500/10 rounded-lg px-3 py-2">
                     <MapPin className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                     <span className="text-sm font-semibold text-amber-700 dark:text-amber-300">{arrivedCount}</span>
-                    <span className="text-xs text-muted-foreground">Arrived</span>
+                    <span className="text-xs text-muted-foreground">{tUi("arrived")}</span>
                   </div>
                 )}
                 {offloadedCount > 0 && (
                   <div className="flex items-center gap-2 bg-green-500/10 rounded-lg px-3 py-2">
                     <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
                     <span className="text-sm font-semibold text-green-700 dark:text-green-300">{offloadedCount}</span>
-                    <span className="text-xs text-muted-foreground">Offloaded</span>
+                    <span className="text-xs text-muted-foreground">{tUi("offloaded")}</span>
                   </div>
                 )}
               </>

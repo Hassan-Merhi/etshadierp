@@ -20,7 +20,9 @@ import { useCompany } from "@/contexts/CompanyContext";
 
 import type { LineItem, PurchaseOrder, StockItem } from "./purchaseorderedit/types";
 import { FreightAccountPicker } from "./purchaseorderedit/components/FreightAccountPicker";
+import { useErpText } from "@/i18n/modules/erp";
 export default function PurchaseOrderEdit() {
+  const tUi = useErpText();
   const [, params] = useRoute("/purchase-orders/:id/edit");
   const [, navigate] = useLocation();
   const handleBack = useBackToParent();
@@ -411,7 +413,7 @@ export default function PurchaseOrderEdit() {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <PageHeader title="Edit Purchase Order" />
+          <PageHeader title={tUi("edit.purchase.order")} />
           <p className="text-muted-foreground">
             {po.supplierName} ({po.supplierCode}) | Container: {po.containerNumber}
           </p>
@@ -422,14 +424,14 @@ export default function PurchaseOrderEdit() {
         <Card className={`flex-1 transition-all ${showItemSidebar ? "sm:mr-[340px]" : ""}`}>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
-              <span>PO Details</span>
+              <span>{tUi("po.details")}</span>
               <Badge variant={po.status === "Closed" ? "secondary" : "default"}>{po.status}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="poNumber">PO Number</Label>
+                <Label htmlFor="poNumber">{tUi("po.number")}</Label>
                 <div className="flex gap-2">
                   <Input
                     id="poNumber"
@@ -444,7 +446,7 @@ export default function PurchaseOrderEdit() {
                       size="icon"
                       variant="outline"
                       data-testid="button-generate-po-number"
-                      title="Generate a new PO number"
+                      title={tUi("generate.a.new.po.number")}
                       onClick={() =>
                         refetchNextPo().then((r) => {
                           if (r.data?.poNumber) setPoNumber(r.data.poNumber);
@@ -462,7 +464,7 @@ export default function PurchaseOrderEdit() {
                 </div>
               </div>
               <div>
-                <Label htmlFor="currency">Currency</Label>
+                <Label htmlFor="currency">{tUi("currency")}</Label>
                 <Select value={currency} onValueChange={setCurrency}>
                   <SelectTrigger id="currency" data-testid="select-currency">
                     <SelectValue />
@@ -476,14 +478,14 @@ export default function PurchaseOrderEdit() {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="status">Status</Label>
+                <Label htmlFor="status">{tUi("status")}</Label>
                 <Select value={status} onValueChange={setStatus}>
                   <SelectTrigger id="status" data-testid="select-status">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Open">Open</SelectItem>
-                    <SelectItem value="Closed">Closed</SelectItem>
+                    <SelectItem value="Open">{tUi("open")}</SelectItem>
+                    <SelectItem value="Closed">{tUi("closed")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -491,7 +493,7 @@ export default function PurchaseOrderEdit() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Line Items</Label>
+                <Label>{tUi("line.items")}</Label>
                 <Button size="sm" variant="outline" onClick={handleAddItem} data-testid="button-add-item">
                   <Plus className="h-4 w-4 mr-1" />
                   Add Item
@@ -502,10 +504,10 @@ export default function PurchaseOrderEdit() {
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
-                      <TableHead className="w-[40%]">Item</TableHead>
-                      <TableHead className="text-right">Quantity</TableHead>
-                      <TableHead className="text-right">Rate</TableHead>
-                      <TableHead className="text-right">Line Total</TableHead>
+                      <TableHead className="w-[40%]">{tUi("item")}</TableHead>
+                      <TableHead className="text-right">{tUi("quantity")}</TableHead>
+                      <TableHead className="text-right">{tUi("rate")}</TableHead>
+                      <TableHead className="text-right">{tUi("line.total")}</TableHead>
                       <TableHead className="w-12"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -576,7 +578,7 @@ export default function PurchaseOrderEdit() {
                                 }
                               }
                             }}
-                            placeholder="Type to search..."
+                            placeholder={tUi("type.to.search")}
                             className="w-full h-9 px-3 rounded-md border bg-background outline-none focus:ring-2 focus:ring-ring"
                             data-testid={`input-item-name-${index}`}
                           />
@@ -625,7 +627,7 @@ export default function PurchaseOrderEdit() {
                     )}
                     {items.length > 0 && (
                       <TableRow className="bg-muted/50">
-                        <TableCell className="text-right font-medium">Total:</TableCell>
+                        <TableCell className="text-right font-medium">{tUi("total.2")}</TableCell>
                         <TableCell className="text-right font-mono font-bold">
                           {formatCurrency(totalQuantity)}
                         </TableCell>
@@ -642,10 +644,10 @@ export default function PurchaseOrderEdit() {
             </div>
 
             <div className="space-y-4">
-              <Label>Freight & Other Charges</Label>
+              <Label>{tUi("freight.other.charges")}</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="freight">Freight</Label>
+                  <Label htmlFor="freight">{tUi("freight")}</Label>
                   <Input
                     id="freight"
                     type="number"
@@ -719,7 +721,7 @@ export default function PurchaseOrderEdit() {
                     )}
                 </div>
                 <div>
-                  <Label htmlFor="surcharge">Surcharge</Label>
+                  <Label htmlFor="surcharge">{tUi("surcharge")}</Label>
                   <Input
                     id="surcharge"
                     type="number"
@@ -731,7 +733,7 @@ export default function PurchaseOrderEdit() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="fumigation">Fumigation</Label>
+                  <Label htmlFor="fumigation">{tUi("fumigation")}</Label>
                   <Input
                     id="fumigation"
                     type="number"
@@ -743,7 +745,7 @@ export default function PurchaseOrderEdit() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="documentCharges">Document Charges</Label>
+                  <Label htmlFor="documentCharges">{tUi("document.charges")}</Label>
                   <Input
                     id="documentCharges"
                     type="number"
@@ -755,7 +757,7 @@ export default function PurchaseOrderEdit() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="discount">Discount</Label>
+                  <Label htmlFor="discount">{tUi("discount")}</Label>
                   <Input
                     id="discount"
                     type="number"
@@ -767,7 +769,7 @@ export default function PurchaseOrderEdit() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="otherCharges">Other Charges</Label>
+                  <Label htmlFor="otherCharges">{tUi("other.charges")}</Label>
                   <Input
                     id="otherCharges"
                     type="number"
@@ -782,7 +784,7 @@ export default function PurchaseOrderEdit() {
 
               <div className="bg-muted/50 rounded-md p-4">
                 <div className="flex justify-between items-center">
-                  <span className="font-medium">Grand Total:</span>
+                  <span className="font-medium">{tUi("grand.total.2")}</span>
                   <span className="text-xl font-bold font-mono">${formatCurrency(parseFloat(grandTotal))}</span>
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
@@ -839,7 +841,7 @@ export default function PurchaseOrderEdit() {
               <ScrollArea className="h-[400px]">
                 <div className="p-2 space-y-1">
                   {filteredStockItems.length === 0 ? (
-                    <div className="text-center py-8 text-sm text-muted-foreground">No items found</div>
+                    <div className="text-center py-8 text-sm text-muted-foreground">{tUi("no.items.found")}</div>
                   ) : (
                     filteredStockItems.map((item, idx) => {
                       const isHighlighted = idx === highlightedIndex;

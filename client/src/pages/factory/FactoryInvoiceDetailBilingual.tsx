@@ -11,8 +11,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import FactoryInvoiceDetail from "./FactoryInvoiceDetail";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export default function FactoryInvoiceDetailBilingual() {
+  const tUi = useFactoryText();
   const [, params] = useRoute("/factory/sales/invoices/:id");
   const orderId = params?.id;
   const { toast } = useToast();
@@ -67,7 +69,7 @@ export default function FactoryInvoiceDetailBilingual() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
-            <DropdownMenuLabel>English</DropdownMenuLabel>
+            <DropdownMenuLabel>{tUi("english")}</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => download("export-pdf?lang=en", "invoice-en.pdf")}>
               <FileDown className="h-4 w-4" /> English PDF
             </DropdownMenuItem>
@@ -89,11 +91,14 @@ export default function FactoryInvoiceDetailBilingual() {
               <PackageCheck className="h-4 w-4" /> قائمة تحميل عربية
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel>No charges</DropdownMenuLabel>
+            <DropdownMenuLabel>{tUi("no.charges")}</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => download("export-pdf?lang=en&noCharges=1", "invoice-en-no-charges.pdf")}>
               English PDF — No Charges
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => download("export-pdf?lang=ar&noCharges=1", "invoice-ar-no-charges.pdf")} dir="rtl">
+            <DropdownMenuItem
+              onClick={() => download("export-pdf?lang=ar&noCharges=1", "invoice-ar-no-charges.pdf")}
+              dir="rtl"
+            >
               PDF عربي — بدون رسوم
             </DropdownMenuItem>
           </DropdownMenuContent>

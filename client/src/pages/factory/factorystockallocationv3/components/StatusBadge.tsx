@@ -4,7 +4,7 @@
  * Extracted from FactoryStockAllocationV3.tsx during the Phase 4 god-file split.
  */
 
-import {STATUS_COLORS, STATUS_LABELS} from "../utils";
+import { STATUS_COLORS, STATUS_LABELS } from "../utils";
 
 export function StatusBadge({ status }: { status: string }) {
   return (

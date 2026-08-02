@@ -3,18 +3,20 @@
  *
  * Extracted from FactoryShippingContainers.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {apiRequest, queryClient} from "@/lib/queryClient";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Plus, Trash2, Check, X, Loader2} from "lucide-react";
-import {useToast} from "@/hooks/use-toast";
-import type {AvailRow, EditingAvail} from "../types";
-import {AVAIL_KEY} from "../utils";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Plus, Trash2, Check, X, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import type { AvailRow, EditingAvail } from "../types";
+import { AVAIL_KEY } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function ShippingAvailabilityTable() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [editing, setEditing] = useState<EditingAvail | null>(null);
   const [adding, setAdding] = useState(false);
@@ -92,7 +94,7 @@ export function ShippingAvailabilityTable() {
   return (
     <div className="rounded-md border overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 bg-muted/20 border-b">
-        <span className="text-sm font-medium">Container Availability</span>
+        <span className="text-sm font-medium">{tUi("container.availability")}</span>
         <Button size="sm" onClick={() => setAdding(true)} disabled={adding} data-testid="button-add-availability">
           <Plus className="h-3.5 w-3.5 mr-1" /> Add Row
         </Button>
@@ -102,10 +104,10 @@ export function ShippingAvailabilityTable() {
         <Table className="text-xs">
           <TableHeader>
             <TableRow>
-              <TableHead className="text-xs w-36">Date</TableHead>
-              <TableHead className="text-xs">Shipping Company</TableHead>
-              <TableHead className="text-xs w-40">Available Containers</TableHead>
-              <TableHead className="text-xs">Note</TableHead>
+              <TableHead className="text-xs w-36">{tUi("date")}</TableHead>
+              <TableHead className="text-xs">{tUi("shipping.company")}</TableHead>
+              <TableHead className="text-xs w-40">{tUi("available.containers")}</TableHead>
+              <TableHead className="text-xs">{tUi("note")}</TableHead>
               <TableHead className="text-xs w-20" />
             </TableRow>
           </TableHeader>
@@ -165,7 +167,7 @@ export function ShippingAvailabilityTable() {
                           onChange={(e) => setEditing({ ...editing, note: e.target.value })}
                           onKeyDown={handleEditKey}
                           className="h-7 text-xs"
-                          placeholder="Optional note"
+                          placeholder={tUi("optional.note")}
                           data-testid={`input-avail-note-${row.id}`}
                         />
                       </TableCell>
@@ -260,7 +262,7 @@ export function ShippingAvailabilityTable() {
                         onChange={(e) => setNewRow({ ...newRow, note: e.target.value })}
                         onKeyDown={handleAddKey}
                         className="h-7 text-xs"
-                        placeholder="Optional note"
+                        placeholder={tUi("optional.note")}
                         data-testid="input-new-avail-note"
                       />
                     </TableCell>

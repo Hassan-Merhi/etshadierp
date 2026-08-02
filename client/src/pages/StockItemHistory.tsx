@@ -14,6 +14,7 @@ import { useState } from "react";
 import { PeriodFilter, getDefaultPeriodValue, type PeriodFilterValue } from "@/components/ui/period-filter";
 import { useDateJump } from "@/hooks/use-date-jump";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface MonthlyData {
   month: number;
@@ -46,6 +47,7 @@ interface StockItemSummary {
 }
 
 export default function StockItemHistory() {
+  const tUi = useErpText();
   const params = useParams();
   const stockItemId = parseInt(params.id || "0");
   const [_location, navigate] = useLocation();
@@ -113,7 +115,7 @@ export default function StockItemHistory() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <PageHeader title="Stock Item Monthly Summary" />
+            <PageHeader title={tUi("stock.item.monthly.summary")} />
             {data?.stockItem && (
               <p className="text-sm text-muted-foreground" data-testid="text-item-name">
                 {data.stockItem.name} ({data.stockItem.code})
@@ -128,7 +130,7 @@ export default function StockItemHistory() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <Select value={selectedYear} onValueChange={setSelectedYear}>
               <SelectTrigger className="w-[100px] sm:w-[120px]" data-testid="select-year">
-                <SelectValue placeholder="Year" />
+                <SelectValue placeholder={tUi("year")} />
               </SelectTrigger>
               <SelectContent>
                 {years.map((y) => (
@@ -165,12 +167,12 @@ export default function StockItemHistory() {
                   </TableHead>
                 </TableRow>
                 <TableRow>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="text-right border-r">Value</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="text-right border-r">Value</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="text-right">Value</TableHead>
+                  <TableHead className="text-right">{tUi("quantity")}</TableHead>
+                  <TableHead className="text-right border-r">{tUi("value")}</TableHead>
+                  <TableHead className="text-right">{tUi("quantity")}</TableHead>
+                  <TableHead className="text-right border-r">{tUi("value")}</TableHead>
+                  <TableHead className="text-right">{tUi("quantity")}</TableHead>
+                  <TableHead className="text-right">{tUi("value")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -207,7 +209,7 @@ export default function StockItemHistory() {
                 })}
 
                 <TableRow className="bg-muted/50 font-bold">
-                  <TableCell className="border-r">Grand Total</TableCell>
+                  <TableCell className="border-r">{tUi("grand.total")}</TableCell>
                   <TableCell className="text-right tabular-nums">
                     {formatNumber(data?.grandTotal.inwardQty || 0, 0)}
                   </TableCell>
@@ -252,7 +254,7 @@ export default function StockItemHistory() {
                       <div className="font-mono">{month.outwardQty > 0 ? formatNumber(month.outwardQty, 0) : "-"}</div>
                     </div>
                     <div>
-                      <div className="text-muted-foreground">Closing</div>
+                      <div className="text-muted-foreground">{tUi("closing")}</div>
                       <div className="font-mono font-medium">
                         {month.closingQty !== 0 ? formatNumber(month.closingQty, 0) : "-"}
                       </div>
@@ -277,7 +279,7 @@ export default function StockItemHistory() {
 
             {data && (
               <div className="p-3 rounded-md border bg-muted/50 text-sm font-bold">
-                <div className="mb-2">Grand Total</div>
+                <div className="mb-2">{tUi("grand.total")}</div>
                 <div className="grid grid-cols-3 gap-2 text-xs">
                   <div>
                     <div className="text-muted-foreground font-normal">In</div>
@@ -288,7 +290,7 @@ export default function StockItemHistory() {
                     <div className="font-mono">{formatNumber(data.grandTotal.outwardQty, 0)}</div>
                   </div>
                   <div>
-                    <div className="text-muted-foreground font-normal">Closing</div>
+                    <div className="text-muted-foreground font-normal">{tUi("closing")}</div>
                     <div className="font-mono">{formatNumber(data.grandTotal.closingQty, 0)}</div>
                   </div>
                 </div>
@@ -300,7 +302,7 @@ export default function StockItemHistory() {
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Monthly Activity Chart</CardTitle>
+          <CardTitle className="text-lg">{tUi("monthly.activity.chart")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="h-[250px] sm:h-[300px]">

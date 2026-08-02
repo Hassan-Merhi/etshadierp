@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowRightLeft, Pencil, Trash2, Package } from "lucide-react";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface SupplierStatementRowsProps {
   statementData: StatementResponse;
@@ -45,11 +46,12 @@ export function SupplierStatementRows({
   onEditPayment,
   onDeletePayment,
 }: SupplierStatementRowsProps) {
+  const tUi = useFactoryText();
   if (displayedRows.length === 0)
     return (
       <div className="text-center py-8 text-muted-foreground">
         <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
-        <p className="text-lg font-medium">No activity yet</p>
+        <p className="text-lg font-medium">{tUi("no.activity.yet")}</p>
       </div>
     );
 
@@ -68,25 +70,25 @@ export function SupplierStatementRows({
     <div className="space-y-3">
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         <div className="rounded-lg border bg-muted/30 px-3 py-2">
-          <p className="text-xs text-muted-foreground mb-1">Total Purchases</p>
+          <p className="text-xs text-muted-foreground mb-1">{tUi("total.purchases.2")}</p>
           <p className="font-mono font-semibold text-sm">{fmtCcAmt(primaryCc, sfTotalPurchases)}</p>
         </div>
         <div className="rounded-lg border bg-muted/30 px-3 py-2">
-          <p className="text-xs text-muted-foreground mb-1">Total Payments</p>
+          <p className="text-xs text-muted-foreground mb-1">{tUi("total.payments")}</p>
           <p className="font-mono font-semibold text-sm text-green-600 dark:text-green-400">
             {fmtCcAmt(primaryCc, sfTotalPayments)}
           </p>
         </div>
         <div className="rounded-lg border bg-muted/30 px-3 py-2">
-          <p className="text-xs text-muted-foreground mb-1">Purchases Qty</p>
+          <p className="text-xs text-muted-foreground mb-1">{tUi("purchases.qty")}</p>
           <p className="font-semibold text-sm">{sfPurchasesQty}</p>
         </div>
         <div className="rounded-lg border bg-muted/30 px-3 py-2">
-          <p className="text-xs text-muted-foreground mb-1">Transactions</p>
+          <p className="text-xs text-muted-foreground mb-1">{tUi("transactions")}</p>
           <p className="font-semibold text-sm">{sfTxCount}</p>
         </div>
         <div className="rounded-lg border bg-muted/30 px-3 py-2">
-          <p className="text-xs text-muted-foreground mb-1">Balance</p>
+          <p className="text-xs text-muted-foreground mb-1">{tUi("balance")}</p>
           <p className="font-mono font-semibold text-sm tabular-nums">{finalBalanceStr}</p>
         </div>
       </div>
@@ -192,7 +194,12 @@ export function SupplierStatementRows({
                   <TableCell>
                     <div className="flex items-center gap-1">
                       {row.onMove && (
-                        <Button variant="ghost" size="icon" title="Move to another supplier" onClick={row.onMove}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title={tUi("move.to.another.supplier")}
+                          onClick={row.onMove}
+                        >
                           <ArrowRightLeft className="h-3.5 w-3.5 text-blue-500" />
                         </Button>
                       )}
@@ -233,7 +240,7 @@ export function SupplierStatementRows({
       </div>
       {Object.entries(currencyTotals).some(([, v]) => v < -0.005) && (
         <div className="mt-3 rounded-md border border-amber-400 dark:border-amber-500 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 flex flex-col gap-1">
-          <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Overpayment detected</p>
+          <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">{tUi("overpayment.detected")}</p>
           {Object.entries(currencyTotals)
             .filter(([, v]) => v < -0.005)
             .map(([cc, total]) => (

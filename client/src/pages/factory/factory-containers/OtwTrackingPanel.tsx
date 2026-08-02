@@ -13,6 +13,7 @@ import type { FactorySupplier } from "@shared/schema";
 import type { ContainerWithSupplier } from "./otwHelpers";
 import { ContainerStatusBadge } from "./ContainerBadges";
 import { trackingStatusBadge, TrackNowProgressLog, EventTimelineSheet, TrackingSettingsSheet } from "./TrackingSheets";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 const OTW_FILTER_LABELS: Record<string, string> = {
   all: "All",
@@ -31,6 +32,7 @@ interface OtwTrackingPanelProps {
 }
 
 export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrackingNowId }: OtwTrackingPanelProps) {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const tqClient = useTQClient();
   const [timelineId, setTimelineId] = useState<number | null>(null);
@@ -89,7 +91,7 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
       <div className="rounded-xl border overflow-hidden">
         <div className="py-16 text-center">
           <Radio className="h-12 w-12 mx-auto mb-3 text-muted-foreground opacity-40" />
-          <p className="text-muted-foreground">No containers currently on the way.</p>
+          <p className="text-muted-foreground">{tUi("no.containers.currently.on.the.way")}</p>
         </div>
       </div>
     );
@@ -114,7 +116,7 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
       <div className="rounded-xl border overflow-hidden">
         <div className="flex flex-col gap-2 px-4 py-3 border-b bg-muted/20">
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <span className="text-sm font-semibold">OTW Container Tracking</span>
+            <span className="text-sm font-semibold">{tUi("otw.container.tracking")}</span>
             <span className="text-xs text-muted-foreground">
               {filteredPanelContainers.length} of {containers.length} container{containers.length !== 1 ? "s" : ""}
             </span>
@@ -241,7 +243,7 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
                           {lastChecked.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </div>
                       ) : (
-                        <span className="text-muted-foreground/40">Never</span>
+                        <span className="text-muted-foreground/40">{tUi("never")}</span>
                       )}
                     </TableCell>
                     <TableCell className="pr-4" onClick={(e) => e.stopPropagation()}>
@@ -257,7 +259,7 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
                               <Settings2 className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Tracking Settings</TooltipContent>
+                          <TooltipContent>{tUi("tracking.settings")}</TooltipContent>
                         </Tooltip>
                         <Tooltip>
                           <TooltipTrigger asChild>

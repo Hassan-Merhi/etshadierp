@@ -17,6 +17,7 @@ import { getPaperFormat } from "@/components/LabelPrintSettings";
 import { AdminAuthDialog } from "@/components/AdminAuthDialog";
 import type { FactoryCategory } from "@shared/schema";
 import type { A4DesignColor } from "@/lib/labelHtml";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface CartItem {
   productId: number;
@@ -48,11 +49,12 @@ export function ConfirmStockEntryDialog({
   isPending: boolean;
   onConfirm: () => void;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Confirm Stock Entry</DialogTitle>
+          <DialogTitle>{tUi("confirm.stock.entry")}</DialogTitle>
           <DialogDescription>
             {totalQty} bale(s) will be entered into stock. Labels ({getPaperFormat()} format) and sticker labels will
             print for each bale.
@@ -70,10 +72,10 @@ export function ConfirmStockEntryDialog({
           <Table>
             <TableHeader className="sticky top-0 z-30 bg-background">
               <TableRow>
-                <TableHead>Product</TableHead>
+                <TableHead>{tUi("product")}</TableHead>
                 <TableHead className="text-center">Qty</TableHead>
-                <TableHead className="text-right">Wt/Bale</TableHead>
-                <TableHead className="text-right">Total KG</TableHead>
+                <TableHead className="text-right">{tUi("wt.bale.2")}</TableHead>
+                <TableHead className="text-right">{tUi("total.kg.2")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -105,7 +107,7 @@ export function ConfirmStockEntryDialog({
                 alt="Selected logo"
                 className="h-6 w-10 object-contain rounded"
               />
-              <span>Custom logo will be used on labels</span>
+              <span>{tUi("custom.logo.will.be.used.on.labels")}</span>
             </div>
           )}
         </div>
@@ -152,45 +154,46 @@ export function QuickCreateProductDialog({
   isPending: boolean;
   onSubmit: () => void;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Quick Create Product</DialogTitle>
-          <DialogDescription>Select the grade to auto-generate the article code.</DialogDescription>
+          <DialogTitle>{tUi("quick.create.product")}</DialogTitle>
+          <DialogDescription>{tUi("select.the.grade.to.auto.generate.the.article.co")}</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="quick-create-grade">Grade</Label>
+            <Label htmlFor="quick-create-grade">{tUi("grade")}</Label>
             <Select value={grade} onValueChange={onGradeChange}>
               <SelectTrigger data-testid="select-quick-create-grade">
-                <SelectValue placeholder="Select grade..." />
+                <SelectValue placeholder={tUi("select.grade")} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="#1">#1 (HMD11...)</SelectItem>
                 <SelectItem value="#2">#2 (HMD12...)</SelectItem>
                 <SelectItem value="#3">#3 (HMD13...)</SelectItem>
                 <SelectItem value="#4">#4 (HMD14...)</SelectItem>
-                <SelectItem value="CREAM">CREAM (HMD10...)</SelectItem>
-                <SelectItem value="Garbage">Garbage (HMD16...)</SelectItem>
+                <SelectItem value="CREAM">{tUi("cream.hmd10")}</SelectItem>
+                <SelectItem value="Garbage">{tUi("garbage.hmd16")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="quick-create-name">Name</Label>
+            <Label htmlFor="quick-create-name">{tUi("name")}</Label>
             <Input
               id="quick-create-name"
               value={name}
               onChange={(e) => onNameChange(e.target.value)}
-              placeholder="Product name..."
+              placeholder={tUi("product.name.2")}
               data-testid="input-quick-create-name"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="quick-create-category">Category</Label>
+            <Label htmlFor="quick-create-category">{tUi("category")}</Label>
             <Select value={categoryId} onValueChange={onCategoryChange}>
               <SelectTrigger data-testid="select-quick-create-category">
-                <SelectValue placeholder="Select category..." />
+                <SelectValue placeholder={tUi("select.category")} />
               </SelectTrigger>
               <SelectContent>
                 {activeCategories?.map((cat) => (
@@ -202,13 +205,13 @@ export function QuickCreateProductDialog({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="quick-create-weight">Weight per Bale (kg)</Label>
+            <Label htmlFor="quick-create-weight">{tUi("weight.per.bale.kg")}</Label>
             <Input
               id="quick-create-weight"
               type="number"
               value={weight}
               onChange={(e) => onWeightChange(e.target.value)}
-              placeholder="Optional - leave empty for default"
+              placeholder={tUi("optional.leave.empty.for.default")}
               step="0.1"
               min={0}
               data-testid="input-quick-create-weight"
@@ -245,12 +248,13 @@ export function DesignPickerDialog({
   onSelect: (color: A4DesignColor) => void;
   onNoDesign: () => void;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Choose Label Design</DialogTitle>
-          <DialogDescription>Select a brand color for the A4 label header banner.</DialogDescription>
+          <DialogTitle>{tUi("choose.label.design")}</DialogTitle>
+          <DialogDescription>{tUi("select.a.brand.color.for.the.a4.label.header.ban")}</DialogDescription>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-3 py-2">
           {designColors.map((opt) => (

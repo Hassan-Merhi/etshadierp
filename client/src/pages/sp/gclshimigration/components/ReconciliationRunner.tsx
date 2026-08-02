@@ -3,11 +3,11 @@
  *
  * Extracted from GcLshiMigration.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {Button} from "@/components/ui/button";
-import {Badge} from "@/components/ui/badge";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {CheckCircle2, XCircle, AlertTriangle} from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 
 export function ReconciliationRunner({
   sourceCompanyId,

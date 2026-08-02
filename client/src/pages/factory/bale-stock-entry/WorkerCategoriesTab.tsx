@@ -17,8 +17,10 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function WorkerCategoriesTab() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const appMode = useAppMode();
   const catApiRequest = getApiRequest(appMode);
@@ -97,8 +99,8 @@ export function WorkerCategoriesTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Worker Groups</h2>
-          <p className="text-xs text-muted-foreground">Group workers for easier assignment during stock entry</p>
+          <h2 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">{tUi("worker.groups")}</h2>
+          <p className="text-xs text-muted-foreground">{tUi("group.workers.for.easier.assignment.during.stock")}</p>
         </div>
         <Button onClick={openNewCat} size="sm" className="gap-2" data-testid="button-new-category">
           <Plus className="h-4 w-4" />
@@ -110,9 +112,9 @@ export function WorkerCategoriesTab() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/30">
-              <TableHead>Group Name</TableHead>
-              <TableHead>Workers</TableHead>
-              <TableHead className="w-24 text-right">Actions</TableHead>
+              <TableHead>{tUi("group.name")}</TableHead>
+              <TableHead>{tUi("workers")}</TableHead>
+              <TableHead className="w-24 text-right">{tUi("actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -142,7 +144,7 @@ export function WorkerCategoriesTab() {
                           </Badge>
                         ))}
                       {(cat.workerIds || []).length === 0 && (
-                        <span className="text-xs text-muted-foreground italic">No workers assigned</span>
+                        <span className="text-xs text-muted-foreground italic">{tUi("no.workers.assigned")}</span>
                       )}
                     </div>
                   </TableCell>
@@ -181,11 +183,11 @@ export function WorkerCategoriesTab() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editingCat ? "Edit Group" : "New Worker Group"}</DialogTitle>
-            <DialogDescription>Group workers to quickly filter the "Finalized By" dropdown.</DialogDescription>
+            <DialogDescription>{tUi("group.workers.to.quickly.filter.the.finalized.by")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Group Name</label>
+              <label className="text-sm font-medium">{tUi("group.name")}</label>
               <Input
                 value={catName}
                 onChange={(e) => setCatName(e.target.value)}
@@ -194,7 +196,7 @@ export function WorkerCategoriesTab() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Assign Workers</label>
+              <label className="text-sm font-medium">{tUi("assign.workers")}</label>
               <div className="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-2">
                 {catWorkers
                   .filter((w) => w.active !== false)

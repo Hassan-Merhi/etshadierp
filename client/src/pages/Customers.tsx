@@ -34,6 +34,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { z } from "zod";
+import { useErpText } from "@/i18n/modules/erp";
 
 const formSchema = insertCustomerSchema.extend({
   legalName: z.string().min(1, "Legal name is required"),
@@ -50,6 +51,7 @@ const typeBadgeClass: Record<string, string> = {
 };
 
 export default function Customers() {
+  const tUi = useErpText();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const { formatAmount, formatCashAmount } = useCurrencyContext();
@@ -197,15 +199,15 @@ export default function Customers() {
           name="legalName"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Legal Name *</FormLabel>
+              <FormLabel>{tUi("legal.name")}</FormLabel>
               <FormControl>
                 <Input
                   {...field}
-                  placeholder="ABC Company Ltd."
+                  placeholder={tUi("abc.company.ltd")}
                   data-testid={isEdit ? "input-edit-legal-name" : "input-legal-name"}
                 />
               </FormControl>
-              {!isEdit && <FormDescription>Customer code will be auto-generated</FormDescription>}
+              {!isEdit && <FormDescription>{tUi("customer.code.will.be.auto.generated")}</FormDescription>}
               <FormMessage />
             </FormItem>
           )}
@@ -215,7 +217,7 @@ export default function Customers() {
           name="phone"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Phone Number</FormLabel>
+              <FormLabel>{tUi("phone.number")}</FormLabel>
               <FormControl>
                 <Input
                   {...field}
@@ -234,7 +236,7 @@ export default function Customers() {
             name="openingBalance"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Opening Balance</FormLabel>
+                <FormLabel>{tUi("opening.balance")}</FormLabel>
                 <FormControl>
                   <Input
                     {...field}
@@ -254,16 +256,16 @@ export default function Customers() {
             name="openingBalanceSide"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Balance Side</FormLabel>
+                <FormLabel>{tUi("balance.side")}</FormLabel>
                 <Select onValueChange={field.onChange} value={field.value || "Dr"}>
                   <FormControl>
                     <SelectTrigger data-testid={isEdit ? "select-edit-balance-side" : "select-balance-side"}>
-                      <SelectValue placeholder="Select side" />
+                      <SelectValue placeholder={tUi("select.side")} />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="Dr">Dr (Debit)</SelectItem>
-                    <SelectItem value="Cr">Cr (Credit)</SelectItem>
+                    <SelectItem value="Dr">{tUi("dr.debit")}</SelectItem>
+                    <SelectItem value="Cr">{tUi("cr.credit")}</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -302,7 +304,11 @@ export default function Customers() {
     <div className="flex flex-col h-full p-6 gap-5">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <PageHeader title="Customers" subtitle="Manage customer accounts and receivables" showBackButton={false} />
+        <PageHeader
+          title={tUi("customers")}
+          subtitle={tUi("manage.customer.accounts.and.receivables")}
+          showBackButton={false}
+        />
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
             <Button data-testid="button-create-customer">
@@ -312,7 +318,7 @@ export default function Customers() {
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Create New Customer</DialogTitle>
+              <DialogTitle>{tUi("create.new.customer")}</DialogTitle>
             </DialogHeader>
             <CustomerForm isEdit={false} />
           </DialogContent>
@@ -332,22 +338,22 @@ export default function Customers() {
           <>
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
               <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Total Customers</span>
+              <span className="text-muted-foreground">{tUi("total.customers")}</span>
               <span className="font-semibold">{totalCustomers}</span>
             </div>
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
               <Wallet className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">With Balance</span>
+              <span className="text-muted-foreground">{tUi("with.balance")}</span>
               <span className="font-semibold">{withBalance}</span>
             </div>
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
               <TrendingUp className="h-4 w-4 text-blue-500" />
-              <span className="text-muted-foreground">Receivable</span>
+              <span className="text-muted-foreground">{tUi("receivable")}</span>
               <span className="font-semibold font-mono">{formatCashAmount(totalReceivable)}</span>
             </div>
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
               <TrendingDown className="h-4 w-4 text-red-500" />
-              <span className="text-muted-foreground">Payable</span>
+              <span className="text-muted-foreground">{tUi("payable")}</span>
               <span className="font-semibold font-mono">{formatCashAmount(totalPayable)}</span>
             </div>
           </>
@@ -359,7 +365,7 @@ export default function Customers() {
         <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search customers..."
+            placeholder={tUi("search.customers")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -377,8 +383,8 @@ export default function Customers() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
-              <TableHead className="text-xs h-9 font-semibold">Customer</TableHead>
-              <TableHead className="text-xs h-9 font-semibold text-right">Balance</TableHead>
+              <TableHead className="text-xs h-9 font-semibold">{tUi("customer")}</TableHead>
+              <TableHead className="text-xs h-9 font-semibold text-right">{tUi("balance")}</TableHead>
               <TableHead className="text-xs h-9 font-semibold w-[60px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -405,7 +411,7 @@ export default function Customers() {
                     <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
                       <Building2 className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <p className="text-sm font-medium">No customers found</p>
+                    <p className="text-sm font-medium">{tUi("no.customers.found")}</p>
                     <p className="text-xs text-muted-foreground">
                       {searchQuery ? "Try a different search term" : "Add your first customer to get started"}
                     </p>
@@ -479,7 +485,7 @@ export default function Customers() {
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Customer</DialogTitle>
+            <DialogTitle>{tUi("edit.customer")}</DialogTitle>
           </DialogHeader>
           <CustomerForm isEdit={true} />
         </DialogContent>
@@ -496,7 +502,7 @@ export default function Customers() {
             <div className="flex flex-wrap items-center gap-2 pt-2">
               <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm">
                 <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-muted-foreground">Balance</span>
+                <span className="text-muted-foreground">{tUi("balance")}</span>
                 <span className={`font-mono font-semibold ${drCrClass(statementCustomer?.balanceSide || "Dr")}`}>
                   {formatCashAmount(statementCustomer?.balance || 0)}
                 </span>
@@ -535,20 +541,20 @@ export default function Customers() {
                     <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
                       <Building2 className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <p className="text-sm font-medium">No transactions</p>
-                    <p className="text-xs text-muted-foreground">No ledger entries found for this customer</p>
+                    <p className="text-sm font-medium">{tUi("no.transactions")}</p>
+                    <p className="text-xs text-muted-foreground">{tUi("no.ledger.entries.found.for.this.customer")}</p>
                   </div>
                 ) : (
                   <div className="border rounded-xl overflow-hidden">
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-muted/40 hover:bg-muted/40">
-                          <TableHead className="text-xs h-9 font-semibold">Date</TableHead>
-                          <TableHead className="text-xs h-9 font-semibold">Type</TableHead>
-                          <TableHead className="text-xs h-9 font-semibold">Description</TableHead>
-                          <TableHead className="text-xs h-9 font-semibold text-right">Debit</TableHead>
-                          <TableHead className="text-xs h-9 font-semibold text-right">Credit</TableHead>
-                          <TableHead className="text-xs h-9 font-semibold text-right">Balance</TableHead>
+                          <TableHead className="text-xs h-9 font-semibold">{tUi("date")}</TableHead>
+                          <TableHead className="text-xs h-9 font-semibold">{tUi("type")}</TableHead>
+                          <TableHead className="text-xs h-9 font-semibold">{tUi("description")}</TableHead>
+                          <TableHead className="text-xs h-9 font-semibold text-right">{tUi("debit")}</TableHead>
+                          <TableHead className="text-xs h-9 font-semibold text-right">{tUi("credit")}</TableHead>
+                          <TableHead className="text-xs h-9 font-semibold text-right">{tUi("balance")}</TableHead>
                           <TableHead className="text-xs h-9 w-8"></TableHead>
                         </TableRow>
                       </TableHeader>
@@ -557,7 +563,7 @@ export default function Customers() {
                           <TableRow className="text-muted-foreground text-xs italic">
                             <TableCell className="py-2">—</TableCell>
                             <TableCell className="py-2"></TableCell>
-                            <TableCell className="py-2">Opening Balance</TableCell>
+                            <TableCell className="py-2">{tUi("opening.balance")}</TableCell>
                             <TableCell className="py-2"></TableCell>
                             <TableCell className="py-2"></TableCell>
                             <TableCell className="py-2 text-right font-mono font-medium">
@@ -609,7 +615,7 @@ export default function Customers() {
                                     size="icon"
                                     variant="ghost"
                                     className="h-6 w-6"
-                                    title="Print Invoice"
+                                    title={tUi("print.invoice")}
                                     data-testid={`btn-print-invoice-${t.voucherId}`}
                                     onClick={() => window.open(`/api/pos/invoice/${t.voucherId}/pdf`, "_blank")}
                                   >
@@ -623,7 +629,7 @@ export default function Customers() {
                       </TableBody>
                       <TableFooter className="bg-muted/40">
                         <TableRow className="font-semibold text-xs">
-                          <TableCell colSpan={3}>Total</TableCell>
+                          <TableCell colSpan={3}>{tUi("total")}</TableCell>
                           <TableCell className="text-right font-mono">{formatCashAmount(totalDr)}</TableCell>
                           <TableCell className="text-right font-mono">{formatCashAmount(totalCr)}</TableCell>
                           <TableCell className="text-right font-mono">

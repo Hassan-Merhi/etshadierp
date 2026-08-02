@@ -321,9 +321,7 @@ export function WorkerDialogs({
         <DialogContent className="max-w-lg" data-testid="dialog-worker-group-members">
           <DialogHeader>
             <DialogTitle>Manage Group: {selectedWorkerGroupForMembers?.name}</DialogTitle>
-            <DialogDescription>
-              Toggle workers in or out of this group.
-            </DialogDescription>
+            <DialogDescription>Toggle workers in or out of this group.</DialogDescription>
           </DialogHeader>
           <div className="max-h-80 overflow-auto border rounded-md">
             <Table>

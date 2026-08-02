@@ -16,6 +16,7 @@ import { StockItem, StockItemCombobox } from "./VoucherEditHelpers";
 import { PurchaseEditFormTable } from "./PurchaseEditFormTable";
 import { AdjustmentEditFormRows } from "./AdjustmentEditFormRows";
 import { TransferEditForm } from "./TransferEditForm";
+import { useErpText } from "@/i18n/modules/erp";
 
 export function PurchaseEditForm({
   form,
@@ -40,6 +41,7 @@ export function PurchaseEditForm({
   total: number;
   toggleOptionalMutation: any;
 }) {
+  const tUi = useErpText();
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "items",
@@ -48,8 +50,8 @@ export function PurchaseEditForm({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Edit Purchase Voucher</CardTitle>
-        <CardDescription>Update purchase invoice details and line items</CardDescription>
+        <CardTitle>{tUi("edit.purchase.voucher")}</CardTitle>
+        <CardDescription>{tUi("update.purchase.invoice.details.and.line.items")}</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -60,7 +62,7 @@ export function PurchaseEditForm({
                 name="voucherDate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date</FormLabel>
+                    <FormLabel>{tUi("date")}</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -91,7 +93,7 @@ export function PurchaseEditForm({
                 name="currency"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Currency</FormLabel>
+                    <FormLabel>{tUi("currency")}</FormLabel>
                     <FormControl>
                       <CurrencySelector value={field.value} onChange={field.onChange} />
                     </FormControl>
@@ -115,7 +117,7 @@ export function PurchaseEditForm({
             </div>
 
             <div>
-              <FormLabel className="mb-2 block">Line Items</FormLabel>
+              <FormLabel className="mb-2 block">{tUi("line.items")}</FormLabel>
               <div className="md:hidden space-y-3">
                 {fields.map((field, index) => {
                   const qty = parseFloat(form.watch(`items.${index}.quantity`)) || 0;
@@ -142,7 +144,7 @@ export function PurchaseEditForm({
                         name={`items.${index}.stockItemId`}
                         render={({ field: itemField }) => (
                           <FormItem>
-                            <FormLabel className="text-xs">Stock Item</FormLabel>
+                            <FormLabel className="text-xs">{tUi("stock.item")}</FormLabel>
                             <FormControl>
                               <StockItemCombobox
                                 value={
@@ -171,7 +173,7 @@ export function PurchaseEditForm({
                           name={`items.${index}.quantity`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-xs">Quantity</FormLabel>
+                              <FormLabel className="text-xs">{tUi("quantity")}</FormLabel>
                               <FormControl>
                                 <Input
                                   {...field}
@@ -191,7 +193,7 @@ export function PurchaseEditForm({
                           name={`items.${index}.rate`}
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-xs">Rate</FormLabel>
+                              <FormLabel className="text-xs">{tUi("rate")}</FormLabel>
                               <FormControl>
                                 <Input
                                   {...field}
@@ -208,7 +210,7 @@ export function PurchaseEditForm({
                         />
                       </div>
                       <div className="flex items-center justify-between pt-2 border-t">
-                        <span className="text-sm text-muted-foreground">Total</span>
+                        <span className="text-sm text-muted-foreground">{tUi("total")}</span>
                         <span className="font-mono font-medium" data-testid={`text-total-purchase-mobile-${index}`}>
                           {formatAmount(lineTotal)}
                         </span>
@@ -228,7 +230,7 @@ export function PurchaseEditForm({
                     Add Row
                   </Button>
                   <div className="text-right">
-                    <div className="text-sm text-muted-foreground">Grand Total</div>
+                    <div className="text-sm text-muted-foreground">{tUi("grand.total")}</div>
                     <div className="font-bold font-mono">{formatAmount(total)}</div>
                   </div>
                 </div>
@@ -245,7 +247,7 @@ export function PurchaseEditForm({
 
               <div className="hidden md:flex justify-end p-2 bg-muted/30 border-x border-b rounded-b-md">
                 <div className="flex items-center gap-4">
-                  <span className="text-sm font-medium">Total Quantity:</span>
+                  <span className="text-sm font-medium">{tUi("total.quantity.2")}</span>
                   <span className="font-mono font-medium">
                     {formatNumber(
                       form.watch("items").reduce((sum: number, item: any) => sum + (parseFloat(item.quantity) || 0), 0)
@@ -260,9 +262,9 @@ export function PurchaseEditForm({
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel>{tUi("notes")}</FormLabel>
                   <FormControl>
-                    <Textarea {...field} placeholder="Additional notes..." rows={3} data-testid="input-notes" />
+                    <Textarea {...field} placeholder={tUi("additional.notes.2")} rows={3} data-testid="input-notes" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -317,6 +319,7 @@ export function AdjustmentEditForm({
   total: number;
   toggleOptionalMutation: any;
 }) {
+  const tUi = useErpText();
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "items",
@@ -327,7 +330,7 @@ export function AdjustmentEditForm({
     <Card>
       <CardHeader>
         <CardTitle>Edit {voucherType} Voucher</CardTitle>
-        <CardDescription>Update stock adjustment details and line items</CardDescription>
+        <CardDescription>{tUi("update.stock.adjustment.details.and.line.items")}</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -338,7 +341,7 @@ export function AdjustmentEditForm({
                 name="voucherDate"
                 render={({ field }) => (
                   <FormItem className="flex-1">
-                    <FormLabel>Date</FormLabel>
+                    <FormLabel>{tUi("date")}</FormLabel>
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -364,9 +367,9 @@ export function AdjustmentEditForm({
                 )}
               />
               <div className="flex-1">
-                <FormLabel>Location</FormLabel>
+                <FormLabel>{tUi("location")}</FormLabel>
                 <Input value={location?.name || "N/A"} disabled className="mt-2" data-testid="input-location" />
-                <p className="text-xs text-muted-foreground mt-1">Location cannot be changed</p>
+                <p className="text-xs text-muted-foreground mt-1">{tUi("location.cannot.be.changed")}</p>
               </div>
             </div>
 
@@ -384,7 +387,7 @@ export function AdjustmentEditForm({
             </div>
 
             <div>
-              <FormLabel className="mb-2 block">Line Items</FormLabel>
+              <FormLabel className="mb-2 block">{tUi("line.items")}</FormLabel>
               <div className="md:hidden space-y-3">
                 {fields.map((field, index) => {
                   const qty = parseFloat(form.watch(`items.${index}.quantity`)) || 0;
@@ -427,19 +430,19 @@ export function AdjustmentEditForm({
                           {...form.register(`items.${index}.quantity`)}
                           type="number"
                           step="0.001"
-                          placeholder="Qty"
+                          placeholder={tUi("qty.3")}
                           data-testid={`input-quantity-adj-mobile-${index}`}
                         />
                         <Input
                           {...form.register(`items.${index}.rate`)}
                           type="number"
                           step="0.01"
-                          placeholder="Rate"
+                          placeholder={tUi("rate")}
                           data-testid={`input-rate-adj-mobile-${index}`}
                         />
                       </div>
                       <div className="flex items-center justify-between pt-2 border-t">
-                        <span className="text-sm text-muted-foreground">Total</span>
+                        <span className="text-sm text-muted-foreground">{tUi("total")}</span>
                         <span className="font-mono font-medium">{formatAmount(lineTotal)}</span>
                       </div>
                     </div>
@@ -457,7 +460,7 @@ export function AdjustmentEditForm({
 
               <div className="hidden md:flex justify-end p-2 bg-muted/30 border-x border-b rounded-b-md">
                 <div className="flex items-center gap-4">
-                  <span className="text-sm font-medium">Grand Total:</span>
+                  <span className="text-sm font-medium">{tUi("grand.total.2")}</span>
                   <span className="font-bold font-mono">{formatAmount(total)}</span>
                 </div>
               </div>
@@ -468,9 +471,9 @@ export function AdjustmentEditForm({
               name="notes"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Notes</FormLabel>
+                  <FormLabel>{tUi("notes")}</FormLabel>
                   <FormControl>
-                    <Textarea {...field} placeholder="Additional notes..." rows={3} data-testid="input-notes" />
+                    <Textarea {...field} placeholder={tUi("additional.notes.2")} rows={3} data-testid="input-notes" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

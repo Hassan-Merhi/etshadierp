@@ -114,9 +114,7 @@ function CategoryGroup({
               ? "/properties/ledger-monthly"
               : "/ledger-monthly";
             const isCreditOnAsset = side === "asset" && acc.value < 0;
-            const rowColor = isCreditOnAsset
-              ? "text-rose-600 dark:text-rose-400"
-              : color;
+            const rowColor = isCreditOnAsset ? "text-rose-600 dark:text-rose-400" : color;
             return (
               <div
                 key={i}

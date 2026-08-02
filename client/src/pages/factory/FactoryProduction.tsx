@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 const ProductionRawStock = lazy(() => import("./ProductionRawStock"));
 const MixBatches = lazy(() => import("../MixBatches"));
@@ -67,6 +68,7 @@ interface SidebarGroup {
 }
 
 export default function FactoryProduction() {
+  const tUi = useFactoryText();
   const [activeSection, setActiveSection] = useState<SectionKey>("raw-stock");
 
   const sidebarGroups: SidebarGroup[] = [
@@ -116,7 +118,7 @@ export default function FactoryProduction() {
       <div className="flex items-center gap-3">
         <Factory className="h-8 w-8 text-primary" />
         <div>
-          <PageHeader title="Factory Production" subtitle="Manage bales, batches, and production" />
+          <PageHeader title={tUi("factory.production")} subtitle={tUi("manage.bales.batches.and.production")} />
         </div>
       </div>
 

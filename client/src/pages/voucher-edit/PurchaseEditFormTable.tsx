@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { StockItem, StockItemCombobox } from "./VoucherEditHelpers";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface PurchaseEditFormTableProps {
   fields: any[];
@@ -22,6 +23,7 @@ export function PurchaseEditFormTable({
   formatAmount,
   total,
 }: PurchaseEditFormTableProps) {
+  const tUi = useErpText();
   const form = useFormContext();
 
   return (
@@ -29,10 +31,10 @@ export function PurchaseEditFormTable({
       <table className="w-full">
         <thead className="bg-muted/50 sticky top-0 z-30">
           <tr>
-            <th className="text-left p-3 font-medium w-[40%]">Stock Item</th>
-            <th className="text-left p-3 font-medium w-[15%]">Quantity</th>
-            <th className="text-left p-3 font-medium w-[15%]">Rate</th>
-            <th className="text-right p-3 font-medium w-[25%]">Total</th>
+            <th className="text-left p-3 font-medium w-[40%]">{tUi("stock.item")}</th>
+            <th className="text-left p-3 font-medium w-[15%]">{tUi("quantity")}</th>
+            <th className="text-left p-3 font-medium w-[15%]">{tUi("rate")}</th>
+            <th className="text-right p-3 font-medium w-[25%]">{tUi("total")}</th>
             <th className="w-[5%]"></th>
           </tr>
         </thead>

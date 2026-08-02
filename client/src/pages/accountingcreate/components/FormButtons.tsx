@@ -3,7 +3,7 @@
  *
  * Extracted from AccountingCreate.tsx during the Phase 4 god-file split.
  */
-import {Button} from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 
 export // Reusable Form Buttons Component
 function FormButtons({ onCancel, isPending }: { onCancel: () => void; isPending: boolean }) {

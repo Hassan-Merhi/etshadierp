@@ -3,20 +3,21 @@
  *
  * Extracted from FactoryShippingContainers.tsx during the Phase 4 god-file split.
  */
-import {useState, useRef, useEffect} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {apiRequest, queryClient} from "@/lib/queryClient";
-import {Button} from "@/components/ui/button";
-import {Badge} from "@/components/ui/badge";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Separator} from "@/components/ui/separator";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter} from "@/components/ui/dialog";
-import {XCircle, Upload, Eye, Trash2, Check, X, Paperclip, Loader2} from "lucide-react";
-import {useToast} from "@/hooks/use-toast";
-import type {ShippingDocument} from "../types";
-import {LIST_KEY} from "../utils";
+import { useState, useRef, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { XCircle, Upload, Eye, Trash2, Check, X, Paperclip, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import type { ShippingDocument } from "../types";
+import { LIST_KEY } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function DocumentsModal({
   open,
@@ -29,6 +30,7 @@ export function DocumentsModal({
   invoiceNumber: string;
   onClose: () => void;
 }) {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [newDocName, setNewDocName] = useState("");
@@ -166,17 +168,17 @@ export function DocumentsModal({
           ) : docs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
               <XCircle className="h-8 w-8 mb-2 text-red-400" />
-              <p className="text-sm">No documents uploaded yet</p>
+              <p className="text-sm">{tUi("no.documents.uploaded.yet")}</p>
             </div>
           ) : (
             <div className="border rounded-md overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="text-xs">Name</TableHead>
-                    <TableHead className="text-xs">Type</TableHead>
-                    <TableHead className="text-xs">Size</TableHead>
-                    <TableHead className="text-xs">Uploaded by</TableHead>
+                    <TableHead className="text-xs">{tUi("name")}</TableHead>
+                    <TableHead className="text-xs">{tUi("type")}</TableHead>
+                    <TableHead className="text-xs">{tUi("size")}</TableHead>
+                    <TableHead className="text-xs">{tUi("uploaded.by")}</TableHead>
                     <TableHead className="w-20" />
                   </TableRow>
                 </TableHeader>
@@ -185,7 +187,7 @@ export function DocumentsModal({
                     doc.isGhost ? (
                       <TableRow key={doc.id} data-testid={`row-doc-${doc.id}`} className="bg-destructive/5">
                         <TableCell colSpan={4} className="py-2">
-                          <p className="text-xs font-medium text-destructive">Broken record</p>
+                          <p className="text-xs font-medium text-destructive">{tUi("broken.record")}</p>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             No file is attached to this record. Delete it and re-upload.
                           </p>
@@ -251,8 +253,10 @@ export function DocumentsModal({
           <Separator />
 
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Upload Document</p>
-            <p className="text-xs text-muted-foreground">Max 25 MB per file.</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              {tUi("upload.document")}
+            </p>
+            <p className="text-xs text-muted-foreground">{tUi("max.25.mb.per.file")}</p>
             <input
               ref={fileInputRef}
               type="file"
@@ -267,7 +271,7 @@ export function DocumentsModal({
                   <span className="truncate">{pendingFile.name}</span>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Display Name</Label>
+                  <Label className="text-xs">{tUi("display.name")}</Label>
                   <Input
                     value={newDocName}
                     onChange={(e) => setNewDocName(e.target.value)}

@@ -2,6 +2,7 @@ import { Check, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TableCell } from "@/components/ui/table";
 import { useJsonCargoEta } from "../useJsonCargoEta";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface OtwContainerActionsProps {
   containerId: number;
@@ -10,12 +11,8 @@ interface OtwContainerActionsProps {
   savingIds: Set<number>;
 }
 
-export function OtwContainerActions({
-  containerId,
-  hasChanges,
-  saveTracking,
-  savingIds,
-}: OtwContainerActionsProps) {
+export function OtwContainerActions({ containerId, hasChanges, saveTracking, savingIds }: OtwContainerActionsProps) {
+  const tUi = useErpText();
   const { refreshOne, refreshingIds } = useJsonCargoEta();
   const isRefreshing = refreshingIds.has(containerId);
 
@@ -40,7 +37,7 @@ export function OtwContainerActions({
         <Button
           size="icon"
           variant="ghost"
-          title="Refresh ETA (Maersk / Hapag-Lloyd / MSC / CMA CGM)"
+          title={tUi("refresh.eta.maersk.hapag.lloyd.msc.cma.cgm")}
           onClick={() => refreshOne(containerId)}
           disabled={isRefreshing}
           data-testid={`button-refresh-eta-${containerId}`}

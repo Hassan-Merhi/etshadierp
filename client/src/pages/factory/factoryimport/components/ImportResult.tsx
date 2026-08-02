@@ -3,10 +3,11 @@
  *
  * Extracted from FactoryImport.tsx during the Phase 4 god-file split.
  */
-import {AlertCircle, CheckCircle2} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function ImportResult({
   result,
@@ -15,6 +16,7 @@ export function ImportResult({
   result: { imported?: number; updated?: number; errors: string[] };
   onReset: () => void;
 }) {
+  const tUi = useFactoryText();
   const hasErrors = result.errors && result.errors.length > 0;
   const total = (result.imported || 0) + (result.updated || 0);
 
@@ -33,7 +35,7 @@ export function ImportResult({
           )}
 
           <div className="text-center">
-            <h3 className="text-lg font-semibold">Import Complete</h3>
+            <h3 className="text-lg font-semibold">{tUi("import.complete")}</h3>
             <div className="flex items-center gap-3 mt-2 justify-center flex-wrap">
               {result.imported !== undefined && result.imported > 0 && (
                 <Badge variant="secondary" data-testid="badge-imported">
@@ -55,7 +57,7 @@ export function ImportResult({
 
           {hasErrors && (
             <div className="w-full max-w-lg border rounded-md p-3 bg-destructive/5 max-h-48 overflow-auto">
-              <p className="text-sm font-medium text-destructive mb-2">Errors:</p>
+              <p className="text-sm font-medium text-destructive mb-2">{tUi("errors")}</p>
               <ul className="text-sm space-y-1">
                 {result.errors.map((err, i) => (
                   <li key={i} className="text-muted-foreground flex items-start gap-2">

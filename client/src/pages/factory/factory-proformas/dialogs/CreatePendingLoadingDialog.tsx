@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function CreatePendingLoadingDialog({
   createLoadingLocationId,
@@ -25,6 +26,7 @@ export function CreatePendingLoadingDialog({
   setCreateLoadingLocationId: any;
   setCreateLoadingProforma: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog
       open={!!createLoadingProforma}
@@ -37,7 +39,7 @@ export function CreatePendingLoadingDialog({
     >
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Create Pending Loading</DialogTitle>
+          <DialogTitle>{tUi("create.pending.loading")}</DialogTitle>
           <DialogDescription>
             A new loading will be created from <strong>{createLoadingProforma?.name}</strong>. Bales matching each
             proforma line will be automatically reserved from the selected location.
@@ -45,10 +47,10 @@ export function CreatePendingLoadingDialog({
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div>
-            <Label className="text-sm font-medium mb-1 block">Warehouse Location</Label>
+            <Label className="text-sm font-medium mb-1 block">{tUi("warehouse.location")}</Label>
             <Select value={createLoadingLocationId} onValueChange={setCreateLoadingLocationId}>
               <SelectTrigger data-testid="select-loading-location">
-                <SelectValue placeholder="Select a location..." />
+                <SelectValue placeholder={tUi("select.a.location")} />
               </SelectTrigger>
               <SelectContent>
                 {locations.map((loc: any) => (

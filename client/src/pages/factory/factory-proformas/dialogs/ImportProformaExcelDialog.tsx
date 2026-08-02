@@ -12,6 +12,7 @@ import { Download, Upload, AlertCircle } from "lucide-react";
 import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import type { Customer } from "../../factoryproformas/types";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function ImportProformaExcelDialog({
   bulkImportMutation,
@@ -46,6 +47,7 @@ export function ImportProformaExcelDialog({
   setExcelImportName: any;
   setIsExcelImportOpen: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog
       open={isExcelImportOpen}
@@ -60,11 +62,12 @@ export function ImportProformaExcelDialog({
     >
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Import Proforma from Excel</DialogTitle>
+          <DialogTitle>{tUi("import.proforma.from.excel")}</DialogTitle>
           <DialogDescription>
-            Upload an Excel file (.xlsx) with columns: <strong>Article Code</strong>, <strong>Product Name</strong>,{" "}
-            <strong>Quantity</strong>, <strong>Price Per Bale</strong>. Column names are flexible — any common variation
-            is detected automatically.
+            Upload an Excel file (.xlsx) with columns: <strong>{tUi("article.code")}</strong>,{" "}
+            <strong>{tUi("product.name")}</strong>, <strong>{tUi("quantity.2")}</strong>,{" "}
+            <strong>{tUi("price.per.bale.3")}</strong>. Column names are flexible — any common variation is detected
+            automatically.
           </DialogDescription>
         </DialogHeader>
 
@@ -72,7 +75,7 @@ export function ImportProformaExcelDialog({
           {/* Customer info */}
           <div className="flex items-center gap-2 p-3 rounded-md bg-muted">
             <div>
-              <p className="text-xs text-muted-foreground">Customer</p>
+              <p className="text-xs text-muted-foreground">{tUi("customer")}</p>
               <p className="text-sm font-medium">
                 {customers.find((c: Customer) => c.id === customerId)?.legalName ?? "—"}
               </p>
@@ -81,7 +84,7 @@ export function ImportProformaExcelDialog({
 
           {/* Proforma name */}
           <div>
-            <Label className="text-sm font-medium mb-1 block">Proforma Name</Label>
+            <Label className="text-sm font-medium mb-1 block">{tUi("proforma.name.2")}</Label>
             <Input
               placeholder="e.g. Summer 2024 Pricing"
               value={excelImportName}
@@ -93,7 +96,7 @@ export function ImportProformaExcelDialog({
           {/* File upload */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <Label className="text-sm font-medium">Excel File (.xlsx)</Label>
+              <Label className="text-sm font-medium">{tUi("excel.file.xlsx")}</Label>
               <button
                 type="button"
                 onClick={downloadProformaTemplate}
@@ -119,7 +122,7 @@ export function ImportProformaExcelDialog({
               <p className="text-sm text-muted-foreground">
                 {excelImportLoading ? "Reading file…" : "Click or drag & drop an Excel file here"}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">Supports .xlsx format</p>
+              <p className="text-xs text-muted-foreground mt-1">{tUi("supports.xlsx.format")}</p>
             </div>
             <input
               ref={excelFileInputRef}
@@ -162,10 +165,10 @@ export function ImportProformaExcelDialog({
                   <Table>
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
-                        <TableHead className="text-xs">Article Code</TableHead>
-                        <TableHead className="text-xs">Product Name</TableHead>
+                        <TableHead className="text-xs">{tUi("article.code")}</TableHead>
+                        <TableHead className="text-xs">{tUi("product.name")}</TableHead>
                         <TableHead className="text-xs text-right">Qty</TableHead>
-                        <TableHead className="text-xs text-right">Price/Bale</TableHead>
+                        <TableHead className="text-xs text-right">{tUi("price.bale.2")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>

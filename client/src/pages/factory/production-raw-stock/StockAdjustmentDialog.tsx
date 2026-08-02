@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
 import { AccountCombobox } from "./ProductionRawStockHelpers";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface StockAdjustmentDialogProps {
   open: boolean;
@@ -40,6 +41,7 @@ export function StockAdjustmentDialog({
   updateCostMutation,
   wrapAdminAction,
 }: StockAdjustmentDialogProps) {
+  const tUi = useFactoryText();
   const [adjType, setAdjType] = useState<"ADD" | "REMOVE" | "COST">("ADD");
   const [adjKg, setAdjKg] = useState("");
   const [adjCostPerKg, setAdjCostPerKg] = useState("");
@@ -89,15 +91,15 @@ export function StockAdjustmentDialog({
         <div className="space-y-4">
           {!isNewMaterial && (
             <div className="space-y-1">
-              <Label>Adjustment Type</Label>
+              <Label>{tUi("adjustment.type")}</Label>
               <Select value={adjType} onValueChange={(v: any) => setAdjType(v)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ADD">Add Stock (+)</SelectItem>
-                  <SelectItem value="REMOVE">Remove Stock (-)</SelectItem>
-                  <SelectItem value="COST">Update Cost per KG</SelectItem>
+                  <SelectItem value="ADD">{tUi("add.stock.2")}</SelectItem>
+                  <SelectItem value="REMOVE">{tUi("remove.stock")}</SelectItem>
+                  <SelectItem value="COST">{tUi("update.cost.per.kg")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -106,7 +108,7 @@ export function StockAdjustmentDialog({
           {isNewMaterial && (
             <>
               <div className="space-y-1">
-                <Label>Material Label / Name</Label>
+                <Label>{tUi("material.label.name")}</Label>
                 <Input
                   value={adjMaterialLabel}
                   onChange={(e) => setAdjMaterialLabel(e.target.value)}
@@ -114,13 +116,13 @@ export function StockAdjustmentDialog({
                 />
               </div>
               <div className="space-y-1">
-                <Label>Supplier (optional)</Label>
+                <Label>{tUi("supplier.optional")}</Label>
                 <Select value={adjSupplierId} onValueChange={setAdjSupplierId}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select supplier..." />
+                    <SelectValue placeholder={tUi("select.supplier")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None / Manual</SelectItem>
+                    <SelectItem value="">{tUi("none.manual")}</SelectItem>
                     {factorySuppliers?.map((s) => (
                       <SelectItem key={s.id} value={s.id.toString()}>
                         {s.name}
@@ -133,13 +135,13 @@ export function StockAdjustmentDialog({
           )}
 
           <div className="space-y-1">
-            <Label>Date</Label>
+            <Label>{tUi("date")}</Label>
             <Input type="date" value={adjDate} onChange={(e) => setAdjDate(e.target.value)} />
           </div>
 
           {adjType !== "COST" && (
             <div className="space-y-1">
-              <Label>Quantity (KG)</Label>
+              <Label>{tUi("quantity.kg")}</Label>
               <Input
                 type="number"
                 step="0.001"
@@ -164,7 +166,7 @@ export function StockAdjustmentDialog({
           {adjType !== "COST" && (
             <>
               <div className="space-y-1">
-                <Label>Reference (optional)</Label>
+                <Label>{tUi("reference.optional")}</Label>
                 <Input
                   value={adjReference}
                   onChange={(e) => setAdjReference(e.target.value)}
@@ -172,11 +174,11 @@ export function StockAdjustmentDialog({
                 />
               </div>
               <div className="space-y-1">
-                <Label>Notes (optional)</Label>
+                <Label>{tUi("notes.optional")}</Label>
                 <Textarea
                   value={adjNotes}
                   onChange={(e) => setAdjNotes(e.target.value)}
-                  placeholder="Adjustment reason..."
+                  placeholder={tUi("adjustment.reason")}
                 />
               </div>
             </>

@@ -16,6 +16,7 @@ import { Plus, Pencil, Search, Phone, User, Trash2, FileText, RotateCcw, History
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { PageHeader } from "@/components/PageHeader";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface Customer {
   id: number;
@@ -31,6 +32,7 @@ interface Customer {
 }
 
 export default function FactoryCustomers() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const { formatCashAmount } = useCurrencyContext();
   const [, navigate] = useLocation();
@@ -199,7 +201,7 @@ export default function FactoryCustomers() {
   if (isError) {
     return (
       <div className="flex flex-col h-full p-6 gap-4">
-        <PageHeader title="Customers" />
+        <PageHeader title={tUi("customers")} />
         <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
           Failed to load customers: {(error as any)?.message || "Unknown error"}
         </div>
@@ -231,7 +233,7 @@ export default function FactoryCustomers() {
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search by name, code, or phone..."
+          placeholder={tUi("search.by.name.code.or.phone")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-9"
@@ -302,7 +304,7 @@ export default function FactoryCustomers() {
                           variant="ghost"
                           size="icon"
                           onClick={() => navigate(`/factory/invoicing?tab=proformas&customerId=${customer.id}`)}
-                          title="View Proformas"
+                          title={tUi("view.proformas")}
                           data-testid={`button-proformas-customer-${customer.id}`}
                         >
                           <FileText className="h-4 w-4" />
@@ -311,7 +313,7 @@ export default function FactoryCustomers() {
                           variant="ghost"
                           size="icon"
                           onClick={() => openEdit(customer)}
-                          title="Edit Customer"
+                          title={tUi("edit.customer")}
                           data-testid={`button-edit-customer-${customer.id}`}
                         >
                           <Pencil className="h-4 w-4" />
@@ -321,7 +323,7 @@ export default function FactoryCustomers() {
                           variant="ghost"
                           size="icon"
                           onClick={() => setDeletingCustomer(customer)}
-                          title="Delete Customer"
+                          title={tUi("delete.customer")}
                           className="text-destructive"
                           data-testid={`button-delete-customer-${customer.id}`}
                         >
@@ -341,7 +343,7 @@ export default function FactoryCustomers() {
         <div className="rounded-xl border overflow-hidden mt-6">
           <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20">
             <History className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-semibold">Deleted Customers</span>
+            <span className="text-sm font-semibold">{tUi("deleted.customers")}</span>
             {deletedCustomers.length > 0 && (
               <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate text-xs">
                 {deletedCustomers.length}
@@ -349,7 +351,7 @@ export default function FactoryCustomers() {
             )}
           </div>
           {deletedCustomers.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8 px-4">No deleted customers found</p>
+            <p className="text-sm text-muted-foreground text-center py-8 px-4">{tUi("no.deleted.customers.found")}</p>
           ) : (
             <div className="table-responsive">
               <Table>
@@ -405,26 +407,26 @@ export default function FactoryCustomers() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">Name</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("name")}</label>
               <Input
                 value={formData.legalName}
                 onChange={(e) => setFormData({ ...formData, legalName: e.target.value })}
-                placeholder="Customer name"
+                placeholder={tUi("customer.name")}
                 data-testid="input-customer-name"
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Phone</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("phone")}</label>
               <Input
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="Phone number"
+                placeholder={tUi("phone.number")}
                 data-testid="input-customer-phone"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-sm font-medium mb-1 block">Opening Balance</label>
+                <label className="text-sm font-medium mb-1 block">{tUi("opening.balance")}</label>
                 <Input
                   type="number"
                   step="0.01"
@@ -435,7 +437,7 @@ export default function FactoryCustomers() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium mb-1 block">Side</label>
+                <label className="text-sm font-medium mb-1 block">{tUi("side")}</label>
                 <Select
                   value={formData.openingBalanceSide}
                   onValueChange={(v) => setFormData({ ...formData, openingBalanceSide: v })}
@@ -444,8 +446,8 @@ export default function FactoryCustomers() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Dr">Debit (Dr)</SelectItem>
-                    <SelectItem value="Cr">Credit (Cr)</SelectItem>
+                    <SelectItem value="Dr">{tUi("debit.dr")}</SelectItem>
+                    <SelectItem value="Cr">{tUi("credit.cr")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -462,14 +464,14 @@ export default function FactoryCustomers() {
                 }
               >
                 <SelectTrigger data-testid="select-payment-terms">
-                  <SelectValue placeholder="No payment terms" />
+                  <SelectValue placeholder={tUi("no.payment.terms")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No payment terms</SelectItem>
-                  <SelectItem value="30">Net 30 days</SelectItem>
-                  <SelectItem value="45">Net 45 days</SelectItem>
-                  <SelectItem value="60">Net 60 days</SelectItem>
-                  <SelectItem value="90">Net 90 days</SelectItem>
+                  <SelectItem value="none">{tUi("no.payment.terms")}</SelectItem>
+                  <SelectItem value="30">{tUi("net.30.days")}</SelectItem>
+                  <SelectItem value="45">{tUi("net.45.days")}</SelectItem>
+                  <SelectItem value="60">{tUi("net.60.days")}</SelectItem>
+                  <SelectItem value="90">{tUi("net.90.days")}</SelectItem>
                 </SelectContent>
               </Select>
               {formData.paymentTermsDays && !["30", "45", "60", "90"].includes(formData.paymentTermsDays) && (
@@ -478,7 +480,7 @@ export default function FactoryCustomers() {
                   min={1}
                   value={formData.paymentTermsDays}
                   onChange={(e) => setFormData({ ...formData, paymentTermsDays: e.target.value })}
-                  placeholder="Days"
+                  placeholder={tUi("days")}
                   className="mt-2"
                   data-testid="input-custom-payment-terms"
                 />
@@ -529,20 +531,20 @@ export default function FactoryCustomers() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">Name</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("name")}</label>
               <Input
                 value={formData.legalName}
                 onChange={(e) => setFormData({ ...formData, legalName: e.target.value })}
-                placeholder="Customer name"
+                placeholder={tUi("customer.name")}
                 data-testid="input-edit-customer-name"
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Phone</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("phone")}</label>
               <Input
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="Phone number"
+                placeholder={tUi("phone.number")}
                 data-testid="input-edit-customer-phone"
               />
             </div>
@@ -566,15 +568,15 @@ export default function FactoryCustomers() {
                 }}
               >
                 <SelectTrigger data-testid="select-edit-payment-terms">
-                  <SelectValue placeholder="No payment terms" />
+                  <SelectValue placeholder={tUi("no.payment.terms")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No payment terms</SelectItem>
-                  <SelectItem value="30">Net 30 days</SelectItem>
-                  <SelectItem value="45">Net 45 days</SelectItem>
-                  <SelectItem value="60">Net 60 days</SelectItem>
-                  <SelectItem value="90">Net 90 days</SelectItem>
-                  <SelectItem value="custom">Custom...</SelectItem>
+                  <SelectItem value="none">{tUi("no.payment.terms")}</SelectItem>
+                  <SelectItem value="30">{tUi("net.30.days")}</SelectItem>
+                  <SelectItem value="45">{tUi("net.45.days")}</SelectItem>
+                  <SelectItem value="60">{tUi("net.60.days")}</SelectItem>
+                  <SelectItem value="90">{tUi("net.90.days")}</SelectItem>
+                  <SelectItem value="custom">{tUi("custom")}</SelectItem>
                 </SelectContent>
               </Select>
               {formData.paymentTermsDays && !["30", "45", "60", "90"].includes(formData.paymentTermsDays) && (
@@ -583,7 +585,7 @@ export default function FactoryCustomers() {
                   min={1}
                   value={formData.paymentTermsDays}
                   onChange={(e) => setFormData({ ...formData, paymentTermsDays: e.target.value })}
-                  placeholder="Number of days"
+                  placeholder={tUi("number.of.days")}
                   className="mt-2"
                   data-testid="input-edit-custom-payment-terms"
                 />
@@ -620,7 +622,7 @@ export default function FactoryCustomers() {
         onOpenChange={(open) => {
           if (!open) setDeletingCustomer(null);
         }}
-        title="Delete Customer"
+        title={tUi("delete.customer")}
         tone="destructive"
         confirmText={deleteMutation.isPending ? "Deleting..." : "Delete"}
         loading={deleteMutation.isPending}

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, FileText, X, Download, FileSpreadsheet, Plus, Check } from "lucide-react";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function FinalizeProformaDialog({
   bulkCreateMutation,
@@ -69,6 +70,7 @@ export function FinalizeProformaDialog({
   updateFinalizePrice: any;
   updateFinalizeQty: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog
       open={finalizeOpen}
@@ -86,7 +88,7 @@ export function FinalizeProformaDialog({
         {!savedProformaId ? (
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">Proforma Name</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("proforma.name.2")}</label>
               <Input
                 placeholder="e.g. March 2026 Order"
                 value={proformaName}
@@ -96,11 +98,11 @@ export function FinalizeProformaDialog({
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-1 block">Customer</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("customer")}</label>
               {showCreateCustomer ? (
                 <div className="flex items-center gap-2">
                   <Input
-                    placeholder="Customer name..."
+                    placeholder={tUi("customer.name.2")}
                     value={newCustomerName}
                     onChange={(e) => setNewCustomerName(e.target.value)}
                     className="flex-1"
@@ -134,7 +136,7 @@ export function FinalizeProformaDialog({
                     <div className="relative flex-1">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input
-                        placeholder="Search customers..."
+                        placeholder={tUi("search.customers")}
                         value={customerSearch}
                         onChange={(e) => setCustomerSearch(e.target.value)}
                         className="pl-9"
@@ -152,7 +154,7 @@ export function FinalizeProformaDialog({
                   </div>
                   <div className="max-h-32 overflow-y-auto border rounded-md">
                     {filteredCustomers.length === 0 ? (
-                      <div className="text-center text-muted-foreground text-sm py-3">No customers found</div>
+                      <div className="text-center text-muted-foreground text-sm py-3">{tUi("no.customers.found")}</div>
                     ) : (
                       filteredCustomers.map((c: any) => (
                         <div
@@ -178,11 +180,11 @@ export function FinalizeProformaDialog({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Article</TableHead>
-                      <TableHead>Product</TableHead>
+                      <TableHead>{tUi("article")}</TableHead>
+                      <TableHead>{tUi("product")}</TableHead>
                       <TableHead className="text-right w-[100px]">Qty</TableHead>
-                      <TableHead className="text-right w-[120px]">Price/Bale</TableHead>
-                      <TableHead className="text-right w-[120px]">Total</TableHead>
+                      <TableHead className="text-right w-[120px]">{tUi("price.bale.2")}</TableHead>
+                      <TableHead className="text-right w-[120px]">{tUi("total")}</TableHead>
                       <TableHead className="w-[40px]"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -228,7 +230,7 @@ export function FinalizeProformaDialog({
                       );
                     })}
                     <TableRow className="bg-muted/50 font-bold">
-                      <TableCell colSpan={2}>Grand Total</TableCell>
+                      <TableCell colSpan={2}>{tUi("grand.total")}</TableCell>
                       <TableCell className="text-right font-mono">{totalSelectedBales}</TableCell>
                       <TableCell></TableCell>
                       <TableCell className="text-right font-mono">{formatAmount(grandTotal)}</TableCell>

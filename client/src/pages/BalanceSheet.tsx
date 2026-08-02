@@ -34,7 +34,7 @@ export default function BalanceSheet() {
       liabilities: calculateBalanceSheetTotal(groups.liabilities, "Cr"),
       equity: calculateBalanceSheetTotal(groups.equity, "Cr"),
     }),
-    [groups],
+    [groups]
   );
   const activeAccounts = groups[activeSection];
 
@@ -42,13 +42,20 @@ export default function BalanceSheet() {
     if (isLoading) {
       return (
         <div className="space-y-2" aria-label="Loading balance sheet accounts">
-          {[1, 2, 3].map((item) => <Skeleton key={item} className="h-12 w-full" />)}
+          {[1, 2, 3].map((item) => (
+            <Skeleton key={item} className="h-12 w-full" />
+          ))}
         </div>
       );
     }
 
     if (activeAccounts.length === 0) {
-      return <EmptyState title="No accounts in this category" description="Accounts will appear here when they are available." />;
+      return (
+        <EmptyState
+          title="No accounts in this category"
+          description="Accounts will appear here when they are available."
+        />
+      );
     }
 
     const total = calculateBalanceSheetTotal(activeAccounts);
@@ -56,7 +63,10 @@ export default function BalanceSheet() {
       <div className="table-responsive rounded-md border">
         <Table>
           <TableHeader className="sticky top-0 z-30 bg-background">
-            <TableRow><TableHead>Account Name</TableHead><TableHead className="text-right">Balance</TableHead></TableRow>
+            <TableRow>
+              <TableHead>Account Name</TableHead>
+              <TableHead className="text-right">Balance</TableHead>
+            </TableRow>
           </TableHeader>
           <TableBody>
             {activeAccounts.map((account) => (
@@ -64,13 +74,17 @@ export default function BalanceSheet() {
                 <TableCell>{account.name}</TableCell>
                 <TableCell className="text-right font-mono">
                   {account.type === "bank" ? formatAmount(account.balance) : formatAmountRaw(account.balance)}
-                  {account.balanceSide ? <span className={`ml-1 ${drCrClass(account.balanceSide)}`}>{account.balanceSide}</span> : null}
+                  {account.balanceSide ? (
+                    <span className={`ml-1 ${drCrClass(account.balanceSide)}`}>{account.balanceSide}</span>
+                  ) : null}
                 </TableCell>
               </TableRow>
             ))}
             <TableRow className="bg-muted/50 font-semibold">
               <TableCell>Total</TableCell>
-              <TableCell className="text-right font-mono" data-testid="text-total">{formatAmountRaw(total)}</TableCell>
+              <TableCell className="text-right font-mono" data-testid="text-total">
+                {formatAmountRaw(total)}
+              </TableCell>
             </TableRow>
           </TableBody>
         </Table>
@@ -82,23 +96,33 @@ export default function BalanceSheet() {
     <div className="space-y-6">
       <PageHeader title="Balance Sheet" subtitle="Financial position showing assets, liabilities, and equity" />
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        {([
-          ["Total Assets", totals.assets, "text-total-assets"],
-          ["Total Liabilities", totals.liabilities, "text-total-liabilities"],
-          ["Total Equity", totals.equity, "text-total-equity"],
-        ] as const).map(([title, value, testId]) => (
+        {(
+          [
+            ["Total Assets", totals.assets, "text-total-assets"],
+            ["Total Liabilities", totals.liabilities, "text-total-liabilities"],
+            ["Total Equity", totals.equity, "text-total-equity"],
+          ] as const
+        ).map(([title, value, testId]) => (
           <Card key={title}>
             <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">{title}</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             </CardHeader>
-            <CardContent><div className="text-2xl font-bold" data-testid={testId}>{isLoading ? "Loading..." : formatAmountRaw(value)}</div></CardContent>
+            <CardContent>
+              <div className="text-2xl font-bold" data-testid={testId}>
+                {isLoading ? "Loading..." : formatAmountRaw(value)}
+              </div>
+            </CardContent>
           </Card>
         ))}
       </div>
       <div className="flex flex-col gap-4 sm:flex-row sm:gap-6">
         <BalanceSheetSectionNav activeSection={activeSection} onSectionChange={setActiveSection} />
-        <div className="min-w-0 flex-1"><Card><CardContent className="p-4 sm:p-6">{renderAccountTable()}</CardContent></Card></div>
+        <div className="min-w-0 flex-1">
+          <Card>
+            <CardContent className="p-4 sm:p-6">{renderAccountTable()}</CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

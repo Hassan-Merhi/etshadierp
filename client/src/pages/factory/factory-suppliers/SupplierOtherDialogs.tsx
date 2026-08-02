@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UseMutationResult } from "@tanstack/react-query";
 import { Package } from "lucide-react";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface SupplierOtherDialogsProps {
   obEditSupplier: { id: number; name: string; currentBalance: string } | null;
@@ -43,6 +44,7 @@ export function SupplierOtherDialogs({
   updateObCommissionMutation,
   wrapAdminAction,
 }: SupplierOtherDialogsProps) {
+  const tUi = useFactoryText();
   return (
     <>
       <Dialog
@@ -62,7 +64,7 @@ export function SupplierOtherDialogs({
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                  <Label>Amount</Label>
+                  <Label>{tUi("amount")}</Label>
                   <Input
                     type="number"
                     step="0.01"
@@ -71,7 +73,7 @@ export function SupplierOtherDialogs({
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Currency</Label>
+                  <Label>{tUi("currency")}</Label>
                   <Input
                     value={editObComm.currencyCode}
                     onChange={(e) =>
@@ -82,19 +84,19 @@ export function SupplierOtherDialogs({
                 </div>
               </div>
               <div className="space-y-1">
-                <Label>Person / Broker</Label>
+                <Label>{tUi("person.broker")}</Label>
                 <Input
                   value={editObComm.personName}
                   onChange={(e) => setEditObComm((p: any) => (p ? { ...p, personName: e.target.value } : null))}
-                  placeholder="Name (optional)"
+                  placeholder={tUi("name.optional")}
                 />
               </div>
               <div className="space-y-1">
-                <Label>Notes</Label>
+                <Label>{tUi("notes")}</Label>
                 <Input
                   value={editObComm.notes}
                   onChange={(e) => setEditObComm((p: any) => (p ? { ...p, notes: e.target.value } : null))}
-                  placeholder="Notes (optional)"
+                  placeholder={tUi("notes.optional")}
                 />
               </div>
             </div>
@@ -137,14 +139,14 @@ export function SupplierOtherDialogs({
       >
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Edit Opening Balance</DialogTitle>
+            <DialogTitle>{tUi("edit.opening.balance")}</DialogTitle>
             <DialogDescription>
               Overwrite the opening balance for <span className="font-semibold">{obEditSupplier?.name}</span>.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Opening Balance (USD)</Label>
+              <Label>{tUi("opening.balance.usd")}</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -193,7 +195,7 @@ export function SupplierOtherDialogs({
           </DialogHeader>
           <div className="space-y-1 max-h-96 overflow-y-auto">
             {dueDialogSupplier?.containers.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No due containers</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">{tUi("no.due.containers")}</p>
             ) : (
               <div className="rounded-md border divide-y text-sm">
                 {(dueDialogSupplier?.containers || [])
@@ -223,7 +225,7 @@ export function SupplierOtherDialogs({
             )}
           </div>
           <DialogFooter>
-            <Button onClick={() => setDueDialogSupplier(null)}>Close</Button>
+            <Button onClick={() => setDueDialogSupplier(null)}>{tUi("close")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

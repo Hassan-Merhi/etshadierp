@@ -3,7 +3,7 @@
  *
  * Extracted from ProductionComparison.tsx during the Phase 4 god-file split.
  */
-import {TrendingUp, TrendingDown, Minus} from "lucide-react";
+import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 export function DiffCell({
   value,

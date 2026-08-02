@@ -61,7 +61,9 @@ import type { FactoryWorker, FactoryWorkerCategory } from "@shared/schema";
 
 import type { CashAccount } from "./factoryworkers/types";
 import { emptyForm, getAvatarColor, getInitials } from "./factoryworkers/utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactoryWorkers() {
+  const tUi = useFactoryText();
   const { data: settings } = useQuery<any>({
     queryKey: ["/api/factory/settings"],
     queryFn: async () => {
@@ -686,10 +688,10 @@ export default function FactoryWorkers() {
   const renderWorkerForm = () => (
     <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-1">
       <div>
-        <h4 className="text-sm font-semibold text-muted-foreground mb-3">Identity</h4>
+        <h4 className="text-sm font-semibold text-muted-foreground mb-3">{tUi("identity")}</h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1">
-            <Label className="text-xs">Full Name *</Label>
+            <Label className="text-xs">{tUi("full.name.2")}</Label>
             <Input
               value={formData.fullName}
               onChange={(e) => updateField("fullName", e.target.value)}
@@ -697,7 +699,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Father Name</Label>
+            <Label className="text-xs">{tUi("father.name")}</Label>
             <Input
               value={formData.fatherName}
               onChange={(e) => updateField("fatherName", e.target.value)}
@@ -705,7 +707,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">National ID</Label>
+            <Label className="text-xs">{tUi("national.id")}</Label>
             <Input
               value={formData.nationalId}
               onChange={(e) => updateField("nationalId", e.target.value)}
@@ -713,7 +715,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Passport Number</Label>
+            <Label className="text-xs">{tUi("passport.number")}</Label>
             <Input
               value={formData.passportNumber}
               onChange={(e) => updateField("passportNumber", e.target.value)}
@@ -721,7 +723,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Date of Birth</Label>
+            <Label className="text-xs">{tUi("date.of.birth")}</Label>
             <Input
               type="date"
               value={formData.dateOfBirth}
@@ -730,19 +732,19 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Gender</Label>
+            <Label className="text-xs">{tUi("gender")}</Label>
             <Select value={formData.gender} onValueChange={(v) => updateField("gender", v)}>
               <SelectTrigger data-testid="select-gender">
-                <SelectValue placeholder="Select" />
+                <SelectValue placeholder={tUi("select")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Male">Male</SelectItem>
-                <SelectItem value="Female">Female</SelectItem>
+                <SelectItem value="Male">{tUi("male")}</SelectItem>
+                <SelectItem value="Female">{tUi("female")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Nationality</Label>
+            <Label className="text-xs">{tUi("nationality")}</Label>
             <Popover open={nationalityOpen} onOpenChange={setNationalityOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -761,7 +763,7 @@ export default function FactoryWorkers() {
               <PopoverContent className="w-[240px] p-0" align="start">
                 <Command>
                   <CommandInput
-                    placeholder="Search or type new…"
+                    placeholder={tUi("search.or.type.new")}
                     value={formData.nationality}
                     onValueChange={(v) => updateField("nationality", v)}
                   />
@@ -780,7 +782,9 @@ export default function FactoryWorkers() {
                           Create "{formData.nationality.trim()}"
                         </button>
                       ) : (
-                        <span className="px-3 py-2 text-xs text-muted-foreground">Type to search or create</span>
+                        <span className="px-3 py-2 text-xs text-muted-foreground">
+                          {tUi("type.to.search.or.create")}
+                        </span>
                       )}
                     </CommandEmpty>
                     <CommandGroup>
@@ -806,25 +810,25 @@ export default function FactoryWorkers() {
             </Popover>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Marital Status</Label>
+            <Label className="text-xs">{tUi("marital.status")}</Label>
             <Select value={formData.maritalStatus} onValueChange={(v) => updateField("maritalStatus", v)}>
               <SelectTrigger data-testid="select-maritalStatus">
-                <SelectValue placeholder="Select" />
+                <SelectValue placeholder={tUi("select")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Single">Single</SelectItem>
-                <SelectItem value="Married">Married</SelectItem>
-                <SelectItem value="Divorced">Divorced</SelectItem>
+                <SelectItem value="Single">{tUi("single")}</SelectItem>
+                <SelectItem value="Married">{tUi("married")}</SelectItem>
+                <SelectItem value="Divorced">{tUi("divorced")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
       </div>
       <div>
-        <h4 className="text-sm font-semibold text-muted-foreground mb-3">Contact</h4>
+        <h4 className="text-sm font-semibold text-muted-foreground mb-3">{tUi("contact")}</h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1">
-            <Label className="text-xs">Phone 1</Label>
+            <Label className="text-xs">{tUi("phone.1")}</Label>
             <Input
               value={formData.phone1}
               onChange={(e) => updateField("phone1", e.target.value)}
@@ -832,7 +836,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Phone 2</Label>
+            <Label className="text-xs">{tUi("phone.2")}</Label>
             <Input
               value={formData.phone2}
               onChange={(e) => updateField("phone2", e.target.value)}
@@ -840,7 +844,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Emergency Contact Name</Label>
+            <Label className="text-xs">{tUi("emergency.contact.name")}</Label>
             <Input
               value={formData.emergencyContactName}
               onChange={(e) => updateField("emergencyContactName", e.target.value)}
@@ -848,7 +852,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Emergency Contact Phone</Label>
+            <Label className="text-xs">{tUi("emergency.contact.phone")}</Label>
             <Input
               value={formData.emergencyContactPhone}
               onChange={(e) => updateField("emergencyContactPhone", e.target.value)}
@@ -856,7 +860,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1 sm:col-span-2">
-            <Label className="text-xs">Address</Label>
+            <Label className="text-xs">{tUi("address")}</Label>
             <Input
               value={formData.address}
               onChange={(e) => updateField("address", e.target.value)}
@@ -864,7 +868,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">City</Label>
+            <Label className="text-xs">{tUi("city")}</Label>
             <Input
               value={formData.city}
               onChange={(e) => updateField("city", e.target.value)}
@@ -872,7 +876,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Country</Label>
+            <Label className="text-xs">{tUi("country")}</Label>
             <Input
               value={formData.country}
               onChange={(e) => updateField("country", e.target.value)}
@@ -882,10 +886,10 @@ export default function FactoryWorkers() {
         </div>
       </div>
       <div>
-        <h4 className="text-sm font-semibold text-muted-foreground mb-3">Employment</h4>
+        <h4 className="text-sm font-semibold text-muted-foreground mb-3">{tUi("employment")}</h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1">
-            <Label className="text-xs">Position</Label>
+            <Label className="text-xs">{tUi("position")}</Label>
             <Input
               value={formData.position}
               onChange={(e) => updateField("position", e.target.value)}
@@ -893,7 +897,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Department</Label>
+            <Label className="text-xs">{tUi("department")}</Label>
             <Input
               value={formData.department}
               onChange={(e) => updateField("department", e.target.value)}
@@ -901,7 +905,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Date Joined</Label>
+            <Label className="text-xs">{tUi("date.joined")}</Label>
             <Input
               type="date"
               value={formData.dateJoined}
@@ -910,7 +914,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Contract Start</Label>
+            <Label className="text-xs">{tUi("contract.start")}</Label>
             <Input
               type="date"
               value={formData.contractStartDate}
@@ -919,21 +923,21 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Salary Type</Label>
+            <Label className="text-xs">{tUi("salary.type")}</Label>
             <Select value={formData.salaryType} onValueChange={(v) => updateField("salaryType", v)}>
               <SelectTrigger data-testid="select-salaryType">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Monthly">Monthly</SelectItem>
-                <SelectItem value="Daily">Daily</SelectItem>
-                <SelectItem value="Per Bale">Per Bale</SelectItem>
-                <SelectItem value="Per KG">Per KG</SelectItem>
+                <SelectItem value="Monthly">{tUi("monthly")}</SelectItem>
+                <SelectItem value="Daily">{tUi("daily")}</SelectItem>
+                <SelectItem value="Per Bale">{tUi("per.bale")}</SelectItem>
+                <SelectItem value="Per KG">{tUi("per.kg")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Base Salary</Label>
+            <Label className="text-xs">{tUi("base.salary")}</Label>
             <Input
               type="number"
               step="0.01"
@@ -943,7 +947,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Transport Allowance (monthly)</Label>
+            <Label className="text-xs">{tUi("transport.allowance.monthly")}</Label>
             <Input
               type="number"
               step="0.01"
@@ -953,7 +957,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Per Bale Rate</Label>
+            <Label className="text-xs">{tUi("per.bale.rate")}</Label>
             <Input
               type="number"
               step="0.0001"
@@ -963,7 +967,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Per KG Rate</Label>
+            <Label className="text-xs">{tUi("per.kg.rate")}</Label>
             <Input
               type="number"
               step="0.0001"
@@ -973,22 +977,22 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Pay Frequency</Label>
+            <Label className="text-xs">{tUi("pay.frequency")}</Label>
             <Select value={formData.payFrequency} onValueChange={(v) => updateField("payFrequency", v)}>
               <SelectTrigger data-testid="select-payFrequency">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Monthly">Monthly</SelectItem>
-                <SelectItem value="Weekly">Weekly</SelectItem>
-                <SelectItem value="Bi-Weekly">Bi-Weekly</SelectItem>
-                <SelectItem value="Hourly">Hourly</SelectItem>
+                <SelectItem value="Monthly">{tUi("monthly")}</SelectItem>
+                <SelectItem value="Weekly">{tUi("weekly")}</SelectItem>
+                <SelectItem value="Bi-Weekly">{tUi("bi.weekly.2")}</SelectItem>
+                <SelectItem value="Hourly">{tUi("hourly")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           {formData.payFrequency === "Weekly" && (
             <div className="space-y-1">
-              <Label className="text-xs">Weekly Salary</Label>
+              <Label className="text-xs">{tUi("weekly.salary")}</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -1000,7 +1004,7 @@ export default function FactoryWorkers() {
           )}
           {formData.payFrequency === "Bi-Weekly" && (
             <div className="space-y-1">
-              <Label className="text-xs">Bi-Weekly Salary</Label>
+              <Label className="text-xs">{tUi("bi.weekly.salary")}</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -1012,7 +1016,7 @@ export default function FactoryWorkers() {
           )}
           {formData.payFrequency === "Hourly" && (
             <div className="space-y-1">
-              <Label className="text-xs">Hourly Rate</Label>
+              <Label className="text-xs">{tUi("hourly.rate")}</Label>
               <Input
                 type="number"
                 step="0.0001"
@@ -1023,25 +1027,25 @@ export default function FactoryWorkers() {
             </div>
           )}
           <div className="space-y-1">
-            <Label className="text-xs">Payment Method</Label>
+            <Label className="text-xs">{tUi("payment.method")}</Label>
             <Select value={formData.paymentMethod} onValueChange={(v) => updateField("paymentMethod", v)}>
               <SelectTrigger data-testid="select-paymentMethod">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Cash">Cash</SelectItem>
-                <SelectItem value="Bank">Bank</SelectItem>
-                <SelectItem value="Transfer">Transfer</SelectItem>
+                <SelectItem value="Cash">{tUi("cash")}</SelectItem>
+                <SelectItem value="Bank">{tUi("bank")}</SelectItem>
+                <SelectItem value="Transfer">{tUi("transfer")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
       </div>
       <div>
-        <h4 className="text-sm font-semibold text-muted-foreground mb-3">Documents</h4>
+        <h4 className="text-sm font-semibold text-muted-foreground mb-3">{tUi("documents")}</h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1">
-            <Label className="text-xs">Visa Number</Label>
+            <Label className="text-xs">{tUi("visa.number")}</Label>
             <Input
               value={formData.visaNumber}
               onChange={(e) => updateField("visaNumber", e.target.value)}
@@ -1049,7 +1053,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Visa Expiry</Label>
+            <Label className="text-xs">{tUi("visa.expiry")}</Label>
             <Input
               type="date"
               value={formData.visaExpiry}
@@ -1058,7 +1062,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Work Permit No.</Label>
+            <Label className="text-xs">{tUi("work.permit.no")}</Label>
             <Input
               value={formData.workPermitNumber}
               onChange={(e) => updateField("workPermitNumber", e.target.value)}
@@ -1066,7 +1070,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Work Permit Expiry</Label>
+            <Label className="text-xs">{tUi("work.permit.expiry")}</Label>
             <Input
               type="date"
               value={formData.workPermitExpiry}
@@ -1075,7 +1079,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Bank Name</Label>
+            <Label className="text-xs">{tUi("bank.name")}</Label>
             <Input
               value={formData.bankName}
               onChange={(e) => updateField("bankName", e.target.value)}
@@ -1083,7 +1087,7 @@ export default function FactoryWorkers() {
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Bank Account No.</Label>
+            <Label className="text-xs">{tUi("bank.account.no")}</Label>
             <Input
               value={formData.bankAccountNumber}
               onChange={(e) => updateField("bankAccountNumber", e.target.value)}
@@ -1093,7 +1097,7 @@ export default function FactoryWorkers() {
         </div>
       </div>
       <div>
-        <h4 className="text-sm font-semibold text-muted-foreground mb-3">Notes</h4>
+        <h4 className="text-sm font-semibold text-muted-foreground mb-3">{tUi("notes")}</h4>
         <Textarea
           value={formData.notes}
           onChange={(e) => updateField("notes", e.target.value)}
@@ -1157,44 +1161,44 @@ export default function FactoryWorkers() {
               <>
                 <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
                   <Users className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Total</span>
+                  <span className="text-muted-foreground">{tUi("total")}</span>
                   <span className="font-semibold">{workers?.length ?? 0}</span>
                 </div>
                 <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
                   <UserCheck className="h-4 w-4 text-emerald-500" />
-                  <span className="text-muted-foreground">Active</span>
+                  <span className="text-muted-foreground">{tUi("active")}</span>
                   <span className="font-semibold">{activeCount}</span>
                 </div>
                 <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
                   <UserX className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Inactive</span>
+                  <span className="text-muted-foreground">{tUi("inactive")}</span>
                   <span className="font-semibold">{inactiveCount}</span>
                 </div>
                 <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
                   <Download className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Total Salary</span>
+                  <span className="text-muted-foreground">{tUi("total.salary")}</span>
                   <span className="font-semibold font-mono">${totalSalary.toLocaleString()}</span>
                 </div>
                 <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
                   <Bus className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Transport</span>
+                  <span className="text-muted-foreground">{tUi("transport")}</span>
                   <span className="font-semibold font-mono">${totalTransport.toLocaleString()}</span>
                 </div>
                 <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
                   <Banknote className="h-4 w-4 text-amber-500" />
-                  <span className="text-muted-foreground">Advances</span>
+                  <span className="text-muted-foreground">{tUi("advances")}</span>
                   <span className="font-semibold font-mono">${totalAdvances.toLocaleString()}</span>
                 </div>
                 <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
                   <Clock className="h-4 w-4 text-emerald-500" />
-                  <span className="text-muted-foreground">Due Today</span>
+                  <span className="text-muted-foreground">{tUi("due.today")}</span>
                   <span className="font-semibold font-mono text-emerald-600 dark:text-emerald-400">
                     ${totalDueToday.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
                   <WalletCards className="h-4 w-4 text-violet-500" />
-                  <span className="text-muted-foreground">Total Remaining</span>
+                  <span className="text-muted-foreground">{tUi("total.remaining")}</span>
                   <span className="font-semibold font-mono text-violet-600 dark:text-violet-400">
                     $
                     {totalRemainingToBePaid.toLocaleString(undefined, {
@@ -1212,7 +1216,7 @@ export default function FactoryWorkers() {
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by name, code, position, nationality..."
+                placeholder={tUi("search.by.name.code.position.nationality")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -1225,8 +1229,8 @@ export default function FactoryWorkers() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="All">All</SelectItem>
-                <SelectItem value="Active">Active</SelectItem>
-                <SelectItem value="Inactive">Inactive</SelectItem>
+                <SelectItem value="Active">{tUi("active")}</SelectItem>
+                <SelectItem value="Inactive">{tUi("inactive")}</SelectItem>
               </SelectContent>
             </Select>
 
@@ -1309,10 +1313,10 @@ export default function FactoryWorkers() {
                 </label>
                 <Select value={positionFilter} onValueChange={setPositionFilter}>
                   <SelectTrigger className="h-8 text-sm bg-background">
-                    <SelectValue placeholder="All" />
+                    <SelectValue placeholder={tUi("all")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All positions</SelectItem>
+                    <SelectItem value="all">{tUi("all.positions")}</SelectItem>
                     {uniquePositions.map((p) => (
                       <SelectItem key={p} value={p}>
                         {p}
@@ -1329,10 +1333,10 @@ export default function FactoryWorkers() {
                 </label>
                 <Select value={locationFilter} onValueChange={setLocationFilter}>
                   <SelectTrigger className="h-8 text-sm bg-background">
-                    <SelectValue placeholder="All" />
+                    <SelectValue placeholder={tUi("all")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All locations</SelectItem>
+                    <SelectItem value="all">{tUi("all.locations")}</SelectItem>
                     {uniqueLocations.map((l) => (
                       <SelectItem key={l} value={l}>
                         {l}
@@ -1349,10 +1353,10 @@ export default function FactoryWorkers() {
                 </label>
                 <Select value={salaryTypeFilter} onValueChange={setSalaryTypeFilter}>
                   <SelectTrigger className="h-8 text-sm bg-background">
-                    <SelectValue placeholder="All" />
+                    <SelectValue placeholder={tUi("all")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All types</SelectItem>
+                    <SelectItem value="all">{tUi("all.types.2")}</SelectItem>
                     {uniqueSalaryTypes.map((t) => (
                       <SelectItem key={t} value={t}>
                         {t}
@@ -1369,10 +1373,10 @@ export default function FactoryWorkers() {
                 </label>
                 <Select value={nationalityFilter} onValueChange={setNationalityFilter}>
                   <SelectTrigger className="h-8 text-sm bg-background">
-                    <SelectValue placeholder="All" />
+                    <SelectValue placeholder={tUi("all")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All nationalities</SelectItem>
+                    <SelectItem value="all">{tUi("all.nationalities")}</SelectItem>
                     {uniqueNationalities.map((n) => (
                       <SelectItem key={n} value={n}>
                         {n}
@@ -1389,11 +1393,11 @@ export default function FactoryWorkers() {
                 </label>
                 <Select value={salaryRangeFilter} onValueChange={setSalaryRangeFilter}>
                   <SelectTrigger className="h-8 text-sm bg-background">
-                    <SelectValue placeholder="All" />
+                    <SelectValue placeholder={tUi("all")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All ranges</SelectItem>
-                    <SelectItem value="0-500">Under $500</SelectItem>
+                    <SelectItem value="all">{tUi("all.ranges")}</SelectItem>
+                    <SelectItem value="0-500">{tUi("under.500")}</SelectItem>
                     <SelectItem value="500-1000">$500 – under $1,000</SelectItem>
                     <SelectItem value="1000-2000">$1,000 – under $2,000</SelectItem>
                     <SelectItem value="2000-5000">$2,000 – under $5,000</SelectItem>
@@ -1409,12 +1413,12 @@ export default function FactoryWorkers() {
                 </label>
                 <Select value={transportFilter} onValueChange={setTransportFilter}>
                   <SelectTrigger className="h-8 text-sm bg-background">
-                    <SelectValue placeholder="All" />
+                    <SelectValue placeholder={tUi("all")} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="has">Has transport allowance</SelectItem>
-                    <SelectItem value="none">No transport allowance</SelectItem>
+                    <SelectItem value="has">{tUi("has.transport.allowance")}</SelectItem>
+                    <SelectItem value="none">{tUi("no.transport.allowance")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1426,12 +1430,12 @@ export default function FactoryWorkers() {
                 </label>
                 <Select value={advanceFilter} onValueChange={setAdvanceFilter}>
                   <SelectTrigger className="h-8 text-sm bg-background">
-                    <SelectValue placeholder="All" />
+                    <SelectValue placeholder={tUi("all")} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All</SelectItem>
-                    <SelectItem value="has">Has outstanding advance</SelectItem>
-                    <SelectItem value="none">No advance</SelectItem>
+                    <SelectItem value="has">{tUi("has.outstanding.advance")}</SelectItem>
+                    <SelectItem value="none">{tUi("no.advance")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1717,7 +1721,7 @@ export default function FactoryWorkers() {
                                 </button>
                               </PopoverTrigger>
                               <PopoverContent className="w-64 p-3 text-sm" align="end" side="left">
-                                <p className="font-semibold text-foreground mb-1">Due Today</p>
+                                <p className="font-semibold text-foreground mb-1">{tUi("due.today")}</p>
                                 <p className="text-[11px] text-muted-foreground mb-3 leading-relaxed">
                                   Period: {fmtDate(due.periodStart)} → {fmtDate(due.periodEnd)}
                                   {due.lastPaidThrough && (
@@ -1726,29 +1730,29 @@ export default function FactoryWorkers() {
                                 </p>
                                 <div className="space-y-1.5">
                                   <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Base salary</span>
+                                    <span className="text-muted-foreground">{tUi("base.salary.2")}</span>
                                     <span className="font-mono">{fmt(due.base)}</span>
                                   </div>
                                   {due.transport > 0 && (
                                     <div className="flex justify-between">
-                                      <span className="text-muted-foreground">Transport</span>
+                                      <span className="text-muted-foreground">{tUi("transport")}</span>
                                       <span className="font-mono">+{fmt(due.transport)}</span>
                                     </div>
                                   )}
                                   {(due.absenceDeducted ?? 0) > 0 && (
                                     <div className="flex justify-between text-rose-600 dark:text-rose-400">
-                                      <span>Absences deducted</span>
+                                      <span>{tUi("absences.deducted")}</span>
                                       <span className="font-mono">−{fmt(due.absenceDeducted)}</span>
                                     </div>
                                   )}
                                   {due.advanceDeducted > 0 && (
                                     <div className="flex justify-between text-amber-600 dark:text-amber-400">
-                                      <span>Advance deducted</span>
+                                      <span>{tUi("advance.deducted")}</span>
                                       <span className="font-mono">−{fmt(due.advanceDeducted)}</span>
                                     </div>
                                   )}
                                   <div className="flex justify-between border-t pt-1.5 font-semibold">
-                                    <span>Net due</span>
+                                    <span>{tUi("net.due")}</span>
                                     <span
                                       className={`font-mono ${due.net > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
                                     >
@@ -1862,8 +1866,8 @@ export default function FactoryWorkers() {
               {categories.length === 0 ? (
                 <div className="text-center py-16 text-muted-foreground border rounded-md">
                   <Layers className="mx-auto h-8 w-8 mb-3 opacity-40" />
-                  <p className="font-medium">No categories yet</p>
-                  <p className="text-sm mt-1">Create a category to group workers for quick filtering</p>
+                  <p className="font-medium">{tUi("no.categories.yet")}</p>
+                  <p className="text-sm mt-1">{tUi("create.a.category.to.group.workers.for.quick.fil")}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1955,7 +1959,7 @@ export default function FactoryWorkers() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1">
-              <Label className="text-xs">Category Name *</Label>
+              <Label className="text-xs">{tUi("category.name")}</Label>
               <Input
                 value={catName}
                 onChange={(e) => setCatName(e.target.value)}
@@ -1964,7 +1968,7 @@ export default function FactoryWorkers() {
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs">Workers</Label>
+              <Label className="text-xs">{tUi("workers")}</Label>
               <div className="border rounded-md divide-y max-h-64 overflow-y-auto">
                 {(workers ?? [])
                   .filter((w) => w.active || catWorkerIds.includes(w.id))
@@ -1989,7 +1993,7 @@ export default function FactoryWorkers() {
                     </label>
                   ))}
                 {(workers ?? []).filter((w) => w.active || catWorkerIds.includes(w.id)).length === 0 && (
-                  <p className="text-sm text-muted-foreground px-3 py-4 text-center">No workers available</p>
+                  <p className="text-sm text-muted-foreground px-3 py-4 text-center">{tUi("no.workers.available")}</p>
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -2082,7 +2086,7 @@ export default function FactoryWorkers() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs">Period Start</Label>
+                  <Label className="text-xs">{tUi("period.start")}</Label>
                   <Input
                     type="date"
                     value={endStart}
@@ -2091,7 +2095,7 @@ export default function FactoryWorkers() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Period End</Label>
+                  <Label className="text-xs">{tUi("period.end")}</Label>
                   <Input
                     type="date"
                     value={endEnd}
@@ -2116,13 +2120,13 @@ export default function FactoryWorkers() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="rounded-md border p-3 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Earned</p>
+                  <p className="text-xs text-muted-foreground mb-1">{tUi("earned")}</p>
                   <p className="font-semibold text-sm" data-testid="text-settlement-earned">
                     ${parseFloat(endResult.earned).toFixed(2)}
                   </p>
                 </div>
                 <div className="rounded-md border p-3 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Already Paid</p>
+                  <p className="text-xs text-muted-foreground mb-1">{tUi("already.paid")}</p>
                   <p className="font-semibold text-sm" data-testid="text-settlement-paid">
                     ${parseFloat(endResult.paid).toFixed(2)}
                   </p>
@@ -2130,7 +2134,7 @@ export default function FactoryWorkers() {
                 <div
                   className={`rounded-md border p-3 text-center ${parseFloat(endResult.advances) > 0 ? "border-orange-300 bg-orange-50 dark:bg-orange-900/20" : ""}`}
                 >
-                  <p className="text-xs text-muted-foreground mb-1">Advances</p>
+                  <p className="text-xs text-muted-foreground mb-1">{tUi("advances")}</p>
                   <p className="font-semibold text-sm" data-testid="text-settlement-advances">
                     ${parseFloat(endResult.advances).toFixed(2)}
                   </p>
@@ -2138,7 +2142,7 @@ export default function FactoryWorkers() {
                 <div
                   className={`rounded-md border p-3 text-center ${balance > 0 ? "border-amber-300 bg-amber-50 dark:bg-amber-900/20" : "border-green-300 bg-green-50 dark:bg-green-900/20"}`}
                 >
-                  <p className="text-xs text-muted-foreground mb-1">Balance Owed</p>
+                  <p className="text-xs text-muted-foreground mb-1">{tUi("balance.owed")}</p>
                   <p className="font-semibold text-sm" data-testid="text-settlement-balance">
                     ${balance.toFixed(2)}
                   </p>
@@ -2147,10 +2151,10 @@ export default function FactoryWorkers() {
 
               {balance > 0 && (
                 <div className="space-y-1">
-                  <Label className="text-xs">Cash Account (for Pay Now)</Label>
+                  <Label className="text-xs">{tUi("cash.account.for.pay.now")}</Label>
                   <Select value={endCashAccountId} onValueChange={setEndCashAccountId}>
                     <SelectTrigger data-testid="select-end-cash-account">
-                      <SelectValue placeholder="Select account..." />
+                      <SelectValue placeholder={tUi("select.account.2")} />
                     </SelectTrigger>
                     <SelectContent>
                       {cashAccounts?.map((a) => (

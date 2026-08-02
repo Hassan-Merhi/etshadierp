@@ -26,6 +26,7 @@ import {
   ChevronsUpDown,
   Check,
 } from "lucide-react";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 type AttendanceStatus = "Present" | "Absent" | "Late" | "Half Day" | "Leave";
 type ViewMode = "daily" | "perEmployee";
@@ -120,6 +121,7 @@ function SummaryCard({
 }
 
 export default function FactoryEmployeeAttendanceTab() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [mode, setMode] = useState<ViewMode>("daily");
 
@@ -228,7 +230,7 @@ export default function FactoryEmployeeAttendanceTab() {
             <CardContent className="pt-4">
               <div className="flex flex-wrap gap-3 items-end">
                 <div className="flex flex-col gap-1">
-                  <Label className="text-xs text-muted-foreground">Attendance Date</Label>
+                  <Label className="text-xs text-muted-foreground">{tUi("attendance.date")}</Label>
                   <Input
                     type="date"
                     value={selectedDate}
@@ -238,7 +240,7 @@ export default function FactoryEmployeeAttendanceTab() {
                   />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <Label className="text-xs text-muted-foreground">Shift (optional)</Label>
+                  <Label className="text-xs text-muted-foreground">{tUi("shift.optional")}</Label>
                   <Input
                     placeholder="e.g. Morning"
                     value={shift}
@@ -345,10 +347,12 @@ export default function FactoryEmployeeAttendanceTab() {
                       <thead className="sticky top-0 z-30">
                         <tr className="border-b bg-muted/40">
                           <th className="text-left px-4 py-2 font-medium text-muted-foreground w-8">#</th>
-                          <th className="text-left px-4 py-2 font-medium text-muted-foreground">Employee</th>
-                          <th className="text-left px-4 py-2 font-medium text-muted-foreground">Department</th>
-                          <th className="text-left px-4 py-2 font-medium text-muted-foreground w-44">Status</th>
-                          <th className="text-left px-4 py-2 font-medium text-muted-foreground">Notes</th>
+                          <th className="text-left px-4 py-2 font-medium text-muted-foreground">{tUi("employee")}</th>
+                          <th className="text-left px-4 py-2 font-medium text-muted-foreground">{tUi("department")}</th>
+                          <th className="text-left px-4 py-2 font-medium text-muted-foreground w-44">
+                            {tUi("status")}
+                          </th>
+                          <th className="text-left px-4 py-2 font-medium text-muted-foreground">{tUi("notes")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -390,7 +394,7 @@ export default function FactoryEmployeeAttendanceTab() {
                               </td>
                               <td className="px-4 py-2">
                                 <Input
-                                  placeholder="Optional notes"
+                                  placeholder={tUi("optional.notes")}
                                   value={notesMap[emp.id] ?? ""}
                                   onChange={(e) => setNotesMap((p) => ({ ...p, [emp.id]: e.target.value }))}
                                   className="h-8 text-xs"
@@ -434,7 +438,7 @@ export default function FactoryEmployeeAttendanceTab() {
                             </SelectContent>
                           </Select>
                           <Input
-                            placeholder="Notes (optional)"
+                            placeholder={tUi("notes.optional")}
                             value={notesMap[emp.id] ?? ""}
                             onChange={(e) => setNotesMap((p) => ({ ...p, [emp.id]: e.target.value }))}
                             className="h-8 text-xs"
@@ -454,6 +458,7 @@ export default function FactoryEmployeeAttendanceTab() {
 }
 
 function PerEmployeeView() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [selectedEmpId, setSelectedEmpId] = useState<string>("");
   const [empComboOpen, setEmpComboOpen] = useState(false);
@@ -543,7 +548,7 @@ function PerEmployeeView() {
         <CardContent className="pt-4">
           <div className="flex flex-wrap gap-3 items-end">
             <div className="flex flex-col gap-1 min-w-[200px]">
-              <Label className="text-xs text-muted-foreground">Employee</Label>
+              <Label className="text-xs text-muted-foreground">{tUi("employee")}</Label>
               <Popover open={empComboOpen} onOpenChange={setEmpComboOpen}>
                 <PopoverTrigger asChild>
                   <Button
@@ -561,9 +566,9 @@ function PerEmployeeView() {
                 </PopoverTrigger>
                 <PopoverContent className="w-72 p-0" align="start">
                   <Command>
-                    <CommandInput placeholder="Search employee…" />
+                    <CommandInput placeholder={tUi("search.employee")} />
                     <CommandList>
-                      <CommandEmpty>No employees found.</CommandEmpty>
+                      <CommandEmpty>{tUi("no.employees.found")}</CommandEmpty>
                       <CommandGroup>
                         {(empList ?? []).map((e) => (
                           <CommandItem
@@ -588,7 +593,7 @@ function PerEmployeeView() {
               </Popover>
             </div>
             <div className="flex flex-col gap-1">
-              <Label className="text-xs text-muted-foreground">From</Label>
+              <Label className="text-xs text-muted-foreground">{tUi("from")}</Label>
               <Input
                 type="date"
                 value={startDate}
@@ -700,7 +705,7 @@ function PerEmployeeView() {
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <User className="h-10 w-10 mx-auto mb-3 opacity-40" />
-            <p>Select an employee to view and edit attendance.</p>
+            <p>{tUi("select.an.employee.to.view.and.edit.attendance")}</p>
           </CardContent>
         </Card>
       )}

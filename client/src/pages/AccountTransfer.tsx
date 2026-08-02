@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeftRight, ArrowRight, Check, Search, X } from "lucide-react";
 import { format } from "date-fns";
 import { PageHeader } from "@/components/PageHeader";
+import { useErpText } from "@/i18n/modules/erp";
 
 type Account = { id: number; name: string; code: string; accountType: string };
 type Entry = {
@@ -45,6 +46,7 @@ function AccountCombobox({
   excludeId?: number | null;
   testId: string;
 }) {
+  const tUi = useErpText();
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
 
@@ -95,7 +97,7 @@ function AccountCombobox({
               <Search className="h-4 w-4 text-muted-foreground shrink-0" />
               <Input
                 className="h-7 border-0 p-0 focus-visible:ring-0 text-sm"
-                placeholder="Search accounts…"
+                placeholder={tUi("search.accounts")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 autoFocus
@@ -105,7 +107,7 @@ function AccountCombobox({
           </div>
           <div className="max-h-60 overflow-y-auto">
             {filtered.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">No accounts found</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{tUi("no.accounts.found")}</p>
             )}
             {filtered.map((a) => (
               <div
@@ -134,6 +136,7 @@ function AccountCombobox({
 }
 
 export default function AccountTransfer() {
+  const tUi = useErpText();
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
 
@@ -189,7 +192,8 @@ export default function AccountTransfer() {
   function toggleOne(id: number) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
@@ -227,8 +231,8 @@ export default function AccountTransfer() {
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <PageHeader
-        title="Account Transfer"
-        subtitle="Move voucher entries from one ledger account to another"
+        title={tUi("account.transfer")}
+        subtitle={tUi("move.voucher.entries.from.one.ledger.account.to.")}
         icon={<ArrowLeftRight className="h-6 w-6" />}
       />
 
@@ -241,7 +245,7 @@ export default function AccountTransfer() {
                   <Check className="h-5 w-5 text-green-600 dark:text-green-400" />
                 </div>
                 <div>
-                  <p className="font-semibold text-green-700 dark:text-green-300">Transfer complete</p>
+                  <p className="font-semibold text-green-700 dark:text-green-300">{tUi("transfer.complete")}</p>
                   <p className="text-sm text-muted-foreground">
                     {done.moved} {done.moved === 1 ? "entry" : "entries"} moved to{" "}
                     <span className="font-medium">{done.toAccount}</span>
@@ -259,8 +263,8 @@ export default function AccountTransfer() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Source Account</CardTitle>
-            <p className="text-sm text-muted-foreground">Entries will be moved away from this account</p>
+            <CardTitle className="text-base">{tUi("source.account")}</CardTitle>
+            <p className="text-sm text-muted-foreground">{tUi("entries.will.be.moved.away.from.this.account")}</p>
           </CardHeader>
           <CardContent>
             <AccountCombobox
@@ -271,7 +275,7 @@ export default function AccountTransfer() {
                 setSelectedIds(new Set());
                 setDone(null);
               }}
-              placeholder="Select source account…"
+              placeholder={tUi("select.source.account")}
               excludeId={toAccountId}
               testId="combobox-from-account"
             />
@@ -280,8 +284,8 @@ export default function AccountTransfer() {
 
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Destination Account</CardTitle>
-            <p className="text-sm text-muted-foreground">Selected entries will be re-assigned here</p>
+            <CardTitle className="text-base">{tUi("destination.account")}</CardTitle>
+            <p className="text-sm text-muted-foreground">{tUi("selected.entries.will.be.re.assigned.here")}</p>
           </CardHeader>
           <CardContent>
             <AccountCombobox
@@ -291,7 +295,7 @@ export default function AccountTransfer() {
                 setToAccountId(id);
                 setDone(null);
               }}
-              placeholder="Select destination account…"
+              placeholder={tUi("select.destination.account")}
               excludeId={fromAccountId}
               testId="combobox-to-account"
             />
@@ -312,14 +316,14 @@ export default function AccountTransfer() {
                     </Badge>
                   )}
                 </CardTitle>
-                <p className="text-sm text-muted-foreground mt-0.5">Select which entries to transfer</p>
+                <p className="text-sm text-muted-foreground mt-0.5">{tUi("select.which.entries.to.transfer")}</p>
               </div>
               <div className="flex items-center gap-2">
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                   <Input
                     className="pl-8 h-8 text-sm w-52"
-                    placeholder="Filter entries…"
+                    placeholder={tUi("filter.entries")}
                     value={searchEntries}
                     onChange={(e) => setSearchEntries(e.target.value)}
                     data-testid="input-search-entries"
@@ -330,9 +334,11 @@ export default function AccountTransfer() {
           </CardHeader>
           <CardContent className="p-0">
             {loadingEntries ? (
-              <div className="text-center py-10 text-muted-foreground text-sm">Loading entries…</div>
+              <div className="text-center py-10 text-muted-foreground text-sm">{tUi("loading.entries")}</div>
             ) : entries.length === 0 ? (
-              <div className="text-center py-10 text-muted-foreground text-sm">No entries found for this account</div>
+              <div className="text-center py-10 text-muted-foreground text-sm">
+                {tUi("no.entries.found.for.this.account")}
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -348,14 +354,24 @@ export default function AccountTransfer() {
                           }}
                         />
                       </th>
-                      <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide">Voucher #</th>
-                      <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide">Date</th>
-                      <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide">Type</th>
+                      <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide">
+                        {tUi("voucher")}
+                      </th>
+                      <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide">
+                        {tUi("date")}
+                      </th>
+                      <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide">
+                        {tUi("type")}
+                      </th>
                       <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide">
                         Description / Narration
                       </th>
-                      <th className="px-3 py-2 text-right font-semibold text-xs uppercase tracking-wide">Debit</th>
-                      <th className="px-3 py-2 text-right font-semibold text-xs uppercase tracking-wide">Credit</th>
+                      <th className="px-3 py-2 text-right font-semibold text-xs uppercase tracking-wide">
+                        {tUi("debit")}
+                      </th>
+                      <th className="px-3 py-2 text-right font-semibold text-xs uppercase tracking-wide">
+                        {tUi("credit")}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>

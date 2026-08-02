@@ -3,8 +3,8 @@
  *
  * Extracted from FactoryOtwTrackingTab.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {Input} from "@/components/ui/input";
+import { useState } from "react";
+import { Input } from "@/components/ui/input";
 
 export // ── Inline notes cell ────────────────────────────────────────────────────────
 function NotesCell({

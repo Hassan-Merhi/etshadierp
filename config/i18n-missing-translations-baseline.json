@@ -1,0 +1,4 @@
+{
+  "description": "One-way ceiling for module catalog entries still missing French or Arabic. Converting a page to t() calls moves its text out of the literal audit and into this one, so the two gates together describe the real state of the rollout. Lower this as reviewed translations land; never raise it without a reviewed conversion adding the entries.",
+  "maxMissing": 6364
+}

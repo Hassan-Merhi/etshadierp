@@ -3,12 +3,14 @@
  *
  * Extracted from FactorySheetsAndSacks.tsx during the Phase 4 god-file split.
  */
-import {Check} from "lucide-react";
+import { Check } from "lucide-react";
 
-import {COLOR_PRESETS, isLight} from "../utils";
+import { COLOR_PRESETS, isLight } from "../utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export // ─── Color Picker ─────────────────────────────────────────────────────────────
 function ColorPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const tUi = useFactoryText();
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
@@ -39,7 +41,7 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (v: string)
             )}
           </button>
         ))}
-        <div className="relative flex items-center" title="Custom color">
+        <div className="relative flex items-center" title={tUi("custom.color")}>
           <input
             type="color"
             value={value && !COLOR_PRESETS.some((c) => c.value === value) ? value : "#888888"}

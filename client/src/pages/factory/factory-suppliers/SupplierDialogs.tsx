@@ -16,6 +16,7 @@ import { SupplierWithBalance, BulkFxPreview } from "./factorySupplierTypes";
 import { FactorySupplier } from "@shared/schema";
 import { UseMutationResult } from "@tanstack/react-query";
 import { Layers } from "lucide-react";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface SupplierDialogsProps {
   createOpen: boolean;
@@ -136,6 +137,7 @@ export function SupplierDialogs({
   setEditObComm,
   updateObCommissionMutation,
 }: SupplierDialogsProps) {
+  const tUi = useFactoryText();
   return (
     <>
       <SupplierFormDialog
@@ -205,7 +207,7 @@ export function SupplierDialogs({
             <div className="space-y-4">
               <div className="rounded-md border p-3 space-y-2 bg-muted/40">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total to settle</span>
+                  <span className="text-muted-foreground">{tUi("total.to.settle")}</span>
                   <span className="font-semibold tabular-nums">
                     {bulkFxForm.fromCurrencyCode}{" "}
                     {parseFloat(bulkFxPreview.totalAllocated).toLocaleString(undefined, {
@@ -226,7 +228,9 @@ export function SupplierDialogs({
                 </div>
               </div>
               <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Account deductions</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  {tUi("account.deductions")}
+                </p>
                 <div className="rounded-md border divide-y text-sm max-h-64 overflow-y-auto">
                   {bulkFxPreview.transfers.map(
                     (t: {
@@ -236,41 +240,41 @@ export function SupplierDialogs({
                       allocated: string;
                       toAmountUsd: string;
                     }) => {
-                    const overpaid = parseFloat(t.overpayment || "0") > 0.01;
-                    return (
-                      <div key={t.supplierId} className="flex justify-between items-center px-3 py-2">
-                        <div>
-                          <div className="font-medium">{t.supplierName}</div>
-                          {overpaid && (
-                            <div className="text-xs text-amber-600 dark:text-amber-400">
-                              incl. {bulkFxForm.fromCurrencyCode}{" "}
-                              {parseFloat(t.overpayment || "0").toLocaleString(undefined, {
+                      const overpaid = parseFloat(t.overpayment || "0") > 0.01;
+                      return (
+                        <div key={t.supplierId} className="flex justify-between items-center px-3 py-2">
+                          <div>
+                            <div className="font-medium">{t.supplierName}</div>
+                            {overpaid && (
+                              <div className="text-xs text-amber-600 dark:text-amber-400">
+                                incl. {bulkFxForm.fromCurrencyCode}{" "}
+                                {parseFloat(t.overpayment || "0").toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}{" "}
+                                overpayment (will show as CR)
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-right space-y-0.5">
+                            <div className="tabular-nums font-medium">
+                              {bulkFxForm.fromCurrencyCode}{" "}
+                              {parseFloat(t.allocated).toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              ≈ $
+                              {parseFloat(t.toAmountUsd).toLocaleString(undefined, {
                                 minimumFractionDigits: 2,
                                 maximumFractionDigits: 2,
                               })}{" "}
-                              overpayment (will show as CR)
+                              USD
                             </div>
-                          )}
-                        </div>
-                        <div className="text-right space-y-0.5">
-                          <div className="tabular-nums font-medium">
-                            {bulkFxForm.fromCurrencyCode}{" "}
-                            {parseFloat(t.allocated).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            ≈ $
-                            {parseFloat(t.toAmountUsd).toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}{" "}
-                            USD
                           </div>
                         </div>
-                      </div>
-                    );
+                      );
                     }
                   )}
                 </div>
@@ -292,18 +296,18 @@ export function SupplierDialogs({
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label>Currency</Label>
+                  <Label>{tUi("currency")}</Label>
                   <Input
                     value={bulkFxForm.fromCurrencyCode}
                     onChange={(e) =>
                       setBulkFxForm((f: any) => ({ ...f, fromCurrencyCode: e.target.value.toUpperCase() }))
                     }
                     maxLength={10}
-                    placeholder="EUR"
+                    placeholder={tUi("eur")}
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Total Amount</Label>
+                  <Label>{tUi("total.amount")}</Label>
                   <Input
                     type="number"
                     step="0.01"
@@ -325,7 +329,7 @@ export function SupplierDialogs({
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Entry Date</Label>
+                  <Label>{tUi("entry.date.2")}</Label>
                   <Input
                     type="date"
                     value={bulkFxForm.date}

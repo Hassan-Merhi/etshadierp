@@ -1,23 +1,54 @@
-import {useState, useMemo, type SetStateAction} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {useDateFormat} from "@/contexts/DateFormatContext";
-import {Play, CheckCircle2, Clock, DollarSign, ChevronDown, ChevronRight, X, Users, Trash2, CalendarDays, Printer, Wrench, FileDown, ShieldCheck, Layers} from "lucide-react";
+import { useState, useMemo, type SetStateAction } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import {
+  Play,
+  CheckCircle2,
+  Clock,
+  DollarSign,
+  ChevronDown,
+  ChevronRight,
+  X,
+  Users,
+  Trash2,
+  CalendarDays,
+  Printer,
+  Wrench,
+  FileDown,
+  ShieldCheck,
+  Layers,
+} from "lucide-react";
 import * as XLSX from "@/lib/excelHelper";
-import {Button} from "@/components/ui/button";
-import {Badge} from "@/components/ui/badge";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Checkbox} from "@/components/ui/checkbox";
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter} from "@/components/ui/dialog";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Skeleton} from "@/components/ui/skeleton";
-import {useToast} from "@/hooks/use-toast";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import type {FactoryWorker} from "@shared/schema";
-import type {AttendanceEntry, CashAccount, PayrollGroup, PayrollRecord, PreviewWorkerRow} from "./factorypayrolltab/types";
-import {fmtDate} from "./factorypayrolltab/utils";
-import {BatchRow} from "./factorypayrolltab/components/BatchRow";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { FactoryWorker } from "@shared/schema";
+import type {
+  AttendanceEntry,
+  CashAccount,
+  PayrollGroup,
+  PayrollRecord,
+  PreviewWorkerRow,
+} from "./factorypayrolltab/types";
+import { fmtDate } from "./factorypayrolltab/utils";
+import { BatchRow } from "./factorypayrolltab/components/BatchRow";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactoryPayrollTab() {
+  const tUi = useFactoryText();
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
 
@@ -123,11 +154,13 @@ export default function FactoryPayrollTab() {
       return { start: t, end: t };
     }
     if (projectionPeriod === "weekly") {
-      const s = new Date(now); s.setDate(now.getDate() - 6);
+      const s = new Date(now);
+      s.setDate(now.getDate() - 6);
       return { start: fmtD(s), end: fmtD(now) };
     }
     if (projectionPeriod === "biweekly") {
-      const s = new Date(now); s.setDate(now.getDate() - 13);
+      const s = new Date(now);
+      s.setDate(now.getDate() - 13);
       return { start: fmtD(s), end: fmtD(now) };
     }
     // monthly — first to last of current month
@@ -149,10 +182,7 @@ export default function FactoryPayrollTab() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const projectionTotal = useMemo(
-    () => (projectionRows ?? []).reduce((s, r) => s + (r.net ?? 0), 0),
-    [projectionRows]
-  );
+  const projectionTotal = useMemo(() => (projectionRows ?? []).reduce((s, r) => s + (r.net ?? 0), 0), [projectionRows]);
 
   // Group payrolls by period
   const payrollGroups = useMemo((): PayrollGroup[] => {
@@ -481,36 +511,36 @@ export default function FactoryPayrollTab() {
           <>
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
               <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Workers on Payroll</span>
+              <span className="text-muted-foreground">{tUi("workers.on.payroll")}</span>
               <span className="font-semibold" data-testid="stat-workers">
                 {stats.uniqueWorkers}
               </span>
             </div>
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
               <Layers className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Batches</span>
+              <span className="text-muted-foreground">{tUi("batches")}</span>
               <span className="font-semibold">{payrollGroups.length}</span>
             </div>
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
               <Clock className="h-4 w-4 text-amber-500" />
-              <span className="text-muted-foreground">Pending</span>
+              <span className="text-muted-foreground">{tUi("pending")}</span>
               <span className="font-semibold font-mono text-amber-600 dark:text-amber-400" data-testid="stat-pending">
                 ${stats.pending.toFixed(2)}
               </span>
             </div>
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm">
               <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-              <span className="text-muted-foreground">Total Paid</span>
+              <span className="text-muted-foreground">{tUi("total.paid")}</span>
               <span className="font-semibold font-mono text-emerald-600 dark:text-emerald-400" data-testid="stat-paid">
                 ${stats.paid.toFixed(2)}
               </span>
             </div>
-            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm" data-testid="stat-projection">
+            <div
+              className="flex items-center gap-2 rounded-lg border bg-muted/40 px-4 py-2 text-sm"
+              data-testid="stat-projection"
+            >
               <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
-              <Select
-                value={projectionPeriod}
-                onValueChange={(v) => setProjectionPeriod(v as typeof projectionPeriod)}
-              >
+              <Select value={projectionPeriod} onValueChange={(v) => setProjectionPeriod(v as typeof projectionPeriod)}>
                 <SelectTrigger
                   className="h-auto border-0 p-0 shadow-none focus:ring-0 text-muted-foreground text-sm gap-1 min-w-0 w-auto"
                   data-testid="select-projection-period"
@@ -518,17 +548,20 @@ export default function FactoryPayrollTab() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="daily">Daily</SelectItem>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="biweekly">Bi-weekly</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="daily">{tUi("daily")}</SelectItem>
+                  <SelectItem value="weekly">{tUi("weekly")}</SelectItem>
+                  <SelectItem value="biweekly">{tUi("bi.weekly")}</SelectItem>
+                  <SelectItem value="monthly">{tUi("monthly")}</SelectItem>
                 </SelectContent>
               </Select>
-              <span className="text-muted-foreground">Total</span>
+              <span className="text-muted-foreground">{tUi("total")}</span>
               {projectionFetching ? (
                 <span className="font-mono text-muted-foreground/50 text-sm">···</span>
               ) : (
-                <span className="font-semibold font-mono text-blue-600 dark:text-blue-400" data-testid="stat-projection-total">
+                <span
+                  className="font-semibold font-mono text-blue-600 dark:text-blue-400"
+                  data-testid="stat-projection-total"
+                >
                   ${projectionTotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               )}
@@ -559,7 +592,7 @@ export default function FactoryPayrollTab() {
                 setRepairOpen(true);
               }}
               data-testid="button-repair-ledger"
-              title="Repair Ledger — remove stale entries from undone payrolls"
+              title={tUi("repair.ledger.remove.stale.entries.from.undone.p")}
             >
               <ShieldCheck className="h-4 w-4 text-muted-foreground" />
             </Button>
@@ -584,8 +617,8 @@ export default function FactoryPayrollTab() {
             <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
               <DollarSign className="h-5 w-5 text-muted-foreground" />
             </div>
-            <p className="text-sm font-medium">No payroll records yet</p>
-            <p className="text-xs text-muted-foreground">Click "Run Payroll" to generate records for your workers</p>
+            <p className="text-sm font-medium">{tUi("no.payroll.records.yet")}</p>
+            <p className="text-xs text-muted-foreground">{tUi("click.run.payroll.to.generate.records.for.your.w")}</p>
           </div>
         ) : (
           <div>
@@ -669,7 +702,7 @@ export default function FactoryPayrollTab() {
       <Dialog open={runOpen} onOpenChange={setRunOpen}>
         <DialogContent className="max-w-2xl flex flex-col max-h-[90vh]" data-testid="dialog-run-payroll">
           <DialogHeader className="flex-shrink-0">
-            <DialogTitle>Run Payroll</DialogTitle>
+            <DialogTitle>{tUi("run.payroll")}</DialogTitle>
             <DialogDescription>
               Configure the payroll period and settings, then preview before generating.
             </DialogDescription>
@@ -677,7 +710,7 @@ export default function FactoryPayrollTab() {
           <div className="flex-1 overflow-y-auto space-y-4 pr-1 min-h-0">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">Period Start</Label>
+                <Label className="text-xs">{tUi("period.start")}</Label>
                 <Input
                   type="date"
                   value={runForm.periodStart}
@@ -686,7 +719,7 @@ export default function FactoryPayrollTab() {
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Period End</Label>
+                <Label className="text-xs">{tUi("period.end")}</Label>
                 <Input
                   type="date"
                   value={runForm.periodEnd}
@@ -697,17 +730,17 @@ export default function FactoryPayrollTab() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">Days Count (auto)</Label>
+                <Label className="text-xs">{tUi("days.count.auto")}</Label>
                 <Input
                   type="number"
-                  placeholder="Auto-calculated"
+                  placeholder={tUi("auto.calculated")}
                   value={runForm.daysCount}
                   onChange={(e) => setRunForm((f) => ({ ...f, daysCount: e.target.value }))}
                   data-testid="input-days-count"
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Bonus Per Worker</Label>
+                <Label className="text-xs">{tUi("bonus.per.worker")}</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -718,13 +751,13 @@ export default function FactoryPayrollTab() {
               </div>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Cash Account (optional, used at payment)</Label>
+              <Label className="text-xs">{tUi("cash.account.optional.used.at.payment")}</Label>
               <Select
                 value={runForm.cashAccountId}
                 onValueChange={(v) => setRunForm((f) => ({ ...f, cashAccountId: v }))}
               >
                 <SelectTrigger data-testid="select-cash-account">
-                  <SelectValue placeholder="Select account (optional)" />
+                  <SelectValue placeholder={tUi("select.account.optional")} />
                 </SelectTrigger>
                 <SelectContent>
                   {cashAccounts?.map((a) => (
@@ -736,7 +769,7 @@ export default function FactoryPayrollTab() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label className="text-xs">Workers</Label>
+              <Label className="text-xs">{tUi("workers")}</Label>
               <div className="flex gap-3">
                 <Button
                   variant={runForm.targetAll ? "default" : "outline"}
@@ -781,7 +814,7 @@ export default function FactoryPayrollTab() {
               )}
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Notes (optional)</Label>
+              <Label className="text-xs">{tUi("notes.optional")}</Label>
               <Input
                 value={runForm.notes}
                 onChange={(e) => setRunForm((f) => ({ ...f, notes: e.target.value }))}
@@ -810,7 +843,7 @@ export default function FactoryPayrollTab() {
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-4xl flex flex-col max-h-[90vh]" data-testid="dialog-preview-payroll">
           <DialogHeader className="flex-shrink-0">
-            <DialogTitle>Payroll Preview</DialogTitle>
+            <DialogTitle>{tUi("payroll.preview")}</DialogTitle>
             <DialogDescription>
               {previewRows.length} workers · {runForm.periodStart} to {runForm.periodEnd} · Net Total: $
               {previewRows
@@ -882,7 +915,7 @@ export default function FactoryPayrollTab() {
                           )}
                         </>
                       ) : (
-                        <span className="text-muted-foreground">No attendance</span>
+                        <span className="text-muted-foreground">{tUi("no.attendance")}</span>
                       )}
                     </div>
                     {/* Salary breakdown */}
@@ -891,7 +924,7 @@ export default function FactoryPayrollTab() {
                       {r.bonus > 0 && <span className="text-muted-foreground">Bonus: ${r.bonus.toFixed(2)}</span>}
                       {r.transportMonthly > 0 && (
                         <span className="text-muted-foreground flex flex-wrap items-center gap-1">
-                          <span>Transport/mo:</span>
+                          <span>{tUi("transport.mo")}</span>
                           <Input
                             type="number"
                             step="0.01"
@@ -918,19 +951,17 @@ export default function FactoryPayrollTab() {
                     <div className="border-t bg-red-50/50 dark:bg-red-950/20 px-3 py-2 space-y-1">
                       {(r.pendingDeductionRecords || []).map((ded) => (
                         <div key={ded.id} className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs text-muted-foreground">Salary Deduction:</span>
+                          <span className="text-xs text-muted-foreground">{tUi("salary.deduction")}</span>
                           <span className="text-sm font-mono font-semibold text-destructive">
                             -${parseFloat(ded.amount).toFixed(2)}
                           </span>
-                          {ded.reason && (
-                            <span className="text-xs text-muted-foreground">· {ded.reason}</span>
-                          )}
+                          {ded.reason && <span className="text-xs text-muted-foreground">· {ded.reason}</span>}
                           <span className="text-xs text-muted-foreground italic">(pending, applied at generation)</span>
                           <Button
                             size="icon"
                             variant="ghost"
                             className="h-5 w-5 text-destructive"
-                            title="Remove this deduction"
+                            title={tUi("remove.this.deduction")}
                             data-testid={`button-delete-deduction-${ded.id}`}
                             onClick={async (e) => {
                               e.stopPropagation();
@@ -941,7 +972,11 @@ export default function FactoryPayrollTab() {
                                 });
                                 if (!res.ok) {
                                   const err = await res.json();
-                                  toast({ title: "Failed to remove deduction", description: err.message, variant: "destructive" });
+                                  toast({
+                                    title: "Failed to remove deduction",
+                                    description: err.message,
+                                    variant: "destructive",
+                                  });
                                 } else {
                                   queryClient.invalidateQueries({ queryKey: ["/api/factory/payrolls/preview"] });
                                 }
@@ -980,7 +1015,7 @@ export default function FactoryPayrollTab() {
                           Total: ${r.totalAdvanceBalance.toFixed(2)}
                         </Button>
                         <div className="flex items-center gap-2 ml-auto">
-                          <span className="text-xs text-muted-foreground">Deduct:</span>
+                          <span className="text-xs text-muted-foreground">{tUi("deduct.2")}</span>
                           <Input
                             type="number"
                             step="0.01"
@@ -1047,7 +1082,8 @@ export default function FactoryPayrollTab() {
                     <div className="border-t bg-blue-50/40 dark:bg-blue-950/20 px-3 py-2 space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground">
-                          Outstanding Loan{(r.outstandingLoans?.length ?? 0) !== 1 ? "s" : ""} (manual repayment — not deducted from salary):
+                          Outstanding Loan{(r.outstandingLoans?.length ?? 0) !== 1 ? "s" : ""} (manual repayment — not
+                          deducted from salary):
                         </span>
                         <span className="text-sm font-mono font-medium text-blue-700 dark:text-blue-400">
                           ${(r.totalLoanBalance ?? 0).toFixed(2)}
@@ -1057,7 +1093,12 @@ export default function FactoryPayrollTab() {
                         {r.outstandingLoans?.map((loan) => (
                           <div key={loan.id} className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                             <span className="font-mono">{loan.advanceDate}</span>
-                            <span>Remaining: <span className="font-mono font-medium">${parseFloat(loan.remainingBalance).toFixed(2)}</span></span>
+                            <span>
+                              {tUi("remaining.2")}{" "}
+                              <span className="font-mono font-medium">
+                                ${parseFloat(loan.remainingBalance).toFixed(2)}
+                              </span>
+                            </span>
                             {loan.notes && <span className="italic truncate max-w-[200px]">{loan.notes}</span>}
                           </div>
                         ))}
@@ -1078,8 +1119,7 @@ export default function FactoryPayrollTab() {
                 try {
                   const exportRows = previewRows.map((r) => {
                     const mRate = parseFloat(transportOverrides[r.id] ?? r.transportMonthly.toFixed(2));
-                    const rHasAtt =
-                      r.presentDates.length > 0 || r.absentDates.length > 0 || r.halfDayDates.length > 0;
+                    const rHasAtt = r.presentDates.length > 0 || r.absentDates.length > 0 || r.halfDayDates.length > 0;
                     const transportPaid =
                       rHasAtt && r.totalWorkingDays > 0 ? (r.presentDays / r.totalWorkingDays) * mRate : mRate;
                     const advanceDeduction = parseFloat(advanceOverrides[r.id] || "0");
@@ -1161,7 +1201,9 @@ export default function FactoryPayrollTab() {
               {attendanceDetail.presentDates.length === 0 &&
               attendanceDetail.absentDates.length === 0 &&
               attendanceDetail.halfDayDates.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No attendance records for this period.</p>
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  {tUi("no.attendance.records.for.this.period")}
+                </p>
               ) : (
                 <>
                   {attendanceDetail.presentDates.length > 0 && (
@@ -1245,14 +1287,14 @@ export default function FactoryPayrollTab() {
       >
         <DialogContent data-testid="dialog-mark-paid">
           <DialogHeader>
-            <DialogTitle>Pay Worker</DialogTitle>
+            <DialogTitle>{tUi("pay.worker")}</DialogTitle>
             <DialogDescription>
               Select the payment date and cash or bank account. This will settle the payroll liability.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label className="text-xs">Payment Date</Label>
+              <Label className="text-xs">{tUi("payment.date")}</Label>
               <Input
                 type="date"
                 value={payPaymentDate}
@@ -1261,10 +1303,10 @@ export default function FactoryPayrollTab() {
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Cash / Bank Account</Label>
+              <Label className="text-xs">{tUi("cash.bank.account")}</Label>
               <Select value={payCashAccountId} onValueChange={setPayCashAccountId}>
                 <SelectTrigger data-testid="select-pay-cash-account">
-                  <SelectValue placeholder="Select account" />
+                  <SelectValue placeholder={tUi("select.account")} />
                 </SelectTrigger>
                 <SelectContent>
                   {cashAccounts?.map((a) => (
@@ -1317,10 +1359,10 @@ export default function FactoryPayrollTab() {
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label className="text-xs">Cash / Bank Account</Label>
+              <Label className="text-xs">{tUi("cash.bank.account")}</Label>
               <Select value={fixAcctCashId} onValueChange={setFixAcctCashId}>
                 <SelectTrigger data-testid="select-fix-cash-account">
-                  <SelectValue placeholder="Select account" />
+                  <SelectValue placeholder={tUi("select.account")} />
                 </SelectTrigger>
                 <SelectContent>
                   {cashAccounts?.map((a) => (
@@ -1359,7 +1401,7 @@ export default function FactoryPayrollTab() {
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label className="text-xs">Payment Date</Label>
+              <Label className="text-xs">{tUi("payment.date")}</Label>
               <Input
                 type="date"
                 value={bulkPaymentDate}
@@ -1368,10 +1410,10 @@ export default function FactoryPayrollTab() {
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Cash / Bank Account</Label>
+              <Label className="text-xs">{tUi("cash.bank.account")}</Label>
               <Select value={bulkCashAccountId} onValueChange={setBulkCashAccountId}>
                 <SelectTrigger data-testid="select-bulk-cash-account">
-                  <SelectValue placeholder="Select account" />
+                  <SelectValue placeholder={tUi("select.account")} />
                 </SelectTrigger>
                 <SelectContent>
                   {cashAccounts?.map((a) => (
@@ -1431,7 +1473,7 @@ export default function FactoryPayrollTab() {
           <Dialog open={undoTargetId !== null} onOpenChange={(open) => !open && setUndoTargetId(null)}>
             <DialogContent data-testid="dialog-undo">
               <DialogHeader>
-                <DialogTitle>Undo Payroll</DialogTitle>
+                <DialogTitle>{tUi("undo.payroll")}</DialogTitle>
                 <DialogDescription>
                   {isPaid
                     ? "This will revert the payroll back to Draft, remove the payment record, and delete all related accounting entries. Advance deductions will also be restored."
@@ -1495,7 +1537,7 @@ export default function FactoryPayrollTab() {
       <Dialog open={deleteTargetId !== null} onOpenChange={(open) => !open && setDeleteTargetId(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Draft Payroll</DialogTitle>
+            <DialogTitle>{tUi("delete.draft.payroll")}</DialogTitle>
             <DialogDescription>
               Are you sure you want to delete this draft payroll record? This action cannot be undone.
             </DialogDescription>
@@ -1537,7 +1579,7 @@ export default function FactoryPayrollTab() {
 
           {repairResult && (
             <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-1">
-              <p className="font-medium text-foreground">Repair complete</p>
+              <p className="font-medium text-foreground">{tUi("repair.complete")}</p>
               <p className="text-muted-foreground">
                 Payroll payment vouchers removed:{" "}
                 <span className="font-semibold text-foreground">{repairResult.deletedPayrollVouchers}</span>

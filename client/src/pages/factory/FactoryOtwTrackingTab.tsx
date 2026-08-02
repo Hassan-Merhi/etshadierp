@@ -1,26 +1,55 @@
-import {useState} from "react";
-import {useQuery, useMutation, useQueryClient as useTQClient} from "@tanstack/react-query";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Checkbox} from "@/components/ui/checkbox";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Tooltip, TooltipContent, TooltipTrigger} from "@/components/ui/tooltip";
-import {Radio, RefreshCw, Loader2, AlertTriangle, Settings2, Search, Package, Pencil, Ship, Truck, CheckCircle2, DollarSign, Clock, Filter, ChevronDown, Scale, Download, Upload} from "lucide-react";
-import {cn} from "@/lib/utils";
-import {useToast} from "@/hooks/use-toast";
-import {factoryApiRequest} from "@/lib/factoryApi";
-import {useFactoryJsonCargoEta} from "./useFactoryJsonCargoEta";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient as useTQClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Radio,
+  RefreshCw,
+  Loader2,
+  AlertTriangle,
+  Settings2,
+  Search,
+  Package,
+  Pencil,
+  Ship,
+  Truck,
+  CheckCircle2,
+  DollarSign,
+  Clock,
+  Filter,
+  ChevronDown,
+  Scale,
+  Download,
+  Upload,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { factoryApiRequest } from "@/lib/factoryApi";
+import { useFactoryJsonCargoEta } from "./useFactoryJsonCargoEta";
 
-import type {ContainerWithSupplier, OtwTrackingTabProps} from "./factoryotwtrackingtab/types";
-import {STATUS_ACTIVE, calcDelayDays, ccySym, containerCost, fmtAmt, isOverdue, num} from "./factoryotwtrackingtab/utils";
-import {SummaryCard} from "./factoryotwtrackingtab/components/SummaryCard";
-import {EtaCell} from "./factoryotwtrackingtab/components/EtaCell";
-import {NotesCell} from "./factoryotwtrackingtab/components/NotesCell";
-import {EventTimelineSheet} from "./factoryotwtrackingtab/components/EventTimelineSheet";
-import {TrackingSettingsSheet} from "./factoryotwtrackingtab/components/TrackingSettingsSheet";
-import {TrackNowProgressLog} from "./factoryotwtrackingtab/components/TrackNowProgressLog";
+import type { ContainerWithSupplier, OtwTrackingTabProps } from "./factoryotwtrackingtab/types";
+import {
+  STATUS_ACTIVE,
+  calcDelayDays,
+  ccySym,
+  containerCost,
+  fmtAmt,
+  isOverdue,
+  num,
+} from "./factoryotwtrackingtab/utils";
+import { SummaryCard } from "./factoryotwtrackingtab/components/SummaryCard";
+import { EtaCell } from "./factoryotwtrackingtab/components/EtaCell";
+import { NotesCell } from "./factoryotwtrackingtab/components/NotesCell";
+import { EventTimelineSheet } from "./factoryotwtrackingtab/components/EventTimelineSheet";
+import { TrackingSettingsSheet } from "./factoryotwtrackingtab/components/TrackingSettingsSheet";
+import { TrackNowProgressLog } from "./factoryotwtrackingtab/components/TrackNowProgressLog";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = {}) {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const tqClient = useTQClient();
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
@@ -488,7 +517,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     return (
       <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
         <Radio className="h-12 w-12 opacity-20" />
-        <p className="text-sm">No containers currently on the way.</p>
+        <p className="text-sm">{tUi("no.containers.currently.on.the.way")}</p>
       </div>
     );
   }
@@ -562,7 +591,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search container #, supplier…"
+            placeholder={tUi("search.container.supplier")}
             className="pl-8"
             data-testid="input-otw-search"
           />
@@ -595,7 +624,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
               variant="outline"
               onClick={() => jsonCargoEta.refreshBulk()}
               disabled={jsonCargoEta.bulkIsPending}
-              title="JSONCargo ETA refresh — Maersk, Hapag-Lloyd, MSC, CMA CGM"
+              title={tUi("jsoncargo.eta.refresh.maersk.hapag.lloyd.msc.cma")}
               data-testid="button-update-etas"
             >
               {jsonCargoEta.bulkIsPending ? (
@@ -609,7 +638,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
               variant="outline"
               onClick={exportCsv}
               disabled={filtered.length === 0}
-              title="Export filtered containers to CSV"
+              title={tUi("export.filtered.containers.to.csv")}
               data-testid="button-export-csv"
             >
               <Download className="h-4 w-4 mr-1.5" />
@@ -618,7 +647,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
             <Button
               variant="outline"
               disabled={importing}
-              title="Import CSV to bulk-update ETA. Columns: Container #, Supplier, ETA (YYYY-MM-DD)"
+              title={tUi("import.csv.to.bulk.update.eta.columns.container.")}
               data-testid="button-import-csv"
               onClick={() => document.getElementById("otw-import-input")?.click()}
             >
@@ -640,13 +669,13 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       {showFilters && (
         <div className="flex flex-wrap gap-3 rounded-md border bg-muted/30 p-3">
           <div className="flex flex-col gap-1 min-w-[160px] flex-1">
-            <p className="text-xs text-muted-foreground">Supplier</p>
+            <p className="text-xs text-muted-foreground">{tUi("supplier")}</p>
             <Select value={supplierFilter} onValueChange={setSupplierFilter}>
               <SelectTrigger className="h-8 text-xs" data-testid="select-supplier-filter">
-                <SelectValue placeholder="All suppliers" />
+                <SelectValue placeholder={tUi("all.suppliers")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All suppliers</SelectItem>
+                <SelectItem value="all">{tUi("all.suppliers")}</SelectItem>
                 {suppliers.map(([key, name]) => (
                   <SelectItem key={key} value={key}>
                     {name}
@@ -656,67 +685,67 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
             </Select>
           </div>
           <div className="flex flex-col gap-1 min-w-[130px] flex-1">
-            <p className="text-xs text-muted-foreground">Freight</p>
+            <p className="text-xs text-muted-foreground">{tUi("freight")}</p>
             <Select value={freightFilter} onValueChange={setFreightFilter}>
               <SelectTrigger className="h-8 text-xs" data-testid="select-freight-filter">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All freight</SelectItem>
-                <SelectItem value="has_freight">Has freight</SelectItem>
-                <SelectItem value="no_freight">No freight</SelectItem>
+                <SelectItem value="all">{tUi("all.freight")}</SelectItem>
+                <SelectItem value="has_freight">{tUi("has.freight")}</SelectItem>
+                <SelectItem value="no_freight">{tUi("no.freight")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="flex flex-col gap-1 min-w-[130px] flex-1">
-            <p className="text-xs text-muted-foreground">Weight</p>
+            <p className="text-xs text-muted-foreground">{tUi("weight")}</p>
             <Select value={weightFilter} onValueChange={setWeightFilter}>
               <SelectTrigger className="h-8 text-xs" data-testid="select-weight-filter">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All weights</SelectItem>
-                <SelectItem value="has_weight">Has weight</SelectItem>
-                <SelectItem value="no_weight">No weight</SelectItem>
+                <SelectItem value="all">{tUi("all.weights")}</SelectItem>
+                <SelectItem value="has_weight">{tUi("has.weight")}</SelectItem>
+                <SelectItem value="no_weight">{tUi("no.weight")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="flex flex-col gap-1 min-w-[130px] flex-1">
-            <p className="text-xs text-muted-foreground">Docs</p>
+            <p className="text-xs text-muted-foreground">{tUi("docs")}</p>
             <Select value={docsFilter} onValueChange={setDocsFilter}>
               <SelectTrigger className="h-8 text-xs" data-testid="select-docs-filter">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All docs</SelectItem>
-                <SelectItem value="received">Docs received</SelectItem>
-                <SelectItem value="not_received">Docs pending</SelectItem>
+                <SelectItem value="all">{tUi("all.docs")}</SelectItem>
+                <SelectItem value="received">{tUi("docs.received")}</SelectItem>
+                <SelectItem value="not_received">{tUi("docs.pending")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="flex flex-col gap-1 min-w-[130px] flex-1">
-            <p className="text-xs text-muted-foreground">Delay / Overdue</p>
+            <p className="text-xs text-muted-foreground">{tUi("delay.overdue")}</p>
             <Select value={delayedFilter} onValueChange={setDelayedFilter}>
               <SelectTrigger className="h-8 text-xs" data-testid="select-delayed-filter">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All</SelectItem>
-                <SelectItem value="delayed">Delayed only</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
+                <SelectItem value="delayed">{tUi("delayed.only")}</SelectItem>
+                <SelectItem value="overdue">{tUi("overdue")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="flex flex-col gap-1 min-w-[120px] flex-1">
-            <p className="text-xs text-muted-foreground">Sort by ETA</p>
+            <p className="text-xs text-muted-foreground">{tUi("sort.by.eta")}</p>
             <Select value={sortOrder} onValueChange={setSortOrder}>
               <SelectTrigger className="h-8 text-xs" data-testid="select-sort-order">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="DEFAULT">Default</SelectItem>
-                <SelectItem value="ETA_ASC">Oldest first</SelectItem>
-                <SelectItem value="ETA_DESC">Newest first</SelectItem>
+                <SelectItem value="DEFAULT">{tUi("default")}</SelectItem>
+                <SelectItem value="ETA_ASC">{tUi("oldest.first")}</SelectItem>
+                <SelectItem value="ETA_DESC">{tUi("newest.first")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -756,26 +785,26 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
           <Radio className="h-10 w-10 opacity-30" />
-          <p className="text-sm">No containers match your filters.</p>
+          <p className="text-sm">{tUi("no.containers.match.your.filters")}</p>
         </div>
       ) : (
         <Table className="text-xs whitespace-nowrap" wrapperClassName="max-h-[calc(100vh-340px)] overflow-x-auto">
           <TableHeader className="sticky top-0 z-10">
             <TableRow className="!bg-amber-100 dark:!bg-amber-900/40">
               <TableHead className="w-8">#</TableHead>
-              <TableHead>Container #</TableHead>
-              <TableHead>Supplier</TableHead>
+              <TableHead>{tUi("container.2")}</TableHead>
+              <TableHead>{tUi("supplier")}</TableHead>
               <TableHead>ETA</TableHead>
-              <TableHead className="text-right">Cost</TableHead>
-              <TableHead className="text-right">Freight</TableHead>
-              <TableHead className="text-right">Commission</TableHead>
-              <TableHead className="text-right">Duty</TableHead>
-              <TableHead>Location</TableHead>
-              <TableHead>Weight (kg)</TableHead>
-              <TableHead>Delayed</TableHead>
-              <TableHead>Docs</TableHead>
-              <TableHead className="min-w-[140px]">Notes</TableHead>
-              <TableHead className="w-24 text-right pr-3">Actions</TableHead>
+              <TableHead className="text-right">{tUi("cost")}</TableHead>
+              <TableHead className="text-right">{tUi("freight")}</TableHead>
+              <TableHead className="text-right">{tUi("commission")}</TableHead>
+              <TableHead className="text-right">{tUi("duty")}</TableHead>
+              <TableHead>{tUi("location")}</TableHead>
+              <TableHead>{tUi("weight.kg")}</TableHead>
+              <TableHead>{tUi("delayed")}</TableHead>
+              <TableHead>{tUi("docs")}</TableHead>
+              <TableHead className="min-w-[140px]">{tUi("notes")}</TableHead>
+              <TableHead className="w-24 text-right pr-3">{tUi("actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -903,7 +932,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
                       checked={docDone}
                       onCheckedChange={(v) => toggleDoc(c.id, !!v)}
                       data-testid={`checkbox-docs-${c.id}`}
-                      aria-label="Docs received"
+                      aria-label={tUi("docs.received")}
                     />
                   </TableCell>
 
@@ -927,7 +956,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Edit Container</TooltipContent>
+                          <TooltipContent>{tUi("edit.container")}</TooltipContent>
                         </Tooltip>
                       )}
                       <Tooltip>
@@ -941,7 +970,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
                             <Settings2 className="h-3.5 w-3.5" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Tracking Settings</TooltipContent>
+                        <TooltipContent>{tUi("tracking.settings")}</TooltipContent>
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -979,7 +1008,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
                             )}
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent>Refresh ETA (JSONCargo)</TooltipContent>
+                        <TooltipContent>{tUi("refresh.eta.jsoncargo")}</TooltipContent>
                       </Tooltip>
                     </div>
                   </TableCell>

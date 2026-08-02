@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DialogDescription } from "@/components/ui/dialog";
 import type { Customer } from "../../factoryproformas/types";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function TransferProformaDialog({
   customers,
@@ -25,6 +26,7 @@ export function TransferProformaDialog({
   transferProformaMutation: any;
   transferTargetCustomerId: any;
 }) {
+  const tUi = useFactoryText();
   return (
     <Dialog
       open={!!transferProforma}
@@ -37,7 +39,7 @@ export function TransferProformaDialog({
     >
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Transfer Proforma</DialogTitle>
+          <DialogTitle>{tUi("transfer.proforma")}</DialogTitle>
           <DialogDescription>
             Move <strong>{transferProforma?.name}</strong> to a different customer. All lines and reservations will be
             moved with it.
@@ -45,16 +47,16 @@ export function TransferProformaDialog({
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div>
-            <label className="text-sm font-medium mb-1 block">Current Customer</label>
+            <label className="text-sm font-medium mb-1 block">{tUi("current.customer")}</label>
             <p className="text-sm text-muted-foreground">
               {customers.find((c: Customer) => c.id === transferProforma?.customerId)?.legalName ?? "—"}
             </p>
           </div>
           <div>
-            <label className="text-sm font-medium mb-1 block">Transfer To</label>
+            <label className="text-sm font-medium mb-1 block">{tUi("transfer.to")}</label>
             <Select value={transferTargetCustomerId} onValueChange={setTransferTargetCustomerId}>
               <SelectTrigger data-testid="select-transfer-customer">
-                <SelectValue placeholder="Select customer..." />
+                <SelectValue placeholder={tUi("select.customer.3")} />
               </SelectTrigger>
               <SelectContent>
                 {customers

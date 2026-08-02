@@ -3,13 +3,13 @@
  *
  * Extracted from FactoryNetPosition.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {Badge} from "@/components/ui/badge";
-import {ChevronDown, ChevronRight} from "lucide-react";
+import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
-import type {AccountItem} from "../types";
-import {fmt} from "../utils";
-import {SupplierRow} from "./SupplierRow";
+import type { AccountItem } from "../types";
+import { fmt } from "../utils";
+import { SupplierRow } from "./SupplierRow";
 
 export /** A collapsible sub-group for accounts that share the same name prefix. */
 function PrefixGroup({

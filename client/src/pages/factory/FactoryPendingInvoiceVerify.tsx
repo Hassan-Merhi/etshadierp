@@ -53,7 +53,9 @@ import type {
   VerificationSummary,
 } from "./factorypendinginvoiceverify/types";
 import { fmtNum } from "./factorypendinginvoiceverify/utils";
+import { useFactoryText } from "@/i18n/modules/factory";
 export default function FactoryPendingInvoiceVerify() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const [, navigate] = useLocation();
@@ -589,7 +591,7 @@ export default function FactoryPendingInvoiceVerify() {
             <h1 className="text-2xl font-bold" data-testid="text-page-title">
               Verify Order #{orderId}
             </h1>
-            <p className="text-muted-foreground text-sm">Review loaded bales against proforma</p>
+            <p className="text-muted-foreground text-sm">{tUi("review.loaded.bales.against.proforma")}</p>
           </div>
         </div>
         <div>
@@ -628,7 +630,8 @@ export default function FactoryPendingInvoiceVerify() {
               </p>
               <p className="text-xs text-blue-700 dark:text-blue-300 mt-0.5">
                 Individual bale scan records are unavailable, but per-article totals are intact. All counts and weights
-                shown are accurate. If you need individual bale-level detail, use <strong>Recover Bales</strong>.
+                shown are accurate. If you need individual bale-level detail, use{" "}
+                <strong>{tUi("recover.bales")}</strong>.
               </p>
             </div>
           </div>
@@ -664,8 +667,8 @@ export default function FactoryPendingInvoiceVerify() {
                 </p>
                 <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
                   Bale scans may have failed while the database columns were missing. If you have the bale reference
-                  numbers, use <strong>Recover Bales</strong> to re-link them. Otherwise use{" "}
-                  <strong>Return to Loading</strong> to re-scan.
+                  numbers, use <strong>{tUi("recover.bales")}</strong> to re-link them. Otherwise use{" "}
+                  <strong>{tUi("return.to.loading")}</strong> to re-scan.
                 </p>
               </div>
             </div>
@@ -684,7 +687,7 @@ export default function FactoryPendingInvoiceVerify() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Loaded Bales</CardTitle>
+            <CardTitle className="text-sm font-medium">{tUi("total.loaded.bales")}</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -695,7 +698,7 @@ export default function FactoryPendingInvoiceVerify() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Weight</CardTitle>
+            <CardTitle className="text-sm font-medium">{tUi("total.weight")}</CardTitle>
             <Truck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -706,7 +709,7 @@ export default function FactoryPendingInvoiceVerify() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Not Loaded</CardTitle>
+            <CardTitle className="text-sm font-medium">{tUi("total.not.loaded")}</CardTitle>
             <Package className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
@@ -720,7 +723,7 @@ export default function FactoryPendingInvoiceVerify() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Not Loaded Weight</CardTitle>
+            <CardTitle className="text-sm font-medium">{tUi("not.loaded.weight")}</CardTitle>
             <Truck className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
@@ -737,9 +740,9 @@ export default function FactoryPendingInvoiceVerify() {
       <Card className="mb-6">
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle className="text-lg">Proforma vs Loaded</CardTitle>
+            <CardTitle className="text-lg">{tUi("proforma.vs.loaded")}</CardTitle>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-muted-foreground">Filter:</span>
+              <span className="text-xs text-muted-foreground">{tUi("filter")}</span>
               {(["OVER_LOADED", "UNDER_LOADED", "MISSING_FROM_LOADED", "LOADED_NOT_IN_PROFORMA"] as const).map((s) => {
                 const labels: Record<string, string> = {
                   OVER_LOADED: "Overloaded",
@@ -864,13 +867,13 @@ export default function FactoryPendingInvoiceVerify() {
                     <Table wrapperClassName="max-h-[50vh] overflow-auto">
                       <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
-                          <TableHead>Article</TableHead>
-                          <TableHead>Product</TableHead>
-                          <TableHead className="text-right">Expected</TableHead>
-                          <TableHead className="text-right">Loaded</TableHead>
-                          <TableHead className="text-right">Remaining</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Stock</TableHead>
+                          <TableHead>{tUi("article")}</TableHead>
+                          <TableHead>{tUi("product")}</TableHead>
+                          <TableHead className="text-right">{tUi("expected")}</TableHead>
+                          <TableHead className="text-right">{tUi("loaded")}</TableHead>
+                          <TableHead className="text-right">{tUi("remaining")}</TableHead>
+                          <TableHead>{tUi("status")}</TableHead>
+                          <TableHead className="text-right">{tUi("stock")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -974,17 +977,17 @@ export default function FactoryPendingInvoiceVerify() {
                     <Table wrapperClassName="max-h-[50vh] overflow-auto">
                       <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
-                          <TableHead>Article</TableHead>
-                          <TableHead>Product</TableHead>
+                          <TableHead>{tUi("article")}</TableHead>
+                          <TableHead>{tUi("product")}</TableHead>
                           <TableHead className="text-right">Qty</TableHead>
-                          <TableHead className="text-right">Weight (kg)</TableHead>
+                          <TableHead className="text-right">{tUi("weight.kg")}</TableHead>
                           {isAdminOrOwner && (
                             <TableHead className="text-right">
                               {verification.loadedItems.some((g) => g.pricingMode === "per_kg") ? "Price/KG" : "Price"}
                             </TableHead>
                           )}
-                          {isAdminOrOwner && <TableHead className="text-right">Total Price</TableHead>}
-                          <TableHead className="text-right text-teal-500 dark:text-teal-400">Stock</TableHead>
+                          {isAdminOrOwner && <TableHead className="text-right">{tUi("total.price")}</TableHead>}
+                          <TableHead className="text-right text-teal-500 dark:text-teal-400">{tUi("stock")}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1073,7 +1076,7 @@ export default function FactoryPendingInvoiceVerify() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium mb-1 block">Container Number</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("container.number")}</label>
               <Input
                 value={containerNumber}
                 onChange={(e) => setContainerNumber(e.target.value)}
@@ -1082,7 +1085,7 @@ export default function FactoryPendingInvoiceVerify() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Shipping Company</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("shipping.company")}</label>
               <Input
                 value={shippingCompany}
                 onChange={(e) => setShippingCompany(e.target.value)}
@@ -1091,7 +1094,7 @@ export default function FactoryPendingInvoiceVerify() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Destination</label>
+              <label className="text-sm font-medium mb-1 block">{tUi("destination")}</label>
               <Input
                 value={destination}
                 onChange={(e) => setDestination(e.target.value)}
@@ -1101,11 +1104,11 @@ export default function FactoryPendingInvoiceVerify() {
             </div>
           </div>
           <div>
-            <label className="text-sm font-medium mb-1 block">Container Notes</label>
+            <label className="text-sm font-medium mb-1 block">{tUi("container.notes")}</label>
             <Textarea
               value={containerNotes}
               onChange={(e) => setContainerNotes(e.target.value)}
-              placeholder="Additional notes..."
+              placeholder={tUi("additional.notes.2")}
               data-testid="input-container-notes"
             />
           </div>
@@ -1126,7 +1129,7 @@ export default function FactoryPendingInvoiceVerify() {
       {(isPending || isVerified || isLoadingStatus) && (
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="text-sm">Freight &amp; Charges</CardTitle>
+            <CardTitle className="text-sm">{tUi("freight.amp.charges")}</CardTitle>
             <p className="text-xs text-muted-foreground">
               These will be billed to the customer and posted to the selected account
             </p>
@@ -1167,14 +1170,14 @@ export default function FactoryPendingInvoiceVerify() {
             )}
 
             <div className="space-y-2 pt-2 border-t">
-              <p className="text-xs font-medium text-muted-foreground">Add Charge</p>
+              <p className="text-xs font-medium text-muted-foreground">{tUi("add.charge")}</p>
               <Select value={chargeType} onValueChange={setChargeType}>
                 <SelectTrigger data-testid="select-charge-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="FREIGHT">Freight</SelectItem>
-                  <SelectItem value="OTHER">Other</SelectItem>
+                  <SelectItem value="FREIGHT">{tUi("freight")}</SelectItem>
+                  <SelectItem value="OTHER">{tUi("other")}</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -1182,7 +1185,7 @@ export default function FactoryPendingInvoiceVerify() {
                 <Input
                   value={chargeName}
                   onChange={(e) => setChargeName(e.target.value)}
-                  placeholder="Charge name..."
+                  placeholder={tUi("charge.name")}
                   data-testid="input-charge-name"
                 />
               )}
@@ -1209,9 +1212,9 @@ export default function FactoryPendingInvoiceVerify() {
                 </PopoverTrigger>
                 <PopoverContent className="w-[320px] p-0" align="start">
                   <Command>
-                    <CommandInput placeholder="Search accounts..." data-testid="input-charge-account-search" />
+                    <CommandInput placeholder={tUi("search.accounts")} data-testid="input-charge-account-search" />
                     <CommandList>
-                      <CommandEmpty>No account found.</CommandEmpty>
+                      <CommandEmpty>{tUi("no.account.found")}</CommandEmpty>
                       <CommandGroup>
                         {ledgerAccounts.map((acct) => (
                           <CommandItem
@@ -1246,7 +1249,7 @@ export default function FactoryPendingInvoiceVerify() {
                   step="0.01"
                   value={chargeAmount}
                   onChange={(e) => setChargeAmount(e.target.value)}
-                  placeholder="Amount"
+                  placeholder={tUi("amount")}
                   data-testid="input-charge-amount"
                 />
                 <Button
@@ -1297,7 +1300,7 @@ export default function FactoryPendingInvoiceVerify() {
             onClick={() => repairPerKgMutation.mutate()}
             disabled={repairPerKgMutation.isPending}
             data-testid="button-repair-perkg-prices"
-            title="Find orders with 0 price on per-kg items and recompute from actual bale weight"
+            title={tUi("find.orders.with.0.price.on.per.kg.items.and.rec")}
           >
             <RefreshCw className="mr-2 h-4 w-4" />
             {repairPerKgMutation.isPending ? "Repairing..." : "Repair Per-KG Prices"}
@@ -1307,7 +1310,7 @@ export default function FactoryPendingInvoiceVerify() {
             onClick={() => applyProductionPricesMutation.mutate()}
             disabled={applyProductionPricesMutation.isPending}
             data-testid="button-apply-production-prices"
-            title="Set all bale prices to the production (cost) price from the catalogue"
+            title={tUi("set.all.bale.prices.to.the.production.cost.price")}
           >
             Apply Production Price
           </Button>
@@ -1316,7 +1319,7 @@ export default function FactoryPendingInvoiceVerify() {
             onClick={() => applySellingPricesMutation.mutate()}
             disabled={applySellingPricesMutation.isPending}
             data-testid="button-apply-selling-prices"
-            title="Set all bale prices to the selling price from the catalogue"
+            title={tUi("set.all.bale.prices.to.the.selling.price.from.th")}
           >
             Apply Selling Price
           </Button>
@@ -1360,7 +1363,7 @@ export default function FactoryPendingInvoiceVerify() {
       <Dialog open={showApproveDialog} onOpenChange={setShowApproveDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Approve & Verify Order</DialogTitle>
+            <DialogTitle>{tUi("approve.verify.order")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
@@ -1369,7 +1372,7 @@ export default function FactoryPendingInvoiceVerify() {
             <Textarea
               value={approveNotes}
               onChange={(e) => setApproveNotes(e.target.value)}
-              placeholder="Optional notes..."
+              placeholder={tUi("optional.notes.2")}
               data-testid="input-approve-notes"
             />
             <div className="flex items-center justify-end gap-2">
@@ -1395,7 +1398,7 @@ export default function FactoryPendingInvoiceVerify() {
       <Dialog open={showReturnDialog} onOpenChange={setShowReturnDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Return to Loading</DialogTitle>
+            <DialogTitle>{tUi("return.to.loading")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
@@ -1468,19 +1471,19 @@ export default function FactoryPendingInvoiceVerify() {
       <Dialog open={showFinalizePreview} onOpenChange={setShowFinalizePreview}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Finalize Invoice Preview</DialogTitle>
+            <DialogTitle>{tUi("finalize.invoice.preview")}</DialogTitle>
           </DialogHeader>
           {finalizePreview && (
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-4">
                 <div className="text-sm">
-                  <span className="text-muted-foreground">Bales in order:</span>{" "}
+                  <span className="text-muted-foreground">{tUi("bales.in.order.2")}</span>{" "}
                   <span className="font-semibold" data-testid="text-preview-total">
                     {finalizePreview.totalBalesInOrder}
                   </span>
                 </div>
                 <div className="text-sm">
-                  <span className="text-muted-foreground">Will be removed from stock:</span>{" "}
+                  <span className="text-muted-foreground">{tUi("will.be.removed.from.stock")}</span>{" "}
                   <span className="font-semibold" data-testid="text-preview-removable">
                     {finalizePreview.baleCount}
                   </span>
@@ -1492,10 +1495,10 @@ export default function FactoryPendingInvoiceVerify() {
                   <Table>
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
-                        <TableHead>Reference</TableHead>
-                        <TableHead>Product</TableHead>
-                        <TableHead className="text-right">Weight (kg)</TableHead>
-                        <TableHead>Location</TableHead>
+                        <TableHead>{tUi("reference")}</TableHead>
+                        <TableHead>{tUi("product")}</TableHead>
+                        <TableHead className="text-right">{tUi("weight.kg")}</TableHead>
+                        <TableHead>{tUi("location")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1527,7 +1530,7 @@ export default function FactoryPendingInvoiceVerify() {
 
               <div className="space-y-3 pt-1">
                 <div className="space-y-1">
-                  <label className="text-sm font-medium">Invoice Date</label>
+                  <label className="text-sm font-medium">{tUi("invoice.date")}</label>
                   <Input
                     type="date"
                     value={invoiceDate}
@@ -1564,7 +1567,7 @@ export default function FactoryPendingInvoiceVerify() {
       <Dialog open={showProformaDialog} onOpenChange={setShowProformaDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Apply Proforma Prices</DialogTitle>
+            <DialogTitle>{tUi("apply.proforma.prices")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
@@ -1572,11 +1575,11 @@ export default function FactoryPendingInvoiceVerify() {
               matching article code will be updated.
             </p>
             {proformas.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">No proformas found for this customer.</p>
+              <p className="text-sm text-muted-foreground italic">{tUi("no.proformas.found.for.this.customer")}</p>
             ) : (
               <Select value={selectedProformaId} onValueChange={setSelectedProformaId}>
                 <SelectTrigger data-testid="select-proforma">
-                  <SelectValue placeholder="Select a proforma..." />
+                  <SelectValue placeholder={tUi("select.a.proforma")} />
                 </SelectTrigger>
                 <SelectContent>
                   {proformas.map((p) => (
@@ -1593,7 +1596,9 @@ export default function FactoryPendingInvoiceVerify() {
                 if (!pf || pf.lines.length === 0) return null;
                 return (
                   <div className="rounded-md border p-3 space-y-1 max-h-48 overflow-y-auto">
-                    <p className="text-xs font-medium text-muted-foreground mb-2">Price lines in this proforma:</p>
+                    <p className="text-xs font-medium text-muted-foreground mb-2">
+                      {tUi("price.lines.in.this.proforma")}
+                    </p>
                     {pf.lines.map((l, i) => {
                       const isPerKg = l.pricingMode === "per_kg" && l.pricePerKg;
                       const wt = parseFloat(l.weightPerBaleKg ?? "0");
@@ -1672,10 +1677,10 @@ export default function FactoryPendingInvoiceVerify() {
                   <Table data-testid="table-view-proforma">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Article</TableHead>
-                        <TableHead>Product</TableHead>
-                        <TableHead className="text-right">Expected Qty</TableHead>
-                        <TableHead className="text-right">Price / Bale</TableHead>
+                        <TableHead>{tUi("article")}</TableHead>
+                        <TableHead>{tUi("product")}</TableHead>
+                        <TableHead className="text-right">{tUi("expected.qty")}</TableHead>
+                        <TableHead className="text-right">{tUi("price.bale")}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1710,7 +1715,7 @@ export default function FactoryPendingInvoiceVerify() {
       <AlertDialog open={showFixBalesDialog} onOpenChange={setShowFixBalesDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Fix Bale Statuses</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("fix.bale.statuses")}</AlertDialogTitle>
             <AlertDialogDescription>
               This will mark all bales attached to this order as SOLD, removing them from inventory. Use this only if
               bales were accidentally returned to stock after a previous finalization. This does not create invoices or
@@ -1718,7 +1723,7 @@ export default function FactoryPendingInvoiceVerify() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-fix-bales">Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-fix-bales">{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={() => forceSyncMutation.mutate()} data-testid="button-confirm-fix-bales">
               <Wrench className="mr-2 h-4 w-4" />
               Fix Bale Statuses
@@ -1736,7 +1741,7 @@ export default function FactoryPendingInvoiceVerify() {
       >
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Recover Bales (Admin)</DialogTitle>
+            <DialogTitle>{tUi("recover.bales.admin")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             {/* Tab switcher */}
@@ -1764,8 +1769,8 @@ export default function FactoryPendingInvoiceVerify() {
                   them — up to the expected quantity per article. Bales claimed by other active orders will be skipped.
                 </p>
                 <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                  <strong>Important:</strong> This picks bales by article code in insertion order (oldest first). Verify
-                  the results afterwards and use manual recovery if specific bale references are needed.
+                  <strong>{tUi("important")}</strong> This picks bales by article code in insertion order (oldest
+                  first). Verify the results afterwards and use manual recovery if specific bale references are needed.
                 </div>
                 <div className="flex items-center justify-end gap-2">
                   <Button

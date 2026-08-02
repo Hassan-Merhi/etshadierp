@@ -3,8 +3,8 @@
  *
  * Extracted from DailyProductionReport.tsx during the Phase 4 god-file split.
  */
-import {useMemo} from "react";
-import {PieChart, Pie, Cell, Tooltip, ResponsiveContainer} from "recharts";
+import { useMemo } from "react";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 
 export // ── Shared mini-pie renderer used by both new charts ──────────────────────
 function MiniPieChart({

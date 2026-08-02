@@ -10,6 +10,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface RemoveBaleAuthDialogProps {
   open: boolean;
@@ -40,6 +41,7 @@ export function RemoveBaleAuthDialog({
   isPending,
   onConfirm,
 }: RemoveBaleAuthDialogProps) {
+  const tUi = useFactoryText();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -54,26 +56,26 @@ export function RemoveBaleAuthDialog({
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Supervisor Username</label>
+            <label className="text-sm font-medium">{tUi("supervisor.username")}</label>
             <Input
               value={supervisorUsername}
               onChange={(e) => onSupervisorUsernameChange(e.target.value)}
-              placeholder="Supervisor username"
+              placeholder={tUi("supervisor.username.2")}
               data-testid="input-supervisor-username"
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Supervisor Password</label>
+            <label className="text-sm font-medium">{tUi("supervisor.password")}</label>
             <Input
               type="password"
               value={supervisorPassword}
               onChange={(e) => onSupervisorPasswordChange(e.target.value)}
-              placeholder="Supervisor password"
+              placeholder={tUi("supervisor.password.2")}
               data-testid="input-supervisor-password"
             />
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Reason for Removal</label>
+            <label className="text-sm font-medium">{tUi("reason.for.removal")}</label>
             <Input
               value={removalReason}
               onChange={(e) => onRemovalReasonChange(e.target.value)}
@@ -120,21 +122,22 @@ export function AssignWorkerDialog({
   isPending,
   onConfirm,
 }: AssignWorkerDialogProps) {
+  const tUi = useFactoryText();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Assign Worker to Bale</DialogTitle>
+          <DialogTitle>{tUi("assign.worker.to.bale")}</DialogTitle>
           <DialogDescription>
             This bale has no worker assigned. Please select the worker who finalized this bale before printing.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-2">
-            <label className="text-sm font-medium">Worker Name</label>
+            <label className="text-sm font-medium">{tUi("worker.name")}</label>
             <Select value={workerIdSelected} onValueChange={onWorkerIdChange}>
               <SelectTrigger data-testid="select-print-worker">
-                <SelectValue placeholder="Select worker..." />
+                <SelectValue placeholder={tUi("select.worker.2")} />
               </SelectTrigger>
               <SelectContent>
                 {workers

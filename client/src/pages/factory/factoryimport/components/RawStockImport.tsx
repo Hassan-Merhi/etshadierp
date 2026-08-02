@@ -3,24 +3,26 @@
  *
  * Extracted from FactoryImport.tsx during the Phase 4 god-file split.
  */
-import {useState, useCallback} from "react";
-import {useMutation} from "@tanstack/react-query";
-import {X, Loader2} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Input} from "@/components/ui/input";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {useToast} from "@/hooks/use-toast";
-import {factoryApiRequest} from "@/lib/factoryApi";
+import { useState, useCallback } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { X, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { factoryApiRequest } from "@/lib/factoryApi";
 import Papa from "papaparse";
 
-import type {RawStockRow} from "../types";
-import {EMPTY_RAW_STOCK} from "../utils";
-import {ImportModeChooser} from "./ImportModeChooser";
-import {ManualEntryCard} from "./ManualEntryCard";
-import {ImportResult} from "./ImportResult";
+import type { RawStockRow } from "../types";
+import { EMPTY_RAW_STOCK } from "../utils";
+import { ImportModeChooser } from "./ImportModeChooser";
+import { ManualEntryCard } from "./ManualEntryCard";
+import { ImportResult } from "./ImportResult";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export function RawStockImport() {
+  const tUi = useFactoryText();
   const [mode, setMode] = useState<"choose" | "csv" | "manual">("choose");
   const [rows, setRows] = useState<RawStockRow[]>([{ ...EMPTY_RAW_STOCK }]);
   const [csvData, setCsvData] = useState<RawStockRow[]>([]);
@@ -110,7 +112,7 @@ export function RawStockImport() {
   if (mode === "choose") {
     return (
       <ImportModeChooser
-        title="Import Raw Stock Balances"
+        title={tUi("import.raw.stock.balances")}
         description="Import opening raw material inventory. Containers will be created automatically if they don't exist."
         templateType="raw-stock"
         onFileUpload={handleFileUpload}
@@ -152,12 +154,12 @@ export function RawStockImport() {
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
-                  <TableHead>Container #</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead>Received Kg</TableHead>
-                  <TableHead>Used Kg</TableHead>
-                  <TableHead>Cost/Kg</TableHead>
-                  <TableHead>Arrival Date</TableHead>
+                  <TableHead>{tUi("container.2")}</TableHead>
+                  <TableHead>{tUi("supplier")}</TableHead>
+                  <TableHead>{tUi("received.kg.2")}</TableHead>
+                  <TableHead>{tUi("used.kg.2")}</TableHead>
+                  <TableHead>{tUi("cost.kg.4")}</TableHead>
+                  <TableHead>{tUi("arrival.date")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -181,7 +183,7 @@ export function RawStockImport() {
 
   return (
     <ManualEntryCard
-      title="Add Raw Stock Records"
+      title={tUi("add.raw.stock.records")}
       columns={["Container # *", "Supplier", "Received Kg *", "Used Kg", "Cost/Kg *", "Arrival Date"]}
       rows={rows}
       onAdd={() => setRows([...rows, { ...EMPTY_RAW_STOCK }])}
@@ -200,7 +202,7 @@ export function RawStockImport() {
             <Input
               value={row.containerNumber}
               onChange={(e) => onChange(i, "containerNumber", e.target.value)}
-              placeholder="Container number"
+              placeholder={tUi("container.number.3")}
               data-testid={`input-rawstock-container-${i}`}
             />
           </TableCell>
@@ -208,7 +210,7 @@ export function RawStockImport() {
             <Input
               value={row.supplierName}
               onChange={(e) => onChange(i, "supplierName", e.target.value)}
-              placeholder="Supplier name"
+              placeholder={tUi("supplier.name.2")}
               data-testid={`input-rawstock-supplier-${i}`}
             />
           </TableCell>
@@ -246,7 +248,7 @@ export function RawStockImport() {
             <Input
               value={row.arrivalDate}
               onChange={(e) => onChange(i, "arrivalDate", e.target.value)}
-              placeholder="YYYY-MM-DD"
+              placeholder={tUi("yyyy.mm.dd")}
               type="date"
               data-testid={`input-rawstock-date-${i}`}
             />

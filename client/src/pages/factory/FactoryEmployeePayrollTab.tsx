@@ -29,6 +29,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface Employee {
   id: number;
@@ -74,6 +75,7 @@ const currentMonthEnd = () => {
 };
 
 export default function FactoryEmployeePayrollTab() {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const [payrollOpen, setPayrollOpen] = useState(false);
   const [payDate, setPayDate] = useState(today());
@@ -223,7 +225,7 @@ export default function FactoryEmployeePayrollTab() {
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <Users className="h-10 w-10 mx-auto mb-3 opacity-40" />
-            <p>No active employees found.</p>
+            <p>{tUi("no.active.employees.found")}</p>
           </CardContent>
         </Card>
       ) : (
@@ -259,10 +261,10 @@ export default function FactoryEmployeePayrollTab() {
                       <Table>
                         <TableHeader className="sticky top-0 z-30 bg-background">
                           <TableRow>
-                            <TableHead className="pl-6">Employee</TableHead>
-                            <TableHead>Code</TableHead>
-                            <TableHead className="text-right">Monthly Salary</TableHead>
-                            <TableHead className="text-right">Balance</TableHead>
+                            <TableHead className="pl-6">{tUi("employee")}</TableHead>
+                            <TableHead>{tUi("code")}</TableHead>
+                            <TableHead className="text-right">{tUi("monthly.salary")}</TableHead>
+                            <TableHead className="text-right">{tUi("balance")}</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -294,7 +296,7 @@ export default function FactoryEmployeePayrollTab() {
       <Dialog open={payrollOpen} onOpenChange={setPayrollOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Run Employee Payroll</DialogTitle>
+            <DialogTitle>{tUi("run.employee.payroll")}</DialogTitle>
             <DialogDescription>
               Salary is auto-calculated from attendance. You can edit any values before paying.
             </DialogDescription>
@@ -302,7 +304,7 @@ export default function FactoryEmployeePayrollTab() {
           <div className="space-y-4">
             <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end">
               <div>
-                <Label>Period Start</Label>
+                <Label>{tUi("period.start")}</Label>
                 <Input
                   type="date"
                   value={startDate}
@@ -311,7 +313,7 @@ export default function FactoryEmployeePayrollTab() {
                 />
               </div>
               <div>
-                <Label>Period End</Label>
+                <Label>{tUi("period.end")}</Label>
                 <Input
                   type="date"
                   value={endDate}
@@ -320,7 +322,7 @@ export default function FactoryEmployeePayrollTab() {
                 />
               </div>
               <div>
-                <Label>Payment Date</Label>
+                <Label>{tUi("payment.date")}</Label>
                 <Input
                   type="date"
                   value={payDate}
@@ -333,7 +335,7 @@ export default function FactoryEmployeePayrollTab() {
                 onClick={loadPreview}
                 disabled={previewLoading}
                 data-testid="button-recalculate-payroll"
-                title="Recalculate salaries for selected period"
+                title={tUi("recalculate.salaries.for.selected.period")}
               >
                 {previewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               </Button>
@@ -351,7 +353,7 @@ export default function FactoryEmployeePayrollTab() {
                 />
               </div>
               <div>
-                <Label>Notes</Label>
+                <Label>{tUi("notes")}</Label>
                 <Input
                   placeholder="e.g. March 2026..."
                   value={payNotes}
@@ -363,12 +365,12 @@ export default function FactoryEmployeePayrollTab() {
 
             {/* Column headers */}
             <div className="grid grid-cols-[1fr_80px_80px_80px_24px_80px_80px] gap-x-2 items-center px-3 pb-1 text-xs text-muted-foreground font-medium border-b">
-              <span>Employee</span>
-              <span className="text-right">Days</span>
-              <span className="text-right">Salary</span>
-              <span className="text-right">Advance</span>
+              <span>{tUi("employee")}</span>
+              <span className="text-right">{tUi("days")}</span>
+              <span className="text-right">{tUi("salary")}</span>
+              <span className="text-right">{tUi("advance")}</span>
               <span />
-              <span className="text-right">Deduct</span>
+              <span className="text-right">{tUi("deduct")}</span>
               <span className="text-right">Net</span>
             </div>
 
@@ -434,7 +436,7 @@ export default function FactoryEmployeePayrollTab() {
             </div>
 
             <div className="flex justify-between text-sm font-medium pt-1 border-t">
-              <span>Total Net Payroll</span>
+              <span>{tUi("total.net.payroll")}</span>
               <span className="font-mono">{fmt(totalNet)}</span>
             </div>
           </div>

@@ -3,17 +3,19 @@
  *
  * Extracted from FactoryInsurance.tsx during the Phase 4 god-file split.
  */
-import {useMemo} from "react";
-import {useQuery} from "@tanstack/react-query";
-import {Shield, Loader2, FileText} from "lucide-react";
-import {Card, CardContent} from "@/components/ui/card";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Sheet, SheetContent, SheetHeader, SheetTitle} from "@/components/ui/sheet";
-import {useDateFormat} from "@/contexts/DateFormatContext";
-import type {InsuranceMember, LedgerEntry} from "../types";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Shield, Loader2, FileText } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import type { InsuranceMember, LedgerEntry } from "../types";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export // ─── Member Statement Drawer ──────────────────────────────────────────────────
 function MemberStatementDrawer({ member, onClose }: { member: InsuranceMember; onClose: () => void }) {
+  const tUi = useFactoryText();
   const { formatDisplayDate } = useDateFormat();
 
   const { data: entries = [], isLoading } = useQuery<LedgerEntry[]>({
@@ -61,26 +63,26 @@ function MemberStatementDrawer({ member, onClose }: { member: InsuranceMember; o
           ) : entries.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <FileText className="h-8 w-8 mb-2 opacity-30" />
-              <p className="text-sm">No entries posted yet for this member.</p>
+              <p className="text-sm">{tUi("no.entries.posted.yet.for.this.member")}</p>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="grid grid-cols-3 gap-3">
                 <Card>
                   <CardContent className="pt-3 pb-3">
-                    <p className="text-xs text-muted-foreground">Total Credited</p>
+                    <p className="text-xs text-muted-foreground">{tUi("total.credited")}</p>
                     <p className="text-lg font-bold">${totalCredit.toFixed(2)}</p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="pt-3 pb-3">
-                    <p className="text-xs text-muted-foreground">Total Debited</p>
+                    <p className="text-xs text-muted-foreground">{tUi("total.debited")}</p>
                     <p className="text-lg font-bold">${totalDebit.toFixed(2)}</p>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardContent className="pt-3 pb-3">
-                    <p className="text-xs text-muted-foreground">Net Balance</p>
+                    <p className="text-xs text-muted-foreground">{tUi("net.balance")}</p>
                     <p className="text-lg font-bold">${(totalCredit - totalDebit).toFixed(2)}</p>
                   </CardContent>
                 </Card>
@@ -89,11 +91,11 @@ function MemberStatementDrawer({ member, onClose }: { member: InsuranceMember; o
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Voucher</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Credit</TableHead>
-                    <TableHead className="text-right">Debit</TableHead>
+                    <TableHead>{tUi("date")}</TableHead>
+                    <TableHead>{tUi("voucher")}</TableHead>
+                    <TableHead>{tUi("description")}</TableHead>
+                    <TableHead className="text-right">{tUi("credit")}</TableHead>
+                    <TableHead className="text-right">{tUi("debit")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

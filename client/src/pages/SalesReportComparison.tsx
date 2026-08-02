@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ArrowLeft, Building2, ChevronDown } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface SalesItem {
   stockItemId: number;
@@ -91,6 +92,7 @@ function getAiResult(row: ItemRow, companies: Company[]): string {
 }
 
 export default function SalesReportComparison() {
+  const tUi = useErpText();
   const [, navigate] = useLocation();
   const { formatAmount } = useCurrencyContext();
   const { companies: allCompanies } = useCompany();
@@ -269,7 +271,10 @@ export default function SalesReportComparison() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <PageHeader title="Company Comparison" subtitle="Compare sales performance across companies" />
+            <PageHeader
+              title={tUi("company.comparison")}
+              subtitle={tUi("compare.sales.performance.across.companies")}
+            />
           </div>
         </div>
 
@@ -324,10 +329,10 @@ export default function SalesReportComparison() {
 
           <Select value={stockGroupFilter} onValueChange={setStockGroupFilter} data-testid="select-stock-group">
             <SelectTrigger className="w-44 h-9">
-              <SelectValue placeholder="All Groups" />
+              <SelectValue placeholder={tUi("all.groups")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Groups</SelectItem>
+              <SelectItem value="all">{tUi("all.groups")}</SelectItem>
               {stockGroups.map((g) => (
                 <SelectItem key={g.id} value={g.name}>
                   {g.name}
@@ -357,8 +362,8 @@ export default function SalesReportComparison() {
         {!enabled ? (
           <div className="flex flex-col items-center justify-center h-64 text-center text-muted-foreground gap-3">
             <Building2 className="h-10 w-10 opacity-30" />
-            <p className="text-base font-medium">Select at least 2 companies to compare</p>
-            <p className="text-sm">Use the "Select Companies" button above</p>
+            <p className="text-base font-medium">{tUi("select.at.least.2.companies.to.compare")}</p>
+            <p className="text-sm">{tUi("use.the.select.companies.button.above")}</p>
           </div>
         ) : (
           <>
@@ -388,7 +393,7 @@ export default function SalesReportComparison() {
             {/* Search */}
             <div className="mb-4">
               <Input
-                placeholder="Search items..."
+                placeholder={tUi("search.items")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="max-w-72"
@@ -403,17 +408,19 @@ export default function SalesReportComparison() {
             )}
 
             {isLoading ? (
-              <div className="text-center py-16 text-muted-foreground">Loading comparison data…</div>
+              <div className="text-center py-16 text-muted-foreground">{tUi("loading.comparison.data")}</div>
             ) : tableData.length === 0 ? (
-              <div className="text-center py-16 text-muted-foreground">No data found for the selected filters</div>
+              <div className="text-center py-16 text-muted-foreground">
+                {tUi("no.data.found.for.the.selected.filters")}
+              </div>
             ) : (
               <div className="rounded-md border overflow-auto">
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     {/* Row 1: Item | Group | [Company name spanning 3 cols each] | AI Result */}
                     <TableRow>
-                      <TableHead className="min-w-[200px] sticky left-0 bg-background z-10">Item</TableHead>
-                      <TableHead className="w-36">Group</TableHead>
+                      <TableHead className="min-w-[200px] sticky left-0 bg-background z-10">{tUi("item")}</TableHead>
+                      <TableHead className="w-36">{tUi("group")}</TableHead>
                       {displayCompanies.map((c) => (
                         <TableHead
                           key={c.code}

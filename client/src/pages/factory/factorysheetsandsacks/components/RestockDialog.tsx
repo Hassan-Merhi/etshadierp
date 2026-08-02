@@ -3,21 +3,23 @@
  *
  * Extracted from FactorySheetsAndSacks.tsx during the Phase 4 god-file split.
  */
-import {useState, useMemo} from "react";
-import {useMutation} from "@tanstack/react-query";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {useToast} from "@/hooks/use-toast";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter} from "@/components/ui/dialog";
-import {Textarea} from "@/components/ui/textarea";
-import {Loader2} from "lucide-react";
+import { useState, useMemo } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Loader2 } from "lucide-react";
 
-import type {SheetsAndSacksItem} from "../types";
+import type { SheetsAndSacksItem } from "../types";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 export // ─── Restock Dialog ───────────────────────────────────────────────────────────
 function RestockDialog({ open, onClose, item }: { open: boolean; onClose: () => void; item: SheetsAndSacksItem }) {
+  const tUi = useFactoryText();
   const { toast } = useToast();
   const hasPacks = item.pcsPerPack != null && item.pcsPerPack > 0;
   const [packsStr, setPacksStr] = useState("");
@@ -62,7 +64,7 @@ function RestockDialog({ open, onClose, item }: { open: boolean; onClose: () => 
         </DialogHeader>
         <div className="space-y-4">
           <div className="rounded-md bg-muted/50 px-3 py-2 flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Current stock</span>
+            <span className="text-muted-foreground">{tUi("current.stock")}</span>
             <span className="font-mono font-semibold">{currentQty.toLocaleString("en-US")} pcs</span>
           </div>
           {hasPacks && (
@@ -97,7 +99,7 @@ function RestockDialog({ open, onClose, item }: { open: boolean; onClose: () => 
             />
           </div>
           <div className="rounded-md bg-green-50 dark:bg-green-950/30 px-3 py-2 flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">New total after add</span>
+            <span className="text-muted-foreground">{tUi("new.total.after.add")}</span>
             <span className="font-mono font-semibold text-green-700 dark:text-green-400">
               {newTotal.toLocaleString("en-US")} pcs
             </span>

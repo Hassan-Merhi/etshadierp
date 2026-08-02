@@ -8,20 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,17 +21,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Plus,
-  Search,
-  Phone,
-  Pencil,
-  Trash2,
-  Copy,
-  BookMarked,
-  X,
-  Check,
-} from "lucide-react";
+import { Plus, Search, Phone, Pencil, Trash2, Copy, BookMarked, X, Check } from "lucide-react";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface PhoneEntry {
   label: string;
@@ -69,6 +48,7 @@ const EMPTY_FORM = {
 };
 
 function CopyButton({ text }: { text: string }) {
+  const tUi = useFactoryText();
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
     navigator.clipboard.writeText(text).then(() => {
@@ -80,7 +60,7 @@ function CopyButton({ text }: { text: string }) {
     <button
       onClick={handleCopy}
       className="ml-1 text-muted-foreground hover:text-foreground transition-colors"
-      title="Copy"
+      title={tUi("copy")}
     >
       {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
     </button>
@@ -88,6 +68,7 @@ function CopyButton({ text }: { text: string }) {
 }
 
 export default function FactoryContacts() {
+  const tUi = useFactoryText();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const queryClient = useQueryClient();
@@ -121,9 +102,7 @@ export default function FactoryContacts() {
 
   const saveMutation = useMutation({
     mutationFn: async (data: typeof EMPTY_FORM) => {
-      const url = editingContact
-        ? `/api/factory/contacts/${editingContact.id}`
-        : "/api/factory/contacts";
+      const url = editingContact ? `/api/factory/contacts/${editingContact.id}` : "/api/factory/contacts";
       const method = editingContact ? "PATCH" : "POST";
       const res = await modeApiRequest(method, url, data);
       if (!res.ok) {
@@ -182,11 +161,9 @@ export default function FactoryContacts() {
     });
   };
 
-  const addNumber = () =>
-    setForm((f) => ({ ...f, numbers: [...f.numbers, { label: "", number: "" }] }));
+  const addNumber = () => setForm((f) => ({ ...f, numbers: [...f.numbers, { label: "", number: "" }] }));
 
-  const removeNumber = (idx: number) =>
-    setForm((f) => ({ ...f, numbers: f.numbers.filter((_, i) => i !== idx) }));
+  const removeNumber = (idx: number) => setForm((f) => ({ ...f, numbers: f.numbers.filter((_, i) => i !== idx) }));
 
   const handleSubmit = () => {
     if (!form.name.trim()) {
@@ -201,11 +178,7 @@ export default function FactoryContacts() {
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <PageHeader
-        title="Contacts"
-        subtitle="Personal reference — names, numbers, and notes"
-        showBackButton
-      >
+      <PageHeader title={tUi("contacts")} subtitle={tUi("personal.reference.names.numbers.and.notes")} showBackButton>
         <Button size="sm" onClick={openNew}>
           <Plus className="h-4 w-4 mr-1" />
           Add Contact
@@ -217,7 +190,7 @@ export default function FactoryContacts() {
         <div className="relative mb-4 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search name, role, number…"
+            placeholder={tUi("search.name.role.number")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -248,11 +221,11 @@ export default function FactoryContacts() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[180px]">Name</TableHead>
-                  <TableHead className="w-[140px]">Role</TableHead>
-                  <TableHead>Phone Numbers</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead className="w-[80px] text-right">Actions</TableHead>
+                  <TableHead className="w-[180px]">{tUi("name")}</TableHead>
+                  <TableHead className="w-[140px]">{tUi("role")}</TableHead>
+                  <TableHead>{tUi("phone.numbers")}</TableHead>
+                  <TableHead>{tUi("notes")}</TableHead>
+                  <TableHead className="w-[80px] text-right">{tUi("actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -275,9 +248,7 @@ export default function FactoryContacts() {
                             <div key={i} className="flex items-center gap-2 text-sm">
                               <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                               <span className="font-mono">{n.number}</span>
-                              {n.label && (
-                                <span className="text-xs text-muted-foreground">({n.label})</span>
-                              )}
+                              {n.label && <span className="text-xs text-muted-foreground">({n.label})</span>}
                               <CopyButton text={n.number} />
                             </div>
                           ))}
@@ -288,21 +259,14 @@ export default function FactoryContacts() {
                     </TableCell>
                     <TableCell className="align-top py-3 max-w-[260px]">
                       {c.notes ? (
-                        <p className="text-xs text-muted-foreground whitespace-pre-wrap line-clamp-3">
-                          {c.notes}
-                        </p>
+                        <p className="text-xs text-muted-foreground whitespace-pre-wrap line-clamp-3">{c.notes}</p>
                       ) : (
                         <span className="text-muted-foreground text-xs">—</span>
                       )}
                     </TableCell>
                     <TableCell className="align-top py-3 text-right">
                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7"
-                          onClick={() => openEdit(c)}
-                        >
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(c)}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                         <Button
@@ -332,7 +296,7 @@ export default function FactoryContacts() {
 
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label>Name *</Label>
+              <Label>{tUi("name.2")}</Label>
               <Input
                 placeholder="e.g. Ahmed Karimi"
                 value={form.name}
@@ -341,7 +305,7 @@ export default function FactoryContacts() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Role / Purpose</Label>
+              <Label>{tUi("role.purpose")}</Label>
               <Input
                 placeholder="e.g. Electrician, Plumber, Driver…"
                 value={form.role}
@@ -351,7 +315,7 @@ export default function FactoryContacts() {
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Phone Numbers</Label>
+                <Label>{tUi("phone.numbers")}</Label>
                 <Button size="sm" variant="ghost" onClick={addNumber} type="button">
                   <Plus className="h-3.5 w-3.5 mr-1" />
                   Add
@@ -360,13 +324,13 @@ export default function FactoryContacts() {
               {form.numbers.map((n, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <Input
-                    placeholder="Label (e.g. Mobile)"
+                    placeholder={tUi("label.e.g.mobile")}
                     value={n.label}
                     onChange={(e) => setNumber(i, "label", e.target.value)}
                     className="w-28 shrink-0 text-sm"
                   />
                   <Input
-                    placeholder="Number"
+                    placeholder={tUi("number")}
                     value={n.number}
                     onChange={(e) => setNumber(i, "number", e.target.value)}
                     className="font-mono text-sm"
@@ -387,9 +351,9 @@ export default function FactoryContacts() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>Notes</Label>
+              <Label>{tUi("notes")}</Label>
               <Textarea
-                placeholder="Anything extra — hours, location, rates…"
+                placeholder={tUi("anything.extra.hours.location.rates")}
                 value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                 rows={3}
@@ -412,13 +376,13 @@ export default function FactoryContacts() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Contact</AlertDialogTitle>
+            <AlertDialogTitle>{tUi("delete.contact")}</AlertDialogTitle>
             <AlertDialogDescription>
               Remove <strong>{deleteTarget?.name}</strong> from your contacts? This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tUi("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}

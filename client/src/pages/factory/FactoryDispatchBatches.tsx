@@ -16,6 +16,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/PageHeader";
 import { Plus, Truck, Package, Filter, ChevronRight, Search, BarChart2 } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface Customer {
   id: number;
@@ -74,6 +75,7 @@ function fmt(n: number | string) {
 }
 
 export default function FactoryDispatchBatches() {
+  const tUi = useFactoryText();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
@@ -213,14 +215,14 @@ export default function FactoryDispatchBatches() {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
         <Truck className="w-10 h-10 opacity-30" />
-        <p className="text-sm">Dispatch Batches is only available in Developer mode.</p>
+        <p className="text-sm">{tUi("dispatch.batches.is.only.available.in.developer.")}</p>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="Dispatch Batches" subtitle="Manage local truck dispatch batches for bale sales">
+      <PageHeader title={tUi("dispatch.batches")} subtitle={tUi("manage.local.truck.dispatch.batches.for.bale.sal")}>
         <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant={activeTab === "list" ? "default" : "outline"}
@@ -271,11 +273,11 @@ export default function FactoryDispatchBatches() {
                   data-testid="card-report-uninvoiced"
                 >
                   <CardContent className="pt-4 pb-4">
-                    <p className="text-xs text-muted-foreground mb-1">Uninvoiced Batches</p>
+                    <p className="text-xs text-muted-foreground mb-1">{tUi("uninvoiced.batches")}</p>
                     <p className="text-3xl font-bold" data-testid="text-uninvoiced-count">
                       {reportsSummary.uninvoicedCount}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">Draft + Loading + Dispatched</p>
+                    <p className="text-xs text-muted-foreground mt-1">{tUi("draft.loading.dispatched")}</p>
                   </CardContent>
                 </Card>
                 <Card
@@ -287,9 +289,9 @@ export default function FactoryDispatchBatches() {
                   data-testid="card-report-loading"
                 >
                   <CardContent className="pt-4 pb-4">
-                    <p className="text-xs text-muted-foreground mb-1">Loading</p>
+                    <p className="text-xs text-muted-foreground mb-1">{tUi("loading.3")}</p>
                     <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{reportsSummary.loadingCount}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Batches currently being loaded</p>
+                    <p className="text-xs text-muted-foreground mt-1">{tUi("batches.currently.being.loaded")}</p>
                   </CardContent>
                 </Card>
                 <Card
@@ -301,11 +303,11 @@ export default function FactoryDispatchBatches() {
                   data-testid="card-report-dispatched"
                 >
                   <CardContent className="pt-4 pb-4">
-                    <p className="text-xs text-muted-foreground mb-1">Dispatched — Pending Invoice</p>
+                    <p className="text-xs text-muted-foreground mb-1">{tUi("dispatched.pending.invoice")}</p>
                     <p className="text-3xl font-bold text-amber-600 dark:text-amber-400">
                       {reportsSummary.dispatchedCount}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">Trucks dispatched, no invoice yet</p>
+                    <p className="text-xs text-muted-foreground mt-1">{tUi("trucks.dispatched.no.invoice.yet")}</p>
                   </CardContent>
                 </Card>
                 <Card
@@ -317,29 +319,29 @@ export default function FactoryDispatchBatches() {
                   data-testid="card-report-invoiced"
                 >
                   <CardContent className="pt-4 pb-4">
-                    <p className="text-xs text-muted-foreground mb-1">Invoiced Batches</p>
+                    <p className="text-xs text-muted-foreground mb-1">{tUi("invoiced.batches")}</p>
                     <p className="text-3xl font-bold text-green-600 dark:text-green-400">
                       {reportsSummary.invoicedCount}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">Completed &amp; invoiced</p>
+                    <p className="text-xs text-muted-foreground mt-1">{tUi("completed.amp.invoiced")}</p>
                   </CardContent>
                 </Card>
                 <Card data-testid="card-report-reserved-bales">
                   <CardContent className="pt-4 pb-4">
-                    <p className="text-xs text-muted-foreground mb-1">Reserved Bales</p>
+                    <p className="text-xs text-muted-foreground mb-1">{tUi("reserved.bales")}</p>
                     <p className="text-3xl font-bold">{reportsSummary.reservedBalesCount}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Bales scanned, not yet invoiced</p>
+                    <p className="text-xs text-muted-foreground mt-1">{tUi("bales.scanned.not.yet.invoiced")}</p>
                   </CardContent>
                 </Card>
                 <Card data-testid="card-report-dispatched-rides">
                   <CardContent className="pt-4 pb-4">
-                    <p className="text-xs text-muted-foreground mb-1">Dispatched Rides</p>
+                    <p className="text-xs text-muted-foreground mb-1">{tUi("dispatched.rides")}</p>
                     <p className="text-3xl font-bold">{reportsSummary.dispatchedRidesNotInvoiced}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Rides dispatched, batch not invoiced</p>
+                    <p className="text-xs text-muted-foreground mt-1">{tUi("rides.dispatched.batch.not.invoiced")}</p>
                   </CardContent>
                 </Card>
               </div>
-              <p className="text-xs text-muted-foreground">Click a card to filter the batch list.</p>
+              <p className="text-xs text-muted-foreground">{tUi("click.a.card.to.filter.the.batch.list")}</p>
             </div>
           ) : null)}
 
@@ -350,16 +352,16 @@ export default function FactoryDispatchBatches() {
                 <div className="flex flex-wrap gap-3 items-end">
                   <div className="flex items-center gap-2">
                     <Filter className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">Filters</span>
+                    <span className="text-sm font-medium">{tUi("filters")}</span>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <Label className="text-xs text-muted-foreground">Customer</Label>
+                    <Label className="text-xs text-muted-foreground">{tUi("customer")}</Label>
                     <Select value={filterCustomer} onValueChange={setFilterCustomer}>
                       <SelectTrigger className="w-48" data-testid="select-filter-customer">
-                        <SelectValue placeholder="All customers" />
+                        <SelectValue placeholder={tUi("all.customers")} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="_all">All customers</SelectItem>
+                        <SelectItem value="_all">{tUi("all.customers")}</SelectItem>
                         {customers.map((c) => (
                           <SelectItem key={c.id} value={String(c.id)}>
                             {c.legalName}
@@ -369,28 +371,28 @@ export default function FactoryDispatchBatches() {
                     </Select>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <Label className="text-xs text-muted-foreground">Status</Label>
+                    <Label className="text-xs text-muted-foreground">{tUi("status")}</Label>
                     <Select value={filterStatus} onValueChange={setFilterStatus}>
                       <SelectTrigger className="w-36" data-testid="select-filter-status">
-                        <SelectValue placeholder="All statuses" />
+                        <SelectValue placeholder={tUi("all.statuses")} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="_all">All statuses</SelectItem>
-                        <SelectItem value="DRAFT">Draft</SelectItem>
-                        <SelectItem value="LOADING">Loading</SelectItem>
-                        <SelectItem value="DISPATCHED">Dispatched</SelectItem>
-                        <SelectItem value="INVOICED">Invoiced</SelectItem>
-                        <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                        <SelectItem value="_all">{tUi("all.statuses")}</SelectItem>
+                        <SelectItem value="DRAFT">{tUi("draft")}</SelectItem>
+                        <SelectItem value="LOADING">{tUi("loading.3")}</SelectItem>
+                        <SelectItem value="DISPATCHED">{tUi("dispatched")}</SelectItem>
+                        <SelectItem value="INVOICED">{tUi("invoiced")}</SelectItem>
+                        <SelectItem value="CANCELLED">{tUi("cancelled")}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <Label className="text-xs text-muted-foreground">Search</Label>
+                    <Label className="text-xs text-muted-foreground">{tUi("search.2")}</Label>
                     <div className="relative">
                       <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                       <Input
                         className="pl-8 w-52"
-                        placeholder="Batch #, customer, invoice..."
+                        placeholder={tUi("batch.customer.invoice")}
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         data-testid="input-search-batches"
@@ -425,7 +427,7 @@ export default function FactoryDispatchBatches() {
                 ) : filtered.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
                     <Truck className="w-10 h-10 opacity-40" />
-                    <p className="text-sm">No dispatch batches found</p>
+                    <p className="text-sm">{tUi("no.dispatch.batches.found")}</p>
                     <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
                       <Plus className="w-4 h-4 mr-1" /> Create first batch
                     </Button>
@@ -434,16 +436,16 @@ export default function FactoryDispatchBatches() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Batch #</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Proforma</TableHead>
-                        <TableHead className="text-center">Rides</TableHead>
-                        <TableHead className="text-right">Bales</TableHead>
-                        <TableHead className="text-right">Weight (kg)</TableHead>
-                        <TableHead className="text-right">Value</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Invoice</TableHead>
+                        <TableHead>{tUi("batch.2")}</TableHead>
+                        <TableHead>{tUi("customer")}</TableHead>
+                        <TableHead>{tUi("date")}</TableHead>
+                        <TableHead>{tUi("proforma")}</TableHead>
+                        <TableHead className="text-center">{tUi("rides")}</TableHead>
+                        <TableHead className="text-right">{tUi("bales")}</TableHead>
+                        <TableHead className="text-right">{tUi("weight.kg")}</TableHead>
+                        <TableHead className="text-right">{tUi("value")}</TableHead>
+                        <TableHead>{tUi("status")}</TableHead>
+                        <TableHead>{tUi("invoice")}</TableHead>
                         <TableHead />
                       </TableRow>
                     </TableHeader>
@@ -496,7 +498,7 @@ export default function FactoryDispatchBatches() {
       >
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>New Dispatch Batch</DialogTitle>
+            <DialogTitle>{tUi("new.dispatch.batch")}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -510,7 +512,7 @@ export default function FactoryDispatchBatches() {
                   onValueChange={(v) => setForm((f) => ({ ...f, customerId: v, proformaId: "_none" }))}
                 >
                   <SelectTrigger data-testid="select-create-customer">
-                    <SelectValue placeholder="Select customer..." />
+                    <SelectValue placeholder={tUi("select.customer.3")} />
                   </SelectTrigger>
                   <SelectContent>
                     {customers.map((c) => (
@@ -524,13 +526,13 @@ export default function FactoryDispatchBatches() {
 
               {form.customerId && (
                 <div className="col-span-2 space-y-1.5">
-                  <Label>Proforma (optional)</Label>
+                  <Label>{tUi("proforma.optional")}</Label>
                   <Select value={form.proformaId} onValueChange={(v) => setForm((f) => ({ ...f, proformaId: v }))}>
                     <SelectTrigger data-testid="select-create-proforma">
-                      <SelectValue placeholder="No proforma" />
+                      <SelectValue placeholder={tUi("no.proforma")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="_none">No proforma</SelectItem>
+                      <SelectItem value="_none">{tUi("no.proforma")}</SelectItem>
                       {activeProformas.map((p) => (
                         <SelectItem key={p.id} value={String(p.id)}>
                           {p.name}
@@ -539,7 +541,7 @@ export default function FactoryDispatchBatches() {
                     </SelectContent>
                   </Select>
                   {form.customerId && activeProformas.length === 0 && (
-                    <p className="text-xs text-muted-foreground">No active proformas for this customer.</p>
+                    <p className="text-xs text-muted-foreground">{tUi("no.active.proformas.for.this.customer")}</p>
                   )}
                 </div>
               )}
@@ -557,7 +559,7 @@ export default function FactoryDispatchBatches() {
               </div>
 
               <div className="space-y-1.5">
-                <Label>Currency</Label>
+                <Label>{tUi("currency")}</Label>
                 <Select value={form.currency} onValueChange={(v) => setForm((f) => ({ ...f, currency: v }))}>
                   <SelectTrigger data-testid="select-currency">
                     <SelectValue />
@@ -571,20 +573,20 @@ export default function FactoryDispatchBatches() {
               </div>
 
               <div className="col-span-2 space-y-1.5">
-                <Label>Price Mode</Label>
+                <Label>{tUi("price.mode")}</Label>
                 <Select value={form.priceMode} onValueChange={(v) => setForm((f) => ({ ...f, priceMode: v }))}>
                   <SelectTrigger data-testid="select-price-mode">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="PER_BALE">Per Bale (fixed price per bale)</SelectItem>
-                    <SelectItem value="PER_KG">Per Kg (price × weight)</SelectItem>
+                    <SelectItem value="PER_BALE">{tUi("per.bale.fixed.price.per.bale")}</SelectItem>
+                    <SelectItem value="PER_KG">{tUi("per.kg.price.weight")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="col-span-2 space-y-1.5">
-                <Label>Destination</Label>
+                <Label>{tUi("destination")}</Label>
                 <Input
                   placeholder="e.g. Lubumbashi Port"
                   value={form.destination}
@@ -594,9 +596,9 @@ export default function FactoryDispatchBatches() {
               </div>
 
               <div className="col-span-2 space-y-1.5">
-                <Label>Notes</Label>
+                <Label>{tUi("notes")}</Label>
                 <Textarea
-                  placeholder="Optional notes..."
+                  placeholder={tUi("optional.notes.2")}
                   value={form.notes}
                   onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                   rows={2}
@@ -615,10 +617,10 @@ export default function FactoryDispatchBatches() {
                   <table className="text-xs w-full">
                     <thead>
                       <tr className="text-muted-foreground">
-                        <th className="text-left font-normal pb-1">Article</th>
-                        <th className="text-left font-normal pb-1">Product</th>
+                        <th className="text-left font-normal pb-1">{tUi("article")}</th>
+                        <th className="text-left font-normal pb-1">{tUi("product")}</th>
                         <th className="text-right font-normal pb-1">Qty</th>
-                        <th className="text-right font-normal pb-1">Price</th>
+                        <th className="text-right font-normal pb-1">{tUi("price")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -633,7 +635,7 @@ export default function FactoryDispatchBatches() {
                     </tbody>
                   </table>
                 ) : (
-                  <p className="text-xs text-muted-foreground">Loading proforma lines...</p>
+                  <p className="text-xs text-muted-foreground">{tUi("loading.proforma.lines")}</p>
                 )}
               </div>
             )}

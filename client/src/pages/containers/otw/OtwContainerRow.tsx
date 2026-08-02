@@ -6,6 +6,7 @@ import type { Container } from "@shared/schema";
 import { OtwEditableCell } from "./OtwEditableCell";
 import { OtwFreightCell } from "./OtwFreightCell";
 import { OtwContainerActions } from "./OtwContainerActions";
+import { useErpText } from "@/i18n/modules/erp";
 
 interface OtwContainerRowProps {
   container: Container;
@@ -34,6 +35,7 @@ export function OtwContainerRow({
   handleKeyDown,
   autoSizeStyle,
 }: OtwContainerRowProps) {
+  const tUi = useErpText();
   const shared = { container, getEditValue, setEditValue, handleKeyDown, autoSizeStyle };
   return (
     <TableRow data-testid={`row-otw-${container.id}`}>
@@ -43,20 +45,97 @@ export function OtwContainerRow({
         </Link>
       </TableCell>
       <TableCell className="text-sm">{getSupplierName(container.supplierId)}</TableCell>
-      <TableCell className="font-mono text-sm">
-        {formatAmount(parseFloat(container.grandTotal || "0"))}
-      </TableCell>
+      <TableCell className="font-mono text-sm">{formatAmount(parseFloat(container.grandTotal || "0"))}</TableCell>
 
-      <OtwEditableCell {...shared} field="shopName" fieldIndex={0} placeholder="Shop" minCh={6} maxCh={16} testId={`input-shop-${container.id}`} />
-      <OtwEditableCell {...shared} field="eta" fieldIndex={1} type="date" placeholder="yyyy-mm-dd" minCh={12} maxCh={12} testId={`input-eta-${container.id}`} />
-      <OtwEditableCell {...shared} field="transporter" fieldIndex={2} placeholder="Transporter" minCh={12} maxCh={40} testId={`input-transporter-${container.id}`} />
-      <OtwEditableCell {...shared} field="transportFee" fieldIndex={3} type="number" placeholder="0.00" testId={`input-transport-${container.id}`} />
-      <OtwEditableCell {...shared} field="numberPlate" fieldIndex={4} placeholder="Plate" minCh={10} maxCh={20} testId={`input-plate-${container.id}`} />
-      <OtwEditableCell {...shared} field="trackingLocation" fieldIndex={5} placeholder="Location" minCh={12} maxCh={40} testId={`input-location-${container.id}`} />
-      <OtwEditableCell {...shared} field="borderDate" fieldIndex={6} type="date" placeholder="yyyy-mm-dd" minCh={12} maxCh={12} testId={`input-border-${container.id}`} />
-      <OtwEditableCell {...shared} field="offloadDate" fieldIndex={7} type="date" placeholder="yyyy-mm-dd" minCh={12} maxCh={12} testId={`input-offload-${container.id}`} />
-      <OtwEditableCell {...shared} field="agent" fieldIndex={8} placeholder="Agent" testId={`input-agent-${container.id}`} />
-      <OtwEditableCell {...shared} field="dutyFee" fieldIndex={9} type="number" placeholder="0.00" testId={`input-duty-${container.id}`} />
+      <OtwEditableCell
+        {...shared}
+        field="shopName"
+        fieldIndex={0}
+        placeholder={tUi("shop")}
+        minCh={6}
+        maxCh={16}
+        testId={`input-shop-${container.id}`}
+      />
+      <OtwEditableCell
+        {...shared}
+        field="eta"
+        fieldIndex={1}
+        type="date"
+        placeholder="yyyy-mm-dd"
+        minCh={12}
+        maxCh={12}
+        testId={`input-eta-${container.id}`}
+      />
+      <OtwEditableCell
+        {...shared}
+        field="transporter"
+        fieldIndex={2}
+        placeholder={tUi("transporter")}
+        minCh={12}
+        maxCh={40}
+        testId={`input-transporter-${container.id}`}
+      />
+      <OtwEditableCell
+        {...shared}
+        field="transportFee"
+        fieldIndex={3}
+        type="number"
+        placeholder="0.00"
+        testId={`input-transport-${container.id}`}
+      />
+      <OtwEditableCell
+        {...shared}
+        field="numberPlate"
+        fieldIndex={4}
+        placeholder={tUi("plate")}
+        minCh={10}
+        maxCh={20}
+        testId={`input-plate-${container.id}`}
+      />
+      <OtwEditableCell
+        {...shared}
+        field="trackingLocation"
+        fieldIndex={5}
+        placeholder={tUi("location")}
+        minCh={12}
+        maxCh={40}
+        testId={`input-location-${container.id}`}
+      />
+      <OtwEditableCell
+        {...shared}
+        field="borderDate"
+        fieldIndex={6}
+        type="date"
+        placeholder="yyyy-mm-dd"
+        minCh={12}
+        maxCh={12}
+        testId={`input-border-${container.id}`}
+      />
+      <OtwEditableCell
+        {...shared}
+        field="offloadDate"
+        fieldIndex={7}
+        type="date"
+        placeholder="yyyy-mm-dd"
+        minCh={12}
+        maxCh={12}
+        testId={`input-offload-${container.id}`}
+      />
+      <OtwEditableCell
+        {...shared}
+        field="agent"
+        fieldIndex={8}
+        placeholder={tUi("agent")}
+        testId={`input-agent-${container.id}`}
+      />
+      <OtwEditableCell
+        {...shared}
+        field="dutyFee"
+        fieldIndex={9}
+        type="number"
+        placeholder="0.00"
+        testId={`input-duty-${container.id}`}
+      />
 
       <TableCell className="text-center">
         <Checkbox
@@ -69,8 +148,25 @@ export function OtwContainerRow({
 
       <OtwFreightCell containerId={container.id} freightStatusMap={freightStatusMap} />
 
-      <OtwEditableCell {...shared} field="trackingDescription" fieldIndex={11} placeholder="Notes..." minCh={10} maxCh={32} testId={`input-desc-${container.id}`} />
-      <OtwEditableCell {...shared} field="docsSentDate" fieldIndex={12} type="date" placeholder="yyyy-mm-dd" minCh={12} maxCh={12} testId={`input-docs-sent-${container.id}`} />
+      <OtwEditableCell
+        {...shared}
+        field="trackingDescription"
+        fieldIndex={11}
+        placeholder={tUi("notes.2")}
+        minCh={10}
+        maxCh={32}
+        testId={`input-desc-${container.id}`}
+      />
+      <OtwEditableCell
+        {...shared}
+        field="docsSentDate"
+        fieldIndex={12}
+        type="date"
+        placeholder="yyyy-mm-dd"
+        minCh={12}
+        maxCh={12}
+        testId={`input-docs-sent-${container.id}`}
+      />
 
       <TableCell>
         <select
@@ -83,11 +179,19 @@ export function OtwContainerRow({
           <option value="">—</option>
           <option value="Yes">Yes</option>
           <option value="No">No</option>
-          <option value="Pending">Pending</option>
+          <option value="Pending">{tUi("pending")}</option>
         </select>
       </TableCell>
 
-      <OtwEditableCell {...shared} field="trackingLink" fieldIndex={13} placeholder="https://..." minCh={12} maxCh={32} testId={`input-link-${container.id}`} />
+      <OtwEditableCell
+        {...shared}
+        field="trackingLink"
+        fieldIndex={13}
+        placeholder="https://..."
+        minCh={12}
+        maxCh={32}
+        testId={`input-link-${container.id}`}
+      />
 
       <OtwContainerActions
         containerId={container.id}

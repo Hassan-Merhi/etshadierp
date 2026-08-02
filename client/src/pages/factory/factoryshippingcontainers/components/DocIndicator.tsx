@@ -3,7 +3,7 @@
  *
  * Extracted from FactoryShippingContainers.tsx during the Phase 4 god-file split.
  */
-import {CheckCircle2, XCircle} from "lucide-react";
+import { CheckCircle2, XCircle } from "lucide-react";
 
 export function DocIndicator({ count, onClick }: { count: number; onClick: () => void }) {
   return (

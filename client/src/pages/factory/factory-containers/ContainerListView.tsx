@@ -21,6 +21,7 @@ import { formatNumber } from "@/lib/formatNumber";
 import type { FactorySupplier } from "@shared/schema";
 import { ContainerStatusBadge } from "./ContainerBadges";
 import type { ContainerWithSupplier } from "./otwHelpers";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface ContainerListViewProps {
   containers: ContainerWithSupplier[] | undefined;
@@ -61,6 +62,7 @@ export function ContainerListView({
   onReverseOffload,
   onNavigateOffload,
 }: ContainerListViewProps) {
+  const tUi = useFactoryText();
   const toggleSupplier = (key: string) => {
     setExpandedSuppliers((prev) => {
       const next = new Set(prev);
@@ -166,7 +168,7 @@ export function ContainerListView({
           <div className="relative w-52">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search containers..."
+              placeholder={tUi("search.containers")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
@@ -175,16 +177,16 @@ export function ContainerListView({
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-40" data-testid="select-filter-status">
-              <SelectValue placeholder="All Statuses" />
+              <SelectValue placeholder={tUi("all.statuses.2")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="PENDING">Pending</SelectItem>
-              <SelectItem value="IN_TRANSIT">In Transit</SelectItem>
-              <SelectItem value="AVAILABLE">Available</SelectItem>
-              <SelectItem value="OFFLOADED">Offloaded</SelectItem>
-              <SelectItem value="HAS_WEIGHT">Has Weight</SelectItem>
-              <SelectItem value="NO_WEIGHT">No Weight</SelectItem>
+              <SelectItem value="all">{tUi("all.statuses.2")}</SelectItem>
+              <SelectItem value="PENDING">{tUi("pending")}</SelectItem>
+              <SelectItem value="IN_TRANSIT">{tUi("in.transit")}</SelectItem>
+              <SelectItem value="AVAILABLE">{tUi("available")}</SelectItem>
+              <SelectItem value="OFFLOADED">{tUi("offloaded")}</SelectItem>
+              <SelectItem value="HAS_WEIGHT">{tUi("has.weight.2")}</SelectItem>
+              <SelectItem value="NO_WEIGHT">{tUi("no.weight.2")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -366,7 +368,7 @@ export function ContainerListView({
                                         <ArrowDown className="h-4 w-4" />
                                       </Button>
                                     </TooltipTrigger>
-                                    <TooltipContent>Offload to Production</TooltipContent>
+                                    <TooltipContent>{tUi("offload.to.production")}</TooltipContent>
                                   </Tooltip>
                                 )}
                                 {(c.status === "OFFLOADED" || c.status === "PARTIALLY_RECEIVED") && (
@@ -382,7 +384,7 @@ export function ContainerListView({
                                           <PlusCircle className="h-4 w-4 text-blue-500" />
                                         </Button>
                                       </TooltipTrigger>
-                                      <TooltipContent>Add Post-Offload Charges</TooltipContent>
+                                      <TooltipContent>{tUi("add.post.offload.charges")}</TooltipContent>
                                     </Tooltip>
                                     <Tooltip>
                                       <TooltipTrigger asChild>
@@ -395,7 +397,7 @@ export function ContainerListView({
                                           <RotateCcw className="h-4 w-4 text-amber-500" />
                                         </Button>
                                       </TooltipTrigger>
-                                      <TooltipContent>Reverse Offload</TooltipContent>
+                                      <TooltipContent>{tUi("reverse.offload")}</TooltipContent>
                                     </Tooltip>
                                   </>
                                 )}
@@ -430,13 +432,13 @@ export function ContainerListView({
             <Container className="h-12 w-12 mx-auto mb-3 opacity-50" />
             {containers && containers.length > 0 ? (
               <>
-                <p className="text-lg font-medium">No matching containers</p>
-                <p className="text-sm mt-1">Try adjusting your search or filter</p>
+                <p className="text-lg font-medium">{tUi("no.matching.containers")}</p>
+                <p className="text-sm mt-1">{tUi("try.adjusting.your.search.or.filter")}</p>
               </>
             ) : (
               <>
-                <p className="text-lg font-medium">No factory containers yet</p>
-                <p className="text-sm mt-1">Add your first container to start tracking arrivals</p>
+                <p className="text-lg font-medium">{tUi("no.factory.containers.yet")}</p>
+                <p className="text-sm mt-1">{tUi("add.your.first.container.to.start.tracking.arriv")}</p>
               </>
             )}
           </div>

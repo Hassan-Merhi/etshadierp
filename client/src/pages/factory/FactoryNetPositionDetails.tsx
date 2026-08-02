@@ -22,6 +22,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { useFactoryText } from "@/i18n/modules/factory";
 
 interface AccountItem {
   id?: number;
@@ -174,11 +175,7 @@ function CategoryGroup({
             </div>
           ))}
           {insuranceAccounts.length > 0 && (
-            <InsuranceSubGroup
-              accounts={insuranceAccounts}
-              amountColor={amountColor}
-              formatAmount={formatAmount}
-            />
+            <InsuranceSubGroup accounts={insuranceAccounts} amountColor={amountColor} formatAmount={formatAmount} />
           )}
         </div>
       )}
@@ -211,6 +208,7 @@ function CollapsibleSection({
   amountColor: string;
   formatAmount: (n: number) => string;
 }) {
+  const tUi = useFactoryText();
   const [open, setOpen] = useState(true);
 
   const grouped = accounts.reduce<Record<string, AccountItem[]>>((acc, item) => {
@@ -266,7 +264,7 @@ function CollapsibleSection({
               </div>
             </>
           ) : (
-            <p className="text-muted-foreground text-center py-4">No data recorded</p>
+            <p className="text-muted-foreground text-center py-4">{tUi("no.data.recorded")}</p>
           )}
         </CardContent>
       )}
@@ -305,6 +303,7 @@ function CustomNetPositionView({
   formatAmount: (n: number) => string;
   asOf: string;
 }) {
+  const tUi = useFactoryText();
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -383,7 +382,7 @@ function CustomNetPositionView({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <CardTitle className="text-base">Custom Net Position View</CardTitle>
+            <CardTitle className="text-base">{tUi("custom.net.position.view")}</CardTitle>
             <p className="text-xs text-muted-foreground mt-0.5">
               Hide accounts to see an adjusted subtotal — does not affect the real Net Position
             </p>
@@ -410,7 +409,9 @@ function CustomNetPositionView({
           <div className="space-y-1">
             <div className="flex items-center gap-1.5 mb-2">
               <Plus className="h-3.5 w-3.5 text-green-600 shrink-0" />
-              <span className="text-xs font-semibold text-green-600 uppercase tracking-wide">What We Have</span>
+              <span className="text-xs font-semibold text-green-600 uppercase tracking-wide">
+                {tUi("what.we.have")}
+              </span>
             </div>
             {forUsAccounts.map((a) => {
               const key = `forUs:${a.name}`;
@@ -450,7 +451,9 @@ function CustomNetPositionView({
               );
             })}
             <div className="flex justify-between items-center px-3 py-2 rounded-md bg-green-50 dark:bg-green-950/30 mt-1">
-              <span className="text-xs font-semibold text-green-700 dark:text-green-300">Visible subtotal</span>
+              <span className="text-xs font-semibold text-green-700 dark:text-green-300">
+                {tUi("visible.subtotal")}
+              </span>
               <span className="font-mono font-bold text-green-600">{formatAmount(visibleForUsTotal)}</span>
             </div>
           </div>
@@ -459,7 +462,7 @@ function CustomNetPositionView({
           <div className="space-y-1">
             <div className="flex items-center gap-1.5 mb-2">
               <Minus className="h-3.5 w-3.5 text-red-600 shrink-0" />
-              <span className="text-xs font-semibold text-red-600 uppercase tracking-wide">What We Owe</span>
+              <span className="text-xs font-semibold text-red-600 uppercase tracking-wide">{tUi("what.we.owe")}</span>
             </div>
 
             {/* Regular onUs account rows */}
@@ -505,7 +508,7 @@ function CustomNetPositionView({
             {payrollEmployees.length > 0 && (
               <>
                 <div className="flex items-center justify-between px-3 py-2 text-sm">
-                  <span className="font-medium text-foreground">Payroll Payable</span>
+                  <span className="font-medium text-foreground">{tUi("payroll.payable")}</span>
                 </div>
                 {payrollEmployees.map((emp) => {
                   const key = `payroll:${emp.id}`;
@@ -538,7 +541,7 @@ function CustomNetPositionView({
             )}
 
             <div className="flex justify-between items-center px-3 py-2 rounded-md bg-red-50 dark:bg-red-950/30 mt-1">
-              <span className="text-xs font-semibold text-red-700 dark:text-red-300">Visible subtotal</span>
+              <span className="text-xs font-semibold text-red-700 dark:text-red-300">{tUi("visible.subtotal")}</span>
               <span className="font-mono font-bold text-red-600">{formatAmount(visibleOnUsTotal)}</span>
             </div>
           </div>
@@ -549,6 +552,7 @@ function CustomNetPositionView({
 }
 
 export default function FactoryNetPositionDetails() {
+  const tUi = useFactoryText();
   const { formatAmount } = useCurrencyContext();
   const [asOf, setAsOf] = useState<string>(todayStr);
   const isToday = asOf === todayStr();
@@ -561,7 +565,9 @@ export default function FactoryNetPositionDetails() {
         const text = await res.text();
         // Attach the parsed code so the retry handler can inspect it
         const err: any = new Error(text);
-        try { err.code = JSON.parse(text)?.code; } catch {}
+        try {
+          err.code = JSON.parse(text)?.code;
+        } catch {}
         throw err;
       }
       return res.json();
@@ -569,8 +575,7 @@ export default function FactoryNetPositionDetails() {
     staleTime: isToday ? 60_000 : Infinity,
     refetchOnWindowFocus: false,
     // Auto-retry when the concurrency guard fires (max 3 attempts, 6 s apart)
-    retry: (failureCount, err: any) =>
-      err?.code === "ENDPOINT_BUSY" ? failureCount < 3 : false,
+    retry: (failureCount, err: any) => (err?.code === "ENDPOINT_BUSY" ? failureCount < 3 : false),
     retryDelay: (_, err: any) => (err?.code === "ENDPOINT_BUSY" ? 6_000 : 0),
   });
 
@@ -608,10 +613,7 @@ export default function FactoryNetPositionDetails() {
               <span>{friendlyMessage}</span>
             </div>
             {!isEndpointBusy && (
-              <button
-                className="mt-3 text-sm underline text-muted-foreground"
-                onClick={() => refetch()}
-              >
+              <button className="mt-3 text-sm underline text-muted-foreground" onClick={() => refetch()}>
                 Try again
               </button>
             )}
@@ -629,7 +631,7 @@ export default function FactoryNetPositionDetails() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <PageHeader
-            title="Factory Net Position"
+            title={tUi("factory.net.position")}
             subtitle={
               isToday
                 ? "Current factory financial standing — what we have vs what we owe"
@@ -645,7 +647,7 @@ export default function FactoryNetPositionDetails() {
               size="icon"
               onClick={() => setAsOf(shiftDate(asOf, -1))}
               data-testid="button-date-prev"
-              title="Previous day"
+              title={tUi("previous.day")}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -666,7 +668,7 @@ export default function FactoryNetPositionDetails() {
               onClick={() => setAsOf(shiftDate(asOf, 1))}
               disabled={isToday}
               data-testid="button-date-next"
-              title="Next day"
+              title={tUi("next.day")}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -695,12 +697,12 @@ export default function FactoryNetPositionDetails() {
         <CardContent className="pt-5">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
             <div className="flex items-center gap-2 bg-green-50 dark:bg-green-950/40 px-4 py-2.5 rounded-md">
-              <span className="text-sm font-medium text-green-700 dark:text-green-300">What We Have</span>
+              <span className="text-sm font-medium text-green-700 dark:text-green-300">{tUi("what.we.have")}</span>
               <span className="font-bold font-mono text-green-600">{formatAmount(data?.forUsTotal || 0)}</span>
             </div>
             <Minus className="h-4 w-4 text-muted-foreground shrink-0" />
             <div className="flex items-center gap-2 bg-red-50 dark:bg-red-950/40 px-4 py-2.5 rounded-md">
-              <span className="text-sm font-medium text-red-700 dark:text-red-300">What We Owe</span>
+              <span className="text-sm font-medium text-red-700 dark:text-red-300">{tUi("what.we.owe")}</span>
               <span className="font-bold font-mono text-red-600">{formatAmount(data?.onUsTotal || 0)}</span>
             </div>
             <Equal className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -726,7 +728,7 @@ export default function FactoryNetPositionDetails() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
         <CollapsibleSection
           id="assets"
-          title="What We Have"
+          title={tUi("what.we.have")}
           subtitle={`${data?.forUs.accounts?.length || 0} asset accounts`}
           accentColor="text-green-600"
           icon={<Plus className="h-5 w-5" />}
@@ -739,7 +741,7 @@ export default function FactoryNetPositionDetails() {
         />
         <CollapsibleSection
           id="liabilities"
-          title="What We Owe"
+          title={tUi("what.we.owe")}
           subtitle={`${data?.onUs.accounts?.length || 0} liability accounts`}
           accentColor="text-red-600"
           icon={<Minus className="h-5 w-5" />}

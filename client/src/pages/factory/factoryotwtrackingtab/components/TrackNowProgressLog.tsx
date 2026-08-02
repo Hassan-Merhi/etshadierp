@@ -3,11 +3,11 @@
  *
  * Extracted from FactoryOtwTrackingTab.tsx during the Phase 4 god-file split.
  */
-import {useState, useEffect} from "react";
-import {Loader2} from "lucide-react";
-import {factoryApiRequest} from "@/lib/factoryApi";
-import type {ProgressStep} from "../types";
-import {ProgressStepIcon} from "./ProgressStepIcon";
+import { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
+import { factoryApiRequest } from "@/lib/factoryApi";
+import type { ProgressStep } from "../types";
+import { ProgressStepIcon } from "./ProgressStepIcon";
 
 export function TrackNowProgressLog({ containerId }: { containerId: number }) {
   const [steps, setSteps] = useState<ProgressStep[]>([]);

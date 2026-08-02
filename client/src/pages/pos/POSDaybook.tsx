@@ -45,7 +45,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
 
 import type { InventoryItem, SalesItem, Voucher, VoucherWithItems } from "./posdaybook/types";
+import { usePosText } from "@/i18n/modules/pos";
 export default function POSDaybook() {
+  const tUi = usePosText();
   const { formatDisplayDate } = useDateFormat();
   const { formatCashAmount } = useCurrencyContext();
   const { selectedCompany } = useCompany();
@@ -470,7 +472,7 @@ export default function POSDaybook() {
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <PageHeader title="POS Daybook" subtitle={getSubtitle()} />
+        <PageHeader title={tUi("pos.daybook")} subtitle={getSubtitle()} />
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
@@ -483,7 +485,7 @@ export default function POSDaybook() {
                 preset: "custom",
               }));
             }}
-            title="Previous day (−)"
+            title={tUi("previous.day")}
             data-testid="button-prev-day"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -500,7 +502,7 @@ export default function POSDaybook() {
                 preset: "custom",
               }));
             }}
-            title="Next day (+)"
+            title={tUi("next.day")}
             data-testid="button-next-day"
           >
             <ChevronRight className="h-4 w-4" />
@@ -513,7 +515,7 @@ export default function POSDaybook() {
         <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
           <Package className="h-4 w-4 text-muted-foreground shrink-0" />
           <div>
-            <p className="text-xs text-muted-foreground leading-none mb-0.5">Sales</p>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">{tUi("sales")}</p>
             {isLoading ? (
               <Skeleton className="h-5 w-10 mt-0.5" />
             ) : (
@@ -526,7 +528,7 @@ export default function POSDaybook() {
         <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
           <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
           <div>
-            <p className="text-xs text-muted-foreground leading-none mb-0.5">Total Revenue</p>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">{tUi("total.revenue")}</p>
             {isLoading ? (
               <Skeleton className="h-5 w-20 mt-0.5" />
             ) : (
@@ -539,7 +541,7 @@ export default function POSDaybook() {
         <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
           <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
           <div>
-            <p className="text-xs text-muted-foreground leading-none mb-0.5">Avg per Sale</p>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">{tUi("avg.per.sale")}</p>
             {isLoading ? (
               <Skeleton className="h-5 w-16 mt-0.5" />
             ) : (
@@ -552,7 +554,7 @@ export default function POSDaybook() {
         <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
           <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
           <div>
-            <p className="text-xs text-muted-foreground leading-none mb-0.5">Transfers</p>
+            <p className="text-xs text-muted-foreground leading-none mb-0.5">{tUi("transfers")}</p>
             {isLoading ? (
               <Skeleton className="h-5 w-10 mt-0.5" />
             ) : (
@@ -605,7 +607,7 @@ export default function POSDaybook() {
                 }}
                 className="gap-1 text-muted-foreground"
                 data-testid="button-clear-hidden-rows"
-                title="Clear all hidden rows"
+                title={tUi("clear.all.hidden.rows")}
               >
                 <X className="w-4 h-4" />
                 Clear
@@ -622,8 +624,8 @@ export default function POSDaybook() {
         ) : salesVouchers.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
             <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p className="text-lg font-medium">No transactions found</p>
-            <p className="text-sm mt-1">Sales and transfers will appear here for the selected period</p>
+            <p className="text-lg font-medium">{tUi("no.transactions.found")}</p>
+            <p className="text-sm mt-1">{tUi("sales.and.transfers.will.appear.here.for.the.sel")}</p>
           </div>
         ) : (
           <div className="border rounded-xl overflow-hidden">
@@ -631,12 +633,12 @@ export default function POSDaybook() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
-                    <TableHead className="text-xs">Time</TableHead>
-                    <TableHead className="text-xs">Type</TableHead>
-                    <TableHead className="text-xs hidden sm:table-cell">Location</TableHead>
-                    <TableHead className="text-xs text-right">Amount</TableHead>
-                    <TableHead className="text-xs hidden md:table-cell">Notes</TableHead>
-                    <TableHead className="text-xs text-right">Actions</TableHead>
+                    <TableHead className="text-xs">{tUi("time")}</TableHead>
+                    <TableHead className="text-xs">{tUi("type")}</TableHead>
+                    <TableHead className="text-xs hidden sm:table-cell">{tUi("location")}</TableHead>
+                    <TableHead className="text-xs text-right">{tUi("amount")}</TableHead>
+                    <TableHead className="text-xs hidden md:table-cell">{tUi("notes")}</TableHead>
+                    <TableHead className="text-xs text-right">{tUi("actions")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -805,7 +807,7 @@ export default function POSDaybook() {
                 textAlign: "center",
               }}
             >
-              <span style={{ fontWeight: "900" }}>Daily Rate:</span> $1 ={" "}
+              <span style={{ fontWeight: "900" }}>{tUi("daily.rate")}</span> $1 ={" "}
               {formatNumber(parseFloat(String(reprintRowDetails.exchangeRate)))} CFA
             </div>
           )}
@@ -819,7 +821,7 @@ export default function POSDaybook() {
                 border: "2px solid black",
               }}
             >
-              <div style={{ fontWeight: "900" }}>CREDIT SALE</div>
+              <div style={{ fontWeight: "900" }}>{tUi("credit.sale")}</div>
               {reprintRowDetails.customerName && <div>Customer: {reprintRowDetails.customerName}</div>}
             </div>
           )}
@@ -1122,7 +1124,7 @@ export default function POSDaybook() {
               justifyContent: "space-between",
             }}
           >
-            <span>TOTAL PAID:</span>
+            <span>{tUi("total.paid")}</span>
             <span>
               {fmtPrint(
                 (reprintRowDetails?.salesItems ?? []).reduce(
@@ -1143,7 +1145,7 @@ export default function POSDaybook() {
                 border: "2px solid black",
               }}
             >
-              <span style={{ fontWeight: "900" }}>Note:</span> {reprintRowDetails.description}
+              <span style={{ fontWeight: "900" }}>{tUi("note")}</span> {reprintRowDetails.description}
             </div>
           )}
           <div
@@ -1156,7 +1158,7 @@ export default function POSDaybook() {
               borderTop: "2px solid black",
             }}
           >
-            <div>Thank you for your business!</div>
+            <div>{tUi("thank.you.for.your.business")}</div>
           </div>
         </div>
       </div>
@@ -1192,11 +1194,11 @@ export default function POSDaybook() {
             ) : isEditMode ? (
               <div className="space-y-4">
                 <div className="border-b pb-4">
-                  <p className="text-sm font-medium text-muted-foreground mb-2">Notes</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-2">{tUi("notes")}</p>
                   <Textarea
                     value={editedNotes}
                     onChange={(e) => setEditedNotes(e.target.value)}
-                    placeholder="Add notes..."
+                    placeholder={tUi("add.notes")}
                     className="min-h-[60px]"
                     data-testid="input-notes"
                   />
@@ -1204,7 +1206,7 @@ export default function POSDaybook() {
 
                 <div>
                   <div className="flex flex-wrap items-center justify-between gap-1 mb-1">
-                    <p className="text-sm font-medium text-muted-foreground">Items Sold</p>
+                    <p className="text-sm font-medium text-muted-foreground">{tUi("items.sold")}</p>
                     <Popover open={addItemOpen} onOpenChange={setAddItemOpen}>
                       <PopoverTrigger asChild>
                         <Button size="sm" variant="outline" data-testid="button-add-item">
@@ -1215,13 +1217,13 @@ export default function POSDaybook() {
                       <PopoverContent className="w-80 p-0" align="end">
                         <Command>
                           <CommandInput
-                            placeholder="Search items..."
+                            placeholder={tUi("search.items")}
                             value={itemSearch}
                             onValueChange={setItemSearch}
                             data-testid="input-item-search"
                           />
                           <CommandList>
-                            <CommandEmpty>No items found.</CommandEmpty>
+                            <CommandEmpty>{tUi("no.items.found")}</CommandEmpty>
                             <CommandGroup>
                               {inventory
                                 .filter(
@@ -1263,12 +1265,12 @@ export default function POSDaybook() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Item</TableHead>
-                        <TableHead className="text-right">Quantity</TableHead>
-                        <TableHead className="text-right">Price</TableHead>
-                        {canSeeProfitCost && <TableHead className="text-right">Cost</TableHead>}
-                        <TableHead className="text-right">Total</TableHead>
-                        {canSeeProfitCost && <TableHead className="text-right">Profit</TableHead>}
+                        <TableHead>{tUi("item")}</TableHead>
+                        <TableHead className="text-right">{tUi("quantity")}</TableHead>
+                        <TableHead className="text-right">{tUi("price")}</TableHead>
+                        {canSeeProfitCost && <TableHead className="text-right">{tUi("cost")}</TableHead>}
+                        <TableHead className="text-right">{tUi("total")}</TableHead>
+                        {canSeeProfitCost && <TableHead className="text-right">{tUi("profit")}</TableHead>}
                         <TableHead className="w-12"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1346,7 +1348,7 @@ export default function POSDaybook() {
                   {canSeeProfitCost && (
                     <div className="space-y-1">
                       <div className="text-sm">
-                        <span className="text-muted-foreground">Total Cost: </span>
+                        <span className="text-muted-foreground">{tUi("total.cost")} </span>
                         <span className="font-mono font-semibold">
                           {formatCashAmount(
                             editedItems.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0)
@@ -1354,7 +1356,7 @@ export default function POSDaybook() {
                         </span>
                       </div>
                       <div className="text-sm">
-                        <span className="text-muted-foreground">Total Profit: </span>
+                        <span className="text-muted-foreground">{tUi("total.profit")} </span>
                         <span className="font-mono font-semibold text-green-600 dark:text-green-400">
                           {formatCashAmount(editedItems.reduce((sum, item) => sum + parseFloat(item.profit || "0"), 0))}
                         </span>
@@ -1362,7 +1364,7 @@ export default function POSDaybook() {
                     </div>
                   )}
                   <div className="text-sm">
-                    <span className="text-muted-foreground">Total Sales: </span>
+                    <span className="text-muted-foreground">{tUi("total.sales")} </span>
                     <span className="font-mono font-semibold">
                       {formatCashAmount(editedItems.reduce((sum, item) => sum + parseFloat(item.totalSales), 0))}
                     </span>
@@ -1373,14 +1375,14 @@ export default function POSDaybook() {
               <div className="space-y-4">
                 {voucherDetails?.description && (
                   <div className="border-b pb-4">
-                    <p className="text-sm font-medium text-muted-foreground">Notes</p>
+                    <p className="text-sm font-medium text-muted-foreground">{tUi("notes")}</p>
                     <p className="text-sm mt-1">{voucherDetails.description}</p>
                   </div>
                 )}
 
                 <div className="table-responsive">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                    <p className="text-sm font-medium text-muted-foreground">Items Sold</p>
+                    <p className="text-sm font-medium text-muted-foreground">{tUi("items.sold")}</p>
                     <div className="flex items-center gap-1">
                       {canSeeProfitCost && (
                         <>
@@ -1443,15 +1445,15 @@ export default function POSDaybook() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Item</TableHead>
+                            <TableHead>{tUi("item")}</TableHead>
                             <TableHead className="text-right">Qty</TableHead>
-                            <TableHead className="text-right">Price</TableHead>
-                            {canSeeProfitCost && <TableHead className="text-right">Cost</TableHead>}
-                            <TableHead className="text-right">Total</TableHead>
-                            {canSeeProfitCost && <TableHead className="text-right">Profit</TableHead>}
-                            {canSeeProfitCost && <TableHead className="text-right">Hassan's Price</TableHead>}
-                            {canSeeProfitCost && <TableHead className="text-right">Hassan's Profit</TableHead>}
-                            {canSeeProfitCost && <TableHead className="text-right">Hassan's %</TableHead>}
+                            <TableHead className="text-right">{tUi("price")}</TableHead>
+                            {canSeeProfitCost && <TableHead className="text-right">{tUi("cost")}</TableHead>}
+                            <TableHead className="text-right">{tUi("total")}</TableHead>
+                            {canSeeProfitCost && <TableHead className="text-right">{tUi("profit")}</TableHead>}
+                            {canSeeProfitCost && <TableHead className="text-right">{tUi("hassan.s.price")}</TableHead>}
+                            {canSeeProfitCost && <TableHead className="text-right">{tUi("hassan.s.profit")}</TableHead>}
+                            {canSeeProfitCost && <TableHead className="text-right">{tUi("hassan.s")}</TableHead>}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1532,7 +1534,7 @@ export default function POSDaybook() {
                   return (
                     <div className="border-t pt-4 flex flex-wrap gap-4 justify-between">
                       <div className="text-sm">
-                        <span className="text-muted-foreground">Total Sales: </span>
+                        <span className="text-muted-foreground">{tUi("total.sales")} </span>
                         <span className="font-mono font-semibold">
                           {formatCashAmount(
                             voucherDetails.salesItems.reduce(
@@ -1545,7 +1547,7 @@ export default function POSDaybook() {
                       {canSeeProfitCost && (
                         <>
                           <div className="text-sm">
-                            <span className="text-muted-foreground">Total Cost: </span>
+                            <span className="text-muted-foreground">{tUi("total.cost")} </span>
                             <span className="font-mono font-semibold">
                               {formatCashAmount(
                                 voucherDetails.salesItems.reduce(
@@ -1556,7 +1558,7 @@ export default function POSDaybook() {
                             </span>
                           </div>
                           <div className="text-sm">
-                            <span className="text-muted-foreground">Total Profit: </span>
+                            <span className="text-muted-foreground">{tUi("total.profit")} </span>
                             <span
                               className={`font-mono font-semibold ${totalProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
                             >
@@ -1564,7 +1566,7 @@ export default function POSDaybook() {
                             </span>
                           </div>
                           <div className="text-sm">
-                            <span className="text-muted-foreground">Hassan's Total: </span>
+                            <span className="text-muted-foreground">{tUi("hassan.s.total")} </span>
                             <span className="font-mono font-semibold">
                               {formatCashAmount(
                                 voucherDetails.salesItems.reduce(
@@ -1575,7 +1577,7 @@ export default function POSDaybook() {
                             </span>
                           </div>
                           <div className="text-sm">
-                            <span className="text-muted-foreground">Hassan's Profit: </span>
+                            <span className="text-muted-foreground">{tUi("hassan.s.profit.2")} </span>
                             <span
                               className={`font-mono font-semibold ${totalHassansProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
                             >
@@ -1589,7 +1591,7 @@ export default function POSDaybook() {
                 })()}
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">No items found for this transaction</div>
+              <div className="text-center py-8 text-muted-foreground">{tUi("no.items.found.for.this.transaction")}</div>
             )}
           </div>
 
@@ -1675,7 +1677,7 @@ export default function POSDaybook() {
                           textAlign: "center",
                         }}
                       >
-                        <span style={{ fontWeight: "900" }}>Daily Rate:</span> $1 ={" "}
+                        <span style={{ fontWeight: "900" }}>{tUi("daily.rate")}</span> $1 ={" "}
                         {formatNumber(parseFloat(String(voucherDetails.exchangeRate)))} CFA
                       </div>
                     )}
@@ -1690,7 +1692,7 @@ export default function POSDaybook() {
                           border: "2px solid black",
                         }}
                       >
-                        <div style={{ fontWeight: "900" }}>CREDIT SALE</div>
+                        <div style={{ fontWeight: "900" }}>{tUi("credit.sale")}</div>
                         {voucherDetails.customerName && <div>Customer: {voucherDetails.customerName}</div>}
                       </div>
                     )}
@@ -1997,7 +1999,7 @@ export default function POSDaybook() {
                         justifyContent: "space-between",
                       }}
                     >
-                      <span>TOTAL PAID:</span>
+                      <span>{tUi("total.paid")}</span>
                       <span>
                         {fmtPrint(
                           (voucherDetails?.salesItems ?? []).reduce(
@@ -2019,7 +2021,7 @@ export default function POSDaybook() {
                           border: "2px solid black",
                         }}
                       >
-                        <span style={{ fontWeight: "900" }}>Note:</span> {voucherDetails.description}
+                        <span style={{ fontWeight: "900" }}>{tUi("note")}</span> {voucherDetails.description}
                       </div>
                     )}
                     {/* Footer */}
@@ -2033,7 +2035,7 @@ export default function POSDaybook() {
                         borderTop: "2px solid black",
                       }}
                     >
-                      <div>Thank you for your business!</div>
+                      <div>{tUi("thank.you.for.your.business")}</div>
                     </div>
                   </div>
                 </div>
@@ -2068,7 +2070,7 @@ export default function POSDaybook() {
                     </TooltipTrigger>
                     {!canEditDaybook && (
                       <TooltipContent>
-                        <p>You don't have permission to edit daybook transactions</p>
+                        <p>{tUi("you.don.t.have.permission.to.edit.daybook.transa")}</p>
                       </TooltipContent>
                     )}
                   </Tooltip>
