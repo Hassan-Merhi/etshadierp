@@ -10,6 +10,8 @@ Phase 4 converts the complete Supplier Partner translation backlog to reviewed E
 - migration preparation, final synchronization, cutover, rollback and recovery messages;
 - validation, verification and reconciliation messages returned by Supplier Partner APIs.
 
+This phase is stacked on the completed shared-interface conversion, so shared navigation and reusable control labels continue to come from Phase 3 while this catalog owns Supplier Partner-specific language.
+
 ## Reviewed result
 
 The Phase 3 classified audit reported 261 actionable Supplier Partner occurrences across 230 unique values. Phase 4 reviews all 230 values and lowers the Supplier Partner module ratchet from 261 to zero.
