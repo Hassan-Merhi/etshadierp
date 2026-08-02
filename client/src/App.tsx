@@ -12,6 +12,8 @@ import { LocationProvider } from "@/contexts/LocationContext";
 import { DateFormatProvider } from "@/contexts/DateFormatContext";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { CursorNavProvider } from "@/contexts/CursorNavContext";
+import { ApplicationLanguageProvider } from "@/contexts/ApplicationLanguageContext";
+import { GlobalLanguageSwitch } from "@/components/GlobalLanguageSwitch";
 import { DateJumpDialog } from "@/components/DateJumpDialog";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { UserNotesPanel } from "@/components/UserNotesPanel";
@@ -24,18 +26,12 @@ import { AuthenticatedApp } from "@/app/AuthenticatedApp";
 import { AppLoadingState } from "@/app/AppLoadingState";
 import { useAuthenticatedUser } from "@/app/useAuthenticatedUser";
 
-// ── Production-only update banner ─────────────────────────────────────────────
-// Polls /api/build-info every 5 minutes. When the build version changes it shows a
-// small non-blocking toast with a manual "Refresh" button. It NEVER auto-refreshes.
-// A service-worker update triggers the same version check immediately without
-// forcing every open tab to download the full application again.
 function UpdateBanner() {
   const { toast } = useToast();
   const notifiedRef = useRef(false);
   const initialVersionRef = useRef<string | null>(null);
 
   useEffect(() => {
-    // Only run in production — dev restarts are handled by Vite HMR
     if (import.meta.env.DEV) return;
 
     async function checkVersion() {
@@ -47,7 +43,6 @@ function UpdateBanner() {
         if (!ver || ver === "dev") return;
 
         if (initialVersionRef.current === null) {
-          // Store the version that was live when the app first loaded
           initialVersionRef.current = ver;
           return;
         }
@@ -57,15 +52,13 @@ function UpdateBanner() {
           toast({
             title: "Update available",
             description: "A new version of the app is ready.",
-            duration: 0, // stay until dismissed
+            duration: 0,
             action: (
               <Button
                 size="sm"
                 variant="outline"
                 data-testid="button-update-refresh"
                 onClick={() => {
-                  // Clear both current and legacy recovery guards before a
-                  // user-requested refresh so the new build starts cleanly.
                   try {
                     const prefixes = ["assetRecovery:", "swReload:", "chunkReload:", "chunkRetry:"];
                     Object.keys(sessionStorage)
@@ -91,8 +84,8 @@ function UpdateBanner() {
       void checkVersion();
     };
 
-    void checkVersion(); // initial check
-    const id = setInterval(checkVersion, 5 * 60 * 1000); // every 5 minutes
+    void checkVersion();
+    const id = setInterval(checkVersion, 5 * 60 * 1000);
     window.addEventListener("erp:service-worker-updated", handleServiceWorkerUpdate);
     return () => {
       clearInterval(id);
@@ -120,13 +113,6 @@ function ServerRestartWatcher() {
   return null;
 }
 
-/**
- * The only entry point for protected UI.
- *
- * Nothing that can call an authenticated endpoint is mounted until /api/auth/me
- * has positively confirmed the session. This prevents the login page and an
- * expired-session refresh from firing dozens of protected requests in parallel.
- */
 function AuthenticatedRoot() {
   const { user, isLoading, error, loadingTimedOut, handleLogout } = useAuthenticatedUser();
 
@@ -134,22 +120,25 @@ function AuthenticatedRoot() {
   if (isLoading || !user) return <AppLoadingState />;
 
   return (
-    <CompanyProvider>
-      <LocationProvider>
-        <DateFormatProvider>
-          <CurrencyProvider>
-            <CursorNavProvider>
-              <ServerRestartWatcher />
-              <AuthenticatedApp user={user} handleLogout={handleLogout} />
-              <AuthenticatedChatWidget />
-              <DateJumpDialog />
-              <AuthenticatedUserNotesPanel />
-              <KeyboardShortcuts />
-            </CursorNavProvider>
-          </CurrencyProvider>
-        </DateFormatProvider>
-      </LocationProvider>
-    </CompanyProvider>
+    <ApplicationLanguageProvider>
+      <CompanyProvider>
+        <LocationProvider>
+          <DateFormatProvider>
+            <CurrencyProvider>
+              <CursorNavProvider>
+                <ServerRestartWatcher />
+                <GlobalLanguageSwitch />
+                <AuthenticatedApp user={user} handleLogout={handleLogout} />
+                <AuthenticatedChatWidget />
+                <DateJumpDialog />
+                <AuthenticatedUserNotesPanel />
+                <KeyboardShortcuts />
+              </CursorNavProvider>
+            </CurrencyProvider>
+          </DateFormatProvider>
+        </LocationProvider>
+      </CompanyProvider>
+    </ApplicationLanguageProvider>
   );
 }
 
