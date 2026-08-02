@@ -16,6 +16,8 @@ jobs:
   format:
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout branch
         uses: actions/checkout@v7
@@ -38,21 +40,58 @@ jobs:
       - name: Format source files
         run: npm run format
 
-      - name: Commit formatted source
-        id: commit
+      - name: Create formatted commit through Git Data API
+        id: publish
+        shell: bash
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add client/src server shared
-          if git diff --cached --quiet; then
-            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          git commit -m "Format translation implementation"
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          parent=$(git rev-parse HEAD)
+          base_tree=$(gh api "repos/${GITHUB_REPOSITORY}/git/commits/${parent}" --jq .tree.sha)
+          files=(
+            client/src/app/FactoryShell.tsx
+            client/src/components/ApplicationInterfaceTranslator.tsx
+            client/src/components/FactoryBilingualDocumentActions.tsx
+            client/src/components/FactoryFrenchCatalogManager.tsx
+            client/src/contexts/ApplicationLanguageContext.tsx
+            client/src/i18n/accountingDocumentTranslations.ts
+            client/src/i18n/applicationTranslations.ts
+            client/src/pages/BaleProductsBilingual.tsx
+            server/lib/workerBalesBilingualPdfGenerator.ts
+            server/routes/factory/factoryBilingualSnapshotRoutes.ts
+            server/routes/factory/factoryFrenchCatalogReadRoutes.ts
+            server/routes/factory/factoryFrenchTranslationRoutes.ts
+            server/routes/factoryRoutes.ts
+            server/services/factoryBilingualSurfaceResolver.ts
+            shared/factoryBilingualContract.ts
+            shared/schema/factoryTrilingualCatalogTables.ts
+          )
 
-      - name: Push formatted staging branch
-        run: git push --force origin HEAD:agent/formatted-translation-staging
+          printf '{"base_tree":"%s","tree":[' "$base_tree" > tree.json
+          first=1
+          for file in "${files[@]}"; do
+            encoded=$(base64 -w0 "$file")
+            blob=$(gh api --method POST "repos/${GITHUB_REPOSITORY}/git/blobs" \
+              -f content="$encoded" -f encoding=base64 --jq .sha)
+            if [ "$first" -eq 0 ]; then printf ',' >> tree.json; fi
+            first=0
+            jq -n --arg path "$file" --arg sha "$blob" \
+              '{path:$path,mode:"100644",type:"blob",sha:$sha}' >> tree.json
+          done
+          printf ']}' >> tree.json
+
+          tree=$(gh api --method POST "repos/${GITHUB_REPOSITORY}/git/trees" --input tree.json --jq .sha)
+          jq -n --arg message "Format translation implementation" --arg tree "$tree" --arg parent "$parent" \
+            '{message:$message,tree:$tree,parents:[$parent]}' > commit.json
+          commit=$(gh api --method POST "repos/${GITHUB_REPOSITORY}/git/commits" --input commit.json --jq .sha)
+
+          ref="heads/agent/formatted-translation-staging"
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/${ref}" >/dev/null 2>&1; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/${ref}" -f sha="$commit" -F force=true >/dev/null
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/${ref}" -f sha="$commit" >/dev/null
+          fi
+          echo "sha=$commit" >> "$GITHUB_OUTPUT"
 
       - name: Publish formatted commit SHA
-        run: echo "FORMATTED_COMMIT=${{ steps.commit.outputs.sha }}"
+        run: echo "FORMATTED_COMMIT=${{ steps.publish.outputs.sha }}"
