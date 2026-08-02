@@ -105,7 +105,7 @@ export default function BaleProductsBilingual() {
   useEffect(() => {
     const handleLanguageChange = (event: Event) => {
       const next = (event as CustomEvent<FactoryCatalogLanguage>).detail;
-      if (next !== "en" && next !== "ar") return;
+      if (next !== "en" && next !== "ar" && next !== "fr") return;
       setLanguage(next);
       queryClient.removeQueries({ queryKey: ["/api/factory/bale-products"] });
       queryClient.removeQueries({ queryKey: ["/api/factory/categories"] });
@@ -160,10 +160,10 @@ export default function BaleProductsBilingual() {
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-              <Input value={catalogSearch} onChange={(event) => setCatalogSearch(event.target.value)} placeholder={language === "ar" ? "بحث بالعربي أو الإنجليزي أو الرمز..." : "Search English, Arabic, or article code..."} className="h-8 w-72 pl-8 pr-8 text-sm" dir="auto" />
+              <Input value={catalogSearch} onChange={(event) => setCatalogSearch(event.target.value)} placeholder={language === "ar" ? "بحث بالعربي أو الإنجليزي أو الرمز..." : language === "fr" ? "Rechercher en français, anglais, arabe ou par code..." : "Search English, Arabic, or article code..."} className="h-8 w-72 pl-8 pr-8 text-sm" dir="auto" />
               {catalogSearch && <button type="button" onClick={() => setCatalogSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"><X className="h-3.5 w-3.5" /></button>}
             </div>
-            {isAdmin && <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => setCategoryDialogOpen(true)}><Plus className="h-3.5 w-3.5 mr-1.5" />{language === "ar" ? "فئة ثنائية اللغة" : "Bilingual category"}</Button>}
+            {isAdmin && <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => setCategoryDialogOpen(true)}><Plus className="h-3.5 w-3.5 mr-1.5" />{language === "ar" ? "فئة ثنائية اللغة" : language === "fr" ? "Catégorie multilingue" : "Bilingual category"}</Button>}
           </div>
         </div>
       </div>
