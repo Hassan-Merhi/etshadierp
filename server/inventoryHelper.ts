@@ -1,3 +1,4 @@
+import Decimal from "decimal.js";
 import { sql } from "drizzle-orm";
 import { logger } from "./lib/logger";
 
@@ -19,6 +20,49 @@ export interface AdjustInventoryResult {
 }
 
 // ─────────────────────────────────────────────────────────────
+// Precision
+// ─────────────────────────────────────────────────────────────
+//
+// This module used to do its arithmetic in JavaScript floats while the rest of
+// the accounting core used decimal.js. That produced wrong last digits at
+// rounding boundaries: a rate of 1.005 is really 1.00499999999999989 in binary,
+// so `(1.005).toFixed(2)` returned "1.00" and the stored average rate was a half
+// cent light. Decimal rounds it to "1.01".
+//
+// Only the arithmetic changed. The public signature still takes and returns
+// numbers, so none of the ~100 call sites move.
+
+/** Scale of each column these values are written to. */
+const QTY_DP = 3;
+const RATE_DP = 2;
+const VALUE_DP = 2;
+const LAYER_RATE_DP = 4;
+
+/**
+ * Half of the quantity column's last place. A residue smaller than this cannot
+ * survive being written at 3dp, so the engine treats it as zero rather than
+ * carrying a layer that rounds away to nothing. This was already the rule; it is
+ * now exact rather than approximate.
+ */
+const QTY_EPSILON = new Decimal("0.0005");
+
+/** Cost variance worth a log line, in currency units. */
+const VARIANCE_LOG_THRESHOLD = new Decimal("0.01");
+
+const ZERO = new Decimal(0);
+
+/**
+ * decimal.js parses a number through its shortest round-trip decimal form, so
+ * `toDecimal(0.1)` is exactly 0.1 rather than the binary value 0.1 denotes.
+ * That is what we want: callers are expressing decimal intent.
+ */
+function toDecimal(value: number | string | null | undefined): Decimal {
+  if (value === null || value === undefined || value === "") return ZERO;
+  const parsed = new Decimal(value);
+  return parsed.isNaN() ? ZERO : parsed;
+}
+
+// ─────────────────────────────────────────────────────────────
 // Private helpers
 // ─────────────────────────────────────────────────────────────
 
@@ -27,8 +71,8 @@ async function createNegativeLayer(
   companyId: number,
   locationId: number,
   stockItemId: number,
-  qty: number,
-  provisionalRate: number,
+  qty: Decimal,
+  provisionalRate: Decimal,
   sourceVoucherType?: string,
   sourceVoucherId?: number
 ): Promise<void> {
@@ -36,8 +80,8 @@ async function createNegativeLayer(
     INSERT INTO inventory_negative_layers
       (company_id, location_id, stock_item_id, qty, provisional_rate, source_voucher_type, source_voucher_id)
     VALUES
-      (${companyId}, ${locationId}, ${stockItemId}, ${qty.toFixed(3)},
-       ${provisionalRate.toFixed(4)}, ${sourceVoucherType ?? null}, ${sourceVoucherId ?? null})
+      (${companyId}, ${locationId}, ${stockItemId}, ${qty.toFixed(QTY_DP)},
+       ${provisionalRate.toFixed(LAYER_RATE_DP)}, ${sourceVoucherType ?? null}, ${sourceVoucherId ?? null})
   `);
 }
 
@@ -53,10 +97,10 @@ async function createNegativeLayer(
  * resulting negative quantity more than once would overstate the FIFO layers
  * and make later receipts settle stock that was never actually issued.
  */
-function incrementalShortage(previousQty: number, newQty: number): number {
-  const previousShortage = Math.max(-previousQty, 0);
-  const newShortage = Math.max(-newQty, 0);
-  return Math.max(newShortage - previousShortage, 0);
+function incrementalShortage(previousQty: Decimal, newQty: Decimal): Decimal {
+  const previousShortage = Decimal.max(previousQty.negated(), ZERO);
+  const newShortage = Decimal.max(newQty.negated(), ZERO);
+  return Decimal.max(newShortage.minus(previousShortage), ZERO);
 }
 
 /**
@@ -67,9 +111,9 @@ async function settleNegativeLayers(
   tx: TxOrDb,
   locationId: number,
   stockItemId: number,
-  incomingQty: number,
-  incomingRate: number
-): Promise<{ settled: number; remaining: number }> {
+  incomingQty: Decimal,
+  incomingRate: Decimal
+): Promise<{ settled: Decimal; remaining: Decimal }> {
   const result = await (tx as any).execute(sql`
     SELECT id, qty, provisional_rate
     FROM inventory_negative_layers
@@ -80,35 +124,36 @@ async function settleNegativeLayers(
   const rows: any[] = result.rows ?? result;
 
   let remaining = incomingQty;
-  let settled = 0;
+  let settled = ZERO;
 
   for (const layer of rows) {
-    if (remaining <= 0.0005) break;
-    const layerQty = parseFloat(layer.qty ?? "0");
-    const consume = Math.min(layerQty, remaining);
-    settled += consume;
-    remaining -= consume;
+    if (remaining.lte(QTY_EPSILON)) break;
+    const layerQty = toDecimal(layer.qty);
+    const consume = Decimal.min(layerQty, remaining);
+    settled = settled.plus(consume);
+    remaining = remaining.minus(consume);
 
-    const variance = (incomingRate - parseFloat(layer.provisional_rate ?? "0")) * consume;
-    if (Math.abs(variance) > 0.01) {
+    const variance = incomingRate.minus(toDecimal(layer.provisional_rate)).times(consume);
+    if (variance.abs().gt(VARIANCE_LOG_THRESHOLD)) {
       logger.info(
         `[settleNegativeLayers] Cost variance: loc=${locationId} item=${stockItemId} ` +
-          `qty=${consume.toFixed(3)} provisional=${layer.provisional_rate} actual=${incomingRate} variance=${variance.toFixed(2)}`
+          `qty=${consume.toFixed(QTY_DP)} provisional=${layer.provisional_rate} actual=${incomingRate.toString()} variance=${variance.toFixed(VALUE_DP)}`
       );
     }
 
-    if (layerQty - consume < 0.0005) {
+    const layerRemainder = layerQty.minus(consume);
+    if (layerRemainder.lt(QTY_EPSILON)) {
       await (tx as any).execute(sql`DELETE FROM inventory_negative_layers WHERE id = ${layer.id}`);
     } else {
       await (tx as any).execute(sql`
         UPDATE inventory_negative_layers
-        SET qty = ${(layerQty - consume).toFixed(3)}, updated_at = NOW()
+        SET qty = ${layerRemainder.toFixed(QTY_DP)}, updated_at = NOW()
         WHERE id = ${layer.id}
       `);
     }
   }
 
-  return { settled, remaining: Math.max(remaining, 0) };
+  return { settled, remaining: Decimal.max(remaining, ZERO) };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -142,52 +187,53 @@ export async function adjustInventory(
     FOR UPDATE
   `);
   const existing = lockResult.rows?.[0] ?? lockResult[0];
+  const delta = toDecimal(deltaQty);
 
   if (existing) {
-    const prevQty = parseFloat(existing.quantity ?? "0");
-    const prevRate = parseFloat(existing.average_rate ?? "0");
-    const prevTotalValue = parseFloat(existing.total_value ?? "0");
-    const newQty = prevQty + deltaQty;
+    const prevQty = toDecimal(existing.quantity);
+    const prevRate = toDecimal(existing.average_rate);
+    const prevTotalValue = toDecimal(existing.total_value);
+    const newQty = prevQty.plus(delta);
 
-    let newTotalValue: number;
-    let newRate: number;
+    let newTotalValue: Decimal;
+    let newRate: Decimal;
 
-    if (deltaQty > 0) {
+    if (delta.gt(ZERO)) {
       // ── INCOMING: settle negative layers first, then add to positive stock ──
-      const effectiveRate = incomingRate ?? prevRate;
-      const { remaining } = await settleNegativeLayers(tx, locationId, stockItemId, deltaQty, effectiveRate);
+      const effectiveRate = incomingRate === undefined ? prevRate : toDecimal(incomingRate);
+      const { remaining } = await settleNegativeLayers(tx, locationId, stockItemId, delta, effectiveRate);
 
-      const addValue = remaining * effectiveRate;
-      newTotalValue = Math.max(prevTotalValue + addValue, 0);
+      const addValue = remaining.times(effectiveRate);
+      newTotalValue = Decimal.max(prevTotalValue.plus(addValue), ZERO);
 
-      if (newQty > 0) {
-        newRate = newTotalValue / newQty;
+      if (newQty.gt(ZERO)) {
+        newRate = newTotalValue.dividedBy(newQty);
       } else {
         // All incoming absorbed by negative layers; net qty still ≤ 0
-        newTotalValue = 0;
+        newTotalValue = ZERO;
         newRate = effectiveRate; // preserve for cost memory
       }
-    } else if (deltaQty < 0) {
+    } else if (delta.lt(ZERO)) {
       // ── OUTGOING ─────────────────────────────────────────────────────────────
-      const effectiveRate = Math.max(prevRate, 0);
+      const effectiveRate = Decimal.max(prevRate, ZERO);
 
-      if (newQty > 0) {
+      if (newQty.gt(ZERO)) {
         // Normal deduction from positive stock
-        const deductionValue = Math.abs(deltaQty) * effectiveRate;
-        newTotalValue = Math.max(prevTotalValue - deductionValue, 0);
-        newRate = newTotalValue / newQty;
-      } else if (newQty === 0) {
-        newTotalValue = 0;
+        const deductionValue = delta.abs().times(effectiveRate);
+        newTotalValue = Decimal.max(prevTotalValue.minus(deductionValue), ZERO);
+        newRate = newTotalValue.dividedBy(newQty);
+      } else if (newQty.isZero()) {
+        newTotalValue = ZERO;
         newRate = effectiveRate; // keep for cost memory
       } else {
         // ── Goes or remains short: create only the incremental shortage ─────────
         const shortageQty = incrementalShortage(prevQty, newQty);
-        const provisionalRate = effectiveRate > 0 ? effectiveRate : prevRate;
+        const provisionalRate = effectiveRate.gt(ZERO) ? effectiveRate : prevRate;
 
-        newTotalValue = 0;
-        newRate = provisionalRate > 0 ? provisionalRate : 0; // cost memory
+        newTotalValue = ZERO;
+        newRate = provisionalRate.gt(ZERO) ? provisionalRate : ZERO; // cost memory
 
-        if (shortageQty > 0.0005) {
+        if (shortageQty.gt(QTY_EPSILON)) {
           await createNegativeLayer(
             tx,
             companyId,
@@ -207,70 +253,77 @@ export async function adjustInventory(
     }
 
     // Safety clamps
-    if (newRate < 0) newRate = 0;
-    if (newQty > 0 && newTotalValue < 0) {
-      newTotalValue = 0;
-      newRate = 0;
+    if (newRate.lt(ZERO)) newRate = ZERO;
+    if (newQty.gt(ZERO) && newTotalValue.lt(ZERO)) {
+      newTotalValue = ZERO;
+      newRate = ZERO;
     }
-    if (newQty <= 0) newTotalValue = 0;
+    if (newQty.lte(ZERO)) newTotalValue = ZERO;
 
     await (tx as any).execute(sql`
       UPDATE inventory
-      SET quantity     = ${newQty.toFixed(3)},
-          average_rate = ${newRate.toFixed(2)},
-          total_value  = ${newTotalValue.toFixed(2)},
+      SET quantity     = ${newQty.toFixed(QTY_DP)},
+          average_rate = ${newRate.toFixed(RATE_DP)},
+          total_value  = ${newTotalValue.toFixed(VALUE_DP)},
           last_updated = NOW()
       WHERE id = ${existing.id}
     `);
 
     return {
-      previousQuantity: prevQty,
-      newQuantity: newQty,
-      previousTotalValue: prevTotalValue,
-      newTotalValue,
-      averageRate: newRate,
+      previousQuantity: prevQty.toNumber(),
+      newQuantity: newQty.toNumber(),
+      previousTotalValue: prevTotalValue.toNumber(),
+      newTotalValue: newTotalValue.toNumber(),
+      averageRate: newRate.toNumber(),
       created: false,
     };
   } else {
     // ── No existing row: INSERT ───────────────────────────────────────────────
-    const rate = Math.max(incomingRate ?? 0, 0);
-    const qty = deltaQty;
-    let totalValue = 0;
+    const rate = Decimal.max(incomingRate === undefined ? ZERO : toDecimal(incomingRate), ZERO);
+    const qty = delta;
+    let totalValue = ZERO;
     let safeRate = rate;
 
-    if (deltaQty > 0) {
-      const { remaining } = await settleNegativeLayers(tx, locationId, stockItemId, deltaQty, rate);
-      totalValue = remaining * rate;
-      safeRate = qty > 0 && totalValue > 0 ? totalValue / qty : rate;
-    } else if (deltaQty < 0) {
+    if (delta.gt(ZERO)) {
+      const { remaining } = await settleNegativeLayers(tx, locationId, stockItemId, delta, rate);
+      totalValue = remaining.times(rate);
+      safeRate = qty.gt(ZERO) && totalValue.gt(ZERO) ? totalValue.dividedBy(qty) : rate;
+    } else if (delta.lt(ZERO)) {
       // Negative stock from the very first touch
-      totalValue = 0;
-      safeRate = 0;
+      totalValue = ZERO;
+      safeRate = ZERO;
       await createNegativeLayer(
         tx,
         companyId,
         locationId,
         stockItemId,
-        Math.abs(deltaQty),
+        delta.abs(),
         rate,
         sourceVoucherType,
         sourceVoucherId
       );
     }
 
+    // The DO UPDATE branch is reached only when a concurrent transaction
+    // inserted this row between the SELECT above and this statement. It is fed
+    // the same rounded values as the VALUES clause — previously it interpolated
+    // the raw floats, so the two branches could disagree in the last place.
+    const qtyText = qty.toFixed(QTY_DP);
+    const totalValueText = totalValue.toFixed(VALUE_DP);
+
     await (tx as any).execute(sql`
       INSERT INTO inventory (company_id, location_id, stock_item_id, quantity, average_rate, total_value, last_updated)
-      VALUES (${companyId}, ${locationId}, ${stockItemId}, ${qty.toFixed(3)}, ${safeRate.toFixed(2)}, ${totalValue.toFixed(2)}, NOW())
+      VALUES (${companyId}, ${locationId}, ${stockItemId}, ${qtyText}, ${safeRate.toFixed(RATE_DP)}, ${totalValueText}, NOW())
       ON CONFLICT (location_id, stock_item_id) DO UPDATE
-      SET quantity     = inventory.quantity + ${qty},
+      SET quantity     = inventory.quantity + ${qtyText},
           total_value  = CASE
-            WHEN inventory.quantity + ${qty} > 0
-            THEN GREATEST(inventory.total_value + ${totalValue}, 0)
+            WHEN inventory.quantity + ${qtyText} > 0
+            THEN GREATEST(inventory.total_value + ${totalValueText}, 0)
             ELSE 0
           END,
           average_rate = CASE
-            WHEN inventory.quantity + ${qty} > 0
-            THEN GREATEST(inventory.total_value + ${totalValue}, 0) / (inventory.quantity + ${qty})
+            WHEN inventory.quantity + ${qtyText} > 0
+            THEN GREATEST(inventory.total_value + ${totalValueText}, 0) / (inventory.quantity + ${qtyText})
             ELSE EXCLUDED.average_rate
           END,
           last_updated = NOW()
@@ -278,10 +331,10 @@ export async function adjustInventory(
 
     return {
       previousQuantity: 0,
-      newQuantity: qty,
+      newQuantity: qty.toNumber(),
       previousTotalValue: 0,
-      newTotalValue: totalValue,
-      averageRate: safeRate,
+      newTotalValue: totalValue.toNumber(),
+      averageRate: safeRate.toNumber(),
       created: true,
     };
   }
@@ -316,32 +369,38 @@ export async function reverseInventoryByExactValue(
   const existing = lockResult.rows?.[0] ?? lockResult[0];
   if (!existing) return;
 
-  const currentQty = parseFloat(existing.quantity ?? "0");
-  const currentValue = parseFloat(existing.total_value ?? "0");
-  const currentRate = parseFloat(existing.average_rate ?? "0");
+  const currentQty = toDecimal(existing.quantity);
+  const currentValue = toDecimal(existing.total_value);
+  const currentRate = toDecimal(existing.average_rate);
 
-  const newQty = currentQty - qtyToReverse;
-  let newValue = currentValue - valueToReverse;
+  const reverseQty = toDecimal(qtyToReverse);
+  const reverseValue = toDecimal(valueToReverse);
 
-  let newRate: number;
+  const newQty = currentQty.minus(reverseQty);
+  let newValue = currentValue.minus(reverseValue);
 
-  if (newQty > 0) {
-    newValue = Math.max(newValue, 0);
-    newRate = newValue / newQty;
+  let newRate: Decimal;
+
+  if (newQty.gt(ZERO)) {
+    newValue = Decimal.max(newValue, ZERO);
+    newRate = newValue.dividedBy(newQty);
   } else {
-    if (newValue !== 0) {
+    if (!newValue.isZero()) {
       logger.warn(
         `[reverseInventoryByExactValue] Normalising: loc=${locationId} item=${stockItemId} ` +
-          `newValue=${newValue} → 0 (newQty=${newQty})`
+          `newValue=${newValue.toString()} → 0 (newQty=${newQty.toString()})`
       );
     }
-    newValue = 0;
+    newValue = ZERO;
     newRate = currentRate; // preserve last positive rate for cost memory
 
     const shortageQty = incrementalShortage(currentQty, newQty);
-    if (shortageQty > 0.0005 && companyId) {
-      const provisionalRate =
-        currentRate > 0 ? currentRate : Math.abs(qtyToReverse > 0 ? valueToReverse / qtyToReverse : 0);
+    if (shortageQty.gt(QTY_EPSILON) && companyId) {
+      const provisionalRate = currentRate.gt(ZERO)
+        ? currentRate
+        : reverseQty.gt(ZERO)
+          ? reverseValue.dividedBy(reverseQty).abs()
+          : ZERO;
       await createNegativeLayer(
         tx,
         companyId,
@@ -355,13 +414,13 @@ export async function reverseInventoryByExactValue(
     }
   }
 
-  if (newRate < 0) newRate = 0;
+  if (newRate.lt(ZERO)) newRate = ZERO;
 
   await (tx as any).execute(sql`
     UPDATE inventory
-    SET quantity     = ${newQty.toFixed(3)},
-        average_rate = ${newRate.toFixed(2)},
-        total_value  = ${newValue.toFixed(2)},
+    SET quantity     = ${newQty.toFixed(QTY_DP)},
+        average_rate = ${newRate.toFixed(RATE_DP)},
+        total_value  = ${newValue.toFixed(VALUE_DP)},
         last_updated = NOW()
     WHERE id = ${existing.id}
   `);

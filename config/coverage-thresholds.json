@@ -57,10 +57,10 @@
         "branches": 25
       },
       "server/inventoryHelper.ts": {
-        "lines": 87,
-        "statements": 84,
+        "lines": 95,
+        "statements": 91,
         "functions": 97,
-        "branches": 65
+        "branches": 78
       },
       "server/routes/helpers/passwordHelpers.ts": {
         "lines": 97,
