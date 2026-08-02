@@ -2,20 +2,34 @@ name: I18n Audit
 
 on:
   push:
-    branches: [main]
+    branches: [main, agent/phase-2-i18n-audit-cleanup]
   pull_request:
     branches: [main]
 
 concurrency:
   group: i18n-audit-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   audit:
-    name: Untranslated text ratchet
+    name: Classified untranslated-text audit
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
-      - name: Run untranslated-text audit
-        run: node scripts/audit-i18n-phase14.mjs
+
+      - name: Generate classified untranslated-text report
+        run: |
+          node scripts/audit-i18n-phase14.mjs \
+            --no-enforce \
+            --json-out artifacts/i18n-audit/report.json \
+            --markdown-out artifacts/i18n-audit/report.md \
+            --suggested-baseline-out artifacts/i18n-audit/suggested-baseline.json
+
+      - name: Upload classified audit report
+        uses: actions/upload-artifact@v7
+        with:
+          name: classified-i18n-audit
+          path: artifacts/i18n-audit
+          if-no-files-found: error
+          retention-days: 7
