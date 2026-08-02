@@ -3,8 +3,7 @@ import { readFile } from "node:fs/promises";
 import process from "node:process";
 import pg from "pg";
 
-const XLSX_MIME =
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
 /**
  * Teach supertest's HTTP client to hand back XLSX responses as a Buffer instead
