@@ -6,7 +6,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: format-translation-branch
@@ -38,35 +38,21 @@ jobs:
       - name: Format source files
         run: npm run format
 
-      - name: Stage formatted files
+      - name: Commit formatted source
+        id: commit
         run: |
-          mkdir -p formatted-source
-          while IFS= read -r file; do
-            mkdir -p "formatted-source/$(dirname "$file")"
-            cp "$file" "formatted-source/$file"
-          done <<'FILES'
-          client/src/app/FactoryShell.tsx
-          client/src/components/ApplicationInterfaceTranslator.tsx
-          client/src/components/FactoryBilingualDocumentActions.tsx
-          client/src/components/FactoryFrenchCatalogManager.tsx
-          client/src/contexts/ApplicationLanguageContext.tsx
-          client/src/i18n/accountingDocumentTranslations.ts
-          client/src/i18n/applicationTranslations.ts
-          client/src/pages/BaleProductsBilingual.tsx
-          server/lib/workerBalesBilingualPdfGenerator.ts
-          server/routes/factory/factoryBilingualSnapshotRoutes.ts
-          server/routes/factory/factoryFrenchCatalogReadRoutes.ts
-          server/routes/factory/factoryFrenchTranslationRoutes.ts
-          server/routes/factoryRoutes.ts
-          server/services/factoryBilingualSurfaceResolver.ts
-          shared/factoryBilingualContract.ts
-          shared/schema/factoryTrilingualCatalogTables.ts
-          FILES
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/src server shared
+          if git diff --cached --quiet; then
+            echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git commit -m "Format translation implementation"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Upload formatted files
-        uses: actions/upload-artifact@v7
-        with:
-          name: formatted-translation-source
-          path: formatted-source
-          if-no-files-found: error
-          retention-days: 1
+      - name: Push formatted staging branch
+        run: git push --force origin HEAD:agent/formatted-translation-staging
+
+      - name: Publish formatted commit SHA
+        run: echo "FORMATTED_COMMIT=${{ steps.commit.outputs.sha }}"
