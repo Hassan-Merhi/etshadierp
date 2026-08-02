@@ -23,11 +23,35 @@ const EXCLUDED_SELECTOR = [
   "[data-voucher-number]",
 ].join(",");
 
+const ELIGIBLE_TEXT_SELECTOR = [
+  "button",
+  "label",
+  "legend",
+  "th",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "nav a",
+  "[role=button]",
+  "[role=menuitem]",
+  "[role=tab]",
+  "[role=columnheader]",
+  "[role=heading]",
+  "[data-i18n-ui]",
+].join(",");
+
 const TRANSLATABLE_ATTRIBUTES = ["aria-label", "title", "placeholder"] as const;
 const PORTAL_SELECTOR = "[data-radix-portal], [data-i18n-portal]";
 
 function isProtected(element: Element): boolean {
   return Boolean(element.closest(EXCLUDED_SELECTOR));
+}
+
+function isEligibleTextElement(element: Element): boolean {
+  return element.matches(ELIGIBLE_TEXT_SELECTOR) || Boolean(element.closest(ELIGIBLE_TEXT_SELECTOR));
 }
 
 export function translateApprovedInterfaceText(
@@ -39,7 +63,7 @@ export function translateApprovedInterfaceText(
 
 function translateTextNode(node: Text, language: ApplicationLanguage) {
   const parent = node.parentElement;
-  if (!parent || isProtected(parent)) return;
+  if (!parent || isProtected(parent) || !isEligibleTextElement(parent)) return;
   const translated = translateApprovedInterfaceText(node.nodeValue ?? "", language);
   if (translated !== null && translated !== node.nodeValue) node.nodeValue = translated;
 }
@@ -76,8 +100,9 @@ export function translateInterfaceTree(root: Node, language: ApplicationLanguage
  *
  * The main observer is scoped to the React application root, while a lightweight
  * body observer only discovers portal roots. Mutation work is batched into one
- * animation frame. Data cells and explicit business-value surfaces are excluded
- * unless a cell is intentionally marked data-i18n-ui.
+ * animation frame. Plain spans/divs and table data cells are treated as business
+ * content by default; interface copy must live in an eligible control/heading or
+ * be explicitly marked data-i18n-ui.
  */
 export function ApplicationInterfaceTranslator({ language }: { language: ApplicationLanguage }) {
   useEffect(() => {
