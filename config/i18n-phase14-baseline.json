@@ -1,0 +1,4 @@
+{
+  "description": "Temporary one-way ceiling for candidate untranslated UI literals. Lower this number whenever reviewed literals are migrated into the trilingual dictionary.",
+  "maxFindings": 10000
+}
