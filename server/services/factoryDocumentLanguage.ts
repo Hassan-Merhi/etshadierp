@@ -65,6 +65,34 @@ export const FACTORY_DOCUMENT_LABELS = {
     cumulativeWeight: "الوزن التراكمي (كغ)",
     status: "الحالة",
   },
+  fr: {
+    invoice: "FACTURE",
+    commercialInvoice: "Facture commerciale",
+    loadingList: "Liste de chargement",
+    invoiceNo: "N° de facture",
+    customer: "Client",
+    date: "Date",
+    container: "Conteneur",
+    destination: "Destination",
+    articleCode: "Code article",
+    product: "Produit",
+    quantity: "Qté",
+    weightPerBale: "Poids/balle",
+    totalWeight: "Poids total",
+    pricePerBale: "Prix/balle",
+    pricePerKg: "Prix/kg",
+    total: "Total",
+    totals: "Totaux",
+    subtotal: "Sous-total",
+    freight: "Fret",
+    otherCharges: "Autres frais",
+    grandTotal: "Total général",
+    notes: "Notes",
+    reference: "Code réf.",
+    weightKg: "Poids (kg)",
+    cumulativeWeight: "Poids total (kg)",
+    status: "Statut",
+  },
 } as const;
 
 export function parseFactoryDocumentLanguage(value: unknown): FactoryDocumentLanguage {
@@ -80,20 +108,25 @@ export function resolveFactoryDocumentProductName(
     articleCode?: string | null;
     baleName?: string | null;
     baleNameAr?: string | null;
+    baleNameFr?: string | null;
     productName?: string | null;
     productNameAr?: string | null;
+    productNameFr?: string | null;
     name?: string | null;
     nameAr?: string | null;
+    nameFr?: string | null;
   },
   language: FactoryDocumentLanguage
 ): string {
   const englishSnapshot = source.baleName ?? source.productName ?? source.name ?? null;
   const arabicSnapshot = source.baleNameAr ?? source.productNameAr ?? source.nameAr ?? null;
+  const frenchSnapshot = source.baleNameFr ?? source.productNameFr ?? source.nameFr ?? null;
   return resolveFactoryProductName(
     {
       articleCode: source.articleCode,
       name: englishSnapshot,
       nameAr: arabicSnapshot,
+      nameFr: frenchSnapshot,
     },
     language
   );
@@ -101,21 +134,40 @@ export function resolveFactoryDocumentProductName(
 
 export function translateFactoryDocumentStatus(status: unknown, language: FactoryDocumentLanguage): string {
   const raw = typeof status === "string" ? status : "";
-  if (language !== "ar") return raw.replaceAll("_", " ");
-  const map: Record<string, string> = {
-    DRAFT: "مسودة",
-    PENDING: "قيد الانتظار",
-    PENDING_LOADING: "بانتظار التحميل",
-    LOADING: "قيد التحميل",
-    LOADED: "تم التحميل",
-    VERIFIED: "تم التحقق",
-    FINALIZED: "نهائي",
-    COMPLETED: "مكتمل",
-    INVOICED: "تمت الفوترة",
-    CANCELLED: "ملغى",
-    DISPATCHED: "تم الإرسال",
-  };
-  return map[raw.toUpperCase()] ?? raw.replaceAll("_", " ");
+  const normalized = raw.toUpperCase();
+  if (language === "ar") {
+    const map: Record<string, string> = {
+      DRAFT: "مسودة",
+      PENDING: "قيد الانتظار",
+      PENDING_LOADING: "بانتظار التحميل",
+      LOADING: "قيد التحميل",
+      LOADED: "تم التحميل",
+      VERIFIED: "تم التحقق",
+      FINALIZED: "نهائي",
+      COMPLETED: "مكتمل",
+      INVOICED: "تمت الفوترة",
+      CANCELLED: "ملغى",
+      DISPATCHED: "تم الإرسال",
+    };
+    return map[normalized] ?? raw.replaceAll("_", " ");
+  }
+  if (language === "fr") {
+    const map: Record<string, string> = {
+      DRAFT: "Brouillon",
+      PENDING: "En attente",
+      PENDING_LOADING: "En attente de chargement",
+      LOADING: "Chargement",
+      LOADED: "Chargé",
+      VERIFIED: "Vérifié",
+      FINALIZED: "Finalisé",
+      COMPLETED: "Terminé",
+      INVOICED: "Facturé",
+      CANCELLED: "Annulé",
+      DISPATCHED: "Expédié",
+    };
+    return map[normalized] ?? raw.replaceAll("_", " ");
+  }
+  return raw.replaceAll("_", " ");
 }
 
 export function configureFactoryArabicWorksheet(sheet: any, language: FactoryDocumentLanguage): void {
@@ -125,7 +177,7 @@ export function configureFactoryArabicWorksheet(sheet: any, language: FactoryDoc
     row.eachCell((cell: any) => {
       cell.alignment = {
         ...(cell.alignment ?? {}),
-        horizontal: typeof cell.value === "number" ? "right" : "right",
+        horizontal: "right",
         readingOrder: "rtl",
         vertical: cell.alignment?.vertical ?? "middle",
       };
