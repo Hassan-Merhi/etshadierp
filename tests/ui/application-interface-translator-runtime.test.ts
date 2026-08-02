@@ -26,14 +26,29 @@ describe("application interface translator runtime behavior", () => {
     expect(surface.textContent).toContain("طباعة الإيصال");
   });
 
+  it("treats plain content and table data as business values by default", () => {
+    const surface = document.createElement("section");
+    surface.innerHTML = `
+      <span>Sales</span>
+      <table><tbody><tr><td>Reports</td></tr></tbody></table>
+      <div data-i18n-ui>Dashboard</div>
+    `;
+    document.body.appendChild(surface);
+
+    translateInterfaceTree(surface, "fr");
+    expect(surface.querySelector("span")?.textContent).toBe("Sales");
+    expect(surface.querySelector("td")?.textContent).toBe("Reports");
+    expect(surface.querySelector("[data-i18n-ui]")?.textContent).toBe("Tableau de bord");
+  });
+
   it("never translates explicitly protected business values", () => {
     const surface = document.createElement("section");
     surface.innerHTML = `
-      <span data-stock-name>Sales</span>
-      <span data-account-name>Reports</span>
-      <span data-article-code>Checkout</span>
-      <span data-voucher-number>Print Receipt</span>
-      <span data-business-value>Dashboard</span>
+      <button data-stock-name>Sales</button>
+      <button data-account-name>Reports</button>
+      <button data-article-code>Checkout</button>
+      <button data-voucher-number>Print Receipt</button>
+      <button data-business-value>Dashboard</button>
     `;
     document.body.appendChild(surface);
 
