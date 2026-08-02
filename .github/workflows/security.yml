@@ -44,8 +44,8 @@ jobs:
           npm audit --omit=dev --json > production-audit.json || true
           npm audit --omit=dev --audit-level=high || true
 
-      - name: Block critical production vulnerabilities
-        run: npm audit --omit=dev --audit-level=critical
+      - name: Block unreviewed high and critical production vulnerabilities
+        run: npm run verify:dependency-audit
 
       - name: Upload production dependency audit
         if: always()
@@ -58,7 +58,7 @@ jobs:
 
       - name: Audit all dependencies
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        run: npm audit --audit-level=critical
+        run: npm run verify:dependency-audit -- --include-dev
 
   secret-scan:
     name: Secret scan

@@ -33,11 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import {
-  PeriodFilter,
-  getDefaultPeriodValue,
-  type PeriodFilterValue,
-} from "@/components/ui/period-filter";
+import { PeriodFilter, getDefaultPeriodValue, type PeriodFilterValue } from "@/components/ui/period-filter";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -189,6 +185,17 @@ const EMPTY_METRICS: StockInSalesMetrics = {
   avgProfitPerBale: 0,
 };
 
+/**
+ * Routes between the three views this screen serves, all of which live at the
+ * same path and differ only by `?view=`.
+ *
+ * This dispatch deliberately calls no hooks of its own. It used to sit at the
+ * top of the summary component, ahead of its ~20 hooks: switching `?view=` while
+ * the component stayed mounted then changed how many hooks ran between renders,
+ * which React fails on with "rendered fewer hooks than expected". Splitting the
+ * dispatch out makes each view its own component, so a view change mounts and
+ * unmounts rather than reshaping one component's hook list.
+ */
 export default function StockInSalesReport() {
   const view = new URLSearchParams(window.location.search).get("view");
   if (view === "detail") {
@@ -197,7 +204,10 @@ export default function StockInSalesReport() {
   if (view === "comparison") {
     return <StockInSalesReportComparison />;
   }
+  return <StockInSalesReportSummary />;
+}
 
+function StockInSalesReportSummary() {
   const { selectedCompany } = useCompany();
   const { formatAmount, selectedCurrency, convertToDisplay } = useCurrencyContext();
   const { formatDisplayDate } = useDateFormat();
@@ -234,10 +244,7 @@ export default function StockInSalesReport() {
   });
 
   const sortedLocations = useMemo(() => [...locations].sort((a, b) => a.name.localeCompare(b.name)), [locations]);
-  const sortedStockGroups = useMemo(
-    () => [...stockGroups].sort((a, b) => a.name.localeCompare(b.name)),
-    [stockGroups]
-  );
+  const sortedStockGroups = useMemo(() => [...stockGroups].sort((a, b) => a.name.localeCompare(b.name)), [stockGroups]);
 
   const queryUrl = useMemo(() => {
     const params = new URLSearchParams();
@@ -259,8 +266,7 @@ export default function StockInSalesReport() {
 
   const summary = data?.summary ?? EMPTY_METRICS;
   const rows = data?.rows ?? [];
-  const formatSignedAmount = (value: number) =>
-    value < 0 ? `-${formatAmount(Math.abs(value))}` : formatAmount(value);
+  const formatSignedAmount = (value: number) => (value < 0 ? `-${formatAmount(Math.abs(value))}` : formatAmount(value));
   const formatRate = (value: number) =>
     selectedCurrency === "CFA" ? `CFA ${formatNumber(convertToDisplay(value), 2)}` : `$ ${formatNumber(value, 6)}`;
   const formatPeriodLabel = (row: StockInSalesRow) => {
@@ -328,7 +334,10 @@ export default function StockInSalesReport() {
       ];
       [
         ["Company", selectedCompany?.name || "Current Company"],
-        ["Period", periodFilter.preset === "all_time" ? "All Time" : `${periodFilter.fromDate} to ${periodFilter.toDate}`],
+        [
+          "Period",
+          periodFilter.preset === "all_time" ? "All Time" : `${periodFilter.fromDate} to ${periodFilter.toDate}`,
+        ],
         ["Grouping", grouping],
         ["Stock In Qty", summary.stockInQty],
         ["Stock In Value", summary.stockInValue],
@@ -401,12 +410,7 @@ export default function StockInSalesReport() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 print:hidden">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={openComparison}
-            data-testid="button-stock-in-sales-compare"
-          >
+          <Button variant="outline" size="sm" onClick={openComparison} data-testid="button-stock-in-sales-compare">
             <GitCompare className="mr-2 h-4 w-4" /> Compare
           </Button>
           <DropdownMenu>
@@ -439,40 +443,125 @@ export default function StockInSalesReport() {
           Array.from({ length: 8 }).map((_, index) => <Skeleton key={index} className="h-9 w-40 rounded-lg" />)
         ) : (
           <>
-            <SummaryPill label="Stock In Qty" value={formatNumber(summary.stockInQty, 3)} icon={PackagePlus} testId="text-stock-in-qty" />
-            <SummaryPill label="Stock In Value" value={formatAmount(summary.stockInValue)} icon={Coins} testId="text-stock-in-value" />
-            <SummaryPill label="Avg In Rate" value={formatRate(summary.stockInAvgRate)} icon={Gauge} testId="text-stock-in-avg-rate" />
-            <SummaryPill label="Stock Out Qty" value={formatNumber(summary.stockOutQty, 3)} icon={PackageMinus} testId="text-stock-out-qty" />
-            <SummaryPill label="Total Sales" value={formatAmount(summary.totalSales)} icon={TrendingUp} testId="text-stock-in-sales-total-sales" />
-            <SummaryPill label="Cost of Sales" value={formatAmount(summary.costOfSales)} icon={BarChart3} testId="text-stock-in-sales-cost" />
-            <SummaryPill label="Cost Profit" value={formatSignedAmount(summary.costProfit)} icon={summary.costProfit < 0 ? TrendingDown : TrendingUp} tone={profitTone} testId="text-stock-in-sales-profit" />
-            <SummaryPill label="Avg Profit/Bale" value={formatSignedAmount(summary.avgProfitPerBale)} icon={Scale} tone={avgProfitTone} testId="text-stock-in-sales-avg-profit" />
+            <SummaryPill
+              label="Stock In Qty"
+              value={formatNumber(summary.stockInQty, 3)}
+              icon={PackagePlus}
+              testId="text-stock-in-qty"
+            />
+            <SummaryPill
+              label="Stock In Value"
+              value={formatAmount(summary.stockInValue)}
+              icon={Coins}
+              testId="text-stock-in-value"
+            />
+            <SummaryPill
+              label="Avg In Rate"
+              value={formatRate(summary.stockInAvgRate)}
+              icon={Gauge}
+              testId="text-stock-in-avg-rate"
+            />
+            <SummaryPill
+              label="Stock Out Qty"
+              value={formatNumber(summary.stockOutQty, 3)}
+              icon={PackageMinus}
+              testId="text-stock-out-qty"
+            />
+            <SummaryPill
+              label="Total Sales"
+              value={formatAmount(summary.totalSales)}
+              icon={TrendingUp}
+              testId="text-stock-in-sales-total-sales"
+            />
+            <SummaryPill
+              label="Cost of Sales"
+              value={formatAmount(summary.costOfSales)}
+              icon={BarChart3}
+              testId="text-stock-in-sales-cost"
+            />
+            <SummaryPill
+              label="Cost Profit"
+              value={formatSignedAmount(summary.costProfit)}
+              icon={summary.costProfit < 0 ? TrendingDown : TrendingUp}
+              tone={profitTone}
+              testId="text-stock-in-sales-profit"
+            />
+            <SummaryPill
+              label="Avg Profit/Bale"
+              value={formatSignedAmount(summary.avgProfitPerBale)}
+              icon={Scale}
+              tone={avgProfitTone}
+              testId="text-stock-in-sales-avg-profit"
+            />
           </>
         )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2 print:hidden">
-        <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter-stock-in-sales-report" />
-        <div className="flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium" title={selectedCompany?.name || "Current Company"}>
+        <PeriodFilter
+          value={periodFilter}
+          onChange={setPeriodFilter}
+          data-testid="period-filter-stock-in-sales-report"
+        />
+        <div
+          className="flex h-9 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium"
+          title={selectedCompany?.name || "Current Company"}
+        >
           <Building2 className="h-4 w-4" /> Current Company
         </div>
         <div className="h-5 w-px bg-border" />
         <Select value={grouping} onValueChange={(value) => setGrouping(value as GroupingType)}>
-          <SelectTrigger className="h-9 w-28" data-testid="select-stock-in-sales-grouping"><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="monthly">Monthly</SelectItem><SelectItem value="yearly">Yearly</SelectItem></SelectContent>
+          <SelectTrigger className="h-9 w-28" data-testid="select-stock-in-sales-grouping">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="daily">Daily</SelectItem>
+            <SelectItem value="monthly">Monthly</SelectItem>
+            <SelectItem value="yearly">Yearly</SelectItem>
+          </SelectContent>
         </Select>
         <Select value={profitFilter} onValueChange={(value) => setProfitFilter(value as ProfitFilter)}>
-          <SelectTrigger className="h-9 w-36" data-testid="select-stock-in-sales-profit-filter"><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="all">All Profits</SelectItem><SelectItem value="positive">Positive Only</SelectItem><SelectItem value="negative">Negative Only</SelectItem></SelectContent>
+          <SelectTrigger className="h-9 w-36" data-testid="select-stock-in-sales-profit-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Profits</SelectItem>
+            <SelectItem value="positive">Positive Only</SelectItem>
+            <SelectItem value="negative">Negative Only</SelectItem>
+          </SelectContent>
         </Select>
         <div className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">
           <GitMerge className="h-4 w-4" /> Merged
         </div>
-        <MultiSelectFilter label="Locations" singularLabel="Location" items={sortedLocations} selectedIds={selectedLocations} onChange={setSelectedLocations} testId="button-stock-in-sales-location-filter" />
-        <MultiSelectFilter label="Groups" singularLabel="Group" items={sortedStockGroups} selectedIds={selectedStockGroups} onChange={setSelectedStockGroups} testId="button-stock-in-sales-group-filter" />
-        <Input placeholder="Search..." value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} className="h-9 w-44" data-testid="input-stock-in-sales-search" />
-        <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-stock-in-sales-clear">Clear</Button>
-        {isFetching && !isLoading && <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Refreshing" />}
+        <MultiSelectFilter
+          label="Locations"
+          singularLabel="Location"
+          items={sortedLocations}
+          selectedIds={selectedLocations}
+          onChange={setSelectedLocations}
+          testId="button-stock-in-sales-location-filter"
+        />
+        <MultiSelectFilter
+          label="Groups"
+          singularLabel="Group"
+          items={sortedStockGroups}
+          selectedIds={selectedStockGroups}
+          onChange={setSelectedStockGroups}
+          testId="button-stock-in-sales-group-filter"
+        />
+        <Input
+          placeholder="Search..."
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+          className="h-9 w-44"
+          data-testid="input-stock-in-sales-search"
+        />
+        <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-stock-in-sales-clear">
+          Clear
+        </Button>
+        {isFetching && !isLoading && (
+          <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Refreshing" />
+        )}
       </div>
 
       <div>
@@ -483,49 +572,129 @@ export default function StockInSalesReport() {
         <div className="overflow-hidden rounded-xl border">
           <div className="overflow-x-auto">
             <Table className="min-w-[1180px]">
-              <TableHeader><TableRow className="bg-muted/40 hover:bg-muted/40">
-                <TableHead>Date</TableHead><TableHead className="text-right">Stock In Qty</TableHead><TableHead className="text-right">Stock In Value</TableHead>
-                <TableHead className="text-right">Avg In Rate</TableHead><TableHead className="text-right">Stock Out Qty</TableHead><TableHead className="text-right">Total Sales</TableHead>
-                <TableHead className="text-right">Cost</TableHead><TableHead className="text-right">Cost Profit</TableHead><TableHead className="text-right">Avg Profit/Bale</TableHead><TableHead className="w-8" />
-              </TableRow></TableHeader>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Stock In Qty</TableHead>
+                  <TableHead className="text-right">Stock In Value</TableHead>
+                  <TableHead className="text-right">Avg In Rate</TableHead>
+                  <TableHead className="text-right">Stock Out Qty</TableHead>
+                  <TableHead className="text-right">Total Sales</TableHead>
+                  <TableHead className="text-right">Cost</TableHead>
+                  <TableHead className="text-right">Cost Profit</TableHead>
+                  <TableHead className="text-right">Avg Profit/Bale</TableHead>
+                  <TableHead className="w-8" />
+                </TableRow>
+              </TableHeader>
               <TableBody>
-                {isLoading ? Array.from({ length: 6 }).map((_, index) => <TableRow key={index}>{Array.from({ length: 10 }).map((__, cellIndex) => <TableCell key={cellIndex}><Skeleton className={`h-4 ${cellIndex === 0 ? "w-24" : "ml-auto w-20"}`} /></TableCell>)}</TableRow>) :
-                isError ? <TableRow><TableCell colSpan={10}><div className="flex flex-col items-center gap-3 py-10 text-center"><TrendingDown className="h-6 w-6 text-destructive" /><p className="text-sm font-medium">Unable to load the report</p><p className="text-xs text-muted-foreground">{error?.message}</p><Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button></div></TableCell></TableRow> :
-                rows.length === 0 ? <TableRow><TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">No stock-in or sales activity found. Try adjusting the filters.</TableCell></TableRow> : <>
-                  {rows.map((row) => {
-                    const profitClass = row.costProfit > 0 ? "text-emerald-600 dark:text-emerald-400" : row.costProfit < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground";
-                    const avgClass = row.avgProfitPerBale > 0 ? "text-emerald-600 dark:text-emerald-400" : row.avgProfitPerBale < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground";
-                    return <TableRow key={row.periodKey} className="cursor-pointer hover:bg-muted/40" onClick={() => openDetail(row)} data-testid={`row-stock-in-sales-${row.periodKey}`}>
-                      <TableCell className="py-3 font-medium">{formatPeriodLabel(row)}</TableCell>
-                      <TableCell className="py-3 text-right font-mono text-sm">{formatNumber(row.stockInQty, 3)}</TableCell>
-                      <TableCell className="py-3 text-right font-mono text-sm">{formatAmount(row.stockInValue)}</TableCell>
-                      <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground">{formatRate(row.stockInAvgRate)}</TableCell>
-                      <TableCell className="py-3 text-right font-mono text-sm">{formatNumber(row.stockOutQty, 3)}</TableCell>
-                      <TableCell className="py-3 text-right font-mono text-sm">{formatAmount(row.totalSales)}</TableCell>
-                      <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground">{formatAmount(row.costOfSales)}</TableCell>
-                      <TableCell className={`py-3 text-right font-mono text-sm font-semibold ${profitClass}`}>{formatSignedAmount(row.costProfit)}</TableCell>
-                      <TableCell className={`py-3 text-right font-mono text-sm font-semibold ${avgClass}`}>{formatSignedAmount(row.avgProfitPerBale)}</TableCell>
-                      <TableCell><ChevronRight className="h-4 w-4 text-muted-foreground" /></TableCell>
-                    </TableRow>;
-                  })}
-                  <TableRow className="bg-muted/40 font-semibold hover:bg-muted/40">
-                    <TableCell className="py-3 text-xs uppercase tracking-wide text-muted-foreground">Total</TableCell>
-                    <TableCell className="text-right font-mono">{formatNumber(summary.stockInQty, 3)}</TableCell>
-                    <TableCell className="text-right font-mono">{formatAmount(summary.stockInValue)}</TableCell>
-                    <TableCell className="text-right font-mono">{formatRate(summary.stockInAvgRate)}</TableCell>
-                    <TableCell className="text-right font-mono">{formatNumber(summary.stockOutQty, 3)}</TableCell>
-                    <TableCell className="text-right font-mono">{formatAmount(summary.totalSales)}</TableCell>
-                    <TableCell className="text-right font-mono">{formatAmount(summary.costOfSales)}</TableCell>
-                    <TableCell className="text-right font-mono">{formatSignedAmount(summary.costProfit)}</TableCell>
-                    <TableCell className="text-right font-mono">{formatSignedAmount(summary.avgProfitPerBale)}</TableCell><TableCell />
+                {isLoading ? (
+                  Array.from({ length: 6 }).map((_, index) => (
+                    <TableRow key={index}>
+                      {Array.from({ length: 10 }).map((__, cellIndex) => (
+                        <TableCell key={cellIndex}>
+                          <Skeleton className={`h-4 ${cellIndex === 0 ? "w-24" : "ml-auto w-20"}`} />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : isError ? (
+                  <TableRow>
+                    <TableCell colSpan={10}>
+                      <div className="flex flex-col items-center gap-3 py-10 text-center">
+                        <TrendingDown className="h-6 w-6 text-destructive" />
+                        <p className="text-sm font-medium">Unable to load the report</p>
+                        <p className="text-xs text-muted-foreground">{error?.message}</p>
+                        <Button variant="outline" size="sm" onClick={() => refetch()}>
+                          Retry
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </>}
+                ) : rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">
+                      No stock-in or sales activity found. Try adjusting the filters.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  <>
+                    {rows.map((row) => {
+                      const profitClass =
+                        row.costProfit > 0
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : row.costProfit < 0
+                            ? "text-red-600 dark:text-red-400"
+                            : "text-muted-foreground";
+                      const avgClass =
+                        row.avgProfitPerBale > 0
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : row.avgProfitPerBale < 0
+                            ? "text-red-600 dark:text-red-400"
+                            : "text-muted-foreground";
+                      return (
+                        <TableRow
+                          key={row.periodKey}
+                          className="cursor-pointer hover:bg-muted/40"
+                          onClick={() => openDetail(row)}
+                          data-testid={`row-stock-in-sales-${row.periodKey}`}
+                        >
+                          <TableCell className="py-3 font-medium">{formatPeriodLabel(row)}</TableCell>
+                          <TableCell className="py-3 text-right font-mono text-sm">
+                            {formatNumber(row.stockInQty, 3)}
+                          </TableCell>
+                          <TableCell className="py-3 text-right font-mono text-sm">
+                            {formatAmount(row.stockInValue)}
+                          </TableCell>
+                          <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground">
+                            {formatRate(row.stockInAvgRate)}
+                          </TableCell>
+                          <TableCell className="py-3 text-right font-mono text-sm">
+                            {formatNumber(row.stockOutQty, 3)}
+                          </TableCell>
+                          <TableCell className="py-3 text-right font-mono text-sm">
+                            {formatAmount(row.totalSales)}
+                          </TableCell>
+                          <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground">
+                            {formatAmount(row.costOfSales)}
+                          </TableCell>
+                          <TableCell className={`py-3 text-right font-mono text-sm font-semibold ${profitClass}`}>
+                            {formatSignedAmount(row.costProfit)}
+                          </TableCell>
+                          <TableCell className={`py-3 text-right font-mono text-sm font-semibold ${avgClass}`}>
+                            {formatSignedAmount(row.avgProfitPerBale)}
+                          </TableCell>
+                          <TableCell>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    <TableRow className="bg-muted/40 font-semibold hover:bg-muted/40">
+                      <TableCell className="py-3 text-xs uppercase tracking-wide text-muted-foreground">
+                        Total
+                      </TableCell>
+                      <TableCell className="text-right font-mono">{formatNumber(summary.stockInQty, 3)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatAmount(summary.stockInValue)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatRate(summary.stockInAvgRate)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatNumber(summary.stockOutQty, 3)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatAmount(summary.totalSales)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatAmount(summary.costOfSales)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatSignedAmount(summary.costProfit)}</TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatSignedAmount(summary.avgProfitPerBale)}
+                      </TableCell>
+                      <TableCell />
+                    </TableRow>
+                  </>
+                )}
               </TableBody>
             </Table>
           </div>
         </div>
       </div>
-      <div className="hidden print:block text-xs text-muted-foreground">Generated {format(new Date(), "yyyy-MM-dd HH:mm")}</div>
+      <div className="hidden print:block text-xs text-muted-foreground">
+        Generated {format(new Date(), "yyyy-MM-dd HH:mm")}
+      </div>
     </div>
   );
 }

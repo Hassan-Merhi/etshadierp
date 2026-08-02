@@ -14,7 +14,7 @@
  * node_modules from previous deploys, or installed normally via npm install).
  */
 
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
@@ -24,13 +24,20 @@ import { build } from "esbuild";
 const pkgRoot = fileURLToPath(new URL("../node_modules/decimal.js/", import.meta.url));
 const decimalEntry = resolve(pkgRoot, "decimal.mjs");
 
-await build({
+const result = await build({
   entryPoints: ["server/index.ts"],
   platform: "node",
   bundle: true,
   format: "esm",
   outdir: "dist",
   packages: "external",
+  // Records which packages the output actually imports, and whether each is a
+  // static import-statement or a dynamic import(). scripts/verify-runtime-
+  // dependencies.mjs reads this to check every static import is declared in
+  // "dependencies". Reading it from esbuild rather than grepping the bundle
+  // matters: the output embeds source text containing `import ... from "@/lib/…"`
+  // inside template literals, which no regex can tell apart from a real import.
+  metafile: true,
   plugins: [
     {
       name: "bundle-decimal-js",
@@ -44,6 +51,8 @@ await build({
     },
   ],
 });
+
+await writeFile("dist/server-build-meta.json", JSON.stringify(result.metafile), "utf8");
 
 // Refuse to publish an artifact that can reproduce the Render startup crash.
 // Keep this check separate from the resolver implementation so future build

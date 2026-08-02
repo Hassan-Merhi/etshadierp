@@ -39,30 +39,45 @@ The server reads env vars at startup. Missing required vars (especially `DATABAS
 
 ---
 
-## Required Environment Variables
+## Environment Variables
 
-| Variable | Required | Purpose |
+**`.env.example` is the source of truth.** It documents every variable the
+server reads — currently 97 — with its default and effect, grouped by area.
+`npm run verify:env-docs` fails CI if the two ever drift, so the file cannot
+go stale the way it previously did.
+
+Only two variables must be set:
+
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string. Takes priority over the individual `PG*` vars, which are the fallback for platforms that inject discrete values. |
+| `SESSION_SECRET` | Signs session cookies. The process **exits** when this is missing and `NODE_ENV=production`. |
+
+Everything else has a working default. The handful worth knowing when
+deploying:
+
+| Variable | Default | Why it matters |
 |---|---|---|
-| `DATABASE_URL` | Required (or PG* set) | PostgreSQL connection string. Takes priority over individual PG vars. |
-| `PGHOST` | Alternative to DATABASE_URL | PostgreSQL host |
-| `PGPORT` | Alternative | PostgreSQL port |
-| `PGUSER` | Alternative | PostgreSQL user |
-| `PGPASSWORD` | Alternative | PostgreSQL password |
-| `PGDATABASE` | Alternative | PostgreSQL database name |
-| `SESSION_SECRET` | Required in production | Express session encryption key. Missing in production logs a critical error. |
-| `NODE_ENV` | Recommended | `"production"` enables secure cookies and production-mode Vite serving. Defaults to development behavior. |
-| `CSRF_ENFORCE` | Optional | Set to `"0"` for warn-only CSRF mode. Default = enforcing (hard 403 on mismatch). |
-| `PG_POOL_MAX` | Optional | PostgreSQL connection pool max size. Default = `10`. |
-| `PGSSLMODE` | Optional | Set to `"disable"` to turn off SSL for the DB connection. Auto-disabled for Replit local DB (`helium` host). |
-| `BUILD_VERSION` | Optional | Display version string shown in the UI header. Falls back to `RENDER_GIT_COMMIT` (first 8 chars) or `"dev"`. |
-| `RENDER_GIT_COMMIT` | Optional | Set automatically by Render. Used to derive `BUILD_VERSION`. |
-| `REPL_ID` | Optional | Set automatically by Replit. Enables secure cookies on Replit. |
-| `CAPACITOR_ENABLED` | Optional | Enables Capacitor WebView origins for CSRF and secure cookies. |
-| `MASTER_PASSWORD` | Optional | Enables a master admin login. If unset, master login is disabled. |
+| `NODE_ENV` | `development` | `production` enables Secure cookies and production-mode static serving. |
+| `CSRF_ENFORCE` | enforcing | `"0"` downgrades CSRF failures to warnings. Escape hatch only. |
+| `CAPACITOR_ENABLED` | off | Set when this server backs the mobile app — switches the session cookie to `SameSite=None`. |
+| `ENABLE_SCHEDULERS` | `true` | Set `false` in CI and test environments. |
+| `PG_POOL_MAX` | `10` | Main connection pool ceiling. Session store has its own, `PG_SESSION_POOL_MAX` (default `3`). |
+| `PGSSLMODE` | unset | `"disable"` turns off TLS to the database. |
+| `BUILD_VERSION` | derived | Shown in the UI header; falls back to `RENDER_GIT_COMMIT`, then `"dev"`. |
 
-**Note**: `OPENAI_API_KEY` or similar AI service keys may be needed for the AI chatbot and agent features. (Needs verification — check `server/aiAgentTools.ts` and `server/routes/aiAgentRoutes.ts` for exact key names.)
+**AI features** are optional and independent — the chatbot and AI import stay
+disabled unless `OPENAI_API_KEY`, `GEMINI_API_KEY`, or `XAI_API_KEY` is set.
 
-**WhatsApp**: the WhatsApp service (`server/services/whatsappService.ts`) likely requires API credentials. (Needs verification — check for `WHATSAPP_*` env vars.)
+**Emergency master-password login** needs all three of `MASTER_PASSWORD`,
+`MASTER_PASSWORD_ENABLED=true`, and a future `MASTER_PASSWORD_EXPIRES_AT`.
+Setting the password alone does nothing. It cannot impersonate Admin or
+Developer accounts, and every use is logged as a security event. See the
+Security section of `.env.example` before enabling it.
+
+**WhatsApp** needs no environment variables. Its instance ID and API token are
+stored per-company in the `whatsapp_settings` table and managed from the app's
+settings UI (`server/services/whatsappService.ts`).
 
 ---
 
@@ -88,15 +103,27 @@ Workflow file: `.github/workflows/ci.yml`
 Triggers on `push` and `pull_request` to `main`.
 
 Steps:
-1. `actions/checkout@v4`
-2. `actions/setup-node@v4` with Node 20 and npm cache
+1. `actions/checkout@v7`
+2. `actions/setup-node@v6` with Node 20 and npm cache
 3. `npm ci` (uses `package-lock.json`)
-4. `npm run check` — TypeScript type-check (can take 2–5 minutes on large codebases)
-5. `npm run build` — full frontend + backend build
-6. `npm run lint` — ESLint across `client/src/`, `server/`, `shared/`
-7. `npm run format:check` — Prettier check
+4. `npm run verify:env-docs` — every env var the server reads is documented
+5. `npm run check` — TypeScript type-check (can take 2–5 minutes on large codebases)
+6. `npm run build` — full frontend + backend build
+7. `npm run lint` — ESLint across `client/src/`, `server/`, `shared/`
+8. Prettier check, limited to source files changed in the push or PR
+9. `drizzle-kit push` — apply the schema to the CI database
+10. Boot `dist/index.js` and wait for `/api/health/db` — the startup-migration smoke test
+11. Backend and frontend test suites with coverage thresholds
 
-No database or environment variables are required for CI — build and type-check are compile-time only.
+CI provisions a PostgreSQL 15 service container and sets `DATABASE_URL`,
+`SESSION_SECRET`, `CSRF_ENFORCE=0`, and `ENABLE_SCHEDULERS=false`. The test
+suites need a migrated database — running them against a schema that has only
+had `drizzle-kit push` applied, without the startup migrations in step 10,
+produces spurious failures.
+
+A separate `.github/workflows/security.yml` runs the dependency audit gate
+(`npm run verify:dependency-audit`) and TruffleHog secret scanning on every
+push and PR, plus a weekly scheduled sweep across all dependencies.
 
 **Note**: `npm run check` (tsc) takes over 2 minutes in resource-constrained environments (documented gotcha). On a standard GitHub Actions runner it completes normally within the 30-minute job timeout.
 

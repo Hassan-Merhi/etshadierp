@@ -43,15 +43,19 @@ npm run dev
 
 ### Environment variables
 
-See `.env.example` for the full list. The essentials:
+`.env.example` documents every variable the server reads, with defaults and
+effects. Only two must be set:
 
 | Variable | Purpose |
 |----------|---------|
-| `DATABASE_URL` | PostgreSQL connection string (required) |
-| `SESSION_SECRET` | Secret used to sign sessions (required in production) |
-| `NODE_ENV` | `development` or `production` |
-| `PORT` | Server port (default `5000`) |
-| `CSRF_ENFORCE` | `0` = warn-only, otherwise hard 403 (default) |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `SESSION_SECRET` | Signs sessions; the server exits without it in production |
+
+Everything else has a working default — `NODE_ENV`, `PORT` (`5000`),
+`CSRF_ENFORCE` (`0` = warn-only, otherwise hard 403), pool sizing, alert
+thresholds, and the optional AI and container-tracking provider keys.
+`npm run verify:env-docs` fails CI if a new variable is added without
+documenting it.
 
 ## Common scripts
 
@@ -66,6 +70,10 @@ See `.env.example` for the full list. The essentials:
 | `npm test` | Backend + frontend test suites (Vitest) |
 | `npm run test:backend` / `npm run test:frontend` | Run one suite |
 | `npm run db:push` | Apply the Drizzle schema to the database |
+| `npm run verify:env-docs` | Check `.env.example` covers every env var the server reads |
+| `npm run verify:dependency-audit` | Fail on unreviewed high/critical production vulnerabilities |
+| `npm run audit:coverage-ratchet` | Report coverage floors that measured coverage has outgrown |
+| `npm run verify:runtime-dependencies` | Check everything production imports is in `dependencies` |
 
 ## Project layout
 
@@ -88,6 +96,32 @@ tests/             Vitest suites (backend + tests/ui frontend)
 docs/              Architecture, flows, and audit documentation
 ```
 
+## Dependency classification
+
+Deployment runs `npm ci` with `NODE_ENV=production`, which **omits
+`devDependencies`**. Anything production touches must therefore be in
+`dependencies`:
+
+- **Runtime** — every package the server bundle statically imports. The bundle
+  is built with `packages: "external"`, so each import is a real resolution
+  against `node_modules`. This includes `vite` and `nanoid`, because
+  `server/index.ts` statically imports `server/vite.ts`; they load on boot even
+  though the dev server never starts in production.
+- **The `--import` preload bridges** in `npm start`. Node loads these from
+  source before the bundle, so a missing package there kills the process before
+  the server exists.
+- **Build tooling** — `vite`, `esbuild`, `tailwindcss`, `postcss`,
+  `autoprefixer`, `@vitejs/plugin-react`, `@tailwindcss/typography`. The
+  deployment builds from source, so these are needed there too.
+
+`devDependencies` is for things only CI and local development run: test
+runners, linters, formatters, and `@types/*`.
+
+`npm run verify:runtime-dependencies` enforces the split and runs as the last
+step of `npm run build`, so a misclassification fails the deploy instead of the
+boot. It reads esbuild's metafile rather than grepping the bundle — the output
+embeds source text containing import statements inside template literals.
+
 ## Architecture notes
 
 - **Full-stack TypeScript** — types flow from the Drizzle schema in
@@ -104,11 +138,19 @@ docs/              Architecture, flows, and audit documentation
 
 GitHub Actions runs on every push / PR to `main`:
 
-- **CI** (`.github/workflows/ci.yml`): type-check → build → lint → format →
-  DB schema push → startup-migration smoke test → backend & frontend tests
-  with coverage thresholds.
-- **Security** (`.github/workflows/security.yml`): production dependency
-  audit and TruffleHog secret scanning.
+- **CI** (`.github/workflows/ci.yml`): env-doc check → type-check → build →
+  lint → format → DB schema push → startup-migration smoke test → backend &
+  frontend tests with coverage thresholds → coverage ratchet audit.
+
+  Coverage floors live in `config/coverage-thresholds.json`: a global floor per
+  suite plus per-file floors on the modules where a regression is most
+  expensive — posting, inventory costing, and tenant isolation. They are a
+  one-way ratchet, so `npm run audit:coverage-ratchet` reports floors that
+  coverage has climbed past and should be raised.
+- **Security** (`.github/workflows/security.yml`): dependency audit and
+  TruffleHog secret scanning. The audit gate fails on any high or critical
+  vulnerability in production dependencies unless it carries a written,
+  dated exception in `scripts/verify-dependency-audit.mjs`.
 
 ## More documentation
 

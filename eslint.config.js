@@ -69,7 +69,13 @@ export default tseslint.config(
       "no-control-regex": "warn",
       "no-extra-boolean-cast": "warn",
 
-      "react-hooks/rules-of-hooks": "warn",
+      // A violation here is a crash, not a style opinion: React fails the render
+      // outright when the hook count changes between renders. The repository was
+      // carrying 36 of these as warnings, including a dispatch on `?view=` that
+      // reshaped a page's hook list whenever the query string changed. All are
+      // fixed, so this is an error now — the rule has no false positives worth
+      // tolerating a silent regression for.
+      "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
     },
   },

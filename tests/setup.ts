@@ -100,11 +100,6 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     await db.delete(schema.userCompanyRoles).where(eq(schema.userCompanyRoles.companyId, company.id));
     await db.delete(schema.userLocations).where(eq(schema.userLocations.companyId, company.id));
 
-    // Authentication and audit middleware can finish asynchronously while a test
-    // is tearing down. Clear any rows written after the initial cleanup before
-    // deleting the company so the test-only fixture teardown remains deterministic.
-    await pool.query("DELETE FROM audit_log WHERE company_id = $1", [company.id]);
-    await pool.query("DELETE FROM login_history WHERE company_id = $1", [company.id]);
     // A crashed/interrupted factory test can leave rows in factory_* tables
     // referencing this company; those FKs otherwise block the company delete
     // below on the NEXT run that reuses this prefix. Delete in FK-safe order.
@@ -126,7 +121,32 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     // exercises read endpoints can still leave an FK reference behind.
     await pool.query("DELETE FROM bale_sequences WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_bale_sequences WHERE company_id = $1", [company.id]);
-    await db.delete(schema.companies).where(eq(schema.companies.id, company.id));
+
+    // Authentication and audit middleware finish asynchronously, so a request
+    // that a test already stopped waiting on can still insert an audit_log or
+    // login_history row while this teardown runs. These two deletes used to sit
+    // above the factory_* block, which left ~15 round trips between them and the
+    // company delete — wide enough for a late write to land and fail the delete
+    // on login_history_company_id_fkey. That is a race, so it broke CI on runs
+    // where the timing happened to line up rather than on any particular change.
+    //
+    // Clearing them last shrinks the window to a single statement. It cannot
+    // close it completely — nothing short of quiescing the middleware can — so
+    // the delete below retries once, re-clearing whatever arrived in between.
+    async function clearAsyncReferences(): Promise<void> {
+      await pool.query("DELETE FROM audit_log WHERE company_id = $1", [company.id]);
+      await pool.query("DELETE FROM login_history WHERE company_id = $1", [company.id]);
+    }
+
+    await clearAsyncReferences();
+
+    try {
+      await db.delete(schema.companies).where(eq(schema.companies.id, company.id));
+    } catch (error) {
+      await clearAsyncReferences();
+      await db.delete(schema.companies).where(eq(schema.companies.id, company.id));
+      void error;
+    }
   }
 
   const usersToDelete = await db

@@ -69,6 +69,37 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
     enabled: open,
   });
 
+  // Declared above the `!container` guard below so the hook count stays constant.
+  // `container` is a prop, so it can go from set to null (or back) while this
+  // dialog is mounted; with the mutation declared after the guard that changed
+  // how many hooks ran between renders, which React fails on. Nothing here reads
+  // `container` during render — `mutationFn` only runs on mutate(), which is
+  // unreachable while the guard is returning null.
+  const offloadMutation = useMutation({
+    mutationFn: () => {
+      if (!selectedLocationId) {
+        toast({ title: "Select a location", variant: "destructive" });
+        return Promise.reject(new Error("Select a location"));
+      }
+      return apiRequest("POST", "/api/sp/offload", {
+        containerId: container.id,
+        offloadDate,
+        locationId: selectedLocationId,
+        chargeLines: chargeLines.filter((c) => parseFloat(c.amountUsd || "0") > 0),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sp/containers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sp/stock"] });
+      toast({ title: "Offload recorded", description: "Goods OTW reversed and stock created." });
+      onOpenChange(false);
+      setChargeLines([]);
+      setSelectedLocationId("");
+      onSuccess?.();
+    },
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
   if (!container) return null;
 
   const discountFactor = 1 - parseFloat(container.discountPct || "0") / 100;
@@ -111,31 +142,6 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
 
   const updateCharge = (idx: number, key: keyof ChargeLine, value: string) =>
     setChargeLines((prev) => prev.map((c, i) => (i === idx ? { ...c, [key]: value } : c)));
-
-  const offloadMutation = useMutation({
-    mutationFn: () => {
-      if (!selectedLocationId) {
-        toast({ title: "Select a location", variant: "destructive" });
-        return Promise.reject(new Error("Select a location"));
-      }
-      return apiRequest("POST", "/api/sp/offload", {
-        containerId: container.id,
-        offloadDate,
-        locationId: selectedLocationId,
-        chargeLines: chargeLines.filter((c) => parseFloat(c.amountUsd || "0") > 0),
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/sp/containers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sp/stock"] });
-      toast({ title: "Offload recorded", description: "Goods OTW reversed and stock created." });
-      onOpenChange(false);
-      setChargeLines([]);
-      setSelectedLocationId("");
-      onSuccess?.();
-    },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
 
   return (
     <Dialog

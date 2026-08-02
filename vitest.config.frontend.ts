@@ -1,6 +1,11 @@
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import { readFileSync } from "fs";
 import path from "path";
+
+const { frontend } = JSON.parse(
+  readFileSync(path.resolve(__dirname, "config/coverage-thresholds.json"), "utf8")
+);
 
 export default defineConfig({
   plugins: [react()],
@@ -14,18 +19,16 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json-summary"],
       reportsDirectory: "coverage/frontend",
-      include: [
-        "client/src/components/ui/period-filter.tsx",
-        "client/src/pages/StockHub.tsx",
-        "client/src/pages/InventoryHub.tsx",
-      ],
+      // This used to name three files, so "59% lines" described those three and
+      // not the frontend. Measuring all of client/src puts the real number —
+      // 5.8% lines — in front of anyone who looks, and lets it ratchet up as
+      // tests are added. The per-file floors below keep the strong signal on
+      // the surfaces that are genuinely covered.
+      include: ["client/src/**/*.{ts,tsx}"],
+      exclude: ["client/src/**/*.test.{ts,tsx}", "client/src/**/*.d.ts"],
       thresholds: {
-        // Exact one-way baseline from the current covered frontend surface.
-        // These remain above rounded-down measured coverage so regressions fail.
-        lines: 59,
-        statements: 56,
-        functions: 60,
-        branches: 53,
+        ...frontend.global,
+        ...frontend.perFile,
       },
     },
     // No pool/fork overrides — jsdom runs in the same process

@@ -14,6 +14,7 @@ import React from "react";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { PaymentReceiptTab } from "@/components/vouchers/PaymentReceiptTab";
 import { renderWithProviders, stubFetch } from "./helpers";
 
 beforeAll(() => stubFetch());
@@ -60,11 +61,13 @@ function Harness({ paymentAccountId = 0, entries = [] }: HarnessProps) {
   const fieldArray = useFieldArray({ control: form.control, name: "entries" });
   const total = rows.reduce((sum, e) => sum + (parseFloat(e.amount || "0") || 0), 0);
 
-  const [PaymentReceiptTab, setTab] = React.useState<any>(null);
-  React.useEffect(() => {
-    import("@/components/vouchers/PaymentReceiptTab").then((m) => setTab(() => m.PaymentReceiptTab));
-  }, []);
-  if (!PaymentReceiptTab) return null;
+  // PaymentReceiptTab is imported statically at the top of this file. It used to
+  // be pulled in by a dynamic import() inside a useEffect, with the harness
+  // rendering null until it resolved — which raced findBy*'s 1s default timeout.
+  // The suite passed in isolation and failed under full-suite load or coverage
+  // instrumentation, where transforming the module tree takes longer than the
+  // wait window. vi.mock is hoisted above imports, so the context mocks below
+  // still apply to a static import.
 
   // The app mounts a single TooltipProvider at the root; the tab relies on it for
   // the disabled Print/Export explanations.

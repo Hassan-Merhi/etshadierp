@@ -1,5 +1,12 @@
 import { defineConfig } from "vitest/config";
+import { readFileSync } from "fs";
 import path from "path";
+
+// Floors live in config/coverage-thresholds.json so the vitest configs and
+// scripts/audit-coverage-ratchet.mjs cannot disagree about what the gate is.
+const { backend } = JSON.parse(
+  readFileSync(path.resolve(__dirname, "config/coverage-thresholds.json"), "utf8")
+);
 
 export default defineConfig({
   test: {
@@ -31,27 +38,14 @@ export default defineConfig({
       reportsDirectory: "coverage/backend",
       include: ["server/**/*.ts", "shared/**/*.ts"],
       exclude: ["server/index.ts", "server/vite.ts", "server/**/*.d.ts", "shared/**/*.d.ts"],
+      // The global floor tracks measured coverage; the per-file floors gate the
+      // modules where a regression is most expensive — posting, inventory
+      // costing, and tenant isolation. Both come from the shared config so
+      // `npm run audit:coverage-ratchet` can report drift against the same
+      // numbers CI enforces.
       thresholds: {
-        // Raise the whole-backend floor while legacy monoliths are still being
-        // split, and add stronger gates for the critical modules below.
-        lines: 8,
-        statements: 8,
-        functions: 6,
-        branches: 6,
-
-        "server/routes/helpers/passwordHelpers.ts": {
-          lines: 95,
-          statements: 95,
-          functions: 100,
-          branches: 90,
-        },
-
-        "server/services/accounting/centralPostingEngine.ts": {
-          lines: 45,
-          statements: 45,
-          functions: 40,
-          branches: 35,
-        },
+        ...backend.global,
+        ...backend.perFile,
       },
     },
   },
