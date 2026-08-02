@@ -3,6 +3,10 @@ import type { ApplicationLanguage } from "@shared/applicationLanguageContract";
 import { translateSharedInterfaceText } from "@/i18n/sharedInterfaceTranslations";
 import { translateAccountingDocumentText } from "@/i18n/accountingDocumentTranslations";
 import { isPhase3SharedUiText, translatePhase3SharedUiText } from "@/i18n/sharedUiPhase3Translations";
+import {
+  isPhase4SupplierPartnerText,
+  translatePhase4SupplierPartnerText,
+} from "@/i18n/supplierPartnerPhase4Translations";
 
 const EXCLUDED_SELECTOR = [
   "code",
@@ -57,6 +61,7 @@ function isEligibleTextElement(element: Element): boolean {
 
 export function translateApprovedInterfaceText(value: string, language: ApplicationLanguage): string | null {
   return (
+    translatePhase4SupplierPartnerText(value, language) ??
     translatePhase3SharedUiText(value, language) ??
     translateSharedInterfaceText(value, language) ??
     translateAccountingDocumentText(value, language)
@@ -68,7 +73,13 @@ function translateTextNode(node: Text, language: ApplicationLanguage) {
   if (!parent || isProtected(parent)) return;
 
   const value = node.nodeValue ?? "";
-  if (!isEligibleTextElement(parent) && !isPhase3SharedUiText(value)) return;
+  if (
+    !isEligibleTextElement(parent) &&
+    !isPhase3SharedUiText(value) &&
+    !isPhase4SupplierPartnerText(value)
+  ) {
+    return;
+  }
 
   const translated = translateApprovedInterfaceText(value, language);
   if (translated !== null && translated !== node.nodeValue) node.nodeValue = translated;
@@ -107,8 +118,9 @@ export function translateInterfaceTree(root: Node, language: ApplicationLanguage
  * The main observer is scoped to the React application root, while a lightweight
  * body observer only discovers portal roots. Mutation work is batched into one
  * animation frame. Plain spans/divs and table data cells remain business content
- * by default. Phase 3 also permits exact reviewed shared-interface messages and
- * their approved dynamic patterns outside the normal control/heading selectors.
+ * by default. Exact reviewed Phase 3 shared-interface and Phase 4 Supplier Partner
+ * messages may translate outside normal control/heading selectors, while protected
+ * business-value markers always take precedence.
  */
 export function ApplicationInterfaceTranslator({ language }: { language: ApplicationLanguage }) {
   useEffect(() => {
