@@ -7,11 +7,29 @@ import {
   renderMarkdown,
 } from "./i18n-audit-lib.mjs";
 
-const DETECTOR_VERSION = 3;
+const DETECTOR_VERSION = 4;
 const compatibilityTranslationFiles = [
   "client/src/i18n/sharedInterfaceTranslations.ts",
   "client/src/i18n/accountingDocumentTranslations.ts",
+  "client/src/i18n/sharedUiPhase3Translations.part1.ts",
+  "client/src/i18n/sharedUiPhase3Translations.part2.ts",
+  "client/src/i18n/sharedUiPhase3Translations.part3.ts",
+  "client/src/i18n/sharedUiPhase3Translations.part4.ts",
+  "client/src/i18n/sharedUiPhase3Translations.part5.ts",
 ];
+
+const phase3ReviewedTechnicalValues = new Set([
+  "seg.isSkip ? (",
+  "text-success",
+  "text-warning",
+  "v.1.9.HMD",
+  "useSidebar must be used within a SidebarProvider.",
+  "useCarousel must be used within a <Carousel />",
+  "useFormField should be used within <FormField>",
+  "useFormField should be used within <FormItem>",
+  "useTheme must be used within ThemeProvider",
+  "useChart must be used within a <ChartContainer />",
+]);
 
 function argumentValue(name) {
   const index = process.argv.indexOf(name);
@@ -51,6 +69,9 @@ function refineFinding(finding, compatibilityCoveredValues) {
     if (/\b(?:return|const|let|var|useState|useRef|Promise|forwardRef|interface|type|extends)\b/.test(value)) {
       return null;
     }
+  }
+  if (phase3ReviewedTechnicalValues.has(value)) {
+    return { ...finding, status: "excluded", category: "technical-identifier" };
   }
   if (compatibilityCoveredValues.has(value)) {
     return { ...finding, status: "excluded", category: "compatibility-covered" };
