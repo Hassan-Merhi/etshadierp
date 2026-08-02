@@ -7,6 +7,12 @@ import {
   renderMarkdown,
 } from "./i18n-audit-lib.mjs";
 
+const DETECTOR_VERSION = 3;
+const compatibilityTranslationFiles = [
+  "client/src/i18n/sharedInterfaceTranslations.ts",
+  "client/src/i18n/accountingDocumentTranslations.ts",
+];
+
 function argumentValue(name) {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : null;
@@ -18,6 +24,18 @@ function writeOutput(file, content) {
   fs.writeFileSync(file, content);
 }
 
+function loadCompatibilityCoveredValues() {
+  const values = new Set();
+  for (const file of compatibilityTranslationFiles) {
+    if (!fs.existsSync(file)) continue;
+    const source = fs.readFileSync(file, "utf8");
+    for (const match of source.matchAll(/\ben\s*:\s*(["'`])((?:\\.|(?!\1).)*)\1/g)) {
+      values.add(match[2].replace(/\\(["'`])/g, "$1").trim());
+    }
+  }
+  return values;
+}
+
 function looksLikeCssClassList(value) {
   const tokens = value.trim().split(/\s+/).filter(Boolean);
   if (tokens.length < 2) return false;
@@ -25,7 +43,7 @@ function looksLikeCssClassList(value) {
   return tokens.every((token) => utility.test(token));
 }
 
-function refineFinding(finding) {
+function refineFinding(finding, compatibilityCoveredValues) {
   const value = finding.text.trim();
   if (finding.kind === "jsx-text") {
     if (value.includes("\n")) return null;
@@ -33,6 +51,9 @@ function refineFinding(finding) {
     if (/\b(?:return|const|let|var|useState|useRef|Promise|forwardRef|interface|type|extends)\b/.test(value)) {
       return null;
     }
+  }
+  if (compatibilityCoveredValues.has(value)) {
+    return { ...finding, status: "excluded", category: "compatibility-covered" };
   }
   if (looksLikeCssClassList(value)) {
     return { ...finding, status: "excluded", category: "style-token" };
@@ -46,8 +67,8 @@ function refineFinding(finding) {
   return finding;
 }
 
-function rebuildReport(report) {
-  const findings = report.findings.map(refineFinding).filter(Boolean);
+function rebuildReport(report, compatibilityCoveredValues) {
+  const findings = report.findings.map((finding) => refineFinding(finding, compatibilityCoveredValues)).filter(Boolean);
   const modules = {};
   const excludedCategories = {};
   const filesByActionableCount = {};
@@ -64,6 +85,7 @@ function rebuildReport(report) {
   const actionable = findings.filter((finding) => finding.status === "actionable").length;
   return {
     ...report,
+    detectorVersion: DETECTOR_VERSION,
     totals: {
       candidates: findings.length,
       actionable,
@@ -91,7 +113,8 @@ const noEnforce = process.argv.includes("--no-enforce");
 
 const policy = JSON.parse(fs.readFileSync(policyPath, "utf8"));
 const baseline = fs.existsSync(baselinePath) ? JSON.parse(fs.readFileSync(baselinePath, "utf8")) : null;
-const report = rebuildReport(buildReport(policy));
+const compatibilityCoveredValues = loadCompatibilityCoveredValues();
+const report = rebuildReport(buildReport(policy), compatibilityCoveredValues);
 
 writeOutput(jsonOutput, `${JSON.stringify(report, null, 2)}\n`);
 writeOutput(markdownOutput, renderMarkdown(report, baseline));
