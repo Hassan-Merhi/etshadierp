@@ -2,6 +2,10 @@ import { useEffect } from "react";
 import type { ApplicationLanguage } from "@shared/applicationLanguageContract";
 import { translateSharedInterfaceText } from "@/i18n/sharedInterfaceTranslations";
 import { translateAccountingDocumentText } from "@/i18n/accountingDocumentTranslations";
+import {
+  isPhase3SharedUiText,
+  translatePhase3SharedUiText,
+} from "@/i18n/sharedUiPhase3Translations";
 
 const EXCLUDED_SELECTOR = [
   "code",
@@ -55,13 +59,21 @@ function isEligibleTextElement(element: Element): boolean {
 }
 
 export function translateApprovedInterfaceText(value: string, language: ApplicationLanguage): string | null {
-  return translateSharedInterfaceText(value, language) ?? translateAccountingDocumentText(value, language);
+  return (
+    translatePhase3SharedUiText(value, language) ??
+    translateSharedInterfaceText(value, language) ??
+    translateAccountingDocumentText(value, language)
+  );
 }
 
 function translateTextNode(node: Text, language: ApplicationLanguage) {
   const parent = node.parentElement;
-  if (!parent || isProtected(parent) || !isEligibleTextElement(parent)) return;
-  const translated = translateApprovedInterfaceText(node.nodeValue ?? "", language);
+  if (!parent || isProtected(parent)) return;
+
+  const value = node.nodeValue ?? "";
+  if (!isEligibleTextElement(parent) && !isPhase3SharedUiText(value)) return;
+
+  const translated = translateApprovedInterfaceText(value, language);
   if (translated !== null && translated !== node.nodeValue) node.nodeValue = translated;
 }
 
@@ -97,9 +109,9 @@ export function translateInterfaceTree(root: Node, language: ApplicationLanguage
  *
  * The main observer is scoped to the React application root, while a lightweight
  * body observer only discovers portal roots. Mutation work is batched into one
- * animation frame. Plain spans/divs and table data cells are treated as business
- * content by default; interface copy must live in an eligible control/heading or
- * be explicitly marked data-i18n-ui.
+ * animation frame. Plain spans/divs and table data cells remain business content
+ * by default. Phase 3 also permits exact reviewed shared-interface messages and
+ * their approved dynamic patterns outside the normal control/heading selectors.
  */
 export function ApplicationInterfaceTranslator({ language }: { language: ApplicationLanguage }) {
   useEffect(() => {
