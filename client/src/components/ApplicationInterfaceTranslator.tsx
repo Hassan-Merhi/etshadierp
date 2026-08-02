@@ -73,11 +73,7 @@ function translateTextNode(node: Text, language: ApplicationLanguage) {
   if (!parent || isProtected(parent)) return;
 
   const value = node.nodeValue ?? "";
-  if (
-    !isEligibleTextElement(parent) &&
-    !isPhase3SharedUiText(value) &&
-    !isPhase4SupplierPartnerText(value)
-  ) {
+  if (!isEligibleTextElement(parent) && !isPhase3SharedUiText(value) && !isPhase4SupplierPartnerText(value)) {
     return;
   }
 

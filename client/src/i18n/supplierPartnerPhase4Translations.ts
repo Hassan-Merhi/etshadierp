@@ -43,7 +43,7 @@ type CompiledTemplate = {
 
 function compileLanguageTemplate(
   value: string,
-  language: ApplicationLanguage,
+  language: ApplicationLanguage
 ): { pattern: RegExp; captureOrder: readonly number[] } {
   const normalized = normalizeTemplate(value, language);
   const captureOrder: number[] = [];
@@ -75,18 +75,18 @@ for (const entry of supplierPartnerPhase4Translations) {
   }
 
   const compiledByLanguage = Object.fromEntries(
-    languages.map((language) => [language, compileLanguageTemplate(entry[language], language)]),
+    languages.map((language) => [language, compileLanguageTemplate(entry[language], language)])
   ) as Record<ApplicationLanguage, { pattern: RegExp; captureOrder: readonly number[] }>;
 
   compiledTemplates.push({
     patterns: Object.fromEntries(
-      languages.map((language) => [language, compiledByLanguage[language].pattern]),
+      languages.map((language) => [language, compiledByLanguage[language].pattern])
     ) as Record<ApplicationLanguage, RegExp>,
     captureOrder: Object.fromEntries(
-      languages.map((language) => [language, compiledByLanguage[language].captureOrder]),
+      languages.map((language) => [language, compiledByLanguage[language].captureOrder])
     ) as Record<ApplicationLanguage, readonly number[]>,
     render: Object.fromEntries(
-      languages.map((language) => [language, normalizeTemplate(entry[language], language)]),
+      languages.map((language) => [language, normalizeTemplate(entry[language], language)])
     ) as Record<ApplicationLanguage, string>,
   });
 }
@@ -96,10 +96,7 @@ function renderTemplate(template: string, values: readonly string[]): string {
   return template.replace(indexedTemplateToken, (_token, rawIndex: string) => values[Number(rawIndex)] ?? "");
 }
 
-function translateCompiledTemplate(
-  value: string,
-  language: ApplicationLanguage,
-): string | null {
+function translateCompiledTemplate(value: string, language: ApplicationLanguage): string | null {
   for (const template of compiledTemplates) {
     for (const sourceLanguage of languages) {
       const match = template.patterns[sourceLanguage].exec(value);
@@ -121,14 +118,11 @@ export function isPhase4SupplierPartnerText(value: string): boolean {
   if (!normalized) return false;
   if (exactEntryByVisibleText.has(normalized)) return true;
   return compiledTemplates.some((template) =>
-    languages.some((language) => template.patterns[language].test(normalized)),
+    languages.some((language) => template.patterns[language].test(normalized))
   );
 }
 
-export function translatePhase4SupplierPartnerText(
-  value: string,
-  language: ApplicationLanguage,
-): string | null {
+export function translatePhase4SupplierPartnerText(value: string, language: ApplicationLanguage): string | null {
   const leading = value.match(/^\s*/)?.[0] ?? "";
   const trailing = value.match(/\s*$/)?.[0] ?? "";
   const normalized = value.trim();
