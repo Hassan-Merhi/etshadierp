@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
-import { APPLICATION_LANGUAGES, DEFAULT_APPLICATION_LANGUAGE, parseApplicationLanguage } from "@shared/applicationLanguageContract";
+import { APPLICATION_LANGUAGES, parseApplicationLanguage } from "@shared/applicationLanguageContract";
 import { requireAuth } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
@@ -13,7 +13,7 @@ function ensureLanguagePreferenceTable() {
       .execute(sql`
         CREATE TABLE IF NOT EXISTS user_language_preferences (
           user_id varchar PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-          preferred_language varchar(2) NOT NULL DEFAULT ${DEFAULT_APPLICATION_LANGUAGE},
+          preferred_language varchar(2) NOT NULL DEFAULT 'en',
           created_at timestamp NOT NULL DEFAULT now(),
           updated_at timestamp NOT NULL DEFAULT now(),
           CONSTRAINT user_language_preferences_language_check
@@ -41,9 +41,7 @@ export function registerLanguagePreferenceRoutes(app: Express) {
         LIMIT 1
       `);
       const row = result.rows[0] as { preferredLanguage?: string } | undefined;
-      return res.json({
-        preferredLanguage: parseApplicationLanguage(row?.preferredLanguage),
-      });
+      return res.json({ preferredLanguage: parseApplicationLanguage(row?.preferredLanguage) });
     } catch (error: unknown) {
       return res.status(500).json({ message: getErrorMessage(error) });
     }
