@@ -13,10 +13,30 @@
  * empty-but-not-crashing render cannot pass silently.
  */
 import React from "react";
-import { fireEvent, screen, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+import { getQueryFn } from "@/lib/queryClient";
 import { renderWithProviders, stubFetch } from "./helpers";
+
+/**
+ * renderWithProviders builds a bare QueryClient, but the application sets a
+ * default queryFn on its own client - so any useQuery that relies on that
+ * default (most of them) never fetches under the shared helper and its data
+ * stays empty. Rows that only exist when data arrives are therefore invisible,
+ * along with the row-level dialogs this file needs to reach. Wire the real
+ * default in so the seeded fixtures actually land.
+ */
+function renderWithData(ui: React.ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, staleTime: Infinity, queryFn: getQueryFn({ on401: "throw" }) },
+      mutations: { retry: false },
+    },
+  });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 beforeAll(() => stubFetch());
 
@@ -187,6 +207,15 @@ describe("Phase 4 extracted dialogs open from their real triggers", () => {
     expect(await screen.findByText("Import from Excel")).toBeTruthy();
   });
 
+  it("StockTransferForm opens the extracted ImportTransferExcelDialog", async () => {
+    const { StockTransferForm } = await import("@/pages/vouchers/StockTransferForm");
+    renderWithProviders(<StockTransferForm />);
+
+    fireEvent.click(await screen.findByTestId("button-open-import-dialog"));
+
+    expect(await screen.findByText("Import Stock Transfer from Excel")).toBeTruthy();
+  });
+
   describe("FactoryProformas with a customer selected", () => {
     beforeEach(() => {
       selectCustomerViaUrl(1);
@@ -209,6 +238,57 @@ describe("Phase 4 extracted dialogs open from their real triggers", () => {
       fireEvent.click(await screen.findByTestId("button-import-excel-proforma"));
 
       expect(await screen.findByText("Import Proforma from Excel")).toBeTruthy();
+    });
+
+    // Row-level dialogs need a proforma to exist, so seed one and drive the
+    // row's own ⋯ menu. This is the wiring most likely to break in a split:
+    // the dialog is handed a value out of the row's map callback, not a
+    // top-level piece of state.
+    describe("with one proforma in the list", () => {
+      const proforma = {
+        id: 7,
+        name: "PF-0007",
+        customerId: 1,
+        status: "active",
+        isActive: true,
+        lines: [],
+        createdAt: "2026-01-01T00:00:00.000Z",
+      };
+
+      beforeEach(() => {
+        stubFetchRoutes([
+          [/\/api\/factory\/customers/, [{ id: 1, name: "Acme Textiles", code: "ACME", active: true }]],
+          [/customer-proformas/, [proforma]],
+          [/customer-price-lists/, []],
+          [/stock-items\/light/, []],
+          // the row's edit menu is gated on role
+          [/\/api\/auth\/me/, { role: "Admin" }],
+        ]);
+      });
+
+      it("opens the extracted RenameProformaDialog from the row menu", async () => {
+        const { default: Page } = await import("@/pages/factory/FactoryProformas");
+        renderWithData(<Page />);
+
+        const user = userEvent.setup();
+        await user.click(await screen.findByTestId(`button-proforma-menu-${proforma.id}`));
+        await user.click(await screen.findByTestId(`button-rename-proforma-${proforma.id}`));
+
+        const dialog = await screen.findByRole("dialog");
+        expect(within(dialog).getByText("Rename Proforma")).toBeTruthy();
+      });
+
+      it("opens the extracted TransferProformaDialog from the row menu", async () => {
+        const { default: Page } = await import("@/pages/factory/FactoryProformas");
+        renderWithData(<Page />);
+
+        const user = userEvent.setup();
+        await user.click(await screen.findByTestId(`button-proforma-menu-${proforma.id}`));
+        await user.click(await screen.findByTestId(`button-transfer-proforma-${proforma.id}`));
+
+        const dialog = await screen.findByRole("dialog");
+        expect(within(dialog).getByText("Transfer Proforma")).toBeTruthy();
+      });
     });
 
     // The create-proforma dialog is still inline in the parent, not one of the
@@ -240,6 +320,7 @@ describe("AdvancesView extracted dialogs open from their real triggers", () => {
     ["button-post-accounting", "PostAccountingPreviewDialog", /Post Accounting for Old Advances/i, true],
     ["button-reconcile-advances", "ReconcileBalancesDialog", /Reconcile Advance Balances/i, true],
     ["button-repayment-audit", "RepaymentAuditDialog", /Repayment Audit/i, true],
+    ["button-repay-by-month", "RepayByMonthDialog", /Repay by Month/i, true],
   ];
 
   beforeEach(() => {
