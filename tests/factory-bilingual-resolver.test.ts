@@ -11,7 +11,8 @@ describe("Factory bilingual shared resolver", () => {
     expect(parseFactoryCatalogLanguage("ar")).toBe("ar");
     expect(parseFactoryCatalogLanguage("en")).toBe("en");
     expect(parseFactoryCatalogLanguage("AR")).toBe("en");
-    expect(parseFactoryCatalogLanguage("fr")).toBe("en");
+    expect(parseFactoryCatalogLanguage("fr")).toBe("fr");
+    expect(parseFactoryCatalogLanguage("de")).toBe("en");
     expect(parseFactoryCatalogLanguage(undefined)).toBe("en");
   });
 

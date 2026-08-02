@@ -5,6 +5,7 @@ import { registerFactoryStockRoutes } from "./factory/stock";
 import { registerFactorySuppliersRoutes } from "./factory/factorySuppliersRoutes";
 import { registerFactoryBilingualCatalogRoutes } from "./factory/factoryBilingualCatalogRoutes";
 import { registerFactoryBilingualSnapshotRoutes } from "./factory/factoryBilingualSnapshotRoutes";
+import { registerFactoryFrenchTranslationRoutes } from "./factory/factoryFrenchTranslationRoutes";
 import { registerFactoryProductsRoutes } from "./factory/products";
 import { registerFactoryContainersRoutes } from "./factory/containers";
 import { registerFactoryBalesRoutes } from "./factory/bales";
@@ -154,6 +155,7 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   registerFactorySuppliersRoutes(app);
   registerFactoryBilingualSnapshotRoutes(app);
   registerFactoryBilingualCatalogRoutes(app);
+  registerFactoryFrenchTranslationRoutes(app);
   registerFactoryProductsRoutes(app);
   registerFactoryContainerTrackingRoutes(app);
   registerFactoryContainersRoutes(app);
