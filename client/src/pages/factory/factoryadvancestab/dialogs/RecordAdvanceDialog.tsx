@@ -1,5 +1,5 @@
 /**
- * SettleDialog — extracted from AdvancesView.tsx during the Phase 4 split.
+ * RecordAdvanceDialog — extracted from AdvancesView.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export function SettleDialog({
+export function RecordAdvanceDialog({
   addOpen,
   cashAccounts,
   createMutation,

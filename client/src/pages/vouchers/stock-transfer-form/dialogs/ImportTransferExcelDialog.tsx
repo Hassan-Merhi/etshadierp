@@ -1,5 +1,5 @@
 /**
- * S3 — extracted from StockTransferForm.tsx during the Phase 4 split.
+ * ImportTransferExcelDialog — extracted from StockTransferForm.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Upload, CheckCircle, XCircle, Download, FileSpreadsheet } from "lucide-react";
 
-export function S3({
+export function ImportTransferExcelDialog({
   downloadImportTemplate,
   handleImportFileChange,
   handleImportParse,

@@ -234,12 +234,12 @@ describe("Phase 4 extracted dialogs open from their real triggers", () => {
 describe("AdvancesView extracted dialogs open from their real triggers", () => {
   // [trigger testid, extracted module, dialog title, trigger sits in the ⋯ menu]
   const cases: Array<[string, string, RegExp, boolean]> = [
-    ["button-add-advance", "SettleDialog", /Record Advance/i, false],
-    ["button-bulk-advance", "AdvanceDialog", /Bulk Advance/i, false],
-    ["button-cash-adjustment", "HistoryDialog", /Cash Account Balance Adjustment/i, true],
-    ["button-post-accounting", "BulkDialog", /Post Accounting for Old Advances/i, true],
-    ["button-reconcile-advances", "ExportDialog", /Reconcile Advance Balances/i, true],
-    ["button-repayment-audit", "EditDialog", /Repayment Audit/i, true],
+    ["button-add-advance", "RecordAdvanceDialog", /Record Advance/i, false],
+    ["button-bulk-advance", "BulkAdvanceDialog", /Bulk Advance/i, false],
+    ["button-cash-adjustment", "CashAccountAdjustmentDialog", /Cash Account Balance Adjustment/i, true],
+    ["button-post-accounting", "PostAccountingPreviewDialog", /Post Accounting for Old Advances/i, true],
+    ["button-reconcile-advances", "ReconcileBalancesDialog", /Reconcile Advance Balances/i, true],
+    ["button-repayment-audit", "RepaymentAuditDialog", /Repayment Audit/i, true],
   ];
 
   beforeEach(() => {

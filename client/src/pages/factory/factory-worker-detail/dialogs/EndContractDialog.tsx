@@ -1,5 +1,5 @@
 /**
- * W1 — extracted from FactoryWorkerDetail.tsx during the Phase 4 split.
+ * EndContractDialog — extracted from FactoryWorkerDetail.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fmtNum } from "../../factoryworkerdetail/utils";
 
-export function W1({
+export function EndContractDialog({
   cashAccounts,
   endCalculating,
   endCashAccountId,

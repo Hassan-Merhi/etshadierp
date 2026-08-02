@@ -1,5 +1,5 @@
 /**
- * L2 — extracted from FactoryLocationInventory.tsx during the Phase 4 split.
+ * RenameLocationDialog — extracted from FactoryLocationInventory.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -15,7 +15,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
-export function L2({
+export function RenameLocationDialog({
   renameDialogOpen,
   renameInput,
   renameLocationMutation,

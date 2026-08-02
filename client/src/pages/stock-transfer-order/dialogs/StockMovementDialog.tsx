@@ -1,5 +1,5 @@
 /**
- * HistoryDialog — extracted from StockTransferOrder.tsx during the Phase 4 split.
+ * StockMovementDialog — extracted from StockTransferOrder.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -17,7 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { MapPin, ExternalLink } from "lucide-react";
 import { PeriodFilter } from "@/components/ui/period-filter";
 
-export function HistoryDialog({
+export function StockMovementDialog({
   formatAmount,
   historyData,
   historyDialogOpen,

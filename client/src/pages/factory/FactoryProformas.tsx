@@ -45,12 +45,12 @@ import { read as readExcel, utils as excelUtils, writeFile as writeExcel } from 
 
 import type { Customer, Proforma, ProformaLine } from "./factoryproformas/types";
 import { effectivePricePerBale } from "./factoryproformas/utils";
-import { D1 } from "./factory-proformas/dialogs/D1";
-import { D2 } from "./factory-proformas/dialogs/D2";
-import { D3 } from "./factory-proformas/dialogs/D3";
-import { D4 } from "./factory-proformas/dialogs/D4";
-import { D5 } from "./factory-proformas/dialogs/D5";
-import { D6 } from "./factory-proformas/dialogs/D6";
+import { RenameProformaDialog } from "./factory-proformas/dialogs/RenameProformaDialog";
+import { TransferProformaDialog } from "./factory-proformas/dialogs/TransferProformaDialog";
+import { AddPriceLineDialog } from "./factory-proformas/dialogs/AddPriceLineDialog";
+import { EditPriceLineDialog } from "./factory-proformas/dialogs/EditPriceLineDialog";
+import { CreatePendingLoadingDialog } from "./factory-proformas/dialogs/CreatePendingLoadingDialog";
+import { ImportProformaExcelDialog } from "./factory-proformas/dialogs/ImportProformaExcelDialog";
 export default function FactoryProformas() {
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
@@ -1320,7 +1320,7 @@ export default function FactoryProformas() {
         </DialogContent>
       </Dialog>
 
-      <D1
+      <RenameProformaDialog
         renameProformaMutation={renameProformaMutation}
         renameValue={renameValue}
         renamingProforma={renamingProforma}
@@ -1329,7 +1329,7 @@ export default function FactoryProformas() {
       />
 
       {/* ── Transfer Proforma Dialog ────────────────────────────────────── */}
-      <D2
+      <TransferProformaDialog
         customers={customers}
         setTransferProforma={setTransferProforma}
         setTransferTargetCustomerId={setTransferTargetCustomerId}
@@ -1338,7 +1338,7 @@ export default function FactoryProformas() {
         transferTargetCustomerId={transferTargetCustomerId}
       />
 
-      <D3
+      <AddPriceLineDialog
         addLineMode={addLineMode}
         addLineMutation={addLineMutation}
         allStockItems={allStockItems}
@@ -1355,7 +1355,7 @@ export default function FactoryProformas() {
         setNewLine={setNewLine}
       />
 
-      <D4
+      <EditPriceLineDialog
         editLineMutation={editLineMutation}
         editLineValues={editLineValues}
         editingLine={editingLine}
@@ -1363,7 +1363,7 @@ export default function FactoryProformas() {
         setEditLineValues={setEditLineValues}
         setEditingLine={setEditingLine}
       />
-      <D5
+      <CreatePendingLoadingDialog
         createLoadingLocationId={createLoadingLocationId}
         createLoadingMutation={createLoadingMutation}
         createLoadingProforma={createLoadingProforma}
@@ -1373,7 +1373,7 @@ export default function FactoryProformas() {
       />
 
       {/* ── Excel Import Dialog ──────────────────────────────────────────── */}
-      <D6
+      <ImportProformaExcelDialog
         bulkImportMutation={bulkImportMutation}
         customerId={customerId}
         customers={customers}

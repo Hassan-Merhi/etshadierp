@@ -1,5 +1,5 @@
 /**
- * W4 — extracted from FactoryWorkerDetail.tsx during the Phase 4 split.
+ * DocumentPreviewDialog — extracted from FactoryWorkerDetail.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -8,7 +8,7 @@ import { FileImage, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-export function W4({ setViewingDoc, viewingDoc }: { setViewingDoc: any; viewingDoc: any }) {
+export function DocumentPreviewDialog({ setViewingDoc, viewingDoc }: { setViewingDoc: any; viewingDoc: any }) {
   return (
     <Dialog
       open={viewingDoc !== null}

@@ -1,5 +1,5 @@
 /**
- * NoteDialog — extracted from AdvancesView.tsx during the Phase 4 split.
+ * ConfirmRepaymentDialog — extracted from AdvancesView.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { fmt } from "../utils";
 
-export function NoteDialog({
+export function ConfirmRepaymentDialog({
   cashAccounts,
   confirmRepay,
   repayByMonthForm,

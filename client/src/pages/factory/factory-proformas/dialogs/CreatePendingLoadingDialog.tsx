@@ -1,5 +1,5 @@
 /**
- * D5 — extracted from FactoryProformas.tsx during the Phase 4 split.
+ * CreatePendingLoadingDialog — extracted from FactoryProformas.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
-export function D5({
+export function CreatePendingLoadingDialog({
   createLoadingLocationId,
   createLoadingMutation,
   createLoadingProforma,

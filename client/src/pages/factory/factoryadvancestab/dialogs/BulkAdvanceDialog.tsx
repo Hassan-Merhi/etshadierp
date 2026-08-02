@@ -1,5 +1,5 @@
 /**
- * AdvanceDialog — extracted from AdvancesView.tsx during the Phase 4 split.
+ * BulkAdvanceDialog — extracted from AdvancesView.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { fmt } from "../utils";
 
-export function AdvanceDialog({
+export function BulkAdvanceDialog({
   bulkAmounts,
   bulkForm,
   bulkMutation,

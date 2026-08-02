@@ -53,11 +53,11 @@ import type { FactoryWorker, FactoryBale, FactoryWorkerDocument, FactoryWorkerAd
 import type { CashAccount, PayrollRecord, WorkerStats, WorkerWithStats } from "./factoryworkerdetail/types";
 import { PAYROLL_STATUS, fmt, fmtNum, getAvatarColor, getInitials } from "./factoryworkerdetail/utils";
 import { AdvanceRow } from "./factoryworkerdetail/components/AdvanceRow";
-import { W1 } from "./factory-worker-detail/dialogs/W1";
-import { W2 } from "./factory-worker-detail/dialogs/W2";
-import { W3 } from "./factory-worker-detail/dialogs/W3";
-import { W4 } from "./factory-worker-detail/dialogs/W4";
-import { W5 } from "./factory-worker-detail/dialogs/W5";
+import { EndContractDialog } from "./factory-worker-detail/dialogs/EndContractDialog";
+import { GenerateMissingAccountingEntryDialog } from "./factory-worker-detail/dialogs/GenerateMissingAccountingEntryDialog";
+import { MarkPayrollPaidDialog } from "./factory-worker-detail/dialogs/MarkPayrollPaidDialog";
+import { DocumentPreviewDialog } from "./factory-worker-detail/dialogs/DocumentPreviewDialog";
+import { PayrollDetailDialog } from "./factory-worker-detail/dialogs/PayrollDetailDialog";
 export default function FactoryWorkerDetail() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const [, navigate] = useLocation();
@@ -1947,7 +1947,7 @@ export default function FactoryWorkerDetail() {
         </div>
       </div>
 
-      <W1
+      <EndContractDialog
         cashAccounts={cashAccounts}
         endCalculating={endCalculating}
         endCashAccountId={endCashAccountId}
@@ -1971,7 +1971,7 @@ export default function FactoryWorkerDetail() {
       />
 
       {/* Fix Accounting Dialog */}
-      <W2
+      <GenerateMissingAccountingEntryDialog
         cashAccounts={cashAccounts}
         fixAcctCashId={fixAcctCashId}
         fixAcctMutation={fixAcctMutation}
@@ -1983,7 +1983,7 @@ export default function FactoryWorkerDetail() {
         wrapAdminAction={wrapAdminAction}
       />
 
-      <W3
+      <MarkPayrollPaidDialog
         cashAccounts={cashAccounts}
         markPaidMutation={markPaidMutation}
         payCashAccountId={payCashAccountId}
@@ -1996,7 +1996,7 @@ export default function FactoryWorkerDetail() {
       />
 
       {/* Image Viewer Dialog */}
-      <W4 setViewingDoc={setViewingDoc} viewingDoc={viewingDoc} />
+      <DocumentPreviewDialog setViewingDoc={setViewingDoc} viewingDoc={viewingDoc} />
 
       {/* Delete Document Confirmation */}
       <Dialog
@@ -2039,7 +2039,7 @@ export default function FactoryWorkerDetail() {
         </DialogContent>
       </Dialog>
       {/* Payroll Detail Dialog */}
-      <W5
+      <PayrollDetailDialog
         detailPayrollId={detailPayrollId}
         payrollDetail={payrollDetail}
         payrollDetailLoading={payrollDetailLoading}

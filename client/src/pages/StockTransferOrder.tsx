@@ -63,7 +63,7 @@ import { DRAFT_KEY, SESSION_STATE_KEY, STORAGE_KEY } from "./stocktransferorder/
 import { RevisionDialog } from "./stock-transfer-order/dialogs/RevisionDialog";
 import { ImportDialog } from "./stock-transfer-order/dialogs/ImportDialog";
 import { QuantityPickerDialog } from "./stock-transfer-order/dialogs/QuantityPickerDialog";
-import { HistoryDialog } from "./stock-transfer-order/dialogs/HistoryDialog";
+import { StockMovementDialog } from "./stock-transfer-order/dialogs/StockMovementDialog";
 import { DetailDialog } from "./stock-transfer-order/dialogs/DetailDialog";
 export default function StockTransferOrder() {
   const [_location, navigate] = useLocation();
@@ -2108,7 +2108,7 @@ export default function StockTransferOrder() {
       />
 
       {/* Stock Movement History Dialog */}
-      <HistoryDialog
+      <StockMovementDialog
         formatAmount={formatAmount}
         historyData={historyData}
         historyDialogOpen={historyDialogOpen}

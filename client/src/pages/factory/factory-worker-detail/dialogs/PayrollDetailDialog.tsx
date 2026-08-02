@@ -1,5 +1,5 @@
 /**
- * W5 — extracted from FactoryWorkerDetail.tsx during the Phase 4 split.
+ * PayrollDetailDialog — extracted from FactoryWorkerDetail.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { fmtNum } from "../../factoryworkerdetail/utils";
 
-export function W5({
+export function PayrollDetailDialog({
   detailPayrollId,
   payrollDetail,
   payrollDetailLoading,

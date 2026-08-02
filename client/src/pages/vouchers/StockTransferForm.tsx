@@ -55,9 +55,9 @@ import {
 
 import type { Location, StockItem, StockTransferFormData, StockTransferFormProps } from "./stocktransferform/types";
 import { stockTransferFormSchema } from "./stocktransferform/utils";
-import { S1 } from "./stock-transfer-form/dialogs/S1";
-import { S2 } from "./stock-transfer-form/dialogs/S2";
-import { S3 } from "./stock-transfer-form/dialogs/S3";
+import { ApproveRevisionDialog } from "./stock-transfer-form/dialogs/ApproveRevisionDialog";
+import { SaveAsRevisionDialog } from "./stock-transfer-form/dialogs/SaveAsRevisionDialog";
+import { ImportTransferExcelDialog } from "./stock-transfer-form/dialogs/ImportTransferExcelDialog";
 export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTransferFormProps) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
@@ -2152,7 +2152,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       </Form>
 
       {/* Revision Approve Dialog */}
-      <S1
+      <ApproveRevisionDialog
         approveRevisionMutation={approveRevisionMutation}
         approveRevisionTarget={approveRevisionTarget}
         setApproveRevisionTarget={setApproveRevisionTarget}
@@ -2289,7 +2289,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       )}
 
       {/* Transfer Revision Note Dialog */}
-      <S2
+      <SaveAsRevisionDialog
         computeTransferRevisionItems={computeTransferRevisionItems}
         confirmTransferSaveAsRevision={confirmTransferSaveAsRevision}
         isTransferSavingRevision={isTransferSavingRevision}
@@ -2301,7 +2301,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       />
 
       {/* Stock Transfer Import Dialog */}
-      <S3
+      <ImportTransferExcelDialog
         downloadImportTemplate={downloadImportTemplate}
         handleImportFileChange={handleImportFileChange}
         handleImportParse={handleImportParse}

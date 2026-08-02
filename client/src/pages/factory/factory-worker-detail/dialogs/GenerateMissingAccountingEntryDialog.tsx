@@ -1,5 +1,5 @@
 /**
- * W2 — extracted from FactoryWorkerDetail.tsx during the Phase 4 split.
+ * GenerateMissingAccountingEntryDialog — extracted from FactoryWorkerDetail.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-export function W2({
+export function GenerateMissingAccountingEntryDialog({
   cashAccounts,
   fixAcctCashId,
   fixAcctMutation,

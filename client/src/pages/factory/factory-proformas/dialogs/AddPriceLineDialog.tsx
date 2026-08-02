@@ -1,5 +1,5 @@
 /**
- * D3 — extracted from FactoryProformas.tsx during the Phase 4 split.
+ * AddPriceLineDialog — extracted from FactoryProformas.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Search, BookOpen, PenLine } from "lucide-react";
 
-export function D3({
+export function AddPriceLineDialog({
   addLineMode,
   addLineMutation,
   allStockItems,

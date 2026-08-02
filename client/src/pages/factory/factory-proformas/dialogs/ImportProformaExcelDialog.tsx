@@ -1,5 +1,5 @@
 /**
- * D6 — extracted from FactoryProformas.tsx during the Phase 4 split.
+ * ImportProformaExcelDialog — extracted from FactoryProformas.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -13,7 +13,7 @@ import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import type { Customer } from "../../factoryproformas/types";
 
-export function D6({
+export function ImportProformaExcelDialog({
   bulkImportMutation,
   customerId,
   customers,

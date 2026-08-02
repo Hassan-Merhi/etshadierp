@@ -1,5 +1,5 @@
 /**
- * L3 — extracted from FactoryLocationInventory.tsx during the Phase 4 split.
+ * StockOverloadWarningDialog — extracted from FactoryLocationInventory.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -15,7 +15,13 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-export function L3({ overloadWarning, setOverloadWarning }: { overloadWarning: any; setOverloadWarning: any }) {
+export function StockOverloadWarningDialog({
+  overloadWarning,
+  setOverloadWarning,
+}: {
+  overloadWarning: any;
+  setOverloadWarning: any;
+}) {
   return (
     <Dialog
       open={overloadWarning.open}

@@ -1,5 +1,5 @@
 /**
- * BulkDialog — extracted from AdvancesView.tsx during the Phase 4 split.
+ * PostAccountingPreviewDialog — extracted from AdvancesView.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -20,7 +20,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fmt } from "../utils";
 
-export function BulkDialog({
+export function PostAccountingPreviewDialog({
   cashAccounts,
   formatDate,
   postAccountingMutation,

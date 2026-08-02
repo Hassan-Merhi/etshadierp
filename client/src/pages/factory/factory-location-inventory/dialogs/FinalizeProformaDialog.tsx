@@ -1,5 +1,5 @@
 /**
- * L1 — extracted from FactoryLocationInventory.tsx during the Phase 4 split.
+ * FinalizeProformaDialog — extracted from FactoryLocationInventory.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Search, FileText, X, Download, FileSpreadsheet, Plus, Check } from "lucide-react";
 
-export function L1({
+export function FinalizeProformaDialog({
   bulkCreateMutation,
   createCustomerMutation,
   customerSearch,

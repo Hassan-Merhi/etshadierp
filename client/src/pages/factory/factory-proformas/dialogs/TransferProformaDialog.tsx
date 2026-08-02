@@ -1,5 +1,5 @@
 /**
- * D2 — extracted from FactoryProformas.tsx during the Phase 4 split.
+ * TransferProformaDialog — extracted from FactoryProformas.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { DialogDescription } from "@/components/ui/dialog";
 import type { Customer } from "../../factoryproformas/types";
 
-export function D2({
+export function TransferProformaDialog({
   customers,
   setTransferProforma,
   setTransferTargetCustomerId,

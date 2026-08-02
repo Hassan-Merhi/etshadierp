@@ -49,15 +49,15 @@ import type { FactoryWorker } from "@shared/schema";
 import type { AdvanceRecord, CashAccount } from "../types";
 import { fmt } from "../utils";
 
-import { AdvanceDialog } from "./../dialogs/AdvanceDialog";
-import { SettleDialog } from "./../dialogs/SettleDialog";
-import { ConfirmDialog } from "./../dialogs/ConfirmDialog";
-import { EditDialog } from "./../dialogs/EditDialog";
-import { HistoryDialog } from "./../dialogs/HistoryDialog";
-import { DeductionDialog } from "./../dialogs/DeductionDialog";
-import { NoteDialog } from "./../dialogs/NoteDialog";
-import { BulkDialog } from "./../dialogs/BulkDialog";
-import { ExportDialog } from "./../dialogs/ExportDialog";
+import { BulkAdvanceDialog } from "./../dialogs/BulkAdvanceDialog";
+import { RecordAdvanceDialog } from "./../dialogs/RecordAdvanceDialog";
+import { ReverseAdvanceDialog } from "./../dialogs/ReverseAdvanceDialog";
+import { RepaymentAuditDialog } from "./../dialogs/RepaymentAuditDialog";
+import { CashAccountAdjustmentDialog } from "./../dialogs/CashAccountAdjustmentDialog";
+import { RepayByMonthDialog } from "./../dialogs/RepayByMonthDialog";
+import { ConfirmRepaymentDialog } from "./../dialogs/ConfirmRepaymentDialog";
+import { PostAccountingPreviewDialog } from "./../dialogs/PostAccountingPreviewDialog";
+import { ReconcileBalancesDialog } from "./../dialogs/ReconcileBalancesDialog";
 
 export interface AuditAdvance {
   id: number;
@@ -839,7 +839,7 @@ export function AdvancesView() {
         </Table>
       </div>
 
-      <AdvanceDialog
+      <BulkAdvanceDialog
         bulkAmounts={bulkAmounts}
         bulkForm={bulkForm}
         bulkMutation={bulkMutation}
@@ -853,7 +853,7 @@ export function AdvancesView() {
         workers={workers}
       />
 
-      <SettleDialog
+      <RecordAdvanceDialog
         addOpen={addOpen}
         cashAccounts={cashAccounts}
         createMutation={createMutation}
@@ -889,14 +889,14 @@ export function AdvancesView() {
       </Dialog>
 
       {/* Reverse Advance Dialog */}
-      <ConfirmDialog
+      <ReverseAdvanceDialog
         reverseMutation={reverseMutation}
         reverseTarget={reverseTarget}
         setReverseTarget={setReverseTarget}
       />
 
       {/* ── Repayment Audit Dialog ── */}
-      <EditDialog
+      <RepaymentAuditDialog
         auditCashBalance={auditCashBalance}
         auditData={auditData}
         auditLoading={auditLoading}
@@ -911,7 +911,7 @@ export function AdvancesView() {
       />
 
       {/* ── Cash Account Adjustment Dialog ── */}
-      <HistoryDialog
+      <CashAccountAdjustmentDialog
         cashAccounts={cashAccounts}
         cashAdjForm={cashAdjForm}
         cashAdjMutation={cashAdjMutation}
@@ -921,7 +921,7 @@ export function AdvancesView() {
       />
 
       {/* ── Repay by Month Dialog ── */}
-      <DeductionDialog
+      <RepayByMonthDialog
         advances={advances}
         cashAccounts={cashAccounts}
         repayByMonthExpanded={repayByMonthExpanded}
@@ -937,7 +937,7 @@ export function AdvancesView() {
       />
 
       {/* ── Confirm Repay Dialog ── */}
-      <NoteDialog
+      <ConfirmRepaymentDialog
         cashAccounts={cashAccounts}
         confirmRepay={confirmRepay}
         repayByMonthForm={repayByMonthForm}
@@ -946,7 +946,7 @@ export function AdvancesView() {
         setRepayingMonth={setRepayingMonth}
       />
 
-      <BulkDialog
+      <PostAccountingPreviewDialog
         cashAccounts={cashAccounts}
         formatDate={formatDate}
         postAccountingMutation={postAccountingMutation}
@@ -959,7 +959,7 @@ export function AdvancesView() {
       />
 
       {/* Reconcile confirmation dialog */}
-      <ExportDialog
+      <ReconcileBalancesDialog
         formatDate={formatDate}
         reconcileMutation={reconcileMutation}
         reconcileOpen={reconcileOpen}

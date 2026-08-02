@@ -72,12 +72,11 @@ import type {
 } from "./factorylocationinventory/types";
 import { applySortProducts, catColor, isSpecialFactoryCategory } from "./factorylocationinventory/utils";
 import { StatCard } from "./factorylocationinventory/components/StatCard";
-import { L1 } from "./factory-location-inventory/dialogs/L1";
-import { L2 } from "./factory-location-inventory/dialogs/L2";
-import { L3 } from "./factory-location-inventory/dialogs/L3";
-import { L4 } from "./factory-location-inventory/dialogs/L4";
-import { L5 } from "./factory-location-inventory/dialogs/L5";
-import { L6 } from "./factory-location-inventory/dialogs/L6";
+import { FinalizeProformaDialog } from "./factory-location-inventory/dialogs/FinalizeProformaDialog";
+import { RenameLocationDialog } from "./factory-location-inventory/dialogs/RenameLocationDialog";
+import { StockOverloadWarningDialog } from "./factory-location-inventory/dialogs/StockOverloadWarningDialog";
+import { RemoveBalesDialog } from "./factory-location-inventory/dialogs/RemoveBalesDialog";
+import { PrintBarcodesDialog } from "./factory-location-inventory/dialogs/PrintBarcodesDialog";
 export default function FactoryLocationInventory() {
   const { colors } = useLabelDesignColors();
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
@@ -918,7 +917,7 @@ export default function FactoryLocationInventory() {
   };
 
   const renderFinalizeDialog = () => (
-    <L1
+    <FinalizeProformaDialog
       bulkCreateMutation={bulkCreateMutation}
       createCustomerMutation={createCustomerMutation}
       customerSearch={customerSearch}
@@ -1043,7 +1042,7 @@ export default function FactoryLocationInventory() {
           </div>
         </div>
 
-        <L2
+        <RenameLocationDialog
           renameDialogOpen={renameDialogOpen}
           renameInput={renameInput}
           renameLocationMutation={renameLocationMutation}
@@ -2094,9 +2093,9 @@ export default function FactoryLocationInventory() {
 
       {renderFinalizeDialog()}
 
-      <L3 overloadWarning={overloadWarning} setOverloadWarning={setOverloadWarning} />
+      <StockOverloadWarningDialog overloadWarning={overloadWarning} setOverloadWarning={setOverloadWarning} />
 
-      <L4
+      <RemoveBalesDialog
         deleteDialogOpen={deleteDialogOpen}
         deleteProduct={deleteProduct}
         deleteQty={deleteQty}
@@ -2113,7 +2112,7 @@ export default function FactoryLocationInventory() {
         setDeleteSupervisorUser={setDeleteSupervisorUser}
       />
 
-      <L5
+      <PrintBarcodesDialog
         handleDoPrint={handleDoPrint}
         reprintBales={reprintBales}
         reprintDialogOpen={reprintDialogOpen}
@@ -2162,7 +2161,7 @@ export default function FactoryLocationInventory() {
         </DialogContent>
       </Dialog>
 
-      <L6
+      <RenameLocationDialog
         renameDialogOpen={renameDialogOpen}
         renameInput={renameInput}
         renameLocationMutation={renameLocationMutation}

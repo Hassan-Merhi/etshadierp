@@ -1,5 +1,5 @@
 /**
- * L5 — extracted from FactoryLocationInventory.tsx during the Phase 4 split.
+ * PrintBarcodesDialog — extracted from FactoryLocationInventory.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Printer } from "lucide-react";
 
-export function L5({
+export function PrintBarcodesDialog({
   handleDoPrint,
   reprintBales,
   reprintDialogOpen,

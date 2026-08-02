@@ -1,5 +1,5 @@
 /**
- * S1 — extracted from StockTransferForm.tsx during the Phase 4 split.
+ * ApproveRevisionDialog — extracted from StockTransferForm.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 
-export function S1({
+export function ApproveRevisionDialog({
   approveRevisionMutation,
   approveRevisionTarget,
   setApproveRevisionTarget,

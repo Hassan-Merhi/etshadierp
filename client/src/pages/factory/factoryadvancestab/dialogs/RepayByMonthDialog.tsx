@@ -1,5 +1,5 @@
 /**
- * DeductionDialog — extracted from AdvancesView.tsx during the Phase 4 split.
+ * RepayByMonthDialog — extracted from AdvancesView.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { AdvanceRecord } from "../types";
 import { fmt } from "../utils";
 
-export function DeductionDialog({
+export function RepayByMonthDialog({
   advances,
   cashAccounts,
   repayByMonthExpanded,

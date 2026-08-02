@@ -1,5 +1,5 @@
 /**
- * S2 — extracted from StockTransferForm.tsx during the Phase 4 split.
+ * SaveAsRevisionDialog — extracted from StockTransferForm.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { GitBranch } from "lucide-react";
 
-export function S2({
+export function SaveAsRevisionDialog({
   computeTransferRevisionItems,
   confirmTransferSaveAsRevision,
   isTransferSavingRevision,

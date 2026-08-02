@@ -1,5 +1,5 @@
 /**
- * EditDialog — extracted from AdvancesView.tsx during the Phase 4 split.
+ * RepaymentAuditDialog — extracted from AdvancesView.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -22,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { fmt } from "../utils";
 
 import type { AuditAdvance } from "../components/AdvancesView";
-export function EditDialog({
+export function RepaymentAuditDialog({
   auditCashBalance,
   auditData,
   auditLoading,

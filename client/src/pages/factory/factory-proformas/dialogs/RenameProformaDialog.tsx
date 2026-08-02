@@ -1,5 +1,5 @@
 /**
- * D1 — extracted from FactoryProformas.tsx during the Phase 4 split.
+ * RenameProformaDialog — extracted from FactoryProformas.tsx during the Phase 4 split.
  *
  * Props are the parent-scope bindings the block referenced; they were
  * discovered from compiler errors rather than guessed.
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-export function D1({
+export function RenameProformaDialog({
   renameProformaMutation,
   renameValue,
   renamingProforma,
