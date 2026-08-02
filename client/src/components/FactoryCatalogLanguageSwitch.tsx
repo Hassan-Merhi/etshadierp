@@ -3,6 +3,8 @@ import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import { persistFactoryCatalogLanguagePreference } from "@/lib/factoryCatalogPreference";
 import { queryClient } from "@/lib/queryClient";
 
+export const FACTORY_CATALOG_LANGUAGE_EVENT = "factory:catalog-language-change";
+
 /**
  * Compatibility mount retained for existing Factory layouts. The visible
  * selector is the single application-wide switch rendered by App.tsx.
@@ -14,6 +16,7 @@ export function FactoryCatalogLanguageSwitch() {
 
   useEffect(() => {
     persistFactoryCatalogLanguagePreference(language, window.localStorage, document);
+    window.dispatchEvent(new CustomEvent(FACTORY_CATALOG_LANGUAGE_EVENT, { detail: language }));
     void queryClient.invalidateQueries({
       predicate: (query) => {
         const first = query.queryKey[0];
