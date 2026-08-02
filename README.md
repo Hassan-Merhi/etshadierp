@@ -73,6 +73,7 @@ documenting it.
 | `npm run verify:env-docs` | Check `.env.example` covers every env var the server reads |
 | `npm run verify:dependency-audit` | Fail on unreviewed high/critical production vulnerabilities |
 | `npm run audit:coverage-ratchet` | Report coverage floors that measured coverage has outgrown |
+| `npm run verify:runtime-dependencies` | Check everything production imports is in `dependencies` |
 
 ## Project layout
 
@@ -94,6 +95,32 @@ migrations/        SQL migrations
 tests/             Vitest suites (backend + tests/ui frontend)
 docs/              Architecture, flows, and audit documentation
 ```
+
+## Dependency classification
+
+Deployment runs `npm ci` with `NODE_ENV=production`, which **omits
+`devDependencies`**. Anything production touches must therefore be in
+`dependencies`:
+
+- **Runtime** — every package the server bundle statically imports. The bundle
+  is built with `packages: "external"`, so each import is a real resolution
+  against `node_modules`. This includes `vite` and `nanoid`, because
+  `server/index.ts` statically imports `server/vite.ts`; they load on boot even
+  though the dev server never starts in production.
+- **The `--import` preload bridges** in `npm start`. Node loads these from
+  source before the bundle, so a missing package there kills the process before
+  the server exists.
+- **Build tooling** — `vite`, `esbuild`, `tailwindcss`, `postcss`,
+  `autoprefixer`, `@vitejs/plugin-react`, `@tailwindcss/typography`. The
+  deployment builds from source, so these are needed there too.
+
+`devDependencies` is for things only CI and local development run: test
+runners, linters, formatters, and `@types/*`.
+
+`npm run verify:runtime-dependencies` enforces the split and runs as the last
+step of `npm run build`, so a misclassification fails the deploy instead of the
+boot. It reads esbuild's metafile rather than grepping the bundle — the output
+embeds source text containing import statements inside template literals.
 
 ## Architecture notes
 
