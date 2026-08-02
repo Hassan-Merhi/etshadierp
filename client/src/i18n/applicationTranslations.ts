@@ -31,6 +31,16 @@ export const applicationTranslations = {
     ar: "تم تغيير اللغة على هذا الجهاز، لكن تعذر حفظ تفضيل الحساب.",
     fr: "La langue a été modifiée sur cet appareil, mais la préférence du compte n’a pas pu être enregistrée.",
   },
+  "user.menu": {
+    en: "Account menu",
+    ar: "قائمة الحساب",
+    fr: "Menu du compte",
+  },
+  "common.logout": {
+    en: "Log out",
+    ar: "تسجيل الخروج",
+    fr: "Se déconnecter",
+  },
   "common.refresh": {
     en: "Refresh",
     ar: "تحديث",
