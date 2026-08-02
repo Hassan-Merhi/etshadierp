@@ -58,12 +58,15 @@ export function UserMenu({ accentColor, user, onLogout }: UserMenuProps) {
             {getInitials(user.username)}
           </span>
           <span className="hidden min-w-0 items-center gap-2 md:flex">
-            <span className="max-w-[8rem] truncate text-sm font-medium leading-none" data-business-value>
+            <span
+              className="max-w-[8rem] truncate text-sm font-medium leading-none"
+              data-business-value="true"
+            >
               {user.username}
             </span>
             <span
               className="hidden border-l border-border/50 pl-2 text-xs leading-none text-muted-foreground lg:inline"
-              data-business-value
+              data-business-value="true"
             >
               {user.role}
             </span>
@@ -75,10 +78,10 @@ export function UserMenu({ accentColor, user, onLogout }: UserMenuProps) {
       <DropdownMenuContent align="end" className="w-64" dir="ltr" data-testid="user-menu-content">
         <DropdownMenuLabel className="font-normal">
           <div className="flex min-w-0 flex-col gap-1">
-            <span className="truncate text-sm font-medium" data-business-value>
+            <span className="truncate text-sm font-medium" data-business-value="true">
               {user.username}
             </span>
-            <span className="truncate text-xs text-muted-foreground" data-business-value>
+            <span className="truncate text-xs text-muted-foreground" data-business-value="true">
               {user.role}
             </span>
           </div>
