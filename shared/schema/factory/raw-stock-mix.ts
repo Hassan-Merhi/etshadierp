@@ -28,11 +28,12 @@ export const factoryRawStock = pgTable(
       .references(() => factoryContainers.id, { onDelete: "restrict" }),
     receivedKg: decimal("received_kg", { precision: 15, scale: 3 }).notNull(),
     usedKg: decimal("used_kg", { precision: 15, scale: 3 }).notNull().default("0"),
-    // scale 6 (not 4) — at typical container volumes (20k+ kg) a 4th-decimal rounding on
-    // cost/kg compounds into a multi-dollar swing on the total landed cost, and disagrees
-    // with suppliers' own Excel reconciliations computed at full precision.
-    costPerKg: decimal("cost_per_kg", { precision: 20, scale: 6 }).notNull(),
-    costPerKgUsd: decimal("cost_per_kg_usd", { precision: 20, scale: 6 }),
+    // scale 7 — at typical container volumes (20k+ kg) rounding on cost/kg compounds into
+    // a multi-dollar swing on the total landed cost, and disagrees with suppliers' own
+    // Excel reconciliations computed at full precision. Every cost-per-KG column in the
+    // Factory module is 7dp; rates and prices that a user types in stay at 6.
+    costPerKg: decimal("cost_per_kg", { precision: 20, scale: 7 }).notNull(),
+    costPerKgUsd: decimal("cost_per_kg_usd", { precision: 20, scale: 7 }),
     commissionPersonName: text("commission_person_name"),
     commissionAmount: decimal("commission_amount", { precision: 20, scale: 4 }),
     commissionCurrencyCode: varchar("commission_currency_code", { length: 10 }),
@@ -89,7 +90,7 @@ export const factoryRawMaterialAdjustments = pgTable(
     date: varchar("date", { length: 20 }).notNull(),
     type: varchar("type", { length: 10 }).notNull(),
     kg: decimal("kg", { precision: 15, scale: 3 }).notNull(),
-    costPerKg: decimal("cost_per_kg", { precision: 20, scale: 6 }).default("0"),
+    costPerKg: decimal("cost_per_kg", { precision: 20, scale: 7 }).default("0"),
     currencyCode: varchar("currency_code", { length: 10 }).default("USD"),
     supplierId: integer("supplier_id").references(() => factorySuppliers.id, { onDelete: "restrict" }),
     materialLabel: varchar("material_label", { length: 200 }),
@@ -207,8 +208,14 @@ export const factoryMixBatches = pgTable(
     name: text("name"),
     totalWeightKg: decimal("total_weight_kg", { precision: 15, scale: 3 }).notNull(),
     usedKg: decimal("used_kg", { precision: 15, scale: 3 }).notNull().default("0"),
-    costPerKg: decimal("cost_per_kg", { precision: 20, scale: 6 }).notNull(),
-    totalCost: decimal("total_cost", { precision: 20, scale: 2 }).notNull(),
+    // 7dp, matching factory_mix_batch_sources and factory_bales. The July 2026
+    // precision migration ALTERs all three tables to NUMERIC(20,7), but this
+    // table's declaration was left at 6dp / 2dp - so whichever ran last decided
+    // the column, and `drizzle-kit push` and application boot disagreed about
+    // the same database. The migration is the intended value; this now agrees
+    // with it. Widening only, so no existing value can be truncated.
+    costPerKg: decimal("cost_per_kg", { precision: 20, scale: 7 }).notNull(),
+    totalCost: decimal("total_cost", { precision: 20, scale: 7 }).notNull(),
     notes: text("notes"),
     status: text("status").notNull().default("ACTIVE"),
     operatorUser: text("operator_user"),
