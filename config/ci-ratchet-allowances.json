@@ -55,8 +55,9 @@
       "tests/factory-bilingual-phase8-surfaces.test.ts",
       "tests/application-language-integration-contract.test.ts",
       "tests/phases-8-5-6-trilingual-expansion.test.ts",
-      "tests/phases-12-9-11-module-surfaces.test.ts"
+      "tests/phases-12-9-11-module-translation.test.ts",
+      "tests/phases-10-7-13-trilingual-surfaces.test.ts"
     ],
-    "maxAdditionalTextAssertions": 240
+    "maxAdditionalTextAssertions": 246
   }
 }
