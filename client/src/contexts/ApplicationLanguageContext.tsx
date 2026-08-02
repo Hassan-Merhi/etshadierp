@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   APPLICATION_LANGUAGE_COOKIE,
@@ -40,7 +40,7 @@ function persistBrowserPreference(language: ApplicationLanguage) {
   document.cookie = `${APPLICATION_LANGUAGE_COOKIE}=${language}; Path=/; Max-Age=31536000; SameSite=Lax`;
 }
 
-export function ApplicationLanguageProvider({ children }: { children: React.ReactNode }) {
+export function ApplicationLanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<ApplicationLanguage>(readLocalPreference);
 
   const preferenceQuery = useQuery<LanguagePreferenceResponse>({
@@ -78,7 +78,7 @@ export function ApplicationLanguageProvider({ children }: { children: React.Reac
       preferenceMutation.mutate(normalized);
       void queryClient.invalidateQueries({ refetchType: "active" });
     },
-    [preferenceMutation],
+    [preferenceMutation.mutate],
   );
 
   useEffect(() => {
@@ -90,12 +90,10 @@ export function ApplicationLanguageProvider({ children }: { children: React.Reac
   useEffect(() => {
     const handleStorage = (event: StorageEvent) => {
       if (event.key !== APPLICATION_LANGUAGE_STORAGE_KEY) return;
-      const next = parseApplicationLanguage(event.newValue);
-      setLanguageState(next);
+      setLanguageState(parseApplicationLanguage(event.newValue));
     };
     const handleLanguageEvent = (event: Event) => {
-      const next = parseApplicationLanguage((event as CustomEvent<ApplicationLanguage>).detail);
-      setLanguageState(next);
+      setLanguageState(parseApplicationLanguage((event as CustomEvent<ApplicationLanguage>).detail));
     };
     window.addEventListener("storage", handleStorage);
     window.addEventListener(APPLICATION_LANGUAGE_EVENT, handleLanguageEvent);
