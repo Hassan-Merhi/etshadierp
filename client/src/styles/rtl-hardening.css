@@ -176,6 +176,22 @@ html[dir="rtl"] a[href="#main-content"]:focus {
   outline-offset: 2px;
 }
 
+/*
+ * POS transfer item picker: the POS navigation rail moves to the physical
+ * right in Arabic. Keep the item picker on the opposite side so it never
+ * covers the navigation header or menu. The existing RTL flex direction
+ * already places the reserved spacer on this same side.
+ */
+@media (min-width: 640px) {
+  html[dir="rtl"] [data-pos-workspace="true"]
+    .fixed:has(> [data-i18n-portal]) {
+    right: auto !important;
+    left: 0 !important;
+    border-left-width: 0;
+    border-right-width: 1px;
+  }
+}
+
 @media (max-width: 640px) {
   [data-slot="app-top-bar"] {
     min-inline-size: 0;
