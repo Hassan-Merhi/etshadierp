@@ -70,7 +70,9 @@ export function LanguageOnboardingDialog({ userId }: LanguageOnboardingDialogPro
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Languages className="h-5 w-5" aria-hidden="true" />
           </div>
-          <DialogTitle className="text-xl">Choose your preferred language</DialogTitle>
+          <DialogTitle className="text-xl" data-no-translate>
+            Choose your preferred language · اختر لغتك المفضلة · Choisissez votre langue préférée
+          </DialogTitle>
           <DialogDescription asChild>
             <div className="space-y-3 text-sm leading-6 text-muted-foreground">
               <p dir="ltr">
@@ -88,7 +90,12 @@ export function LanguageOnboardingDialog({ userId }: LanguageOnboardingDialogPro
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Preferred language">
+        <div
+          className="grid gap-2 sm:grid-cols-3"
+          role="radiogroup"
+          aria-label="Preferred language / اللغة المفضلة / Langue préférée"
+          data-no-translate
+        >
           {languageOptions.map((option) => {
             const selected = selectedLanguage === option.value;
             return (
