@@ -99,7 +99,8 @@ body {
     touch-action: manipulation;
   }
 
-  #main-content :where(
+  #main-content
+    :where(
       input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]),
       select,
       textarea
