@@ -2,8 +2,7 @@ name: Phase 8 Focused Verification
 
 on:
   push:
-    branches:
-      - agent/phase-8-rtl-responsive-accessibility
+    branches: [agent/phase-8-rtl-responsive-accessibility]
 
 permissions:
   contents: write
@@ -17,109 +16,75 @@ jobs:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 35
-
     env:
       NODE_ENV: test
       NODE_OPTIONS: --max-old-space-size=4096
 
     steps:
-      - name: Checkout Phase 8 branch
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           ref: agent/phase-8-rtl-responsive-accessibility
           fetch-depth: 0
-
-      - name: Set up Node.js 20
-        uses: actions/setup-node@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
           cache: npm
-
-      - name: Normalize registry URLs
-        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
-
-      - name: Install dependencies
-        id: install
+      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - id: install
         continue-on-error: true
         run: npm ci --no-audit --bin-links=true
-
-      - name: Type-check
-        id: typecheck
-        if: steps.install.outcome == 'success'
-        continue-on-error: true
-        run: npm run check
-
-      - name: Production build
-        id: build
-        if: steps.install.outcome == 'success'
-        continue-on-error: true
-        run: npm run build
-
-      - name: Lint
-        id: lint
-        if: steps.install.outcome == 'success'
-        continue-on-error: true
-        run: npm run lint
-
-      - name: Pinned Phase 8 formatting
-        id: format
+      - id: format
         if: steps.install.outcome == 'success'
         continue-on-error: true
         run: |
-          node node_modules/prettier/bin/prettier.cjs --check \
-            client/src/app/ErpShell.tsx \
-            client/src/app/FactoryShell.tsx \
-            client/src/app/PosShell.tsx \
-            client/src/app/PropertiesShell.tsx \
-            client/src/components/AppTopBar.tsx \
-            client/src/components/ApplicationInterfaceTranslator.tsx \
-            client/src/components/ui/dialog.tsx \
-            client/src/components/ui/responsive-accessibility.tsx \
-            client/src/components/ui/sheet.tsx \
-            client/src/contexts/ApplicationLanguageContext.tsx \
-            client/src/i18n/applicationDirection.test.ts \
-            client/src/i18n/applicationDirection.ts \
-            client/src/i18n/applicationTranslations.ts \
-            client/src/styles/rtl-hardening.css
-
-      - name: Program 7D accessibility verifier
-        id: program7d
+          mkdir -p artifacts/phase8
+          node node_modules/prettier/bin/prettier.cjs --write \
+            client/src/app/ErpShell.tsx client/src/app/FactoryShell.tsx \
+            client/src/app/PosShell.tsx client/src/app/PropertiesShell.tsx \
+            client/src/components/AppTopBar.tsx client/src/components/ApplicationInterfaceTranslator.tsx \
+            client/src/components/ui/dialog.tsx client/src/components/ui/responsive-accessibility.tsx \
+            client/src/components/ui/sheet.tsx client/src/contexts/ApplicationLanguageContext.tsx \
+            client/src/i18n/applicationDirection.test.ts client/src/i18n/applicationDirection.ts \
+            client/src/i18n/applicationTranslations.ts client/src/styles/rtl-hardening.css \
+            2>&1 | tee artifacts/phase8/format.log
+      - id: typecheck
         if: steps.install.outcome == 'success'
         continue-on-error: true
-        run: node scripts/verify-program7d-accessibility-responsive.mjs
-
-      - name: Phase 8 backend release contracts
-        id: backend
+        run: npm run check 2>&1 | tee artifacts/phase8/typecheck.log
+      - id: build
         if: steps.install.outcome == 'success'
         continue-on-error: true
-        run: |
-          node node_modules/vitest/vitest.mjs run \
-            tests/phase8-rtl-responsive-accessibility.test.ts \
-            tests/phase14-i18n-release-gate.test.ts
-
-      - name: Phase 8 frontend behavior
-        id: frontend
+        run: npm run build 2>&1 | tee artifacts/phase8/build.log
+      - id: lint
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run lint 2>&1 | tee artifacts/phase8/lint.log
+      - id: program7d
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: node scripts/verify-program7d-accessibility-responsive.mjs 2>&1 | tee artifacts/phase8/program7d.log
+      - id: backend
         if: steps.install.outcome == 'success'
         continue-on-error: true
         run: |
-          node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts \
-            client/src/i18n/applicationDirection.test.ts \
-            client/src/components/ui/responsive-accessibility.test.tsx
-
-      - name: Classified I18n Audit
-        id: audit
+          node node_modules/vitest/vitest.mjs run tests/phase8-rtl-responsive-accessibility.test.ts tests/phase14-i18n-release-gate.test.ts 2>&1 | tee artifacts/phase8/backend.log
+      - id: frontend
         if: steps.install.outcome == 'success'
         continue-on-error: true
-        run: node scripts/audit-i18n-phase14.mjs
-
-      - name: Record focused verification result
+        run: |
+          node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts client/src/i18n/applicationDirection.test.ts client/src/components/ui/responsive-accessibility.test.tsx 2>&1 | tee artifacts/phase8/frontend.log
+      - id: audit
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: node scripts/audit-i18n-phase14.mjs 2>&1 | tee artifacts/phase8/audit.log
+      - name: Commit formatted source and diagnostic result
         if: always()
         env:
           INSTALL: ${{ steps.install.outcome }}
+          FORMAT: ${{ steps.format.outcome }}
           TYPECHECK: ${{ steps.typecheck.outcome }}
           BUILD: ${{ steps.build.outcome }}
           LINT: ${{ steps.lint.outcome }}
-          FORMAT: ${{ steps.format.outcome }}
           PROGRAM7D: ${{ steps.program7d.outcome }}
           BACKEND: ${{ steps.backend.outcome }}
           FRONTEND: ${{ steps.frontend.outcome }}
@@ -127,31 +92,36 @@ jobs:
           VERIFIED_SHA: ${{ github.sha }}
         run: |
           result=success
-          for outcome in "$INSTALL" "$TYPECHECK" "$BUILD" "$LINT" "$FORMAT" "$PROGRAM7D" "$BACKEND" "$FRONTEND" "$AUDIT"; do
-            if [ "$outcome" != "success" ]; then result=failure; fi
+          for outcome in "$INSTALL" "$FORMAT" "$TYPECHECK" "$BUILD" "$LINT" "$PROGRAM7D" "$BACKEND" "$FRONTEND" "$AUDIT"; do
+            [ "$outcome" = success ] || result=failure
           done
-
-          mkdir -p artifacts/phase8
           cat > artifacts/phase8/verification-status.md <<EOF
           # Phase 8 focused verification: $result
 
           Verified source head: $VERIFIED_SHA
 
           - Dependency install: $INSTALL
+          - Pinned formatting: $FORMAT
           - TypeScript: $TYPECHECK
           - Production build: $BUILD
           - Lint: $LINT
-          - Phase 8 pinned formatting: $FORMAT
-          - Program 7D accessibility verifier: $PROGRAM7D
-          - Phase 8 backend release contracts: $BACKEND
-          - Phase 8 frontend behavior: $FRONTEND
+          - Program 7D verifier: $PROGRAM7D
+          - Backend release contracts: $BACKEND
+          - Frontend behavior: $FRONTEND
           - Classified I18n Audit: $AUDIT
           EOF
-
+          for name in program7d backend audit typecheck build lint frontend; do
+            file="artifacts/phase8/$name.log"
+            if [ -f "$file" ]; then
+              printf '\n## %s output\n\n```text\n' "$name" >> artifacts/phase8/verification-status.md
+              tail -n 120 "$file" >> artifacts/phase8/verification-status.md
+              printf '\n```\n' >> artifacts/phase8/verification-status.md
+            fi
+          done
+          git checkout -- package-lock.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add artifacts/phase8/verification-status.md
-          git diff --cached --quiet || git commit -m "Record Phase 8 focused verification: $result"
+          git add client/src artifacts/phase8/verification-status.md
+          git diff --cached --quiet || git commit -m "Apply Phase 8 formatting and record verification: $result"
           git push origin HEAD:agent/phase-8-rtl-responsive-accessibility
-
-          if [ "$result" != "success" ]; then exit 1; fi
+          [ "$result" = success ]
