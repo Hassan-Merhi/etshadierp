@@ -16,8 +16,11 @@ export interface RemoteSupportFlags {
 export interface RemoteSupportMetricsSnapshot {
   watcherStatusPolls: number;
   viewerPolls: number;
+  liveStatusConnections: number;
+  liveViewerConnections: number;
   framesAccepted: number;
   framesRejected: number;
+  framesPushed: number;
   totalFrameBytes: number;
   averageFrameBytes: number;
   lastFrameBytes: number | null;
@@ -35,14 +38,21 @@ export interface RemoteSupportRuntimeSnapshot {
   metrics: RemoteSupportMetricsSnapshot;
 }
 
-type RemoteSupportMetric = "watcherStatusPoll" | "viewerPoll" | "frameAccepted" | "frameRejected";
+type RemoteSupportMetric =
+  | "watcherStatusPoll"
+  | "viewerPoll"
+  | "liveStatusConnected"
+  | "liveViewerConnected"
+  | "frameAccepted"
+  | "frameRejected"
+  | "framePushed";
 
 const HARD_DISABLED = process.env.DISABLE_SCREEN_FEED === "true";
 const startedAt = new Date();
 
 const bootFlags: RemoteSupportFlags = {
   screenFeedEnabled: !HARD_DISABLED,
-  fastScreenFeed: false,
+  fastScreenFeed: !HARD_DISABLED,
   remoteControl: false,
   keyboardControl: false,
   sensitiveActionProtection: true,
@@ -56,8 +66,11 @@ let updatedBy = "system";
 const metrics = {
   watcherStatusPolls: 0,
   viewerPolls: 0,
+  liveStatusConnections: 0,
+  liveViewerConnections: 0,
   framesAccepted: 0,
   framesRejected: 0,
+  framesPushed: 0,
   totalFrameBytes: 0,
   lastFrameBytes: null as number | null,
   lastFrameAcceptedAt: null as Date | null,
@@ -89,8 +102,11 @@ function metricsSnapshot(): RemoteSupportMetricsSnapshot {
   return {
     watcherStatusPolls: metrics.watcherStatusPolls,
     viewerPolls: metrics.viewerPolls,
+    liveStatusConnections: metrics.liveStatusConnections,
+    liveViewerConnections: metrics.liveViewerConnections,
     framesAccepted: metrics.framesAccepted,
     framesRejected: metrics.framesRejected,
+    framesPushed: metrics.framesPushed,
     totalFrameBytes: metrics.totalFrameBytes,
     averageFrameBytes: metrics.framesAccepted > 0 ? Math.round(metrics.totalFrameBytes / metrics.framesAccepted) : 0,
     lastFrameBytes: metrics.lastFrameBytes,
@@ -162,7 +178,7 @@ export function restoreRemoteSupportBootDefaults(actor: string): RemoteSupportRu
   return getRemoteSupportRuntimeSnapshot();
 }
 
-export function recordRemoteSupportMetric(metric: RemoteSupportMetric, frameBytes?: number): void {
+export function recordRemoteSupportMetric(metric: RemoteSupportMetric, value?: number): void {
   switch (metric) {
     case "watcherStatusPoll":
       metrics.watcherStatusPolls += 1;
@@ -171,11 +187,20 @@ export function recordRemoteSupportMetric(metric: RemoteSupportMetric, frameByte
       metrics.viewerPolls += 1;
       metrics.lastViewerPollAt = new Date();
       return;
+    case "liveStatusConnected":
+      metrics.liveStatusConnections += 1;
+      return;
+    case "liveViewerConnected":
+      metrics.liveViewerConnections += 1;
+      return;
     case "frameRejected":
       metrics.framesRejected += 1;
       return;
+    case "framePushed":
+      metrics.framesPushed += Number.isFinite(value) && (value ?? 0) > 0 ? Math.floor(value as number) : 1;
+      return;
     case "frameAccepted": {
-      const safeBytes = Number.isFinite(frameBytes) && (frameBytes ?? 0) > 0 ? Math.floor(frameBytes as number) : 0;
+      const safeBytes = Number.isFinite(value) && (value ?? 0) > 0 ? Math.floor(value as number) : 0;
       metrics.framesAccepted += 1;
       metrics.totalFrameBytes += safeBytes;
       metrics.lastFrameBytes = safeBytes;
@@ -188,8 +213,11 @@ export function recordRemoteSupportMetric(metric: RemoteSupportMetric, frameByte
 export function resetRemoteSupportMetrics(): RemoteSupportRuntimeSnapshot {
   metrics.watcherStatusPolls = 0;
   metrics.viewerPolls = 0;
+  metrics.liveStatusConnections = 0;
+  metrics.liveViewerConnections = 0;
   metrics.framesAccepted = 0;
   metrics.framesRejected = 0;
+  metrics.framesPushed = 0;
   metrics.totalFrameBytes = 0;
   metrics.lastFrameBytes = null;
   metrics.lastFrameAcceptedAt = null;
