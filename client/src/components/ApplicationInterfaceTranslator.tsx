@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import type { ApplicationLanguage } from "@shared/applicationLanguageContract";
 import { translateApplicationLiteral } from "@/i18n/applicationTranslations";
 import { translateSharedInterfaceText } from "@/i18n/sharedInterfaceTranslations";
+import { translateTabsFiltersText } from "@/i18n/tabsFiltersTranslations";
 import { translateAccountingDocumentText } from "@/i18n/accountingDocumentTranslations";
 import { isPhase3SharedUiText, translatePhase3SharedUiText } from "@/i18n/sharedUiPhase3Translations";
 import {
@@ -77,6 +78,7 @@ function isEligibleTextElement(element: Element): boolean {
 export function translateApprovedInterfaceText(value: string, language: ApplicationLanguage): string | null {
   return (
     translateApplicationLiteral(value, language) ??
+    translateTabsFiltersText(value, language) ??
     translatePhase7BackendMessageText(value, language) ??
     translatePhase6ReportsExportsText(value, language) ??
     translatePhase5PropertiesRentalsText(value, language) ??
@@ -92,19 +94,12 @@ function translateTextNode(node: Text, language: ApplicationLanguage) {
   if (!parent || isProtected(parent)) return;
 
   const value = node.nodeValue ?? "";
-
-  // Every catalog is an exact reviewed allowlist. Try it first for all visible
-  // non-business text nodes so labels inside plain div/span wrappers, KPI cards,
-  // filters, tabs and POS layouts translate just like buttons and headings.
   const translated = translateApprovedInterfaceText(value, language);
   if (translated !== null) {
     if (translated !== node.nodeValue) node.nodeValue = translated;
     return;
   }
 
-  // Unknown free text remains untouched unless it is in a known UI control.
-  // This preserves business names, codes and values that are not explicitly
-  // approved in one of the translation catalogs.
   if (
     !isEligibleTextElement(parent) &&
     !isPhase3SharedUiText(value) &&
@@ -143,16 +138,6 @@ export function translateInterfaceTree(root: Node, language: ApplicationLanguage
   }
 }
 
-/**
- * Transitional compatibility bridge for legacy screens that have not yet been
- * converted to component-level translation calls.
- *
- * The main observer is scoped to the React application root, while a lightweight
- * body observer only discovers portal roots. Mutation work is batched into one
- * animation frame. Approved exact catalog values translate in any ordinary UI
- * wrapper, while protected business-value markers and table data cells remain
- * authoritative and are never translated by this bridge.
- */
 export function ApplicationInterfaceTranslator({ language }: { language: ApplicationLanguage }) {
   useEffect(() => {
     const root = document.getElementById("root");
