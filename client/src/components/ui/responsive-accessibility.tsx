@@ -3,7 +3,12 @@ import { cn } from "@/lib/utils";
 
 type SkipLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement>;
 
-export function SkipLink({ className, children = "Skip to main content", href = "#main-content", ...props }: SkipLinkProps) {
+export function SkipLink({
+  className,
+  children = "Skip to main content",
+  href = "#main-content",
+  ...props
+}: SkipLinkProps) {
   return (
     <a
       href={href}
@@ -50,7 +55,11 @@ type ResponsivePageProps = React.HTMLAttributes<HTMLDivElement> & {
   compact?: boolean;
 };
 
-export function ResponsivePage({ className, compact = false, ...props }: ResponsivePageProps) {
+export function ResponsivePage({
+  className,
+  compact = false,
+  ...props
+}: ResponsivePageProps) {
   return (
     <div
       data-responsive-page="true"
@@ -68,7 +77,11 @@ type ResponsiveSectionProps = React.HTMLAttributes<HTMLElement> & {
   label?: string;
 };
 
-export function ResponsiveSection({ className, label, ...props }: ResponsiveSectionProps) {
+export function ResponsiveSection({
+  className,
+  label,
+  ...props
+}: ResponsiveSectionProps) {
   return (
     <section
       aria-label={label}
@@ -82,7 +95,11 @@ type ResponsiveActionsProps = React.HTMLAttributes<HTMLDivElement> & {
   label?: string;
 };
 
-export function ResponsiveActions({ className, label = "Page actions", ...props }: ResponsiveActionsProps) {
+export function ResponsiveActions({
+  className,
+  label = "Page actions",
+  ...props
+}: ResponsiveActionsProps) {
   return (
     <div
       role="group"
@@ -100,7 +117,11 @@ type MobileActionBarProps = React.HTMLAttributes<HTMLDivElement> & {
   label?: string;
 };
 
-export function MobileActionBar({ className, label = "Form actions", ...props }: MobileActionBarProps) {
+export function MobileActionBar({
+  className,
+  label = "Form actions",
+  ...props
+}: MobileActionBarProps) {
   return (
     <div
       role="group"
@@ -118,7 +139,11 @@ type ResponsiveToolbarProps = React.HTMLAttributes<HTMLDivElement> & {
   label?: string;
 };
 
-export function ResponsiveToolbar({ className, label = "Page filters and tools", ...props }: ResponsiveToolbarProps) {
+export function ResponsiveToolbar({
+  className,
+  label = "Page filters and tools",
+  ...props
+}: ResponsiveToolbarProps) {
   return (
     <div
       role="search"
@@ -136,11 +161,19 @@ type ResponsiveGridProps = React.HTMLAttributes<HTMLDivElement> & {
   minColumnWidth?: string;
 };
 
-export function ResponsiveGrid({ className, minColumnWidth = "16rem", style, ...props }: ResponsiveGridProps) {
+export function ResponsiveGrid({
+  className,
+  minColumnWidth = "16rem",
+  style,
+  ...props
+}: ResponsiveGridProps) {
   return (
     <div
       className={cn("grid min-w-0 gap-4", className)}
-      style={{ gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${minColumnWidth}), 1fr))`, ...style }}
+      style={{
+        gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${minColumnWidth}), 1fr))`,
+        ...style,
+      }}
       {...props}
     />
   );
@@ -160,7 +193,10 @@ export function ResponsiveFormGrid({
     <div
       data-responsive-form-grid="true"
       className={cn("grid w-full min-w-0 gap-4 [&>*]:min-w-0", className)}
-      style={{ gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${minColumnWidth}), 1fr))`, ...style }}
+      style={{
+        gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${minColumnWidth}), 1fr))`,
+        ...style,
+      }}
       {...props}
     />
   );
@@ -171,7 +207,12 @@ type AccessibleRegionProps = React.HTMLAttributes<HTMLElement> & {
   as?: "section" | "nav" | "main" | "header";
 };
 
-export function AccessibleRegion({ label, as: Comp = "section", className, ...props }: AccessibleRegionProps) {
+export function AccessibleRegion({
+  label,
+  as: Comp = "section",
+  className,
+  ...props
+}: AccessibleRegionProps) {
   return <Comp aria-label={label} className={className} {...props} />;
 }
 
