@@ -35,7 +35,7 @@ export function DaybookFilters({
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <CoreErpFilterGrid className="gap-2 p-2 sm:p-3">
+      <CoreErpFilterGrid className="gap-2 p-2 sm:p-3" label="Daybook filters">
         <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
 
         <Select value={filters.voucherType} onValueChange={(value) => setFilters({ ...filters, voucherType: value })}>
