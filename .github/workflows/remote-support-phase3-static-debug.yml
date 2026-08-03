@@ -1,0 +1,64 @@
+name: Remote support Phase 3 static debug
+
+on:
+  push:
+    branches:
+      - agent/remote-support-phase-3-viewing-quality
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  static-debug:
+    if: github.event_name == 'push' || github.head_ref == 'agent/remote-support-phase-3-viewing-quality'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: agent/remote-support-phase-3-viewing-quality
+          fetch-depth: 0
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.14"
+          cache: npm
+      - name: Normalize registry
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+      - name: Run exact static-build sequence
+        run: |
+          set -o pipefail
+          {
+            npm run verify:lockfile
+            npm run verify:production-dependencies
+            mapfile -d '' changed_files < <(
+              git diff --name-only --diff-filter=ACMR -z origin/main...HEAD -- client/src server shared tests scripts |
+                grep -zE '\.(ts|tsx|css|mjs)$' || true
+            )
+            printf 'Changed files:\n'
+            printf '%s\n' "${changed_files[@]}"
+            if [ "${#changed_files[@]}" -gt 0 ]; then
+              node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
+            fi
+            npm run lint
+            npm run check
+            npm run build
+            npm run verify:server-bundle
+            npm run verify:program1-observability
+            npm run verify:final-production-readiness
+            npm run verify:bandwidth
+          } 2>&1 | tee phase3-static-debug.log
+      - name: Upload debug output
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: phase3-static-debug-output
+          path: phase3-static-debug.log
+          if-no-files-found: warn
+          retention-days: 1
