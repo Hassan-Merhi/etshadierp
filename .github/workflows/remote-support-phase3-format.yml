@@ -4,16 +4,20 @@ on:
   push:
     branches:
       - agent/remote-support-phase-3-viewing-quality
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
 
 concurrency:
-  group: remote-support-phase3-format-${{ github.ref }}
+  group: remote-support-phase3-format-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   format:
+    if: github.event_name == 'push' || github.head_ref == 'agent/remote-support-phase-3-viewing-quality'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
