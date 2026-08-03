@@ -3,12 +3,34 @@
  *
  * Extracted from PosTransferOrders.tsx during the Phase 4 god-file split.
  */
-import {useRef, useEffect} from "react";
-import {X} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {cn} from "@/lib/utils";
+import { useEffect, useRef } from "react";
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
+import { cn } from "@/lib/utils";
 
-import {fmtQty} from "../utils";
+import { fmtQty } from "../utils";
+
+const COPY = {
+  en: {
+    addItems: "Add Items",
+    noItems: "No items found",
+    out: "Out",
+    close: "Close item picker",
+  },
+  ar: {
+    addItems: "إضافة أصناف",
+    noItems: "لم يتم العثور على أصناف",
+    out: "نفد",
+    close: "إغلاق اختيار الأصناف",
+  },
+  fr: {
+    addItems: "Ajouter des articles",
+    noItems: "Aucun article trouvé",
+    out: "Épuisé",
+    close: "Fermer le sélecteur d’articles",
+  },
+} as const;
 
 export // ─── Right-side item search panel (results only — input lives in the bar) ──────
 function ItemSearchPanel({
@@ -27,6 +49,9 @@ function ItemSearchPanel({
   onClose: () => void;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
+  const { language, direction } = useApplicationLanguage();
+  const copy = COPY[language];
+  const isRtl = direction === "rtl";
 
   useEffect(() => {
     if (listRef.current) {
@@ -36,28 +61,34 @@ function ItemSearchPanel({
   }, [activeIdx]);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Panel header */}
-      <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-b bg-muted/30">
-        <div className="min-w-0">
-          <div className="font-semibold text-sm leading-tight">Add Items</div>
-          <div className="text-xs text-muted-foreground truncate">{locationName}</div>
+    <div className="flex h-full flex-col" dir={direction} data-i18n-portal>
+      <div className="flex items-center justify-between gap-2 border-b bg-muted/30 px-3 py-2.5">
+        <div className={cn("min-w-0", isRtl ? "text-right" : "text-left")}>
+          <div className="text-sm font-semibold leading-tight" data-i18n-ui>
+            {copy.addItems}
+          </div>
+          <div className="truncate text-xs text-muted-foreground" dir="auto" data-business-value>
+            {locationName}
+          </div>
         </div>
         <Button
           size="icon"
           variant="ghost"
           onClick={onClose}
           className="shrink-0"
+          aria-label={copy.close}
+          title={copy.close}
           data-testid="button-close-search-panel"
         >
           <X className="h-4 w-4" />
         </Button>
       </div>
 
-      {/* Items list */}
       <div ref={listRef} className="flex-1 overflow-y-auto">
         {matches.length === 0 ? (
-          <div className="text-center py-10 text-xs text-muted-foreground">No items found</div>
+          <div className="py-10 text-center text-xs text-muted-foreground" data-i18n-ui>
+            {copy.noItems}
+          </div>
         ) : (
           matches.map((item, i) => {
             const qty = parseFloat(item.quantity) || 0;
@@ -70,19 +101,29 @@ function ItemSearchPanel({
                 onClick={() => onPick(item)}
                 onMouseEnter={() => onActiveChange(i)}
                 className={cn(
-                  "w-full text-left px-3 py-2.5 text-sm border-b last:border-b-0 flex items-center justify-between gap-3 transition-none",
+                  "flex w-full items-center justify-between gap-3 border-b px-3 py-2.5 text-sm transition-none last:border-b-0",
+                  isRtl ? "text-right" : "text-left",
                   i === activeIdx ? "bg-accent text-accent-foreground" : "hover-elevate"
                 )}
                 data-testid={`button-panel-item-${item.stockItemId}`}
               >
-                <span className="truncate text-sm">{item.name}</span>
+                <span className="min-w-0 flex-1 truncate text-sm" dir="auto" data-stock-name data-business-value>
+                  {item.name}
+                </span>
                 {inStock ? (
-                  <span className="text-xs font-mono shrink-0 tabular-nums font-bold text-green-600 dark:text-green-400">
+                  <span
+                    className="shrink-0 text-xs font-bold font-mono tabular-nums text-green-600 dark:text-green-400"
+                    dir="ltr"
+                    data-business-value
+                  >
                     {fmtQty(qty)}
                   </span>
                 ) : (
-                  <span className="text-xs shrink-0 px-1.5 py-0.5 rounded-sm bg-muted text-muted-foreground font-medium">
-                    Out
+                  <span
+                    className="shrink-0 rounded-sm bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground"
+                    data-i18n-ui
+                  >
+                    {copy.out}
                   </span>
                 )}
               </button>
