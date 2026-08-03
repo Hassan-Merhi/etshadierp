@@ -3,6 +3,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+// This source-contract verifier is intentionally independent of server, API, and database behavior.
 const ROOT = process.cwd();
 const read = (file) => fs.readFile(path.join(ROOT, file), "utf8");
 
