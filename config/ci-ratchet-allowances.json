@@ -45,6 +45,8 @@
     "GET /api/screen-feed/live/status [requireLogin > <anonymous>]",
     "GET /api/screen-feed/live/:userId [requireAuth > <anonymous>]",
     "POST /api/screen-feed/pointer [requireLogin > <anonymous>]",
+    "POST /api/sp/sales/:id/reverse [requireAuth > <anonymous> > <anonymous>]",
+    "POST /api/sp/containers/:id/cancel [requireAuth > <anonymous> > <anonymous>]",
     "GET /api/screen-feed/control/tabs/:userId [requireAuth > <anonymous>]",
     "POST /api/screen-feed/control/tab-heartbeat [requireLogin > <anonymous>]",
     "GET /api/screen-feed/control/status [requireLogin > <anonymous>]",
@@ -59,7 +61,9 @@
     "USE /api/factory [factoryBilingualCatalogMiddleware]",
     "USE /api/factory [bilingualSurfaceMiddleware]",
     "USE /api [bilingualSurfaceMiddleware]",
-    "USE /api/factory [factoryBilingualSnapshotWriteMiddleware]"
+    "USE /api/factory [factoryBilingualSnapshotWriteMiddleware]",
+    "USE re:^\\/api\\/sp\\/containers(?:\\/([^/]+?))\\/?(?=\\/|$) [requireSpContainerPatchAuth]",
+    "USE re:^\\/api\\/sp\\/containers(?:\\/([^/]+?))\\/?(?=\\/|$) [<anonymous>]"
   ],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [
