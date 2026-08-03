@@ -1,3 +1,4 @@
+import "@/styles/mobile-performance.css";
 import { useEffect } from "react";
 import { focusManager, onlineManager } from "@tanstack/react-query";
 import { getBrowserConnection, getBrowserConnectionProfile } from "@/lib/mobilePerformance";
