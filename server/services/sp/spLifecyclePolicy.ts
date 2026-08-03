@@ -2,6 +2,7 @@ import type { VoucherEntry } from "@shared/schema";
 
 export type SpLifecycleCode =
   | "SP_LIFECYCLE_REASON_REQUIRED"
+  | "SP_LIFECYCLE_ALREADY_DONE"
   | "SP_SALE_NOT_REVERSIBLE"
   | "SP_CONTAINER_NOT_CANCELLABLE"
   | "SP_LIFECYCLE_CONFLICT";
@@ -142,7 +143,7 @@ export function buildSpReversalEntries(entries: VoucherEntry[], reversalVoucherI
 
 export function appendSpLifecycleNote(params: {
   existingNotes: unknown;
-  action: "SALE REVERSED" | "CONTAINER CANCELLED";
+  action: "SALE REVERSED" | "CONTAINER CANCELLED" | "OFFLOAD REVERSED";
   reason: string;
   username: unknown;
   date: string;
