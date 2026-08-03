@@ -10,6 +10,11 @@ describe("Phase 14 trilingual release gate", () => {
     expect(css).toContain("unicode-bidi: isolate");
     expect(css).toContain("[data-business-value]");
     expect(css).toContain("[data-account-code]");
+    expect(css).toContain('[data-slot="sidebar-container"]');
+    expect(css).toContain('[data-slot="dialog-close"]');
+    expect(css).toContain('[data-slot="app-top-bar-actions"]');
+    expect(css).toContain("prefers-reduced-motion");
+    expect(css).toContain("forced-colors");
   });
 
   it("keeps a classified audit and reviewed per-module ratchet", () => {
@@ -59,9 +64,28 @@ describe("Phase 14 trilingual release gate", () => {
 
   it("supports all three languages and Arabic-only RTL", () => {
     const contract = fs.readFileSync("shared/applicationLanguageContract.ts", "utf8");
+    const direction = fs.readFileSync("client/src/i18n/applicationDirection.ts", "utf8");
+    const context = fs.readFileSync("client/src/contexts/ApplicationLanguageContext.tsx", "utf8");
     expect(contract).toContain('"en"');
     expect(contract).toContain('"ar"');
     expect(contract).toContain('"fr"');
     expect(contract).toContain('language === "ar"');
+    expect(direction).toContain("applyApplicationLanguageToDocument");
+    expect(direction).toContain("targetDocument.body.dir = direction");
+    expect(context).toContain('data-testid="application-language-announcement"');
+  });
+
+  it("keeps keyboard skip navigation in every application mode", () => {
+    for (const path of [
+      "client/src/app/ErpShell.tsx",
+      "client/src/app/FactoryShell.tsx",
+      "client/src/app/PropertiesShell.tsx",
+      "client/src/app/PosShell.tsx",
+    ]) {
+      const source = fs.readFileSync(path, "utf8");
+      expect(source).toContain('<SkipLink>{t("accessibility.skipToMainContent")}</SkipLink>');
+      expect(source).toContain('id="main-content"');
+      expect(source).toContain("tabIndex={-1}");
+    }
   });
 });
