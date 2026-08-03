@@ -48,14 +48,20 @@ async function prepareCorrectedReoffload(req: Request, res: Response, next: Next
       if (reversedOffloadIds.length === 0) return;
 
       await tx.execute(sql`
-        DELETE FROM sp_offload_charges
-        WHERE company_id = ${companyId}
-          AND offload_id = ANY(${reversedOffloadIds}::int[])
+        DELETE FROM sp_offload_charges c
+        USING sp_offload_reversals r
+        WHERE c.offload_id = r.offload_id
+          AND c.company_id = ${companyId}
+          AND r.company_id = ${companyId}
+          AND r.container_id = ${containerId}
       `);
       await tx.execute(sql`
-        DELETE FROM sp_offloads
-        WHERE company_id = ${companyId}
-          AND id = ANY(${reversedOffloadIds}::int[])
+        DELETE FROM sp_offloads o
+        USING sp_offload_reversals r
+        WHERE o.id = r.offload_id
+          AND o.company_id = ${companyId}
+          AND r.company_id = ${companyId}
+          AND r.container_id = ${containerId}
       `);
     });
 
