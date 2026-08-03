@@ -1,9 +1,7 @@
 name: Phase 4 PostgreSQL Diagnostic
 
 on:
-  push:
-    branches:
-      - agent/phase4-postgres-diagnostic
+  pull_request:
 
 jobs:
   diagnose:
