@@ -60,6 +60,9 @@ describe("Phase 9 final verification and release contract", () => {
     expect(workflow).toContain("postgres:15");
     expect(workflow).toContain("scripts/run-phase9-language-browser-smoke.mjs");
     expect(workflow).toContain("scripts/verify-phase9-final-i18n-baseline.mjs");
-    expect(workflow).toContain("test \"$PHASE9_STATUS\" = \"success\"");
+    expect(workflow).toContain("id: release_result");
+    expect(workflow).toContain("status=$status");
+    expect(workflow).toContain("steps.release_result.outputs.status");
+    expect(workflow).toContain('test "${PHASE9_STATUS}" = "success"');
   });
 });
