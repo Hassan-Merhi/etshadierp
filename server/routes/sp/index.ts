@@ -7,6 +7,7 @@ import { registerSpReoffloadPreparationGuard } from "./spReoffloadPreparationGua
 import { registerSpOffloadConcurrencyGuard } from "./spOffloadConcurrencyGuard";
 import { registerSpOffloadRoutes } from "./spOffloadRoutes";
 import { registerSpOffloadLifecycleRoutes } from "./spOffloadLifecycleRoutes";
+import { registerSpChargeReconciliationRoutes } from "./spChargeReconciliationRoutes";
 import { registerSpSalesRoutes } from "./spSalesRoutes";
 import { registerSpLifecycleRoutes } from "./spLifecycleRoutes";
 import { registerSpOpeningStockRoutes } from "./spOpeningStockRoutes";
@@ -69,6 +70,7 @@ export function registerSpRoutes(app: Express) {
   registerSpOffloadConcurrencyGuard(app);
   registerSpOffloadRoutes(app);
   registerSpOffloadLifecycleRoutes(app);
+  registerSpChargeReconciliationRoutes(app);
   registerSpSalesRoutes(app);
   registerSpLifecycleRoutes(app);
   registerSpOpeningStockRoutes(app);
