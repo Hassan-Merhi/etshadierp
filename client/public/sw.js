@@ -16,11 +16,9 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
+  const navigationPreload = self.registration.navigationPreload?.enable?.() ?? Promise.resolve();
   event.waitUntil(
-    Promise.all([
-      deleteErpCachesExcept(CACHE_VERSION),
-      self.registration.navigationPreload?.enable?.().catch(() => {}),
-    ])
+    Promise.all([deleteErpCachesExcept(CACHE_VERSION), navigationPreload.catch(() => {})])
       .then(() => self.clients.claim())
       .then(() =>
         self.clients.matchAll({ type: "window" }).then((clients) =>
@@ -114,8 +112,6 @@ async function networkOnlyApi(request) {
 async function navigationHandler(event) {
   const request = event.request;
   try {
-    // Navigation preload starts the request while the service worker wakes up,
-    // avoiding a second mobile startup round trip after worker activation.
     const preloaded = await event.preloadResponse;
     const response = preloaded || (await fetch(request.clone(), { cache: "no-store" }));
     if (response.ok) {
