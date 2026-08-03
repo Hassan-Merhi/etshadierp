@@ -5,7 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CompanySelector } from "@/components/CompanySelector";
-import { useApplicationDirection } from "@/contexts/ApplicationLanguageContext";
+import {
+  useApplicationDirection,
+  useApplicationLanguage,
+} from "@/contexts/ApplicationLanguageContext";
 
 const MobileWorkspaceControls = lazy(() => import("@/components/MobileWorkspaceControls"));
 const WorkspaceHeaderControls = lazy(() =>
@@ -36,6 +39,7 @@ export function AppTopBar({
   const [currentLocation] = useLocation();
   const { isMobile, setOpenMobile } = useSidebar();
   const direction = useApplicationDirection();
+  const { t } = useApplicationLanguage();
   const dividerDirection = direction === "rtl" ? "to left" : "to right";
 
   useEffect(() => {
@@ -59,7 +63,7 @@ export function AppTopBar({
         <SidebarTrigger
           data-testid="button-sidebar-toggle"
           className="h-10 w-10 shrink-0 sm:h-8 sm:w-8"
-          aria-label="Open navigation"
+          aria-label={t("accessibility.toggleSidebar")}
         />
         {leftContent && <div className="hidden min-w-0 sm:block">{leftContent}</div>}
       </div>
@@ -74,7 +78,7 @@ export function AppTopBar({
           <button
             onClick={onSearchOpen}
             data-testid="button-open-palette"
-            aria-label="Search"
+            aria-label={t("accessibility.openSearch")}
             className="hidden h-8 items-center gap-2 rounded-full border border-border/60 bg-muted/40 px-3 text-xs text-muted-foreground transition-colors hover-elevate sm:flex"
           >
             <Search className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -91,7 +95,7 @@ export function AppTopBar({
             size="icon"
             onClick={onSearchOpen}
             data-testid="button-open-palette-sm"
-            aria-label="Open search"
+            aria-label={t("accessibility.openSearch")}
             className="h-10 w-10 shrink-0 sm:hidden"
           >
             <Search className="h-4 w-4" aria-hidden="true" />
