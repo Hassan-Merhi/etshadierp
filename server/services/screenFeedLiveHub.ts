@@ -2,10 +2,12 @@ import type { ScreenFrame } from "../screenFeedStore";
 
 type StatusListener = () => void;
 type FrameListener = (frame: ScreenFrame) => void;
+type DisconnectListener = () => void;
 
 export class ScreenFeedLiveHub {
   private readonly statusListeners = new Map<string, Set<StatusListener>>();
   private readonly frameListeners = new Map<string, Set<FrameListener>>();
+  private readonly disconnectListeners = new Set<DisconnectListener>();
 
   subscribeStatus(userId: string, listener: StatusListener): () => void {
     const listeners = this.statusListeners.get(userId) ?? new Set<StatusListener>();
@@ -29,6 +31,11 @@ export class ScreenFeedLiveHub {
       if (listeners.size === 0) this.frameListeners.delete(userId);
       this.notifyStatus(userId);
     };
+  }
+
+  subscribeDisconnect(listener: DisconnectListener): () => void {
+    this.disconnectListeners.add(listener);
+    return () => this.disconnectListeners.delete(listener);
   }
 
   hasViewer(userId: string): boolean {
@@ -64,11 +71,21 @@ export class ScreenFeedLiveHub {
     }
   }
 
+  disconnectAll(): void {
+    for (const disconnect of [...this.disconnectListeners]) {
+      try {
+        disconnect();
+      } catch {
+        // A request may already have closed while the kill switch was running.
+      }
+    }
+  }
+
   clear(): void {
-    const userIds = new Set([...this.statusListeners.keys(), ...this.frameListeners.keys()]);
+    this.disconnectAll();
     this.frameListeners.clear();
-    for (const userId of userIds) this.notifyStatus(userId);
     this.statusListeners.clear();
+    this.disconnectListeners.clear();
   }
 }
 
