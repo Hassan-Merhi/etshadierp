@@ -260,8 +260,8 @@ export function ContainerSpView({
           <DialogHeader>
             <DialogTitle>Cancel Supplier Partner container</DialogTitle>
             <DialogDescription>
-              Only an open container with no offload, stock movement, or used prepaid charge can be cancelled. The Goods OTW
-              voucher is reversed and unused prepaid charges are detached rather than deleted.
+              Only an open container with no offload, stock movement, or used prepaid charge can be cancelled. The Goods
+              OTW voucher is reversed and unused prepaid charges are detached rather than deleted.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">

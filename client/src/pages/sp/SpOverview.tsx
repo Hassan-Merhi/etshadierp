@@ -134,7 +134,10 @@ export default function SpOverview() {
 
       <section className="space-y-3" aria-labelledby="sp-daily-work-heading">
         <div>
-          <h2 id="sp-daily-work-heading" className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          <h2
+            id="sp-daily-work-heading"
+            className="text-sm font-semibold uppercase tracking-wide text-muted-foreground"
+          >
             Daily work
           </h2>
         </div>
@@ -152,11 +155,15 @@ export default function SpOverview() {
       <section className="space-y-3" aria-labelledby="sp-sales-history-heading">
         <div className="flex items-end justify-between gap-3">
           <div>
-            <h2 id="sp-sales-history-heading" className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <h2
+              id="sp-sales-history-heading"
+              className="text-sm font-semibold uppercase tracking-wide text-muted-foreground"
+            >
               Recent Supplier Partner sales
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Full reversals restore the original FIFO lots, ERP inventory, cash or bank, and supplier payable in one transaction.
+              Full reversals restore the original FIFO lots, ERP inventory, cash or bank, and supplier payable in one
+              transaction.
             </p>
           </div>
         </div>
@@ -214,7 +221,10 @@ export default function SpOverview() {
 
       <section className="space-y-3" aria-labelledby="sp-administration-heading">
         <div>
-          <h2 id="sp-administration-heading" className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          <h2
+            id="sp-administration-heading"
+            className="text-sm font-semibold uppercase tracking-wide text-muted-foreground"
+          >
             Administration
           </h2>
         </div>
@@ -242,8 +252,8 @@ export default function SpOverview() {
           <DialogHeader>
             <DialogTitle>Reverse Supplier Partner sale #{selectedSale?.id}</DialogTitle>
             <DialogDescription>
-              This creates a compensating voucher and restores every original stock lot. The posted sale remains visible as
-              reversed and cannot be reversed twice.
+              This creates a compensating voucher and restores every original stock lot. The posted sale remains visible
+              as reversed and cannot be reversed twice.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
