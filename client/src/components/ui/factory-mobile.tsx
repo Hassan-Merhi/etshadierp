@@ -8,7 +8,7 @@ const FactoryMobilePage = React.forwardRef<HTMLElement, React.HTMLAttributes<HTM
       ref={ref}
       data-factory-mobile-page="true"
       className={cn(
-        "flex min-w-0 max-w-full flex-col gap-4 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:gap-5",
+        "flex min-w-0 max-w-full flex-col gap-4 pb-[calc(5.5rem+env(safe-area-inset-bottom))] sm:gap-5 sm:pb-0",
         className
       )}
       {...props}
@@ -92,7 +92,7 @@ const FactoryMobileActionBar = React.forwardRef<HTMLDivElement, React.HTMLAttrib
       aria-label="Factory workflow actions"
       data-factory-mobile-action-bar="true"
       className={cn(
-        "sticky bottom-0 z-20 -mx-3 grid min-w-0 grid-cols-1 gap-2 border-t bg-background/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur min-[360px]:grid-cols-2 sm:static sm:mx-0 sm:flex sm:flex-wrap sm:justify-end sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none [&>*]:min-h-11 [&>*]:w-full sm:[&>*]:min-h-9 sm:[&>*]:w-auto",
+        "fixed inset-x-0 bottom-0 z-40 grid min-w-0 grid-cols-1 gap-2 border-t bg-background/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur min-[360px]:grid-cols-2 sm:static sm:flex sm:flex-wrap sm:justify-end sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none [&>*]:min-h-11 [&>*]:w-full sm:[&>*]:min-h-9 sm:[&>*]:w-auto",
         className
       )}
       {...props}
