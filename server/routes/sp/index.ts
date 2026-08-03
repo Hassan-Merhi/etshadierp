@@ -11,6 +11,7 @@ import { registerSpOffloadRoutes } from "./spOffloadRoutes";
 import { registerSpOffloadLifecycleRoutes } from "./spOffloadLifecycleRoutes";
 import { registerSpChargeReconciliationRoutes } from "./spChargeReconciliationRoutes";
 import { registerSpFullReconciliationRoutes } from "./spFullReconciliationRoutes";
+import { registerSpProductionClosureRoutes } from "./spProductionClosureRoutes";
 import { registerSpSalesRoutes } from "./spSalesRoutes";
 import { registerSpLifecycleRoutes } from "./spLifecycleRoutes";
 import { registerSpOpeningStockRoutes } from "./spOpeningStockRoutes";
@@ -25,8 +26,6 @@ import { ensureCutoverHardening, installExplicitCompanyWriteGuard } from "./spMi
 import { ensureSpSupplierVoucherSyncTrigger, repairSpSupplierVoucherLinks } from "./spSupplierVoucherSync";
 
 export function registerSpRoutes(app: Express) {
-  // Phase 7: authenticate and authorize every Supplier Partner request before
-  // any migration, setup, lifecycle, report, or export handler is reachable.
   registerSpAccessControl(app);
   registerSpPermissionRoutes(app);
 
@@ -62,6 +61,7 @@ export function registerSpRoutes(app: Express) {
   registerSpOffloadLifecycleRoutes(app);
   registerSpChargeReconciliationRoutes(app);
   registerSpFullReconciliationRoutes(app);
+  registerSpProductionClosureRoutes(app);
   registerSpSalesRoutes(app);
   registerSpLifecycleRoutes(app);
   registerSpOpeningStockRoutes(app);
