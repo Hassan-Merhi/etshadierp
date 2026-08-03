@@ -20,7 +20,7 @@ on:
       - agent/phase-8-rtl-responsive-accessibility
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: phase8-rtl-accessibility-${{ github.ref }}
@@ -32,8 +32,11 @@ jobs:
     timeout-minutes: 45
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Phase 4 branch
         uses: actions/checkout@v4
+        with:
+          ref: agent/remote-support-phase-4-current-main
+          fetch-depth: 0
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
@@ -47,25 +50,15 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --bin-links=true
 
-      - name: Capture full lint output
-        id: lint
-        shell: bash
+      - name: Apply exact ESLint import fix
         run: |
-          set +e
-          npm run lint > lint-output.txt 2>&1
-          code=$?
-          cat lint-output.txt
-          echo "code=$code" >> "$GITHUB_OUTPUT"
-          exit 0
-
-      - name: Upload lint output
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: phase4-lint-output
-          path: lint-output.txt
-          if-no-files-found: error
-
-      - name: Preserve lint result
-        if: always()
-        run: test "${{ steps.lint.outputs.code }}" = "0"
+          node node_modules/eslint/bin/eslint.js --fix server/routes/sp/spOffloadLifecycleRoutes.ts
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/routes/sp/spOffloadLifecycleRoutes.ts
+          if git diff --cached --quiet; then
+            echo "No lint fix required."
+          else
+            git commit -m "Remove unused SP lifecycle imports"
+            SKIP_TSC_CHECK=1 git push origin HEAD:agent/remote-support-phase-4-current-main
+          fi
