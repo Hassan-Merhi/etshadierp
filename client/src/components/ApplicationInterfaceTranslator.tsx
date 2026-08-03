@@ -56,6 +56,7 @@ const ELIGIBLE_TEXT_SELECTOR = [
   "nav a",
   "[role=button]",
   "[role=menuitem]",
+  "[role=option]",
   "[role=tab]",
   "[role=columnheader]",
   "[role=heading]",
@@ -91,6 +92,19 @@ function translateTextNode(node: Text, language: ApplicationLanguage) {
   if (!parent || isProtected(parent)) return;
 
   const value = node.nodeValue ?? "";
+
+  // Every catalog is an exact reviewed allowlist. Try it first for all visible
+  // non-business text nodes so labels inside plain div/span wrappers, KPI cards,
+  // filters, tabs and POS layouts translate just like buttons and headings.
+  const translated = translateApprovedInterfaceText(value, language);
+  if (translated !== null) {
+    if (translated !== node.nodeValue) node.nodeValue = translated;
+    return;
+  }
+
+  // Unknown free text remains untouched unless it is in a known UI control.
+  // This preserves business names, codes and values that are not explicitly
+  // approved in one of the translation catalogs.
   if (
     !isEligibleTextElement(parent) &&
     !isPhase3SharedUiText(value) &&
@@ -101,9 +115,6 @@ function translateTextNode(node: Text, language: ApplicationLanguage) {
   ) {
     return;
   }
-
-  const translated = translateApprovedInterfaceText(value, language);
-  if (translated !== null && translated !== node.nodeValue) node.nodeValue = translated;
 }
 
 function translateAttributes(element: Element, language: ApplicationLanguage) {
@@ -138,11 +149,9 @@ export function translateInterfaceTree(root: Node, language: ApplicationLanguage
  *
  * The main observer is scoped to the React application root, while a lightweight
  * body observer only discovers portal roots. Mutation work is batched into one
- * animation frame. Plain spans/divs and table data cells remain business content
- * by default. Exact reviewed application labels, Phase 3 shared-interface,
- * Phase 4 Supplier Partner, Phase 5 Properties/Rentals, Phase 6 Reports/Exports,
- * and Phase 7 backend messages may translate outside normal control/heading
- * selectors, while protected business-value markers always take precedence.
+ * animation frame. Approved exact catalog values translate in any ordinary UI
+ * wrapper, while protected business-value markers and table data cells remain
+ * authoritative and are never translated by this bridge.
  */
 export function ApplicationInterfaceTranslator({ language }: { language: ApplicationLanguage }) {
   useEffect(() => {
