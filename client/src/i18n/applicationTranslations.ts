@@ -41,6 +41,11 @@ export const applicationTranslations = {
     ar: "الانتقال إلى المحتوى الرئيسي",
     fr: "Aller au contenu principal",
   },
+  "accessibility.openSearch": {
+    en: "Open search",
+    ar: "فتح البحث",
+    fr: "Ouvrir la recherche",
+  },
   "accessibility.toggleSidebar": {
     en: "Toggle Sidebar",
     ar: "فتح أو إغلاق شريط التنقل الجانبي",
