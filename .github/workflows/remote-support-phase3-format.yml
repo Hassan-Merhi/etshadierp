@@ -1,0 +1,56 @@
+name: Remote support Phase 3 formatter
+
+on:
+  push:
+    branches:
+      - agent/remote-support-phase-3-viewing-quality
+
+permissions:
+  contents: write
+
+concurrency:
+  group: remote-support-phase3-format-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: agent/remote-support-phase-3-viewing-quality
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Normalize Replit registry URLs for CI
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Format Phase 3 sources
+        run: >-
+          npx prettier --write
+          client/src/hooks/screen-feed-viewing-quality.ts
+          client/src/hooks/use-screen-feed.ts
+          client/src/pages/settings/WatchUserDialog.tsx
+          client/src/pages/settings/screen-feed-viewer-layout.ts
+          server/routes/screenFeedRoutes.ts
+          server/services/screenFeedService.ts
+
+      - name: Commit formatted sources and remove formatter
+        run: |
+          git rm .github/workflows/remote-support-phase3-format.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/src/hooks/screen-feed-viewing-quality.ts client/src/hooks/use-screen-feed.ts
+          git add client/src/pages/settings/WatchUserDialog.tsx client/src/pages/settings/screen-feed-viewer-layout.ts
+          git add server/routes/screenFeedRoutes.ts server/services/screenFeedService.ts
+          git commit -m "style(remote-support): format Phase 3 sources"
+          git push origin HEAD:agent/remote-support-phase-3-viewing-quality
