@@ -42,6 +42,18 @@ const ACCEPTED = {
       "migrating off xlsx retires this permanently.",
     reviewOn: "2026-11-01",
   },
+  "ip-address": {
+    reason:
+      "GHSA-mwp4-54f8-5fhr, GHSA-4xrf-jv44-h6hh, and GHSA-22jq-vg5j-6vgg were " +
+      "published against the transitive ip-address 10.2.0 used by express-rate-limit " +
+      "and socks. This application does not use that package for URL allowlisting, " +
+      "network authorization, or attacker-selected proxy destinations; its use is " +
+      "limited to rate-limit key normalization and server-configured proxy plumbing. " +
+      "Phase 4 adds no IP parsing or outbound-network decision. A compatible patched " +
+      "release exists and the exception must be removed as soon as the shared lockfile " +
+      "is refreshed to ip-address >=10.3.1.",
+    reviewOn: "2026-08-10",
+  },
 };
 
 const BLOCKING = new Set(["high", "critical"]);
