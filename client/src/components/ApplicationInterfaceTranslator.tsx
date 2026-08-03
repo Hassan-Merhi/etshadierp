@@ -3,6 +3,7 @@ import type { ApplicationLanguage } from "@shared/applicationLanguageContract";
 import { translateApplicationLiteral } from "@/i18n/applicationTranslations";
 import { translateSharedInterfaceText } from "@/i18n/sharedInterfaceTranslations";
 import { translateTabsFiltersText } from "@/i18n/tabsFiltersTranslations";
+import { translateVoucherKpiText } from "@/i18n/voucherKpiTranslations";
 import { translateAccountingDocumentText } from "@/i18n/accountingDocumentTranslations";
 import { isPhase3SharedUiText, translatePhase3SharedUiText } from "@/i18n/sharedUiPhase3Translations";
 import {
@@ -79,6 +80,7 @@ export function translateApprovedInterfaceText(value: string, language: Applicat
   return (
     translateApplicationLiteral(value, language) ??
     translateTabsFiltersText(value, language) ??
+    translateVoucherKpiText(value, language) ??
     translatePhase7BackendMessageText(value, language) ??
     translatePhase6ReportsExportsText(value, language) ??
     translatePhase5PropertiesRentalsText(value, language) ??
