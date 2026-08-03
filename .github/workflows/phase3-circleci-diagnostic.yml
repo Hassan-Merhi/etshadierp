@@ -1,53 +1,41 @@
-name: Phase 3 CircleCI Diagnostic
+name: Phase 3 Formatting Diagnostic
 
 on:
   pull_request:
     branches: [main]
 
 concurrency:
-  group: phase3-circleci-diagnostic-${{ github.ref }}
+  group: phase3-formatting-diagnostic-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  diagnose:
+  format:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - name: Fetch CircleCI failed-step output
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl --location --silent --show-error --fail \
-            "https://circleci.com/api/v1.1/project/github/Hassan-Merhi/etshadierp/6748" \
-            -o circleci-job.json
-          node <<'NODE'
-          const fs = require("fs");
-          const job = JSON.parse(fs.readFileSync("circleci-job.json", "utf8"));
-          const failedSteps = job.steps.filter((step) =>
-            step.actions?.some((action) => action.failed || action.exit_code > 0),
-          );
-          if (!failedSteps.length) {
-            console.log(JSON.stringify(job.steps, null, 2));
-            process.exit(2);
-          }
-          for (const step of failedSteps) {
-            console.log(`===== ${step.name} =====`);
-            for (const action of step.actions ?? []) {
-              if (!action.output_url) continue;
-              const { execFileSync } = require("child_process");
-              const raw = execFileSync("curl", ["--location", "--silent", "--show-error", "--fail", action.output_url], {
-                encoding: "utf8",
-              });
-              try {
-                const parsed = JSON.parse(raw);
-                if (Array.isArray(parsed)) {
-                  for (const entry of parsed) console.log(entry.message ?? entry);
-                } else {
-                  console.log(parsed);
-                }
-              } catch {
-                console.log(raw);
-              }
-            }
-          }
-          NODE
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js 22.14
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.14"
+          cache: npm
+
+      - name: Normalize package registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Apply exact formatting
+        run: node node_modules/prettier/bin/prettier.cjs --write client/src/components/ui/workspace-layout.tsx tests/ui/phase10-ui-consistency.test.ts
+
+      - name: Upload formatted files
+        uses: actions/upload-artifact@v7
+        with:
+          name: phase3-formatted-source
+          path: |
+            client/src/components/ui/workspace-layout.tsx
+            tests/ui/phase10-ui-consistency.test.ts
+          retention-days: 1
