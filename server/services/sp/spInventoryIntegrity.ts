@@ -12,7 +12,7 @@ export class SpInventoryIntegrityError extends Error {
     message: string,
     code: "SP_INVENTORY_LINK_REQUIRED" | "SP_INVENTORY_POST_FAILED",
     statusCode: 409 | 500,
-    options?: { cause?: unknown },
+    options?: { cause?: unknown }
   ) {
     super(message, options);
     this.name = "SpInventoryIntegrityError";
@@ -37,7 +37,7 @@ export async function requireSpInventoryMapping(
     locationId: unknown;
     stockItemId: unknown;
     context: string;
-  },
+  }
 ): Promise<{ locationId: number; stockItemId: number }> {
   const locationId = positiveInteger(params.locationId);
   const stockItemId = positiveInteger(params.stockItemId);
@@ -46,7 +46,7 @@ export async function requireSpInventoryMapping(
     throw new SpInventoryIntegrityError(
       `${params.context} requires both a mapped stock item and an active company location.`,
       "SP_INVENTORY_LINK_REQUIRED",
-      409,
+      409
     );
   }
 
@@ -62,7 +62,7 @@ export async function requireSpInventoryMapping(
     throw new SpInventoryIntegrityError(
       `${params.context} references stock item #${stockItemId}, which is not available in this Supplier Partner company.`,
       "SP_INVENTORY_LINK_REQUIRED",
-      409,
+      409
     );
   }
 
@@ -79,7 +79,7 @@ export async function requireSpInventoryMapping(
     throw new SpInventoryIntegrityError(
       `${params.context} references location #${locationId}, which is not active in this Supplier Partner company.`,
       "SP_INVENTORY_LINK_REQUIRED",
-      409,
+      409
     );
   }
 
@@ -97,7 +97,7 @@ export async function adjustSpInventoryAtomic(
     incomingRate?: number;
     sourceVoucherType?: string;
     sourceVoucherId?: number;
-  },
+  }
 ): Promise<AdjustInventoryResult> {
   const mapping = await requireSpInventoryMapping(tx, params);
 
@@ -110,7 +110,7 @@ export async function adjustSpInventoryAtomic(
       params.companyId,
       params.incomingRate,
       params.sourceVoucherType,
-      params.sourceVoucherId,
+      params.sourceVoucherId
     );
   } catch (error: unknown) {
     if (error instanceof SpInventoryIntegrityError) throw error;
@@ -118,7 +118,7 @@ export async function adjustSpInventoryAtomic(
       `${params.context} inventory posting failed. The complete Supplier Partner transaction was rolled back: ${getErrorMessage(error)}`,
       "SP_INVENTORY_POST_FAILED",
       500,
-      { cause: error },
+      { cause: error }
     );
   }
 }

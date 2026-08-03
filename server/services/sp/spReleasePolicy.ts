@@ -20,12 +20,14 @@ export const SP_RELEASE_POLICY = Object.freeze({
 } as const);
 
 export function assertSpReleaseCurrency(currency: unknown, exchangeRate: unknown = SP_RELEASE_EXCHANGE_RATE): void {
-  const normalizedCurrency = String(currency ?? "").trim().toUpperCase();
+  const normalizedCurrency = String(currency ?? "")
+    .trim()
+    .toUpperCase();
   const normalizedRate = Number(exchangeRate);
 
   if (normalizedCurrency !== SP_RELEASE_CURRENCY || !Number.isFinite(normalizedRate) || normalizedRate !== 1) {
     throw new Error(
-      `Supplier Partner is USD-only for this release. Expected ${SP_RELEASE_CURRENCY} at exchange rate 1.`,
+      `Supplier Partner is USD-only for this release. Expected ${SP_RELEASE_CURRENCY} at exchange rate 1.`
     );
   }
 }

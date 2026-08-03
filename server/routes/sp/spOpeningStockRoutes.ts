@@ -4,14 +4,8 @@ import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { sql, eq, and, isNull } from "drizzle-orm";
 import { vouchers, voucherEntries, locations, spStockMovements } from "@shared/schema";
-import {
-  adjustSpInventoryAtomic,
-  respondToSpInventoryIntegrityError,
-} from "../../services/sp/spInventoryIntegrity";
-import {
-  SP_RELEASE_CURRENCY,
-  SP_RELEASE_EXCHANGE_RATE,
-} from "../../services/sp/spReleasePolicy";
+import { adjustSpInventoryAtomic, respondToSpInventoryIntegrityError } from "../../services/sp/spInventoryIntegrity";
+import { SP_RELEASE_CURRENCY, SP_RELEASE_EXCHANGE_RATE } from "../../services/sp/spReleasePolicy";
 import { requireSpCompany, getSpAccount, parseNum } from "./spHelpers";
 
 // ── Opening Stock ─────────────────────────────────────────────────────────

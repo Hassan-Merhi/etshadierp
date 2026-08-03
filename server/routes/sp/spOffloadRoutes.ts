@@ -15,14 +15,8 @@ import {
   spOffloadCharges,
   spStockMovements,
 } from "@shared/schema";
-import {
-  adjustSpInventoryAtomic,
-  respondToSpInventoryIntegrityError,
-} from "../../services/sp/spInventoryIntegrity";
-import {
-  SP_RELEASE_CURRENCY,
-  SP_RELEASE_EXCHANGE_RATE,
-} from "../../services/sp/spReleasePolicy";
+import { adjustSpInventoryAtomic, respondToSpInventoryIntegrityError } from "../../services/sp/spInventoryIntegrity";
+import { SP_RELEASE_CURRENCY, SP_RELEASE_EXCHANGE_RATE } from "../../services/sp/spReleasePolicy";
 import { requireSpCompany, getSpAccount, parseNum } from "./spHelpers";
 
 // ── Parent Company Agents + Offload ──────────────────────────────────────────

@@ -13,14 +13,8 @@ import {
   spSaleLines,
   stockItemCodeAliases,
 } from "@shared/schema";
-import {
-  adjustSpInventoryAtomic,
-  respondToSpInventoryIntegrityError,
-} from "../../services/sp/spInventoryIntegrity";
-import {
-  SP_RELEASE_CURRENCY,
-  SP_RELEASE_EXCHANGE_RATE,
-} from "../../services/sp/spReleasePolicy";
+import { adjustSpInventoryAtomic, respondToSpInventoryIntegrityError } from "../../services/sp/spInventoryIntegrity";
+import { SP_RELEASE_CURRENCY, SP_RELEASE_EXCHANGE_RATE } from "../../services/sp/spReleasePolicy";
 import { requireSpCompany, getSpAccount, parseNum } from "./spHelpers";
 
 // ── Sales + Stock Movements ───────────────────────────────────────────────────
@@ -55,7 +49,8 @@ export function registerSpSalesRoutes(app: Express) {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
 
-      const { saleDate, customerName, saleLines, bankAccountId, paymentAccountType, paymentAccountId, notes } = req.body;
+      const { saleDate, customerName, saleLines, bankAccountId, paymentAccountType, paymentAccountId, notes } =
+        req.body;
 
       if (!saleDate || !customerName || !Array.isArray(saleLines) || saleLines.length === 0) {
         return res.status(400).json({ message: "saleDate, customerName, saleLines required" });
@@ -70,7 +65,9 @@ export function registerSpSalesRoutes(app: Express) {
       const resolvedAccountId = paymentAccountId ?? bankAccountId;
       const resolvedAccountType: "cash" | "bank" = paymentAccountType === "cash" ? "cash" : "bank";
       if (!resolvedAccountId) {
-        return res.status(400).json({ message: "A cash or bank account is required to record where the sale cash was collected" });
+        return res
+          .status(400)
+          .json({ message: "A cash or bank account is required to record where the sale cash was collected" });
       }
 
       // Validate the settlement account belongs to this company, and is the
