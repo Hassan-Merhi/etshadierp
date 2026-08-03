@@ -5,6 +5,7 @@ import { registerSpContainerRoutes } from "./spContainerRoutes";
 import { registerSpLifecycleGuards } from "./spLifecycleGuards";
 import { registerSpOffloadConcurrencyGuard } from "./spOffloadConcurrencyGuard";
 import { registerSpOffloadRoutes } from "./spOffloadRoutes";
+import { registerSpOffloadLifecycleRoutes } from "./spOffloadLifecycleRoutes";
 import { registerSpSalesRoutes } from "./spSalesRoutes";
 import { registerSpLifecycleRoutes } from "./spLifecycleRoutes";
 import { registerSpOpeningStockRoutes } from "./spOpeningStockRoutes";
@@ -63,6 +64,7 @@ export function registerSpRoutes(app: Express) {
   // formulas after the lock has been acquired.
   registerSpOffloadConcurrencyGuard(app);
   registerSpOffloadRoutes(app);
+  registerSpOffloadLifecycleRoutes(app);
   registerSpSalesRoutes(app);
   registerSpLifecycleRoutes(app);
   registerSpOpeningStockRoutes(app);
