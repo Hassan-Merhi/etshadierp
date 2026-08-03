@@ -44,7 +44,10 @@ jobs:
 
   phase7-verify:
     name: Focused Phase 7 verification
-    if: github.ref == 'refs/heads/agent/phase-7-backend-message-conversion' && github.actor != 'github-actions[bot]'
+    if: >-
+      github.actor != 'github-actions[bot]' &&
+      (github.ref == 'refs/heads/agent/phase-7-backend-message-conversion' ||
+       github.head_ref == 'agent/phase-7-backend-verification-merge')
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -73,10 +76,9 @@ jobs:
       NODE_OPTIONS: --max-old-space-size=4096
 
     steps:
-      - name: Checkout Phase 7 branch
+      - name: Checkout verification source
         uses: actions/checkout@v7
         with:
-          ref: agent/phase-7-backend-message-conversion
           fetch-depth: 0
 
       - name: Set up Node.js 20
@@ -135,8 +137,8 @@ jobs:
         id: audit
         run: node scripts/audit-i18n-phase14.mjs
 
-      - name: Record focused verification result
-        if: always()
+      - name: Record branch-push verification result
+        if: always() && github.ref == 'refs/heads/agent/phase-7-backend-message-conversion'
         run: |
           result=success
           for outcome in \
