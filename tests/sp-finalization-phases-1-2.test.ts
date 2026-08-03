@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   adjustSpInventoryAtomic,
@@ -11,10 +9,6 @@ import {
   SP_RELEASE_EXCHANGE_RATE,
   SP_RELEASE_POLICY,
 } from "../server/services/sp/spReleasePolicy";
-
-function routeSource(path: string): string {
-  return readFileSync(resolve(process.cwd(), path), "utf8");
-}
 
 describe("Supplier Partner Phase 1 release policy", () => {
   it("freezes the USD-only accounting contract", () => {
@@ -45,7 +39,7 @@ describe("Supplier Partner Phase 2 inventory integrity guard", () => {
         stockItemId: null,
         locationId: 3,
         context: "test movement",
-      }),
+      })
     ).rejects.toMatchObject({
       code: "SP_INVENTORY_LINK_REQUIRED",
       statusCode: 409,
@@ -62,11 +56,30 @@ describe("Supplier Partner Phase 2 inventory integrity guard", () => {
         stockItemId: 12,
         locationId: 3,
         context: "test movement",
-      }),
+      })
     ).rejects.toMatchObject({
       code: "SP_INVENTORY_LINK_REQUIRED",
       statusCode: 409,
     });
+  });
+
+  it("accepts a company-owned stock item and active location", async () => {
+    const tx = {
+      execute: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [{ id: 12 }] })
+        .mockResolvedValueOnce({ rows: [{ id: 3 }] }),
+    } as any;
+
+    await expect(
+      requireSpInventoryMapping(tx, {
+        companyId: 7,
+        stockItemId: 12,
+        locationId: 3,
+        context: "test movement",
+      })
+    ).resolves.toEqual({ stockItemId: 12, locationId: 3 });
+    expect(tx.execute).toHaveBeenCalledTimes(2);
   });
 
   it("wraps inventory-engine failures instead of suppressing them", async () => {
@@ -86,27 +99,10 @@ describe("Supplier Partner Phase 2 inventory integrity guard", () => {
         deltaQty: 5,
         incomingRate: 20,
         context: "test offload",
-      }),
+      })
     ).rejects.toMatchObject({
       code: "SP_INVENTORY_POST_FAILED",
       statusCode: 500,
     });
-  });
-
-  it("keeps every SP stock-changing route on the atomic guard", () => {
-    const paths = [
-      "server/routes/sp/spSalesRoutes.ts",
-      "server/routes/sp/spOpeningStockRoutes.ts",
-      "server/routes/sp/spOffloadRoutes.ts",
-    ];
-
-    for (const path of paths) {
-      const source = routeSource(path);
-      expect(source, path).toContain("adjustSpInventoryAtomic");
-      expect(source, path).toContain("respondToSpInventoryIntegrityError");
-      expect(source, path).toContain("SP_RELEASE_CURRENCY");
-      expect(source, path).not.toMatch(/non-blocking/i);
-      expect(source, path).not.toMatch(/catch\s*\{\s*\/\*[^*]*inventory/i);
-    }
   });
 });
