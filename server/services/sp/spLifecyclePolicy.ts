@@ -1,3 +1,4 @@
+import type { Response } from "express";
 import type { VoucherEntry } from "@shared/schema";
 
 export type SpLifecycleCode =
@@ -154,7 +155,7 @@ export function appendSpLifecycleNote(params: {
   return existing ? `${existing}\n${entry}` : entry;
 }
 
-export function respondToSpLifecycleError(res: any, error: unknown): boolean {
+export function respondToSpLifecycleError(res: Response, error: unknown): boolean {
   if (!(error instanceof SpLifecycleError)) return false;
   res.status(error.statusCode).json({ code: error.code, message: error.message });
   return true;
