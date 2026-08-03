@@ -117,7 +117,7 @@ type HorizontalScrollRegionProps = React.HTMLAttributes<HTMLDivElement> & {
 
 export function HorizontalScrollRegion({
   label,
-  description = "Scroll horizontally to view additional columns.",
+  description = "Scroll horizontally to view additional content.",
   className,
   tabIndex = 0,
   children,
@@ -128,6 +128,7 @@ export function HorizontalScrollRegion({
   return (
     <div
       data-slot="horizontal-scroll-region"
+      data-horizontal-scroll="true"
       data-horizontal-scroll-region="true"
       role="region"
       aria-label={label}
