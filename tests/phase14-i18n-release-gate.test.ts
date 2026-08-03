@@ -25,6 +25,7 @@ describe("Phase 14 trilingual release gate", () => {
     const workflow = fs.readFileSync(".github/workflows/i18n-audit.yml", "utf8");
 
     expect(audit).toContain("compatibility-covered");
+    expect(audit).toContain("applicationTranslations.ts");
     expect(audit).toContain("reportsExportsPhase6Translations.part4.ts");
     expect(audit).toContain("backendMessagesPhase7Translations.part8.ts");
     expect(audit).toContain("enforceBaseline");
@@ -32,8 +33,8 @@ describe("Phase 14 trilingual release gate", () => {
     expect(classifier).toContain("I18n audit classifier contract verified");
     expect(policy.ignoredPathRules.every((rule: { reason?: string }) => Boolean(rule.reason))).toBe(true);
     expect(baseline.schemaVersion).toBe(2);
-    expect(baseline.detectorVersion).toBe(8);
-    expect(baseline.maxActionable).toBe(12550);
+    expect(baseline.detectorVersion).toBe(9);
+    expect(baseline.maxActionable).toBe(12545);
     expect(baseline.maxUnclassified).toBe(0);
     expect(Object.keys(baseline.modules)).toHaveLength(14);
     expect(baseline.modules["shared-ui"].maxActionable).toBe(0);
