@@ -64,6 +64,7 @@ export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const passwordInputRef = useRef<HTMLInputElement>(null);
 
   const [biometryAvailable, setBiometryAvailable] = useState(false);
   const [biometryType, setBiometryType] = useState<BiometryType | null>(null);
@@ -174,6 +175,8 @@ export default function Login() {
       }
     },
     onError: (error: any) => {
+      setPassword("");
+      requestAnimationFrame(() => passwordInputRef.current?.focus());
       if ((error as any)?._handledGlobally) return;
       toast({
         title: "Login Failed",
@@ -185,6 +188,7 @@ export default function Login() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    if (loginMutation.isPending || biometryPending) return;
     if (!username || !password) {
       toast({ title: "Error", description: "Please enter both username and password", variant: "destructive" });
       return;
@@ -609,11 +613,19 @@ export default function Login() {
                   }}
                 >
                   <Input
+                    ref={passwordInputRef}
                     id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+                      e.preventDefault();
+                      if (!loginMutation.isPending && !biometryPending) {
+                        e.currentTarget.form?.requestSubmit();
+                      }
+                    }}
                     data-testid="input-password"
                     autoComplete="current-password"
                     className="pr-9 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none"
