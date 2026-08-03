@@ -46,12 +46,16 @@ const CoreErpHeaderActions = React.forwardRef<HTMLDivElement, React.HTMLAttribut
 );
 CoreErpHeaderActions.displayName = "CoreErpHeaderActions";
 
-const CoreErpFilterGrid = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
+type CoreErpFilterGridProps = React.HTMLAttributes<HTMLDivElement> & {
+  label?: string;
+};
+
+const CoreErpFilterGrid = React.forwardRef<HTMLDivElement, CoreErpFilterGridProps>(
+  ({ className, label = "Page filters", ...props }, ref) => (
     <div
       ref={ref}
       role="search"
-      aria-label="Page filters"
+      aria-label={label}
       data-core-erp-filters="true"
       className={cn(
         "grid min-w-0 grid-cols-1 gap-3 rounded-lg border bg-card p-3 min-[420px]:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(12rem,1fr))] [&>*]:min-w-0 [&_button]:touch-manipulation",
