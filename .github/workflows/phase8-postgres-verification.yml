@@ -1,0 +1,264 @@
+name: Phase 8 PostgreSQL verification
+
+on:
+  push:
+    branches:
+      - agent/phase-8-rtl-responsive-accessibility
+
+permissions:
+  contents: write
+
+concurrency:
+  group: phase8-postgres-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
+      NODE_ENV: test
+      SESSION_SECRET: phase8-verification-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+      PORT: "5000"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: agent/phase-8-rtl-responsive-accessibility
+          fetch-depth: 0
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Normalize registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        id: install
+        continue-on-error: true
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Check Phase 8 formatting
+        id: formatting
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --check \
+            client/src/app/ErpShell.tsx \
+            client/src/app/FactoryShell.tsx \
+            client/src/app/PosShell.tsx \
+            client/src/app/PropertiesShell.tsx \
+            client/src/components/AppTopBar.tsx \
+            client/src/components/ApplicationInterfaceTranslator.tsx \
+            client/src/components/ui/dialog.tsx \
+            client/src/components/ui/responsive-accessibility.tsx \
+            client/src/components/ui/sheet.tsx \
+            client/src/contexts/ApplicationLanguageContext.tsx \
+            client/src/i18n/applicationDirection.test.ts \
+            client/src/i18n/applicationDirection.ts \
+            client/src/i18n/applicationTranslations.ts \
+            client/src/styles/rtl-hardening.css \
+            scripts/audit-i18n-phase14.mjs \
+            scripts/verify-program7d-accessibility-responsive.mjs \
+            tests/phase14-i18n-release-gate.test.ts \
+            tests/phase8-rtl-responsive-accessibility.test.ts
+
+      - name: TypeScript
+        id: typecheck
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run check
+
+      - name: Production build
+        id: build
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run build
+
+      - name: Lint
+        id: lint
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run lint
+
+      - name: Program 7D accessibility and RTL verifier
+        id: program7d
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: node scripts/verify-program7d-accessibility-responsive.mjs
+
+      - name: Prepare disposable PostgreSQL schema
+        id: db_schema
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: node node_modules/drizzle-kit/bin.cjs push --force
+
+      - name: Run application startup migrations
+        id: migrations
+        if: always() && steps.db_schema.outcome == 'success' && steps.build.outcome == 'success'
+        continue-on-error: true
+        run: |
+          node dist/index.js > phase8-startup.log 2>&1 &
+          app_pid=$!
+          cleanup() {
+            kill "$app_pid" 2>/dev/null || true
+            wait "$app_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          for attempt in $(seq 1 180); do
+            if curl --fail --silent --show-error http://127.0.0.1:${PORT}/api/health/db > phase8-health.json; then
+              cat phase8-health.json
+              exit 0
+            fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              cat phase8-startup.log
+              exit 1
+            fi
+            sleep 1
+          done
+          cat phase8-startup.log
+          exit 1
+
+      - name: Full backend tests
+        id: backend
+        if: always() && steps.migrations.outcome == 'success'
+        continue-on-error: true
+        run: npm run test:backend
+
+      - name: API smoke sweep
+        id: smoke
+        if: always() && steps.migrations.outcome == 'success'
+        continue-on-error: true
+        run: npm run test:smoke-sweep
+
+      - name: Backend coverage thresholds
+        id: backend_coverage
+        if: always() && steps.backend.outcome == 'success'
+        continue-on-error: true
+        run: npm run test:backend:coverage
+
+      - name: Full frontend tests
+        id: frontend
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run test:frontend
+
+      - name: Frontend coverage thresholds
+        id: frontend_coverage
+        if: always() && steps.frontend.outcome == 'success'
+        continue-on-error: true
+        run: npm run test:frontend:coverage
+
+      - name: Classified I18n Audit
+        id: i18n
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: node scripts/audit-i18n-phase14.mjs
+
+      - name: Critical production dependency audit
+        id: dependency_audit
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=critical
+
+      - name: Verified secret scan
+        id: secret_scan
+        if: always()
+        continue-on-error: true
+        uses: trufflesecurity/trufflehog@v3.90.4
+        with:
+          extra_args: --results=verified,unknown
+
+      - name: Record exact verification result
+        if: always()
+        env:
+          INSTALL: ${{ steps.install.outcome }}
+          FORMATTING: ${{ steps.formatting.outcome }}
+          TYPECHECK: ${{ steps.typecheck.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          PROGRAM7D: ${{ steps.program7d.outcome }}
+          DB_SCHEMA: ${{ steps.db_schema.outcome }}
+          MIGRATIONS: ${{ steps.migrations.outcome }}
+          BACKEND: ${{ steps.backend.outcome }}
+          SMOKE: ${{ steps.smoke.outcome }}
+          BACKEND_COVERAGE: ${{ steps.backend_coverage.outcome }}
+          FRONTEND: ${{ steps.frontend.outcome }}
+          FRONTEND_COVERAGE: ${{ steps.frontend_coverage.outcome }}
+          I18N: ${{ steps.i18n.outcome }}
+          DEPENDENCY_AUDIT: ${{ steps.dependency_audit.outcome }}
+          SECRET_SCAN: ${{ steps.secret_scan.outcome }}
+        run: |
+          mkdir -p artifacts/phase8
+          status=success
+          for value in "$INSTALL" "$FORMATTING" "$TYPECHECK" "$BUILD" "$LINT" "$PROGRAM7D" "$DB_SCHEMA" "$MIGRATIONS" "$BACKEND" "$SMOKE" "$BACKEND_COVERAGE" "$FRONTEND" "$FRONTEND_COVERAGE" "$I18N" "$DEPENDENCY_AUDIT" "$SECRET_SCAN"; do
+            if [ "$value" != "success" ]; then status=failure; fi
+          done
+          cat > artifacts/phase8/postgres-verification-status.md <<EOF
+          # Phase 8 PostgreSQL verification: $status
+
+          Verified source head: $GITHUB_SHA
+
+          | Check | Result |
+          |---|---|
+          | Dependency install | $INSTALL |
+          | Pinned formatting | $FORMATTING |
+          | TypeScript | $TYPECHECK |
+          | Production build | $BUILD |
+          | Lint | $LINT |
+          | Program 7D accessibility/RTL contract | $PROGRAM7D |
+          | Disposable PostgreSQL schema | $DB_SCHEMA |
+          | Application startup migrations | $MIGRATIONS |
+          | Full backend tests | $BACKEND |
+          | API smoke sweep | $SMOKE |
+          | Backend coverage thresholds | $BACKEND_COVERAGE |
+          | Full frontend tests | $FRONTEND |
+          | Frontend coverage thresholds | $FRONTEND_COVERAGE |
+          | Classified I18n Audit | $I18N |
+          | Critical production dependency audit | $DEPENDENCY_AUDIT |
+          | Verified/unknown secret scan | $SECRET_SCAN |
+          EOF
+          cat artifacts/phase8/postgres-verification-status.md
+          echo "PHASE8_STATUS=$status" >> "$GITHUB_ENV"
+
+      - name: Commit verification record
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add artifacts/phase8/postgres-verification-status.md
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Record Phase 8 PostgreSQL verification: ${PHASE8_STATUS}"
+          git push origin HEAD:agent/phase-8-rtl-responsive-accessibility
+
+      - name: Enforce successful verification
+        if: always()
+        run: test "$PHASE8_STATUS" = "success"
