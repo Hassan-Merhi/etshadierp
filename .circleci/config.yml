@@ -87,9 +87,9 @@ jobs:
       - run:
           name: Check formatting for changed source files
           command: |
-            git fetch origin main --depth=1
+            git fetch --no-tags --prune --depth=1 origin +refs/heads/main:refs/remotes/origin/main
             mapfile -d '' changed_files < <(
-              git diff --name-only --diff-filter=ACMR -z origin/main...HEAD -- client/src server shared tests scripts |
+              git diff --name-only --diff-filter=ACMR -z origin/main HEAD -- client/src server shared tests scripts |
                 grep -zE '\.(ts|tsx|css|mjs)$' || true
             )
             if [ "${#changed_files[@]}" -eq 0 ]; then

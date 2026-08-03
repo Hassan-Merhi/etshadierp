@@ -1,12 +1,17 @@
-import { ReactNode } from "react";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { lazy, ReactNode, Suspense, useEffect } from "react";
+import { useLocation } from "wouter";
+import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Search, LogOut } from "lucide-react";
+import { Search } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { CurrencyToggle } from "@/components/CurrencyToggle";
 import { CompanySelector } from "@/components/CompanySelector";
-import { PendingSyncIndicator } from "@/components/PendingSyncIndicator";
-import { NotificationsCenter } from "@/components/NotificationsCenter";
+
+const MobileWorkspaceControls = lazy(() => import("@/components/MobileWorkspaceControls"));
+const WorkspaceHeaderControls = lazy(() =>
+  import("@/components/MobileWorkspaceControls").then((module) => ({
+    default: module.WorkspaceHeaderControls,
+  }))
+);
 
 interface AppTopBarProps {
   accentColor: string;
@@ -18,12 +23,6 @@ interface AppTopBarProps {
   extraActions?: ReactNode;
 }
 
-function getInitials(username: string) {
-  const words = username.trim().split(/\s+/);
-  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
-  return username.substring(0, 2).toUpperCase();
-}
-
 export function AppTopBar({
   accentColor,
   user,
@@ -33,87 +32,82 @@ export function AppTopBar({
   leftContent,
   extraActions,
 }: AppTopBarProps) {
+  const [currentLocation] = useLocation();
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  useEffect(() => {
+    if (isMobile) setOpenMobile(false);
+  }, [currentLocation, isMobile, setOpenMobile]);
+
   return (
-    <header className="relative flex flex-nowrap items-center justify-between px-3 sm:px-4 min-h-14 gap-2 sm:gap-3 no-print">
-      {/* Gradient bottom border — replaces plain border-b */}
+    <header className="relative flex min-h-14 flex-nowrap items-center justify-between gap-1.5 px-2.5 sm:gap-3 sm:px-4 no-print">
       <div
-        className="absolute bottom-0 left-0 right-0 h-px pointer-events-none"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-px"
         style={{
           background: `linear-gradient(to right, ${accentColor}cc 0%, ${accentColor}44 30%, hsl(var(--border)) 65%)`,
         }}
       />
 
-      {/* Left zone: sidebar toggle + optional module badge */}
-      <div className="flex items-center gap-2.5 shrink-0">
-        <SidebarTrigger data-testid="button-sidebar-toggle" />
-        {leftContent}
+      <div className="flex min-w-0 shrink-0 items-center gap-1.5 sm:gap-2.5">
+        <SidebarTrigger
+          data-testid="button-sidebar-toggle"
+          className="h-10 w-10 shrink-0 sm:h-8 sm:w-8"
+          aria-label="Open navigation"
+        />
+        {leftContent && <div className="hidden min-w-0 sm:block">{leftContent}</div>}
       </div>
 
-      {/* Right zone */}
-      <div className="flex flex-nowrap items-center gap-1 sm:gap-1.5 ml-auto min-w-0">
-        {/* Extra actions slot (e.g. "Switch to ERP") */}
-        {extraActions}
+      <div className="ml-auto flex min-w-0 flex-nowrap items-center gap-0.5 sm:gap-1.5">
+        {extraActions && <div className="hidden items-center sm:flex">{extraActions}</div>}
 
-        {/* Search pill — desktop */}
         {showSearch && onSearchOpen && (
           <button
             onClick={onSearchOpen}
             data-testid="button-open-palette"
-            className="hidden sm:flex items-center gap-2 h-8 px-3 rounded-full border border-border/60 bg-muted/40 text-muted-foreground text-xs transition-colors hover-elevate"
+            aria-label="Search"
+            className="hidden h-8 items-center gap-2 rounded-full border border-border/60 bg-muted/40 px-3 text-xs text-muted-foreground transition-colors hover-elevate sm:flex"
           >
             <Search className="h-3.5 w-3.5 shrink-0" />
             <span className="hidden lg:inline">Search</span>
-            <kbd className="inline-flex h-4 items-center rounded border border-border bg-background px-1.5 text-[9px] font-mono leading-none">
+            <kbd className="inline-flex h-4 items-center rounded border border-border bg-background px-1.5 font-mono text-[9px] leading-none">
               {typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform) ? "⌘ /" : "Ctrl /"}
             </kbd>
           </button>
         )}
-        {/* Search icon — mobile */}
+
         {showSearch && onSearchOpen && (
           <Button
             variant="ghost"
             size="icon"
             onClick={onSearchOpen}
             data-testid="button-open-palette-sm"
-            className="sm:hidden"
+            aria-label="Search"
+            className="h-10 w-10 shrink-0 sm:hidden"
           >
             <Search className="h-4 w-4" />
           </Button>
         )}
 
-        <PendingSyncIndicator />
-        <NotificationsCenter />
+        <Suspense fallback={<span className="h-10 w-10 shrink-0" aria-hidden="true" />}>
+          <WorkspaceHeaderControls accentColor={accentColor} user={user} onLogout={onLogout} />
+        </Suspense>
 
-        {/* Divider */}
-        <div className="hidden sm:block h-5 w-px bg-border/60 mx-1" />
-
-        {/* User pill */}
-        <div className="hidden md:flex items-center gap-2 px-2.5 py-1 rounded-full border border-border/40 bg-muted/30 shrink-0">
-          <span
-            className="h-5 w-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0"
-            style={{ backgroundColor: accentColor }}
-          >
-            {getInitials(user.username)}
-          </span>
-          <span className="text-sm font-medium leading-none">{user.username}</span>
-          <span className="text-xs text-muted-foreground leading-none border-l border-border/50 pl-1.5">
-            {user.role}
-          </span>
-        </div>
-
-        {/* Logout */}
-        <Button variant="ghost" size="icon" onClick={onLogout} data-testid="button-logout">
-          <LogOut className="h-4 w-4" />
-        </Button>
-
-        {/* Divider */}
-        <div className="hidden sm:block h-5 w-px bg-border/60 mx-1" />
+        <CompanySelector />
 
         <span className="hidden sm:block">
-          <CurrencyToggle />
+          <ThemeToggle />
         </span>
-        <CompanySelector />
-        <ThemeToggle />
+
+        <Suspense fallback={<span className="h-10 w-10 shrink-0 sm:hidden" aria-hidden="true" />}>
+          <MobileWorkspaceControls
+            accentColor={accentColor}
+            user={user}
+            onLogout={onLogout}
+            onSearchOpen={onSearchOpen}
+            showSearch={showSearch}
+            extraActions={extraActions}
+          />
+        </Suspense>
       </div>
     </header>
   );
