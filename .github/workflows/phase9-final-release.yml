@@ -245,8 +245,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Record final release result
-        id: release_result
+      - name: Record and enforce final release result
         if: always()
         env:
           INSTALL: ${{ steps.install.outcome }}
@@ -269,6 +268,7 @@ jobs:
           DEPENDENCY_AUDIT: ${{ steps.dependency_audit.outcome }}
           SECRET_SCAN: ${{ steps.secret_scan.outcome }}
         run: |
+          set -euo pipefail
           status=success
           for value in "$INSTALL" "$DEPENDENCIES" "$FORMATTING" "$TYPECHECK" "$BUILD" "$LINT" "$CONTRACTS" "$READINESS" "$DB_SCHEMA" "$BROWSER_SMOKE" "$BACKEND" "$SMOKE" "$BACKEND_COVERAGE" "$FRONTEND" "$FRONTEND_COVERAGE" "$I18N" "$SECURITY" "$DEPENDENCY_AUDIT" "$SECRET_SCAN"; do
             if [ "$value" != "success" ]; then status=failure; fi
@@ -299,12 +299,5 @@ jobs:
           | Critical production dependency audit | $DEPENDENCY_AUDIT |
           | Verified/unknown secret scan | $SECRET_SCAN |
           EOF
-          echo "status=$status" >> "$GITHUB_OUTPUT"
 
-      - name: Enforce successful release verification
-        if: always()
-        env:
-          PHASE9_STATUS: ${{ steps.release_result.outputs.status }}
-        run: |
-          echo "Recorded Phase 9 status: ${PHASE9_STATUS}"
-          test "${PHASE9_STATUS}" = "success"
+          test "$status" = "success"
