@@ -12,7 +12,7 @@ export function normalizeScreenFeedPoint(
   clientX: number,
   clientY: number,
   viewportWidth: number,
-  viewportHeight: number,
+  viewportHeight: number
 ): NormalizedScreenFeedPoint {
   const safeWidth = Math.max(1, viewportWidth);
   const safeHeight = Math.max(1, viewportHeight);

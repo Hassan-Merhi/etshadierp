@@ -9,7 +9,7 @@ export function calculateContainedScreenFeedSize(
   containerWidth: number,
   containerHeight: number,
   sourceWidth: number,
-  sourceHeight: number,
+  sourceHeight: number
 ): ScreenFeedDisplaySize {
   if (containerWidth <= 0 || containerHeight <= 0 || sourceWidth <= 0 || sourceHeight <= 0) {
     return { width: 0, height: 0 };
@@ -25,7 +25,7 @@ export function calculateContainedScreenFeedSize(
 export function classifyScreenFeedConnection(
   hasFrame: boolean,
   liveConnected: boolean,
-  frameAgeMs: number,
+  frameAgeMs: number
 ): ScreenFeedConnectionQuality {
   if (!hasFrame) return "waiting";
   if (liveConnected && frameAgeMs < 2500) return "excellent";

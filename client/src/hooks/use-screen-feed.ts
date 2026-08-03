@@ -101,7 +101,7 @@ if (typeof window !== "undefined") {
       });
       if (clickBuffer.length > 50) clickBuffer.shift();
     },
-    { capture: true },
+    { capture: true }
   );
 }
 
@@ -173,7 +173,7 @@ async function tryCapture(opts: Record<string, unknown>): Promise<HTMLCanvasElem
       windowHeight: window.innerHeight,
     }),
     new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`timeout-${CAPTURE_TIMEOUT_MS}ms`)), CAPTURE_TIMEOUT_MS),
+      setTimeout(() => reject(new Error(`timeout-${CAPTURE_TIMEOUT_MS}ms`)), CAPTURE_TIMEOUT_MS)
     ),
   ]);
 }
@@ -228,7 +228,7 @@ async function withSafeCreatePattern<T>(fn: () => Promise<T>): Promise<T> {
   const original = CanvasRenderingContext2D.prototype.createPattern;
   CanvasRenderingContext2D.prototype.createPattern = function (
     image: CanvasImageSource,
-    repetition: string | null,
+    repetition: string | null
   ): CanvasPattern | null {
     try {
       return original.call(this, image, repetition);
@@ -302,7 +302,7 @@ async function captureCanvas(): Promise<CaptureCanvasResult> {
           ...options,
           scale: 0.35,
           imageTimeout: 300,
-        }),
+        })
       );
       trace("capture-ok-retry");
       return { canvas, source: "retry" };
@@ -333,7 +333,7 @@ async function captureAndUpload(
   fast: boolean,
   lastSignature: string | null,
   lastUploadedClickTs: number,
-  cursor: CursorEvent | null,
+  cursor: CursorEvent | null
 ): Promise<CaptureResult> {
   const startedAt = Date.now();
   const { canvas, source } = await captureCanvas();
@@ -510,7 +510,7 @@ export function useScreenFeed() {
           fastModeRef.current,
           lastSignatureRef.current,
           lastUploadedClickTsRef.current,
-          pointerRef.current,
+          pointerRef.current
         )
           .then((result) => {
             if (result.uploaded) {

@@ -1,8 +1,4 @@
-import type {
-  ScreenFeedCaptureInfo,
-  ScreenFeedCursor,
-  ScreenFeedViewport,
-} from "../screenFeedStore";
+import type { ScreenFeedCaptureInfo, ScreenFeedCursor, ScreenFeedViewport } from "../screenFeedStore";
 
 export interface ScreenFeedClick {
   x: number;
@@ -48,7 +44,7 @@ export function sanitizeScreenFeedClicks(value: unknown, now = Date.now()): Scre
         normalizedCoordinate(click.y) !== null &&
         typeof click.ts === "number" &&
         Number.isFinite(click.ts) &&
-        now - click.ts < MAX_CLICK_AGE_MS,
+        now - click.ts < MAX_CLICK_AGE_MS
     )
     .slice(-MAX_CLICKS_PER_FRAME)
     .map((click) => ({

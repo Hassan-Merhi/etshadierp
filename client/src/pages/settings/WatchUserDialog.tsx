@@ -3,17 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Clock,
-  Eye,
-  History,
-  Maximize2,
-  Monitor,
-  MousePointer2,
-  Wifi,
-  WifiOff,
-  ZoomIn,
-} from "lucide-react";
+import { Clock, Eye, History, Maximize2, Monitor, MousePointer2, Wifi, WifiOff, ZoomIn } from "lucide-react";
 import {
   calculateContainedScreenFeedSize,
   classifyScreenFeedConnection,
@@ -235,7 +225,7 @@ export function WatchUserDialog({
         return;
       }
       setDisplaySize(
-        calculateContainedScreenFeedSize(element.clientWidth, element.clientHeight, sourceWidth, sourceHeight),
+        calculateContainedScreenFeedSize(element.clientWidth, element.clientHeight, sourceWidth, sourceHeight)
       );
     };
 
@@ -252,7 +242,9 @@ export function WatchUserDialog({
     tick - new Date(presence.lastSeen).getTime() < 3 * 60 * 1000;
   const hasScreen = !!screenFrame?.dataUrl;
   const serverTimestamp = screenFrame?.receivedAt ?? screenFrame?.capturedAt;
-  const frameAgeMs = serverTimestamp ? Math.max(0, tick - new Date(serverTimestamp).getTime()) : Number.POSITIVE_INFINITY;
+  const frameAgeMs = serverTimestamp
+    ? Math.max(0, tick - new Date(serverTimestamp).getTime())
+    : Number.POSITIVE_INFINITY;
   const transportDelayMs =
     serverTimestamp && frameReceivedAt !== null
       ? Math.max(0, frameReceivedAt - new Date(serverTimestamp).getTime())
@@ -448,7 +440,9 @@ export function WatchUserDialog({
 
             <div className="border-t px-3 py-1.5 shrink-0 bg-background/95 text-xs text-muted-foreground">
               <div className="flex items-center gap-x-4 gap-y-1 flex-wrap">
-                <span className="font-medium text-foreground">{liveConnected ? "Live stream" : "Polling fallback"}</span>
+                <span className="font-medium text-foreground">
+                  {liveConnected ? "Live stream" : "Polling fallback"}
+                </span>
                 <span>Frame age: {Number.isFinite(frameAgeMs) ? formatScreenFeedDelay(frameAgeMs) : "—"}</span>
                 <span>Delivery: {formatScreenFeedDelay(transportDelayMs)}</span>
                 <span>Capture: {frameMetadata.resolution}</span>
