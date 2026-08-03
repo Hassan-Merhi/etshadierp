@@ -27,8 +27,8 @@ export function WorkspaceToolbar({ className, ...props }: React.HTMLAttributes<H
     <div
       className={cn(
         "flex min-w-0 flex-col gap-3 rounded-lg border bg-card p-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-2",
-        "[&_[data-radix-select-trigger]]:w-full sm:[&_[data-radix-select-trigger]]:w-auto",
-        "[&_input]:min-w-0 [&_input]:w-full sm:[&_input]:w-auto",
+        "[&>*]:min-w-0 [&_input]:w-full sm:[&_input]:w-auto",
+        "[&_[role=combobox]]:w-full sm:[&_[role=combobox]]:w-auto",
         className,
       )}
       {...props}
@@ -53,8 +53,8 @@ export function WorkspaceActions({ className, ...props }: React.HTMLAttributes<H
   return (
     <div
       className={cn(
-        "grid w-full min-w-0 grid-cols-1 gap-2 xs:grid-cols-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end",
-        "[&>*]:min-w-0 [&_button]:w-full sm:[&_button]:w-auto",
+        "flex w-full min-w-0 flex-col-reverse gap-2 min-[360px]:grid min-[360px]:grid-cols-2 sm:flex sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end",
+        "[&>*]:min-w-0 [&>*]:w-full sm:[&>*]:w-auto [&_button]:w-full sm:[&_button]:w-auto",
         className,
       )}
       {...props}
@@ -81,8 +81,8 @@ export function FormActionBar({ className, ...props }: React.HTMLAttributes<HTML
   return (
     <div
       className={cn(
-        "sticky bottom-0 z-10 -mx-1 grid grid-cols-1 gap-2 border-t bg-background/95 px-1 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 xs:grid-cols-2 sm:flex sm:justify-end",
-        "[&_button]:w-full sm:[&_button]:w-auto",
+        "sticky bottom-0 z-10 -mx-1 flex flex-col-reverse gap-2 border-t bg-background/95 px-1 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 min-[360px]:grid min-[360px]:grid-cols-2 sm:flex sm:flex-row sm:justify-end",
+        "[&>*]:min-w-0 [&>*]:w-full sm:[&>*]:w-auto [&_button]:w-full sm:[&_button]:w-auto",
         className,
       )}
       {...props}
