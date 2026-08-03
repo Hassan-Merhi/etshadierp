@@ -14,15 +14,14 @@ import {
 } from "../services/remoteSupportRuntime";
 import { getSessionRole, getSessionUserId, getSessionUsername } from "../lib/requestContext";
 
-// How long (ms) after a watcher's last GET we still consider the user "being watched".
-// Must be comfortably larger than the watcher's poll interval (~3–5 s) to avoid
-// the watched user flipping back to "not watched" between watcher polls.
 const WATCHER_TIMEOUT_MS = 12000;
-
-// Reject frames larger than 1.5 MB (base64 string length)
 const MAX_FRAME_SIZE = 1_500_000;
-
+const FAST_MAX_FRAME_SIZE = 900_000;
+const FAST_MIN_UPLOAD_INTERVAL_MS = 650;
+const FAST_RETRY_AFTER_SECONDS = 1;
+const MAX_USER_ID_LENGTH = 64;
 const isDev = process.env.NODE_ENV !== "production";
+const lastFastUploadAt = new Map<string, number>();
 
 function requireDeveloper(req: Request, res: Response): boolean {
   if (getSessionRole(req) !== "Developer") {
@@ -36,9 +35,15 @@ function runtimeActor(req: Request): string {
   return getSessionUsername(req) || String(getSessionUserId(req));
 }
 
+function isValidWatchedUserId(value: string): boolean {
+  return value.length > 0 && value.length <= MAX_USER_ID_LENGTH && /^[A-Za-z0-9_-]+$/.test(value);
+}
+
+function frameEtag(userId: string, capturedAt: Date, dataUrlLength: number): string {
+  return `W/\"screen-feed-${userId}-${capturedAt.getTime()}-${dataUrlLength}\"`;
+}
+
 export function registerScreenFeedRoutes(app: Express) {
-  // Runtime safety controls are intentionally registered before /:userId so
-  // "admin" can never be interpreted as a watched user ID.
   app.get("/api/screen-feed/admin/runtime", requireAuth, (req, res) => {
     if (!requireDeveloper(req, res)) return;
     res.setHeader("Cache-Control", "no-store");
@@ -49,11 +54,10 @@ export function registerScreenFeedRoutes(app: Express) {
     if (!requireDeveloper(req, res)) return;
     const patch = req.body?.flags ?? req.body ?? {};
     const snapshot = updateRemoteSupportFlags(patch, runtimeActor(req));
-
     if (!snapshot.flags.screenFeedEnabled) {
       watcherPollStore.clear();
+      lastFastUploadAt.clear();
     }
-
     res.setHeader("Cache-Control", "no-store");
     res.json(snapshot);
   });
@@ -61,6 +65,7 @@ export function registerScreenFeedRoutes(app: Express) {
   app.post("/api/screen-feed/admin/runtime/emergency-stop", requireAuth, (req, res) => {
     if (!requireDeveloper(req, res)) return;
     watcherPollStore.clear();
+    lastFastUploadAt.clear();
     const snapshot = emergencyDisableRemoteSupport(runtimeActor(req));
     logger.warn(`[RemoteSupport] emergency stop activated by ${runtimeActor(req)}`);
     res.setHeader("Cache-Control", "no-store");
@@ -80,35 +85,32 @@ export function registerScreenFeedRoutes(app: Express) {
     res.json(resetRemoteSupportMetrics());
   });
 
-  // GET: watched user asks "is anyone watching me right now?"
-  // Must be registered BEFORE /:userId to avoid route conflict.
   app.get("/api/screen-feed/being-watched", requireLogin, (req, res) => {
     recordRemoteSupportMetric("watcherStatusPoll");
-
     if (!isRemoteSupportEnabled("screenFeedEnabled")) {
-      return res.json({ watched: false });
+      return res.json({ watched: false, transport: "legacy" });
     }
 
     const userId = String(getSessionUserId(req));
     const lastPoll = watcherPollStore.get(userId) ?? 0;
     const ageMs = Date.now() - lastPoll;
     const watched = lastPoll > 0 && ageMs < WATCHER_TIMEOUT_MS;
+    const fastEnabled = isRemoteSupportEnabled("fastScreenFeed");
 
     if (isDev) {
       logger.info(
-        `[ScreenFeed] being-watched userId=${userId} watched=${watched} lastPollAgeMs=${lastPoll > 0 ? ageMs : "never"}`
+        `[ScreenFeed] being-watched userId=${userId} watched=${watched} transport=${fastEnabled ? "fast" : "legacy"} lastPollAgeMs=${lastPoll > 0 ? ageMs : "never"}`
       );
     }
 
+    res.setHeader("Cache-Control", "no-store");
     res.json({
       watched,
+      transport: fastEnabled ? "fast" : "legacy",
       ...(isDev ? { userId, lastWatcherPollAgeMs: lastPoll > 0 ? ageMs : null } : {}),
     });
   });
 
-  // GET-based trace: CSRF-exempt diagnostic ping from the watched user's browser.
-  // Route pattern: GET /api/screen-feed/trace/:event?d=<extra>
-  // Registered BEFORE /:userId so "trace" is not mistaken for a userId.
   app.get("/api/screen-feed/trace/:event", requireLogin, (req, res) => {
     if (!isDev) return res.status(204).end();
     const userId = String(getSessionUserId(req));
@@ -118,81 +120,67 @@ export function registerScreenFeedRoutes(app: Express) {
     res.status(204).end();
   });
 
-  // POST: watched user uploads their screenshot frame + recent clicks.
   app.post("/api/screen-feed", requireLogin, (req, res) => {
-    if (!isRemoteSupportEnabled("screenFeedEnabled")) {
-      return res.status(200).end();
-    }
+    if (!isRemoteSupportEnabled("screenFeedEnabled")) return res.status(200).end();
 
     const userId = String(getSessionUserId(req));
-    if (isDev) {
-      logger.info(
-        `[ScreenFeed] POST /api/screen-feed received from userId=${userId} body_keys=${Object.keys(req.body ?? {}).join(",")}`
-      );
+    const fastEnabled = isRemoteSupportEnabled("fastScreenFeed");
+    const now = Date.now();
+    if (fastEnabled) {
+      const previous = lastFastUploadAt.get(userId) ?? 0;
+      if (now - previous < FAST_MIN_UPLOAD_INTERVAL_MS) {
+        recordRemoteSupportMetric("frameRejected");
+        res.setHeader("Retry-After", String(FAST_RETRY_AFTER_SECONDS));
+        return res.status(429).json({ message: "Frame producer is sending too quickly." });
+      }
     }
 
     const { dataUrl, clicks } = req.body ?? {};
-
     if (!isValidScreenFeedDataUrl(dataUrl)) {
       recordRemoteSupportMetric("frameRejected");
-      if (isDev) {
-        logger.warn(
-          `[ScreenFeed] POST rejected: missing or invalid dataUrl (type=${typeof dataUrl} starts=${typeof dataUrl === "string" ? dataUrl.slice(0, 30) : "N/A"})`
-        );
-      }
       return res.status(400).end();
     }
-    if (dataUrl.length > MAX_FRAME_SIZE) {
+
+    const activeLimit = fastEnabled ? FAST_MAX_FRAME_SIZE : MAX_FRAME_SIZE;
+    if (dataUrl.length > activeLimit) {
       recordRemoteSupportMetric("frameRejected");
-      if (isDev) logger.warn(`[ScreenFeed] POST rejected: frame too large (${dataUrl.length} bytes)`);
-      return res.status(204).end();
+      return res.status(413).json({ message: "Frame payload is too large." });
     }
 
     const username = getSessionUsername(req) || userId;
     const safeClicks = sanitizeScreenFeedClicks(clicks);
-    screenFeedStore.set(userId, {
-      dataUrl,
-      capturedAt: new Date(),
-      userId,
-      username,
-      clicks: safeClicks,
-    });
+    const capturedAt = new Date();
+    screenFeedStore.set(userId, { dataUrl, capturedAt, userId, username, clicks: safeClicks });
+    if (fastEnabled) lastFastUploadAt.set(userId, now);
     recordRemoteSupportMetric("frameAccepted", Buffer.byteLength(dataUrl, "utf8"));
-
-    if (isDev) {
-      logger.info(
-        `[ScreenFeed] POST frame stored userId=${userId} frameLen=${dataUrl.length} clicks=${safeClicks.length}`
-      );
-    }
-
     res.status(204).end();
   });
 
-  // GET: Developer polls the latest frame + clicks for a specific watched user.
   app.get("/api/screen-feed/:userId", requireAuth, (req, res) => {
     if (!requireDeveloper(req, res)) return;
 
-    recordRemoteSupportMetric("viewerPoll");
-    res.setHeader("Cache-Control", "no-store");
-
-    if (!isRemoteSupportEnabled("screenFeedEnabled")) {
-      return res.json(null);
-    }
-
     const watchedUserId = req.params.userId;
-    watcherPollStore.set(watchedUserId, Date.now());
-
-    const frame = screenFeedStore.get(watchedUserId);
-    const hasFrame = !!frame;
-
-    if (isDev) {
-      const frameAgeMs = frame ? Date.now() - frame.capturedAt.getTime() : null;
-      logger.info(
-        `[ScreenFeed] GET /:userId watchedUserId=${watchedUserId} hasFrame=${hasFrame} frameAgeMs=${frameAgeMs}`
-      );
+    if (!isValidWatchedUserId(watchedUserId)) {
+      return res.status(400).json({ message: "Invalid watched user ID." });
     }
 
+    recordRemoteSupportMetric("viewerPoll");
+    res.setHeader("Cache-Control", "private, no-cache, must-revalidate");
+
+    if (!isRemoteSupportEnabled("screenFeedEnabled")) return res.json(null);
+
+    watcherPollStore.set(watchedUserId, Date.now());
+    const frame = screenFeedStore.get(watchedUserId);
     if (!frame) return res.json(null);
+
+    const etag = frameEtag(watchedUserId, frame.capturedAt, frame.dataUrl.length);
+    res.setHeader("ETag", etag);
+    res.setHeader("X-Screen-Feed-Transport", isRemoteSupportEnabled("fastScreenFeed") ? "fast" : "legacy");
+
+    if (isRemoteSupportEnabled("fastScreenFeed") && req.headers["if-none-match"] === etag) {
+      return res.status(304).end();
+    }
+
     res.json({
       dataUrl: frame.dataUrl,
       capturedAt: frame.capturedAt.toISOString(),
