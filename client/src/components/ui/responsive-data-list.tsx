@@ -4,12 +4,7 @@ import { cn } from "@/lib/utils";
 
 const ResponsiveDataList = React.forwardRef<HTMLUListElement, React.HTMLAttributes<HTMLUListElement>>(
   ({ className, ...props }, ref) => (
-    <ul
-      ref={ref}
-      data-mobile-data-list="true"
-      className={cn("grid min-w-0 gap-3", className)}
-      {...props}
-    />
+    <ul ref={ref} data-mobile-data-list="true" className={cn("grid min-w-0 gap-3", className)} {...props} />
   )
 );
 ResponsiveDataList.displayName = "ResponsiveDataList";
@@ -18,10 +13,7 @@ const ResponsiveDataListItem = React.forwardRef<HTMLLIElement, React.HTMLAttribu
   ({ className, ...props }, ref) => (
     <li
       ref={ref}
-      className={cn(
-        "min-w-0 rounded-lg border bg-card p-3 text-card-foreground shadow-sm sm:p-4",
-        className
-      )}
+      className={cn("min-w-0 rounded-lg border bg-card p-3 text-card-foreground shadow-sm sm:p-4", className)}
       {...props}
     />
   )
@@ -46,15 +38,16 @@ const ResponsiveDataListTitle = React.forwardRef<HTMLHeadingElement, React.HTMLA
 );
 ResponsiveDataListTitle.displayName = "ResponsiveDataListTitle";
 
-const ResponsiveDataListDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
-  ({ className, ...props }, ref) => (
-    <p
-      ref={ref}
-      className={cn("min-w-0 break-words text-xs leading-relaxed text-muted-foreground", className)}
-      {...props}
-    />
-  )
-);
+const ResponsiveDataListDescription = React.forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLParagraphElement>
+>(({ className, ...props }, ref) => (
+  <p
+    ref={ref}
+    className={cn("min-w-0 break-words text-xs leading-relaxed text-muted-foreground", className)}
+    {...props}
+  />
+));
 ResponsiveDataListDescription.displayName = "ResponsiveDataListDescription";
 
 const ResponsiveDataListFields = React.forwardRef<HTMLDListElement, React.HTMLAttributes<HTMLDListElement>>(
