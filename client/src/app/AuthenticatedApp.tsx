@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useDialogScrollFix } from "@/hooks/use-dialog-scroll-fix";
+import { useMobilePerformanceLifecycle } from "@/hooks/use-mobile-performance-lifecycle";
 import { useLocation, Redirect } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { usePresence } from "@/hooks/use-presence";
@@ -23,6 +24,7 @@ interface AuthenticatedAppProps {
 
 export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) {
   const { selectedCompany, isLoading: companyLoading } = useCompany();
+  useMobilePerformanceLifecycle();
   usePresence(true);
   useScreenFeed();
   useWsInvalidation();
