@@ -1,33 +1,61 @@
 {
   "schemaVersion": 2,
-  "detectorVersion": 7,
+  "detectorVersion": 8,
   "policyDigest": "c26178dd9bc7d71d34976e5bb87aa946cc5d59e6db54b7415f9e363514809f8f",
   "reviewedAt": "2026-08-03",
-  "reviewedHead": "14f2c8a6f05d1f75b83265d4e70b69bdbfbc4654",
-  "description": "Reviewed untranslated-text ratchet after Phase 6 Reports and Exports conversion. Actionable counts may only decrease unless the detector or policy is explicitly re-reviewed. Compatibility-covered labels and documented technical exclusions are reported separately and do not consume the unresolved backlog.",
+  "reviewedHead": "fae9b807ffc806b5af9ca09d3a5abda5e9f65893",
+  "description": "Reviewed untranslated-text ratchet after Phase 7 backend and operational message conversion. Actionable counts may only decrease unless the detector or policy is explicitly re-reviewed. Compatibility-covered labels and documented technical exclusions are reported separately and do not consume the unresolved backlog.",
   "reviewedTotals": {
     "candidates": 22429,
-    "actionable": 13404,
-    "excluded": 9025,
-    "compatibilityCovered": 7965,
+    "actionable": 12550,
+    "excluded": 9879,
+    "compatibilityCovered": 8819,
     "unclassified": 0
   },
-  "maxActionable": 13404,
+  "maxActionable": 12550,
   "modules": {
-    "accounting": { "maxActionable": 1552 },
-    "administration": { "maxActionable": 1191 },
-    "backend-messages": { "maxActionable": 506 },
-    "container-purchasing": { "maxActionable": 890 },
-    "factory": { "maxActionable": 5580 },
-    "inventory-logistics": { "maxActionable": 1431 },
-    "other-client": { "maxActionable": 876 },
-    "payroll": { "maxActionable": 556 },
-    "properties-rentals": { "maxActionable": 0 },
-    "reports-exports": { "maxActionable": 0 },
-    "sales-pos": { "maxActionable": 817 },
-    "shared-contracts": { "maxActionable": 5 },
-    "shared-ui": { "maxActionable": 0 },
-    "supplier-partner": { "maxActionable": 0 }
+    "accounting": {
+      "maxActionable": 1441
+    },
+    "administration": {
+      "maxActionable": 1165
+    },
+    "backend-messages": {
+      "maxActionable": 0
+    },
+    "container-purchasing": {
+      "maxActionable": 870
+    },
+    "factory": {
+      "maxActionable": 5501
+    },
+    "inventory-logistics": {
+      "maxActionable": 1381
+    },
+    "other-client": {
+      "maxActionable": 857
+    },
+    "payroll": {
+      "maxActionable": 555
+    },
+    "properties-rentals": {
+      "maxActionable": 0
+    },
+    "reports-exports": {
+      "maxActionable": 0
+    },
+    "sales-pos": {
+      "maxActionable": 776
+    },
+    "shared-contracts": {
+      "maxActionable": 4
+    },
+    "shared-ui": {
+      "maxActionable": 0
+    },
+    "supplier-partner": {
+      "maxActionable": 0
+    }
   },
   "maxUnclassified": 0
 }
