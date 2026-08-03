@@ -1,4 +1,4 @@
-const CACHE_VERSION = "erp-v10";
+const CACHE_VERSION = "erp-v11";
 const CACHE_PREFIX = "erp-";
 const APP_SHELL = ["/", "/manifest.json"];
 const MAX_STATIC_CACHE_ENTRIES = 200;
@@ -6,7 +6,6 @@ const HASHED_ASSET_RE =
   /^\/assets\/[^/]+-[A-Za-z0-9_-]{6,}\.(?:js|css|woff2?|ttf|png|jpe?g|webp|svg|ico)$/i;
 const LABEL_PREVIEW_RE = /^\/labels\/previews\/[^/]+-preview\.webp$/i;
 
-// ── Install: cache the latest app shell ───────────────────────────────────────
 self.addEventListener("install", (event) => {
   self.skipWaiting();
   event.waitUntil(
@@ -16,10 +15,12 @@ self.addEventListener("install", (event) => {
   );
 });
 
-// ── Activate: prune old ERP caches and take control of all tabs ──────────────
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    deleteErpCachesExcept(CACHE_VERSION)
+    Promise.all([
+      deleteErpCachesExcept(CACHE_VERSION),
+      self.registration.navigationPreload?.enable?.().catch(() => {}),
+    ])
       .then(() => self.clients.claim())
       .then(() =>
         self.clients.matchAll({ type: "window" }).then((clients) =>
@@ -29,8 +30,6 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Allow the page to request one controlled cache reset after a stale-chunk
-// failure. IndexedDB/offline mutation queues are intentionally untouched.
 self.addEventListener("message", (event) => {
   if (event.data?.type === "CLEAR_APP_CACHES") {
     event.waitUntil(
@@ -41,46 +40,31 @@ self.addEventListener("message", (event) => {
   }
 });
 
-// ── Fetch ─────────────────────────────────────────────────────────────────────
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
-  // Only handle same-origin GET requests. Range responses must stay on the
-  // network because a cached partial response can corrupt later downloads.
   if (request.method !== "GET" || request.headers.has("range")) return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
   if (url.pathname.startsWith("/api/")) {
-    // API responses contain company-scoped and user-scoped data. They are
-    // already protected by the in-memory request guards and server microcache;
-    // persisting multi-megabyte JSON in shared Cache Storage would create stale
-    // cross-login data and unbounded device storage. Always use the network.
     event.respondWith(networkOnlyApi(request));
   } else if (request.mode === "navigate") {
-    // Navigation requests: network first, fall back to the single cached SPA shell.
-    event.respondWith(navigationHandler(request));
+    event.respondWith(navigationHandler(event));
   } else if (HASHED_ASSET_RE.test(url.pathname)) {
-    // Content-hashed production assets are immutable and safe for cache-first.
     event.respondWith(cacheFirstHashedAsset(request));
   } else if (isVersionedLabelAsset(url)) {
-    // Label previews are immutable defaults; custom banners carry a stable
-    // ?t=<updatedAt> version. Both can avoid repeat downloads safely.
     event.respondWith(cacheFirstVersionedAsset(request));
   } else if (
     url.pathname.startsWith("/assets/") ||
     url.pathname.startsWith("/node_modules/.vite/") ||
     url.pathname.startsWith("/src/")
   ) {
-    // Unhashed/dev assets remain network-first so edits are immediately visible.
     event.respondWith(networkFirstAsset(request));
   } else {
-    // Other small static assets use stale-while-revalidate with a bounded cache.
     event.respondWith(staleWhileRevalidate(request));
   }
 });
-
-// ── Cache helpers ──────────────────────────────────────────────────────────────
 
 function isVersionedLabelAsset(url) {
   if (LABEL_PREVIEW_RE.test(url.pathname)) return true;
@@ -116,8 +100,6 @@ function rejectHtmlAssetResponse(response) {
   });
 }
 
-// ── Strategies ────────────────────────────────────────────────────────────────
-
 async function networkOnlyApi(request) {
   try {
     return await fetch(request.clone(), { cache: "no-store" });
@@ -129,11 +111,13 @@ async function networkOnlyApi(request) {
   }
 }
 
-async function navigationHandler(request) {
+async function navigationHandler(event) {
+  const request = event.request;
   try {
-    // Bypass the browser HTTP cache so deployments cannot pair stale HTML with
-    // newly hashed JavaScript files. Cache only one canonical SPA shell.
-    const response = await fetch(request.clone(), { cache: "no-store" });
+    // Navigation preload starts the request while the service worker wakes up,
+    // avoiding a second mobile startup round trip after worker activation.
+    const preloaded = await event.preloadResponse;
+    const response = preloaded || (await fetch(request.clone(), { cache: "no-store" }));
     if (response.ok) {
       const contentType = response.headers.get("content-type") || "";
       if (contentType.includes("text/html")) {
@@ -153,8 +137,6 @@ async function navigationHandler(request) {
   }
 }
 
-// Cache-first is safe only for Vite content-hashed production files. Their URL
-// changes whenever the content changes, and the server marks them immutable.
 async function cacheFirstHashedAsset(request) {
   const cache = await caches.open(CACHE_VERSION);
   const cached = await cache.match(request);
@@ -193,8 +175,6 @@ async function cacheFirstVersionedAsset(request) {
   }
 }
 
-// Network-first for unhashed Vite/development content. Never return HTML as a
-// script or stylesheet; that produces misleading MIME errors on mobile browsers.
 async function networkFirstAsset(request) {
   const cache = await caches.open(CACHE_VERSION);
   try {
@@ -220,7 +200,6 @@ async function staleWhileRevalidate(request) {
   const fetchPromise = fetch(request.clone())
     .then(async (response) => {
       if (response.ok) {
-        // Never cache HTML under a non-navigation URL — prevents MIME corruption.
         const contentType = response.headers.get("content-type") || "";
         if (!contentType.includes("text/html")) {
           await putBounded(cache, request, response.clone());
@@ -239,7 +218,6 @@ async function staleWhileRevalidate(request) {
   });
 }
 
-// ── Background sync (triggered by ConnectivityContext) ────────────────────────
 self.addEventListener("sync", (event) => {
   if (event.tag === "erp-sync") {
     event.waitUntil(
@@ -250,7 +228,6 @@ self.addEventListener("sync", (event) => {
   }
 });
 
-// ── Push notifications (future-proof hook) ───────────────────────────────────
 self.addEventListener("push", (event) => {
   if (!event.data) return;
   try {
