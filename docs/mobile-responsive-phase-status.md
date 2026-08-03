@@ -24,7 +24,7 @@ This document is the source of truth for converting the existing ERP web applica
 | 5 | Tables and mobile data lists | Implemented | `agent/mobile-responsive-phase-5-tables-data-lists` / PR #422 | Final CI validation pending |
 | 6 | Core ERP mobile conversion | Implemented | `agent/mobile-responsive-phase-6-core-erp` / PR #430 | Final CI validation pending |
 | 7 | Factory mobile conversion | Implemented | `agent/mobile-responsive-phase-7-factory` / PR #447 | Final CI and rendered validation pending |
-| 8 | POS mobile and tablet redesign | Not started | — | — |
+| 8 | POS mobile and tablet redesign | Implemented | `agent/mobile-responsive-phase-8-pos` / PR #452 | Final CI and rendered validation pending |
 | 9 | Dashboards, reports, and charts | Not started | — | — |
 | 10 | Mobile performance and offline behavior | Not started | — | — |
 | 11 | Full responsive regression verification | Not started | — | — |
@@ -221,6 +221,35 @@ This document is the source of truth for converting the existing ERP web applica
 - Verify scanner autofocus, physical barcode scanner input, on-screen keyboard behavior, arrow-key selection, touch product selection, long product names, cart quantity and weight controls, worker and logo selectors, confirmation safeguards, and label printing.
 - Retarget to `main` only after Phases 4, 5, and 6 merge in order.
 
+## Phase 8 completion record
+
+### Delivered
+
+- Applied phone-safe touch targets, safe-area spacing, width containment, responsive form boundaries, and bounded dialog/listbox behavior to the POS shell.
+- Corrected the full-height POS route boundary so POS users landing on `/`, administrators using `/pos`, and transaction editors using `/pos/edit/:id` receive the intended sales canvas.
+- Added a compact mobile POS identity header while preserving the existing desktop sidebar, navigation, company selector, currency selector, theme control, search, synchronization, and logout behavior.
+- Separated the desktop page header and save action from the phone/tablet checkout flow so users no longer see duplicated save controls.
+- Converted mobile product search into an accessible combobox and listbox with large touch results, long-name wrapping, stock status, and viewport-bounded scrolling.
+- Made location, sale date, credit/customer, cash/bank, and payment-account controls responsive across phone and tablet widths.
+- Converted mobile cart rows into readable cards with large decrement/increment controls, quantity and rate inputs, calculated totals, long-code wrapping, and touch-sized removal actions.
+- Kept the final checkout action visible in a safe-area-aware fixed bottom bar while preserving the existing save handler and pending/valid-item safeguards.
+- Converted POS transfer-order filters, route summaries, item counts, status badges, and view/adjust actions to phone- and tablet-safe layouts.
+- Added focused source-contract tests and a standalone Phase 8 verifier.
+
+### Deliberately unchanged
+
+- POS API requests, save mutation payloads, inventory deduction, accounting postings, pricing calculations, exchange-rate behavior, credit restrictions, and payment-account rules.
+- Supplier Partner cash/bank-only behavior, POS-user location assignment, drafts, autosave, last-sold-price behavior, zero-stock warnings, and customer selection data.
+- Desktop `SaleGrid`, `InventoryPicker`, keyboard navigation, checkout strip, transaction export, invoice printing, stock printing, and WhatsApp delivery.
+- POS permissions, company isolation, routes, database schema, and SQL.
+
+### Remaining verification
+
+- Complete TypeScript, production build, lint, exact formatting, focused tests, full tests, smoke, coverage, Security, I18n, and CircleCI checks.
+- Verify POS sales and transfer orders at 320 px, 360 px, 390 px, phone landscape, tablet portrait, tablet landscape, desktop, and wide desktop widths.
+- Verify POS-user `/` routing, admin `/pos` routing, transaction editing, physical barcode scanners, typed search, long product names, low/out-of-stock indicators, quantity and rate editing, customer selection, payment selectors, fixed checkout, save safeguards, transfer-order view/adjust behavior, printing, and WhatsApp dialogs.
+- Retarget to `main` only after Phases 4 through 7 merge in order.
+
 ## Internal SQL ledger
 
 | Phase | SQL used |
@@ -232,5 +261,6 @@ This document is the source of truth for converting the existing ERP web applica
 | 5 | None |
 | 6 | None |
 | 7 | None |
+| 8 | None |
 
 Do not provide this ledger as the final SQL report until every phase is complete.
