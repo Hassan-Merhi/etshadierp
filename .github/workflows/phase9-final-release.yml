@@ -15,7 +15,7 @@ on:
       - ".github/workflows/phase9-final-release.yml"
   push:
     branches:
-      - agent/phase-9-final-verification-release
+      - agent/phase-9-final-release
   workflow_dispatch:
 
 permissions:
