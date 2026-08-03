@@ -7,6 +7,10 @@ import {
   isPhase4SupplierPartnerText,
   translatePhase4SupplierPartnerText,
 } from "@/i18n/supplierPartnerPhase4Translations";
+import {
+  isPhase5PropertiesRentalsText,
+  translatePhase5PropertiesRentalsText,
+} from "@/i18n/propertiesRentalsPhase5Translations";
 
 const EXCLUDED_SELECTOR = [
   "code",
@@ -26,6 +30,10 @@ const EXCLUDED_SELECTOR = [
   "[data-account-code]",
   "[data-container-number]",
   "[data-voucher-number]",
+  "[data-property-name]",
+  "[data-unit-name]",
+  "[data-tenant-name]",
+  "[data-contract-reference]",
 ].join(",");
 
 const ELIGIBLE_TEXT_SELECTOR = [
@@ -61,6 +69,7 @@ function isEligibleTextElement(element: Element): boolean {
 
 export function translateApprovedInterfaceText(value: string, language: ApplicationLanguage): string | null {
   return (
+    translatePhase5PropertiesRentalsText(value, language) ??
     translatePhase4SupplierPartnerText(value, language) ??
     translatePhase3SharedUiText(value, language) ??
     translateSharedInterfaceText(value, language) ??
@@ -73,7 +82,12 @@ function translateTextNode(node: Text, language: ApplicationLanguage) {
   if (!parent || isProtected(parent)) return;
 
   const value = node.nodeValue ?? "";
-  if (!isEligibleTextElement(parent) && !isPhase3SharedUiText(value) && !isPhase4SupplierPartnerText(value)) {
+  if (
+    !isEligibleTextElement(parent) &&
+    !isPhase3SharedUiText(value) &&
+    !isPhase4SupplierPartnerText(value) &&
+    !isPhase5PropertiesRentalsText(value)
+  ) {
     return;
   }
 
@@ -114,9 +128,9 @@ export function translateInterfaceTree(root: Node, language: ApplicationLanguage
  * The main observer is scoped to the React application root, while a lightweight
  * body observer only discovers portal roots. Mutation work is batched into one
  * animation frame. Plain spans/divs and table data cells remain business content
- * by default. Exact reviewed Phase 3 shared-interface and Phase 4 Supplier Partner
- * messages may translate outside normal control/heading selectors, while protected
- * business-value markers always take precedence.
+ * by default. Exact reviewed Phase 3 shared-interface, Phase 4 Supplier Partner,
+ * and Phase 5 Properties/Rentals messages may translate outside normal control/
+ * heading selectors, while protected business-value markers always take precedence.
  */
 export function ApplicationInterfaceTranslator({ language }: { language: ApplicationLanguage }) {
   useEffect(() => {
