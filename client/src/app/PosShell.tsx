@@ -141,18 +141,20 @@ export function PosShell({
               </SidebarGroup>
             </SidebarContent>
             <SidebarFooter className="space-y-1 border-t p-2">
-              <div
-                data-business-value="true"
-                dir="auto"
-                className="truncate px-2 text-xs text-muted-foreground"
-              >
+              <div data-business-value="true" dir="auto" className="truncate px-2 text-xs text-muted-foreground">
                 {user.username}
               </div>
               <div className="flex flex-wrap items-center gap-1">
                 <CurrencyToggle />
                 <CompanySelector />
                 <ThemeToggle />
-                <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Log out" data-testid="button-logout">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleLogout}
+                  aria-label="Log out"
+                  data-testid="button-logout"
+                >
                   <LogOut className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </div>
@@ -205,7 +207,11 @@ export function PosShell({
             >
               <div className={isFullHeightRoute ? "h-full min-w-0" : "w-full min-w-0"}>
                 <ErrorBoundary resetKey={currentLocation}>
-                  <Suspense fallback={<LoadingState title="Loading point of sale" description="Preparing the latest sales workspace." />}>
+                  <Suspense
+                    fallback={
+                      <LoadingState title="Loading point of sale" description="Preparing the latest sales workspace." />
+                    }
+                  >
                     <Router user={user} posImportEnabled={posImportEnabled} />
                   </Suspense>
                 </ErrorBoundary>
@@ -214,9 +220,7 @@ export function PosShell({
           </div>
         </div>
       </SidebarProvider>
-      {hasAdminSearch && (
-        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} isPOS={true} user={user} />
-      )}
+      {hasAdminSearch && <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} isPOS={true} user={user} />}
       {leaveConfirmDialog}
     </>
   );

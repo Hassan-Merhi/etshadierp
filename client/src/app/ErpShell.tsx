@@ -61,10 +61,7 @@ export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog 
                 <ErrorBoundary resetKey={currentLocation}>
                   <Suspense
                     fallback={
-                      <LoadingState
-                        title="Loading workspace"
-                        description="Preparing the latest ERP information."
-                      />
+                      <LoadingState title="Loading workspace" description="Preparing the latest ERP information." />
                     }
                   >
                     <Router user={user} />

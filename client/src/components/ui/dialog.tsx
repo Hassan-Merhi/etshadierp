@@ -21,7 +21,7 @@ const DialogOverlay = React.forwardRef<
     data-slot="dialog-overlay"
     className={cn(
       "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 motion-reduce:animate-none",
-      className,
+      className
     )}
     {...props}
   />
@@ -84,7 +84,7 @@ const DialogContent = React.forwardRef<
         onCloseAutoFocus={handleCloseAutoFocus}
         className={cn(
           "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto overscroll-contain border bg-background p-4 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:max-h-[calc(100dvh-2rem)] sm:w-[calc(100vw-2rem)] sm:rounded-lg sm:p-6 motion-reduce:animate-none motion-reduce:transition-none",
-          className,
+          className
         )}
         {...props}
       >
@@ -117,7 +117,7 @@ const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivEleme
     data-slot="dialog-footer"
     className={cn(
       "flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:justify-end sm:border-t-0 sm:pt-0 [&>*]:w-full sm:[&>*]:w-auto",
-      className,
+      className
     )}
     {...props}
   />

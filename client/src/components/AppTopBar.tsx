@@ -50,10 +50,7 @@ export function AppTopBar({
         {leftContent}
       </div>
 
-      <div
-        data-slot="app-top-bar-actions"
-        className="ml-auto flex min-w-0 flex-nowrap items-center gap-1 sm:gap-1.5"
-      >
+      <div data-slot="app-top-bar-actions" className="ml-auto flex min-w-0 flex-nowrap items-center gap-1 sm:gap-1.5">
         {extraActions}
 
         {showSearch && onSearchOpen && (

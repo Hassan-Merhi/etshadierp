@@ -118,15 +118,11 @@ html[dir="rtl"] [data-slot="sidebar"][data-side="left"] [data-slot="sidebar-cont
   border-left-width: 1px;
 }
 
-html[dir="rtl"]
-  [data-slot="sidebar"][data-side="left"][data-collapsible="offcanvas"]
-  [data-slot="sidebar-container"] {
+html[dir="rtl"] [data-slot="sidebar"][data-side="left"][data-collapsible="offcanvas"] [data-slot="sidebar-container"] {
   right: calc(var(--sidebar-width) * -1);
 }
 
-html[dir="rtl"]
-  [data-slot="sidebar"][data-side="left"][data-state="expanded"]
-  [data-slot="sidebar-container"] {
+html[dir="rtl"] [data-slot="sidebar"][data-side="left"][data-state="expanded"] [data-slot="sidebar-container"] {
   right: 0;
 }
 

@@ -3,14 +3,19 @@ import { cn } from "@/lib/utils";
 
 type SkipLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement>;
 
-export function SkipLink({ className, children = "Skip to main content", href = "#main-content", ...props }: SkipLinkProps) {
+export function SkipLink({
+  className,
+  children = "Skip to main content",
+  href = "#main-content",
+  ...props
+}: SkipLinkProps) {
   return (
     <a
       href={href}
       data-slot="skip-link"
       className={cn(
         "sr-only z-50 rounded-md bg-background px-4 py-2 text-sm font-medium text-foreground shadow-lg transition focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 motion-reduce:transition-none",
-        className,
+        className
       )}
       {...props}
     >
@@ -30,12 +35,7 @@ type LiveRegionProps = React.HTMLAttributes<HTMLDivElement> & {
   atomic?: boolean;
 };
 
-export function LiveRegion({
-  className,
-  politeness = "polite",
-  atomic = true,
-  ...props
-}: LiveRegionProps) {
+export function LiveRegion({ className, politeness = "polite", atomic = true, ...props }: LiveRegionProps) {
   return (
     <div
       data-slot="live-region"
@@ -60,7 +60,7 @@ export function ResponsiveActions({ className, label = "Page actions", ...props 
       aria-label={label}
       className={cn(
         "flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end [&>*]:min-h-10 [&>*]:w-full sm:[&>*]:w-auto",
-        className,
+        className
       )}
       {...props}
     />
@@ -79,7 +79,7 @@ export function ResponsiveToolbar({ className, label = "Page filters and tools",
       aria-label={label}
       className={cn(
         "flex w-full flex-col gap-3 rounded-lg border bg-card p-3 sm:flex-row sm:flex-wrap sm:items-end [&>*]:min-w-0 [&_button]:touch-manipulation",
-        className,
+        className
       )}
       {...props}
     />
@@ -135,7 +135,7 @@ export function HorizontalScrollRegion({
       tabIndex={tabIndex}
       className={cn(
         "max-w-full touch-pan-x overflow-x-auto overscroll-x-contain rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        className,
+        className
       )}
       {...props}
     >
