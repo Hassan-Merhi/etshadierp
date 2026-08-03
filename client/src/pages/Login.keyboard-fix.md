@@ -1,1 +1,0 @@
-Temporary implementation note: make Enter submit the login form and clear/refocus the password field after failed authentication.
