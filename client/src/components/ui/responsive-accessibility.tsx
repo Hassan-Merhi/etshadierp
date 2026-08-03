@@ -46,6 +46,38 @@ export function LiveRegion({
   );
 }
 
+type ResponsivePageProps = React.HTMLAttributes<HTMLDivElement> & {
+  compact?: boolean;
+};
+
+export function ResponsivePage({ className, compact = false, ...props }: ResponsivePageProps) {
+  return (
+    <div
+      data-responsive-page="true"
+      className={cn(
+        "mx-auto flex w-full min-w-0 max-w-full flex-col",
+        compact ? "gap-3 sm:gap-4" : "gap-4 sm:gap-6",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+type ResponsiveSectionProps = React.HTMLAttributes<HTMLElement> & {
+  label?: string;
+};
+
+export function ResponsiveSection({ className, label, ...props }: ResponsiveSectionProps) {
+  return (
+    <section
+      aria-label={label}
+      className={cn("w-full min-w-0 max-w-full", className)}
+      {...props}
+    />
+  );
+}
+
 type ResponsiveActionsProps = React.HTMLAttributes<HTMLDivElement> & {
   label?: string;
 };
@@ -56,7 +88,25 @@ export function ResponsiveActions({ className, label = "Page actions", ...props 
       role="group"
       aria-label={label}
       className={cn(
-        "flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end [&>*]:min-h-10 [&>*]:w-full sm:[&>*]:w-auto",
+        "flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end [&>*]:min-h-11 [&>*]:w-full sm:[&>*]:min-h-10 sm:[&>*]:w-auto",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+type MobileActionBarProps = React.HTMLAttributes<HTMLDivElement> & {
+  label?: string;
+};
+
+export function MobileActionBar({ className, label = "Form actions", ...props }: MobileActionBarProps) {
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className={cn(
+        "mobile-action-bar flex w-full flex-col-reverse gap-2 sm:static sm:ml-auto sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none [&>*]:min-h-11 [&>*]:w-full sm:[&>*]:min-h-10 sm:[&>*]:w-auto",
         className,
       )}
       {...props}
@@ -74,7 +124,7 @@ export function ResponsiveToolbar({ className, label = "Page filters and tools",
       role="search"
       aria-label={label}
       className={cn(
-        "flex w-full flex-col gap-3 rounded-lg border bg-card p-3 sm:flex-row sm:flex-wrap sm:items-end [&>*]:min-w-0 [&_button]:touch-manipulation",
+        "flex w-full min-w-0 flex-col gap-3 rounded-lg border bg-card p-3 sm:flex-row sm:flex-wrap sm:items-end [&>*]:min-w-0 [&_button]:touch-manipulation [&_input]:min-h-11 [&_select]:min-h-11 sm:[&_input]:min-h-10 sm:[&_select]:min-h-10",
         className,
       )}
       {...props}
@@ -90,6 +140,26 @@ export function ResponsiveGrid({ className, minColumnWidth = "16rem", style, ...
   return (
     <div
       className={cn("grid min-w-0 gap-4", className)}
+      style={{ gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${minColumnWidth}), 1fr))`, ...style }}
+      {...props}
+    />
+  );
+}
+
+type ResponsiveFormGridProps = React.HTMLAttributes<HTMLDivElement> & {
+  minColumnWidth?: string;
+};
+
+export function ResponsiveFormGrid({
+  className,
+  minColumnWidth = "18rem",
+  style,
+  ...props
+}: ResponsiveFormGridProps) {
+  return (
+    <div
+      data-responsive-form-grid="true"
+      className={cn("grid w-full min-w-0 gap-4 [&>*]:min-w-0", className)}
       style={{ gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${minColumnWidth}), 1fr))`, ...style }}
       {...props}
     />
@@ -126,6 +196,7 @@ export function HorizontalScrollRegion({
       aria-label={label}
       aria-describedby={descriptionId}
       tabIndex={tabIndex}
+      data-horizontal-scroll="true"
       className={cn(
         "max-w-full touch-pan-x overflow-x-auto overscroll-x-contain rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         className,
