@@ -246,6 +246,7 @@ jobs:
           retention-days: 14
 
       - name: Record final release result
+        id: release_result
         if: always()
         env:
           INSTALL: ${{ steps.install.outcome }}
@@ -298,8 +299,12 @@ jobs:
           | Critical production dependency audit | $DEPENDENCY_AUDIT |
           | Verified/unknown secret scan | $SECRET_SCAN |
           EOF
-          echo "PHASE9_STATUS=$status" >> "$GITHUB_ENV"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
 
       - name: Enforce successful release verification
         if: always()
-        run: test "$PHASE9_STATUS" = "success"
+        env:
+          PHASE9_STATUS: ${{ steps.release_result.outputs.status }}
+        run: |
+          echo "Recorded Phase 9 status: ${PHASE9_STATUS}"
+          test "${PHASE9_STATUS}" = "success"
