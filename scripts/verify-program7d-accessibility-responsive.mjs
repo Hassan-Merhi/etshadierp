@@ -6,6 +6,14 @@ const files = {
   financial: "client/src/components/financial/financial-screen.tsx",
   operations: "client/src/components/operations/operations-screen.tsx",
   dialog: "client/src/components/ui/dialog.tsx",
+  sheet: "client/src/components/ui/sheet.tsx",
+  direction: "client/src/i18n/applicationDirection.ts",
+  languageContext: "client/src/contexts/ApplicationLanguageContext.tsx",
+  rtl: "client/src/styles/rtl-hardening.css",
+  erpShell: "client/src/app/ErpShell.tsx",
+  factoryShell: "client/src/app/FactoryShell.tsx",
+  propertiesShell: "client/src/app/PropertiesShell.tsx",
+  posShell: "client/src/app/PosShell.tsx",
   mobileHook: "client/src/hooks/use-mobile.tsx",
   mobileViewport: "client/src/mobile-browser-compat.css",
   main: "client/src/main.tsx",
@@ -40,6 +48,7 @@ for (const token of [
   "auto-fit",
   "minmax",
   "motion-reduce:transition-none",
+  'data-horizontal-scroll-region="true"',
 ]) {
   if (!sources.responsive.includes(token)) failures.push(`Responsive primitive contract missing: ${token}`);
 }
@@ -74,8 +83,84 @@ for (const token of [
   'aria-label="Close dialog"',
   "VisuallyHidden",
   "[&>*]:w-full",
+  'data-slot="dialog-content"',
+  'data-slot="dialog-close"',
 ]) {
   if (!sources.dialog.includes(token)) failures.push(`Accessible dialog contract missing: ${token}`);
+}
+
+for (const token of [
+  'data-slot="sheet-content"',
+  'data-slot="sheet-close"',
+  'data-sheet-side={side}',
+  "min-h-10",
+  "min-w-10",
+  "motion-reduce:animate-none",
+]) {
+  if (!sources.sheet.includes(token)) failures.push(`Accessible sheet contract missing: ${token}`);
+}
+
+for (const token of [
+  "applyApplicationLanguageToDocument",
+  "root.dataset.applicationLanguage",
+  "root.dataset.applicationDirection",
+  "targetDocument.body.dir = direction",
+]) {
+  if (!sources.direction.includes(token)) failures.push(`Application direction contract missing: ${token}`);
+}
+
+for (const token of [
+  "applyApplicationLanguageToDocument(language)",
+  "<LiveRegion",
+  'data-testid="application-language-announcement"',
+  "useApplicationDirection",
+]) {
+  if (!sources.languageContext.includes(token)) failures.push(`Language accessibility contract missing: ${token}`);
+}
+
+for (const token of [
+  '[data-business-value]',
+  '[data-account-code]',
+  '[data-container-number]',
+  '[data-voucher-number]',
+  '[data-slot="sidebar-container"]',
+  '[data-slot="dialog-close"]',
+  '[data-slot="sheet-close"]',
+  '[data-slot="app-top-bar-actions"]',
+  '[data-slot="pos-top-bar-actions"]',
+  '[data-directional-icon="true"]',
+  "unicode-bidi: isolate",
+  "direction: ltr",
+  "pointer: coarse",
+  "prefers-reduced-motion",
+  "forced-colors",
+]) {
+  if (!sources.rtl.includes(token)) failures.push(`RTL hardening contract missing: ${token}`);
+}
+
+for (const [name, source] of [
+  ["ERP", sources.erpShell],
+  ["Factory", sources.factoryShell],
+  ["Properties", sources.propertiesShell],
+  ["POS", sources.posShell],
+]) {
+  for (const token of [
+    "useApplicationLanguage",
+    '<SkipLink>{t("accessibility.skipToMainContent")}</SkipLink>',
+    'id="main-content"',
+    "tabIndex={-1}",
+  ]) {
+    if (!source.includes(token)) failures.push(`${name} shell accessibility contract missing: ${token}`);
+  }
+}
+
+for (const token of [
+  'data-directional-icon="true"',
+  'data-slot="pos-top-bar-actions"',
+  'data-business-value="true"',
+  'dir="auto"',
+]) {
+  if (!sources.posShell.includes(token)) failures.push(`POS RTL contract missing: ${token}`);
 }
 
 for (const token of [
@@ -111,4 +196,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log("Program 7D accessibility and responsive contracts verified.");
+console.log("Program 7D accessibility, responsive and RTL contracts verified.");
