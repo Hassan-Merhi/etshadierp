@@ -136,6 +136,17 @@ describe("handlePossibleSessionExpiry", () => {
     expect((fetch as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
   });
 
+  it("does not re-verify later 401s after expiry was already handled", async () => {
+    const firstFetch = mockAuthMeFetch(401);
+    await handlePossibleSessionExpiry(makeResponse(401), "/api/reports/example", firstFetch);
+    expect((firstFetch as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
+    expect(redirectTarget).toBe("/login");
+
+    const laterFetch = mockAuthMeFetch(401);
+    await handlePossibleSessionExpiry(makeResponse(401), "/api/notifications/unread-count", laterFetch);
+    expect((laterFetch as ReturnType<typeof vi.fn>).mock.calls.length).toBe(0);
+  });
+
   // ── Scenario 3: temporary server problems ─────────────────────────────────
   it("does NOT redirect when /api/auth/me returns 502", async () => {
     await handlePossibleSessionExpiry(makeResponse(401), "/api/reports/example", mockAuthMeFetch(502));
