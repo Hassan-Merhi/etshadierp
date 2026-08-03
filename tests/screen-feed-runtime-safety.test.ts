@@ -14,10 +14,10 @@ describe("screen feed runtime safety", () => {
     resetRemoteSupportMetrics();
   });
 
-  it("keeps all future capabilities off by default", () => {
+  it("enables only the verified fast feed by default", () => {
     const snapshot = getRemoteSupportRuntimeSnapshot();
 
-    expect(snapshot.flags.fastScreenFeed).toBe(false);
+    expect(snapshot.flags.fastScreenFeed).toBe(true);
     expect(snapshot.flags.remoteControl).toBe(false);
     expect(snapshot.flags.keyboardControl).toBe(false);
     expect(snapshot.flags.sensitiveActionProtection).toBe(true);
@@ -45,19 +45,25 @@ describe("screen feed runtime safety", () => {
     expect(snapshot.updatedBy).toBe("developer");
   });
 
-  it("records lightweight feed measurements", () => {
+  it("records polling and live feed measurements", () => {
     recordRemoteSupportMetric("watcherStatusPoll");
     recordRemoteSupportMetric("viewerPoll");
+    recordRemoteSupportMetric("liveStatusConnected");
+    recordRemoteSupportMetric("liveViewerConnected");
     recordRemoteSupportMetric("frameAccepted", 1200);
     recordRemoteSupportMetric("frameAccepted", 800);
+    recordRemoteSupportMetric("framePushed", 2);
     recordRemoteSupportMetric("frameRejected");
 
     const metrics = getRemoteSupportRuntimeSnapshot().metrics;
 
     expect(metrics.watcherStatusPolls).toBe(1);
     expect(metrics.viewerPolls).toBe(1);
+    expect(metrics.liveStatusConnections).toBe(1);
+    expect(metrics.liveViewerConnections).toBe(1);
     expect(metrics.framesAccepted).toBe(2);
     expect(metrics.framesRejected).toBe(1);
+    expect(metrics.framesPushed).toBe(2);
     expect(metrics.totalFrameBytes).toBe(2000);
     expect(metrics.averageFrameBytes).toBe(1000);
     expect(metrics.lastFrameBytes).toBe(800);
