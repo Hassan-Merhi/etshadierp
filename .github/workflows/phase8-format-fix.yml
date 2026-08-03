@@ -1,6 +1,7 @@
 name: Phase 8 formatting fix
 
 on:
+  pull_request:
   push:
     branches:
       - agent/phase-8-rtl-responsive-accessibility
