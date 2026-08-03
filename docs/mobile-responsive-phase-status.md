@@ -18,8 +18,8 @@ This document is the source of truth for converting the existing ERP web applica
 | Phase | Scope | Status | Branch / PR | Validation |
 | --- | --- | --- | --- | --- |
 | 1 | Global responsive foundation | Complete and merged | `agent/mobile-responsive-phase-1-foundation` / PR #403 | Full CI, Security, I18n, tests, and coverage passed |
-| 2 | Mobile navigation and top bar | Implemented | `agent/mobile-responsive-phase-2-navigation` / PR #411 | Node 22 static-build and shallow-checkout diagnostics passed; final clean-branch validation in progress |
-| 3 | Shared page headers, filters, and actions | Not started | — | — |
+| 2 | Mobile navigation and top bar | Complete and merged | `agent/mobile-responsive-phase-2-navigation` / PR #411 | GitHub CI, Security, and I18n passed; PR merged conflict-free |
+| 3 | Shared page headers, filters, and actions | Implemented | `agent/mobile-responsive-phase-3-page-controls` / PR pending | Final CI validation pending |
 | 4 | Forms and dialogs | Not started | — | — |
 | 5 | Tables and mobile data lists | Not started | — | — |
 | 6 | Core ERP mobile conversion | Not started | — | — |
@@ -74,20 +74,34 @@ This document is the source of truth for converting the existing ERP web applica
 - Desktop sidebar width, collapse behavior, and keyboard shortcut.
 - API routes, database schema, and business calculations.
 
-### Validation completed
+### Validation
 
-- The complete CircleCI static-build command sequence passed under Node.js 22.14.
-- The original shallow-checkout failure was reproduced and traced to a missing Git merge base.
-- The repaired shallow-checkout sequence passed before the permanent CircleCI configuration change was applied.
-- Security and I18n audits passed on the clean Phase 2 implementation before the CI repair commit.
+- GitHub CI passed.
+- Security passed.
+- I18n Audit passed.
+- Pull request was conflict-free and merged.
+
+## Phase 3 completion record
+
+### Delivered
+
+- Made shared page action groups use a compact one-column layout on the narrowest phones and two columns where space permits.
+- Preserved the existing wrapped horizontal desktop action layout.
+- Made shared filter toolbars stack cleanly on phones while retaining wrapped desktop filters.
+- Ensured shared toolbar inputs and select triggers can shrink without forcing page-level horizontal overflow.
+- Added minimum-width containment for shared toolbar children and action controls.
+- Made shared form action bars use the same predictable phone grid and desktop row behavior.
+
+### Deliberately unchanged
+
+- Page-specific filtering behavior and query parameters.
+- Button handlers, navigation targets, permissions, APIs, accounting, costing, and database schema.
+- Existing desktop breakpoints and page content order.
 
 ### Remaining verification
 
-- Complete the final TypeScript, build, lint, format, tests, coverage, Security, I18n, and CircleCI checks on the clean Phase 2 branch.
-- Verify the top bar at 320 px, 360 px, 390 px, phone landscape, tablet, desktop, and wide desktop.
-- Verify company switching online and offline from a phone viewport.
-- Verify sidebar links close the drawer in ERP, Factory, Properties, and Supplier Partner modes.
-- Verify module-specific `extraActions` remain available in the mobile controls sheet.
+- Complete TypeScript, production build, formatting, tests, coverage, Security, I18n, and CI checks.
+- Verify representative headers, filters, and action groups at 320 px, 360 px, 390 px, tablet, and desktop widths.
 
 ## Internal SQL ledger
 
@@ -95,5 +109,6 @@ This document is the source of truth for converting the existing ERP web applica
 | --- | --- |
 | 1 | None |
 | 2 | None |
+| 3 | None |
 
 Do not provide this ledger as the final SQL report until every phase is complete.
