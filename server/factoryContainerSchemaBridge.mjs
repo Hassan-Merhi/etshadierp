@@ -120,7 +120,8 @@ async function ensureFactoryContainerSchema() {
     return;
   }
 
-  const isLocalReplitDb = process.env.PGHOST === "helium" || connectionString.includes("@helium:");
+  const isLocalReplitDb =
+    process.env.PGHOST === "helium" || connectionString.includes("@helium:");
   const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
   const requiresSsl = !isLocalReplitDb && !sslExplicitlyDisabled;
 
@@ -138,7 +139,9 @@ async function ensureFactoryContainerSchema() {
     await client.query("SET LOCAL lock_timeout = '15s'");
     await client.query("SET LOCAL statement_timeout = '90s'");
 
-    const tableLookup = await client.query(`SELECT to_regclass('public.factory_containers') AS table_name`);
+    const tableLookup = await client.query(
+      `SELECT to_regclass('public.factory_containers') AS table_name`
+    );
     if (!tableLookup.rows[0]?.table_name) {
       throw new Error("Required table public.factory_containers does not exist");
     }
@@ -153,7 +156,9 @@ async function ensureFactoryContainerSchema() {
 
     const missingCoreColumns = CORE_COLUMNS.filter((columnName) => !existingColumns.has(columnName));
     if (missingCoreColumns.length > 0) {
-      throw new Error(`factory_containers is missing core column(s): ${missingCoreColumns.join(", ")}`);
+      throw new Error(
+        `factory_containers is missing core column(s): ${missingCoreColumns.join(", ")}`
+      );
     }
 
     for (const [columnName, definition] of REQUIRED_COLUMNS) {
@@ -168,9 +173,13 @@ async function ensureFactoryContainerSchema() {
       "json_cargo_tracking_status",
       "json_cargo_error",
     ];
-    const missingAfterRepair = requiredJsonCargoColumns.filter((columnName) => !existingColumns.has(columnName));
+    const missingAfterRepair = requiredJsonCargoColumns.filter(
+      (columnName) => !existingColumns.has(columnName)
+    );
     if (missingAfterRepair.length > 0) {
-      throw new Error(`Factory container JSONCargo columns remain missing: ${missingAfterRepair.join(", ")}`);
+      throw new Error(
+        `Factory container JSONCargo columns remain missing: ${missingAfterRepair.join(", ")}`
+      );
     }
 
     await client.query("COMMIT");
