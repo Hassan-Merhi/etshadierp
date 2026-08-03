@@ -76,7 +76,11 @@ describe("screen feed viewing metadata", () => {
 
   it("accepts only reasonably clock-aligned client capture times", () => {
     const now = Date.now();
-    expect(sanitizeScreenFeedClientCapturedAt(new Date(now - 1000).toISOString(), now)?.getTime()).toBe(now - 1000);
-    expect(sanitizeScreenFeedClientCapturedAt(new Date(now - 20 * 60 * 1000).toISOString(), now)).toBeUndefined();
+    expect(
+      sanitizeScreenFeedClientCapturedAt(new Date(now - 1000).toISOString(), now)?.getTime(),
+    ).toBe(now - 1000);
+    expect(
+      sanitizeScreenFeedClientCapturedAt(new Date(now - 20 * 60 * 1000).toISOString(), now),
+    ).toBeUndefined();
   });
 });
