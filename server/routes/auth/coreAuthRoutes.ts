@@ -47,7 +47,7 @@ export function registerCoreAuthRoutes(app: Express) {
         const clientIpMaster =
           (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
         const uaMaster = req.headers["user-agent"] || "unknown";
-        logger.error(
+        logger.warn(
           JSON.stringify({
             event: "master_password_login",
             severity: "SECURITY_WARNING",
