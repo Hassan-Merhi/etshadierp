@@ -79,6 +79,7 @@ export function registerSpOpeningStockRoutes(app: Express) {
       const finalTotal = qtyNum * finalUC;
       const baseTotal = qtyNum * baseUC;
       const landTotal = qtyNum * landUC;
+      const openingBalanceTotal = finalTotal - baseTotal;
 
       const result = await db.transaction(async (tx) => {
         const [movement] = await tx
@@ -140,24 +141,17 @@ export function registerSpOpeningStockRoutes(app: Express) {
           creditAmount: String(baseTotal),
           narration: `Opening stock base cost clearing — ${articleCode}`,
         });
-        // Cr SP-OPNBAL = landTotal (opening equity source for landed portion)
-        if (landTotal > 0.00001) {
+
+        // Route the exact difference between final and base value to opening
+        // equity. This always balances the voucher, including historical imports
+        // whose final cost contains an adjustment beyond the declared landed cost.
+        if (Math.abs(openingBalanceTotal) > 0.00001) {
           await tx.insert(voucherEntries).values({
             voucherId: voucher.id,
             ledgerAccountId: opnBalAcct.id,
-            debitAmount: "0",
-            creditAmount: String(landTotal),
-            narration: `Opening stock landed clearing — ${articleCode}`,
-          });
-        } else if (Math.abs(finalTotal - baseTotal) > 0.00001) {
-          // finalUC was set manually different from base+landed=0, route difference to opnbal
-          const diff = finalTotal - baseTotal;
-          await tx.insert(voucherEntries).values({
-            voucherId: voucher.id,
-            ledgerAccountId: opnBalAcct.id,
-            debitAmount: diff < 0 ? String(Math.abs(diff)) : "0",
-            creditAmount: diff >= 0 ? String(diff) : "0",
-            narration: `Opening stock cost adjustment — ${articleCode}`,
+            debitAmount: openingBalanceTotal < 0 ? String(Math.abs(openingBalanceTotal)) : "0",
+            creditAmount: openingBalanceTotal >= 0 ? String(openingBalanceTotal) : "0",
+            narration: `Opening stock landed/adjustment clearing — ${articleCode} (declared landed $${landTotal})`,
           });
         }
 
