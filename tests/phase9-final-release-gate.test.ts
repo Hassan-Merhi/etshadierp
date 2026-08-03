@@ -60,9 +60,11 @@ describe("Phase 9 final verification and release contract", () => {
     expect(workflow).toContain("postgres:15");
     expect(workflow).toContain("scripts/run-phase9-language-browser-smoke.mjs");
     expect(workflow).toContain("scripts/verify-phase9-final-i18n-baseline.mjs");
-    expect(workflow).toContain("id: release_result");
-    expect(workflow).toContain("status=$status");
-    expect(workflow).toContain("steps.release_result.outputs.status");
-    expect(workflow).toContain('test "${PHASE9_STATUS}" = "success"');
+    expect(workflow).toContain("Record and enforce final release result");
+    expect(workflow).toContain("INSTALL: ${{ steps.install.outcome }}");
+    expect(workflow).toContain("SECRET_SCAN: ${{ steps.secret_scan.outcome }}");
+    expect(workflow).toContain("set -euo pipefail");
+    expect(workflow).toContain('test "$status" = "success"');
+    expect(workflow).not.toContain("steps.release_result.outputs.status");
   });
 });
