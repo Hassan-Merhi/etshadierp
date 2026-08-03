@@ -118,7 +118,9 @@ export function getRemoteSupportRuntimeSnapshot(): RemoteSupportRuntimeSnapshot 
   };
 }
 
-export function isRemoteSupportEnabled(flag: RemoteSupportFlagName): boolean {
+export function isRemoteSupportEnabled(
+  flag: RemoteSupportFlagName,
+): boolean {
   return flags[flag];
 }
 
@@ -137,7 +139,8 @@ export function updateRemoteSupportFlags(
   const safePatch = Object.fromEntries(
     Object.entries(patch).filter(
       ([key, value]) =>
-        allowedKeys.includes(key as RemoteSupportFlagName) && typeof value === "boolean",
+        allowedKeys.includes(key as RemoteSupportFlagName) &&
+        typeof value === "boolean",
     ),
   ) as Partial<RemoteSupportFlags>;
 
@@ -148,7 +151,9 @@ export function updateRemoteSupportFlags(
   return getRemoteSupportRuntimeSnapshot();
 }
 
-export function emergencyDisableRemoteSupport(actor: string): RemoteSupportRuntimeSnapshot {
+export function emergencyDisableRemoteSupport(
+  actor: string,
+): RemoteSupportRuntimeSnapshot {
   flags = {
     screenFeedEnabled: false,
     fastScreenFeed: false,
@@ -162,7 +167,9 @@ export function emergencyDisableRemoteSupport(actor: string): RemoteSupportRunti
   return getRemoteSupportRuntimeSnapshot();
 }
 
-export function restoreRemoteSupportBootDefaults(actor: string): RemoteSupportRuntimeSnapshot {
+export function restoreRemoteSupportBootDefaults(
+  actor: string,
+): RemoteSupportRuntimeSnapshot {
   flags = normalizeFlags({ ...bootFlags });
   revision += 1;
   updatedAt = new Date();
@@ -186,9 +193,10 @@ export function recordRemoteSupportMetric(
       metrics.framesRejected += 1;
       return;
     case "frameAccepted": {
-      const safeBytes = Number.isFinite(frameBytes) && (frameBytes ?? 0) > 0
-        ? Math.floor(frameBytes as number)
-        : 0;
+      const safeBytes =
+        Number.isFinite(frameBytes) && (frameBytes ?? 0) > 0
+          ? Math.floor(frameBytes as number)
+          : 0;
       metrics.framesAccepted += 1;
       metrics.totalFrameBytes += safeBytes;
       metrics.lastFrameBytes = safeBytes;
