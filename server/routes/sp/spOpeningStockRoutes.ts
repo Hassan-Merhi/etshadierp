@@ -4,7 +4,14 @@ import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { sql, eq, and, isNull } from "drizzle-orm";
 import { vouchers, voucherEntries, locations, spStockMovements } from "@shared/schema";
-import { adjustInventory } from "../../inventoryHelper";
+import {
+  adjustSpInventoryAtomic,
+  respondToSpInventoryIntegrityError,
+} from "../../services/sp/spInventoryIntegrity";
+import {
+  SP_RELEASE_CURRENCY,
+  SP_RELEASE_EXCHANGE_RATE,
+} from "../../services/sp/spReleasePolicy";
 import { requireSpCompany, getSpAccount, parseNum } from "./spHelpers";
 
 // ── Opening Stock ─────────────────────────────────────────────────────────
@@ -32,6 +39,14 @@ export function registerSpOpeningStockRoutes(app: Express) {
         req.body;
 
       if (!articleCode) return res.status(400).json({ message: "articleCode required" });
+      const parsedStockItemId = Number(stockItemId);
+      if (!Number.isInteger(parsedStockItemId) || parsedStockItemId <= 0) {
+        return res.status(400).json({
+          code: "SP_INVENTORY_LINK_REQUIRED",
+          message: "stockItemId is required so opening stock and ERP inventory remain synchronized",
+        });
+      }
+
       const qtyNum = parseNum(qty);
       if (qtyNum <= 0) return res.status(400).json({ message: "qty must be > 0" });
       const baseUC = parseNum(baseUnitCostUsd);
@@ -54,6 +69,12 @@ export function registerSpOpeningStockRoutes(app: Express) {
           .where(and(eq(locations.companyId, companyId), isNull(locations.deletedAt)));
         if (locs.length > 0) locId = locs[0].id;
       }
+      if (!locId) {
+        return res.status(400).json({
+          code: "SP_INVENTORY_LINK_REQUIRED",
+          message: "An active Supplier Partner location is required before opening stock can be posted",
+        });
+      }
 
       const finalTotal = qtyNum * finalUC;
       const baseTotal = qtyNum * baseUC;
@@ -67,7 +88,7 @@ export function registerSpOpeningStockRoutes(app: Express) {
             sourceType: "opening",
             articleCode,
             description: notes || null,
-            stockItemId: stockItemId ? parseInt(stockItemId) : null,
+            stockItemId: parsedStockItemId,
             locationId: locId,
             qtyIn: String(qtyNum),
             qtyRemaining: String(qtyNum),
@@ -77,13 +98,16 @@ export function registerSpOpeningStockRoutes(app: Express) {
           })
           .returning();
 
-        if (stockItemId && locId) {
-          try {
-            await adjustInventory(tx, locId, parseInt(stockItemId), qtyNum, companyId);
-          } catch {
-            /* non-blocking */
-          }
-        }
+        await adjustSpInventoryAtomic(tx, {
+          companyId,
+          locationId: locId,
+          stockItemId: parsedStockItemId,
+          deltaQty: qtyNum,
+          incomingRate: finalUC,
+          context: `SP opening stock ${articleCode} movement #${movement.id}`,
+          sourceVoucherType: "SP_OPENING_STOCK",
+          sourceVoucherId: movement.id,
+        });
 
         const [voucher] = await tx
           .insert(vouchers)
@@ -94,8 +118,8 @@ export function registerSpOpeningStockRoutes(app: Express) {
             voucherDate: new Date().toISOString().slice(0, 10),
             description: `Opening stock — ${articleCode} (${qtyNum} units)`,
             totalAmount: String(finalTotal),
-            currency: "USD",
-            exchangeRate: "1",
+            currency: SP_RELEASE_CURRENCY,
+            exchangeRate: SP_RELEASE_EXCHANGE_RATE,
             sourceModule: "SP",
           })
           .returning();
@@ -142,6 +166,7 @@ export function registerSpOpeningStockRoutes(app: Express) {
 
       res.json(result);
     } catch (error: unknown) {
+      if (respondToSpInventoryIntegrityError(res, error)) return;
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
