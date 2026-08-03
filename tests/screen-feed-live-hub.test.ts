@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ScreenFrame } from "../server/screenFeedStore";
+import type { ScreenFeedCursor, ScreenFrame } from "../server/screenFeedStore";
 import { ScreenFeedLiveHub } from "../server/services/screenFeedLiveHub";
 
 function buildFrame(): ScreenFrame {
@@ -40,6 +40,17 @@ describe("screen feed live hub", () => {
     expect(hub.publishFrame("42", frame)).toBe(2);
     expect(firstViewer).toHaveBeenCalledWith(frame);
     expect(secondViewer).toHaveBeenCalledWith(frame);
+  });
+
+  it("pushes pointer updates without forcing another image frame", () => {
+    const hub = new ScreenFeedLiveHub();
+    const cursorViewer = vi.fn();
+    const cursor: ScreenFeedCursor = { x: 0.25, y: 0.75, ts: Date.now(), visible: true };
+    hub.subscribeCursors("42", cursorViewer);
+
+    expect(hub.publishCursor("42", cursor)).toBe(1);
+    expect(cursorViewer).toHaveBeenCalledWith(cursor);
+    expect(hub.publishFrame("42", buildFrame())).toBe(0);
   });
 
   it("disconnects all active streams when the kill switch runs", () => {
