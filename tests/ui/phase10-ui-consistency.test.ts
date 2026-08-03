@@ -28,6 +28,16 @@ describe("Phase 10 UI consistency contracts", () => {
     expect(layout).toContain("flex-col-reverse");
   });
 
+  it("keeps shared filters and actions contained on phone widths", () => {
+    const layout = source("client/src/components/ui/workspace-layout.tsx");
+
+    expect(layout).toContain("min-[360px]:grid-cols-2");
+    expect(layout).toContain("sm:[&_button]:w-auto");
+    expect(layout).toContain("[&_input]:w-full");
+    expect(layout).toContain("[&_[role=combobox]]:w-full");
+    expect(layout).not.toContain("xs:grid-cols-2");
+  });
+
   it("uses semantic and accessible page navigation", () => {
     const header = source("client/src/components/PageHeader.tsx");
 
