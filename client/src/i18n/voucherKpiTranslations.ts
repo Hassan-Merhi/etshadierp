@@ -25,6 +25,7 @@ const entries: Entry[] = [
   { en: "Delete Voucher", ar: "حذف السند", fr: "Supprimer la pièce" },
   { en: "Payment", ar: "دفع", fr: "Paiement" },
   { en: "Receipt", ar: "قبض", fr: "Encaissement" },
+  { en: "Journal", ar: "اليومية", fr: "Journal" },
   { en: "Journal Entry", ar: "قيد يومية", fr: "Écriture de journal" },
   { en: "Detailed", ar: "مفصل", fr: "Détaillé" },
   { en: "Condensed", ar: "مختصر", fr: "Condensé" },
