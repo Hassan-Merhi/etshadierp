@@ -21,16 +21,16 @@ export function GlobalLanguageSwitch({ embedded = false }: { embedded?: boolean 
       className={
         embedded
           ? "flex items-center justify-end gap-1"
-          : "fixed right-3 top-3 z-[70] flex items-center gap-1 rounded-lg border bg-background/95 p-1 shadow-sm backdrop-blur"
+          : "fixed bottom-3 left-1/2 z-[70] flex -translate-x-1/2 items-center gap-1 rounded-lg border bg-background/95 p-1 shadow-sm backdrop-blur"
       }
       dir="ltr"
       role="group"
       aria-label={t("language.label")}
       data-testid="global-language-switch"
     >
-      <span className="hidden items-center gap-1 px-1 text-xs text-muted-foreground md:flex">
+      <span className="flex items-center px-1 text-muted-foreground">
         <Languages className="h-3.5 w-3.5" aria-hidden="true" />
-        {t("language.label")}
+        <span className="sr-only">{t("language.label")}</span>
       </span>
       {languageOptions.map((option) => (
         <Button
