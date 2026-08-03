@@ -53,7 +53,9 @@
     "USE /api/factory [factoryBilingualCatalogMiddleware]",
     "USE /api/factory [bilingualSurfaceMiddleware]",
     "USE /api [bilingualSurfaceMiddleware]",
-    "USE /api/factory [factoryBilingualSnapshotWriteMiddleware]"
+    "USE /api/factory [factoryBilingualSnapshotWriteMiddleware]",
+    "USE re:^\\/api\\/sp\\/containers(?:\\/([^/]+?))\\/?(?=\\/|$) [requireSpContainerPatchAuth]",
+    "USE re:^\\/api\\/sp\\/containers(?:\\/([^/]+?))\\/?(?=\\/|$) [<anonymous>]"
   ],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [
