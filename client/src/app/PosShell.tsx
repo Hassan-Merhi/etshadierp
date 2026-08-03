@@ -45,14 +45,22 @@ interface PosShellProps {
 
 const posWorkspaceClasses = [
   "[&_button]:touch-manipulation",
-  "[&_input]:min-h-10",
-  "[&_select]:min-h-10",
-  "[&_textarea]:min-h-20",
+  "max-sm:[&_button]:min-h-11",
+  "max-sm:[&_input]:min-h-11",
+  "max-sm:[&_input]:text-base",
+  "max-sm:[&_select]:min-h-11",
+  "max-sm:[&_textarea]:min-h-24",
+  "[&_form]:min-w-0",
+  "[&_form]:max-w-full",
+  "[&_fieldset]:min-w-0",
+  "[&_img]:max-w-full",
   "[&_table]:min-w-max",
   "[&_th]:whitespace-nowrap",
   "[&_td]:align-middle",
   "[&_[role=dialog]]:max-w-[calc(100vw-1rem)]",
   "[&_[role=listbox]]:max-h-[min(24rem,70dvh)]",
+  "[&_[data-pos-mobile-page]]:max-w-full",
+  "[&_[data-table-scroll-region]]:max-w-full",
   "[&_.tabular-nums]:font-variant-numeric-tabular-nums",
 ].join(" ");
 
@@ -71,8 +79,6 @@ export function PosShell({
 
   const posStyle = { "--sidebar-width": "11rem", "--sidebar-width-icon": "3rem" };
   const isPosRoute = currentLocation === "/pos" || currentLocation.startsWith("/pos/");
-  // Only the true full-screen POS canvas uses overflow-hidden on <main>.
-  // All other routes — including /tracking — are scrollable and must receive focus.
   const isFullHeightRoute = isPosRoute;
   const hasAdminSearch = canUseAdminSearch(user);
   const posContainerRef = useRef<HTMLDivElement>(null);
@@ -83,7 +89,11 @@ export function PosShell({
     <>
       <SkipLink />
       <SidebarProvider style={posStyle as React.CSSProperties}>
-        <div ref={posContainerRef} className="flex h-full w-full min-w-0 overflow-hidden">
+        <div
+          ref={posContainerRef}
+          data-pos-shell="true"
+          className="flex h-full w-full min-w-0 overflow-hidden"
+        >
           {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
           <Sidebar>
             <SidebarHeader className="space-y-2 border-b p-3">
@@ -138,7 +148,7 @@ export function PosShell({
                 </SidebarGroupContent>
               </SidebarGroup>
             </SidebarContent>
-            <SidebarFooter className="space-y-1 border-t p-2">
+            <SidebarFooter className="space-y-1 border-t p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
               <div className="truncate px-2 text-xs text-muted-foreground">{user.username}</div>
               <div className="flex flex-wrap items-center gap-1">
                 <CurrencyToggle />
@@ -151,21 +161,29 @@ export function PosShell({
             </SidebarFooter>
           </Sidebar>
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-            <header className="no-print flex h-12 items-center justify-between gap-2 border-b p-2">
-              <SidebarTrigger aria-label="Toggle point of sale navigation" data-testid="button-sidebar-toggle" />
-              <div className="ml-auto flex min-w-0 items-center gap-2">
+            <header className="no-print flex min-h-14 items-center gap-2 border-b px-2 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] sm:min-h-12 sm:pt-2">
+              <SidebarTrigger
+                className="h-11 w-11 sm:h-9 sm:w-9"
+                aria-label="Toggle point of sale navigation"
+                data-testid="button-sidebar-toggle"
+              />
+              <div className="min-w-0 flex-1 lg:hidden">
+                <p className="truncate text-sm font-semibold">{user.posStation ? `POS ${user.posStation}` : "Point of Sale"}</p>
+                <p className="truncate text-xs text-muted-foreground">{selectedCompany?.name}</p>
+              </div>
+              <div className="ml-auto flex min-w-0 items-center gap-1 sm:gap-2">
                 <PendingSyncIndicator />
                 {hasAdminSearch && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="flex items-center gap-1.5 text-muted-foreground"
+                    className="flex min-h-11 items-center gap-1.5 px-2 text-muted-foreground sm:min-h-9"
                     onClick={() => setPaletteOpen(true)}
                     aria-label="Open command search"
                     data-testid="button-open-palette"
                   >
                     <Search className="h-4 w-4" aria-hidden="true" />
-                    <kbd className="hidden h-5 items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] sm:inline-flex">
+                    <kbd className="hidden h-5 items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] lg:inline-flex">
                       {typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
                         ? "⌘ /"
                         : "Ctrl /"}
@@ -175,6 +193,7 @@ export function PosShell({
                 <Button
                   variant="ghost"
                   size="icon"
+                  className="h-11 w-11 sm:h-9 sm:w-9"
                   onClick={handleLogout}
                   aria-label="Log out"
                   data-testid="button-logout-header"
@@ -192,10 +211,10 @@ export function PosShell({
               className={`${posWorkspaceClasses} outline-none ${
                 isFullHeightRoute
                   ? "flex-1 min-w-0 overflow-hidden overscroll-contain"
-                  : "flex-1 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain p-3 sm:p-6"
+                  : "flex-1 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-6"
               }`}
             >
-              <div className={isFullHeightRoute ? "h-full min-w-0" : "w-full min-w-0"}>
+              <div className={isFullHeightRoute ? "h-full min-w-0" : "w-full min-w-0 max-w-full"}>
                 <ErrorBoundary resetKey={currentLocation}>
                   <Suspense fallback={<LoadingState title="Loading point of sale" description="Preparing the latest sales workspace." />}>
                     <Router user={user} posImportEnabled={posImportEnabled} />
