@@ -1,0 +1,50 @@
+name: Phase 8 formatting fix
+
+on:
+  push:
+    branches:
+      - agent/phase-8-rtl-responsive-accessibility
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Phase 8 branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/phase-8-rtl-responsive-accessibility
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Normalize registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Format verification files
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            tests/phase8-rtl-responsive-accessibility.test.ts \
+            vitest.config.i18n-contracts.ts
+
+      - name: Commit formatting correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/phase8-rtl-responsive-accessibility.test.ts vitest.config.i18n-contracts.ts
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Format Phase 8 verification files"
+          git push origin HEAD:agent/phase-8-rtl-responsive-accessibility
