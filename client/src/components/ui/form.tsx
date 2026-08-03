@@ -83,16 +83,15 @@ const FormGrid = React.forwardRef<HTMLDivElement, FormGridProps>(
       style={{ gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${minColumnWidth}), 1fr))`, ...style }}
       {...props}
     />
-  ),
+  )
 );
 FormGrid.displayName = "FormGrid";
 
-const FormSection = React.forwardRef<
-  HTMLFieldSetElement,
-  React.FieldsetHTMLAttributes<HTMLFieldSetElement>
->(({ className, ...props }, ref) => (
-  <fieldset ref={ref} className={cn("min-w-0 space-y-4 rounded-lg border p-3 sm:p-4", className)} {...props} />
-));
+const FormSection = React.forwardRef<HTMLFieldSetElement, React.FieldsetHTMLAttributes<HTMLFieldSetElement>>(
+  ({ className, ...props }, ref) => (
+    <fieldset ref={ref} className={cn("min-w-0 space-y-4 rounded-lg border p-3 sm:p-4", className)} {...props} />
+  )
+);
 FormSection.displayName = "FormSection";
 
 const FormSectionLegend = React.forwardRef<HTMLLegendElement, React.HTMLAttributes<HTMLLegendElement>>(
@@ -102,7 +101,7 @@ const FormSectionLegend = React.forwardRef<HTMLLegendElement, React.HTMLAttribut
       className={cn("max-w-full break-words px-1 text-sm font-semibold leading-snug", className)}
       {...props}
     />
-  ),
+  )
 );
 FormSectionLegend.displayName = "FormSectionLegend";
 
@@ -115,7 +114,7 @@ const FormItem = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
         <div ref={ref} className={cn("min-w-0 scroll-mt-24 space-y-1.5", className)} {...props} />
       </FormItemContext.Provider>
     );
-  },
+  }
 );
 FormItem.displayName = "FormItem";
 
@@ -136,67 +135,64 @@ const FormLabel = React.forwardRef<
 });
 FormLabel.displayName = "FormLabel";
 
-const FormControl = React.forwardRef<
-  React.ElementRef<typeof Slot>,
-  React.ComponentPropsWithoutRef<typeof Slot>
->(({ ...props }, ref) => {
-  const { error, formItemId, formDescriptionId, formMessageId } = useFormField();
-  const describedBy = error ? `${formDescriptionId} ${formMessageId}` : formDescriptionId;
+const FormControl = React.forwardRef<React.ElementRef<typeof Slot>, React.ComponentPropsWithoutRef<typeof Slot>>(
+  ({ ...props }, ref) => {
+    const { error, formItemId, formDescriptionId, formMessageId } = useFormField();
+    const describedBy = error ? `${formDescriptionId} ${formMessageId}` : formDescriptionId;
 
-  return (
-    <Slot
-      ref={ref}
-      id={formItemId}
-      aria-describedby={describedBy}
-      aria-errormessage={error ? formMessageId : undefined}
-      aria-invalid={Boolean(error)}
-      {...props}
-    />
-  );
-});
+    return (
+      <Slot
+        ref={ref}
+        id={formItemId}
+        aria-describedby={describedBy}
+        aria-errormessage={error ? formMessageId : undefined}
+        aria-invalid={Boolean(error)}
+        {...props}
+      />
+    );
+  }
+);
 FormControl.displayName = "FormControl";
 
-const FormDescription = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLParagraphElement>
->(({ className, ...props }, ref) => {
-  const { formDescriptionId } = useFormField();
+const FormDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
+  ({ className, ...props }, ref) => {
+    const { formDescriptionId } = useFormField();
 
-  return (
-    <p
-      ref={ref}
-      id={formDescriptionId}
-      className={cn("break-words text-xs leading-relaxed text-muted-foreground", className)}
-      {...props}
-    />
-  );
-});
+    return (
+      <p
+        ref={ref}
+        id={formDescriptionId}
+        className={cn("break-words text-xs leading-relaxed text-muted-foreground", className)}
+        {...props}
+      />
+    );
+  }
+);
 FormDescription.displayName = "FormDescription";
 
-const FormMessage = React.forwardRef<
-  HTMLParagraphElement,
-  React.HTMLAttributes<HTMLParagraphElement>
->(({ className, children, ...props }, ref) => {
-  const { error, formMessageId } = useFormField();
-  const body = error ? String(error.message ?? "") : children;
+const FormMessage = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
+  ({ className, children, ...props }, ref) => {
+    const { error, formMessageId } = useFormField();
+    const body = error ? String(error.message ?? "") : children;
 
-  if (!body) {
-    return null;
+    if (!body) {
+      return null;
+    }
+
+    return (
+      <p
+        ref={ref}
+        id={formMessageId}
+        role="alert"
+        aria-live="polite"
+        className={cn("break-words text-xs font-medium leading-relaxed text-destructive", className)}
+        {...props}
+      >
+        {body}
+      </p>
+    );
   }
-
-  return (
-    <p
-      ref={ref}
-      id={formMessageId}
-      role="alert"
-      aria-live="polite"
-      className={cn("break-words text-xs font-medium leading-relaxed text-destructive", className)}
-      {...props}
-    >
-      {body}
-    </p>
-  );
-});
+);
 FormMessage.displayName = "FormMessage";
 
 export {

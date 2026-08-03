@@ -63,7 +63,7 @@ export function WorkflowDialog({
       <DialogContent
         className={cn(
           "max-h-[calc(var(--app-viewport-height)-1rem)] w-[calc(100vw-1rem)] overflow-hidden p-0 sm:max-w-lg",
-          contentClassName,
+          contentClassName
         )}
         data-testid={testId}
       >
