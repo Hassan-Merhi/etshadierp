@@ -132,7 +132,7 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
           <div className="relative">
             <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
             <Input
-              placeholder="Voucher # or item..."
+              placeholder="Item name..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-8 h-8 text-sm"
@@ -204,9 +204,6 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
               {/* Main content */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-semibold font-mono" data-testid={`text-voucher-${t.voucherId}`}>
-                    {t.voucherNumber}
-                  </span>
                   <span className="text-xs text-muted-foreground">{formatDate(t.voucherDate)}</span>
                   {t.inventoryApplied ? (
                     <Badge
