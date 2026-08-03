@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -42,8 +42,15 @@ export function getPageLabel(route: string): string {
     .replace(/-/g, " ")
     .replace(/\//g, " > ")
     .split(" ")
-    .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+    .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+interface ScreenFrame {
+  dataUrl: string;
+  capturedAt: string;
+  username: string;
+  clicks: Array<{ x: number; y: number; label: string; ts: number }>;
 }
 
 export function WatchUserDialog({
@@ -55,30 +62,66 @@ export function WatchUserDialog({
   username: string;
   onClose: () => void;
 }) {
+  const [liveConnected, setLiveConnected] = useState(false);
+  const [liveFrame, setLiveFrame] = useState<ScreenFrame | null>(null);
+
   const { data: presenceRaw } = useQuery<any>({
     queryKey: ["/api/user-presence", userId],
-    queryFn: () => apiRequest("GET", `/api/user-presence/${userId}`).then((r) => r.json()),
+    queryFn: () => apiRequest("GET", `/api/user-presence/${userId}`).then((response) => response.json()),
     refetchInterval: 30000,
   });
   const { data: activityRaw } = useQuery<any>({
     queryKey: ["/api/user-presence", userId, "activity"],
-    queryFn: () => apiRequest("GET", `/api/user-presence/${userId}/activity`).then((r) => r.json()),
+    queryFn: () => apiRequest("GET", `/api/user-presence/${userId}/activity`).then((response) => response.json()),
     refetchInterval: 30000,
   });
   const watchStartRef = useRef(Date.now());
   const { data: screenFrameRaw } = useQuery<any>({
     queryKey: ["/api/screen-feed", userId],
-    queryFn: () => apiRequest("GET", `/api/screen-feed/${userId}`).then((r) => r.json()),
-    refetchInterval: 30000,
+    queryFn: () => apiRequest("GET", `/api/screen-feed/${userId}`).then((response) => response.json()),
+    refetchInterval: liveConnected ? false : 5000,
   });
+
+  useEffect(() => {
+    setLiveConnected(false);
+    setLiveFrame(null);
+
+    let eventSource: EventSource | null = null;
+    try {
+      eventSource = new EventSource(`/api/screen-feed/live/${encodeURIComponent(userId)}`, {
+        withCredentials: true,
+      });
+      eventSource.addEventListener("ready", () => setLiveConnected(true));
+      eventSource.addEventListener("frame", (event) => {
+        try {
+          const frame = JSON.parse((event as MessageEvent<string>).data) as ScreenFrame;
+          if (frame?.dataUrl && frame?.capturedAt) {
+            setLiveConnected(true);
+            setLiveFrame(frame);
+          }
+        } catch {
+          setLiveConnected(false);
+        }
+      });
+      eventSource.onerror = () => {
+        setLiveConnected(false);
+        setLiveFrame(null);
+      };
+    } catch {
+      setLiveConnected(false);
+    }
+
+    return () => eventSource?.close();
+  }, [userId]);
 
   const presence = presenceRaw && typeof presenceRaw === "object" && !Array.isArray(presenceRaw) ? presenceRaw : null;
   const activity = Array.isArray(activityRaw) ? activityRaw : [];
-  const screenFrame =
-    screenFrameRaw && typeof screenFrameRaw === "object" && !Array.isArray(screenFrameRaw) ? screenFrameRaw : null;
-  const clicks: Array<{ x: number; y: number; label: string; ts: number }> = Array.isArray(screenFrame?.clicks)
-    ? screenFrame.clicks
-    : [];
+  const fallbackFrame =
+    screenFrameRaw && typeof screenFrameRaw === "object" && !Array.isArray(screenFrameRaw)
+      ? (screenFrameRaw as ScreenFrame)
+      : null;
+  const screenFrame = liveFrame ?? fallbackFrame;
+  const clicks = Array.isArray(screenFrame?.clicks) ? screenFrame.clicks : [];
 
   const isOnline =
     !!presence &&
@@ -88,33 +131,31 @@ export function WatchUserDialog({
   const hasScreen = !!screenFrame?.dataUrl;
 
   const now = Date.now();
-  const recentClicks = clicks.filter((c) => now - c.ts < 4000);
+  const recentClicks = clicks.filter((click) => now - click.ts < 4000);
 
-  const fmtTime = (val: string | Date | null | undefined) => {
-    if (!val) return "—";
-    const d = new Date(val as string);
-    return isNaN(d.getTime())
+  const fmtTime = (value: string | Date | null | undefined) => {
+    if (!value) return "—";
+    const date = new Date(value as string);
+    return Number.isNaN(date.getTime())
       ? "—"
-      : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   };
-  const timeAgo = (val: string | Date | null | undefined) => {
-    if (!val) return "unknown";
-    const d = new Date(val as string);
-    if (isNaN(d.getTime())) return "unknown";
-    const s = Math.floor((Date.now() - d.getTime()) / 1000);
-    if (s < 5) return "just now";
-    if (s < 60) return `${s}s ago`;
-    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-    return `${Math.floor(s / 3600)}h ago`;
+  const timeAgo = (value: string | Date | null | undefined) => {
+    if (!value) return "unknown";
+    const date = new Date(value as string);
+    if (Number.isNaN(date.getTime())) return "unknown";
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (seconds < 5) return "just now";
+    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    return `${Math.floor(seconds / 3600)}h ago`;
   };
 
   const imgRef = useRef<HTMLImageElement>(null);
 
   const openNativeFullscreen = () => {
-    if (imgRef.current) {
-      if (imgRef.current.requestFullscreen) {
-        imgRef.current.requestFullscreen();
-      }
+    if (imgRef.current?.requestFullscreen) {
+      void imgRef.current.requestFullscreen();
     }
   };
 
@@ -171,12 +212,12 @@ export function WatchUserDialog({
                     data-testid="img-screen-feed"
                     style={{ imageRendering: "crisp-edges" }}
                   />
-                  {recentClicks.map((click, i) => {
+                  {recentClicks.map((click, index) => {
                     const ageSec = (now - click.ts) / 1000;
                     const opacity = Math.max(0, 1 - ageSec / 4);
                     return (
                       <div
-                        key={i}
+                        key={`${click.ts}-${index}`}
                         title={click.label}
                         style={{
                           position: "absolute",
@@ -199,10 +240,10 @@ export function WatchUserDialog({
                 <div className="flex flex-col items-center gap-2 text-muted-foreground">
                   <Clock className="h-10 w-10 opacity-30" />
                   <p className="text-sm">Waiting for first frame…</p>
-                  <p className="text-xs">Updates every 3–5 seconds while watched</p>
+                  <p className="text-xs">Live delivery starts as soon as the browser responds.</p>
                   {Date.now() - watchStartRef.current > 20000 && (
                     <p className="text-xs text-amber-600 dark:text-amber-400 text-center max-w-xs">
-                      Still waiting — user may be on a background tab.
+                      Still waiting — the fallback viewer will keep retrying automatically.
                     </p>
                   )}
                 </div>
@@ -218,8 +259,11 @@ export function WatchUserDialog({
                   {[...clicks]
                     .reverse()
                     .slice(0, 6)
-                    .map((click, i) => (
-                      <div key={i} className="flex items-center gap-1 text-xs text-muted-foreground">
+                    .map((click, index) => (
+                      <div
+                        key={`${click.ts}-${index}`}
+                        className="flex items-center gap-1 text-xs text-muted-foreground"
+                      >
                         <span className="truncate max-w-[160px]">{click.label || "—"}</span>
                         <span className="text-muted-foreground/50 shrink-0">
                           {new Date(click.ts).toLocaleTimeString([], {
@@ -254,12 +298,12 @@ export function WatchUserDialog({
                   No history yet — pages appear here as the user navigates.
                 </p>
               ) : (
-                activity.map((evt: any) => (
-                  <div key={evt.id} className="px-3 py-2 space-y-0.5">
-                    <p className="font-medium leading-tight truncate">{getPageLabel(evt.route)}</p>
+                activity.map((event: any) => (
+                  <div key={event.id} className="px-3 py-2 space-y-0.5">
+                    <p className="font-medium leading-tight truncate">{getPageLabel(event.route)}</p>
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs text-muted-foreground font-mono truncate">{evt.route}</p>
-                      <p className="text-xs text-muted-foreground shrink-0">{fmtTime(evt.occurredAt)}</p>
+                      <p className="text-xs text-muted-foreground font-mono truncate">{event.route}</p>
+                      <p className="text-xs text-muted-foreground shrink-0">{fmtTime(event.occurredAt)}</p>
                     </div>
                   </div>
                 ))

@@ -1,7 +1,8 @@
 import type { Express, Request, Response } from "express";
 import { logger } from "../lib/logger";
 import { requireAuth, requireLogin } from "../auth";
-import { screenFeedStore, watcherPollStore } from "../screenFeedStore";
+import { screenFeedStore, watcherPollStore, type ScreenFrame } from "../screenFeedStore";
+import { screenFeedLiveHub } from "../services/screenFeedLiveHub";
 import { isValidScreenFeedDataUrl, sanitizeScreenFeedClicks } from "../services/screenFeedService";
 import {
   emergencyDisableRemoteSupport,
@@ -15,14 +16,17 @@ import {
 import { getSessionRole, getSessionUserId, getSessionUsername } from "../lib/requestContext";
 
 // How long (ms) after a watcher's last GET we still consider the user "being watched".
-// Must be comfortably larger than the watcher's poll interval (~3–5 s) to avoid
-// the watched user flipping back to "not watched" between watcher polls.
+// Must be comfortably larger than the fallback watcher's poll interval.
 const WATCHER_TIMEOUT_MS = 12000;
+const LIVE_STATUS_REFRESH_MS = 4000;
+const LIVE_HEARTBEAT_MS = 5000;
 
 // Reject frames larger than 1.5 MB (base64 string length)
 const MAX_FRAME_SIZE = 1_500_000;
 
 const isDev = process.env.NODE_ENV !== "production";
+
+type FlushableResponse = Response & { flush?: () => void };
 
 function requireDeveloper(req: Request, res: Response): boolean {
   if (getSessionRole(req) !== "Developer") {
@@ -34,6 +38,43 @@ function requireDeveloper(req: Request, res: Response): boolean {
 
 function runtimeActor(req: Request): string {
   return getSessionUsername(req) || String(getSessionUserId(req));
+}
+
+function openEventStream(res: Response): void {
+  res.status(200);
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+  res.write("retry: 3000\n\n");
+}
+
+function writeEvent(res: Response, event: string, payload: unknown): void {
+  if (res.writableEnded || res.destroyed) return;
+  res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
+  (res as FlushableResponse).flush?.();
+}
+
+function writeHeartbeat(res: Response): void {
+  if (res.writableEnded || res.destroyed) return;
+  res.write(`: heartbeat ${Date.now()}\n\n`);
+  (res as FlushableResponse).flush?.();
+}
+
+function isUserBeingWatched(userId: string): boolean {
+  if (screenFeedLiveHub.hasViewer(userId)) return true;
+  const lastPoll = watcherPollStore.get(userId) ?? 0;
+  return lastPoll > 0 && Date.now() - lastPoll < WATCHER_TIMEOUT_MS;
+}
+
+function serializeFrame(frame: ScreenFrame) {
+  return {
+    dataUrl: frame.dataUrl,
+    capturedAt: frame.capturedAt.toISOString(),
+    username: frame.username,
+    clicks: frame.clicks,
+  };
 }
 
 export function registerScreenFeedRoutes(app: Express) {
@@ -53,6 +94,9 @@ export function registerScreenFeedRoutes(app: Express) {
     if (!snapshot.flags.screenFeedEnabled) {
       watcherPollStore.clear();
     }
+    if (!snapshot.flags.screenFeedEnabled || !snapshot.flags.fastScreenFeed) {
+      screenFeedLiveHub.disconnectAll();
+    }
 
     res.setHeader("Cache-Control", "no-store");
     res.json(snapshot);
@@ -61,6 +105,7 @@ export function registerScreenFeedRoutes(app: Express) {
   app.post("/api/screen-feed/admin/runtime/emergency-stop", requireAuth, (req, res) => {
     if (!requireDeveloper(req, res)) return;
     watcherPollStore.clear();
+    screenFeedLiveHub.disconnectAll();
     const snapshot = emergencyDisableRemoteSupport(runtimeActor(req));
     logger.warn(`[RemoteSupport] emergency stop activated by ${runtimeActor(req)}`);
     res.setHeader("Cache-Control", "no-store");
@@ -80,19 +125,103 @@ export function registerScreenFeedRoutes(app: Express) {
     res.json(resetRemoteSupportMetrics());
   });
 
+  // Event stream used by the watched browser. It is silent and carries only
+  // whether a Developer viewer is currently connected.
+  app.get("/api/screen-feed/live/status", requireLogin, (req, res) => {
+    if (!isRemoteSupportEnabled("screenFeedEnabled") || !isRemoteSupportEnabled("fastScreenFeed")) {
+      return res.status(409).json({ live: false });
+    }
+
+    const userId = String(getSessionUserId(req));
+    openEventStream(res);
+    recordRemoteSupportMetric("liveStatusConnected");
+
+    const sendStatus = () => {
+      writeEvent(res, "status", {
+        watched: isUserBeingWatched(userId),
+        fast: true,
+      });
+    };
+
+    const unsubscribeStatus = screenFeedLiveHub.subscribeStatus(userId, sendStatus);
+    let unsubscribeDisconnect = () => {};
+    let closed = false;
+    const refreshId = setInterval(sendStatus, LIVE_STATUS_REFRESH_MS);
+
+    const cleanup = () => {
+      if (closed) return;
+      closed = true;
+      clearInterval(refreshId);
+      unsubscribeStatus();
+      unsubscribeDisconnect();
+      if (!res.writableEnded) res.end();
+    };
+
+    unsubscribeDisconnect = screenFeedLiveHub.subscribeDisconnect(cleanup);
+    req.once("close", cleanup);
+    res.once("close", cleanup);
+    sendStatus();
+  });
+
+  // Event stream used by a Developer viewer. A connection marks the selected
+  // user as watched immediately and receives new frames as soon as they arrive.
+  app.get("/api/screen-feed/live/:userId", requireAuth, (req, res) => {
+    if (!requireDeveloper(req, res)) return;
+    if (!isRemoteSupportEnabled("screenFeedEnabled") || !isRemoteSupportEnabled("fastScreenFeed")) {
+      return res.status(409).json({ live: false });
+    }
+
+    const watchedUserId = req.params.userId;
+    openEventStream(res);
+    recordRemoteSupportMetric("liveViewerConnected");
+    watcherPollStore.set(watchedUserId, Date.now());
+
+    const unsubscribeFrames = screenFeedLiveHub.subscribeFrames(watchedUserId, (frame) => {
+      writeEvent(res, "frame", serializeFrame(frame));
+    });
+    let unsubscribeDisconnect = () => {};
+    let closed = false;
+
+    const heartbeatId = setInterval(() => {
+      watcherPollStore.set(watchedUserId, Date.now());
+      writeHeartbeat(res);
+    }, LIVE_HEARTBEAT_MS);
+
+    const cleanup = () => {
+      if (closed) return;
+      closed = true;
+      clearInterval(heartbeatId);
+      unsubscribeFrames();
+      unsubscribeDisconnect();
+      if (!screenFeedLiveHub.hasViewer(watchedUserId)) {
+        watcherPollStore.delete(watchedUserId);
+        screenFeedLiveHub.notifyStatus(watchedUserId);
+      }
+      if (!res.writableEnded) res.end();
+    };
+
+    unsubscribeDisconnect = screenFeedLiveHub.subscribeDisconnect(cleanup);
+    req.once("close", cleanup);
+    res.once("close", cleanup);
+
+    writeEvent(res, "ready", { userId: watchedUserId });
+    const currentFrame = screenFeedStore.get(watchedUserId);
+    if (currentFrame) writeEvent(res, "frame", serializeFrame(currentFrame));
+  });
+
   // GET: watched user asks "is anyone watching me right now?"
-  // Must be registered BEFORE /:userId to avoid route conflict.
+  // Retained as the automatic fallback when the event stream is unavailable.
   app.get("/api/screen-feed/being-watched", requireLogin, (req, res) => {
     recordRemoteSupportMetric("watcherStatusPoll");
 
     if (!isRemoteSupportEnabled("screenFeedEnabled")) {
-      return res.json({ watched: false });
+      return res.json({ watched: false, fast: false });
     }
 
     const userId = String(getSessionUserId(req));
     const lastPoll = watcherPollStore.get(userId) ?? 0;
     const ageMs = Date.now() - lastPoll;
-    const watched = lastPoll > 0 && ageMs < WATCHER_TIMEOUT_MS;
+    const watched = isUserBeingWatched(userId);
 
     if (isDev) {
       logger.info(
@@ -102,6 +231,7 @@ export function registerScreenFeedRoutes(app: Express) {
 
     res.json({
       watched,
+      fast: isRemoteSupportEnabled("fastScreenFeed"),
       ...(isDev ? { userId, lastWatcherPollAgeMs: lastPoll > 0 ? ageMs : null } : {}),
     });
   });
@@ -150,14 +280,20 @@ export function registerScreenFeedRoutes(app: Express) {
 
     const username = getSessionUsername(req) || userId;
     const safeClicks = sanitizeScreenFeedClicks(clicks);
-    screenFeedStore.set(userId, {
+    const frame: ScreenFrame = {
       dataUrl,
       capturedAt: new Date(),
       userId,
       username,
       clicks: safeClicks,
-    });
+    };
+    screenFeedStore.set(userId, frame);
     recordRemoteSupportMetric("frameAccepted", Buffer.byteLength(dataUrl, "utf8"));
+
+    if (isRemoteSupportEnabled("fastScreenFeed")) {
+      const pushed = screenFeedLiveHub.publishFrame(userId, frame);
+      if (pushed > 0) recordRemoteSupportMetric("framePushed", pushed);
+    }
 
     if (isDev) {
       logger.info(
@@ -169,6 +305,7 @@ export function registerScreenFeedRoutes(app: Express) {
   });
 
   // GET: Developer polls the latest frame + clicks for a specific watched user.
+  // Retained as the automatic viewer fallback when the event stream is unavailable.
   app.get("/api/screen-feed/:userId", requireAuth, (req, res) => {
     if (!requireDeveloper(req, res)) return;
 
@@ -181,6 +318,7 @@ export function registerScreenFeedRoutes(app: Express) {
 
     const watchedUserId = req.params.userId;
     watcherPollStore.set(watchedUserId, Date.now());
+    screenFeedLiveHub.notifyStatus(watchedUserId);
 
     const frame = screenFeedStore.get(watchedUserId);
     const hasFrame = !!frame;
@@ -193,11 +331,6 @@ export function registerScreenFeedRoutes(app: Express) {
     }
 
     if (!frame) return res.json(null);
-    res.json({
-      dataUrl: frame.dataUrl,
-      capturedAt: frame.capturedAt.toISOString(),
-      username: frame.username,
-      clicks: frame.clicks,
-    });
+    res.json(serializeFrame(frame));
   });
 }
