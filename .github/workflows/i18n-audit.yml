@@ -99,8 +99,8 @@ jobs:
             tests/phase14-i18n-release-gate.test.ts \
             tests/phase5-properties-rentals-translations.test.ts
 
-      - name: Run application startup migrations
-        run: node --import tsx server/runStartupMigrations.ts
+      - name: Prepare disposable database schema
+        run: node node_modules/drizzle-kit/bin.cjs push --force
 
       - name: Run Phase 5 behavior and release-gate tests
         run: |
