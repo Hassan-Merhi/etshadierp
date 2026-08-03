@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { applyApplicationLanguageToDocument, getApplicationDirection } from "./applicationDirection";
+import { translateApplicationLiteral } from "./applicationTranslations";
 
 describe("application direction contract", () => {
   beforeEach(() => {
@@ -39,5 +40,12 @@ describe("application direction contract", () => {
     applyApplicationLanguageToDocument("en", document);
     expect(document.documentElement.dataset.applicationLanguage).toBe("en");
     expect(document.documentElement.dataset.applicationDirection).toBe("ltr");
+  });
+
+  it("translates approved screen-reader labels in either direction", () => {
+    expect(translateApplicationLiteral("Close dialog", "ar")).toBe("إغلاق مربع الحوار");
+    expect(translateApplicationLiteral("  Sidebar  ", "fr")).toBe("  Barre de navigation  ");
+    expect(translateApplicationLiteral("Fermer le panneau", "en")).toBe("Close panel");
+    expect(translateApplicationLiteral("GC Lshi #2", "ar")).toBeNull();
   });
 });
