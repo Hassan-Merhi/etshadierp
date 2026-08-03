@@ -111,7 +111,6 @@ export function CompanySelector() {
   }
 
   const activeType = selectedCompany.companyType;
-  const selectorLabel = `${t("company.current")}: ${selectedCompany.name}`;
 
   if (companies.length <= 1) {
     return (
@@ -120,7 +119,7 @@ export function CompanySelector() {
         size="sm"
         disabled
         data-testid="button-company-selector"
-        aria-label={selectorLabel}
+        aria-label={[t("company.current"), selectedCompany.name].join(": ")}
         title={selectedCompany.name}
         className="h-10 gap-1.5 px-2 sm:h-8"
       >
@@ -137,7 +136,10 @@ export function CompanySelector() {
           variant="outline"
           size="sm"
           data-testid="button-company-selector"
-          aria-label={`${selectorLabel}. ${t("company.openSwitcher")}.`}
+          aria-label={[
+            [t("company.current"), selectedCompany.name].join(": "),
+            t("company.openSwitcher"),
+          ].join(". ")}
           title={selectedCompany.name}
           className="h-10 max-w-[4.5rem] gap-1.5 px-2 sm:h-8 sm:max-w-[11rem] sm:pr-2"
         >
