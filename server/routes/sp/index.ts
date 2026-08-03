@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { logger } from "../../lib/logger";
 import { registerSpSetupRoutes } from "./spSetupRoutes";
 import { registerSpContainerRoutes } from "./spContainerRoutes";
+import { registerSpLifecycleGuards } from "./spLifecycleGuards";
 import { registerSpOffloadConcurrencyGuard } from "./spOffloadConcurrencyGuard";
 import { registerSpOffloadRoutes } from "./spOffloadRoutes";
 import { registerSpSalesRoutes } from "./spSalesRoutes";
@@ -55,6 +56,7 @@ export function registerSpRoutes(app: Express) {
   });
 
   registerSpSetupRoutes(app);
+  registerSpLifecycleGuards(app);
   registerSpContainerRoutes(app);
   // The guard owns company/container serialization and safe replay. The legacy
   // handler below still owns all voucher, prepaid, inventory, and intercompany
