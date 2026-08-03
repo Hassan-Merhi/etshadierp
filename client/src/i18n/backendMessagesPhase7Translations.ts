@@ -48,6 +48,12 @@ function templateSpecificity(value: string): number {
   return value.replace(indexedTemplateToken, "").length;
 }
 
+function hasTranslatableStaticText(value: string): boolean {
+  indexedTemplateToken.lastIndex = 0;
+  const staticText = value.replace(indexedTemplateToken, "");
+  return /[\p{L}\p{N}]/u.test(staticText);
+}
+
 type CompiledTemplate = {
   patterns: Record<ApplicationLanguage, RegExp>;
   captureOrder: Record<ApplicationLanguage, readonly number[]>;
@@ -88,10 +94,12 @@ for (const entry of backendMessagesPhase7Translations) {
     continue;
   }
 
+  const englishRender = normalizeTemplate(entry.en, "en");
+  if (!hasTranslatableStaticText(englishRender)) continue;
+
   const compiledByLanguage = Object.fromEntries(
     languages.map((language) => [language, compileLanguageTemplate(entry[language], language)])
   ) as Record<ApplicationLanguage, { pattern: RegExp; captureOrder: readonly number[] }>;
-  const englishRender = normalizeTemplate(entry.en, "en");
 
   compiledTemplates.push({
     patterns: Object.fromEntries(
