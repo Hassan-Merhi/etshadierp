@@ -11,10 +11,7 @@ import {
   isPhase5PropertiesRentalsText,
   translatePhase5PropertiesRentalsText,
 } from "@/i18n/propertiesRentalsPhase5Translations";
-import {
-  isPhase6ReportsExportsText,
-  translatePhase6ReportsExportsText,
-} from "@/i18n/reportsExportsPhase6Translations";
+import { isPhase6ReportsExportsText, translatePhase6ReportsExportsText } from "@/i18n/reportsExportsPhase6Translations";
 
 const EXCLUDED_SELECTOR = [
   "code",

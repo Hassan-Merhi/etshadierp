@@ -121,8 +121,8 @@ export const reportsExportsPhase6TranslationsPart2: readonly Phase6ReportsExport
   { en: "No Data", ar: "لا توجد بيانات", fr: "Aucune donnée" },
   { en: "No months in range", ar: "لا توجد أشهر ضمن النطاق", fr: "Aucun mois dans la période" },
   {
-    en: "No WhatsApp group configured for agent \"${agentName}\". Configure it in Settings → Agent Duty WA.",
-    ar: "لم يتم إعداد مجموعة واتساب للوكيل \"{0}\". قم بإعدادها من الإعدادات ← واتساب مهام الوكيل.",
+    en: 'No WhatsApp group configured for agent "${agentName}". Configure it in Settings → Agent Duty WA.',
+    ar: 'لم يتم إعداد مجموعة واتساب للوكيل "{0}". قم بإعدادها من الإعدادات ← واتساب مهام الوكيل.',
     fr: "Aucun groupe WhatsApp configuré pour l’agent « {0} ». Configurez-le dans Paramètres → WhatsApp des tâches de l’agent.",
   },
   {
