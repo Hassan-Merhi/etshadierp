@@ -4,21 +4,30 @@ import {
   nextScreenFeedCaptureDelay,
   shouldUploadScreenFrame,
 } from "./screen-feed-capture-policy";
+import {
+  approximateDataUrlBytes,
+  getScreenFeedCaptureScale,
+  isSafeScreenFeedAssetUrl,
+  normalizeScreenFeedPoint,
+  shouldPreserveScreenFeedBackground,
+} from "./screen-feed-viewing-quality";
 
 // Polling remains as a fallback for browsers or proxies that cannot keep an
 // event stream open. The live path normally detects a viewer immediately.
 const POLL_INTERVAL_MS = 15000;
 const LEGACY_CAPTURE_INTERVAL_MS = 3000;
+const POINTER_INTERVAL_MS = 250;
 const CAPTURE_TIMEOUT_MS = 4000;
 const CLICK_RETAIN_MS = 8000;
 const MAX_DATA_URL_LEN = 1_300_000;
-const FAST_MAX_DATA_URL_LEN = 420_000;
+const FAST_MAX_DATA_URL_LEN = 560_000;
 const SIGNATURE_WIDTH = 32;
 const SIGNATURE_HEIGHT = 18;
 
 const isDev = import.meta.env.DEV;
 
 type Html2Canvas = (typeof import("html2canvas"))["default"];
+type CaptureSource = "dom" | "retry" | "fallback";
 let html2canvasPromise: Promise<Html2Canvas> | null = null;
 
 async function loadHtml2Canvas(): Promise<Html2Canvas> {
@@ -38,6 +47,24 @@ export interface ClickEvent {
   y: number;
   label: string;
   ts: number;
+}
+
+interface CursorEvent {
+  x: number;
+  y: number;
+  visible: boolean;
+  ts: number;
+}
+
+interface EncodedFrame {
+  dataUrl: string;
+  canvas: HTMLCanvasElement;
+  quality: number;
+}
+
+interface CaptureCanvasResult {
+  canvas: HTMLCanvasElement;
+  source: CaptureSource;
 }
 
 interface CaptureResult {
@@ -66,9 +93,9 @@ if (typeof window !== "undefined") {
     (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       if (target.closest("[data-screenfeed-ignore='true']")) return;
+      const point = normalizeScreenFeedPoint(event.clientX, event.clientY, window.innerWidth, window.innerHeight);
       clickBuffer.push({
-        x: event.clientX / window.innerWidth,
-        y: event.clientY / window.innerHeight,
+        ...point,
         label: trimLabel(target),
         ts: Date.now(),
       });
@@ -93,30 +120,43 @@ function trace(event: string, extra?: string): void {
   fetch(url, { credentials: "include" }).catch(() => {});
 }
 
-// Strip elements and CSS that reliably cause createPattern errors in
-// html2canvas. This runs on the cloned document and never mutates the live UI.
 function sanitizeClone(doc: Document): void {
-  doc.querySelectorAll("img").forEach((el) => el.remove());
-  doc.querySelectorAll("image").forEach((el) => el.remove());
-  doc.querySelectorAll<HTMLElement>("*").forEach((el) => {
+  const origin = window.location.origin;
+
+  doc.querySelectorAll<HTMLImageElement>("img").forEach((element) => {
+    const src = element.currentSrc || element.getAttribute("src") || "";
+    if (src && !isSafeScreenFeedAssetUrl(src, origin)) element.remove();
+  });
+
+  doc.querySelectorAll<SVGImageElement>("image").forEach((element) => {
+    const href = element.getAttribute("href") || element.getAttribute("xlink:href") || "";
+    if (href && !isSafeScreenFeedAssetUrl(href, origin)) element.remove();
+  });
+
+  doc.querySelectorAll<HTMLElement>("*").forEach((element) => {
     try {
-      const bg = window.getComputedStyle(el).backgroundImage;
-      if (bg && bg !== "none") el.style.backgroundImage = "none";
+      const backgroundImage = (doc.defaultView ?? window).getComputedStyle(element).backgroundImage;
+      if (!shouldPreserveScreenFeedBackground(backgroundImage, origin)) {
+        element.style.backgroundImage = "none";
+      }
     } catch {
-      // Cross-origin iframe: skip it.
+      element.style.backgroundImage = "none";
     }
   });
 }
 
-const html2canvasBaseOpts = {
-  scale: 0.7,
-  useCORS: true,
-  logging: false,
-  foreignObjectRendering: false,
-  imageTimeout: 200,
-  onclone: (doc: Document) => sanitizeClone(doc),
-  ignoreElements: (el: Element) => el.getAttribute("data-screenfeed-ignore") === "true",
-} as const;
+function buildHtml2CanvasOptions() {
+  return {
+    scale: getScreenFeedCaptureScale(window.devicePixelRatio),
+    useCORS: true,
+    allowTaint: false,
+    logging: false,
+    foreignObjectRendering: false,
+    imageTimeout: 1200,
+    onclone: (doc: Document) => sanitizeClone(doc),
+    ignoreElements: (element: Element) => element.getAttribute("data-screenfeed-ignore") === "true",
+  } as const;
+}
 
 async function tryCapture(opts: Record<string, unknown>): Promise<HTMLCanvasElement> {
   const html2canvas = await loadHtml2Canvas();
@@ -171,11 +211,11 @@ function buildFallbackCanvas(): HTMLCanvasElement {
   }
 
   let y = 220;
-  document.querySelectorAll("h1, h2, h3").forEach((el) => {
-    const text = el.textContent?.trim().slice(0, 80);
+  document.querySelectorAll("h1, h2, h3").forEach((element) => {
+    const text = element.textContent?.trim().slice(0, 80);
     if (text && y < height - 20) {
       ctx.fillStyle = dark ? "#ccc" : "#222";
-      ctx.font = el.tagName === "H1" ? "bold 16px system-ui" : "14px system-ui, sans-serif";
+      ctx.font = element.tagName === "H1" ? "bold 16px system-ui" : "14px system-ui, sans-serif";
       ctx.fillText(text, 24, y);
       y += 24;
     }
@@ -221,60 +261,82 @@ function resizeCanvas(source: HTMLCanvasElement, maxWidth: number): HTMLCanvasEl
   target.height = Math.max(1, Math.round(source.height * scale));
   const ctx = target.getContext("2d");
   if (!ctx) return source;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
   ctx.drawImage(source, 0, 0, target.width, target.height);
   return target;
 }
 
-function encodeFastFrame(canvas: HTMLCanvasElement): string | null {
+function encodeFastFrame(canvas: HTMLCanvasElement): EncodedFrame | null {
   const attempts = [
-    { maxWidth: 1280, quality: 0.64 },
-    { maxWidth: 1120, quality: 0.56 },
-    { maxWidth: 960, quality: 0.48 },
-    { maxWidth: 800, quality: 0.42 },
+    { maxWidth: 1440, quality: 0.72 },
+    { maxWidth: 1280, quality: 0.66 },
+    { maxWidth: 1120, quality: 0.58 },
+    { maxWidth: 960, quality: 0.5 },
+    { maxWidth: 800, quality: 0.44 },
   ];
 
-  let lastDataUrl = "";
+  let lastFrame: EncodedFrame | null = null;
   for (const attempt of attempts) {
     const candidate = resizeCanvas(canvas, attempt.maxWidth);
-    lastDataUrl = candidate.toDataURL("image/jpeg", attempt.quality);
-    if (lastDataUrl.length <= FAST_MAX_DATA_URL_LEN) return lastDataUrl;
+    const dataUrl = candidate.toDataURL("image/jpeg", attempt.quality);
+    lastFrame = { dataUrl, canvas: candidate, quality: attempt.quality };
+    if (dataUrl.length <= FAST_MAX_DATA_URL_LEN) return lastFrame;
   }
 
-  return lastDataUrl.length <= MAX_DATA_URL_LEN ? lastDataUrl : null;
+  return lastFrame && lastFrame.dataUrl.length <= MAX_DATA_URL_LEN ? lastFrame : null;
 }
 
-async function captureCanvas(): Promise<HTMLCanvasElement> {
+async function captureCanvas(): Promise<CaptureCanvasResult> {
   trace("capture-start");
+  const options = buildHtml2CanvasOptions();
   try {
-    const canvas = await withSafeCreatePattern(() => tryCapture(html2canvasBaseOpts));
+    const canvas = await withSafeCreatePattern(() => tryCapture(options));
     trace("capture-ok");
-    return canvas;
+    return { canvas, source: "dom" };
   } catch (error) {
     trace("capture-fail-p1", String(error).slice(0, 80));
     try {
       const canvas = await withSafeCreatePattern(() =>
         tryCapture({
-          ...html2canvasBaseOpts,
-          scale: 0.15,
-          imageTimeout: 200,
+          ...options,
+          scale: 0.35,
+          imageTimeout: 300,
         })
       );
       trace("capture-ok-retry");
-      return canvas;
+      return { canvas, source: "retry" };
     } catch (retryError) {
       trace("capture-fail-p2", String(retryError).slice(0, 80));
       trace("capture-fallback");
-      return buildFallbackCanvas();
+      return { canvas: buildFallbackCanvas(), source: "fallback" };
     }
   }
+}
+
+function buildViewportMetadata() {
+  const documentElement = document.documentElement;
+  const body = document.body;
+  return {
+    width: Math.max(1, Math.round(window.innerWidth)),
+    height: Math.max(1, Math.round(window.innerHeight)),
+    scrollX: Math.max(0, Math.round(window.scrollX)),
+    scrollY: Math.max(0, Math.round(window.scrollY)),
+    documentWidth: Math.max(documentElement.scrollWidth, body?.scrollWidth ?? 0, window.innerWidth),
+    documentHeight: Math.max(documentElement.scrollHeight, body?.scrollHeight ?? 0, window.innerHeight),
+    devicePixelRatio: Math.max(0.25, window.devicePixelRatio || 1),
+    visualScale: Math.max(0.25, window.visualViewport?.scale ?? 1),
+  };
 }
 
 async function captureAndUpload(
   fast: boolean,
   lastSignature: string | null,
-  lastUploadedClickTs: number
+  lastUploadedClickTs: number,
+  cursor: CursorEvent | null
 ): Promise<CaptureResult> {
-  const canvas = await captureCanvas();
+  const startedAt = Date.now();
+  const { canvas, source } = await captureCanvas();
   const signature = buildFrameSignature(canvas);
   const cutoff = Date.now() - CLICK_RETAIN_MS;
   const clicks = clickBuffer.filter((click) => click.ts >= cutoff);
@@ -292,30 +354,51 @@ async function captureAndUpload(
     return { uploaded: false, unchanged: true, failed: false, signature, latestClickTs };
   }
 
-  let dataUrl: string | null;
+  let encoded: EncodedFrame | null;
   try {
-    dataUrl = fast ? encodeFastFrame(canvas) : canvas.toDataURL("image/jpeg", 0.75);
+    encoded = fast
+      ? encodeFastFrame(canvas)
+      : {
+          dataUrl: canvas.toDataURL("image/jpeg", 0.75),
+          canvas,
+          quality: 0.75,
+        };
   } catch (error) {
     trace("to-data-url-failed", String(error).slice(0, 80));
     return { uploaded: false, unchanged: false, failed: true, signature, latestClickTs };
   }
 
-  if (!dataUrl?.startsWith("data:image/")) {
+  if (!encoded?.dataUrl.startsWith("data:image/")) {
     trace("bad-prefix");
     return { uploaded: false, unchanged: false, failed: true, signature, latestClickTs };
   }
-  if (dataUrl.length > MAX_DATA_URL_LEN) {
-    trace("too-large", String(dataUrl.length));
+  if (encoded.dataUrl.length > MAX_DATA_URL_LEN) {
+    trace("too-large", String(encoded.dataUrl.length));
     return { uploaded: false, unchanged: false, failed: true, signature, latestClickTs };
   }
 
-  trace("uploading", String(dataUrl.length));
+  trace("uploading", String(encoded.dataUrl.length));
+  const completedAt = Date.now();
   try {
     const response = await fetch("/api/screen-feed", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ dataUrl, clicks }),
+      body: JSON.stringify({
+        dataUrl: encoded.dataUrl,
+        clicks,
+        cursor,
+        viewport: buildViewportMetadata(),
+        clientCapturedAt: new Date(completedAt).toISOString(),
+        capture: {
+          width: encoded.canvas.width,
+          height: encoded.canvas.height,
+          source,
+          quality: encoded.quality,
+          encodedBytes: approximateDataUrlBytes(encoded.dataUrl),
+          durationMs: completedAt - startedAt,
+        },
+      }),
     });
     trace("upload-done", String(response.status));
     return {
@@ -331,11 +414,24 @@ async function captureAndUpload(
   }
 }
 
+function cursorsDiffer(previous: CursorEvent | null, next: CursorEvent): boolean {
+  if (!previous) return true;
+  return (
+    previous.visible !== next.visible ||
+    Math.abs(previous.x - next.x) > 0.002 ||
+    Math.abs(previous.y - next.y) > 0.002 ||
+    next.ts - previous.ts > 1000
+  );
+}
+
 export function useScreenFeed() {
   const busyRef = useRef(false);
   const watchedRef = useRef(false);
   const fastModeRef = useRef(false);
   const captureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pointerTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pointerRef = useRef<CursorEvent | null>(null);
+  const lastSentPointerRef = useRef<CursorEvent | null>(null);
   const lastSignatureRef = useRef<string | null>(null);
   const lastUploadedClickTsRef = useRef(0);
   const unchangedFramesRef = useRef(0);
@@ -344,6 +440,17 @@ export function useScreenFeed() {
     busyRef.current = false;
     trace("hook-mounted");
 
+    const onPointerMove = (event: PointerEvent) => {
+      const point = normalizeScreenFeedPoint(event.clientX, event.clientY, window.innerWidth, window.innerHeight);
+      pointerRef.current = { ...point, visible: true, ts: Date.now() };
+    };
+    const onPointerLeave = () => {
+      const previous = pointerRef.current ?? { x: 0, y: 0, visible: false, ts: Date.now() };
+      pointerRef.current = { ...previous, visible: false, ts: Date.now() };
+    };
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    document.documentElement.addEventListener("pointerleave", onPointerLeave, { passive: true });
+
     const clearCaptureTimer = () => {
       if (captureTimerRef.current) {
         clearTimeout(captureTimerRef.current);
@@ -351,8 +458,37 @@ export function useScreenFeed() {
       }
     };
 
+    const stopPointerLoop = () => {
+      if (pointerTimerRef.current) {
+        clearInterval(pointerTimerRef.current);
+        pointerTimerRef.current = null;
+      }
+      lastSentPointerRef.current = null;
+    };
+
+    const sendPointerUpdate = () => {
+      const cursor = pointerRef.current;
+      if (!watchedRef.current || !cursor || !cursorsDiffer(lastSentPointerRef.current, cursor)) return;
+      lastSentPointerRef.current = cursor;
+      void fetch("/api/screen-feed/pointer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ cursor }),
+      }).catch(() => {
+        lastSentPointerRef.current = null;
+      });
+    };
+
+    const startPointerLoop = () => {
+      if (pointerTimerRef.current) return;
+      sendPointerUpdate();
+      pointerTimerRef.current = setInterval(sendPointerUpdate, POINTER_INTERVAL_MS);
+    };
+
     const stopCapturing = () => {
       clearCaptureTimer();
+      stopPointerLoop();
       lastSignatureRef.current = null;
       lastUploadedClickTsRef.current = 0;
       unchangedFramesRef.current = 0;
@@ -370,7 +506,12 @@ export function useScreenFeed() {
       busyRef.current = true;
 
       runWhenIdle(() => {
-        captureAndUpload(fastModeRef.current, lastSignatureRef.current, lastUploadedClickTsRef.current)
+        captureAndUpload(
+          fastModeRef.current,
+          lastSignatureRef.current,
+          lastUploadedClickTsRef.current,
+          pointerRef.current
+        )
           .then((result) => {
             if (result.uploaded) {
               lastSignatureRef.current = result.signature;
@@ -397,6 +538,7 @@ export function useScreenFeed() {
       if (watched) {
         const wasWatched = watchedRef.current;
         watchedRef.current = true;
+        startPointerLoop();
         if (!wasWatched && !busyRef.current) {
           trace("start-capturing");
           scheduleCapture(0);
@@ -462,6 +604,8 @@ export function useScreenFeed() {
       stopFallbackPolling();
       watchedRef.current = false;
       stopCapturing();
+      window.removeEventListener("pointermove", onPointerMove);
+      document.documentElement.removeEventListener("pointerleave", onPointerLeave);
     };
   }, []);
 }

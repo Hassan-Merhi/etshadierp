@@ -1,9 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Maximize2, Clock, Eye, History } from "lucide-react";
+import { Clock, Eye, History, Maximize2, Monitor, MousePointer2, Wifi, WifiOff, ZoomIn } from "lucide-react";
+import {
+  calculateContainedScreenFeedSize,
+  classifyScreenFeedConnection,
+  formatScreenFeedDelay,
+  type ScreenFeedDisplaySize,
+} from "./screen-feed-viewer-layout";
 
 export function getPageLabel(route: string): string {
   if (!route || route === "/") return "Dashboard";
@@ -46,11 +52,59 @@ export function getPageLabel(route: string): string {
     .join(" ");
 }
 
+interface ScreenFeedCursor {
+  x: number;
+  y: number;
+  ts: number;
+  visible: boolean;
+}
+
+interface ScreenFeedViewport {
+  width: number;
+  height: number;
+  scrollX: number;
+  scrollY: number;
+  documentWidth: number;
+  documentHeight: number;
+  devicePixelRatio: number;
+  visualScale: number;
+}
+
+interface ScreenFeedCapture {
+  width: number;
+  height: number;
+  source: "dom" | "retry" | "fallback";
+  quality: number;
+  encodedBytes: number;
+  durationMs: number;
+}
+
 interface ScreenFrame {
   dataUrl: string;
   capturedAt: string;
+  receivedAt?: string;
+  clientCapturedAt?: string | null;
   username: string;
   clicks: Array<{ x: number; y: number; label: string; ts: number }>;
+  cursor?: ScreenFeedCursor | null;
+  viewport?: ScreenFeedViewport | null;
+  capture?: ScreenFeedCapture | null;
+}
+
+type DisplayMode = "fit" | "actual";
+
+const qualityLabels = {
+  excellent: "Excellent",
+  good: "Good",
+  delayed: "Delayed",
+  stale: "Stale",
+  waiting: "Waiting",
+} as const;
+
+function formatBytes(bytes: number | undefined): string {
+  if (!bytes || !Number.isFinite(bytes)) return "—";
+  if (bytes < 1024) return `${Math.round(bytes)} B`;
+  return `${Math.round(bytes / 1024)} KB`;
 }
 
 export function WatchUserDialog({
@@ -64,6 +118,15 @@ export function WatchUserDialog({
 }) {
   const [liveConnected, setLiveConnected] = useState(false);
   const [liveFrame, setLiveFrame] = useState<ScreenFrame | null>(null);
+  const [liveCursor, setLiveCursor] = useState<ScreenFeedCursor | null>(null);
+  const [frameReceivedAt, setFrameReceivedAt] = useState<number | null>(null);
+  const [displayMode, setDisplayMode] = useState<DisplayMode>("fit");
+  const [tick, setTick] = useState(Date.now());
+  const [displaySize, setDisplaySize] = useState<ScreenFeedDisplaySize>({ width: 0, height: 0 });
+
+  const viewerSurfaceRef = useRef<HTMLDivElement>(null);
+  const frameViewportRef = useRef<HTMLDivElement>(null);
+  const watchStartRef = useRef(Date.now());
 
   const { data: presenceRaw } = useQuery<any>({
     queryKey: ["/api/user-presence", userId],
@@ -75,7 +138,6 @@ export function WatchUserDialog({
     queryFn: () => apiRequest("GET", `/api/user-presence/${userId}/activity`).then((response) => response.json()),
     refetchInterval: 30000,
   });
-  const watchStartRef = useRef(Date.now());
   const { data: screenFrameRaw } = useQuery<any>({
     queryKey: ["/api/screen-feed", userId],
     queryFn: () => apiRequest("GET", `/api/screen-feed/${userId}`).then((response) => response.json()),
@@ -83,8 +145,15 @@ export function WatchUserDialog({
   });
 
   useEffect(() => {
+    const intervalId = setInterval(() => setTick(Date.now()), 1000);
+    return () => clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
     setLiveConnected(false);
     setLiveFrame(null);
+    setLiveCursor(null);
+    setFrameReceivedAt(null);
 
     let eventSource: EventSource | null = null;
     try {
@@ -98,9 +167,21 @@ export function WatchUserDialog({
           if (frame?.dataUrl && frame?.capturedAt) {
             setLiveConnected(true);
             setLiveFrame(frame);
+            setLiveCursor(frame.cursor ?? null);
+            setFrameReceivedAt(Date.now());
           }
         } catch {
           setLiveConnected(false);
+        }
+      });
+      eventSource.addEventListener("cursor", (event) => {
+        try {
+          const cursor = JSON.parse((event as MessageEvent<string>).data) as ScreenFeedCursor;
+          if (cursor && Number.isFinite(cursor.x) && Number.isFinite(cursor.y)) {
+            setLiveCursor(cursor);
+          }
+        } catch {
+          // The next valid cursor or frame replaces a malformed event.
         }
       });
       eventSource.onerror = () => {
@@ -122,16 +203,55 @@ export function WatchUserDialog({
       : null;
   const screenFrame = liveFrame ?? fallbackFrame;
   const clicks = Array.isArray(screenFrame?.clicks) ? screenFrame.clicks : [];
+  const cursor = liveCursor ?? screenFrame?.cursor ?? null;
+
+  useEffect(() => {
+    if (!liveFrame && fallbackFrame?.dataUrl) {
+      setFrameReceivedAt(Date.now());
+      setLiveCursor(fallbackFrame.cursor ?? null);
+    }
+  }, [fallbackFrame?.capturedAt, fallbackFrame?.cursor, fallbackFrame?.dataUrl, liveFrame]);
+
+  const sourceWidth = screenFrame?.capture?.width ?? screenFrame?.viewport?.width ?? 1280;
+  const sourceHeight = screenFrame?.capture?.height ?? screenFrame?.viewport?.height ?? 720;
+
+  useEffect(() => {
+    const element = frameViewportRef.current;
+    if (!element) return;
+
+    const updateSize = () => {
+      if (displayMode === "actual") {
+        setDisplaySize({ width: sourceWidth, height: sourceHeight });
+        return;
+      }
+      setDisplaySize(
+        calculateContainedScreenFeedSize(element.clientWidth, element.clientHeight, sourceWidth, sourceHeight)
+      );
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [displayMode, sourceHeight, sourceWidth]);
 
   const isOnline =
     !!presence &&
     !!presence.userId &&
     !!presence.lastSeen &&
-    Date.now() - new Date(presence.lastSeen).getTime() < 3 * 60 * 1000;
+    tick - new Date(presence.lastSeen).getTime() < 3 * 60 * 1000;
   const hasScreen = !!screenFrame?.dataUrl;
-
-  const now = Date.now();
-  const recentClicks = clicks.filter((click) => now - click.ts < 4000);
+  const serverTimestamp = screenFrame?.receivedAt ?? screenFrame?.capturedAt;
+  const frameAgeMs = serverTimestamp
+    ? Math.max(0, tick - new Date(serverTimestamp).getTime())
+    : Number.POSITIVE_INFINITY;
+  const transportDelayMs =
+    serverTimestamp && frameReceivedAt !== null
+      ? Math.max(0, frameReceivedAt - new Date(serverTimestamp).getTime())
+      : Number.NaN;
+  const quality = classifyScreenFeedConnection(hasScreen, liveConnected, frameAgeMs);
+  const recentClicks = clicks.filter((click) => tick - click.ts < 4000);
+  const cursorVisible = !!cursor?.visible && tick - cursor.ts < 3000;
 
   const fmtTime = (value: string | Date | null | undefined) => {
     if (!value) return "—";
@@ -144,20 +264,33 @@ export function WatchUserDialog({
     if (!value) return "unknown";
     const date = new Date(value as string);
     if (Number.isNaN(date.getTime())) return "unknown";
-    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+    const seconds = Math.floor((tick - date.getTime()) / 1000);
     if (seconds < 5) return "just now";
     if (seconds < 60) return `${seconds}s ago`;
     if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
     return `${Math.floor(seconds / 3600)}h ago`;
   };
 
-  const imgRef = useRef<HTMLImageElement>(null);
-
   const openNativeFullscreen = () => {
-    if (imgRef.current?.requestFullscreen) {
-      void imgRef.current.requestFullscreen();
+    if (viewerSurfaceRef.current?.requestFullscreen) {
+      void viewerSurfaceRef.current.requestFullscreen();
     }
   };
+
+  const frameMetadata = useMemo(() => {
+    const capture = screenFrame?.capture;
+    const viewport = screenFrame?.viewport;
+    return {
+      resolution: capture ? `${capture.width}×${capture.height}` : `${sourceWidth}×${sourceHeight}`,
+      viewport: viewport ? `${viewport.width}×${viewport.height}` : "—",
+      scroll: viewport ? `${viewport.scrollX}, ${viewport.scrollY}` : "—",
+      zoom: viewport ? `${Math.round(viewport.visualScale * 100)}%` : "—",
+      dpr: viewport ? viewport.devicePixelRatio.toFixed(2) : "—",
+      source: capture?.source ?? "legacy",
+      size: formatBytes(capture?.encodedBytes),
+      captureTime: capture ? formatScreenFeedDelay(capture.durationMs) : "—",
+    };
+  }, [screenFrame?.capture, screenFrame?.viewport, sourceHeight, sourceWidth]);
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -183,13 +316,43 @@ export function WatchUserDialog({
           <span className="font-semibold text-sm">Watching: {username}</span>
           {isOnline && presence && (
             <span className="text-sm text-muted-foreground">
-              · {presence.companyName || "no company"} · {presence.role || "—"}· last seen {timeAgo(presence.lastSeen)}
+              · {presence.companyName || "no company"} · {presence.role || "—"} · last seen {timeAgo(presence.lastSeen)}
             </span>
           )}
-          <div className="ml-auto flex items-center gap-2">
-            {screenFrame?.capturedAt && (
-              <span className="text-xs text-muted-foreground">captured {timeAgo(screenFrame.capturedAt)}</span>
-            )}
+          <div className="ml-auto flex items-center gap-2 flex-wrap">
+            <span
+              className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium ${
+                quality === "excellent"
+                  ? "border-green-500/40 text-green-600 dark:text-green-400"
+                  : quality === "good"
+                    ? "border-blue-500/40 text-blue-600 dark:text-blue-400"
+                    : quality === "delayed"
+                      ? "border-amber-500/40 text-amber-600 dark:text-amber-400"
+                      : "border-muted-foreground/30 text-muted-foreground"
+              }`}
+              data-testid="screen-feed-quality"
+            >
+              {liveConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+              {qualityLabels[quality]}
+            </span>
+            <Button
+              size="sm"
+              variant={displayMode === "fit" ? "default" : "outline"}
+              onClick={() => setDisplayMode("fit")}
+              data-testid="button-feed-fit"
+            >
+              <Monitor className="h-3.5 w-3.5 mr-1.5" />
+              Fit
+            </Button>
+            <Button
+              size="sm"
+              variant={displayMode === "actual" ? "default" : "outline"}
+              onClick={() => setDisplayMode("actual")}
+              data-testid="button-feed-actual"
+            >
+              <ZoomIn className="h-3.5 w-3.5 mr-1.5" />
+              100%
+            </Button>
             {hasScreen && (
               <Button size="sm" variant="outline" onClick={openNativeFullscreen} data-testid="button-fullscreen-feed">
                 <Maximize2 className="h-3.5 w-3.5 mr-1.5" />
@@ -200,20 +363,45 @@ export function WatchUserDialog({
         </div>
 
         <div className="flex flex-1 min-h-0 overflow-hidden">
-          <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-black">
-            <div className="flex-1 min-h-0 flex items-center justify-center">
+          <div ref={viewerSurfaceRef} className="flex-1 min-w-0 flex flex-col overflow-hidden bg-black">
+            <div
+              ref={frameViewportRef}
+              className={`flex-1 min-h-0 ${
+                displayMode === "fit"
+                  ? "overflow-hidden flex items-center justify-center"
+                  : "overflow-auto flex items-start justify-start"
+              }`}
+              data-testid="screen-feed-viewport"
+            >
               {hasScreen ? (
-                <div className="relative w-full h-full flex items-center justify-center">
+                <div
+                  className="relative shrink-0"
+                  style={{ width: displaySize.width, height: displaySize.height }}
+                  data-testid="screen-feed-frame-wrapper"
+                >
                   <img
-                    ref={imgRef}
                     src={screenFrame.dataUrl}
                     alt="Live screen of user"
-                    className="max-w-full max-h-full object-contain block"
+                    className="block w-full h-full object-fill select-none"
+                    draggable={false}
                     data-testid="img-screen-feed"
-                    style={{ imageRendering: "crisp-edges" }}
+                    style={{ imageRendering: "auto" }}
                   />
+                  {cursorVisible && cursor && (
+                    <div
+                      className="absolute pointer-events-none drop-shadow-md"
+                      style={{
+                        left: `${cursor.x * 100}%`,
+                        top: `${cursor.y * 100}%`,
+                        transform: "translate(-2px, -2px)",
+                      }}
+                      data-testid="screen-feed-cursor"
+                    >
+                      <MousePointer2 className="h-5 w-5 fill-white text-black" />
+                    </div>
+                  )}
                   {recentClicks.map((click, index) => {
-                    const ageSec = (now - click.ts) / 1000;
+                    const ageSec = (tick - click.ts) / 1000;
                     const opacity = Math.max(0, 1 - ageSec / 4);
                     return (
                       <div
@@ -237,17 +425,35 @@ export function WatchUserDialog({
                   })}
                 </div>
               ) : (
-                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                <div className="flex flex-col items-center gap-2 text-muted-foreground m-auto">
                   <Clock className="h-10 w-10 opacity-30" />
                   <p className="text-sm">Waiting for first frame…</p>
                   <p className="text-xs">Live delivery starts as soon as the browser responds.</p>
-                  {Date.now() - watchStartRef.current > 20000 && (
+                  {tick - watchStartRef.current > 20000 && (
                     <p className="text-xs text-amber-600 dark:text-amber-400 text-center max-w-xs">
                       Still waiting — the fallback viewer will keep retrying automatically.
                     </p>
                   )}
                 </div>
               )}
+            </div>
+
+            <div className="border-t px-3 py-1.5 shrink-0 bg-background/95 text-xs text-muted-foreground">
+              <div className="flex items-center gap-x-4 gap-y-1 flex-wrap">
+                <span className="font-medium text-foreground">
+                  {liveConnected ? "Live stream" : "Polling fallback"}
+                </span>
+                <span>Frame age: {Number.isFinite(frameAgeMs) ? formatScreenFeedDelay(frameAgeMs) : "—"}</span>
+                <span>Delivery: {formatScreenFeedDelay(transportDelayMs)}</span>
+                <span>Capture: {frameMetadata.resolution}</span>
+                <span>Viewport: {frameMetadata.viewport}</span>
+                <span>Zoom: {frameMetadata.zoom}</span>
+                <span>DPR: {frameMetadata.dpr}</span>
+                <span>Scroll: {frameMetadata.scroll}</span>
+                <span>Frame: {frameMetadata.size}</span>
+                <span>Render: {frameMetadata.captureTime}</span>
+                <span>Source: {frameMetadata.source}</span>
+              </div>
             </div>
 
             {clicks.length > 0 && (
