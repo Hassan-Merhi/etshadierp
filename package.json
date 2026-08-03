@@ -187,7 +187,7 @@
     "@types/express-session": "^1.18.0",
     "@types/jsdom": "^28.0.3",
     "@types/multer": "^2.0.0",
-    "@types/node": "20.16.11",
+    "@types/node": "26.1.2",
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^7.0.12",
     "@types/papaparse": "^5.5.2",
