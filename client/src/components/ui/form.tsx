@@ -71,13 +71,48 @@ const useFormField = () => {
   };
 };
 
+type FormGridProps = React.HTMLAttributes<HTMLDivElement> & {
+  minColumnWidth?: string;
+};
+
+const FormGrid = React.forwardRef<HTMLDivElement, FormGridProps>(
+  ({ className, minColumnWidth = "16rem", style, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn("grid min-w-0 gap-4", className)}
+      style={{ gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${minColumnWidth}), 1fr))`, ...style }}
+      {...props}
+    />
+  ),
+);
+FormGrid.displayName = "FormGrid";
+
+const FormSection = React.forwardRef<
+  HTMLFieldSetElement,
+  React.FieldsetHTMLAttributes<HTMLFieldSetElement>
+>(({ className, ...props }, ref) => (
+  <fieldset ref={ref} className={cn("min-w-0 space-y-4 rounded-lg border p-3 sm:p-4", className)} {...props} />
+));
+FormSection.displayName = "FormSection";
+
+const FormSectionLegend = React.forwardRef<HTMLLegendElement, React.HTMLAttributes<HTMLLegendElement>>(
+  ({ className, ...props }, ref) => (
+    <legend
+      ref={ref}
+      className={cn("max-w-full break-words px-1 text-sm font-semibold leading-snug", className)}
+      {...props}
+    />
+  ),
+);
+FormSectionLegend.displayName = "FormSectionLegend";
+
 const FormItem = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => {
     const id = React.useId();
 
     return (
       <FormItemContext.Provider value={{ id }}>
-        <div ref={ref} className={cn("space-y-1.5", className)} {...props} />
+        <div ref={ref} className={cn("min-w-0 scroll-mt-24 space-y-1.5", className)} {...props} />
       </FormItemContext.Provider>
     );
   },
@@ -93,11 +128,7 @@ const FormLabel = React.forwardRef<
   return (
     <Label
       ref={ref}
-      className={cn(
-        "text-xs font-medium text-foreground",
-        error && "text-destructive",
-        className,
-      )}
+      className={cn("break-words text-xs font-medium text-foreground", error && "text-destructive", className)}
       htmlFor={formItemId}
       {...props}
     />
@@ -110,15 +141,14 @@ const FormControl = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof Slot>
 >(({ ...props }, ref) => {
   const { error, formItemId, formDescriptionId, formMessageId } = useFormField();
-  const describedBy = error
-    ? `${formDescriptionId} ${formMessageId}`
-    : formDescriptionId;
+  const describedBy = error ? `${formDescriptionId} ${formMessageId}` : formDescriptionId;
 
   return (
     <Slot
       ref={ref}
       id={formItemId}
       aria-describedby={describedBy}
+      aria-errormessage={error ? formMessageId : undefined}
       aria-invalid={Boolean(error)}
       {...props}
     />
@@ -136,7 +166,7 @@ const FormDescription = React.forwardRef<
     <p
       ref={ref}
       id={formDescriptionId}
-      className={cn("text-xs leading-relaxed text-muted-foreground", className)}
+      className={cn("break-words text-xs leading-relaxed text-muted-foreground", className)}
       {...props}
     />
   );
@@ -160,7 +190,7 @@ const FormMessage = React.forwardRef<
       id={formMessageId}
       role="alert"
       aria-live="polite"
-      className={cn("text-xs font-medium leading-relaxed text-destructive", className)}
+      className={cn("break-words text-xs font-medium leading-relaxed text-destructive", className)}
       {...props}
     >
       {body}
@@ -172,6 +202,9 @@ FormMessage.displayName = "FormMessage";
 export {
   useFormField,
   Form,
+  FormGrid,
+  FormSection,
+  FormSectionLegend,
   FormItem,
   FormLabel,
   FormControl,
