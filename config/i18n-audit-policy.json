@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "description": "Policy for classifying candidate English interface literals without treating business identifiers, translation dictionaries, routes, formats or technical tokens as untranslated UI.",
+  "roots": ["client/src", "server", "shared"],
+  "extensions": [".ts", ".tsx"],
+  "ignoredDirectories": ["node_modules", "dist", "coverage", "generated"],
+  "ignoredPathRules": [
+    {
+      "pattern": "(^|/)i18n(/|$)",
+      "category": "translation-source",
+      "reason": "Translation dictionaries intentionally contain source-language text."
+    },
+    {
+      "pattern": "applicationTranslations\\.ts$|fullSystemInterfaceTranslations\\.ts$|factory.*Translations\\.ts$",
+      "category": "translation-source",
+      "reason": "Explicit translation source files are not untranslated interface consumers."
+    },
+    {
+      "pattern": "(^|/)(__tests__|fixtures|mocks)(/|$)|\\.(spec|test)\\.(ts|tsx)$",
+      "category": "test-source",
+      "reason": "Test and fixture prose is not shipped as application interface text."
+    }
+  ],
+  "protectedMarkers": [
+    "data-no-translate",
+    "data-business-value",
+    "data-stock-name",
+    "data-account-code",
+    "data-container-number",
+    "data-voucher-number"
+  ],
+  "moduleRules": [
+    {
+      "module": "accounting",
+      "patterns": ["account", "voucher", "daybook", "journal", "ledger", "net-position", "balance-sheet", "cash-flow"]
+    },
+    {
+      "module": "factory",
+      "patterns": ["factory", "bale", "offload", "mix-batch", "raw-material"]
+    },
+    {
+      "module": "inventory-logistics",
+      "patterns": ["inventory", "stock", "location", "transfer", "warehouse"]
+    },
+    {
+      "module": "sales-pos",
+      "patterns": ["/pos", "sales", "customer", "invoice", "quotation"]
+    },
+    {
+      "module": "container-purchasing",
+      "patterns": ["container", "purchase", "supplier", "shipment", "tracking"]
+    },
+    {
+      "module": "properties-rentals",
+      "patterns": ["property", "properties", "rental", "rentals", "tenant"]
+    },
+    {
+      "module": "payroll",
+      "patterns": ["payroll", "salary", "employee", "worker"]
+    },
+    {
+      "module": "supplier-partner",
+      "patterns": ["supplier-partner", "supplierpartner", "/sp/"]
+    },
+    {
+      "module": "administration",
+      "patterns": ["admin", "permission", "role", "user", "setting", "migration"]
+    },
+    {
+      "module": "reports-exports",
+      "patterns": ["report", "export", "pdf", "excel", "print", "whatsapp"]
+    }
+  ]
+}

@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useMainContentFocus } from "@/hooks/use-main-content-focus";
 import { useWorkspaceWheelScroll } from "@/hooks/use-workspace-wheel-scroll";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import {
   SidebarProvider,
   SidebarTrigger,
@@ -67,6 +68,7 @@ export function PosShell({
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [currentLocation] = useLocation();
   const { selectedCompany } = useCompany();
+  const { t } = useApplicationLanguage();
   const posNavItems = usePosNavigationItems({ user, posImportEnabled, chatUnread });
 
   const posStyle = { "--sidebar-width": "11rem", "--sidebar-width-icon": "3rem" };
@@ -81,7 +83,7 @@ export function PosShell({
 
   return (
     <>
-      <SkipLink />
+      <SkipLink>{t("accessibility.skipToMainContent")}</SkipLink>
       <SidebarProvider style={posStyle as React.CSSProperties}>
         <div ref={posContainerRef} className="flex h-full w-full min-w-0 overflow-hidden">
           {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
@@ -95,7 +97,7 @@ export function PosShell({
                   aria-label="Go back"
                   data-testid="button-pos-back"
                 >
-                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                  <ArrowLeft data-directional-icon="true" className="h-4 w-4" aria-hidden="true" />
                 </Button>
                 <ModuleIdentity
                   compact
@@ -139,12 +141,20 @@ export function PosShell({
               </SidebarGroup>
             </SidebarContent>
             <SidebarFooter className="space-y-1 border-t p-2">
-              <div className="truncate px-2 text-xs text-muted-foreground">{user.username}</div>
+              <div data-business-value="true" dir="auto" className="truncate px-2 text-xs text-muted-foreground">
+                {user.username}
+              </div>
               <div className="flex flex-wrap items-center gap-1">
                 <CurrencyToggle />
                 <CompanySelector />
                 <ThemeToggle />
-                <Button variant="ghost" size="icon" onClick={handleLogout} aria-label="Log out" data-testid="button-logout">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleLogout}
+                  aria-label="Log out"
+                  data-testid="button-logout"
+                >
                   <LogOut className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </div>
@@ -153,7 +163,7 @@ export function PosShell({
           <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <header className="no-print flex h-12 items-center justify-between gap-2 border-b p-2">
               <SidebarTrigger aria-label="Toggle point of sale navigation" data-testid="button-sidebar-toggle" />
-              <div className="ml-auto flex min-w-0 items-center gap-2">
+              <div data-slot="pos-top-bar-actions" className="ml-auto flex min-w-0 items-center gap-2">
                 <PendingSyncIndicator />
                 {hasAdminSearch && (
                   <Button
@@ -197,7 +207,11 @@ export function PosShell({
             >
               <div className={isFullHeightRoute ? "h-full min-w-0" : "w-full min-w-0"}>
                 <ErrorBoundary resetKey={currentLocation}>
-                  <Suspense fallback={<LoadingState title="Loading point of sale" description="Preparing the latest sales workspace." />}>
+                  <Suspense
+                    fallback={
+                      <LoadingState title="Loading point of sale" description="Preparing the latest sales workspace." />
+                    }
+                  >
                     <Router user={user} posImportEnabled={posImportEnabled} />
                   </Suspense>
                 </ErrorBoundary>
@@ -206,9 +220,7 @@ export function PosShell({
           </div>
         </div>
       </SidebarProvider>
-      {hasAdminSearch && (
-        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} isPOS={true} user={user} />
-      )}
+      {hasAdminSearch && <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} isPOS={true} user={user} />}
       {leaveConfirmDialog}
     </>
   );

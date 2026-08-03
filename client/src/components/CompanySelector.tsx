@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
+import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import { enqueueRequest } from "@/lib/offlineQueue";
 
 const TYPE_META: Record<CompanyType, { color: string; label: string }> = {
@@ -52,6 +53,7 @@ function getErrorMessage(error: unknown): string {
 export function CompanySelector() {
   const { selectedCompany, companies, isLoading, selectCompany } = useCompany();
   const { isOnline } = useConnectivity();
+  const { t } = useApplicationLanguage();
   const { toast } = useToast();
 
   const handleCompanyChange = async (company: Company) => {
@@ -99,7 +101,7 @@ export function CompanySelector() {
         size="sm"
         disabled
         data-testid="button-company-selector"
-        aria-label="Loading company selector"
+        aria-label={t("company.loadingSelector")}
         className="h-10 gap-1.5 px-2 sm:h-8"
       >
         <span className="h-5 w-5 shrink-0 animate-pulse rounded-md bg-muted" />
@@ -109,7 +111,6 @@ export function CompanySelector() {
   }
 
   const activeType = selectedCompany.companyType;
-  const selectorLabel = `Current company: ${selectedCompany.name}`;
 
   if (companies.length <= 1) {
     return (
@@ -118,7 +119,7 @@ export function CompanySelector() {
         size="sm"
         disabled
         data-testid="button-company-selector"
-        aria-label={selectorLabel}
+        aria-label={[t("company.current"), selectedCompany.name].join(": ")}
         title={selectedCompany.name}
         className="h-10 gap-1.5 px-2 sm:h-8"
       >
@@ -135,7 +136,10 @@ export function CompanySelector() {
           variant="outline"
           size="sm"
           data-testid="button-company-selector"
-          aria-label={`${selectorLabel}. Open company switcher.`}
+          aria-label={[
+            [t("company.current"), selectedCompany.name].join(": "),
+            t("company.openSwitcher"),
+          ].join(". ")}
           title={selectedCompany.name}
           className="h-10 max-w-[4.5rem] gap-1.5 px-2 sm:h-8 sm:max-w-[11rem] sm:pr-2"
         >
