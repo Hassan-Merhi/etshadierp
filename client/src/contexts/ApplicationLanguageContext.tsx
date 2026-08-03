@@ -1,17 +1,31 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   APPLICATION_LANGUAGE_COOKIE,
   APPLICATION_LANGUAGE_EVENT,
   APPLICATION_LANGUAGE_STORAGE_KEY,
   DEFAULT_APPLICATION_LANGUAGE,
-  isRtlApplicationLanguage,
   parseApplicationLanguage,
   type ApplicationLanguage,
 } from "@shared/applicationLanguageContract";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ApplicationInterfaceTranslator } from "@/components/ApplicationInterfaceTranslator";
+import { LiveRegion } from "@/components/ui/responsive-accessibility";
 import { translateApplicationText, type ApplicationTranslationKey } from "@/i18n/applicationTranslations";
+import {
+  applyApplicationLanguageToDocument,
+  getApplicationDirection,
+  type ApplicationDirection,
+} from "@/i18n/applicationDirection";
 
 interface LanguagePreferenceResponse {
   preferredLanguage?: ApplicationLanguage;
@@ -19,7 +33,7 @@ interface LanguagePreferenceResponse {
 
 interface ApplicationLanguageContextValue {
   language: ApplicationLanguage;
-  direction: "ltr" | "rtl";
+  direction: ApplicationDirection;
   isSaving: boolean;
   setLanguage: (language: ApplicationLanguage) => void;
   t: (key: ApplicationTranslationKey) => string;
@@ -40,6 +54,8 @@ function persistBrowserPreference(language: ApplicationLanguage) {
 
 export function ApplicationLanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<ApplicationLanguage>(readLocalPreference);
+  const [announcement, setAnnouncement] = useState("");
+  const announcedLanguageRef = useRef(language);
 
   const preferenceQuery = useQuery<LanguagePreferenceResponse>({
     queryKey: ["/api/language-preference"],
@@ -69,9 +85,8 @@ export function ApplicationLanguageProvider({ children }: { children: ReactNode 
     (next: ApplicationLanguage) => {
       const normalized = parseApplicationLanguage(next);
       persistBrowserPreference(normalized);
+      applyApplicationLanguageToDocument(normalized);
       setLanguageState(normalized);
-      document.documentElement.lang = normalized;
-      document.documentElement.dir = isRtlApplicationLanguage(normalized) ? "rtl" : "ltr";
       window.dispatchEvent(new CustomEvent<ApplicationLanguage>(APPLICATION_LANGUAGE_EVENT, { detail: normalized }));
       preferenceMutation.mutate(normalized);
       void queryClient.invalidateQueries({ refetchType: "active" });
@@ -80,9 +95,13 @@ export function ApplicationLanguageProvider({ children }: { children: ReactNode 
   );
 
   useEffect(() => {
-    document.documentElement.lang = language;
-    document.documentElement.dir = isRtlApplicationLanguage(language) ? "rtl" : "ltr";
+    applyApplicationLanguageToDocument(language);
     persistBrowserPreference(language);
+
+    if (announcedLanguageRef.current !== language) {
+      announcedLanguageRef.current = language;
+      setAnnouncement(translateApplicationText("language.changed", language));
+    }
   }, [language]);
 
   useEffect(() => {
@@ -104,7 +123,7 @@ export function ApplicationLanguageProvider({ children }: { children: ReactNode 
   const value = useMemo<ApplicationLanguageContextValue>(
     () => ({
       language,
-      direction: isRtlApplicationLanguage(language) ? "rtl" : "ltr",
+      direction: getApplicationDirection(language),
       isSaving: preferenceMutation.isPending,
       setLanguage,
       t: (key) => translateApplicationText(key, language),
@@ -115,6 +134,7 @@ export function ApplicationLanguageProvider({ children }: { children: ReactNode 
   return (
     <ApplicationLanguageContext.Provider value={value}>
       <ApplicationInterfaceTranslator language={language} />
+      <LiveRegion data-testid="application-language-announcement">{announcement}</LiveRegion>
       {children}
     </ApplicationLanguageContext.Provider>
   );
@@ -124,4 +144,11 @@ export function useApplicationLanguage() {
   const value = useContext(ApplicationLanguageContext);
   if (!value) throw new Error("useApplicationLanguage must be used inside ApplicationLanguageProvider");
   return value;
+}
+
+export function useApplicationDirection(): ApplicationDirection {
+  const value = useContext(ApplicationLanguageContext);
+  if (value) return value.direction;
+  if (typeof document !== "undefined" && document.documentElement.dir === "rtl") return "rtl";
+  return "ltr";
 }
