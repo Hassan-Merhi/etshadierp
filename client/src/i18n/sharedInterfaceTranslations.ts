@@ -11,7 +11,8 @@ export const sharedInterfaceTranslations: SharedEntry[] = [
   // Shared navigation and modules
   { en: "Dashboard", ar: "لوحة التحكم", fr: "Tableau de bord" },
   { en: "Overview", ar: "نظرة عامة", fr: "Aperçu" },
-  { en: "Inventory", ar: "المخزون", fr: "Stock" },
+  { en: "Inventory", ar: "الجرد", fr: "Inventaire" },
+  { en: "Stock", ar: "المخزون", fr: "Stock" },
   { en: "Location Inventory", ar: "مخزون المواقع", fr: "Stock par emplacement" },
   { en: "Stock Items", ar: "أصناف المخزون", fr: "Articles en stock" },
   { en: "Stock Groups", ar: "مجموعات المخزون", fr: "Groupes de stock" },
@@ -191,10 +192,16 @@ export const sharedInterfaceTranslations: SharedEntry[] = [
 ];
 
 const entryByVisibleText = new Map<string, SharedEntry>();
+
+// Canonical English labels must win over translated aliases that use the same
+// visible spelling. For example, French "Stock" previously overwrote the
+// English Stock route and made it render as "Inventory" in English.
 for (const entry of sharedInterfaceTranslations) {
   entryByVisibleText.set(entry.en, entry);
-  entryByVisibleText.set(entry.ar, entry);
-  entryByVisibleText.set(entry.fr, entry);
+}
+for (const entry of sharedInterfaceTranslations) {
+  if (!entryByVisibleText.has(entry.ar)) entryByVisibleText.set(entry.ar, entry);
+  if (!entryByVisibleText.has(entry.fr)) entryByVisibleText.set(entry.fr, entry);
 }
 
 export function translateSharedInterfaceText(value: string, language: ApplicationLanguage): string | null {
