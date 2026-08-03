@@ -5,14 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CompanySelector } from "@/components/CompanySelector";
-import {
-  useApplicationDirection,
-  useApplicationLanguage,
-} from "@/contexts/ApplicationLanguageContext";
+import { useApplicationDirection, useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 
-const MobileWorkspaceControls = lazy(
-  () => import("@/components/MobileWorkspaceControls")
-);
+const MobileWorkspaceControls = lazy(() => import("@/components/MobileWorkspaceControls"));
 const WorkspaceHeaderControls = lazy(() =>
   import("@/components/MobileWorkspaceControls").then((module) => ({
     default: module.WorkspaceHeaderControls,
@@ -61,27 +56,17 @@ export function AppTopBar({
         }}
       />
 
-      <div
-        data-slot="app-top-bar-leading"
-        className="flex min-w-0 shrink-0 items-center gap-1.5 sm:gap-2.5"
-      >
+      <div data-slot="app-top-bar-leading" className="flex min-w-0 shrink-0 items-center gap-1.5 sm:gap-2.5">
         <SidebarTrigger
           data-testid="button-sidebar-toggle"
           className="h-10 w-10 shrink-0 sm:h-8 sm:w-8"
           aria-label={t("accessibility.toggleSidebar")}
         />
-        {leftContent && (
-          <div className="hidden min-w-0 sm:block">{leftContent}</div>
-        )}
+        {leftContent && <div className="hidden min-w-0 sm:block">{leftContent}</div>}
       </div>
 
-      <div
-        data-slot="app-top-bar-actions"
-        className="ml-auto flex min-w-0 flex-nowrap items-center gap-0.5 sm:gap-1.5"
-      >
-        {extraActions && (
-          <div className="hidden items-center sm:flex">{extraActions}</div>
-        )}
+      <div data-slot="app-top-bar-actions" className="ml-auto flex min-w-0 flex-nowrap items-center gap-0.5 sm:gap-1.5">
+        {extraActions && <div className="hidden items-center sm:flex">{extraActions}</div>}
 
         {showSearch && onSearchOpen && (
           <button
@@ -93,10 +78,7 @@ export function AppTopBar({
             <Search className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             <span className="hidden lg:inline">Search</span>
             <kbd className="inline-flex h-4 items-center rounded border border-border bg-background px-1.5 font-mono text-[9px] leading-none">
-              {typeof navigator !== "undefined" &&
-              /Mac|iPod|iPhone|iPad/.test(navigator.platform)
-                ? "⌘ /"
-                : "Ctrl /"}
+              {typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform) ? "⌘ /" : "Ctrl /"}
             </kbd>
           </button>
         )}
@@ -114,16 +96,8 @@ export function AppTopBar({
           </Button>
         )}
 
-        <Suspense
-          fallback={
-            <span className="h-10 w-10 shrink-0" aria-hidden="true" />
-          }
-        >
-          <WorkspaceHeaderControls
-            accentColor={accentColor}
-            user={user}
-            onLogout={onLogout}
-          />
+        <Suspense fallback={<span className="h-10 w-10 shrink-0" aria-hidden="true" />}>
+          <WorkspaceHeaderControls accentColor={accentColor} user={user} onLogout={onLogout} />
         </Suspense>
 
         <CompanySelector />
@@ -132,14 +106,7 @@ export function AppTopBar({
           <ThemeToggle />
         </span>
 
-        <Suspense
-          fallback={
-            <span
-              className="h-10 w-10 shrink-0 sm:hidden"
-              aria-hidden="true"
-            />
-          }
-        >
+        <Suspense fallback={<span className="h-10 w-10 shrink-0 sm:hidden" aria-hidden="true" />}>
           <MobileWorkspaceControls
             accentColor={accentColor}
             user={user}
