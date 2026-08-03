@@ -3,6 +3,7 @@ import { logger } from "../../lib/logger";
 import { registerSpSetupRoutes } from "./spSetupRoutes";
 import { registerSpContainerRoutes } from "./spContainerRoutes";
 import { registerSpLifecycleGuards } from "./spLifecycleGuards";
+import { registerSpReoffloadPreparationGuard } from "./spReoffloadPreparationGuard";
 import { registerSpOffloadConcurrencyGuard } from "./spOffloadConcurrencyGuard";
 import { registerSpOffloadRoutes } from "./spOffloadRoutes";
 import { registerSpOffloadLifecycleRoutes } from "./spOffloadLifecycleRoutes";
@@ -59,6 +60,9 @@ export function registerSpRoutes(app: Express) {
   registerSpSetupRoutes(app);
   registerSpLifecycleGuards(app);
   registerSpContainerRoutes(app);
+  // A completed reversal archives the prior operational offload immediately
+  // before the corrected offload reaches the existing serialization guard.
+  registerSpReoffloadPreparationGuard(app);
   // The guard owns company/container serialization and safe replay. The legacy
   // handler below still owns all voucher, prepaid, inventory, and intercompany
   // formulas after the lock has been acquired.
