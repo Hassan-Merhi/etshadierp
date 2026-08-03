@@ -2,6 +2,11 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ScanLine, List, CalendarDays, Tag, Factory } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  FactoryMobileHeader,
+  FactoryMobileHeaderActions,
+  FactoryMobilePage,
+} from "@/components/ui/factory-mobile";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { LabelPrintSettings } from "@/components/LabelPrintSettings";
@@ -69,86 +74,88 @@ export default function BaleStockEntry() {
   });
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500/30 to-emerald-600/10 border border-emerald-500/25 shrink-0">
-            <ScanLine className="h-4.5 w-4.5 text-emerald-500" />
+    <FactoryMobilePage>
+      <FactoryMobileHeader>
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/30 to-emerald-600/10">
+            <ScanLine className="h-5 w-5 text-emerald-500" />
           </div>
-          <div>
-            <h1 className="text-lg font-bold leading-tight">Bale Stock Entry</h1>
-            <p className="text-xs text-muted-foreground leading-tight">Scan and record bale production</p>
+          <div className="min-w-0">
+            <h1 className="break-words text-lg font-bold leading-tight sm:text-xl">Bale Stock Entry</h1>
+            <p className="mt-0.5 break-words text-sm leading-snug text-muted-foreground">
+              Scan and record bale production
+            </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <FactoryMobileHeaderActions>
           <LabelPrintSettings />
           <span
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold tracking-widest bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25"
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-500/25 bg-emerald-500/15 px-3 py-2 text-xs font-bold tracking-widest text-emerald-600 dark:text-emerald-400"
             data-testid="badge-stock-entry"
           >
-            <Factory className="h-3 w-3" />
+            <Factory className="h-3.5 w-3.5" />
             STOCK ENTRY
           </span>
-        </div>
-      </div>
+        </FactoryMobileHeaderActions>
+      </FactoryMobileHeader>
 
       <DailyStockSummary date={summaryDate} />
 
-      <Tabs defaultValue={showEntry ? "entry" : "history"} onValueChange={handleTabChange}>
-        <TabsList>
+      <Tabs defaultValue={showEntry ? "entry" : "history"} onValueChange={handleTabChange} className="min-w-0">
+        <TabsList aria-label="Bale stock entry sections" className="w-full max-w-full">
           {showEntry && (
             <TabsTrigger value="entry" data-testid="tab-stock-entry">
-              <ScanLine className="h-4 w-4 mr-1" />
+              <ScanLine className="mr-1 h-4 w-4" />
               Stock Entry
             </TabsTrigger>
           )}
           {showHistory && (
             <TabsTrigger value="history" data-testid="tab-stock-entry-history">
-              <List className="h-4 w-4 mr-1" />
+              <List className="mr-1 h-4 w-4" />
               Stock Entry History
             </TabsTrigger>
           )}
           {showGroundScan && (
             <TabsTrigger value="ground-scan" data-testid="tab-ground-scan">
-              <ScanLine className="h-4 w-4 mr-1" />
+              <ScanLine className="mr-1 h-4 w-4" />
               Ground Scan
             </TabsTrigger>
           )}
           {showDailyScan && (
             <TabsTrigger value="daily-scan" data-testid="tab-daily-scan">
-              <CalendarDays className="h-4 w-4 mr-1" />
+              <CalendarDays className="mr-1 h-4 w-4" />
               Daily Scan
             </TabsTrigger>
           )}
           <TabsTrigger value="worker-categories" data-testid="tab-worker-categories">
-            <Tag className="h-4 w-4 mr-1" />
+            <Tag className="mr-1 h-4 w-4" />
             Worker Categories
           </TabsTrigger>
         </TabsList>
         {showEntry && (
-          <TabsContent value="entry" className="mt-4">
+          <TabsContent value="entry" className="mt-4 min-w-0">
             <StockEntryTab />
           </TabsContent>
         )}
         {showHistory && (
-          <TabsContent value="history" className="mt-0 p-0">
+          <TabsContent value="history" className="mt-0 min-w-0 p-0">
             {mountedTabs.has("history") && <StockEntryHistory />}
           </TabsContent>
         )}
         {showGroundScan && (
-          <TabsContent value="ground-scan" className="mt-0 p-0">
+          <TabsContent value="ground-scan" className="mt-0 min-w-0 p-0">
             {mountedTabs.has("ground-scan") && <GroundScan />}
           </TabsContent>
         )}
         {showDailyScan && (
-          <TabsContent value="daily-scan" className="mt-0 p-0">
+          <TabsContent value="daily-scan" className="mt-0 min-w-0 p-0">
             {mountedTabs.has("daily-scan") && <DailyScan />}
           </TabsContent>
         )}
-        <TabsContent value="worker-categories" className="mt-4">
+        <TabsContent value="worker-categories" className="mt-4 min-w-0">
           {mountedTabs.has("worker-categories") && <WorkerCategoriesTab />}
         </TabsContent>
       </Tabs>
-    </div>
+    </FactoryMobilePage>
   );
 }
