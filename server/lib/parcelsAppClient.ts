@@ -27,10 +27,10 @@ export interface ParcelsAppShipment {
   trackingId: string;
   done: boolean;
   fromCache?: boolean;
-  // ParcelsApp returns attributes as an array of {l, val} objects in the real API
-  // response, but we also accept a plain dict for tests / legacy callers.
+  // ParcelsApp normally returns attributes as an array of {l, val} objects,
+  // but malformed/partial entries are possible and must be tolerated.
   attributes?:
-    | Array<{ l: string; val?: string; [k: string]: unknown }>
+    | Array<{ l?: unknown; val?: unknown; [k: string]: unknown }>
     | {
         status?: string;
         location?: string;
@@ -326,10 +326,24 @@ export function normaliseEvents(shipment: ParcelsAppShipment): ParcelsAppEvent[]
 function getShipmentAttribute(shipment: ParcelsAppShipment, key: string): string | undefined {
   const attributes = shipment.attributes;
   if (!attributes) return undefined;
+
+  const normalizedKey = key.trim().toLowerCase();
   if (Array.isArray(attributes)) {
-    return attributes.find((attribute) => attribute.l.toLowerCase() === key.toLowerCase())?.val;
+    for (const attribute of attributes) {
+      if (!attribute || typeof attribute !== "object") continue;
+      const label = typeof attribute.l === "string" ? attribute.l.trim() : "";
+      if (!label || label.toLowerCase() !== normalizedKey) continue;
+      return typeof attribute.val === "string" ? attribute.val : undefined;
+    }
+    return undefined;
   }
-  return attributes[key];
+
+  const exactValue = attributes[key];
+  if (typeof exactValue === "string") return exactValue;
+  const matchingKey = Object.keys(attributes).find((attributeKey) => attributeKey.toLowerCase() === normalizedKey);
+  if (!matchingKey) return undefined;
+  const value = attributes[matchingKey];
+  return typeof value === "string" ? value : undefined;
 }
 
 /**
@@ -399,7 +413,7 @@ export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): strin
   let attrsDict: Record<string, string> = {};
   if (Array.isArray(rawAttrs)) {
     for (const entry of rawAttrs) {
-      if (entry.l && typeof entry.val === "string") {
+      if (typeof entry?.l === "string" && typeof entry.val === "string") {
         attrsDict[entry.l] = entry.val;
       }
     }
