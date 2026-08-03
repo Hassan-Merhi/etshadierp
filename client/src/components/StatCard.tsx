@@ -68,22 +68,37 @@ export function StatCard({
     .replace(/\s+/g, "-")
     .replace(/[^a-z0-9-]/g, "");
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!onClick || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    onClick();
+  };
+
   return (
     <Card
-      className={cn("p-4 sm:p-5", isClickable && "hover-elevate active-elevate-2 cursor-pointer", className)}
+      className={cn(
+        "min-w-0 max-w-full p-3 sm:p-5",
+        isClickable && "cursor-pointer hover-elevate active-elevate-2",
+        className
+      )}
+      role={isClickable ? "button" : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      aria-label={isClickable ? `${title}: ${String(value)}` : undefined}
       onClick={onClick}
+      onKeyDown={handleKeyDown}
+      data-responsive-stat-card="true"
       data-testid={testId ?? `card-stat-${slug}`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <span className="min-w-0 break-words text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             {title}
           </span>
           {loading ? (
-            <Skeleton className="h-7 w-24" />
+            <Skeleton className="h-7 w-24 max-w-full" />
           ) : (
             <span
-              className="text-2xl sm:text-3xl font-semibold tracking-tight tabular-nums leading-none truncate"
+              className="min-w-0 break-words text-xl font-semibold leading-tight tracking-tight tabular-nums min-[360px]:text-2xl sm:text-3xl"
               data-testid={`text-stat-value-${slug}`}
             >
               {value}
@@ -92,7 +107,7 @@ export function StatCard({
           {!loading && change && (
             <span
               className={cn(
-                "inline-flex items-center gap-0.5 text-xs font-medium tabular-nums truncate",
+                "inline-flex min-w-0 items-start gap-0.5 break-words text-xs font-medium tabular-nums",
                 changeType === "positive"
                   ? "text-success"
                   : changeType === "negative"
@@ -101,17 +116,24 @@ export function StatCard({
               )}
               data-testid={`text-stat-delta-${slug}`}
             >
-              <ChangeIcon className="h-3 w-3 shrink-0" />
-              {change}
+              <ChangeIcon className="mt-0.5 h-3 w-3 shrink-0" />
+              <span className="min-w-0 break-words">{change}</span>
             </span>
           )}
-          {!loading && hint && !change && <span className="text-xs text-muted-foreground truncate">{hint}</span>}
+          {!loading && hint && !change && (
+            <span className="min-w-0 break-words text-xs text-muted-foreground">{hint}</span>
+          )}
         </div>
         {Icon && (
           <div
-            className={cn("flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-lg shrink-0", t.bg, t.fg)}
+            className={cn(
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-11 sm:w-11",
+              t.bg,
+              t.fg
+            )}
+            aria-hidden="true"
           >
-            <Icon className="h-5 w-5" />
+            <Icon className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
           </div>
         )}
       </div>
