@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  adjustSpInventoryAtomic,
-  requireSpInventoryMapping,
-} from "../server/services/sp/spInventoryIntegrity";
+import { adjustSpInventoryAtomic, requireSpInventoryMapping } from "../server/services/sp/spInventoryIntegrity";
 import {
   assertSpReleaseCurrency,
   SP_RELEASE_CURRENCY,
