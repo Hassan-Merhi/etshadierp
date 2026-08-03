@@ -20,12 +20,7 @@ interface DaybookFiltersProps {
   onNextDay?: () => void;
 }
 
-export function DaybookFilters({
-  periodFilter,
-  setPeriodFilter,
-  filters,
-  setFilters,
-}: DaybookFiltersProps) {
+export function DaybookFilters({ periodFilter, setPeriodFilter, filters, setFilters }: DaybookFiltersProps) {
   const hasActiveFilters =
     filters.voucherType !== "all" ||
     !!filters.searchQuery ||
@@ -56,9 +51,7 @@ export function DaybookFilters({
 
         <Select
           value={filters.statusFilter}
-          onValueChange={(value) =>
-            setFilters({ ...filters, statusFilter: value as "all" | "active" | "optional" })
-          }
+          onValueChange={(value) => setFilters({ ...filters, statusFilter: value as "all" | "active" | "optional" })}
         >
           <SelectTrigger id="status-filter" data-testid="select-status-filter" className="w-full">
             <SelectValue />
