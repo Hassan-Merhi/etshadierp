@@ -1,4 +1,5 @@
 import * as React from "react";
+
 import { cn } from "@/lib/utils";
 
 type TabsContextValue = {
@@ -38,7 +39,7 @@ function Tabs({
 
   return (
     <TabsContext.Provider value={{ value: activeValue, onValueChange: handleChange }}>
-      <div className={className} {...props}>
+      <div className={cn("min-w-0", className)} {...props}>
         {children}
       </div>
     </TabsContext.Provider>
@@ -51,11 +52,14 @@ const TabsList = React.forwardRef<
 >(({ className, variant = "pill", ...props }, ref) => (
   <div
     ref={ref}
+    role="tablist"
+    data-responsive-tabs="true"
     className={cn(
+      "inline-flex max-w-full items-center justify-start gap-1 overflow-x-auto overscroll-x-contain touch-pan-x",
       variant === "pill" &&
-        "inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 p-1 text-muted-foreground",
+        "rounded-full border border-border bg-muted/40 p-1 text-muted-foreground",
       variant === "underline" &&
-        "inline-flex items-center gap-1 border-b border-border bg-transparent p-0 text-muted-foreground",
+        "border-b border-border bg-transparent p-0 text-muted-foreground",
       className
     )}
     {...props}
@@ -74,17 +78,20 @@ const TabsTrigger = React.forwardRef<
     <button
       ref={ref}
       type="button"
+      role="tab"
+      aria-selected={active}
+      tabIndex={active ? 0 : -1}
       data-state={active ? "active" : "inactive"}
       onClick={(event) => {
         onClick?.(event);
         if (!event.defaultPrevented) ctx.onValueChange(value);
       }}
       className={cn(
-        "inline-flex items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium transition-all",
+        "inline-flex min-h-11 shrink-0 touch-manipulation items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium transition-all sm:min-h-9",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         "disabled:pointer-events-none disabled:opacity-40",
-        "rounded-full px-4 py-1.5 text-muted-foreground hover:text-foreground",
-        active && "bg-background text-foreground shadow-sm font-semibold",
+        "rounded-full px-3 py-1.5 text-muted-foreground hover:text-foreground sm:px-4",
+        active && "bg-background font-semibold text-foreground shadow-sm",
         className
       )}
       {...props}
@@ -104,9 +111,10 @@ const TabsContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
     return (
       <div
         ref={ref}
+        role="tabpanel"
         data-state={ctx.value === value ? "active" : "inactive"}
         className={cn(
-          "mt-4 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          "mt-4 min-w-0 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
           className
         )}
         {...props}
