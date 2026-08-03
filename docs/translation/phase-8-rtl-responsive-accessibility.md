@@ -79,3 +79,11 @@ Phase 8 is guarded by:
 - POS directional-control and business-value checks;
 - the existing Phase 14 trilingual release gate;
 - the Program 7D accessibility and responsive verifier.
+
+The two release-contract suites have a dedicated database-free Vitest configuration so static RTL and accessibility checks cannot fail before execution because of unrelated backend migration setup:
+
+```bash
+node node_modules/vitest/vitest.mjs run --config vitest.config.i18n-contracts.ts
+```
+
+Full database, regression, security and production smoke verification remains part of Phase 9. Phase 8 must not record a successful verification result unless the command output actually passes.
