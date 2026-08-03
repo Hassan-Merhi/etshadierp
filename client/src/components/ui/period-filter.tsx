@@ -8,9 +8,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogBody, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import {
   format,
@@ -120,6 +121,7 @@ export function PeriodFilter({
   "data-testid": testId,
 }: PeriodFilterProps) {
   const { formatDisplayDate } = useDateFormat();
+  const isMobile = useIsMobile();
   const [calendarOpen, setCalendarOpen] = useState(false);
 
   const fromDateObj = value.fromDate ? new Date(value.fromDate + "T12:00:00") : undefined;
@@ -173,16 +175,21 @@ export function PeriodFilter({
   const displayLabel = buildLabel();
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+    <div className={cn("flex min-w-0 w-full flex-wrap items-center gap-2 sm:w-auto", className)}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="gap-1" data-testid={testId || "period-filter-dropdown"}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full min-w-0 justify-between gap-1 sm:w-auto"
+            data-testid={testId || "period-filter-dropdown"}
+          >
             <CalendarIcon className="h-4 w-4 shrink-0" />
-            <span className="max-w-[200px] truncate">{displayLabel}</span>
-            <ChevronDown className="h-3 w-3 opacity-50 shrink-0" />
+            <span className="min-w-0 flex-1 truncate text-left sm:max-w-[200px]">{displayLabel}</span>
+            <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuContent align={isMobile ? "start" : "end"} className="w-56 max-w-[calc(100vw-1rem)]">
           <DropdownMenuItem onClick={() => handlePresetChange("all_time")} data-testid="period-preset-all-time">
             All Time
           </DropdownMenuItem>
@@ -225,28 +232,33 @@ export function PeriodFilter({
       {/* Calendar in a modal Dialog — immune to DismissableLayer race conditions */}
       {!hideCustomInputs && (
         <Dialog open={calendarOpen} onOpenChange={setCalendarOpen}>
-          <DialogContent className="w-auto max-w-fit p-0" data-testid="period-custom-range-dialog">
-            <DialogHeader className="px-4 pt-4 pb-0">
-              <DialogTitle className="text-sm font-medium flex items-center justify-between">
+          <DialogContent className="w-[calc(100vw-1rem)] max-w-fit p-0" data-testid="period-custom-range-dialog">
+            <DialogHeader className="px-4 pb-0 pt-4">
+              <DialogTitle className="flex items-center justify-between text-sm font-medium">
                 Select date range
               </DialogTitle>
-              <p className="text-xs text-muted-foreground mt-0.5">Click a start date, then an end date</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Click a start date, then an end date</p>
             </DialogHeader>
-            <div className="p-3">
+            <DialogBody className="px-2 sm:px-3">
               <Calendar
                 mode="range"
                 selected={calendarRange}
                 onSelect={handleRangeSelect}
-                numberOfMonths={2}
+                numberOfMonths={isMobile ? 1 : 2}
                 defaultMonth={fromDateObj ?? new Date()}
               />
-            </div>
+            </DialogBody>
             {calendarRange?.from && !calendarRange?.to && (
-              <div className="px-4 pb-3 text-xs text-muted-foreground text-center">Now click an end date</div>
+              <div className="px-4 text-center text-xs text-muted-foreground">Now click an end date</div>
             )}
-            <div className="px-4 pb-4 flex justify-end">
-              <Button variant="outline" size="sm" onClick={() => setCalendarOpen(false)}>
-                <X className="h-3.5 w-3.5 mr-1" /> Close
+            <div className="flex justify-end px-4 pb-4">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full sm:w-auto"
+                onClick={() => setCalendarOpen(false)}
+              >
+                <X className="mr-1 h-3.5 w-3.5" /> Close
               </Button>
             </div>
           </DialogContent>
