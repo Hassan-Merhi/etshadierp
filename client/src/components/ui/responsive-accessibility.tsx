@@ -3,7 +3,12 @@ import { cn } from "@/lib/utils";
 
 type SkipLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement>;
 
-export function SkipLink({ className, children = "Skip to main content", href = "#main-content", ...props }: SkipLinkProps) {
+export function SkipLink({
+  className,
+  children = "Skip to main content",
+  href = "#main-content",
+  ...props
+}: SkipLinkProps) {
   return (
     <a
       href={href}
@@ -29,12 +34,7 @@ type LiveRegionProps = React.HTMLAttributes<HTMLDivElement> & {
   atomic?: boolean;
 };
 
-export function LiveRegion({
-  className,
-  politeness = "polite",
-  atomic = true,
-  ...props
-}: LiveRegionProps) {
+export function LiveRegion({ className, politeness = "polite", atomic = true, ...props }: LiveRegionProps) {
   return (
     <div
       role={politeness === "assertive" ? "alert" : "status"}
