@@ -62,8 +62,8 @@ jobs:
             tests/sp-lifecycle-phases-3-4.test.ts
       - name: Prepare disposable database
         run: node node_modules/drizzle-kit/bin.cjs push --force
-      - name: Regenerate reviewed route manifest
-        run: UPDATE_ROUTE_MANIFEST=1 node node_modules/vitest/vitest.mjs run tests/route-manifest.test.ts --maxWorkers=1 --no-file-parallelism
+      - name: Verify reviewed route additions
+        run: node node_modules/vitest/vitest.mjs run tests/route-manifest.test.ts --maxWorkers=1 --no-file-parallelism
       - name: Type-check
         run: npm run check
       - name: Run Supplier Partner lifecycle integration tests
@@ -71,7 +71,7 @@ jobs:
       - name: Commit prepared source
         run: |
           if git diff --quiet; then
-            echo "Source, tests, and route manifest are already prepared."
+            echo "Source and tests are already prepared."
             exit 0
           fi
           git config user.name "github-actions[bot]"
@@ -84,6 +84,6 @@ jobs:
             server/routes/sp/spLifecycleRoutes.ts \
             server/services/sp/spLifecyclePolicy.ts \
             tests/sp-lifecycle-phases-3-4.test.ts \
-            config/route-manifest.json
+            config/ci-ratchet-allowances.json
           git commit -m "Prepare Supplier Partner phases 3-4"
           git push origin HEAD:agent/sp-finalization-phases-3-4-lifecycle
