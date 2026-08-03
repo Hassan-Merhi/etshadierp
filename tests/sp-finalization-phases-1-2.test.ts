@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   adjustSpInventoryAtomic,
   requireSpInventoryMapping,
-  SpInventoryIntegrityError,
 } from "../server/services/sp/spInventoryIntegrity";
 import {
   assertSpReleaseCurrency,
@@ -38,7 +37,7 @@ describe("Supplier Partner Phase 1 release policy", () => {
 
 describe("Supplier Partner Phase 2 inventory integrity guard", () => {
   it("requires a stock item and location mapping before inventory is touched", async () => {
-    const tx = { execute: vi.fn() };
+    const tx = { execute: vi.fn() } as any;
 
     await expect(
       requireSpInventoryMapping(tx, {
@@ -47,7 +46,7 @@ describe("Supplier Partner Phase 2 inventory integrity guard", () => {
         locationId: 3,
         context: "test movement",
       }),
-    ).rejects.toMatchObject<Partial<SpInventoryIntegrityError>>({
+    ).rejects.toMatchObject({
       code: "SP_INVENTORY_LINK_REQUIRED",
       statusCode: 409,
     });
@@ -55,7 +54,7 @@ describe("Supplier Partner Phase 2 inventory integrity guard", () => {
   });
 
   it("rejects cross-company or missing stock-item mappings", async () => {
-    const tx = { execute: vi.fn().mockResolvedValueOnce({ rows: [] }) };
+    const tx = { execute: vi.fn().mockResolvedValueOnce({ rows: [] }) } as any;
 
     await expect(
       requireSpInventoryMapping(tx, {
@@ -64,7 +63,7 @@ describe("Supplier Partner Phase 2 inventory integrity guard", () => {
         locationId: 3,
         context: "test movement",
       }),
-    ).rejects.toMatchObject<Partial<SpInventoryIntegrityError>>({
+    ).rejects.toMatchObject({
       code: "SP_INVENTORY_LINK_REQUIRED",
       statusCode: 409,
     });
@@ -77,7 +76,7 @@ describe("Supplier Partner Phase 2 inventory integrity guard", () => {
         .mockResolvedValueOnce({ rows: [{ id: 12 }] })
         .mockResolvedValueOnce({ rows: [{ id: 3 }] })
         .mockRejectedValueOnce(new Error("inventory write unavailable")),
-    };
+    } as any;
 
     await expect(
       adjustSpInventoryAtomic(tx, {
@@ -88,7 +87,7 @@ describe("Supplier Partner Phase 2 inventory integrity guard", () => {
         incomingRate: 20,
         context: "test offload",
       }),
-    ).rejects.toMatchObject<Partial<SpInventoryIntegrityError>>({
+    ).rejects.toMatchObject({
       code: "SP_INVENTORY_POST_FAILED",
       statusCode: 500,
     });
