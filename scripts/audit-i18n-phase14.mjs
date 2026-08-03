@@ -7,7 +7,7 @@ import {
   renderMarkdown,
 } from "./i18n-audit-lib.mjs";
 
-const DETECTOR_VERSION = 7;
+const DETECTOR_VERSION = 8;
 const compatibilityTranslationFiles = [
   "client/src/i18n/sharedInterfaceTranslations.ts",
   "client/src/i18n/accountingDocumentTranslations.ts",
@@ -27,6 +27,14 @@ const compatibilityTranslationFiles = [
   "client/src/i18n/reportsExportsPhase6Translations.part2.ts",
   "client/src/i18n/reportsExportsPhase6Translations.part3.ts",
   "client/src/i18n/reportsExportsPhase6Translations.part4.ts",
+  "client/src/i18n/backendMessagesPhase7Translations.part1.ts",
+  "client/src/i18n/backendMessagesPhase7Translations.part2.ts",
+  "client/src/i18n/backendMessagesPhase7Translations.part3.ts",
+  "client/src/i18n/backendMessagesPhase7Translations.part4.ts",
+  "client/src/i18n/backendMessagesPhase7Translations.part5.ts",
+  "client/src/i18n/backendMessagesPhase7Translations.part6.ts",
+  "client/src/i18n/backendMessagesPhase7Translations.part7.ts",
+  "client/src/i18n/backendMessagesPhase7Translations.part8.ts",
 ];
 
 const reviewedTechnicalValues = new Set([
