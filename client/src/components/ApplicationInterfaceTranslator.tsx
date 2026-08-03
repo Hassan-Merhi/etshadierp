@@ -68,6 +68,19 @@ const ELIGIBLE_TEXT_SELECTOR = [
 const TRANSLATABLE_ATTRIBUTES = ["aria-label", "title", "placeholder"] as const;
 const PORTAL_SELECTOR = "[data-radix-portal], [data-i18n-portal]";
 
+type TranslatableAttribute = (typeof TRANSLATABLE_ATTRIBUTES)[number];
+
+interface TranslationMemory {
+  source: string;
+  applied: string;
+}
+
+// DOM translation is intentionally centralized. Remember the original React-rendered
+// source so switching English ↔ Arabic ↔ French never depends on the currently
+// translated DOM value and never requires a page refresh.
+const textTranslationMemory = new WeakMap<Text, TranslationMemory>();
+const attributeTranslationMemory = new WeakMap<Element, Map<TranslatableAttribute, TranslationMemory>>();
+
 function isProtected(element: Element): boolean {
   return Boolean(element.closest(EXCLUDED_SELECTOR));
 }
@@ -91,24 +104,63 @@ export function translateApprovedInterfaceText(value: string, language: Applicat
   );
 }
 
+function getTextMemory(node: Text, currentValue: string): TranslationMemory {
+  const existing = textTranslationMemory.get(node);
+  if (existing && currentValue === existing.applied) return existing;
+
+  const next = { source: currentValue, applied: currentValue };
+  textTranslationMemory.set(node, next);
+  return next;
+}
+
+function getAttributeMemory(
+  element: Element,
+  attribute: TranslatableAttribute,
+  currentValue: string
+): TranslationMemory {
+  let attributes = attributeTranslationMemory.get(element);
+  if (!attributes) {
+    attributes = new Map();
+    attributeTranslationMemory.set(element, attributes);
+  }
+
+  const existing = attributes.get(attribute);
+  if (existing && currentValue === existing.applied) return existing;
+
+  const next = { source: currentValue, applied: currentValue };
+  attributes.set(attribute, next);
+  return next;
+}
+
 function translateTextNode(node: Text, language: ApplicationLanguage) {
   const parent = node.parentElement;
   if (!parent || isProtected(parent)) return;
 
-  const value = node.nodeValue ?? "";
-  const translated = translateApprovedInterfaceText(value, language);
+  const currentValue = node.nodeValue ?? "";
+  const memory = getTextMemory(node, currentValue);
+  const translated = translateApprovedInterfaceText(memory.source, language);
+
   if (translated !== null) {
-    if (translated !== node.nodeValue) node.nodeValue = translated;
+    memory.applied = translated;
+    if (translated !== currentValue) node.nodeValue = translated;
+    return;
+  }
+
+  // If a previously translated node is no longer in the approved dictionary,
+  // restore the original application value instead of leaving stale Arabic/French.
+  if (currentValue !== memory.source) {
+    memory.applied = memory.source;
+    node.nodeValue = memory.source;
     return;
   }
 
   if (
     !isEligibleTextElement(parent) &&
-    !isPhase3SharedUiText(value) &&
-    !isPhase4SupplierPartnerText(value) &&
-    !isPhase5PropertiesRentalsText(value) &&
-    !isPhase6ReportsExportsText(value) &&
-    !isPhase7BackendMessageText(value)
+    !isPhase3SharedUiText(memory.source) &&
+    !isPhase4SupplierPartnerText(memory.source) &&
+    !isPhase5PropertiesRentalsText(memory.source) &&
+    !isPhase6ReportsExportsText(memory.source) &&
+    !isPhase7BackendMessageText(memory.source)
   ) {
     return;
   }
@@ -116,11 +168,17 @@ function translateTextNode(node: Text, language: ApplicationLanguage) {
 
 function translateAttributes(element: Element, language: ApplicationLanguage) {
   if (isProtected(element)) return;
+
   for (const attribute of TRANSLATABLE_ATTRIBUTES) {
-    const value = element.getAttribute(attribute);
-    if (!value) continue;
-    const translated = translateApprovedInterfaceText(value, language);
-    if (translated !== null && translated !== value) element.setAttribute(attribute, translated.trim());
+    const currentValue = element.getAttribute(attribute);
+    if (!currentValue) continue;
+
+    const memory = getAttributeMemory(element, attribute, currentValue);
+    const translated = translateApprovedInterfaceText(memory.source, language);
+    const nextValue = (translated ?? memory.source).trim();
+
+    memory.applied = nextValue;
+    if (nextValue !== currentValue) element.setAttribute(attribute, nextValue);
   }
 }
 
