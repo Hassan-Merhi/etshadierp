@@ -3,8 +3,6 @@ import { and, eq, sql } from "drizzle-orm";
 import {
   spContainers,
   spOffloadCharges,
-  spOffloads,
-  spPrepaidCharges,
   spStockMovements,
   voucherEntries,
   vouchers,
