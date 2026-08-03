@@ -2,9 +2,14 @@ name: I18n Audit
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - agent/phase-7-backend-message-conversion
   pull_request:
     branches: [main]
+
+permissions:
+  contents: write
 
 concurrency:
   group: i18n-audit-${{ github.ref }}
@@ -39,7 +44,7 @@ jobs:
 
   phase7-verify:
     name: Focused Phase 7 verification
-    if: github.head_ref == 'agent/phase-7-backend-message-conversion'
+    if: github.ref == 'refs/heads/agent/phase-7-backend-message-conversion' && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -68,8 +73,11 @@ jobs:
       NODE_OPTIONS: --max-old-space-size=4096
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Phase 7 branch
         uses: actions/checkout@v7
+        with:
+          ref: agent/phase-7-backend-message-conversion
+          fetch-depth: 0
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v6
@@ -120,3 +128,25 @@ jobs:
 
       - name: Enforce classified audit
         run: node scripts/audit-i18n-phase14.mjs
+
+      - name: Record focused verification success
+        run: |
+          mkdir -p artifacts/phase7
+          cat > artifacts/phase7/verification-success.md <<EOF
+          # Phase 7 focused verification passed
+
+          Verified source head: $GITHUB_SHA
+
+          - TypeScript passed
+          - Phase 7 pinned formatting passed
+          - Disposable PostgreSQL schema passed
+          - Phase 7 backend behavior tests passed
+          - Runtime bridge regression passed
+          - Phase 14 release gate passed
+          - Classified I18n Audit passed
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add artifacts/phase7/verification-success.md
+          git commit -m "Phase 7: record focused verification success"
+          git push origin HEAD:agent/phase-7-backend-message-conversion
