@@ -1,28 +1,9 @@
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
-import { db, pool } from "../../../db";
-import {
-  getDuePeriods,
-  getRentalBillingDay,
-  getUtcTodayString,
-  isRentalPeriodDue,
-  getRentalPeriodDueDate,
-} from "../../../services/rental/rentalPeriodService";
-import {
-  propertyUnits,
-  propertyContracts,
-  propertyMonthlyLedger,
-  propertyPayments,
-  insertPropertyUnitSchema,
-  insertPropertyContractSchema,
-  ledgerAccounts,
-  vouchers,
-  voucherEntries,
-  rentalAutoTransferConfigs,
-  interCompanyTransfers,
-  companies,
-} from "@shared/schema";
-import { eq, and, sql, desc, inArray, isNull, isNotNull, ne } from "drizzle-orm";
+import { db } from "../../../db";
+import { getUtcTodayString, isRentalPeriodDue } from "../../../services/rental/rentalPeriodService";
+import { propertyUnits, propertyContracts, propertyMonthlyLedger, vouchers, voucherEntries } from "@shared/schema";
+import { eq, and, sql, inArray, isNull, isNotNull, ne } from "drizzle-orm";
 import { RentalModule, findOrCreateLedgerAccount } from "./ledger";
 import { ensureMonthlyLedgerRows } from "./monthly-rows";
 

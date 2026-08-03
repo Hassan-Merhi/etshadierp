@@ -2,14 +2,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import {
   ChatResponse,
-  ChatMessage,
   VoucherDraft,
   StockAdjustmentDraft,
   StockTransferDraft,
   StockItemDraft,
   PriceUpdateDraft,
-  POImportDraft,
-  POImportResult,
   FilePatchDraft,
   PushResult,
 } from "./chatWidgetTypes";

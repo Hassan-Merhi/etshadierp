@@ -1,13 +1,6 @@
 import { useState, useMemo } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Search, Package } from "lucide-react";
@@ -34,10 +27,10 @@ interface AssignContainersDialogProps {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  PENDING:    "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  PENDING: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
   IN_TRANSIT: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
-  ARRIVED:    "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
-  OFFLOADED:  "bg-muted text-muted-foreground",
+  ARRIVED: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
+  OFFLOADED: "bg-muted text-muted-foreground",
 };
 
 function fmtKg(v: string | null) {
@@ -86,7 +79,8 @@ export function AssignContainersDialog({
   const toggle = (id: number) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
@@ -106,12 +100,10 @@ export function AssignContainersDialog({
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>
-            Assign Containers → {linkedSupplier?.name}
-          </DialogTitle>
+          <DialogTitle>Assign Containers → {linkedSupplier?.name}</DialogTitle>
           <p className="text-sm text-muted-foreground pt-1">
-            Select containers currently held directly under the broker to move
-            to this linked supplier. Commission stays with the broker.
+            Select containers currently held directly under the broker to move to this linked supplier. Commission stays
+            with the broker.
           </p>
         </DialogHeader>
 
@@ -145,11 +137,7 @@ export function AssignContainersDialog({
                   key={c.id}
                   className="flex items-start gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors"
                 >
-                  <Checkbox
-                    checked={selected.has(c.id)}
-                    onCheckedChange={() => toggle(c.id)}
-                    className="mt-0.5"
-                  />
+                  <Checkbox checked={selected.has(c.id)} onCheckedChange={() => toggle(c.id)} className="mt-0.5" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono font-semibold text-sm">{c.containerNumber}</span>
@@ -181,10 +169,7 @@ export function AssignContainersDialog({
           <Button variant="outline" onClick={handleClose} disabled={isPending}>
             Cancel
           </Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={selected.size === 0 || isPending}
-          >
+          <Button onClick={handleSubmit} disabled={selected.size === 0 || isPending}>
             {isPending
               ? "Assigning..."
               : `Assign ${selected.size > 0 ? selected.size + " " : ""}Container${selected.size !== 1 ? "s" : ""}`}

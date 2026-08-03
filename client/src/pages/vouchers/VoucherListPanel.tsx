@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Pencil, ArrowRight } from "lucide-react";
+import { Pencil } from "lucide-react";
 
 interface VoucherListPanelProps {
   onEdit: (id: number) => void;

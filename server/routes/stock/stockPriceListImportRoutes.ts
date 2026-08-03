@@ -2,80 +2,23 @@ import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
-import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
-import { requireActionAccess } from "../../lib/permissionMiddleware";
-import { upload, logAudit, getCurrentExchangeRate } from "../_helpers";
+import { requireAuth, requireNonPOS } from "../../auth";
+import { upload, logAudit } from "../_helpers";
 import {
   inventory,
   stockItems,
   stockGroups,
   stockItemCodeAliases,
-  stockItemMergeLogs,
   stockItemLocationPrices,
-  stockTransferVouchers,
-  stockTransferItems,
-  stockAdjustmentVouchers,
-  stockAdjustmentItems,
-  containers,
-  containerOffloads,
-  containerOffloadItems,
-  containerSales,
-  containerCharges,
-  containerTrackingImportRowSchema,
-  updateContainerTrackingSchema,
-  bankAccounts,
-  fixedAssets,
-  insertBankAccountSchema,
-  insertFixedAssetSchema,
-  insertStockGroupSchema,
   insertStockItemSchema,
-  insertStockItemCodeAliasSchema,
-  insertContainerSchema,
-  offloadRequestSchema,
-  purchaseOrders,
-  poLineItems,
-  insertContainerSaleSchema,
-  vouchers,
-  voucherEntries,
-  salesItems,
-  suppliers,
-  customers,
   locations,
-  employees,
   userLocations,
-  auditLog,
-  interCompanyTransfers,
-  insertInterCompanyTransferSchema,
-  FEATURE_KEYS,
   locationPriceGroups,
   stockGrades,
   stockCategories,
-  insertStockGradeSchema,
-  insertStockCategorySchema,
 } from "@shared/schema";
-import {
-  eq,
-  and,
-  or,
-  desc,
-  asc,
-  lt,
-  gt,
-  ne,
-  inArray,
-  sql,
-  isNull,
-  isNotNull,
-  not,
-  gte,
-  lte,
-  like,
-  ilike,
-} from "drizzle-orm";
-import { format } from "date-fns";
-import { z } from "zod";
-import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../../excelHelper";
-import { adjustInventory } from "../../inventoryHelper";
+import { eq, and, inArray, sql, isNull } from "drizzle-orm";
+import { readExcel, sheetToJson } from "../../excelHelper";
 
 export function registerStockPriceListImportRoutes(app: Express) {
   app.get("/api/location-price-groups", requireAuth, requireNonPOS, async (req, res) => {

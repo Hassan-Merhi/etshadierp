@@ -1,7 +1,6 @@
 import {
   pgTable,
   text,
-  varchar,
   serial,
   integer,
   decimal,
@@ -61,7 +60,9 @@ export const propertyContracts = pgTable(
     id: serial("id").primaryKey(),
     companyId: integer("company_id").notNull(),
     module: text("module").notNull().default("PROPERTIES"),
-    unitId: integer("unit_id").notNull().references(() => propertyUnits.id, { onDelete: "restrict" }),
+    unitId: integer("unit_id")
+      .notNull()
+      .references(() => propertyUnits.id, { onDelete: "restrict" }),
     tenantName: text("tenant_name").notNull(),
     guaranteePeriod: text("guarantee_period"),
     guaranteeAmount: decimal("guarantee_amount", { precision: 20, scale: 2 }).notNull().default("0"),
@@ -110,7 +111,9 @@ export const propertyMonthlyLedger = pgTable(
     companyId: integer("company_id").notNull(),
     module: text("module").notNull().default("PROPERTIES"),
     contractId: integer("contract_id").notNull(),
-    unitId: integer("unit_id").notNull().references(() => propertyUnits.id, { onDelete: "restrict" }),
+    unitId: integer("unit_id")
+      .notNull()
+      .references(() => propertyUnits.id, { onDelete: "restrict" }),
     year: integer("year").notNull(),
     month: integer("month").notNull(),
     expectedAmount: decimal("expected_amount", { precision: 20, scale: 2 }).notNull().default("0"),
@@ -143,7 +146,9 @@ export const propertyPayments = pgTable(
     companyId: integer("company_id").notNull(),
     module: text("module").notNull().default("PROPERTIES"),
     contractId: integer("contract_id").notNull(),
-    unitId: integer("unit_id").notNull().references(() => propertyUnits.id, { onDelete: "restrict" }),
+    unitId: integer("unit_id")
+      .notNull()
+      .references(() => propertyUnits.id, { onDelete: "restrict" }),
     ledgerRowId: integer("ledger_row_id"),
     cashAccountId: integer("cash_account_id").references(() => ledgerAccounts.id, { onDelete: "restrict" }),
     voucherId: integer("voucher_id"),

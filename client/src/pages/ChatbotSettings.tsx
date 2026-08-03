@@ -18,7 +18,6 @@ import {
   ArrowLeft,
   Loader2,
   Check,
-  X,
   Settings,
   GitBranch,
   Eye,
@@ -28,7 +27,6 @@ import {
   RotateCcw,
   GitCommit,
   Trash2,
-  PlusCircle,
 } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";

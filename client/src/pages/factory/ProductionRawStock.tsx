@@ -1,15 +1,13 @@
 import { useState, useMemo, useRef } from "react";
-import { Link } from "wouter";
 import { useAdminOverride } from "@/hooks/use-admin-override";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { FlaskConical, ArrowDown, Plus, Tag, Layers, Calculator } from "lucide-react";
+import { FlaskConical, ArrowDown, Plus, Tag, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
-import { formatNumber } from "@/lib/formatNumber";
 import type { FactoryMixBatch } from "@shared/schema";
 
 import { SupplierCategoriesDialog } from "./production-raw-stock/ProductionRawStockHelpers";
@@ -73,9 +71,7 @@ export default function ProductionRawStock() {
   const { data: availableContainersRaw = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/raw-stock/available-containers"],
   });
-  const availableContainers = availableContainersRaw.filter(
-    (c) => c.status !== "PARTIALLY_RECEIVED"
-  );
+  const availableContainers = availableContainersRaw.filter((c) => c.status !== "PARTIALLY_RECEIVED");
 
   const { data: mixBatchesByDate = [], isLoading: mixBatchesByDateLoading } = useQuery<any[]>({
     queryKey: [`/api/factory/mix-batches-by-date?date=${encodeURIComponent(mixBatchDate)}`],
@@ -251,11 +247,7 @@ export default function ProductionRawStock() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            onClick={() => setCreateMixBatchOpen(true)}
-            className="gap-2"
-            data-testid="button-create-mix-batch"
-          >
+          <Button onClick={() => setCreateMixBatchOpen(true)} className="gap-2" data-testid="button-create-mix-batch">
             <Layers className="h-4 w-4" /> New Mix Batch
           </Button>
           <Button
@@ -337,7 +329,9 @@ export default function ProductionRawStock() {
       <EditMixBatchDialog
         batch={editBatch}
         open={editBatch !== null}
-        onOpenChange={(open) => { if (!open) setEditBatch(null); }}
+        onOpenChange={(open) => {
+          if (!open) setEditBatch(null);
+        }}
       />
 
       <OffloadDialog

@@ -1,125 +1,22 @@
-import { parseId, parseOptionalId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
-import { classifyNetPositionAccounts } from "../../../netPositionHelper";
-import { adjustInventory } from "../../../inventoryHelper";
 import { getLockedSupplierRate } from "../../../services/factory/rawStockLockedRate";
-import {
-  writeDaybookEntry,
-  getOrFetchFxRateToUsd,
-  getOrCreateLedgerAccount,
-  isLegacySHA256Hash,
-  verifySupervisorPassword,
-} from "../_helpers";
+import { writeDaybookEntry, getOrFetchFxRateToUsd } from "../_helpers";
 import {
   factorySuppliers,
-  factoryCategories,
-  factoryBaleProducts,
   factoryContainers,
   factoryRawStock,
   factoryMixBatches,
   factoryMixBatchSources,
-  factoryDailyUsages,
-  factoryPressingBatches,
   factoryBales,
-  factoryBaleSequences,
-  factoryContainerCommissions,
-  baleLabelPrints,
-  stockItems,
-  stockGroups,
-  users,
-  insertFactorySupplierSchema,
-  insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema,
-  insertFactoryContainerSchema,
-  insertFactoryRawStockSchema,
-  insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema,
-  insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema,
-  customerProformas,
-  customerProformaLines,
-  customerOrders,
-  customerOrderLines,
-  customerOrderBales,
-  customerOrderCharges,
-  customerInvoiceSequences,
-  customerBalances,
-  customers,
-  insertCustomerSchema,
-  ledgerAccounts,
-  voucherEntries,
-  companies,
-  locations,
-  userCompanyRoles,
-  insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema,
-  insertCustomerOrderSchema,
-  factoryFxRates,
-  insertFactoryFxRateSchema,
-  factoryDaybookEntries,
-  containerDocumentTypes,
-  containerDocuments,
-  containerFreight,
-  containerFreightPayments,
-  factoryDaybookEntryEdits,
-  containers,
-  factoryUserProfiles,
-  factoryUserPageAccess,
-  insertUserSchema,
-  directMessages,
-  insertDirectMessageSchema,
-  userPresence,
-  factoryDutyAuditLog,
-  factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges,
-  companySettings,
-  factorySettings,
-  factoryWorkers,
-  factoryWorkerCategories,
-  insertFactoryWorkerCategorySchema,
   factoryRawMaterialAdjustments,
-  factoryPayrolls,
-  factoryWorkerDocuments,
-  factoryAlerts,
-  employees,
-  factoryWasteEntries,
-  factoryBalePhotos,
-  factoryDailyKpiSnapshots,
-  factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots,
-  factoryContainerProfitSnapshots,
-  bankAccounts,
-  inventory,
-  exchangeRates,
-  vouchers,
-  suppliers,
-  containerSales,
-  factorySupplierPayments,
-  insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers,
-  insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations,
-  baleRecodeSessions,
-  baleRecodeItems,
-  factoryWorkerAdvances,
-  factoryAdvanceRepayments,
-  factoryBaleWasteDispatches,
-  factoryPosSales,
-  factoryPosSaleItems,
-  proformaStockReservations,
   factorySupplierCategories,
 } from "@shared/schema";
-import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
-import bcrypt from "bcryptjs";
-import CryptoJS from "crypto-js";
-import multer from "multer";
-import path from "path";
-import fs from "fs";
+import { eq, and, desc, sql, isNull } from "drizzle-orm";
 
 export function registerRawStockReceiptRoutes(app: Express) {
   app.get("/api/factory/raw-stock", requireAuth, async (req: any, res: any) => {
@@ -160,7 +57,9 @@ export function registerRawStockReceiptRoutes(app: Express) {
           try {
             supplierLockedRateMap.set(s.id, await getLockedSupplierRate(db, companyId, s.id));
           } catch (rateErr: unknown) {
-            logger.error(`[raw-stock] getLockedSupplierRate failed for supplier ${s.id}:`, { error: getErrorMessage(rateErr) });
+            logger.error(`[raw-stock] getLockedSupplierRate failed for supplier ${s.id}:`, {
+              error: getErrorMessage(rateErr),
+            });
             supplierLockedRateMap.set(s.id, 0);
           }
         }
@@ -464,7 +363,7 @@ export function registerRawStockReceiptRoutes(app: Express) {
         // an actual offload / opening balance / explicit correction can move it.
         // Standalone MANUAL materials (no supplierId) have no locked rate to read, so
         // they keep their own tracked blended-average cost.
-        const lockedRateUsd = s.supplierId ? supplierLockedRateMap.get(s.supplierId) ?? 0 : null;
+        const lockedRateUsd = s.supplierId ? (supplierLockedRateMap.get(s.supplierId) ?? 0) : null;
         const avgCostPerKg = lockedRateUsd !== null ? lockedRateUsd : s._avgCostPerKg;
         const avgCostPerKgUsd = lockedRateUsd !== null ? lockedRateUsd : s._avgCostPerKgUsd;
         return {

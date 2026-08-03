@@ -10,8 +10,6 @@ import { inventory, containers, vouchers, suppliers, locations, factoryWorkerAdv
 import { eq, and, or, inArray, sql, isNull, lte } from "drizzle-orm";
 import { classifyNetPositionAccounts, round2 } from "../../netPositionHelper";
 
-import { _getCached, _setCached } from "../../services/shared/ttlCache";
-
 export function registerStatsNetPositionRoutes(app: Express) {
   app.get("/api/stats/net-position-excel", requireAuth, requireNonPOS, async (req, res) => {
     try {

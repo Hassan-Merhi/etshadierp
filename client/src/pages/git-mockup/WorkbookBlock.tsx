@@ -1,6 +1,6 @@
 import { CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { fmt, fmtD, parseNum, COMPANY_COLORS, getRealRowBg, groupBySupplier } from "./helpers";
+import { fmt, fmtD, parseNum, getRealRowBg, groupBySupplier } from "./helpers";
 import type { EnrichedContainerApi } from "./types";
 
 export function WorkbookLegend() {

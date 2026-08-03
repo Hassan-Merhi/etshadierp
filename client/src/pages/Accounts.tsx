@@ -1,7 +1,5 @@
 import { useEffect, useRef } from "react";
 import AccountsLegacy from "./AccountsLegacy";
-import { CashBankRevaluationPanel } from "./accounts/CashBankRevaluationPanel";
-import { HistoricalOpeningResolver } from "./accounts/HistoricalOpeningResolver";
 
 const PATCH_KEY = "__program6bAccountsParentGroupFetchPatch";
 
@@ -63,7 +61,7 @@ export default function Accounts() {
       cleanupRef.current?.();
       cleanupRef.current = null;
     },
-    [],
+    []
   );
 
   return (

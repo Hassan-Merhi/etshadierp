@@ -23,8 +23,6 @@ import {
   ShieldAlert,
   FileSpreadsheet,
   Upload,
-  CheckCircle,
-  Minus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -66,7 +64,7 @@ import {
   type A4DesignColor,
 } from "@/lib/labelHtml";
 import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
-import type { FactoryMixBatch, FactoryBaleProduct } from "@shared/schema";
+import type { FactoryMixBatch } from "@shared/schema";
 import { BaleWeightEditDialog, type WeightEditBale } from "@/components/BaleWeightEditDialog";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -182,7 +180,9 @@ export default function BalesHistory() {
   type BalesPage = { items: any[]; total: number; page: number; limit: number; totalPages: number };
   const { data: balesResponse, isLoading } = useQuery<BalesPage>({
     queryKey: [
-      "/api/factory/bales", dateFilter, currentPage,
+      "/api/factory/bales",
+      dateFilter,
+      currentPage,
       statusFilter !== "all" ? statusFilter : undefined,
       batchFilter !== "all" ? batchFilter : undefined,
       debouncedSearch || undefined,
@@ -576,8 +576,8 @@ export default function BalesHistory() {
       const baleDate = bale.stockEntryDate
         ? bale.stockEntryDate
         : bale.createdAt
-        ? new Date(bale.createdAt).toLocaleDateString("en-CA")
-        : null;
+          ? new Date(bale.createdAt).toLocaleDateString("en-CA")
+          : null;
       if (baleDate !== dateFilter) return false;
     }
 
@@ -657,8 +657,8 @@ export default function BalesHistory() {
     const baleDate = bale.stockEntryDate
       ? bale.stockEntryDate
       : bale.createdAt
-      ? new Date(bale.createdAt).toLocaleDateString("en-CA")
-      : null;
+        ? new Date(bale.createdAt).toLocaleDateString("en-CA")
+        : null;
     return baleDate === summaryDate;
   });
 
@@ -1157,7 +1157,14 @@ export default function BalesHistory() {
                               <TableCell className="text-right font-mono">
                                 <button
                                   className="group flex items-center gap-1 ml-auto hover:text-foreground"
-                                  onClick={(e) => { e.stopPropagation(); setWeightEditBale({ id: bale.id, referenceNumber: bale.referenceNumber, weightKg: bale.weightKg }); }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setWeightEditBale({
+                                      id: bale.id,
+                                      referenceNumber: bale.referenceNumber,
+                                      weightKg: bale.weightKg,
+                                    });
+                                  }}
                                   title="Correct weight"
                                 >
                                   {formatLabelNum(bale.weightKg)}

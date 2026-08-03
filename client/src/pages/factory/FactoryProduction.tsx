@@ -3,7 +3,6 @@ import {
   Factory,
   Package,
   Boxes,
-  Layers,
   Tags,
   Search,
   Container,

@@ -1,82 +1,24 @@
-import { parseId, parseOptionalId } from "../../lib/parseId";
+import { parseId } from "../../lib/parseId";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { getClientDate } from "../../lib/dateUtils";
-import type { Express, Request, Response, NextFunction } from "express";
+import type { Express } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
-import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
-import { upload, logAudit, getCurrentExchangeRate } from "../_helpers";
+import { requireAuth, requireRole, requireNonPOS } from "../../auth";
+import { logAudit } from "../_helpers";
 import { logger } from "../../lib/logger";
 import {
-  inventory,
   stockItems,
-  stockGroups,
-  stockItemCodeAliases,
-  stockItemLocationPrices,
-  stockTransferVouchers,
-  stockTransferItems,
-  stockAdjustmentVouchers,
-  stockAdjustmentItems,
   containers,
   containerOffloads,
-  containerOffloadItems,
-  containerSales,
-  containerCharges,
-  containerTrackingImportRowSchema,
-  updateContainerTrackingSchema,
-  bankAccounts,
-  fixedAssets,
-  insertBankAccountSchema,
-  insertFixedAssetSchema,
-  insertStockGroupSchema,
-  insertStockItemSchema,
-  insertStockItemCodeAliasSchema,
   insertContainerSchema,
-  offloadRequestSchema,
   purchaseOrders,
   poLineItems,
-  insertContainerSaleSchema,
-  vouchers,
-  voucherEntries,
-  salesItems,
   stockGrades,
   stockCategories,
   suppliers,
-  customers,
-  locations,
-  employees,
-  userLocations,
-  auditLog,
-  interCompanyTransfers,
-  insertInterCompanyTransferSchema,
-  FEATURE_KEYS,
-  ledgerAccounts,
-  intercompanyPosConfigs,
-  stockItemMergeLogs,
 } from "@shared/schema";
-import {
-  eq,
-  and,
-  or,
-  desc,
-  asc,
-  lt,
-  gt,
-  ne,
-  inArray,
-  sql,
-  isNull,
-  isNotNull,
-  not,
-  gte,
-  lte,
-  like,
-  ilike,
-} from "drizzle-orm";
-import { format } from "date-fns";
-import { z } from "zod";
-import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../../excelHelper";
-import { adjustInventory, reverseInventoryByExactValue } from "../../inventoryHelper";
+import { eq, and, sql } from "drizzle-orm";
 import { requireNonSP } from "./containerHelpers";
 
 export function registerContainerCrudRoutes(app: Express) {
@@ -125,7 +67,12 @@ export function registerContainerCrudRoutes(app: Express) {
     const _uid = req.session.userId;
     const _cid = req.session.currentCompanyId;
     try {
-      logger.info("container create started", { module: "containers", action: "create", userId: _uid, companyId: _cid });
+      logger.info("container create started", {
+        module: "containers",
+        action: "create",
+        userId: _uid,
+        companyId: _cid,
+      });
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -203,7 +150,9 @@ export function registerContainerCrudRoutes(app: Express) {
         } catch (voucherError: unknown) {
           // Rollback: Delete container if voucher creation fails
           await storage.deleteContainer(container.id);
-          throw new Error(`Failed to create purchase voucher: ${getErrorMessage(voucherError)}`, { cause: voucherError });
+          throw new Error(`Failed to create purchase voucher: ${getErrorMessage(voucherError)}`, {
+            cause: voucherError,
+          });
         }
       }
 
@@ -226,10 +175,24 @@ export function registerContainerCrudRoutes(app: Express) {
       } catch {
         /* non-fatal */
       }
-      logger.info("container create succeeded", { module: "containers", action: "create", userId: _uid, companyId: _cid, containerId: container.id, durationMs: Date.now() - _t });
+      logger.info("container create succeeded", {
+        module: "containers",
+        action: "create",
+        userId: _uid,
+        companyId: _cid,
+        containerId: container.id,
+        durationMs: Date.now() - _t,
+      });
       res.status(201).json(container);
     } catch (error: unknown) {
-      logger.error("container create failed", { module: "containers", action: "create", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
+      logger.error("container create failed", {
+        module: "containers",
+        action: "create",
+        userId: _uid,
+        companyId: _cid,
+        durationMs: Date.now() - _t,
+        error,
+      });
       if ((error as { name?: string }).name === "ZodError") {
         return res.status(400).json({
           message: "Validation error",
@@ -256,31 +219,26 @@ export function registerContainerCrudRoutes(app: Express) {
             CASE WHEN ${stockItems.deletedAt} IS NULL THEN ${stockItems.name} ELSE NULL END,
             ${poLineItems.itemName}
           )`,
-          quantity:    poLineItems.quantity,
-          totalCost:   poLineItems.lineTotal,
-          rate:        poLineItems.rate,
+          quantity: poLineItems.quantity,
+          totalCost: poLineItems.lineTotal,
+          rate: poLineItems.rate,
           containerNumber: containers.containerNumber,
-          supplierId:  containers.supplierId,
+          supplierId: containers.supplierId,
           supplierName: sql<string>`COALESCE(${suppliers.legalName}, 'Unknown')`,
-          importDate:  containers.importDate,
-          gradeId:     stockItems.gradeId,
-          gradeName:   stockGrades.name,
-          categoryId:  stockItems.categoryId,
+          importDate: containers.importDate,
+          gradeId: stockItems.gradeId,
+          gradeName: stockGrades.name,
+          categoryId: stockItems.categoryId,
           categoryName: stockCategories.name,
         })
         .from(containers)
         .innerJoin(purchaseOrders, eq(purchaseOrders.containerId, containers.id))
-        .innerJoin(poLineItems,    eq(poLineItems.poId, purchaseOrders.id))
-        .leftJoin(stockItems,      eq(stockItems.id,    poLineItems.stockItemId))
-        .leftJoin(stockGrades,     eq(stockGrades.id,   stockItems.gradeId))
+        .innerJoin(poLineItems, eq(poLineItems.poId, purchaseOrders.id))
+        .leftJoin(stockItems, eq(stockItems.id, poLineItems.stockItemId))
+        .leftJoin(stockGrades, eq(stockGrades.id, stockItems.gradeId))
         .leftJoin(stockCategories, eq(stockCategories.id, stockItems.categoryId))
-        .leftJoin(suppliers,       eq(suppliers.id,     containers.supplierId))
-        .where(
-          and(
-            eq(containers.companyId, companyId),
-            eq(containers.status,    "OTW"),
-          ),
-        );
+        .leftJoin(suppliers, eq(suppliers.id, containers.supplierId))
+        .where(and(eq(containers.companyId, companyId), eq(containers.status, "OTW")));
 
       res.json(rows);
     } catch (error: unknown) {

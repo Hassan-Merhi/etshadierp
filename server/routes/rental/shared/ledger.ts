@@ -1,19 +1,6 @@
-import type { Express, Request, Response } from "express";
-import {
-  propertyUnits,
-  propertyContracts,
-  propertyMonthlyLedger,
-  propertyPayments,
-  insertPropertyUnitSchema,
-  insertPropertyContractSchema,
-  ledgerAccounts,
-  vouchers,
-  voucherEntries,
-  rentalAutoTransferConfigs,
-  interCompanyTransfers,
-  companies,
-} from "@shared/schema";
-import { eq, and, sql, desc, inArray, isNull, isNotNull, ne } from "drizzle-orm";
+import type { Request } from "express";
+import { ledgerAccounts } from "@shared/schema";
+import { eq, and, sql, isNull } from "drizzle-orm";
 
 export type RentalModule = "PROPERTIES" | "ERP" | "FACTORY";
 

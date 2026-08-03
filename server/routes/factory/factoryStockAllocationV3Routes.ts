@@ -1,16 +1,9 @@
-import { parseId, parseOptionalId } from "../../lib/parseId";
+import { parseId } from "../../lib/parseId";
 import { getErrorMessage } from "../../lib/httpHandlers";
-import { and, eq, isNull, inArray, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { sqlArray } from "../../lib/sqlArray";
 import { db } from "../../db";
-import {
-  factoryV3Loads,
-  factoryV3LoadBales,
-  factoryBales,
-  customerProformas,
-  customerProformaLines,
-  factoryBaleProducts,
-} from "@shared/schema";
+import { factoryV3Loads, factoryV3LoadBales } from "@shared/schema";
 import { requireAuth } from "../../auth";
 
 function getCompanyId(req: any): number | null {
@@ -364,7 +357,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         SELECT id FROM factory_v3_load_bales
         WHERE load_id = ${loadId} AND bale_id = ${bale.id} AND removed_at IS NULL
       `);
-      if ((alreadyInLoad.rows).length > 0) {
+      if (alreadyInLoad.rows.length > 0) {
         return res.status(400).json({ message: `Bale ${bale.referenceNumber} is already in this load` });
       }
 
@@ -389,7 +382,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
           AND l.company_id = ${companyId}
         LIMIT 1
       `);
-      const otherV3 = (inOtherV3.rows)[0];
+      const otherV3 = inOtherV3.rows[0];
       if (otherV3 && !bypass) {
         return res.status(409).json({
           code: "OTHER_V3_LOAD_WARNING",
@@ -476,7 +469,7 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         SELECT bale_id FROM factory_v3_load_bales
         WHERE load_id = ${id} AND removed_at IS NULL
       `);
-      const baleIds: number[] = (baleRows.rows).map((r: any) => r.bale_id ?? r.baleId);
+      const baleIds: number[] = baleRows.rows.map((r: any) => r.bale_id ?? r.baleId);
 
       // Mark each bale as SOLD in factory_bales (same end-state as existing finalization)
       if (baleIds.length > 0) {

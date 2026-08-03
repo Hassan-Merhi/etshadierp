@@ -1,7 +1,6 @@
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, ChevronRight, Shield, Building2 } from "lucide-react";
+import { Users, ChevronRight, Shield } from "lucide-react";
 import { FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
 import { FEATURE_KEYS } from "@shared/schema";
 

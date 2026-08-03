@@ -1,7 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ChevronsUp, ArrowUp, ArrowDown, ArrowLeftRight, XIcon } from "lucide-react";
-import { CheckCircle2 } from "lucide-react";
 import { fmt, fmtD } from "./helpers";
 import type { ApiAllocatedRow, ApiPreviewRow } from "./types";
 

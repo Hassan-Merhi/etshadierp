@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeftRight, XCircle, Loader2, FileCheck, X, Download, Plus, Minus } from "lucide-react";
+import { ArrowLeftRight, XCircle, Loader2, FileCheck, X, Download, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StockTransferDraft, VerifyContainerDraft, DataQueryResult } from "./chatWidgetTypes";
 import { cn } from "@/lib/utils";
@@ -15,7 +15,8 @@ function formatOtwLine(otwQty: number | null | undefined, details: OtwDetail[] |
   const counted = details.filter((d) => d.matchType !== "other");
   if (counted.length === 1) {
     const d = counted[0];
-    const shopText = d.matchType === "direct" && d.shopName ? ` for ${d.shopName}` : d.matchType === "unknown" ? ", shop unknown" : "";
+    const shopText =
+      d.matchType === "direct" && d.shopName ? ` for ${d.shopName}` : d.matchType === "unknown" ? ", shop unknown" : "";
     const etaText = d.eta ? `, ETA ${d.eta}` : d.trackingStatus ? `, ${d.trackingStatus}` : ", ETA unavailable";
     return `OTW: ${d.quantity}${shopText} in ${d.containerNumber}${etaText}`;
   }
@@ -168,7 +169,9 @@ export function StockTransferConfirmCard({
                           const c = candidates.find((c) => c.id === id);
                           if (c)
                             setEditItems((prev) =>
-                              prev.map((it, idx) => (idx === i ? { ...it, selectedId: c.id, selectedName: c.name } : it))
+                              prev.map((it, idx) =>
+                                idx === i ? { ...it, selectedId: c.id, selectedName: c.name } : it
+                              )
                             );
                         }}
                       >

@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNull, lt, lte, notInArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lte, notInArray, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   inventory,
@@ -101,9 +101,7 @@ function assertIsoDate(value: string, fieldName: string): void {
 
 function sumItemQuantity(order: HistoricalTransferOrder | null, stockItemId: number): number {
   if (!order) return 0;
-  return order.items
-    .filter((item) => item.stockItemId === stockItemId)
-    .reduce((sum, item) => sum + item.quantity, 0);
+  return order.items.filter((item) => item.stockItemId === stockItemId).reduce((sum, item) => sum + item.quantity, 0);
 }
 
 function buildExplanation(
@@ -160,7 +158,8 @@ export async function analyzeLastTwoMultiSourceTransfers(
   }
 
   const uniqueSourceIds = uniquePositiveIds(sourceLocationIds).filter((id) => id !== destinationLocationId);
-  if (uniqueSourceIds.length === 0) throw new Error("At least one source location different from the destination is required");
+  if (uniqueSourceIds.length === 0)
+    throw new Error("At least one source location different from the destination is required");
 
   const asOfDate = options.asOfDate ?? new Date().toISOString().slice(0, 10);
   assertIsoDate(asOfDate, "asOfDate");
@@ -170,11 +169,7 @@ export async function analyzeLastTwoMultiSourceTransfers(
     .select({ id: locations.id, name: locations.name, code: locations.code })
     .from(locations)
     .where(
-      and(
-        eq(locations.companyId, companyId),
-        inArray(locations.id, requestedLocationIds),
-        isNull(locations.deletedAt)
-      )
+      and(eq(locations.companyId, companyId), inArray(locations.id, requestedLocationIds), isNull(locations.deletedAt))
     );
 
   const locationNameById = new Map(locationRows.map((location) => [location.id, location.name]));
@@ -318,11 +313,14 @@ export async function analyzeLastTwoMultiSourceTransfers(
           inArray(salesItems.stockItemId, stockItemIds),
           // Look back up to 365 days so sales rates reflect the full available
           // history, not just the narrow window since the last two transfers.
-          gte(vouchers.voucherDate, (() => {
-            const d = new Date(asOfDate);
-            d.setFullYear(d.getFullYear() - 1);
-            return d.toISOString().slice(0, 10);
-          })()),
+          gte(
+            vouchers.voucherDate,
+            (() => {
+              const d = new Date(asOfDate);
+              d.setFullYear(d.getFullYear() - 1);
+              return d.toISOString().slice(0, 10);
+            })()
+          ),
           lte(vouchers.voucherDate, asOfDate)
         )
       )
@@ -368,9 +366,12 @@ export async function analyzeLastTwoMultiSourceTransfers(
     const olderTransferQty = priorOrders.reduce((sum, o) => sum + sumItemQuantity(o, stockItemId), 0);
 
     // olderWindowSales = everything from the oldest transfer up to (not incl.) the newest
-    const olderWindowSales = earliestTransferDate < newerTransfer!.voucherDate
-      ? itemSales.filter((sale) => sale.voucherDate >= earliestTransferDate && sale.voucherDate < newerTransfer!.voucherDate)
-      : [];
+    const olderWindowSales =
+      earliestTransferDate < newerTransfer!.voucherDate
+        ? itemSales.filter(
+            (sale) => sale.voucherDate >= earliestTransferDate && sale.voucherDate < newerTransfer!.voucherDate
+          )
+        : [];
     const newerWindowSales = itemSales.filter(
       (sale) => sale.voucherDate >= newerTransfer!.voucherDate && sale.voucherDate <= asOfDate
     );
@@ -449,48 +450,49 @@ export async function analyzeLastTwoMultiSourceTransfers(
     return d.toISOString().slice(0, 10);
   })();
 
-  const supplementalSaleRows = stockItemIds.length > 0
-    ? await db
-        .select({
-          stockItemId: salesItems.stockItemId,
-          voucherDate: vouchers.voucherDate,
-          quantity: salesItems.quantity,
-        })
-        .from(salesItems)
-        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
-        .where(
-          and(
-            eq(vouchers.companyId, companyId),
-            eq(vouchers.voucherType, "Sales"),
-            eq(vouchers.optional, false),
-            isNull(vouchers.deletedAt),
-            eq(vouchers.locationId, destinationLocationId),
-            notInArray(salesItems.stockItemId, stockItemIds),
-            gte(vouchers.voucherDate, ninetyDaysAgo),
-            lte(vouchers.voucherDate, asOfDate)
+  const supplementalSaleRows =
+    stockItemIds.length > 0
+      ? await db
+          .select({
+            stockItemId: salesItems.stockItemId,
+            voucherDate: vouchers.voucherDate,
+            quantity: salesItems.quantity,
+          })
+          .from(salesItems)
+          .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              eq(vouchers.voucherType, "Sales"),
+              eq(vouchers.optional, false),
+              isNull(vouchers.deletedAt),
+              eq(vouchers.locationId, destinationLocationId),
+              notInArray(salesItems.stockItemId, stockItemIds),
+              gte(vouchers.voucherDate, ninetyDaysAgo),
+              lte(vouchers.voucherDate, asOfDate)
+            )
           )
-        )
-        .orderBy(vouchers.voucherDate)
-    : await db
-        .select({
-          stockItemId: salesItems.stockItemId,
-          voucherDate: vouchers.voucherDate,
-          quantity: salesItems.quantity,
-        })
-        .from(salesItems)
-        .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
-        .where(
-          and(
-            eq(vouchers.companyId, companyId),
-            eq(vouchers.voucherType, "Sales"),
-            eq(vouchers.optional, false),
-            isNull(vouchers.deletedAt),
-            eq(vouchers.locationId, destinationLocationId),
-            gte(vouchers.voucherDate, ninetyDaysAgo),
-            lte(vouchers.voucherDate, asOfDate)
+          .orderBy(vouchers.voucherDate)
+      : await db
+          .select({
+            stockItemId: salesItems.stockItemId,
+            voucherDate: vouchers.voucherDate,
+            quantity: salesItems.quantity,
+          })
+          .from(salesItems)
+          .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              eq(vouchers.voucherType, "Sales"),
+              eq(vouchers.optional, false),
+              isNull(vouchers.deletedAt),
+              eq(vouchers.locationId, destinationLocationId),
+              gte(vouchers.voucherDate, ninetyDaysAgo),
+              lte(vouchers.voucherDate, asOfDate)
+            )
           )
-        )
-        .orderBy(vouchers.voucherDate);
+          .orderBy(vouchers.voucherDate);
 
   // Build sales map for supplemental items
   const suppSalesByItem = new Map<number, Array<{ voucherDate: string; quantity: number }>>();

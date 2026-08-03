@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import { Bot, Sparkles, ThumbsUp, ThumbsDown, Cpu, Loader2, Check } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -170,22 +169,22 @@ export function ChatMessageList({
           </p>
 
           {displaySuggestions.length > 0 && (
-          <div className="w-full space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">Try asking:</p>
-            <div className="flex flex-wrap gap-2 justify-center">
-              {displaySuggestions.map((suggestion, index) => (
-                <Badge
-                  key={index}
-                  variant="outline"
-                  className="cursor-pointer hover-elevate text-xs py-1.5 px-3"
-                  onClick={() => handleSuggestionClick(suggestion)}
-                  data-testid={`suggestion-chip-${index}`}
-                >
-                  {suggestion}
-                </Badge>
-              ))}
+            <div className="w-full space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">Try asking:</p>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {displaySuggestions.map((suggestion, index) => (
+                  <Badge
+                    key={index}
+                    variant="outline"
+                    className="cursor-pointer hover-elevate text-xs py-1.5 px-3"
+                    onClick={() => handleSuggestionClick(suggestion)}
+                    data-testid={`suggestion-chip-${index}`}
+                  >
+                    {suggestion}
+                  </Badge>
+                ))}
+              </div>
             </div>
-          </div>
           )}
         </div>
       )}
@@ -332,7 +331,8 @@ export function ChatMessageList({
         {pendingStockTransferBatch && pendingStockTransferBatch.length > 0 && !isPending && (
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground px-1">
-              {pendingStockTransferBatch.length} pending transfer draft{pendingStockTransferBatch.length > 1 ? "s" : ""} — review each below.
+              {pendingStockTransferBatch.length} pending transfer draft{pendingStockTransferBatch.length > 1 ? "s" : ""}{" "}
+              — review each below.
             </p>
             {pendingStockTransferBatch.map((draft, idx) => (
               <StockTransferConfirmCard

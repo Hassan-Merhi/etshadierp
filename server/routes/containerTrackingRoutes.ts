@@ -10,7 +10,7 @@ import type { Express, Request, Response } from "express";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { db } from "../db";
-import { requireAuth, requireRole } from "../auth";
+import { requireAuth } from "../auth";
 import { containers, containerTrackingEvents } from "../../shared/schema";
 import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
@@ -32,10 +32,7 @@ import {
   track as maerskPublicTrack,
 } from "../lib/trackingProviders/maerskPublicProvider";
 import { isEnabled as isCmaPublicEnabled } from "../lib/trackingProviders/cmaPublicProvider";
-import {
-  isConfigured as is17trackConfigured,
-  getMonthlyLimit as get17trackLimit,
-} from "../lib/trackingProviders/seventeenTrackProvider";
+import { isConfigured as is17trackConfigured } from "../lib/trackingProviders/seventeenTrackProvider";
 import { isScraperAvailable } from "../lib/parcelsAppScraper";
 import { isHttpScraperAvailable } from "../lib/httpTrackingScraper";
 import { scrapeMaerskDirect, isMaerskDirectScraperAvailable, deepScanForEta } from "../lib/maerskDirectScraper";

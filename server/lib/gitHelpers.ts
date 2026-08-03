@@ -6,14 +6,7 @@
  */
 
 import { db } from "../db";
-import {
-  containers,
-  companies,
-  userCompanyRoles,
-  suppliers,
-  purchaseOrders,
-  containerCharges,
-} from "../../shared/schema";
+import { containers, companies, userCompanyRoles, suppliers } from "../../shared/schema";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 // ── Status constants ──────────────────────────────────────────────────────────

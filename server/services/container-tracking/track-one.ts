@@ -1,8 +1,8 @@
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { containers, containerTrackingEvents, containerTrackingChecks } from "../../../shared/schema";
-import { and, eq, inArray, gte, sql, desc, isNotNull, isNull } from "drizzle-orm";
+import { containers } from "../../../shared/schema";
+import { eq } from "drizzle-orm";
 import { refreshContainerEta as refreshJsonCargoEta } from "../jsonCargoTrackingService";
 import { normalizeJsonCargoCarrier } from "../../lib/trackingProviders/jsonCargoProvider";
 import { resolveProvider } from "../../lib/trackingProviders/providerResolver";

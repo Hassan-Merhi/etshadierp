@@ -1,6 +1,5 @@
-import { Download, Mail, MessageSquare, AlertTriangle, CheckCircle2, ChevronRight, XCircle, Users } from "lucide-react";
+import { Download, Mail, MessageSquare, AlertTriangle, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";

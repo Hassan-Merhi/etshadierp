@@ -6,7 +6,6 @@ import {
   factoryFxRates,
   factoryDaybookEntries,
   ledgerAccounts,
-  companies,
   customerOrderBales,
   customerOrderLines,
   customerOrderCharges,
@@ -23,7 +22,11 @@ import {
 import { eq, and, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import CryptoJS from "crypto-js";
-import { resolveStoredFxRate, applyFxRate, UnresolvedExchangeRateError } from "../../services/factory/currencyConversion";
+import {
+  resolveStoredFxRate,
+  applyFxRate,
+  UnresolvedExchangeRateError,
+} from "../../services/factory/currencyConversion";
 
 function buildValidatedUrl(baseUrl: string, dateISO: string, currencyCode: string): string {
   try {
@@ -85,8 +88,7 @@ export async function writeDaybookEntry(
       txType: opts.txType,
       referenceId: opts.referenceId ?? null,
       referenceTable:
-        opts.referenceTable ??
-        (opts.referenceId != null ? (AUTO_FILL_REF_TABLE[opts.txType] ?? null) : null),
+        opts.referenceTable ?? (opts.referenceId != null ? (AUTO_FILL_REF_TABLE[opts.txType] ?? null) : null),
       description: opts.description,
       metaJson: opts.metaJson || null,
       currencyCode: currency,
@@ -161,7 +163,10 @@ export async function getOrFetchFxRateToUsd(companyId: number, currencyCode: str
       .limit(1);
 
     if (fallback) return fallback.rateToUsd;
-    throw new Error(`No FX rate available for ${dateISO}/${currencyCode}. External API error: ${getErrorMessage(err)}`, { cause: err });
+    throw new Error(
+      `No FX rate available for ${dateISO}/${currencyCode}. External API error: ${getErrorMessage(err)}`,
+      { cause: err }
+    );
   }
 }
 
@@ -453,7 +458,9 @@ export async function recalculateContainerCosts(
     }
 
     // 4. Recalculate weighted-average costPerKg on affected mix batches
-    const affectedBatchIds = Array.from(new Set<number>(mixSources.map((s: (typeof mixSources)[number]) => s.mixBatchId)));
+    const affectedBatchIds = Array.from(
+      new Set<number>(mixSources.map((s: (typeof mixSources)[number]) => s.mixBatchId))
+    );
     for (const batchId of affectedBatchIds) {
       const allSrc = await tx
         .select()

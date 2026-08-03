@@ -23,7 +23,6 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
-  Building2,
   MapPin,
   Search,
   RefreshCw,

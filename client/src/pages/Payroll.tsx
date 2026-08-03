@@ -11,7 +11,6 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import type { Employee } from "@shared/schema";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import { useDateFormat } from "@/contexts/DateFormatContext";
 
 import ERPRunPayroll from "@/components/ERPRunPayroll";
 import {
@@ -29,7 +28,6 @@ import { DepositDialog } from "./payroll/DepositDialog";
 import { WithdrawalDialog } from "./payroll/WithdrawalDialog";
 import { BulkPaymentDialog } from "./payroll/BulkPaymentDialog";
 import { WorkerDialogs } from "./payroll/WorkerDialogs";
-import { AdvanceDialogs } from "./payroll/AdvanceDialogs";
 import { BonusDialog } from "./payroll/BonusDialog";
 import { EmployeeCrudDialogs } from "./payroll/EmployeeCrudDialogs";
 import { BulkDialogs } from "./payroll/BulkDialogs";
@@ -38,7 +36,6 @@ import { EditEmployeeDialog } from "./payroll/EditEmployeeDialog";
 
 import { EmployeesTab } from "./payroll/EmployeesTab";
 import { WorkersTab } from "./payroll/WorkersTab";
-import { WorkerProfilesTab } from "./payroll/WorkerProfilesTab";
 import { GroupsTab } from "./payroll/GroupsTab";
 import { AdvancesTab } from "./payroll/AdvancesTab";
 import { WorkerDeductionDialog } from "./payroll/PayrollDialogs";
@@ -275,9 +272,7 @@ export default function Payroll() {
   }, [workerStaff, workerOverrides]);
 
   const ungroupedWorkers = useMemo(() => {
-    const groupedIds = new Set(
-      workerGroupsData.flatMap((g: any) => (g.members || []).map((m: any) => m.id))
-    );
+    const groupedIds = new Set(workerGroupsData.flatMap((g: any) => (g.members || []).map((m: any) => m.id)));
     return workerStaff.filter((w) => !groupedIds.has(w.id));
   }, [workerStaff, workerGroupsData]);
 
@@ -357,7 +352,7 @@ export default function Payroll() {
     });
     // Load bale rates
     fetch(`/api/employees/${editingEmployee.id}/bale-rates`, { credentials: "include" })
-      .then((r) => r.ok ? r.json() : [])
+      .then((r) => (r.ok ? r.json() : []))
       .then((data: any[]) =>
         setEditBaleRates(
           data.map((r: any) => ({
@@ -370,7 +365,7 @@ export default function Payroll() {
       .catch(() => setEditBaleRates([]));
     // Load pct rates
     fetch(`/api/employees/${editingEmployee.id}/bale-pct-rates`, { credentials: "include" })
-      .then((r) => r.ok ? r.json() : [])
+      .then((r) => (r.ok ? r.json() : []))
       .then((data: any[]) =>
         setEditBalePctRates(
           data.map((r: any) => ({
@@ -462,14 +457,16 @@ export default function Payroll() {
     setBonusSalesPeriod("thisMonth");
     setBonusSalesStart("");
     setBonusSalesEnd("");
-    setBalesRows([{
-      locationId: "",
-      sourceCompanyId: "",
-      qty: "",
-      rate: emp.balesBonusRate != null ? String(emp.balesBonusRate) : "",
-      preview: null,
-      loading: false,
-    }]);
+    setBalesRows([
+      {
+        locationId: "",
+        sourceCompanyId: "",
+        qty: "",
+        rate: emp.balesBonusRate != null ? String(emp.balesBonusRate) : "",
+        preview: null,
+        loading: false,
+      },
+    ]);
     setBalesPeriod("thisMonth");
     setBonusDate(new Date().toLocaleDateString("en-CA"));
     setBonusNotes("");
@@ -502,7 +499,7 @@ export default function Payroll() {
   const fetchBalesQty = async (idx: number) => {
     const row = balesRows[idx];
     if (!row.locationId) return;
-    setBalesRows((prev: any[]) => prev.map((r: any, i: number) => i === idx ? { ...r, loading: true } : r));
+    setBalesRows((prev: any[]) => prev.map((r: any, i: number) => (i === idx ? { ...r, loading: true } : r)));
     try {
       const { getThisMonthRange: tmr } = await import("./payroll/payrollSchemas");
       const range = balesPeriod === "thisMonth" ? tmr() : { start: balesStart, end: balesEnd };
@@ -513,11 +510,11 @@ export default function Payroll() {
       );
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      setBalesRows((prev: any[]) => prev.map((r: any, i: number) =>
-        i === idx ? { ...r, qty: data.totalQuantity, loading: false } : r
-      ));
+      setBalesRows((prev: any[]) =>
+        prev.map((r: any, i: number) => (i === idx ? { ...r, qty: data.totalQuantity, loading: false } : r))
+      );
     } catch (e: any) {
-      setBalesRows((prev: any[]) => prev.map((r: any, i: number) => i === idx ? { ...r, loading: false } : r));
+      setBalesRows((prev: any[]) => prev.map((r: any, i: number) => (i === idx ? { ...r, loading: false } : r)));
       toast({ title: "Error fetching qty", description: e.message, variant: "destructive" });
     }
   };
@@ -539,10 +536,14 @@ export default function Payroll() {
     if (bonusTab === "sales" && bonusSalesPreview) {
       descParts.push(`Sales bonus ${bonusSalesCustomPct}% on ${bonusSalesPreview.locationName}`);
     } else {
-      balesRows.filter((r: any) => parseFloat(r.qty || "0") > 0 && parseFloat(r.rate || "0") > 0).forEach((r: any) => {
-        const loc = locations.find((l: any) => l.id === parseInt(r.locationId)) ?? allCompanyLocations.find((l: any) => l.id === parseInt(r.locationId));
-        descParts.push(`${parseFloat(r.qty)} bales @ ${r.rate} (${loc?.name ?? r.locationId})`);
-      });
+      balesRows
+        .filter((r: any) => parseFloat(r.qty || "0") > 0 && parseFloat(r.rate || "0") > 0)
+        .forEach((r: any) => {
+          const loc =
+            locations.find((l: any) => l.id === parseInt(r.locationId)) ??
+            allCompanyLocations.find((l: any) => l.id === parseInt(r.locationId));
+          descParts.push(`${parseFloat(r.qty)} bales @ ${r.rate} (${loc?.name ?? r.locationId})`);
+        });
     }
     setPendingBonuses((prev: any) => ({
       ...prev,
@@ -553,7 +554,10 @@ export default function Payroll() {
       },
     }));
     setBonusDialogOpen(false);
-    toast({ title: "Saved to bulk", description: `Bonus of ${amount.toFixed(2)} saved for ${selectedEmployee.firstName}` });
+    toast({
+      title: "Saved to bulk",
+      description: `Bonus of ${amount.toFixed(2)} saved for ${selectedEmployee.firstName}`,
+    });
   };
 
   const bonusMutation = useMutation({
@@ -568,7 +572,8 @@ export default function Payroll() {
     onSuccess: () => {
       toast({ title: "Success", description: "Bonus recorded successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
-      if (selectedEmployee) queryClient.invalidateQueries({ queryKey: ["/api/accounts/employee", selectedEmployee.id] });
+      if (selectedEmployee)
+        queryClient.invalidateQueries({ queryKey: ["/api/accounts/employee", selectedEmployee.id] });
       setBonusDialogOpen(false);
     },
     onError: (e: any) => {
@@ -587,7 +592,9 @@ export default function Payroll() {
   const handleSelectAllEmployees = (checked: any) => {
     if (checked) {
       const all: Record<number, boolean> = {};
-      employeeStaff.forEach((e) => { all[e.id] = true; });
+      employeeStaff.forEach((e) => {
+        all[e.id] = true;
+      });
       setBulkDepositSelections(all);
     } else {
       setBulkDepositSelections({});
@@ -708,7 +715,9 @@ export default function Payroll() {
         endDate: range.end,
         pctLocationId: bulkBonusAutoPctLocationId || null,
       });
-      const { results } = await res.json() as { results: Array<{ employeeId: number; amount: string; breakdown: string[] }> };
+      const { results } = (await res.json()) as {
+        results: Array<{ employeeId: number; amount: string; breakdown: string[] }>;
+      };
 
       const amounts: Record<number, string> = { ...bulkBonusAmounts };
       const breakdowns: Record<number, string[]> = { ...bulkBonusBreakdowns };
@@ -726,11 +735,15 @@ export default function Payroll() {
       if (calculatedCount === 0) {
         toast({
           title: "Nothing calculated",
-          description: "No bale sales found for the configured locations in this date range. Check that sales vouchers exist for June.",
+          description:
+            "No bale sales found for the configured locations in this date range. Check that sales vouchers exist for June.",
           variant: "destructive",
         });
       } else {
-        toast({ title: "Done", description: `Bonuses calculated for ${calculatedCount} employee${calculatedCount !== 1 ? "s" : ""}` });
+        toast({
+          title: "Done",
+          description: `Bonuses calculated for ${calculatedCount} employee${calculatedCount !== 1 ? "s" : ""}`,
+        });
       }
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" });
@@ -915,10 +928,12 @@ export default function Payroll() {
 
   const handleDeleteWorker = (worker: Employee) => {
     if (confirm(`Delete worker ${worker.firstName} ${worker.lastName}?`)) {
-      modeApiRequest("DELETE", `/api/employees/${worker.id}`, undefined).then(() => {
-        toast({ title: "Deleted", description: "Worker deleted" });
-        queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
-      }).catch((e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }));
+      modeApiRequest("DELETE", `/api/employees/${worker.id}`, undefined)
+        .then(() => {
+          toast({ title: "Deleted", description: "Worker deleted" });
+          queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
+        })
+        .catch((e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }));
     }
   };
 
@@ -1009,300 +1024,300 @@ export default function Payroll() {
       <PageHeader title="Payroll Management" />
 
       <div className="flex-1 overflow-y-auto p-4">
-      <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-        <TabsList className="grid grid-cols-5 w-full">
-          <TabsTrigger value="employees">Employees</TabsTrigger>
-          <TabsTrigger value="workers">Workers</TabsTrigger>
-          <TabsTrigger value="advances">Advances + Deductions</TabsTrigger>
-          <TabsTrigger value="groups">Groups</TabsTrigger>
-          <TabsTrigger value="run-payroll">Run Payroll</TabsTrigger>
-        </TabsList>
+        <Tabs value={selectedTab} onValueChange={setSelectedTab}>
+          <TabsList className="grid grid-cols-5 w-full">
+            <TabsTrigger value="employees">Employees</TabsTrigger>
+            <TabsTrigger value="workers">Workers</TabsTrigger>
+            <TabsTrigger value="advances">Advances + Deductions</TabsTrigger>
+            <TabsTrigger value="groups">Groups</TabsTrigger>
+            <TabsTrigger value="run-payroll">Run Payroll</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="employees">
-          <EmployeesTab
-            empSearch={empSearch}
-            setEmpSearch={setEmpSearch}
-            empStatusFilter={empStatusFilter}
-            setEmpStatusFilter={setEmpStatusFilter}
-            setCreateEmployeeDialogOpen={setCreateEmployeeDialogOpen}
-            employeeStaff={employeeStaff as any}
-            filteredEmployeeStaff={filteredEmployeeStaff as any}
-            pendingBonuses={pendingBonuses}
-            setBulkDepositSelections={setBulkDepositSelections}
-            setBulkDepositDialogOpen={setBulkDepositDialogOpen}
-            setBulkBonusAmounts={setBulkBonusAmounts}
-            setBulkBonusStep={setBulkBonusStep}
-            setBulkBonusDialogOpen={setBulkBonusDialogOpen}
-            setBulkWithdrawalAmounts={setBulkWithdrawalAmounts}
-            setBulkWithdrawalAccountId={setBulkWithdrawalAccountId}
-            setBulkWithdrawalDialogOpen={setBulkWithdrawalDialogOpen}
-            setStatementEmployee={setStatementEmployee}
-            handleDeposit={handleDeposit}
-            handleBonus={handleBonus}
-            handleWithdrawal={handleWithdrawal}
-            setEditingEmployee={setEditingEmployee}
-            setEditEmployeeDialogOpen={setEditEmployeeDialogOpen}
-            handleDeleteEmployee={handleDeleteEmployee}
-          />
-        </TabsContent>
+          <TabsContent value="employees">
+            <EmployeesTab
+              empSearch={empSearch}
+              setEmpSearch={setEmpSearch}
+              empStatusFilter={empStatusFilter}
+              setEmpStatusFilter={setEmpStatusFilter}
+              setCreateEmployeeDialogOpen={setCreateEmployeeDialogOpen}
+              employeeStaff={employeeStaff as any}
+              filteredEmployeeStaff={filteredEmployeeStaff as any}
+              pendingBonuses={pendingBonuses}
+              setBulkDepositSelections={setBulkDepositSelections}
+              setBulkDepositDialogOpen={setBulkDepositDialogOpen}
+              setBulkBonusAmounts={setBulkBonusAmounts}
+              setBulkBonusStep={setBulkBonusStep}
+              setBulkBonusDialogOpen={setBulkBonusDialogOpen}
+              setBulkWithdrawalAmounts={setBulkWithdrawalAmounts}
+              setBulkWithdrawalAccountId={setBulkWithdrawalAccountId}
+              setBulkWithdrawalDialogOpen={setBulkWithdrawalDialogOpen}
+              setStatementEmployee={setStatementEmployee}
+              handleDeposit={handleDeposit}
+              handleBonus={handleBonus}
+              handleWithdrawal={handleWithdrawal}
+              setEditingEmployee={setEditingEmployee}
+              setEditEmployeeDialogOpen={setEditEmployeeDialogOpen}
+              handleDeleteEmployee={handleDeleteEmployee}
+            />
+          </TabsContent>
 
-        <TabsContent value="workers">
-          <WorkersTab
-            workerStaff={workerStaff}
-            workerPaymentSummary={workerPaymentSummary}
-            selectedPayments={selectedPayments}
-            totalAmount={totalAmount}
-            workerGroups={workerGroupsData}
-            workerGroupsExpanded={workerGroupsExpanded}
-            setWorkerGroupsExpanded={setWorkerGroupsExpanded}
-            workerPayments={workerPayments}
-            setWorkerOverrides={setWorkerOverrides}
-            setBulkPaymentDialogOpen={setBulkPaymentDialogOpen}
-            setNewWorkerDialogOpen={setNewWorkerDialogOpen}
-            setWorkerDeductionTarget={setWorkerDeductionTarget}
-            setSelectedWorkerForEdit={setSelectedWorkerForEdit}
-            setEditWorkerDialogOpen={setEditWorkerDialogOpen}
-            setCreateWorkerGroupDialogOpen={setCreateWorkerGroupDialogOpen}
-            setSelectedWorkerGroupForMembers={setSelectedWorkerGroupForMembers}
-            setWorkerGroupMembersDialogOpen={setWorkerGroupMembersDialogOpen}
-            setWorkerGroupMemberSelections={setWorkerGroupMemberSelections}
-            deleteWorkerGroupMutation={deleteWorkerGroupMutation}
-            handleToggleWorker={handleToggleWorker}
-            handleUpdateAmount={handleUpdateAmount}
-            handleDeleteWorker={handleDeleteWorker as any}
-            setStatementEmployee={setStatementEmployee}
-            ungroupedWorkers={ungroupedWorkers}
-            addWorkerToWorkerGroupMutation={addWorkerToWorkerGroupMutation}
-          />
-        </TabsContent>
+          <TabsContent value="workers">
+            <WorkersTab
+              workerStaff={workerStaff}
+              workerPaymentSummary={workerPaymentSummary}
+              selectedPayments={selectedPayments}
+              totalAmount={totalAmount}
+              workerGroups={workerGroupsData}
+              workerGroupsExpanded={workerGroupsExpanded}
+              setWorkerGroupsExpanded={setWorkerGroupsExpanded}
+              workerPayments={workerPayments}
+              setWorkerOverrides={setWorkerOverrides}
+              setBulkPaymentDialogOpen={setBulkPaymentDialogOpen}
+              setNewWorkerDialogOpen={setNewWorkerDialogOpen}
+              setWorkerDeductionTarget={setWorkerDeductionTarget}
+              setSelectedWorkerForEdit={setSelectedWorkerForEdit}
+              setEditWorkerDialogOpen={setEditWorkerDialogOpen}
+              setCreateWorkerGroupDialogOpen={setCreateWorkerGroupDialogOpen}
+              setSelectedWorkerGroupForMembers={setSelectedWorkerGroupForMembers}
+              setWorkerGroupMembersDialogOpen={setWorkerGroupMembersDialogOpen}
+              setWorkerGroupMemberSelections={setWorkerGroupMemberSelections}
+              deleteWorkerGroupMutation={deleteWorkerGroupMutation}
+              handleToggleWorker={handleToggleWorker}
+              handleUpdateAmount={handleUpdateAmount}
+              handleDeleteWorker={handleDeleteWorker as any}
+              setStatementEmployee={setStatementEmployee}
+              ungroupedWorkers={ungroupedWorkers}
+              addWorkerToWorkerGroupMutation={addWorkerToWorkerGroupMutation}
+            />
+          </TabsContent>
 
-        <TabsContent value="advances">
-          <AdvancesTab cashAccounts={cashAccounts} />
-        </TabsContent>
+          <TabsContent value="advances">
+            <AdvancesTab cashAccounts={cashAccounts} />
+          </TabsContent>
 
-        <TabsContent value="groups">
-          <GroupsTab />
-        </TabsContent>
+          <TabsContent value="groups">
+            <GroupsTab />
+          </TabsContent>
 
-        <TabsContent value="run-payroll">
-          <ERPRunPayroll />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="run-payroll">
+            <ERPRunPayroll />
+          </TabsContent>
+        </Tabs>
 
-      {/* Dialogs */}
-      <BulkDialogs
-        bulkDepositDialogOpen={bulkDepositDialogOpen}
-        setBulkDepositDialogOpen={setBulkDepositDialogOpen}
-        bulkDepositDate={bulkDepositDate}
-        setBulkDepositDate={setBulkDepositDate}
-        bulkDepositNotes={bulkDepositNotes}
-        setBulkDepositNotes={setBulkDepositNotes}
-        employeeStaff={employeeStaff as any}
-        bulkDepositSelections={bulkDepositSelections}
-        handleSelectAllEmployees={handleSelectAllEmployees}
-        handleToggleEmployeeDeposit={handleToggleEmployeeDeposit}
-        bulkDepositTotal={bulkDepositTotal}
-        validSelectedEmployees={validSelectedEmployees}
-        bulkDepositMutation={bulkDepositMutation}
-        bulkWithdrawalDialogOpen={bulkWithdrawalDialogOpen}
-        setBulkWithdrawalDialogOpen={setBulkWithdrawalDialogOpen}
-        bulkWithdrawalDate={bulkWithdrawalDate}
-        setBulkWithdrawalDate={setBulkWithdrawalDate}
-        bulkWithdrawalAccountType={bulkWithdrawalAccountType}
-        setBulkWithdrawalAccountType={setBulkWithdrawalAccountType}
-        bulkWithdrawalAccountId={bulkWithdrawalAccountId}
-        setBulkWithdrawalAccountId={setBulkWithdrawalAccountId}
-        bulkWithdrawalNotes={bulkWithdrawalNotes}
-        setBulkWithdrawalNotes={setBulkWithdrawalNotes}
-        bulkWithdrawalAmounts={bulkWithdrawalAmounts}
-        setBulkWithdrawalAmounts={setBulkWithdrawalAmounts as any}
-        bulkWithdrawalMutation={bulkWithdrawalMutation}
-        cashAccounts={cashAccounts}
-        bankAccounts={bankAccounts}
-        bulkBonusDialogOpen={bulkBonusDialogOpen}
-        setBulkBonusDialogOpen={setBulkBonusDialogOpen}
-        bulkBonusStep={bulkBonusStep}
-        setBulkBonusStep={setBulkBonusStep}
-        bulkBonusDate={bulkBonusDate}
-        setBulkBonusDate={setBulkBonusDate}
-        bulkBonusNotes={bulkBonusNotes}
-        setBulkBonusNotes={setBulkBonusNotes}
-        bulkBonusAutoMonth={bulkBonusAutoMonth}
-        setBulkBonusAutoMonth={setBulkBonusAutoMonth}
-        bulkBonusAutoStart={bulkBonusAutoStart}
-        setBulkBonusAutoStart={setBulkBonusAutoStart}
-        bulkBonusAutoEnd={bulkBonusAutoEnd}
-        setBulkBonusAutoEnd={setBulkBonusAutoEnd}
-        autoCalculateBonuses={autoCalculateBonuses}
-        bulkBonusAutoLoading={bulkBonusAutoLoading}
-        bulkBonusAutoPctLocationId={bulkBonusAutoPctLocationId}
-        setBulkBonusAutoPctLocationId={setBulkBonusAutoPctLocationId}
-        bulkBonusAmounts={bulkBonusAmounts}
-        setBulkBonusAmounts={setBulkBonusAmounts as any}
-        pendingBonuses={pendingBonuses}
-        bulkBonusBreakdowns={bulkBonusBreakdowns}
-        bulkBonusMutation={bulkBonusMutation}
-        handlePrintBulkBonus={handlePrintBulkBonus}
-        locations={locations}
-      />
+        {/* Dialogs */}
+        <BulkDialogs
+          bulkDepositDialogOpen={bulkDepositDialogOpen}
+          setBulkDepositDialogOpen={setBulkDepositDialogOpen}
+          bulkDepositDate={bulkDepositDate}
+          setBulkDepositDate={setBulkDepositDate}
+          bulkDepositNotes={bulkDepositNotes}
+          setBulkDepositNotes={setBulkDepositNotes}
+          employeeStaff={employeeStaff as any}
+          bulkDepositSelections={bulkDepositSelections}
+          handleSelectAllEmployees={handleSelectAllEmployees}
+          handleToggleEmployeeDeposit={handleToggleEmployeeDeposit}
+          bulkDepositTotal={bulkDepositTotal}
+          validSelectedEmployees={validSelectedEmployees}
+          bulkDepositMutation={bulkDepositMutation}
+          bulkWithdrawalDialogOpen={bulkWithdrawalDialogOpen}
+          setBulkWithdrawalDialogOpen={setBulkWithdrawalDialogOpen}
+          bulkWithdrawalDate={bulkWithdrawalDate}
+          setBulkWithdrawalDate={setBulkWithdrawalDate}
+          bulkWithdrawalAccountType={bulkWithdrawalAccountType}
+          setBulkWithdrawalAccountType={setBulkWithdrawalAccountType}
+          bulkWithdrawalAccountId={bulkWithdrawalAccountId}
+          setBulkWithdrawalAccountId={setBulkWithdrawalAccountId}
+          bulkWithdrawalNotes={bulkWithdrawalNotes}
+          setBulkWithdrawalNotes={setBulkWithdrawalNotes}
+          bulkWithdrawalAmounts={bulkWithdrawalAmounts}
+          setBulkWithdrawalAmounts={setBulkWithdrawalAmounts as any}
+          bulkWithdrawalMutation={bulkWithdrawalMutation}
+          cashAccounts={cashAccounts}
+          bankAccounts={bankAccounts}
+          bulkBonusDialogOpen={bulkBonusDialogOpen}
+          setBulkBonusDialogOpen={setBulkBonusDialogOpen}
+          bulkBonusStep={bulkBonusStep}
+          setBulkBonusStep={setBulkBonusStep}
+          bulkBonusDate={bulkBonusDate}
+          setBulkBonusDate={setBulkBonusDate}
+          bulkBonusNotes={bulkBonusNotes}
+          setBulkBonusNotes={setBulkBonusNotes}
+          bulkBonusAutoMonth={bulkBonusAutoMonth}
+          setBulkBonusAutoMonth={setBulkBonusAutoMonth}
+          bulkBonusAutoStart={bulkBonusAutoStart}
+          setBulkBonusAutoStart={setBulkBonusAutoStart}
+          bulkBonusAutoEnd={bulkBonusAutoEnd}
+          setBulkBonusAutoEnd={setBulkBonusAutoEnd}
+          autoCalculateBonuses={autoCalculateBonuses}
+          bulkBonusAutoLoading={bulkBonusAutoLoading}
+          bulkBonusAutoPctLocationId={bulkBonusAutoPctLocationId}
+          setBulkBonusAutoPctLocationId={setBulkBonusAutoPctLocationId}
+          bulkBonusAmounts={bulkBonusAmounts}
+          setBulkBonusAmounts={setBulkBonusAmounts as any}
+          pendingBonuses={pendingBonuses}
+          bulkBonusBreakdowns={bulkBonusBreakdowns}
+          bulkBonusMutation={bulkBonusMutation}
+          handlePrintBulkBonus={handlePrintBulkBonus}
+          locations={locations}
+        />
 
-      <DepositDialog
-        open={depositDialogOpen}
-        onOpenChange={setDepositDialogOpen}
-        selectedEmployee={selectedEmployee}
-        form={depositForm}
-        mutation={depositMutation}
-      />
+        <DepositDialog
+          open={depositDialogOpen}
+          onOpenChange={setDepositDialogOpen}
+          selectedEmployee={selectedEmployee}
+          form={depositForm}
+          mutation={depositMutation}
+        />
 
-      <WithdrawalDialog
-        open={withdrawalDialogOpen}
-        onOpenChange={setWithdrawalDialogOpen}
-        selectedEmployee={selectedEmployee}
-        form={withdrawalForm}
-        mutation={withdrawalMutation}
-        cashAccounts={cashAccounts}
-        bankAccounts={bankAccounts}
-        bankAccountsLoading={bankAccountsLoading}
-      />
+        <WithdrawalDialog
+          open={withdrawalDialogOpen}
+          onOpenChange={setWithdrawalDialogOpen}
+          selectedEmployee={selectedEmployee}
+          form={withdrawalForm}
+          mutation={withdrawalMutation}
+          cashAccounts={cashAccounts}
+          bankAccounts={bankAccounts}
+          bankAccountsLoading={bankAccountsLoading}
+        />
 
-      <BonusDialog
-        open={bonusDialogOpen}
-        onOpenChange={setBonusDialogOpen}
-        selectedEmployee={selectedEmployee}
-        bonusTab={bonusTab}
-        setBonusTab={setBonusTab}
-        bonusSalesPreview={bonusSalesPreview}
-        setBonusSalesPreview={setBonusSalesPreview}
-        bonusSalesCustomPct={bonusSalesCustomPct}
-        setBonusSalesCustomPct={setBonusSalesCustomPct}
-        bonusSalesLocationId={bonusSalesLocationId}
-        setBonusSalesLocationId={setBonusSalesLocationId}
-        bonusSalesPeriod={bonusSalesPeriod}
-        setBonusSalesPeriod={setBonusSalesPeriod}
-        bonusSalesStart={bonusSalesStart}
-        setBonusSalesStart={setBonusSalesStart}
-        bonusSalesEnd={bonusSalesEnd}
-        setBonusSalesEnd={setBonusSalesEnd}
-        bonusSalesLoading={bonusSalesLoading}
-        fetchSalesPreview={fetchSalesPreview}
-        balesRows={balesRows}
-        setBalesRows={setBalesRows}
-        balesPeriod={balesPeriod}
-        setBalesPeriod={setBalesPeriod}
-        balesStart={balesStart}
-        setBalesStart={setBalesStart}
-        balesEnd={balesEnd}
-        setBalesEnd={setBalesEnd}
-        fetchBalesQty={fetchBalesQty}
-        bonusDate={bonusDate}
-        setBonusDate={setBonusDate}
-        bonusNotes={bonusNotes}
-        setBonusNotes={setBonusNotes}
-        saveBonusToPending={saveBonusToPending}
-        submitSmartBonus={submitSmartBonus}
-        locations={locations}
-        allCompanyLocations={allCompanyLocations}
-      />
+        <BonusDialog
+          open={bonusDialogOpen}
+          onOpenChange={setBonusDialogOpen}
+          selectedEmployee={selectedEmployee}
+          bonusTab={bonusTab}
+          setBonusTab={setBonusTab}
+          bonusSalesPreview={bonusSalesPreview}
+          setBonusSalesPreview={setBonusSalesPreview}
+          bonusSalesCustomPct={bonusSalesCustomPct}
+          setBonusSalesCustomPct={setBonusSalesCustomPct}
+          bonusSalesLocationId={bonusSalesLocationId}
+          setBonusSalesLocationId={setBonusSalesLocationId}
+          bonusSalesPeriod={bonusSalesPeriod}
+          setBonusSalesPeriod={setBonusSalesPeriod}
+          bonusSalesStart={bonusSalesStart}
+          setBonusSalesStart={setBonusSalesStart}
+          bonusSalesEnd={bonusSalesEnd}
+          setBonusSalesEnd={setBonusSalesEnd}
+          bonusSalesLoading={bonusSalesLoading}
+          fetchSalesPreview={fetchSalesPreview}
+          balesRows={balesRows}
+          setBalesRows={setBalesRows}
+          balesPeriod={balesPeriod}
+          setBalesPeriod={setBalesPeriod}
+          balesStart={balesStart}
+          setBalesStart={setBalesStart}
+          balesEnd={balesEnd}
+          setBalesEnd={setBalesEnd}
+          fetchBalesQty={fetchBalesQty}
+          bonusDate={bonusDate}
+          setBonusDate={setBonusDate}
+          bonusNotes={bonusNotes}
+          setBonusNotes={setBonusNotes}
+          saveBonusToPending={saveBonusToPending}
+          submitSmartBonus={submitSmartBonus}
+          locations={locations}
+          allCompanyLocations={allCompanyLocations}
+        />
 
-      <EmployeeStatementDialog
-        statementEmployee={statementEmployee}
-        setStatementEmployee={setStatementEmployee}
-        transactionsLoading={transactionsLoading}
-        employeeTransactions={employeeTransactions}
-        statementExpanded={statementExpanded}
-        setStatementExpanded={setStatementExpanded as any}
-        cleanTxnDesc={cleanTxnDesc}
-      />
+        <EmployeeStatementDialog
+          statementEmployee={statementEmployee}
+          setStatementEmployee={setStatementEmployee}
+          transactionsLoading={transactionsLoading}
+          employeeTransactions={employeeTransactions}
+          statementExpanded={statementExpanded}
+          setStatementExpanded={setStatementExpanded as any}
+          cleanTxnDesc={cleanTxnDesc}
+        />
 
-      <WorkerDeductionDialog
-        target={workerDeductionTarget}
-        onClose={() => setWorkerDeductionTarget(null)}
-        amount={workerDeductionAmount}
-        setAmount={setWorkerDeductionAmount}
-        reason={workerDeductionReason}
-        setReason={setWorkerDeductionReason}
-        date={workerDeductionDate}
-        setDate={setWorkerDeductionDate}
-        mutation={workerDeductionMutation}
-      />
+        <WorkerDeductionDialog
+          target={workerDeductionTarget}
+          onClose={() => setWorkerDeductionTarget(null)}
+          amount={workerDeductionAmount}
+          setAmount={setWorkerDeductionAmount}
+          reason={workerDeductionReason}
+          setReason={setWorkerDeductionReason}
+          date={workerDeductionDate}
+          setDate={setWorkerDeductionDate}
+          mutation={workerDeductionMutation}
+        />
 
-      <BulkPaymentDialog
-        open={bulkPaymentDialogOpen}
-        onOpenChange={setBulkPaymentDialogOpen}
-        selectedPayments={selectedPaymentsSummary}
-        totalAmount={totalAmount}
-        workerStaff={workerStaff}
-        form={bulkPaymentForm}
-        mutation={bulkPaymentMutation}
-        cashAccounts={cashAccounts}
-        bankAccounts={bankAccounts}
-        bankAccountsLoading={bankAccountsLoading}
-      />
+        <BulkPaymentDialog
+          open={bulkPaymentDialogOpen}
+          onOpenChange={setBulkPaymentDialogOpen}
+          selectedPayments={selectedPaymentsSummary}
+          totalAmount={totalAmount}
+          workerStaff={workerStaff}
+          form={bulkPaymentForm}
+          mutation={bulkPaymentMutation}
+          cashAccounts={cashAccounts}
+          bankAccounts={bankAccounts}
+          bankAccountsLoading={bankAccountsLoading}
+        />
 
-      <WorkerDialogs
-        newWorkerDialogOpen={newWorkerDialogOpen}
-        setNewWorkerDialogOpen={setNewWorkerDialogOpen}
-        newWorkerForm={newWorkerForm}
-        createWorkerMutation={createWorkerMutation}
-        editWorkerDialogOpen={editWorkerDialogOpen}
-        setEditWorkerDialogOpen={setEditWorkerDialogOpen}
-        selectedWorkerForEdit={selectedWorkerForEdit}
-        editWorkerForm={editWorkerForm}
-        updateWorkerMutation={updateWorkerMutation}
-        deleteWorkerConflict={deleteWorkerConflict}
-        setDeleteWorkerConflict={setDeleteWorkerConflict}
-        handleForceDeleteWorker={handleForceDeleteWorker}
-        workerGroupMembersDialogOpen={workerGroupMembersDialogOpen}
-        setWorkerGroupMembersDialogOpen={setWorkerGroupMembersDialogOpen}
-        selectedWorkerGroupForMembers={selectedWorkerGroupForMembers}
-        allWorkerGroups={workerGroupsData}
-        allWorkers={workerStaff}
-        addWorkerToWorkerGroupMutation={addWorkerToWorkerGroupMutation}
-        removeWorkerFromWorkerGroupMutation={removeWorkerFromWorkerGroupMutation}
-      />
+        <WorkerDialogs
+          newWorkerDialogOpen={newWorkerDialogOpen}
+          setNewWorkerDialogOpen={setNewWorkerDialogOpen}
+          newWorkerForm={newWorkerForm}
+          createWorkerMutation={createWorkerMutation}
+          editWorkerDialogOpen={editWorkerDialogOpen}
+          setEditWorkerDialogOpen={setEditWorkerDialogOpen}
+          selectedWorkerForEdit={selectedWorkerForEdit}
+          editWorkerForm={editWorkerForm}
+          updateWorkerMutation={updateWorkerMutation}
+          deleteWorkerConflict={deleteWorkerConflict}
+          setDeleteWorkerConflict={setDeleteWorkerConflict}
+          handleForceDeleteWorker={handleForceDeleteWorker}
+          workerGroupMembersDialogOpen={workerGroupMembersDialogOpen}
+          setWorkerGroupMembersDialogOpen={setWorkerGroupMembersDialogOpen}
+          selectedWorkerGroupForMembers={selectedWorkerGroupForMembers}
+          allWorkerGroups={workerGroupsData}
+          allWorkers={workerStaff}
+          addWorkerToWorkerGroupMutation={addWorkerToWorkerGroupMutation}
+          removeWorkerFromWorkerGroupMutation={removeWorkerFromWorkerGroupMutation}
+        />
 
-      <EditEmployeeDialog
-        open={editEmployeeDialogOpen}
-        onOpenChange={setEditEmployeeDialogOpen}
-        setEditingEmployee={setEditingEmployee}
-        editEmployeeForm={editEmployeeForm}
-        editEmployeeMutation={editEmployeeMutation}
-        employeeGroups={employeeGroups}
-        otherCompanies={otherCompanies}
-        selectedCompany={selectedCompany}
-        locations={locations}
-        allCompanyLocations={allCompanyLocations}
-        editBaleRates={editBaleRates}
-        setEditBaleRates={setEditBaleRates}
-        editBalePctRates={editBalePctRates}
-        setEditBalePctRates={setEditBalePctRates}
-        pctLocations={allCompanyLocations}
-      />
+        <EditEmployeeDialog
+          open={editEmployeeDialogOpen}
+          onOpenChange={setEditEmployeeDialogOpen}
+          setEditingEmployee={setEditingEmployee}
+          editEmployeeForm={editEmployeeForm}
+          editEmployeeMutation={editEmployeeMutation}
+          employeeGroups={employeeGroups}
+          otherCompanies={otherCompanies}
+          selectedCompany={selectedCompany}
+          locations={locations}
+          allCompanyLocations={allCompanyLocations}
+          editBaleRates={editBaleRates}
+          setEditBaleRates={setEditBaleRates}
+          editBalePctRates={editBalePctRates}
+          setEditBalePctRates={setEditBalePctRates}
+          pctLocations={allCompanyLocations}
+        />
 
-      <EmployeeCrudDialogs
-        createEmployeeDialogOpen={createEmployeeDialogOpen}
-        setCreateEmployeeDialogOpen={setCreateEmployeeDialogOpen}
-        createEmployeeForm={createEmployeeForm}
-        createEmployeeMutation={createEmployeeMutation}
-        employeeGroups={employeeGroups}
-        deleteConflict={deleteConflict}
-        setDeleteConflict={setDeleteConflict}
-        handleForceDeleteEmployee={handleForceDeleteEmployee}
-        createGroupDialogOpen={createGroupDialogOpen}
-        setCreateGroupDialogOpen={setCreateGroupDialogOpen}
-        newGroupName={newGroupName}
-        setNewGroupName={setNewGroupName}
-        newGroupDescription={newGroupDescription}
-        setNewGroupDescription={setNewGroupDescription}
-        createGroupMutation={createGroupMutation}
-        groupMembersDialogOpen={groupMembersDialogOpen}
-        setGroupMembersDialogOpen={setGroupMembersDialogOpen}
-        selectedGroupForMembers={selectedGroupForMembers}
-        employeeStaff={employeeStaff as any}
-        groupMembers={groupMembers}
-        addWorkerToGroupMutation={addWorkerToGroupMutation}
-        removeWorkerFromGroupMutation={removeWorkerFromGroupMutation}
-      />
+        <EmployeeCrudDialogs
+          createEmployeeDialogOpen={createEmployeeDialogOpen}
+          setCreateEmployeeDialogOpen={setCreateEmployeeDialogOpen}
+          createEmployeeForm={createEmployeeForm}
+          createEmployeeMutation={createEmployeeMutation}
+          employeeGroups={employeeGroups}
+          deleteConflict={deleteConflict}
+          setDeleteConflict={setDeleteConflict}
+          handleForceDeleteEmployee={handleForceDeleteEmployee}
+          createGroupDialogOpen={createGroupDialogOpen}
+          setCreateGroupDialogOpen={setCreateGroupDialogOpen}
+          newGroupName={newGroupName}
+          setNewGroupName={setNewGroupName}
+          newGroupDescription={newGroupDescription}
+          setNewGroupDescription={setNewGroupDescription}
+          createGroupMutation={createGroupMutation}
+          groupMembersDialogOpen={groupMembersDialogOpen}
+          setGroupMembersDialogOpen={setGroupMembersDialogOpen}
+          selectedGroupForMembers={selectedGroupForMembers}
+          employeeStaff={employeeStaff as any}
+          groupMembers={groupMembers}
+          addWorkerToGroupMutation={addWorkerToGroupMutation}
+          removeWorkerFromGroupMutation={removeWorkerFromGroupMutation}
+        />
       </div>
     </div>
   );

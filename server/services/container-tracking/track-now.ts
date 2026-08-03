@@ -1,7 +1,7 @@
 import { db } from "../../db";
-import { containers, containerTrackingEvents, containerTrackingChecks } from "../../../shared/schema";
-import { and, eq, inArray, gte, sql, desc, isNotNull, isNull } from "drizzle-orm";
-import { scrapeMaerskDirect, isMaerskDirectScraperAvailable } from "../../lib/maerskDirectScraper";
+import { containers, containerTrackingChecks } from "../../../shared/schema";
+import { and, eq, gte } from "drizzle-orm";
+import { isMaerskDirectScraperAvailable } from "../../lib/maerskDirectScraper";
 import { getParcelsAppUsageStats, setSchedulerMeta } from "./quotas";
 import { trackOneContainer } from "./track-one";
 import { isInactiveStatus } from "./validation-progress";

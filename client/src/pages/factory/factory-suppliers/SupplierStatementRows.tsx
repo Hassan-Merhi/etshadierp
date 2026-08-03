@@ -1,4 +1,4 @@
-import { StatementResponse, SupplierWithBalance } from "./factorySupplierTypes";
+import { StatementResponse } from "./factorySupplierTypes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";

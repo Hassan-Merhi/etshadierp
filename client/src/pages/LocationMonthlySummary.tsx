@@ -8,8 +8,6 @@ import {
   MapPin,
   Globe,
   Eye,
-  TrendingUp,
-  TrendingDown,
   ArrowDownToLine,
   ArrowUpFromLine,
   Package,
@@ -17,7 +15,6 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { PeriodFilter, getDefaultPeriodValue, PeriodFilterValue } from "@/components/ui/period-filter";

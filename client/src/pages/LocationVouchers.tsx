@@ -9,7 +9,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { useDateJump } from "@/hooks/use-date-jump";
-import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCursorNav } from "@/contexts/CursorNavContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";

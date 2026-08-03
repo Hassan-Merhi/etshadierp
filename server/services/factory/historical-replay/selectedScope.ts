@@ -1,5 +1,4 @@
 import crypto from "crypto";
-import Decimal from "decimal.js";
 import { pool } from "../../../db";
 import {
   FINALIZED_BALE_STATUSES,

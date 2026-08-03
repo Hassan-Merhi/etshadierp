@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Upload, Download, CheckCircle2, AlertCircle, Barcode, Package, Tag } from "lucide-react";
-import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
+import { utils, writeFile, read, ExcelJS } from "@/lib/excelHelper";
 import { useCompany } from "@/contexts/CompanyContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader } from "@/components/PageHeader";

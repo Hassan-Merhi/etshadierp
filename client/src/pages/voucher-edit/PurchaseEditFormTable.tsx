@@ -2,7 +2,7 @@ import { useFormContext } from "react-hook-form";
 import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { FormField, FormItem, FormControl, FormMessage } from "@/components/ui/form";
 import { StockItem, StockItemCombobox } from "./VoucherEditHelpers";
 
 interface PurchaseEditFormTableProps {

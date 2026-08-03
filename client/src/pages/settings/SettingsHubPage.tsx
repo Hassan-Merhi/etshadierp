@@ -16,7 +16,6 @@ import {
   Shield,
   ChevronRight,
   Search,
-  TrendingUp,
   AlertTriangle,
   Zap,
   Factory,

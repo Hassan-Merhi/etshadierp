@@ -1,7 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAdminOverride } from "@/hooks/use-admin-override";
-import { useLocation } from "wouter";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -664,41 +663,41 @@ export default function FactoryTransporters() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 z-30 bg-muted/50">
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="px-4 py-3 font-medium">Transporter</th>
-                  <th className="px-4 py-3 font-medium">Phone</th>
-                  <th className="px-4 py-3 text-right font-medium">Total Charged</th>
-                  <th className="px-4 py-3 text-right font-medium">Total Paid</th>
-                  <th className="px-4 py-3 text-right font-medium">Outstanding</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transporters.map((t) => (
-                  <tr
-                    key={t.id}
-                    className="border-b hover-elevate cursor-pointer"
-                    onClick={() => setSelectedId(t.id)}
-                    data-testid={`row-transporter-${t.id}`}
-                  >
-                    <td className="px-4 py-3 font-medium">{t.name}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{t.phone || "—"}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">${fmt(t.totalCharged)}</td>
-                    <td
-                      className={`px-4 py-3 text-right tabular-nums ${t.totalPaid > 0 ? "text-green-600 dark:text-green-400" : ""}`}
-                    >
-                      ${fmt(t.totalPaid)}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-right tabular-nums font-medium ${t.outstanding > 0 ? "text-red-600 dark:text-red-400" : t.outstanding < 0 ? "text-green-600 dark:text-green-400" : ""}`}
-                    >
-                      ${fmt(t.outstanding)}
-                    </td>
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-30 bg-muted/50">
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="px-4 py-3 font-medium">Transporter</th>
+                    <th className="px-4 py-3 font-medium">Phone</th>
+                    <th className="px-4 py-3 text-right font-medium">Total Charged</th>
+                    <th className="px-4 py-3 text-right font-medium">Total Paid</th>
+                    <th className="px-4 py-3 text-right font-medium">Outstanding</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {transporters.map((t) => (
+                    <tr
+                      key={t.id}
+                      className="border-b hover-elevate cursor-pointer"
+                      onClick={() => setSelectedId(t.id)}
+                      data-testid={`row-transporter-${t.id}`}
+                    >
+                      <td className="px-4 py-3 font-medium">{t.name}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{t.phone || "—"}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">${fmt(t.totalCharged)}</td>
+                      <td
+                        className={`px-4 py-3 text-right tabular-nums ${t.totalPaid > 0 ? "text-green-600 dark:text-green-400" : ""}`}
+                      >
+                        ${fmt(t.totalPaid)}
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-right tabular-nums font-medium ${t.outstanding > 0 ? "text-red-600 dark:text-red-400" : t.outstanding < 0 ? "text-green-600 dark:text-green-400" : ""}`}
+                      >
+                        ${fmt(t.outstanding)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </CardContent>

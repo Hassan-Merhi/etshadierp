@@ -4,122 +4,20 @@ import { logger } from "../lib/logger";
 import { db } from "../db";
 import { normalizeVoucherEntryAmounts } from "../services/accounting/currencyAmounts";
 import { storage } from "../storage";
-import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
-import {
-  upload,
-  logAudit,
-  getCurrentExchangeRate,
-  calculateHistoricalLocationInventory,
-  syncEmployeeBalancesFromEntries,
-  buildItemLevelChanges,
-} from "./_helpers";
+import { requireAuth, requireNonPOS } from "../auth";
+import { logAudit, buildItemLevelChanges } from "./_helpers";
 import {
   inventory,
   stockItems,
-  stockGroups,
-  stockItemCodeAliases,
-  stockItemLocationPrices,
-  stockTransferVouchers,
-  stockTransferItems,
-  stockAdjustmentVouchers,
-  stockAdjustmentItems,
-  containers,
-  containerOffloads,
   containerOffloadItems,
-  containerSales,
-  containerCharges,
-  containerTrackingImportRowSchema,
-  updateContainerTrackingSchema,
-  bankAccounts,
-  fixedAssets,
-  insertBankAccountSchema,
-  insertFixedAssetSchema,
-  insertStockGroupSchema,
-  insertStockItemSchema,
-  insertStockItemCodeAliasSchema,
-  insertContainerSchema,
-  offloadRequestSchema,
-  purchaseOrders,
-  poLineItems,
-  insertContainerSaleSchema,
   vouchers,
   voucherEntries,
-  salesItems,
-  insertVoucherSchema,
-  insertVoucherEntrySchema,
-  insertSalesItemSchema,
-  suppliers,
-  customers,
-  customerBalances,
   locations,
-  employees,
-  userLocations,
-  auditLog,
-  interCompanyTransfers,
-  insertInterCompanyTransferSchema,
   ledgerAccounts,
-  insertLedgerAccountSchema,
-  companies,
-  users,
-  userCompanyRoles,
-  companySettings,
-  FEATURE_KEYS,
-  fiscalPeriodClosures,
-  wasteDispatches,
-  wasteDispatchItems,
-  insertWasteDispatchSchema,
-  bales,
-  baleProducts,
-  baleProductCategories,
-  baleTransfers,
-  insertBaleSchema,
-  insertBaleTransferSchema,
-  dashboardCashAccounts,
-  dashboardPayableAccounts,
-  dashboardAccountSelections,
-  insertDashboardCashAccountSchema,
-  insertDashboardPayableAccountSchema,
-  insertDashboardAccountSelectionSchema,
   creditNoteItems,
-  pendingBarcodes,
-  insertPendingBarcodeSchema,
-  storedFiles,
-  spreadsheets,
-  liveSpreadsheets,
-  agentAccounts,
-  insertAgentAccountSchema,
-  salaryAdvances,
-  salaryAdvanceDeductions,
-  insertSalaryAdvanceSchema,
-  insertSalaryAdvanceDeductionSchema,
-  chatMessages,
 } from "@shared/schema";
-import {
-  eq,
-  and,
-  or,
-  desc,
-  asc,
-  lt,
-  gt,
-  ne,
-  inArray,
-  sql,
-  isNull,
-  isNotNull,
-  not,
-  gte,
-  lte,
-  like,
-  ilike,
-} from "drizzle-orm";
-import { format } from "date-fns";
-import { z } from "zod";
-import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
-import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
-import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
-import path from "path";
-import fs from "fs";
+import { eq, and, or, desc, ilike } from "drizzle-orm";
+import { adjustInventory } from "../inventoryHelper";
 
 /**
  * Find the "Sales Returns & Allowances" account for a company, or create one

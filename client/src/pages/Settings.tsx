@@ -1,8 +1,7 @@
-import { useState, useEffect } from "react";
-import { useConnectivity } from "@/contexts/ConnectivityContext";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -19,29 +18,6 @@ import {
   ShoppingCart,
   TrendingUp,
   Wrench,
-  Clock,
-  Search,
-  Trash2,
-  PieChart,
-  Bot,
-  Bell,
-  Layers,
-  ArrowLeftRight,
-  Eraser,
-  Printer,
-  RefreshCw,
-  ChevronLeft,
-  ChevronRight,
-  X,
-  ExternalLink,
-  Calculator,
-  Loader2,
-  Package,
-  Check,
-  ChevronDown,
-  ChevronUp,
-  Info,
-  TrendingDown,
 } from "lucide-react";
 
 import { FxRatesCard } from "./settings/FxRatesCard";
@@ -56,7 +32,6 @@ import { FileStorageAndExport } from "./settings/FileStorageAndExport";
 import { ExportCenter } from "./settings/ExportCenter";
 import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -67,8 +42,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 
 export default function Settings() {
   const { toast } = useToast();

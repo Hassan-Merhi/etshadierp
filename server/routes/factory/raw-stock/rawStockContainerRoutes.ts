@@ -1,4 +1,4 @@
-import { parseId, parseOptionalId } from "../../../lib/parseId";
+import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { getClientDate } from "../../../lib/dateUtils";
@@ -6,129 +6,19 @@ import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth, requireRole } from "../../../auth";
 import { applyPostOffloadChargeMutation, type AccountingContext } from "../../../services/factory/post-offload-charge";
-import { classifyNetPositionAccounts } from "../../../netPositionHelper";
-import { adjustInventory } from "../../../inventoryHelper";
-import Decimal from "decimal.js";
 import { cascadeContainerCostChange } from "../../../services/factory/rawStockCostCascade";
 import { computeCorrectContainerCost } from "../../../services/factory/raw-stock-recalc";
-import { getAuthoritativeSupplierRemainingKg } from "../../../services/factory/rawStockLockedRate";
+import { resolveStoredFxRate, UnresolvedExchangeRateError } from "../../../services/factory/currencyConversion";
+import { writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount } from "../_helpers";
 import {
-  resolveStoredFxRate,
-  resolveStoredFxRateOrThrow,
-  UnresolvedExchangeRateError,
-} from "../../../services/factory/currencyConversion";
-import {
-  writeDaybookEntry,
-  getOrFetchFxRateToUsd,
-  getOrCreateLedgerAccount,
-  isLegacySHA256Hash,
-  verifySupervisorPassword,
-} from "../_helpers";
-import {
-  factorySuppliers,
-  factoryCategories,
-  factoryBaleProducts,
   factoryContainers,
   factoryRawStock,
-  factoryMixBatches,
-  factoryMixBatchSources,
-  factoryDailyUsages,
-  factoryPressingBatches,
-  factoryBales,
-  factoryBaleSequences,
   factoryContainerCommissions,
-  baleLabelPrints,
-  stockItems,
-  stockGroups,
-  users,
-  insertFactorySupplierSchema,
-  insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema,
-  insertFactoryContainerSchema,
-  insertFactoryRawStockSchema,
-  insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema,
-  insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema,
-  customerProformas,
-  customerProformaLines,
-  customerOrders,
-  customerOrderLines,
-  customerOrderBales,
-  customerOrderCharges,
-  customerInvoiceSequences,
-  customerBalances,
-  customers,
-  insertCustomerSchema,
   ledgerAccounts,
-  voucherEntries,
-  companies,
-  locations,
-  userCompanyRoles,
-  insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema,
-  insertCustomerOrderSchema,
-  factoryFxRates,
-  insertFactoryFxRateSchema,
-  factoryDaybookEntries,
-  containerDocumentTypes,
-  containerDocuments,
-  containerFreight,
-  containerFreightPayments,
-  factoryDaybookEntryEdits,
-  containers,
-  factoryUserProfiles,
-  factoryUserPageAccess,
-  insertUserSchema,
-  directMessages,
-  insertDirectMessageSchema,
-  userPresence,
   factoryDutyAuditLog,
   factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges,
-  companySettings,
-  factorySettings,
-  factoryWorkers,
-  factoryWorkerCategories,
-  insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments,
-  factoryPayrolls,
-  factoryWorkerDocuments,
-  factoryAlerts,
-  employees,
-  factoryWasteEntries,
-  factoryBalePhotos,
-  factoryDailyKpiSnapshots,
-  factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots,
-  factoryContainerProfitSnapshots,
-  bankAccounts,
-  inventory,
-  exchangeRates,
-  vouchers,
-  suppliers,
-  containerSales,
-  factorySupplierPayments,
-  insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers,
-  insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations,
-  baleRecodeSessions,
-  baleRecodeItems,
-  factoryWorkerAdvances,
-  factoryAdvanceRepayments,
-  factoryBaleWasteDispatches,
-  factoryPosSales,
-  factoryPosSaleItems,
-  proformaStockReservations,
-  factorySupplierCategories,
 } from "@shared/schema";
-import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
-import bcrypt from "bcryptjs";
-import CryptoJS from "crypto-js";
-import multer from "multer";
-import path from "path";
-import fs from "fs";
+import { eq, and, desc } from "drizzle-orm";
 
 const ADMIN_ROLES = ["Admin", "Developer"] as const;
 
@@ -436,7 +326,7 @@ export function registerRawStockContainerRoutes(app: Express) {
       const oldContainerTotalUsd = parseFloat((container as any).finalPayableAmountUsd || "0");
 
       let lastResult: any = null;
-      let allCascadeResults: any[] = [];
+      const allCascadeResults: any[] = [];
 
       await db.transaction(async (tx) => {
         for (let i = 0; i < validCharges.length; i++) {

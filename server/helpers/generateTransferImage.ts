@@ -4,7 +4,7 @@
  * Rendered at 2× scale for crisp display on high-DPI screens (WhatsApp).
  */
 
-import { createCanvas, type Canvas, type SKRSContext2D } from "@napi-rs/canvas";
+import { createCanvas, type SKRSContext2D } from "@napi-rs/canvas";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

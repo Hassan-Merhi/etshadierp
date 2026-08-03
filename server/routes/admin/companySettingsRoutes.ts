@@ -1,152 +1,12 @@
-import { getClientDate } from "../../lib/dateUtils";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import type { Express } from "express";
 import { db, pool } from "../../db";
 import { storage } from "../../storage";
-import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
-import { sqlArray } from "../../lib/sqlArray";
-import {
-  upload,
-  logAudit,
-  getCurrentExchangeRate,
-  calculateHistoricalLocationInventory,
-  syncEmployeeBalancesFromEntries,
-} from "../_helpers";
-import {
-  factoryCategories,
-  factoryBaleProducts,
-  factoryContainers,
-  factoryRawStock,
-  factoryRawMaterialAdjustments,
-  factoryMixBatches,
-  factoryBales,
-  customerProformas,
-  customerProformaLines,
-  customerOrders,
-  customerOrderLines,
-  customerOrderBales,
-  customerOrderCharges,
-  proformaStockReservations,
-  inventory,
-  stockItems,
-  stockGroups,
-  stockItemCodeAliases,
-  stockItemLocationPrices,
-  stockTransferVouchers,
-  stockTransferItems,
-  stockTransferRevisionItems,
-  stockGroupLocationArchiveItems,
-  stockAdjustmentVouchers,
-  stockAdjustmentItems,
-  containers,
-  containerOffloads,
-  containerOffloadItems,
-  containerSales,
-  containerCharges,
-  containerTrackingImportRowSchema,
-  updateContainerTrackingSchema,
-  bankAccounts,
-  fixedAssets,
-  insertBankAccountSchema,
-  insertFixedAssetSchema,
-  insertStockGroupSchema,
-  insertStockItemSchema,
-  insertStockItemCodeAliasSchema,
-  insertContainerSchema,
-  offloadRequestSchema,
-  purchaseOrders,
-  poLineItems,
-  insertContainerSaleSchema,
-  vouchers,
-  voucherEntries,
-  salesItems,
-  insertVoucherSchema,
-  insertVoucherEntrySchema,
-  insertSalesItemSchema,
-  suppliers,
-  customers,
-  customerBalances,
-  locations,
-  employees,
-  userLocations,
-  auditLog,
-  interCompanyTransfers,
-  insertInterCompanyTransferSchema,
-  ledgerAccounts,
-  insertLedgerAccountSchema,
-  companies,
-  users,
-  userCompanyRoles,
-  companySettings,
-  FEATURE_KEYS,
-  fiscalPeriodClosures,
-  wasteDispatches,
-  wasteDispatchItems,
-  insertWasteDispatchSchema,
-  bales,
-  baleProducts,
-  baleProductCategories,
-  baleTransfers,
-  insertBaleSchema,
-  insertBaleTransferSchema,
-  dashboardCashAccounts,
-  dashboardPayableAccounts,
-  dashboardAccountSelections,
-  insertDashboardCashAccountSchema,
-  insertDashboardPayableAccountSchema,
-  insertDashboardAccountSelectionSchema,
-  creditNoteItems,
-  pendingBarcodes,
-  insertPendingBarcodeSchema,
-  storedFiles,
-  fileFolders,
-  spreadsheets,
-  liveSpreadsheets,
-  agentAccounts,
-  insertAgentAccountSchema,
-  freightAccounts,
-  snapshotPinnedAccounts,
-  salaryAdvances,
-  salaryAdvanceDeductions,
-  insertSalaryAdvanceSchema,
-  insertSalaryAdvanceDeductionSchema,
-  employeeGroupMembers,
-  employeeBaleRates,
-  employeeBalePctRates,
-  erpWorkerDocs,
-  erpPayrollRunItems,
-  chatMessages,
-  propertyPayments,
-  factoryTransporterTransactions,
-  systemSettings,
-} from "@shared/schema";
-import {
-  eq,
-  and,
-  or,
-  desc,
-  asc,
-  lt,
-  gt,
-  ne,
-  inArray,
-  sql,
-  isNull,
-  isNotNull,
-  not,
-  gte,
-  lte,
-  like,
-  ilike,
-} from "drizzle-orm";
-import { format } from "date-fns";
-import { z } from "zod";
-import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../../excelHelper";
-import { adjustInventory, reverseInventoryByExactValue } from "../../inventoryHelper";
-import { classifyNetPositionAccounts, getAccountNetBalance } from "../../netPositionHelper";
-import path from "path";
-import fs from "fs";
+import { requireAuth, requireRole } from "../../auth";
+
+import { stockItems, containers, vouchers, voucherEntries, ledgerAccounts } from "@shared/schema";
+import { eq, and, inArray, sql, isNotNull } from "drizzle-orm";
 
 export function registerCompanySettingsRoutes(app: Express) {
   app.post("/api/admin/reset-company-data", requireAuth, requireRole("Admin"), async (req, res) => {
@@ -333,7 +193,11 @@ export function registerCompanySettingsRoutes(app: Express) {
         const vouchersToDelete = allVouchers.filter((v) => {
           // Preserve vouchers that involve inter-company credit accounts
           if (interCompanyVoucherIds.has(v.id)) {
-            logger.info("Preserving inter-company voucher", { voucherId: v.id, voucherType: v.voucherType, description: v.description });
+            logger.info("Preserving inter-company voucher", {
+              voucherId: v.id,
+              voucherType: v.voucherType,
+              description: v.description,
+            });
             return false; // Don't delete
           }
 
@@ -350,7 +214,9 @@ export function registerCompanySettingsRoutes(app: Express) {
         });
         const voucherIdsToDelete = vouchersToDelete.map((v) => v.id);
         logger.info("Vouchers to delete", { count: voucherIdsToDelete.length });
-        logger.info("Vouchers preserved (OTW + inter-company)", { count: allVouchers.length - voucherIdsToDelete.length });
+        logger.info("Vouchers preserved (OTW + inter-company)", {
+          count: allVouchers.length - voucherIdsToDelete.length,
+        });
 
         if (voucherIdsToDelete.length > 0) {
           // SOFT DELETE vouchers only - DON'T delete voucher entries

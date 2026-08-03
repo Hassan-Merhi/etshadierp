@@ -2,13 +2,11 @@ import Decimal from "decimal.js";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { logAudit } from "../../helpers/auditHelpers";
-import { parseId, parseOptionalId } from "../../../lib/parseId";
+import { parseId } from "../../../lib/parseId";
 import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
-import { classifyNetPositionAccounts } from "../../../netPositionHelper";
-import { adjustInventory } from "../../../inventoryHelper";
 import {
   applyOffloadMovingAverage,
   getAuthoritativeSupplierRemainingKg,
@@ -16,119 +14,21 @@ import {
 } from "../../../services/factory/rawStockLockedRate";
 import { resolveStoredFxRate, resolveStoredFxRateOrThrow } from "../../../services/factory/currencyConversion";
 import { computeContainerLandedCost } from "../../../services/factory/containerLandedCost";
-import {
-  writeDaybookEntry,
-  getOrFetchFxRateToUsd,
-  getOrCreateLedgerAccount,
-  isLegacySHA256Hash,
-  verifySupervisorPassword,
-} from "../_helpers";
+import { writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount } from "../_helpers";
 import {
   factorySuppliers,
-  factoryCategories,
-  factoryBaleProducts,
   factoryContainers,
   factoryRawStock,
   factoryMixBatches,
   factoryMixBatchSources,
-  factoryDailyUsages,
-  factoryPressingBatches,
-  factoryBales,
-  factoryBaleSequences,
   factoryContainerCommissions,
-  baleLabelPrints,
-  stockItems,
-  stockGroups,
-  users,
-  insertFactorySupplierSchema,
-  insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema,
-  insertFactoryContainerSchema,
-  insertFactoryRawStockSchema,
-  insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema,
-  insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema,
-  customerProformas,
-  customerProformaLines,
-  customerOrders,
-  customerOrderLines,
-  customerOrderBales,
-  customerOrderCharges,
-  customerInvoiceSequences,
-  customerBalances,
-  customers,
-  insertCustomerSchema,
-  ledgerAccounts,
   voucherEntries,
-  companies,
-  locations,
-  userCompanyRoles,
-  insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema,
-  insertCustomerOrderSchema,
-  factoryFxRates,
-  insertFactoryFxRateSchema,
   factoryDaybookEntries,
-  containerDocumentTypes,
-  containerDocuments,
-  containerFreight,
-  containerFreightPayments,
-  factoryDaybookEntryEdits,
-  containers,
-  factoryUserProfiles,
-  factoryUserPageAccess,
-  insertUserSchema,
-  directMessages,
-  insertDirectMessageSchema,
-  userPresence,
-  factoryDutyAuditLog,
   factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges,
-  companySettings,
-  factorySettings,
-  factoryWorkers,
-  factoryWorkerCategories,
-  insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments,
-  factoryPayrolls,
-  factoryWorkerDocuments,
-  factoryAlerts,
-  employees,
-  factoryWasteEntries,
-  factoryBalePhotos,
-  factoryDailyKpiSnapshots,
-  factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots,
-  factoryContainerProfitSnapshots,
-  bankAccounts,
-  inventory,
-  exchangeRates,
   vouchers,
-  suppliers,
-  containerSales,
-  factorySupplierPayments,
-  insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers,
-  insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations,
-  baleRecodeSessions,
-  baleRecodeItems,
-  factoryWorkerAdvances,
-  factoryAdvanceRepayments,
-  factoryBaleWasteDispatches,
-  factoryPosSales,
-  factoryPosSaleItems,
-  proformaStockReservations,
-  factorySupplierCategories,
   factoryContainerReceipts,
 } from "@shared/schema";
-import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
-import bcrypt from "bcryptjs";
-import CryptoJS from "crypto-js";
-import multer from "multer";
-import path from "path";
-import fs from "fs";
+import { eq, and, or, sql, inArray, ilike, isNull } from "drizzle-orm";
 
 export function registerRawStockOffloadRoutes(app: Express) {
   app.post("/api/factory/raw-stock/offload", requireAuth, async (req: any, res: any) => {
@@ -277,9 +177,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
           resolvedCommFxRate = fxRate;
         } else {
           try {
-            resolvedCommFxRate = parseFloat(
-              await getOrFetchFxRateToUsd(companyId, commCurrency, offloadDate)
-            );
+            resolvedCommFxRate = parseFloat(await getOrFetchFxRateToUsd(companyId, commCurrency, offloadDate));
           } catch (err: unknown) {
             return res.status(400).json({
               message: `Cannot resolve FX rate for commission currency ${commCurrency} on ${offloadDate}. ${getErrorMessage(err)}`,
@@ -341,9 +239,17 @@ export function registerRawStockOffloadRoutes(app: Express) {
       };
 
       // OC as a single per-row entry so the helper uses the confirmed-FX code path.
-      const ocRowsForHelper: any[] = otherChargesVal > 0
-        ? [{ amount: String(otherChargesVal), currencyCode: ocCcy, fxRateToUsd: String(ocFxRateVal), fxRateConfirmed: true }]
-        : [];
+      const ocRowsForHelper: any[] =
+        otherChargesVal > 0
+          ? [
+              {
+                amount: String(otherChargesVal),
+                currencyCode: ocCcy,
+                fxRateToUsd: String(ocFxRateVal),
+                fxRateConfirmed: true,
+              },
+            ]
+          : [];
 
       // Additional charges: confirmed when an explicit rate was supplied for a
       // non-container-currency charge; same-ccy charges need no separate rate.
@@ -432,7 +338,8 @@ export function registerRawStockOffloadRoutes(app: Express) {
             .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)))
             .for("update");
           if (!lockedContainer) throw new Error("Container not found inside transaction");
-          if (lockedContainer.status === "OFFLOADED") throw new Error("This container has already been fully offloaded");
+          if (lockedContainer.status === "OFFLOADED")
+            throw new Error("This container has already been fully offloaded");
 
           const [lockedRawStock] = await tx
             .select()
@@ -532,8 +439,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
           }
 
           // 3. Update container cumulative actualReceivedKg and status
-          const subsequentStatus =
-            newCumulativeKg >= lockedValuationKgNum - 0.001 ? "OFFLOADED" : "PARTIALLY_RECEIVED";
+          const subsequentStatus = newCumulativeKg >= lockedValuationKgNum - 0.001 ? "OFFLOADED" : "PARTIALLY_RECEIVED";
           await tx
             .update(factoryContainers)
             .set({
@@ -649,9 +555,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
           const dAllocKg = new Decimal(allocKg);
           // Rate: supplier moving-average for supplier-backed containers;
           //       container's own USD rate for no-supplier containers.
-          const dAllocRate = container.supplierId
-            ? new Decimal(firstReceiptNewLockedRate)
-            : dCostPerKgUsd;
+          const dAllocRate = container.supplierId ? new Decimal(firstReceiptNewLockedRate) : dCostPerKgUsd;
           // sourceType: SUPPLIER_FIFO when supplierId + containerId present,
           //             CONTAINER_DIRECT when no supplier.
           const firstSrcType = container.supplierId ? "SUPPLIER_FIFO" : "CONTAINER_DIRECT";
@@ -699,19 +603,19 @@ export function registerRawStockOffloadRoutes(app: Express) {
               ? "supplier"
               : reqFreightAccountId
                 ? "own"
-                : ((container as any).freightPaidBy || "supplier"),
+                : (container as any).freightPaidBy || "supplier",
             // When own-account is used, persist the credit account so the
             // reverse-offload can correctly restore it without falling back
             // to the material supplier.
-            freightOwnAccountId: !effectiveFreightSupplierId && reqFreightAccountId
-              ? parseInt(reqFreightAccountId)
-              : null,
+            freightOwnAccountId:
+              !effectiveFreightSupplierId && reqFreightAccountId ? parseInt(reqFreightAccountId) : null,
             otherCharges: String(otherChargesVal),
             otherChargesCurrencyCode: ocCcy || null,
             otherChargesAccountId: reqOtherChargesAccountId ? parseInt(reqOtherChargesAccountId) : null,
             otherChargesSupplierId: reqOtherChargesSupplierId ? parseInt(reqOtherChargesSupplierId) : null,
             commissionAmount: commTotalVal > 0 ? String(commTotalVal) : container.commissionAmount || "0",
-            commissionCurrencyCode: commTotalVal > 0 ? commCurrencyForUsd : (container as any).commissionCurrencyCode || "USD",
+            commissionCurrencyCode:
+              commTotalVal > 0 ? commCurrencyForUsd : (container as any).commissionCurrencyCode || "USD",
             // Persist the resolved commission-specific FX rate so computeCorrectContainerCost
             // and repair scripts can use it without re-fetching.  When there is no commission
             // (commTotalVal == 0) clear all three fields so stale pre-offload values don't linger.

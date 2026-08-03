@@ -5,75 +5,17 @@ import { createHash } from "crypto";
 import Decimal from "decimal.js";
 import { db, pool } from "../db";
 import { storage } from "../storage";
-import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
-import { upload, logAudit, getCurrentExchangeRate } from "./_helpers";
+import { requireAuth, requireNonPOS } from "../auth";
+import { upload, logAudit } from "./_helpers";
 import {
-  inventory,
-  stockItems,
-  stockGroups,
-  stockItemCodeAliases,
-  stockItemLocationPrices,
-  stockTransferVouchers,
-  stockTransferItems,
-  stockAdjustmentVouchers,
-  stockAdjustmentItems,
-  containers,
-  containerOffloads,
-  containerOffloadItems,
-  containerSales,
-  containerCharges,
-  containerTrackingImportRowSchema,
-  updateContainerTrackingSchema,
-  bankAccounts,
   fixedAssets,
   insertBankAccountSchema,
   insertFixedAssetSchema,
-  insertStockGroupSchema,
-  insertStockItemSchema,
-  insertStockItemCodeAliasSchema,
-  insertContainerSchema,
-  offloadRequestSchema,
-  purchaseOrders,
-  poLineItems,
-  insertContainerSaleSchema,
-  vouchers,
-  voucherEntries,
-  salesItems,
-  suppliers,
-  customers,
-  locations,
-  employees,
-  userLocations,
-  auditLog,
-  interCompanyTransfers,
-  insertInterCompanyTransferSchema,
   ledgerAccounts,
   exchangeRates,
-  FEATURE_KEYS,
 } from "@shared/schema";
-import {
-  eq,
-  and,
-  or,
-  desc,
-  asc,
-  lt,
-  gt,
-  ne,
-  inArray,
-  sql,
-  isNull,
-  isNotNull,
-  not,
-  gte,
-  lte,
-  like,
-  ilike,
-} from "drizzle-orm";
-import { format } from "date-fns";
-import { z } from "zod";
-import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
-import { adjustInventory } from "../inventoryHelper";
+import { eq, and, or, desc, sql, isNull } from "drizzle-orm";
+import { readExcel, sheetToJson } from "../excelHelper";
 
 export function registerBankAssetRoutes(app: Express) {
   app.get("/api/bank-accounts", requireAuth, async (req, res) => {
@@ -279,8 +221,8 @@ export function registerBankAssetRoutes(app: Express) {
           and(
             eq(ledgerAccounts.companyId, companyId),
             isNull(ledgerAccounts.deletedAt),
-            or(eq(ledgerAccounts.accountType, "Bank"), eq(ledgerAccounts.accountType, "Cash")),
-          ),
+            or(eq(ledgerAccounts.accountType, "Bank"), eq(ledgerAccounts.accountType, "Cash"))
+          )
         )
         .execute();
 
@@ -299,15 +241,14 @@ export function registerBankAssetRoutes(app: Express) {
             eq(exchangeRates.companyId, companyId),
             or(
               and(eq(exchangeRates.fromCurrency, "USD"), eq(exchangeRates.toCurrency, "CFA")),
-              and(eq(exchangeRates.fromCurrency, "USD"), eq(exchangeRates.toCurrency, "XOF")),
-            ),
-          ),
+              and(eq(exchangeRates.fromCurrency, "USD"), eq(exchangeRates.toCurrency, "XOF"))
+            )
+          )
         )
         .orderBy(desc(exchangeRates.effectiveDate))
         .limit(1)
         .execute();
-      const currentCfaPerUsd =
-        rateRows.length > 0 && rateRows[0].rate ? new Decimal(rateRows[0].rate) : null;
+      const currentCfaPerUsd = rateRows.length > 0 && rateRows[0].rate ? new Decimal(rateRows[0].rate) : null;
 
       // Phase 2: aggregate per (ledger_account_id, currency) so that mixed-currency accounts
       // (e.g. an account with both USD and CFA deposits) are handled correctly.
@@ -333,7 +274,7 @@ export function registerBankAssetRoutes(app: Express) {
            AND v.deleted_at IS NULL
            AND ve.ledger_account_id = ANY($2::int[])
          GROUP BY ve.ledger_account_id, COALESCE(ve.transaction_currency, 'USD')`,
-        [companyId, accountIds],
+        [companyId, accountIds]
       );
 
       // Build per-account currency buckets.
@@ -396,15 +337,11 @@ export function registerBankAssetRoutes(app: Express) {
         const nativeBalancesByCurrency: Record<string, string> = {};
 
         if (!openingNativeAmount.isZero()) {
-          nativeBalancesByCurrency[openingNativeCurrency] = openingNativeAmount
-            .toDecimalPlaces(6)
-            .toFixed(6);
+          nativeBalancesByCurrency[openingNativeCurrency] = openingNativeAmount.toDecimalPlaces(6).toFixed(6);
         }
         for (const [ccy, bucket] of buckets) {
           const nativeNet = bucket.nativeDebit.minus(bucket.nativeCredit);
-          const prev = nativeBalancesByCurrency[ccy]
-            ? new Decimal(nativeBalancesByCurrency[ccy])
-            : new Decimal(0);
+          const prev = nativeBalancesByCurrency[ccy] ? new Decimal(nativeBalancesByCurrency[ccy]) : new Decimal(0);
           const total = prev.plus(nativeNet);
           if (!total.isZero()) {
             nativeBalancesByCurrency[ccy] = total.toDecimalPlaces(6).toFixed(6);
@@ -420,9 +357,7 @@ export function registerBankAssetRoutes(app: Express) {
         // ── Historical base balance (USD) ───────────────────────────────────────
         let historicalBaseBalance = openingBaseContrib;
         for (const [, bucket] of buckets) {
-          historicalBaseBalance = historicalBaseBalance
-            .plus(bucket.histBaseDebit)
-            .minus(bucket.histBaseCredit);
+          historicalBaseBalance = historicalBaseBalance.plus(bucket.histBaseDebit).minus(bucket.histBaseCredit);
         }
 
         // ── Current translated base balance ─────────────────────────────────────
@@ -462,9 +397,7 @@ export function registerBankAssetRoutes(app: Express) {
           nativeBalancesByCurrency,
           historicalBaseBalance: historicalBaseBalance.toDecimalPlaces(6).toFixed(6),
           currentRate: currentRate.toDecimalPlaces(10).toFixed(10),
-          currentTranslatedBaseBalance: currentTranslatedBaseBalance
-            .toDecimalPlaces(6)
-            .toFixed(6),
+          currentTranslatedBaseBalance: currentTranslatedBaseBalance.toDecimalPlaces(6).toFixed(6),
           translationDifference: translationDifference.toDecimalPlaces(6).toFixed(6),
           openingBalanceCurrencyUnresolved,
         };
@@ -472,9 +405,7 @@ export function registerBankAssetRoutes(app: Express) {
 
       res.json({
         accounts,
-        currentCfaPerUsd: currentCfaPerUsd
-          ? currentCfaPerUsd.toDecimalPlaces(10).toFixed(10)
-          : null,
+        currentCfaPerUsd: currentCfaPerUsd ? currentCfaPerUsd.toDecimalPlaces(10).toFixed(10) : null,
       });
     } catch (error: unknown) {
       logger.error("Bank revaluation error:", { error: error });
@@ -511,7 +442,7 @@ export function registerBankAssetRoutes(app: Express) {
              AND v.deleted_at IS NULL
              AND v.optional = false
            GROUP BY ve.fixed_asset_id`,
-          [assetIds],
+          [assetIds]
         );
         for (const row of histRows.rows) {
           assetHistMap.set(parseInt(row.fixed_asset_id), {

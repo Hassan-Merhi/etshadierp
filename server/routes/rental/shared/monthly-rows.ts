@@ -1,26 +1,7 @@
-import { db, pool } from "../../../db";
-import {
-  getDuePeriods,
-  getRentalBillingDay,
-  getUtcTodayString,
-  isRentalPeriodDue,
-  getRentalPeriodDueDate,
-} from "../../../services/rental/rentalPeriodService";
-import {
-  propertyUnits,
-  propertyContracts,
-  propertyMonthlyLedger,
-  propertyPayments,
-  insertPropertyUnitSchema,
-  insertPropertyContractSchema,
-  ledgerAccounts,
-  vouchers,
-  voucherEntries,
-  rentalAutoTransferConfigs,
-  interCompanyTransfers,
-  companies,
-} from "@shared/schema";
-import { eq, and, sql, desc, inArray, isNull, isNotNull, ne } from "drizzle-orm";
+import { db } from "../../../db";
+import { getDuePeriods, getRentalBillingDay, getUtcTodayString } from "../../../services/rental/rentalPeriodService";
+import { propertyContracts, propertyMonthlyLedger } from "@shared/schema";
+import { eq, sql } from "drizzle-orm";
 
 export async function ensureMonthlyLedgerRows(contractId: number, asOfDate?: string) {
   const [contract] = await db.select().from(propertyContracts).where(eq(propertyContracts.id, contractId));

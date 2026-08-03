@@ -2,11 +2,9 @@ import { useState, useMemo } from "react";
 import { formatNumber } from "@/lib/formatNumber";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Layers, Pencil, Trash2, MessageCircle, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format } from "date-fns";
 
 interface MixBatchRow {
   id: number;
@@ -164,7 +162,10 @@ export function MixBatchList({
                 {[
                   { label: "Total Weight", value: formatNumber(batch.totalWeightKg) + " kg" },
                   { label: "Total Cost", value: "$" + formatNumber(batch.displayTotalCost ?? batch.totalCost) },
-                  { label: "Cost/kg", value: "$" + (parseFloat(batch.displayCostPerKg ?? batch.costPerKg) || 0).toFixed(2) },
+                  {
+                    label: "Cost/kg",
+                    value: "$" + (parseFloat(batch.displayCostPerKg ?? batch.costPerKg) || 0).toFixed(2),
+                  },
                 ].map((stat) => (
                   <div
                     key={stat.label}

@@ -277,5 +277,3 @@ export function RecipientsTab({
     </div>
   );
 }
-
-import { ChevronDown, ChevronRight } from "lucide-react";

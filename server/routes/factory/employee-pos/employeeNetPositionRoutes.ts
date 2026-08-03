@@ -8,126 +8,30 @@ import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts, type AccountLike } from "../../../netPositionHelper";
 import { buildBrokerStatement } from "../suppliers/broker";
-import { adjustInventory } from "../../../inventoryHelper";
 import { resolveStoredFxRate } from "../../../services/factory/currencyConversion";
 import { getLockedSupplierRate } from "../../../services/factory/rawStockLockedRate";
-import {
-  writeDaybookEntry,
-  getOrFetchFxRateToUsd,
-  getOrCreateLedgerAccount,
-  isLegacySHA256Hash,
-  verifySupervisorPassword,
-} from "../_helpers";
+
 import {
   factorySuppliers,
-  factoryCategories,
-  factoryBaleProducts,
   factoryContainers,
-  factoryRawStock,
-  factoryMixBatches,
-  factoryMixBatchSources,
-  factoryDailyUsages,
-  factoryPressingBatches,
-  factoryBales,
-  factoryBaleSequences,
-  factoryContainerCommissions,
-  baleLabelPrints,
-  stockItems,
-  stockGroups,
-  users,
-  insertFactorySupplierSchema,
-  insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema,
-  insertFactoryContainerSchema,
-  insertFactoryRawStockSchema,
-  insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema,
-  insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema,
-  customerProformas,
-  customerProformaLines,
   customerOrders,
-  customerOrderLines,
-  customerOrderBales,
-  customerOrderCharges,
-  customerInvoiceSequences,
   customerBalances,
   customers,
-  insertCustomerSchema,
   ledgerAccounts,
   voucherEntries,
   companies,
-  locations,
-  userCompanyRoles,
-  insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema,
-  insertCustomerOrderSchema,
-  factoryFxRates,
-  insertFactoryFxRateSchema,
-  factoryDaybookEntries,
-  containerDocumentTypes,
-  containerDocuments,
-  containerFreight,
-  containerFreightPayments,
-  factoryDaybookEntryEdits,
-  containers,
-  factoryUserProfiles,
-  factoryUserPageAccess,
-  insertUserSchema,
-  directMessages,
-  insertDirectMessageSchema,
-  userPresence,
-  factoryDutyAuditLog,
   factoryOffloadAdditionalCharges,
   factoryContainerOtherCharges,
-  companySettings,
-  factorySettings,
-  factoryWorkers,
-  factoryWorkerCategories,
-  insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments,
-  factoryPayrolls,
-  factoryWorkerDocuments,
-  factoryAlerts,
   employees,
-  factoryWasteEntries,
-  factoryBalePhotos,
-  factoryDailyKpiSnapshots,
-  factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots,
-  factoryContainerProfitSnapshots,
-  bankAccounts,
-  inventory,
-  exchangeRates,
   vouchers,
-  suppliers,
-  containerSales,
   factorySupplierPayments,
-  insertFactorySupplierPaymentSchema,
   factorySupplierFxTransfers,
-  insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations,
-  baleRecodeSessions,
-  baleRecodeItems,
-  factoryWorkerAdvances,
-  factoryAdvanceRepayments,
-  factoryBaleWasteDispatches,
-  factoryPosSales,
-  factoryPosSaleItems,
-  proformaStockReservations,
   propertyContracts,
   propertyMonthlyLedger,
-  propertyPayments,
   propertyUnits,
 } from "@shared/schema";
-import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
-import bcrypt from "bcryptjs";
-import { sqlArray } from "../../../lib/sqlArray";
-import CryptoJS from "crypto-js";
-import multer from "multer";
-import path from "path";
-import fs from "fs";
-import { calcBrokerApproxUsd, calcBrokerDetail, type BrokerCalcContext } from "./netPositionBrokerCalc";
+import { eq, and, desc, sql, inArray, isNull, lte } from "drizzle-orm";
+import { type BrokerCalcContext } from "./netPositionBrokerCalc";
 import { computeNetPositionInventory } from "./netPositionInventory";
 
 export function registerEmployeeNetPositionRoutes(app: Express) {
@@ -817,7 +721,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       // OUTSTANDING = tenants still OWE us → receivable (asset)
       // Prepaid Rent = CREDIT + OUTSTANDING  (both are "What We Have")
       let prepaidRent = 0;
-      let rentPayable = 0;
+      const rentPayable = 0;
       {
         // All FACTORY units owned by this company
         const rentalUnitsRows = await db

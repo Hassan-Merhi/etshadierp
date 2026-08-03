@@ -1,14 +1,11 @@
 import { db } from "../../db";
 import { logger } from "../../lib/logger";
-import { containers, containerTrackingEvents, containerTrackingChecks } from "../../../shared/schema";
-import { and, eq, inArray, gte, sql, desc, isNotNull, isNull } from "drizzle-orm";
+import { containers } from "../../../shared/schema";
+import { eq } from "drizzle-orm";
 import {
-  trackContainer,
-  normaliseEvents,
   deriveLastStatus,
   deriveLastLocation,
   deriveLastEventDate,
-  deriveEstimatedDeliveryDate,
   type ParcelsAppShipment,
 } from "../../lib/parcelsAppClient";
 import { scrapeTracking, isScraperAvailable } from "../../lib/parcelsAppScraper";
@@ -22,7 +19,6 @@ import { logAndConfirmEta, logEtaResolution, resolveEtaFromProvider, resolveEtaF
 import { trackViaParcelsAppApi } from "./parcels-app-api";
 import { saveDirectEvents, saveParcelsAppEvents, saveTrackingCheck } from "./persistence";
 import { check17trackQuota } from "./quotas";
-import { trackOneContainer } from "./track-one";
 import { CMA_PREFIXES, ep, initTrackingProgress } from "./validation-progress";
 
 export async function trackViaParcelsApp(

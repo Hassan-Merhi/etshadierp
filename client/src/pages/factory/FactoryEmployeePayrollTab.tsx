@@ -1,18 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import {
-  Play,
-  DollarSign,
-  Users,
-  Loader2,
-  ChevronDown,
-  ChevronRight,
-  Minus,
-  CalendarDays,
-  Calculator,
-  RefreshCw,
-} from "lucide-react";
+import { Play, DollarSign, Users, Loader2, ChevronDown, ChevronRight, Minus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

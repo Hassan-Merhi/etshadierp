@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { ShieldAlert, AlertTriangle, Loader2, ShieldCheck, RefreshCw, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";

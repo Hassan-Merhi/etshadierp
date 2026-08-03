@@ -1,5 +1,5 @@
-import { containers, containerTrackingEvents, containerTrackingChecks } from "../../../shared/schema";
-import { and, eq, inArray, gte, sql, desc, isNotNull, isNull } from "drizzle-orm";
+import { containers } from "../../../shared/schema";
+import { sql } from "drizzle-orm";
 
 // ── Inactive status — case-insensitive throughout ─────────────────────────────
 

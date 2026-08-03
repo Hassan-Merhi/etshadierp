@@ -1,13 +1,13 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import { ClipboardCheck, Eye, Package, Trash2, Download, FileText, FileSpreadsheet, Container } from "lucide-react";
+import { ClipboardCheck, Eye, Package, Trash2, FileText, FileSpreadsheet, Container } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";

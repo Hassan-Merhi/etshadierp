@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +20,6 @@ import {
   ChevronRight,
   Download,
   ArrowUpRight,
-  ArrowDownRight,
   Equal,
 } from "lucide-react";
 import { useLocation } from "wouter";

@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Edit, Trash2, MapPin, Monitor, Calendar, PackageMinus, ShieldCheck, Users } from "lucide-react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AdvancedRestrictionsPanel } from "@/components/AdvancedRestrictionsPanel";
 
 interface RoleSummaryRowProps {

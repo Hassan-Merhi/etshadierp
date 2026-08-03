@@ -1,8 +1,7 @@
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { containers, containerTrackingEvents, containerTrackingChecks } from "../../../shared/schema";
-import { and, eq, inArray, gte, sql, desc, isNotNull, isNull } from "drizzle-orm";
+import { containers } from "../../../shared/schema";
 import { sleep } from "./persistence";
 import { anyProviderConfigured } from "./quotas";
 import { trackOneContainer } from "./track-one";

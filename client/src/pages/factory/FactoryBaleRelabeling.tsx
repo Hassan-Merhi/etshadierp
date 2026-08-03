@@ -1,26 +1,44 @@
-import {useState, useRef} from "react";
-import {useLocation} from "wouter";
-import {useMutation, useQuery} from "@tanstack/react-query";
-import {PageHeader} from "@/components/PageHeader";
-import {Upload, CheckCircle, AlertCircle, RefreshCw, Printer, Download, ChevronDown, ChevronUp, Tag, FileSpreadsheet, Eye} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
-import {Checkbox} from "@/components/ui/checkbox";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Label} from "@/components/ui/label";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {useToast} from "@/hooks/use-toast";
-import {queryClient} from "@/lib/queryClient";
-import {factoryApiRequest} from "@/lib/factoryApi";
-import {useDateFormat} from "@/contexts/DateFormatContext";
-import * as XLSX from "@/lib/excelHelper";
-import {generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, prefetchBannersForPrint, type A4DesignColor, type LabelData} from "@/lib/labelHtml";
-import {useLabelDesignColors} from "@/hooks/useLabelDesignColors";
+import { useState, useRef } from "react";
+import { useLocation } from "wouter";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { PageHeader } from "@/components/PageHeader";
+import {
+  Upload,
+  CheckCircle,
+  AlertCircle,
+  RefreshCw,
+  Printer,
+  Download,
+  ChevronDown,
+  ChevronUp,
+  Tag,
+  FileSpreadsheet,
+  Eye,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
+import { factoryApiRequest } from "@/lib/factoryApi";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import {
+  generateCombinedLabelsHtml,
+  generateA5LabelsHtml,
+  generateStickerLabelsHtml,
+  prefetchBannersForPrint,
+  type A4DesignColor,
+  type LabelData,
+} from "@/lib/labelHtml";
+import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 
-import type {ApplyItem, ParsedRow, Step, ValidationResult} from "./factorybalerelabeling/types";
-import {downloadCsv, downloadExcelTemplate, parseExcelFile} from "./factorybalerelabeling/utils";
-import {LabelPreviewCard} from "./factorybalerelabeling/components/LabelPreviewCard";
+import type { ApplyItem, ParsedRow, Step, ValidationResult } from "./factorybalerelabeling/types";
+import { downloadCsv, downloadExcelTemplate, parseExcelFile } from "./factorybalerelabeling/utils";
+import { LabelPreviewCard } from "./factorybalerelabeling/components/LabelPreviewCard";
 export default function FactoryBaleRelabeling() {
   const { toast } = useToast();
   const { formatDisplayDate } = useDateFormat();
