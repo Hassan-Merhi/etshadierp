@@ -46,6 +46,11 @@ export const applicationTranslations = {
     ar: "فتح البحث",
     fr: "Ouvrir la recherche",
   },
+  "accessibility.openWorkspaceControls": {
+    en: "Open account and display controls",
+    ar: "فتح عناصر التحكم بالحساب والعرض",
+    fr: "Ouvrir les commandes du compte et de l’affichage",
+  },
   "accessibility.toggleSidebar": {
     en: "Toggle Sidebar",
     ar: "فتح أو إغلاق شريط التنقل الجانبي",
@@ -70,6 +75,41 @@ export const applicationTranslations = {
     en: "Close panel",
     ar: "إغلاق اللوحة",
     fr: "Fermer le panneau",
+  },
+  "workspace.controls": {
+    en: "Workspace controls",
+    ar: "عناصر تحكم مساحة العمل",
+    fr: "Commandes de l’espace de travail",
+  },
+  "workspace.controlsDescription": {
+    en: "Account, display, synchronization, language, and search controls.",
+    ar: "عناصر تحكم الحساب والعرض والمزامنة واللغة والبحث.",
+    fr: "Commandes du compte, de l’affichage, de la synchronisation, de la langue et de la recherche.",
+  },
+  "workspace.search": {
+    en: "Search the workspace",
+    ar: "البحث في مساحة العمل",
+    fr: "Rechercher dans l’espace de travail",
+  },
+  "workspace.statusDisplay": {
+    en: "Status and display",
+    ar: "الحالة والعرض",
+    fr: "État et affichage",
+  },
+  "workspace.pendingSync": {
+    en: "Pending synchronization",
+    ar: "المزامنة المعلّقة",
+    fr: "Synchronisation en attente",
+  },
+  "workspace.theme": {
+    en: "Theme",
+    ar: "المظهر",
+    fr: "Thème",
+  },
+  "workspace.accountLanguage": {
+    en: "Account and language",
+    ar: "الحساب واللغة",
+    fr: "Compte et langue",
   },
   "user.menu": {
     en: "Account menu",
