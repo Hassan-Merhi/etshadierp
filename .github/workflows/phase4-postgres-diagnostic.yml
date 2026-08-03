@@ -1,0 +1,52 @@
+name: Phase 4 PostgreSQL Diagnostic
+
+on:
+  push:
+    branches:
+      - agent/phase4-postgres-diagnostic
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Fetch CircleCI PostgreSQL failure
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --location --silent --show-error --fail \
+            "https://circleci.com/api/v1.1/project/github/Hassan-Merhi/etshadierp/6949" \
+            -o circleci-job.json
+          node <<'NODE'
+          const fs = require("fs");
+          const { execFileSync } = require("child_process");
+          const job = JSON.parse(fs.readFileSync("circleci-job.json", "utf8"));
+          const failedSteps = job.steps.filter((step) =>
+            step.actions?.some((action) => action.failed || action.exit_code > 0),
+          );
+          if (!failedSteps.length) {
+            console.log(JSON.stringify(job.steps, null, 2));
+            process.exit(2);
+          }
+          for (const step of failedSteps) {
+            console.log(`===== ${step.name} =====`);
+            for (const action of step.actions ?? []) {
+              if (!action.output_url) continue;
+              const raw = execFileSync(
+                "curl",
+                ["--location", "--silent", "--show-error", "--fail", action.output_url],
+                { encoding: "utf8" },
+              );
+              try {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                  for (const entry of parsed) console.log(entry.message ?? entry);
+                } else {
+                  console.log(parsed);
+                }
+              } catch {
+                console.log(raw);
+              }
+            }
+          }
+          NODE
