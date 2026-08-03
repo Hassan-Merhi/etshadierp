@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { ShieldCheck, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import { useRemoteControlSession } from "@/hooks/use-remote-control-session";
+import { translateRemoteSupportPhase4Text } from "@/i18n/remoteSupportPhase4Translations";
 
 function formatRemaining(expiresAt: string, now: number): string {
   const remainingMs = Math.max(0, new Date(expiresAt).getTime() - now);
@@ -11,6 +13,7 @@ function formatRemaining(expiresAt: string, now: number): string {
 }
 
 export function RemoteSupportIndicator() {
+  const { language } = useApplicationLanguage();
   const { session, stopping, stop } = useRemoteControlSession();
   const [now, setNow] = useState(Date.now());
 
@@ -32,9 +35,12 @@ export function RemoteSupportIndicator() {
     >
       <ShieldCheck className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-semibold">Admin support active</p>
+        <p className="truncate text-xs font-semibold">
+          {translateRemoteSupportPhase4Text("Admin support active", language)}
+        </p>
         <p className="truncate text-[11px] text-muted-foreground">
-          {session.controllerUsername} · ERP tab only · {formatRemaining(session.expiresAt, now)}
+          {session.controllerUsername} · {translateRemoteSupportPhase4Text("ERP tab only", language)} ·{" "}
+          {formatRemaining(session.expiresAt, now)}
         </p>
       </div>
       <Button
