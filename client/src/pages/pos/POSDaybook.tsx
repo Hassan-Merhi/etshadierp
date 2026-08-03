@@ -1,738 +1,367 @@
-import { useState, useEffect, useCallback } from "react";
-import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { PageHeader } from "@/components/PageHeader";
-import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useReactToPrint } from "react-to-print";
+import { addDays, format, isValid, parseISO } from "date-fns";
 import {
+  ArrowRight,
   Calendar,
+  ChevronLeft,
+  ChevronRight,
   DollarSign,
-  Package,
   Eye,
   EyeOff,
   Lock,
+  MessageCircle,
+  Package,
   Pencil,
-  Save,
-  X,
-  Plus,
-  Trash2,
-  ArrowRight,
   Printer,
-  TrendingUp,
-  TrendingDown,
-  LayoutList,
-  ChevronLeft,
-  ChevronRight,
+  X,
 } from "lucide-react";
-import { useRef } from "react";
-import { useReactToPrint } from "react-to-print";
-import { format, isValid, parseISO, addDays } from "date-fns";
-import { useDateFormat } from "@/contexts/DateFormatContext";
-import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import { useCompany } from "@/contexts/CompanyContext";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { formatNumber } from "@/lib/formatNumber";
 
-import type { InventoryItem, SalesItem, Voucher, VoucherWithItems } from "./posdaybook/types";
+import { PageHeader } from "@/components/PageHeader";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PeriodFilter, type PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useCompany } from "@/contexts/CompanyContext";
+import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import { useToast } from "@/hooks/use-toast";
+import { formatNumber } from "@/lib/formatNumber";
+import { sendInvoicePdfWithRetry } from "./utils/posPrintHelpers";
+import type { Voucher, VoucherWithItems } from "./posdaybook/types";
+
+const offscreenPrintStyle: React.CSSProperties = {
+  position: "fixed",
+  left: "-10000px",
+  top: 0,
+  width: "210mm",
+  background: "white",
+  color: "black",
+  pointerEvents: "none",
+};
+
 export default function POSDaybook() {
   const { formatDisplayDate } = useDateFormat();
   const { formatCashAmount } = useCurrencyContext();
   const { selectedCompany } = useCompany();
-  const isMaliCompany = selectedCompany?.name?.toLowerCase().includes("mali");
-  const [selectedVoucher, setSelectedVoucher] = useState<VoucherWithItems | null>(null);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editedItems, setEditedItems] = useState<SalesItem[]>([]);
-  const [editedNotes, setEditedNotes] = useState("");
-  const [addItemOpen, setAddItemOpen] = useState(false);
-  const [itemSearch, setItemSearch] = useState("");
-  const [selectedDialogRow, setSelectedDialogRow] = useState<number | null>(null);
-  const [plFilter, setPlFilter] = useState<"all" | "gain" | "loss">("all");
-  const [_location, navigate] = useLocation();
   const { toast } = useToast();
-  const reprintRef = useRef<HTMLDivElement>(null);
-  const reprintRowRef = useRef<HTMLDivElement>(null);
-  const reprintPrintingRef = useRef(false);
-  const [reprintRowVoucherId, setReprintRowVoucherId] = useState<number | null>(null);
+  const [, navigate] = useLocation();
 
-  // Check for date and voucherId in URL query parameters (from stock item voucher history)
+  const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
+  const [printVoucherId, setPrintVoucherId] = useState<number | null>(null);
+  const [hiddenRowIds, setHiddenRowIds] = useState<Set<number>>(new Set());
+  const [showHidden, setShowHidden] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
+  const printStartedRef = useRef(false);
+
   const urlParams = new URLSearchParams(window.location.search);
-  const voucherIdParam = urlParams.get("voucherId");
   const dateParam = urlParams.get("date");
+  const voucherIdParam = urlParams.get("voucherId");
 
-  // Period filter state - initialize based on URL param or default to today
-  const getInitialPeriod = (): PeriodFilterValue => {
+  const initialPeriod = (): PeriodFilterValue => {
     if (dateParam) {
-      const parsedDate = parseISO(dateParam);
-      if (isValid(parsedDate)) {
-        const dateStr = format(parsedDate, "yyyy-MM-dd");
-        return { fromDate: dateStr, toDate: dateStr, preset: "custom" };
+      const parsed = parseISO(dateParam);
+      if (isValid(parsed)) {
+        const day = format(parsed, "yyyy-MM-dd");
+        return { fromDate: day, toDate: day, preset: "custom" };
       }
     }
     return getDefaultPeriodValue("today");
   };
 
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getInitialPeriod);
-  const [hiddenRowIds, setHiddenRowIds] = useState<Set<number>>(new Set());
-  const [showHidden, setShowHidden] = useState(false);
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(initialPeriod);
 
-  // Use periodFilter dates for API queries
-  const startDate = periodFilter.fromDate;
-  const endDate = periodFilter.toDate;
-
-  // Fetch user permissions
   const { data: currentUser, isLoading: isLoadingUser } = useQuery<any>({
     queryKey: ["/api/auth/me"],
   });
 
-  // Only allow editing if explicitly permitted - defaults to false for safety
-  // Admin and Owner can always edit regardless of daybookEditDays setting
-  const daybookEditDays = currentUser?.daybookEditDays || 0;
-  const isAdminOrOwner =
-    currentUser?.role === "Admin" || currentUser?.role === "Owner" || currentUser?.role === "Developer";
+  const isAdminOrOwner = ["Admin", "Owner", "Developer"].includes(currentUser?.role);
   const isPOS = currentUser?.role === "POS";
+  const daybookEditDays = Number(currentUser?.daybookEditDays || 0);
   const canEditDaybook = isAdminOrOwner || daybookEditDays > 0;
+  const canSeeProfitCost = isAdminOrOwner;
 
-  // For POS users, fetch all their assigned locations so multi-location users
-  // see transactions from every location they manage, not just their primary one.
   const { data: myLocations = [] } = useQuery<{ id: number; name: string }[]>({
     queryKey: ["/api/my-locations"],
     enabled: isPOS,
   });
-  // Build a fast-lookup set of allowed location IDs for this POS user
-  const myLocationIds = new Set(myLocations.map((l) => l.id));
+  const assignedLocationIds = useMemo(() => new Set(myLocations.map((location) => location.id)), [myLocations]);
 
-  // Check if user can see profit/cost (Admin or Owner only)
-  const canSeeProfitCost = isAdminOrOwner;
-
-  // Fetch today's sales vouchers (only fetch after user is loaded)
   const { data: vouchers = [], isLoading } = useQuery<Voucher[]>({
-    queryKey: ["/api/vouchers", startDate, endDate],
+    queryKey: ["/api/vouchers", periodFilter.fromDate, periodFilter.toDate],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (startDate) params.set("startDate", startDate);
-      if (endDate) params.set("endDate", endDate);
-      const url = `/api/vouchers?${params.toString()}`;
-      const res = await fetch(url, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch vouchers");
-      return res.json();
+      const params = new URLSearchParams({
+        startDate: periodFilter.fromDate,
+        endDate: periodFilter.toDate,
+      });
+      const response = await fetch(`/api/vouchers?${params.toString()}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to load POS transactions");
+      return response.json();
     },
-    enabled: !isLoadingUser, // Only fetch vouchers after user data is loaded
+    enabled: !isLoadingUser,
   });
 
-  // Filter to show Sales and StockTransfer vouchers from the user's assigned location
-  // Exception: When voucherId is provided (from history), bypass location filter for Admin/Owner
-  const bypassLocationFilter = voucherIdParam && isAdminOrOwner;
+  const filteredVouchers = useMemo(
+    () =>
+      vouchers
+        .filter((voucher) => {
+          const isSupportedType = ["Sales", "Stock Transfer", "StockTransfer"].includes(voucher.voucherType);
+          if (!isSupportedType) return false;
+          if (!isPOS) return true;
+          return assignedLocationIds.has(voucher.locationId);
+        })
+        .sort((a, b) => {
+          const dateComparison = b.voucherDate.localeCompare(a.voucherDate);
+          return dateComparison || b.voucherNumber.localeCompare(a.voucherNumber);
+        }),
+    [assignedLocationIds, isPOS, vouchers]
+  );
 
-  const filteredVouchers = vouchers
-    .filter((v) => {
-      // Must be a Sales or Stock Transfer voucher
-      if (v.voucherType !== "Sales" && v.voucherType !== "Stock Transfer" && v.voucherType !== "StockTransfer")
-        return false;
+  const visibleVouchers = showHidden
+    ? filteredVouchers
+    : filteredVouchers.filter((voucher) => !hiddenRowIds.has(voucher.id));
 
-      // Bypass location filter when viewing specific historical voucher
-      if (bypassLocationFilter) return true;
-
-      // POS users: show transactions from all their assigned locations
-      if (isPOS) {
-        // While locations are still loading, show nothing to avoid flicker
-        if (myLocationIds.size === 0) return false;
-        return myLocationIds.has(v.locationId);
-      }
-
-      // Non-POS users see all transactions
-      return true;
-    })
-    // Sort newest first (descending by date, then by voucher number)
-    .sort((a, b) => {
-      const dateCompare = b.voucherDate.localeCompare(a.voucherDate);
-      if (dateCompare !== 0) return dateCompare;
-      return b.voucherNumber.localeCompare(a.voucherNumber);
-    });
-
-  // Backward compatibility alias
-  const salesVouchers = filteredVouchers;
-
-  // Visible vouchers: filter out hidden rows unless showHidden is true
-  const visibleVouchers = showHidden ? salesVouchers : salesVouchers.filter((v) => !hiddenRowIds.has(v.id));
-
-  // Fetch voucher details when viewing
   const { data: voucherDetails, isLoading: detailsLoading } = useQuery<VoucherWithItems>({
-    queryKey: selectedVoucher ? [`/api/vouchers/${selectedVoucher.id}`] : [],
-    enabled: !!selectedVoucher,
+    queryKey: selectedVoucher ? [`/api/vouchers/${selectedVoucher.id}`] : ["pos-daybook-no-selection"],
+    enabled: Boolean(selectedVoucher),
   });
 
-  // Fetch inventory for the location when in edit mode
-  const { data: inventory = [] } = useQuery<InventoryItem[]>({
-    queryKey: selectedVoucher?.locationId ? [`/api/locations/${selectedVoucher.locationId}/inventory`] : [],
-    enabled: !!selectedVoucher?.locationId && isEditMode,
+  const {
+    data: printDetails,
+    isLoading: printLoading,
+    isError: printError,
+  } = useQuery<VoucherWithItems>({
+    queryKey: printVoucherId ? [`/api/vouchers/${printVoucherId}`] : ["pos-daybook-no-print"],
+    enabled: Boolean(printVoucherId),
+    retry: false,
   });
 
-  // Populate editedItems when voucher details load (deep clone to avoid mutating cached data)
-  useEffect(() => {
-    if (voucherDetails?.salesItems && isEditMode) {
-      setEditedItems(JSON.parse(JSON.stringify(voucherDetails.salesItems)));
-      setEditedNotes(voucherDetails.description || "");
-    }
-  }, [voucherDetails, isEditMode]);
-
-  // Auto-select voucher from URL parameter
-  useEffect(() => {
-    if (voucherIdParam && vouchers.length > 0 && !selectedVoucher) {
-      const voucherId = parseInt(voucherIdParam);
-      const voucherToSelect = vouchers.find((v) => v.id === voucherId);
-
-      // Clear the voucherId parameter from URL
-      const newParams = new URLSearchParams(window.location.search);
-      newParams.delete("voucherId");
-      const newSearch = newParams.toString();
-      const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : "");
-      window.history.replaceState({}, "", newUrl);
-
-      if (voucherToSelect) {
-        setSelectedVoucher(voucherToSelect);
-      } else {
-        // Voucher not found - show feedback
-        toast({
-          variant: "destructive",
-          title: "Voucher not found",
-          description: "The requested sales transaction could not be found for this date.",
-        });
-      }
-    }
-  }, [voucherIdParam, vouchers, selectedVoucher, toast]);
-
-  // Reset selected row and filter when dialog opens/closes or mode changes
-  useEffect(() => {
-    setSelectedDialogRow(null);
-    setPlFilter("all");
-  }, [selectedVoucher, isEditMode]);
-
-  // Scroll highlighted row into view when using arrow keys
-  useEffect(() => {
-    if (selectedDialogRow === null) return;
-    const row = document.querySelector(`[data-dialog-row="${selectedDialogRow}"]`);
-    if (row) row.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [selectedDialogRow]);
-
-  // Keyboard +/- date navigation (when no dialog is open)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (hasAnyOpenDialog()) return;
-      if (selectedVoucher) return;
-      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select") return;
-      const fmt = "yyyy-MM-dd";
-      const isBack = e.key === "-" || e.code === "Minus";
-      const isForward = (e.key === "+" && e.shiftKey) || (e.code === "Equal" && e.shiftKey) || e.key === "=";
-      if (isBack) {
-        e.preventDefault();
-        setPeriodFilter((prev) => ({
-          fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), -1), fmt),
-          toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), -1), fmt),
-          preset: "custom",
-        }));
-      } else if (isForward) {
-        e.preventDefault();
-        setPeriodFilter((prev) => ({
-          fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), 1), fmt),
-          toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), 1), fmt),
-          preset: "custom",
-        }));
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown, true);
-    return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [selectedVoucher]);
-
-  // Keyboard navigation for dialog item rows
-  const getDialogItems = useCallback((): Array<{ stockItemId?: number; stockItemName?: string }> => {
-    if (!selectedVoucher) return [];
-    if (isEditMode) return editedItems;
-    return (voucherDetails as any)?.salesItems || [];
-  }, [selectedVoucher, isEditMode, editedItems, voucherDetails]);
-
-  useEffect(() => {
-    if (!selectedVoucher) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      const isTyping = tag === "input" || tag === "textarea" || (e.target as HTMLElement)?.isContentEditable;
-
-      const items = getDialogItems();
-
-      if (e.key === "ArrowDown" && !isTyping) {
-        e.preventDefault();
-        setSelectedDialogRow((prev) => {
-          if (prev === null) return 0;
-          return Math.min(prev + 1, items.length - 1);
-        });
-        return;
-      }
-
-      if (e.key === "ArrowUp" && !isTyping) {
-        e.preventDefault();
-        setSelectedDialogRow((prev) => {
-          if (prev === null) return items.length - 1;
-          return Math.max(prev - 1, 0);
-        });
-        return;
-      }
-
-      // Alt+S → open Stock Item detail directly for selected item
-      if (e.altKey && (e.key === "s" || e.key === "S" || e.key === "ß")) {
-        e.preventDefault();
-        if (selectedDialogRow !== null && items[selectedDialogRow]) {
-          const itemId = items[selectedDialogRow].stockItemId;
-          if (itemId) {
-            navigate(`/stock-query/${itemId}?from=pos-daybook`);
-            setSelectedVoucher(null);
-          }
-        }
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown, true);
-    return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [selectedVoucher, getDialogItems, navigate, selectedDialogRow]);
-
-  // Save mutation
-  const saveMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedVoucher) throw new Error("No voucher selected");
-
-      const items = editedItems.map((item) => {
-        const payload: any = {
-          stockItemId: item.stockItemId,
-          quantity: item.quantity,
-          sellingPrice: item.sellingPrice,
-        };
-
-        // Only include ID for existing items (positive IDs), not new items (negative IDs)
-        if (item.id > 0) {
-          payload.id = item.id;
-        }
-
-        return payload;
-      });
-
-      return await apiRequest("PUT", `/api/vouchers/${selectedVoucher.id}/sales`, {
-        description: editedNotes,
-        items,
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: printDetails?.voucherNumber ? `POS-${printDetails.voucherNumber}` : "POS-Invoice",
+    onAfterPrint: () => {
+      printStartedRef.current = false;
+      setPrintVoucherId(null);
+    },
+    onPrintError: (_location, error) => {
+      printStartedRef.current = false;
+      setPrintVoucherId(null);
+      toast({
+        title: "Print failed",
+        description: error?.message || "The browser could not open the print dialog.",
+        variant: "destructive",
       });
     },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Transaction updated successfully",
+  });
+
+  useEffect(() => {
+    if (!printDetails || printLoading || printStartedRef.current) return;
+    printStartedRef.current = true;
+    const timer = window.setTimeout(() => handlePrint(), 150);
+    return () => window.clearTimeout(timer);
+  }, [handlePrint, printDetails, printLoading]);
+
+  useEffect(() => {
+    if (!printError || !printVoucherId) return;
+    printStartedRef.current = false;
+    setPrintVoucherId(null);
+    toast({
+      title: "Unable to print",
+      description: "The sale details could not be loaded.",
+      variant: "destructive",
+    });
+  }, [printError, printVoucherId, toast]);
+
+  useEffect(() => {
+    if (!voucherIdParam || vouchers.length === 0 || selectedVoucher) return;
+    const id = Number(voucherIdParam);
+    const match = filteredVouchers.find((voucher) => voucher.id === id);
+    const params = new URLSearchParams(window.location.search);
+    params.delete("voucherId");
+    window.history.replaceState({}, "", `${window.location.pathname}${params.toString() ? `?${params}` : ""}`);
+    if (match) setSelectedVoucher(match);
+  }, [filteredVouchers, selectedVoucher, voucherIdParam, vouchers.length]);
+
+  const whatsappMutation = useMutation({
+    mutationFn: async (voucher: Voucher) => {
+      const result = await sendInvoicePdfWithRetry(voucher.id, voucher.locationId, {
+        maxAttempts: 3,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${selectedVoucher?.id}`] });
-      if (selectedVoucher?.locationId) {
-        queryClient.invalidateQueries({ queryKey: [`/api/locations/${selectedVoucher.locationId}/inventory`] });
-      }
-      setIsEditMode(false);
+      if (!result.ok) throw new Error(result.message);
+      return voucher;
+    },
+    onSuccess: (voucher) => {
+      toast({
+        title: "Sent on WhatsApp",
+        description: `Receipt ${voucher.voucherNumber} was resent successfully.`,
+      });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
       toast({
-        title: "Error",
+        title: "WhatsApp send failed",
         description: error.message,
         variant: "destructive",
       });
     },
   });
 
-  const handleEdit = () => {
-    if (selectedVoucher) {
-      navigate(`/pos/edit/${selectedVoucher.id}`);
-    }
+  const salesOnly = filteredVouchers.filter((voucher) => voucher.voucherType === "Sales");
+  const transfersOnly = filteredVouchers.filter((voucher) => voucher.voucherType !== "Sales");
+  const totalSales = salesOnly.reduce((sum, voucher) => sum + Number(voucher.totalAmount || 0), 0);
+
+  const shiftDay = (days: number) => {
+    const from = addDays(new Date(`${periodFilter.fromDate}T00:00:00`), days);
+    const to = addDays(new Date(`${periodFilter.toDate}T00:00:00`), days);
+    setPeriodFilter({
+      fromDate: format(from, "yyyy-MM-dd"),
+      toDate: format(to, "yyyy-MM-dd"),
+      preset: "custom",
+    });
   };
 
-  const fmtPrint = (n: number, prefix = "") => {
-    const parts = Math.abs(n)
-      .toFixed(2)
-      .replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-      .split(".");
-    const num = parts[1] === "00" ? parts[0] : parts.join(".");
-    return prefix ? prefix + "\u00A0" + num : num;
-  };
+  const subtitle =
+    periodFilter.fromDate === periodFilter.toDate
+      ? `Sales transactions - ${formatDisplayDate(new Date(`${periodFilter.fromDate}T00:00:00`))}`
+      : `Sales transactions - ${formatDisplayDate(new Date(`${periodFilter.fromDate}T00:00:00`))} to ${formatDisplayDate(new Date(`${periodFilter.toDate}T00:00:00`))}`;
 
-  const handleReprint = useReactToPrint({
-    contentRef: reprintRef,
-  });
-
-  const handleReprintRow = useReactToPrint({
-    contentRef: reprintRowRef,
-    onAfterPrint: () => {
-      reprintPrintingRef.current = false;
-      setReprintRowVoucherId(null);
-    },
-  });
-
-  // Fetch voucher details for row-level reprint
-  const { data: reprintRowDetails, isLoading: reprintRowLoading } = useQuery<VoucherWithItems>({
-    queryKey: reprintRowVoucherId ? [`/api/vouchers/${reprintRowVoucherId}`] : [],
-    enabled: !!reprintRowVoucherId,
-    retry: false,
-  });
-
-  // Auto-trigger print once details load — guard prevents double-trigger
-  useEffect(() => {
-    if (reprintRowDetails && reprintRowVoucherId && !reprintRowLoading && !reprintPrintingRef.current) {
-      reprintPrintingRef.current = true;
-      setTimeout(() => handleReprintRow(), 100);
-    }
-  }, [reprintRowDetails, reprintRowVoucherId, reprintRowLoading]);
-
-  const handleCancelEdit = () => {
-    setIsEditMode(false);
-    setEditedItems([]);
-    setEditedNotes("");
-  };
-
-  const handleSave = () => {
-    saveMutation.mutate();
-  };
-
-  const handleItemChange = (index: number, field: keyof SalesItem, value: string) => {
-    const newItems = [...editedItems];
-    newItems[index] = { ...newItems[index], [field]: value };
-
-    // Recalculate totals
-    const qty = parseFloat(newItems[index].quantity) || 0;
-    const price = parseFloat(newItems[index].sellingPrice) || 0;
-    const cost = parseFloat(newItems[index].costPrice) || 0;
-
-    newItems[index].totalSales = formatNumber(qty * price);
-    newItems[index].totalCost = formatNumber(qty * cost);
-    newItems[index].profit = formatNumber(qty * (price - cost));
-
-    setEditedItems(newItems);
-  };
-
-  const handleAddItem = (item: InventoryItem) => {
-    // Create new sales item with current inventory cost and default price
-    const newItem: SalesItem = {
-      id: -Date.now(), // Temporary negative ID for new items
-      stockItemId: item.stockItemId,
-      stockItemName: item.stockItemName,
-      quantity: "1",
-      sellingPrice: item.lastSellingPrice || item.averageRate,
-      costPrice: item.averageRate, // Use current cost for new items
-      totalSales: item.lastSellingPrice || item.averageRate,
-      totalCost: item.averageRate,
-      profit: formatNumber((parseFloat(item.lastSellingPrice || item.averageRate) - parseFloat(item.averageRate)) * 1),
-    };
-
-    setEditedItems([...editedItems, newItem]);
-    setAddItemOpen(false);
-    setItemSearch("");
-  };
-
-  const handleRemoveItem = (index: number) => {
-    if (editedItems.length <= 1) {
-      toast({ title: "Cannot remove", description: "A sale must have at least one item.", variant: "destructive" });
-      return;
-    }
-    const newItems = editedItems.filter((_, i) => i !== index);
-    setEditedItems(newItems);
-  };
-
-  // Separate sales from transfers for accurate metrics
-  const salesOnlyVouchers = salesVouchers.filter((v) => v.voucherType === "Sales");
-  const transferVouchers = salesVouchers.filter((v) => v.voucherType !== "Sales");
-
-  const totalSales = salesOnlyVouchers.reduce((sum, v) => sum + parseFloat(v.totalAmount), 0);
-  const salesTransactionCount = salesOnlyVouchers.length;
-  const transferCount = transferVouchers.length;
-
-  // Generate subtitle based on period filter
-  const getSubtitle = () => {
-    const fromDate = new Date(periodFilter.fromDate);
-    const toDate = new Date(periodFilter.toDate);
-    if (periodFilter.fromDate === periodFilter.toDate) {
-      return `Sales transactions - ${formatDisplayDate(fromDate)}`;
-    }
-    return `Sales transactions - ${formatDisplayDate(fromDate)} to ${formatDisplayDate(toDate)}`;
+  const fmtPrint = (value: number) => {
+    const fixed = Math.abs(value).toFixed(2);
+    return fixed.endsWith(".00") ? fixed.slice(0, -3) : fixed;
   };
 
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <PageHeader title="POS Daybook" subtitle={getSubtitle()} />
+    <div className="container mx-auto space-y-4 p-4 md:space-y-6 md:p-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <PageHeader title="POS Daybook" subtitle={subtitle} />
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              const fmt = "yyyy-MM-dd";
-              setPeriodFilter((prev) => ({
-                fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), -1), fmt),
-                toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), -1), fmt),
-                preset: "custom",
-              }));
-            }}
-            title="Previous day (−)"
-            data-testid="button-prev-day"
-          >
+          <Button variant="ghost" size="icon" onClick={() => shiftDay(-1)} title="Previous day">
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="pos-daybook-period-filter" />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              const fmt = "yyyy-MM-dd";
-              setPeriodFilter((prev) => ({
-                fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), 1), fmt),
-                toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), 1), fmt),
-                preset: "custom",
-              }));
-            }}
-            title="Next day (+)"
-            data-testid="button-next-day"
-          >
+          <Button variant="ghost" size="icon" onClick={() => shiftDay(1)} title="Next day">
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      {/* Stats pill bar */}
       <div className="flex flex-wrap gap-3">
-        <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
-          <Package className="h-4 w-4 text-muted-foreground shrink-0" />
-          <div>
-            <p className="text-xs text-muted-foreground leading-none mb-0.5">Sales</p>
-            {isLoading ? (
-              <Skeleton className="h-5 w-10 mt-0.5" />
-            ) : (
-              <p className="text-lg font-semibold leading-none" data-testid="text-transaction-count">
-                {salesTransactionCount}
-              </p>
-            )}
-          </div>
-        </div>
-        <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
-          <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
-          <div>
-            <p className="text-xs text-muted-foreground leading-none mb-0.5">Total Revenue</p>
-            {isLoading ? (
-              <Skeleton className="h-5 w-20 mt-0.5" />
-            ) : (
-              <p className="text-lg font-semibold leading-none font-mono" data-testid="text-total-sales">
-                {formatCashAmount(totalSales)}
-              </p>
-            )}
-          </div>
-        </div>
-        <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
-          <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-          <div>
-            <p className="text-xs text-muted-foreground leading-none mb-0.5">Avg per Sale</p>
-            {isLoading ? (
-              <Skeleton className="h-5 w-16 mt-0.5" />
-            ) : (
-              <p className="text-lg font-semibold leading-none font-mono" data-testid="text-avg-transaction">
-                {formatCashAmount(salesTransactionCount > 0 ? totalSales / salesTransactionCount : 0)}
-              </p>
-            )}
-          </div>
-        </div>
-        <div className="rounded-lg border bg-muted/40 px-4 py-2.5 flex items-center gap-3">
-          <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
-          <div>
-            <p className="text-xs text-muted-foreground leading-none mb-0.5">Transfers</p>
-            {isLoading ? (
-              <Skeleton className="h-5 w-10 mt-0.5" />
-            ) : (
-              <p className="text-lg font-semibold leading-none" data-testid="text-transfer-count">
-                {transferCount}
-              </p>
-            )}
-          </div>
-        </div>
+        <Stat label="Sales" value={String(salesOnly.length)} icon={<Package className="h-4 w-4" />} loading={isLoading} />
+        <Stat label="Total Revenue" value={formatCashAmount(totalSales)} icon={<DollarSign className="h-4 w-4" />} loading={isLoading} />
+        <Stat
+          label="Avg per Sale"
+          value={formatCashAmount(salesOnly.length ? totalSales / salesOnly.length : 0)}
+          icon={<Calendar className="h-4 w-4" />}
+          loading={isLoading}
+        />
+        <Stat label="Transfers" value={String(transfersOnly.length)} icon={<ArrowRight className="h-4 w-4" />} loading={isLoading} />
       </div>
 
-      {/* Transactions table */}
       <div>
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <p className="text-sm font-semibold">
-            Transactions
-            {hiddenRowIds.size > 0 && !showHidden && (
-              <span className="text-sm font-normal text-muted-foreground ml-2">
-                ({visibleVouchers.length} of {salesVouchers.length})
-              </span>
-            )}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={showHidden ? "secondary" : "outline"}
-              size="sm"
-              onClick={() => setShowHidden((prev) => !prev)}
-              data-testid="button-toggle-show-hidden"
-              className="gap-1"
-              disabled={hiddenRowIds.size === 0}
-              title={
-                hiddenRowIds.size === 0
-                  ? "No hidden rows"
-                  : showHidden
-                    ? "Hide hidden rows"
-                    : `Show ${hiddenRowIds.size} hidden row${hiddenRowIds.size !== 1 ? "s" : ""}`
-              }
-            >
-              {showHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-              {showHidden ? "Showing hidden" : "Show hidden"}
-              {hiddenRowIds.size > 0 && <Badge className="ml-1">{hiddenRowIds.size}</Badge>}
-            </Button>
-            {hiddenRowIds.size > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setHiddenRowIds(new Set());
-                  setShowHidden(false);
-                }}
-                className="gap-1 text-muted-foreground"
-                data-testid="button-clear-hidden-rows"
-                title="Clear all hidden rows"
-              >
-                <X className="w-4 h-4" />
-                Clear
-              </Button>
-            )}
-          </div>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <p className="text-sm font-semibold">Transactions</p>
+          <Button
+            variant={showHidden ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setShowHidden((value) => !value)}
+            disabled={hiddenRowIds.size === 0}
+          >
+            {showHidden ? <Eye className="mr-1 h-4 w-4" /> : <EyeOff className="mr-1 h-4 w-4" />}
+            {showHidden ? "Showing hidden" : "Show hidden"}
+          </Button>
         </div>
+
         {isLoadingUser || isLoading ? (
-          <div className="space-y-2 mt-1">
-            {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
-          </div>
-        ) : salesVouchers.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground">
-            <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p className="text-lg font-medium">No transactions found</p>
-            <p className="text-sm mt-1">Sales and transfers will appear here for the selected period</p>
-          </div>
+          <div className="space-y-2">{[0, 1, 2].map((key) => <Skeleton key={key} className="h-12 w-full" />)}</div>
+        ) : visibleVouchers.length === 0 ? (
+          <div className="py-12 text-center text-muted-foreground">No transactions found</div>
         ) : (
-          <div className="border rounded-xl overflow-hidden">
+          <div className="overflow-hidden rounded-xl border">
             <div className="table-responsive">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/40 hover:bg-muted/40">
-                    <TableHead className="text-xs">Time</TableHead>
-                    <TableHead className="text-xs">Type</TableHead>
-                    <TableHead className="text-xs hidden sm:table-cell">Location</TableHead>
-                    <TableHead className="text-xs text-right">Amount</TableHead>
-                    <TableHead className="text-xs hidden md:table-cell">Notes</TableHead>
-                    <TableHead className="text-xs text-right">Actions</TableHead>
+                  <TableRow className="bg-muted/40">
+                    <TableHead>Time</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="hidden sm:table-cell">Location</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="hidden md:table-cell">Notes</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {visibleVouchers.map((voucher) => {
+                    const isOwnVoucher = !isPOS || voucher.userId === currentUser?.id;
+                    const canAct = isOwnVoucher;
+                    const isSending = whatsappMutation.isPending && whatsappMutation.variables?.id === voucher.id;
+                    const isPrinting = printVoucherId === voucher.id;
                     const isHidden = hiddenRowIds.has(voucher.id);
                     return (
-                      <TableRow
-                        key={voucher.id}
-                        data-testid={`row-voucher-${voucher.id}`}
-                        className={isHidden && showHidden ? "opacity-50" : ""}
-                      >
+                      <TableRow key={voucher.id} className={isHidden && showHidden ? "opacity-50" : ""}>
                         <TableCell className="font-mono text-xs">
-                          {(() => {
-                            if (!voucher.createdAt) return "—";
-                            const d = new Date(voucher.createdAt);
-                            return isNaN(d.getTime()) ? "—" : format(d, "MMM dd, hh:mm a");
-                          })()}
+                          {voucher.createdAt && isValid(new Date(voucher.createdAt))
+                            ? format(new Date(voucher.createdAt), "MMM dd, hh:mm a")
+                            : "—"}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={voucher.voucherType === "Sales" ? "default" : "outline"} className="text-xs">
+                          <Badge variant={voucher.voucherType === "Sales" ? "default" : "outline"}>
                             {voucher.voucherType === "Sales" ? "Sale" : "Transfer"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="hidden sm:table-cell">
-                          <Badge variant="secondary" className="text-xs">
-                            {voucher.locationName || `Location ${voucher.locationId}`}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs font-semibold">
-                          {formatCashAmount(voucher.totalAmount)}
-                        </TableCell>
-                        <TableCell className="max-w-xs truncate text-xs hidden md:table-cell">
-                          {voucher.description || "-"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {(() => {
-                              // POS users can only act on their own sales; others can see the row but not open/reprint it
-                              const isOwnVoucher = !isPOS || voucher.userId === currentUser?.id;
-                              return (
-                                <>
-                                  {voucher.voucherType === "Sales" && (
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => setReprintRowVoucherId(voucher.id)}
-                                      disabled={reprintRowVoucherId === voucher.id || !isOwnVoucher}
-                                      data-testid={`button-reprint-row-${voucher.id}`}
-                                      title={isOwnVoucher ? "Reprint invoice" : "You can only reprint your own sales"}
-                                    >
-                                      <Printer
-                                        className={`h-4 w-4 ${reprintRowVoucherId === voucher.id ? "animate-pulse" : ""}`}
-                                      />
-                                    </Button>
-                                  )}
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => isOwnVoucher && setSelectedVoucher(voucher as VoucherWithItems)}
-                                    disabled={!isOwnVoucher}
-                                    data-testid={`button-view-${voucher.id}`}
-                                    title={
-                                      isOwnVoucher ? "View details" : "You can only view details of your own sales"
-                                    }
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                  </Button>
-                                </>
-                              );
-                            })()}
+                        <TableCell className="hidden sm:table-cell">{voucher.locationName || `Location ${voucher.locationId}`}</TableCell>
+                        <TableCell className="text-right font-mono font-semibold">{formatCashAmount(Number(voucher.totalAmount || 0))}</TableCell>
+                        <TableCell className="hidden max-w-xs truncate md:table-cell">{voucher.description || "-"}</TableCell>
+                        <TableCell>
+                          <div className="flex justify-end gap-1">
+                            {voucher.voucherType === "Sales" && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  disabled={!canAct || isPrinting}
+                                  onClick={() => setPrintVoucherId(voucher.id)}
+                                  title={canAct ? "Print receipt" : "You can only print your own sales"}
+                                >
+                                  <Printer className={`h-4 w-4 ${isPrinting ? "animate-pulse" : ""}`} />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  disabled={!canAct || isSending}
+                                  onClick={() => whatsappMutation.mutate(voucher)}
+                                  title={canAct ? "Resend receipt on WhatsApp" : "You can only resend your own sales"}
+                                >
+                                  <MessageCircle className={`h-4 w-4 ${isSending ? "animate-pulse" : ""}`} />
+                                </Button>
+                              </>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
-                              title={isHidden ? "Unhide row" : "Hide row"}
-                              onClick={() => {
-                                if (isHidden) {
-                                  setHiddenRowIds((prev) => {
-                                    const next = new Set(prev);
-                                    next.delete(voucher.id);
-                                    return next;
-                                  });
-                                } else {
-                                  setHiddenRowIds((prev) => {
-                                    const next = new Set(prev);
-                                    next.add(voucher.id);
-                                    return next;
-                                  });
-                                }
-                              }}
-                              data-testid={isHidden ? `button-unhide-${voucher.id}` : `button-hide-${voucher.id}`}
+                              disabled={!canAct}
+                              onClick={() => canAct && setSelectedVoucher(voucher)}
+                              title={canAct ? "View full sale details" : "You can only view your own sales"}
                             >
-                              {isHidden ? (
-                                <Eye className="h-4 w-4 text-muted-foreground" />
-                              ) : (
-                                <EyeOff className="h-4 w-4 text-muted-foreground" />
-                              )}
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() =>
+                                setHiddenRowIds((previous) => {
+                                  const next = new Set(previous);
+                                  if (next.has(voucher.id)) next.delete(voucher.id);
+                                  else next.add(voucher.id);
+                                  return next;
+                                })
+                              }
+                              title={isHidden ? "Unhide row" : "Hide row"}
+                            >
+                              {isHidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                             </Button>
                           </div>
                         </TableCell>
@@ -746,1338 +375,146 @@ export default function POSDaybook() {
         )}
       </div>
 
-      {/* Hidden row-level reprint template (outside dialog, always in DOM) */}
-      <div className="hidden">
-        <div
-          ref={reprintRowRef}
-          style={{
-            fontFamily: "Arial, Helvetica, sans-serif",
-            fontSize: "11pt",
-            padding: "12px",
-            backgroundColor: "white",
-            color: "black",
-            width: "100%",
-            fontWeight: "normal",
-            fontVariantNumeric: "tabular-nums",
-          }}
-        >
-          <style
-            dangerouslySetInnerHTML={{
-              __html: `@media print { body { font-family: Arial, Helvetica, sans-serif !important; } * { font-family: Arial, Helvetica, sans-serif !important; font-variant-numeric: tabular-nums !important; } }`,
-            }}
-          />
-          <div
-            style={{
-              textAlign: "center",
-              fontWeight: "900",
-              fontSize: "18pt",
-              letterSpacing: "2px",
-              marginBottom: "6px",
-            }}
-          >
-            POS INVOICE
+      <div style={offscreenPrintStyle} aria-hidden="true">
+        <div ref={printRef} className="bg-white p-6 text-black">
+          <style>{`@page { margin: 10mm; } @media print { body { background: white !important; } }`}</style>
+          <div className="mb-4 text-center text-2xl font-black tracking-wider">POS INVOICE</div>
+          <div className="mb-3 flex justify-between border-y-2 border-black py-2 text-sm font-bold">
+            <span>Receipt: {printDetails?.voucherNumber || "—"}</span>
+            <span>Date: {printDetails?.voucherDate || "—"}</span>
           </div>
-          <div
-            style={{
-              fontSize: "11pt",
-              fontWeight: "700",
-              display: "flex",
-              justifyContent: "space-between",
-              borderTop: "2px solid black",
-              borderBottom: "2px solid black",
-              padding: "5px 0",
-              marginBottom: "6px",
-            }}
-          >
-            <span>Date: {reprintRowDetails?.voucherDate}</span>
-            <span>
-              User: {currentUser?.fullName || currentUser?.name || currentUser?.username || currentUser?.email}
-            </span>
+          <div className="mb-3 text-sm">
+            <div>Location: {printDetails?.locationName || `Location ${printDetails?.locationId || "—"}`}</div>
+            {printDetails?.customerName && <div>Customer: {printDetails.customerName}</div>}
+            {printDetails?.isCreditSale && <div className="font-bold">CREDIT SALE</div>}
           </div>
-          {isMaliCompany && reprintRowDetails?.exchangeRate && (
-            <div
-              style={{
-                fontSize: "11pt",
-                fontWeight: "700",
-                marginBottom: "6px",
-                padding: "4px",
-                border: "2px solid black",
-                textAlign: "center",
-              }}
-            >
-              <span style={{ fontWeight: "900" }}>Daily Rate:</span> $1 ={" "}
-              {formatNumber(parseFloat(String(reprintRowDetails.exchangeRate)))} CFA
-            </div>
-          )}
-          {reprintRowDetails?.isCreditSale && (
-            <div
-              style={{
-                fontSize: "10pt",
-                fontWeight: "700",
-                marginBottom: "6px",
-                padding: "4px",
-                border: "2px solid black",
-              }}
-            >
-              <div style={{ fontWeight: "900" }}>CREDIT SALE</div>
-              {reprintRowDetails.customerName && <div>Customer: {reprintRowDetails.customerName}</div>}
-            </div>
-          )}
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: "11pt",
-              marginBottom: "0",
-              fontVariantNumeric: "tabular-nums",
-              border: "1px solid #999",
-            }}
-          >
+          <table className="w-full border-collapse text-sm">
             <thead>
               <tr>
-                <th
-                  style={{
-                    textAlign: "left",
-                    padding: "4px 7px",
-                    width: "30%",
-                    fontWeight: "900",
-                    fontSize: "9pt",
-                    border: "1px solid #999",
-                    backgroundColor: "#eeeeee",
-                  }}
-                >
-                  Description
-                </th>
-                <th
-                  style={{
-                    textAlign: "center",
-                    padding: "4px 7px",
-                    width: "6%",
-                    fontWeight: "900",
-                    fontSize: "9pt",
-                    border: "1px solid #999",
-                    backgroundColor: "#eeeeee",
-                  }}
-                >
-                  Qty
-                </th>
-                <th
-                  style={{
-                    textAlign: "center",
-                    padding: "4px 7px",
-                    width: "9%",
-                    fontWeight: "900",
-                    fontSize: "9pt",
-                    border: "1px solid #999",
-                    backgroundColor: "#eeeeee",
-                  }}
-                >
-                  Rate
-                </th>
-                <th
-                  style={{
-                    textAlign: "center",
-                    padding: "4px 7px",
-                    width: "10%",
-                    fontWeight: "900",
-                    fontSize: "9pt",
-                    border: "1px solid #999",
-                    backgroundColor: "#eeeeee",
-                  }}
-                >
-                  Amt
-                </th>
-                <th
-                  style={{
-                    textAlign: "center",
-                    padding: "4px 7px",
-                    width: "10%",
-                    fontWeight: "900",
-                    fontSize: "9pt",
-                    border: "1px solid #999",
-                    backgroundColor: "#eeeeee",
-                  }}
-                >
-                  Config
-                </th>
-                <th
-                  style={{
-                    textAlign: "center",
-                    padding: "4px 7px",
-                    width: "12%",
-                    fontWeight: "900",
-                    fontSize: "9pt",
-                    border: "1px solid #999",
-                    backgroundColor: "#eeeeee",
-                  }}
-                >
-                  P/L Bale
-                </th>
-                <th
-                  style={{
-                    textAlign: "center",
-                    padding: "4px 7px",
-                    width: "13%",
-                    fontWeight: "900",
-                    fontSize: "9pt",
-                    border: "1px solid #999",
-                    backgroundColor: "#eeeeee",
-                  }}
-                >
-                  Total P/L
-                </th>
+                <th className="border border-black p-2 text-left">Item</th>
+                <th className="border border-black p-2 text-right">Qty</th>
+                <th className="border border-black p-2 text-right">Price</th>
+                <th className="border border-black p-2 text-right">Total</th>
               </tr>
             </thead>
             <tbody>
-              {(reprintRowDetails?.salesItems ?? []).map((item: any, idx: number) => {
-                const rate = parseFloat(item.sellingPrice || "0");
-                const qty = parseFloat(item.quantity || "0");
-                const configPrice = parseFloat(item.configuredPrice || "0");
-                const plPerBale = rate - configPrice;
-                const totalPL = plPerBale * qty;
-                const rowBg = idx % 2 === 0 ? "#ffffff" : "#f5f5f5";
+              {(printDetails?.salesItems || []).map((item) => {
+                const qty = Number(item.quantity || 0);
+                const price = Number(item.sellingPrice || 0);
                 return (
-                  <tr key={idx} style={{ backgroundColor: rowBg }}>
-                    <td
-                      style={{
-                        padding: "4px 7px",
-                        verticalAlign: "top",
-                        wordBreak: "break-word",
-                        fontWeight: "600",
-                        lineHeight: "1.3",
-                        fontSize: "9pt",
-                        border: "1px solid #c8c8c8",
-                      }}
-                    >
-                      {item.stockItemName}
-                    </td>
-                    <td
-                      style={{
-                        textAlign: "center",
-                        padding: "4px 7px",
-                        verticalAlign: "top",
-                        fontWeight: "600",
-                        fontSize: "9pt",
-                        border: "1px solid #c8c8c8",
-                      }}
-                    >
-                      {fmtPrint(qty)}
-                    </td>
-                    <td
-                      style={{
-                        textAlign: "center",
-                        padding: "4px 7px",
-                        verticalAlign: "top",
-                        fontWeight: "600",
-                        fontSize: "9pt",
-                        border: "1px solid #c8c8c8",
-                      }}
-                    >
-                      {fmtPrint(rate, "$")}
-                    </td>
-                    <td
-                      style={{
-                        textAlign: "center",
-                        padding: "4px 7px",
-                        verticalAlign: "top",
-                        fontWeight: "600",
-                        fontSize: "9pt",
-                        border: "1px solid #c8c8c8",
-                      }}
-                    >
-                      {fmtPrint(qty * rate, "$")}
-                    </td>
-                    <td
-                      style={{
-                        textAlign: "center",
-                        padding: "4px 7px",
-                        verticalAlign: "top",
-                        fontWeight: "600",
-                        fontSize: "9pt",
-                        border: "1px solid #c8c8c8",
-                      }}
-                    >
-                      {fmtPrint(configPrice, "$")}
-                    </td>
-                    <td
-                      style={{
-                        textAlign: "center",
-                        padding: "4px 7px",
-                        verticalAlign: "top",
-                        fontWeight: "600",
-                        fontSize: "9pt",
-                        border: "1px solid #c8c8c8",
-                        color: plPerBale > 0 ? "#0a7e1f" : plPerBale < 0 ? "#c2272d" : undefined,
-                      }}
-                    >
-                      {fmtPrint(plPerBale, "$")}
-                    </td>
-                    <td
-                      style={{
-                        textAlign: "center",
-                        padding: "4px 7px",
-                        verticalAlign: "top",
-                        fontWeight: "600",
-                        fontSize: "9pt",
-                        border: "1px solid #c8c8c8",
-                        color: totalPL > 0 ? "#0a7e1f" : totalPL < 0 ? "#c2272d" : undefined,
-                      }}
-                    >
-                      {fmtPrint(totalPL, "$")}
-                    </td>
+                  <tr key={item.id}>
+                    <td className="border border-black p-2">{item.stockItemName || `Item ${item.stockItemId}`}</td>
+                    <td className="border border-black p-2 text-right">{fmtPrint(qty)}</td>
+                    <td className="border border-black p-2 text-right">${fmtPrint(price)}</td>
+                    <td className="border border-black p-2 text-right">${fmtPrint(qty * price)}</td>
                   </tr>
                 );
               })}
             </tbody>
-            <tfoot>
-              <tr>
-                <td
-                  style={{
-                    padding: "4px 7px",
-                    fontWeight: "900",
-                    fontSize: "9pt",
-                    border: "1px solid #999",
-                    backgroundColor: "#eeeeee",
-                  }}
-                >
-                  TOTAL
-                </td>
-                <td
-                  style={{
-                    textAlign: "center",
-                    padding: "4px 7px",
-                    fontWeight: "900",
-                    fontSize: "9pt",
-                    border: "1px solid #999",
-                    backgroundColor: "#eeeeee",
-                  }}
-                >
-                  {fmtPrint(
-                    (reprintRowDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0"), 0)
-                  )}
-                </td>
-                <td style={{ padding: "4px 7px", border: "1px solid #999", backgroundColor: "#eeeeee" }}></td>
-                <td
-                  style={{
-                    textAlign: "center",
-                    padding: "4px 7px",
-                    fontWeight: "900",
-                    fontSize: "9pt",
-                    border: "1px solid #999",
-                    backgroundColor: "#eeeeee",
-                  }}
-                >
-                  {fmtPrint(
-                    (reprintRowDetails?.salesItems ?? []).reduce(
-                      (s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"),
-                      0
-                    ),
-                    "$"
-                  )}
-                </td>
-                <td style={{ padding: "4px 7px", border: "1px solid #999", backgroundColor: "#eeeeee" }}></td>
-                <td style={{ padding: "4px 7px", border: "1px solid #999", backgroundColor: "#eeeeee" }}></td>
-                <td
-                  style={{
-                    textAlign: "center",
-                    padding: "4px 7px",
-                    fontWeight: "900",
-                    fontSize: "9pt",
-                    border: "1px solid #999",
-                    backgroundColor: "#eeeeee",
-                    color: (() => {
-                      const t = (reprintRowDetails?.salesItems ?? []).reduce(
-                        (s, i) =>
-                          s +
-                          (parseFloat(i.sellingPrice || "0") - parseFloat(i.configuredPrice || "0")) *
-                            parseFloat(i.quantity || "0"),
-                        0
-                      );
-                      return t > 0 ? "#0a7e1f" : t < 0 ? "#c2272d" : undefined;
-                    })(),
-                  }}
-                >
-                  {(() => {
-                    const t = (reprintRowDetails?.salesItems ?? []).reduce(
-                      (s, i) =>
-                        s +
-                        (parseFloat(i.sellingPrice || "0") - parseFloat(i.configuredPrice || "0")) *
-                          parseFloat(i.quantity || "0"),
-                      0
-                    );
-                    return fmtPrint(t, "$");
-                  })()}
-                </td>
-              </tr>
-            </tfoot>
           </table>
-          <div
-            style={{
-              fontSize: "14pt",
-              fontWeight: "900",
-              marginTop: "8px",
-              paddingTop: "8px",
-              borderTop: "1.5px solid #333",
-              display: "flex",
-              justifyContent: "space-between",
-            }}
-          >
-            <span>TOTAL PAID:</span>
-            <span>
-              {fmtPrint(
-                (reprintRowDetails?.salesItems ?? []).reduce(
-                  (s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"),
-                  0
-                ),
-                "$"
-              )}
-            </span>
+          <div className="mt-4 flex justify-between border-t-2 border-black pt-3 text-lg font-black">
+            <span>TOTAL PAID</span>
+            <span>{formatCashAmount(Number(printDetails?.totalAmount || 0))}</span>
           </div>
-          {reprintRowDetails?.description && (
-            <div
-              style={{
-                fontSize: "9pt",
-                fontWeight: "600",
-                marginTop: "8px",
-                padding: "4px",
-                border: "2px solid black",
-              }}
-            >
-              <span style={{ fontWeight: "900" }}>Note:</span> {reprintRowDetails.description}
-            </div>
-          )}
-          <div
-            style={{
-              textAlign: "center",
-              fontSize: "9pt",
-              fontWeight: "700",
-              marginTop: "10px",
-              paddingTop: "5px",
-              borderTop: "2px solid black",
-            }}
-          >
-            <div>Thank you for your business!</div>
-          </div>
+          {printDetails?.description && <div className="mt-3 border border-black p-2 text-sm">Note: {printDetails.description}</div>}
+          {selectedCompany?.name && <div className="mt-5 text-center text-sm font-bold">{selectedCompany.name}</div>}
         </div>
       </div>
 
-      {/* Transaction Details Dialog */}
-      <Dialog open={!!selectedVoucher} onOpenChange={() => setSelectedVoucher(null)}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+      <Dialog open={Boolean(selectedVoucher)} onOpenChange={(open) => !open && setSelectedVoucher(null)}>
+        <DialogContent className="flex max-h-[85vh] w-[95vw] max-w-4xl flex-col overflow-hidden">
           <DialogHeader>
-            <DialogTitle className="text-base sm:text-lg">
-              Transaction Details - {selectedVoucher?.voucherNumber}
-            </DialogTitle>
-            <div className="flex flex-wrap items-center gap-2 sm:gap-4 pt-2 text-sm text-muted-foreground">
-              <span>
-                {selectedVoucher &&
-                  `${formatDisplayDate(selectedVoucher.createdAt)} at ${(() => {
-                    if (!selectedVoucher.createdAt) return "—";
-                    const d = new Date(selectedVoucher.createdAt);
-                    return isNaN(d.getTime()) ? "—" : format(d, "hh:mm a");
-                  })()}`}
-              </span>
-              <span>•</span>
-              <span>{selectedVoucher?.locationName || `Location ${selectedVoucher?.locationId}`}</span>
-            </div>
+            <DialogTitle>POS Sale Details - {selectedVoucher?.voucherNumber}</DialogTitle>
           </DialogHeader>
-
           <div className="flex-1 overflow-y-auto">
             {detailsLoading ? (
-              <div className="space-y-2">
-                {[...Array(3)].map((_, i) => (
-                  <Skeleton key={i} className="h-16 w-full" />
-                ))}
-              </div>
-            ) : isEditMode ? (
+              <div className="space-y-2">{[0, 1, 2].map((key) => <Skeleton key={key} className="h-14 w-full" />)}</div>
+            ) : voucherDetails ? (
               <div className="space-y-4">
-                <div className="border-b pb-4">
-                  <p className="text-sm font-medium text-muted-foreground mb-2">Notes</p>
-                  <Textarea
-                    value={editedNotes}
-                    onChange={(e) => setEditedNotes(e.target.value)}
-                    placeholder="Add notes..."
-                    className="min-h-[60px]"
-                    data-testid="input-notes"
-                  />
+                <div className="grid gap-2 rounded-lg border p-3 text-sm sm:grid-cols-2">
+                  <div><span className="text-muted-foreground">Receipt:</span> {voucherDetails.voucherNumber}</div>
+                  <div><span className="text-muted-foreground">Date:</span> {voucherDetails.voucherDate}</div>
+                  <div><span className="text-muted-foreground">Location:</span> {voucherDetails.locationName || `Location ${voucherDetails.locationId}`}</div>
+                  <div><span className="text-muted-foreground">Type:</span> {voucherDetails.voucherType}</div>
+                  {voucherDetails.customerName && <div><span className="text-muted-foreground">Customer:</span> {voucherDetails.customerName}</div>}
+                  {voucherDetails.isCreditSale && <div className="font-semibold">Credit sale</div>}
+                  {voucherDetails.description && <div className="sm:col-span-2"><span className="text-muted-foreground">Notes:</span> {voucherDetails.description}</div>}
                 </div>
-
-                <div>
-                  <div className="flex flex-wrap items-center justify-between gap-1 mb-1">
-                    <p className="text-sm font-medium text-muted-foreground">Items Sold</p>
-                    <Popover open={addItemOpen} onOpenChange={setAddItemOpen}>
-                      <PopoverTrigger asChild>
-                        <Button size="sm" variant="outline" data-testid="button-add-item">
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Item
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-80 p-0" align="end">
-                        <Command>
-                          <CommandInput
-                            placeholder="Search items..."
-                            value={itemSearch}
-                            onValueChange={setItemSearch}
-                            data-testid="input-item-search"
-                          />
-                          <CommandList>
-                            <CommandEmpty>No items found.</CommandEmpty>
-                            <CommandGroup>
-                              {inventory
-                                .filter(
-                                  (item) =>
-                                    (item.stockItemName || "").toLowerCase().includes(itemSearch.toLowerCase()) ||
-                                    (item.stockItemCode || "").toLowerCase().includes(itemSearch.toLowerCase())
-                                )
-                                .map((item) => (
-                                  <CommandItem
-                                    key={item.stockItemId}
-                                    value={item.stockItemName || ""}
-                                    onSelect={() => handleAddItem(item)}
-                                    data-testid={`item-${item.stockItemId}`}
-                                  >
-                                    <div className="flex justify-between w-full">
-                                      <div>
-                                        <div className="font-medium">{item.stockItemName || "Unknown Item"}</div>
-                                        <div className="text-xs text-muted-foreground">{item.stockItemCode || ""}</div>
-                                      </div>
-                                      <div className="text-sm font-mono">
-                                        {formatCashAmount(parseFloat(item.lastSellingPrice || item.averageRate))}
-                                      </div>
-                                    </div>
-                                  </CommandItem>
-                                ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Hover or use ↑↓ to select ·{" "}
-                    {typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
-                      ? "⌥S"
-                      : "Alt+S"}{" "}
-                    to view item
-                  </p>
+                <div className="table-responsive">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Item</TableHead>
-                        <TableHead className="text-right">Quantity</TableHead>
+                        <TableHead className="text-right">Qty</TableHead>
                         <TableHead className="text-right">Price</TableHead>
-                        {canSeeProfitCost && <TableHead className="text-right">Cost</TableHead>}
                         <TableHead className="text-right">Total</TableHead>
+                        {canSeeProfitCost && <TableHead className="text-right">Cost</TableHead>}
                         {canSeeProfitCost && <TableHead className="text-right">Profit</TableHead>}
-                        <TableHead className="w-12"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {editedItems.map((item, idx) => {
-                        const profit = parseFloat(item.profit || "0");
-                        const isPositiveProfit = profit >= 0;
-
-                        return (
-                          <TableRow
-                            key={item.id || idx}
-                            data-dialog-row={idx}
-                            className={selectedDialogRow === idx ? "bg-accent" : ""}
-                            onMouseEnter={() => setSelectedDialogRow(idx)}
-                          >
-                            <TableCell className="font-medium">
-                              {item.stockItemName || `Item ${item.stockItemId}`}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0.01"
-                                value={item.quantity}
-                                onChange={(e) => handleItemChange(idx, "quantity", e.target.value)}
-                                className="text-right font-mono w-24"
-                                data-testid={`input-quantity-${idx}`}
-                              />
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0.01"
-                                value={item.sellingPrice}
-                                onChange={(e) => handleItemChange(idx, "sellingPrice", e.target.value)}
-                                className="text-right font-mono w-24"
-                                data-testid={`input-price-${idx}`}
-                              />
-                            </TableCell>
-                            {canSeeProfitCost && (
-                              <TableCell className="text-right font-mono text-muted-foreground">
-                                {formatCashAmount(parseFloat(item.costPrice || "0"))}
-                              </TableCell>
-                            )}
-                            <TableCell className="text-right font-mono font-semibold">
-                              {formatCashAmount(parseFloat(item.totalSales))}
-                            </TableCell>
-                            {canSeeProfitCost && (
-                              <TableCell
-                                className={`text-right font-mono font-semibold ${isPositiveProfit ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
-                              >
-                                {formatCashAmount(profit)}
-                              </TableCell>
-                            )}
-                            <TableCell>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleRemoveItem(idx)}
-                                data-testid={`button-remove-${idx}`}
-                                className="h-8 w-8"
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                      {(voucherDetails.salesItems || []).map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>{item.stockItemName || `Item ${item.stockItemId}`}</TableCell>
+                          <TableCell className="text-right font-mono">{formatNumber(Number(item.quantity || 0), 0)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatCashAmount(Number(item.sellingPrice || 0))}</TableCell>
+                          <TableCell className="text-right font-mono font-semibold">{formatCashAmount(Number(item.totalSales || 0))}</TableCell>
+                          {canSeeProfitCost && <TableCell className="text-right font-mono">{formatCashAmount(Number(item.costPrice || 0))}</TableCell>}
+                          {canSeeProfitCost && <TableCell className="text-right font-mono">{formatCashAmount(Number(item.profit || 0))}</TableCell>}
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                 </div>
-
-                <div className="border-t pt-4 flex justify-between">
-                  {canSeeProfitCost && (
-                    <div className="space-y-1">
-                      <div className="text-sm">
-                        <span className="text-muted-foreground">Total Cost: </span>
-                        <span className="font-mono font-semibold">
-                          {formatCashAmount(
-                            editedItems.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0)
-                          )}
-                        </span>
-                      </div>
-                      <div className="text-sm">
-                        <span className="text-muted-foreground">Total Profit: </span>
-                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
-                          {formatCashAmount(editedItems.reduce((sum, item) => sum + parseFloat(item.profit || "0"), 0))}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">Total Sales: </span>
-                    <span className="font-mono font-semibold">
-                      {formatCashAmount(editedItems.reduce((sum, item) => sum + parseFloat(item.totalSales), 0))}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ) : voucherDetails?.salesItems && voucherDetails.salesItems.length > 0 ? (
-              <div className="space-y-4">
-                {voucherDetails?.description && (
-                  <div className="border-b pb-4">
-                    <p className="text-sm font-medium text-muted-foreground">Notes</p>
-                    <p className="text-sm mt-1">{voucherDetails.description}</p>
-                  </div>
-                )}
-
-                <div className="table-responsive">
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                    <p className="text-sm font-medium text-muted-foreground">Items Sold</p>
-                    <div className="flex items-center gap-1">
-                      {canSeeProfitCost && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={plFilter === "all" ? "toggle-elevate toggle-elevated" : "toggle-elevate"}
-                            onClick={() => setPlFilter("all")}
-                            data-testid="button-filter-all"
-                          >
-                            <LayoutList className="h-3.5 w-3.5 mr-1" />
-                            All
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={
-                              plFilter === "gain" ? "toggle-elevate toggle-elevated text-green-600" : "toggle-elevate"
-                            }
-                            onClick={() => setPlFilter("gain")}
-                            data-testid="button-filter-gaining"
-                          >
-                            <TrendingUp className="h-3.5 w-3.5 mr-1" />
-                            Gaining
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={
-                              plFilter === "loss" ? "toggle-elevate toggle-elevated text-red-600" : "toggle-elevate"
-                            }
-                            onClick={() => setPlFilter("loss")}
-                            data-testid="button-filter-losing"
-                          >
-                            <TrendingDown className="h-3.5 w-3.5 mr-1" />
-                            Losing
-                          </Button>
-                          <div className="w-px h-5 bg-border mx-0.5" />
-                        </>
-                      )}
-                      <p className="text-xs text-muted-foreground">
-                        ↑↓ ·{" "}
-                        {typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
-                          ? "⌥S"
-                          : "Alt+S"}
-                      </p>
-                    </div>
-                  </div>
-                  {(() => {
-                    const displayedItems = canSeeProfitCost
-                      ? voucherDetails.salesItems.filter((item: any) => {
-                          if (plFilter === "all") return true;
-                          const hp = parseFloat(item.hassansProfit || "0");
-                          if (plFilter === "gain") return hp > 0;
-                          if (plFilter === "loss") return hp < 0;
-                          return true;
-                        })
-                      : voucherDetails.salesItems;
-                    return (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Item</TableHead>
-                            <TableHead className="text-right">Qty</TableHead>
-                            <TableHead className="text-right">Price</TableHead>
-                            {canSeeProfitCost && <TableHead className="text-right">Cost</TableHead>}
-                            <TableHead className="text-right">Total</TableHead>
-                            {canSeeProfitCost && <TableHead className="text-right">Profit</TableHead>}
-                            {canSeeProfitCost && <TableHead className="text-right">Hassan's Price</TableHead>}
-                            {canSeeProfitCost && <TableHead className="text-right">Hassan's Profit</TableHead>}
-                            {canSeeProfitCost && <TableHead className="text-right">Hassan's %</TableHead>}
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {displayedItems.map((item: any, idx: number) => {
-                            const profit = parseFloat(item.profit || "0");
-                            const isPositiveProfit = profit >= 0;
-                            const hassansProfit = parseFloat(item.hassansProfit || "0");
-                            const isHassansProfitPositive = hassansProfit >= 0;
-
-                            return (
-                              <TableRow
-                                key={item.id || idx}
-                                data-dialog-row={idx}
-                                className={`cursor-pointer ${selectedDialogRow === idx ? "bg-accent" : ""}`}
-                                onMouseEnter={() => setSelectedDialogRow(idx)}
-                              >
-                                <TableCell className="font-medium">
-                                  {item.stockItemName || `Item ${item.stockItemId}`}
-                                </TableCell>
-                                <TableCell className="text-right font-mono">
-                                  {formatNumber(parseFloat(item.quantity), 0)}
-                                </TableCell>
-                                <TableCell className="text-right font-mono">
-                                  {formatCashAmount(parseFloat(item.sellingPrice))}
-                                </TableCell>
-                                {canSeeProfitCost && (
-                                  <TableCell className="text-right font-mono text-muted-foreground">
-                                    {formatCashAmount(parseFloat(item.costPrice || "0"))}
-                                  </TableCell>
-                                )}
-                                <TableCell className="text-right font-mono font-semibold">
-                                  {formatCashAmount(parseFloat(item.totalSales))}
-                                </TableCell>
-                                {canSeeProfitCost && (
-                                  <TableCell
-                                    className={`text-right font-mono font-semibold ${isPositiveProfit ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
-                                  >
-                                    {formatCashAmount(profit)}
-                                  </TableCell>
-                                )}
-                                {canSeeProfitCost && (
-                                  <TableCell className="text-right font-mono text-muted-foreground">
-                                    {formatCashAmount(parseFloat(item.configuredPrice || "0"))}
-                                  </TableCell>
-                                )}
-                                {canSeeProfitCost && (
-                                  <TableCell
-                                    className={`text-right font-mono font-semibold ${isHassansProfitPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
-                                  >
-                                    {formatCashAmount(hassansProfit)}
-                                  </TableCell>
-                                )}
-                                {canSeeProfitCost && (
-                                  <TableCell
-                                    className={`text-right font-mono ${isHassansProfitPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
-                                  >
-                                    {item.hassansPercentage || "0"}%
-                                  </TableCell>
-                                )}
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    );
-                  })()}
-                </div>
-
-                {(() => {
-                  const totalProfit = voucherDetails.salesItems.reduce(
-                    (sum: number, item: any) => sum + parseFloat(item.profit || "0"),
-                    0
-                  );
-                  const totalHassansProfit = voucherDetails.salesItems.reduce(
-                    (sum: number, item: any) => sum + parseFloat(item.hassansProfit || "0"),
-                    0
-                  );
-                  return (
-                    <div className="border-t pt-4 flex flex-wrap gap-4 justify-between">
-                      <div className="text-sm">
-                        <span className="text-muted-foreground">Total Sales: </span>
-                        <span className="font-mono font-semibold">
-                          {formatCashAmount(
-                            voucherDetails.salesItems.reduce(
-                              (sum: number, item: any) => sum + parseFloat(item.totalSales),
-                              0
-                            )
-                          )}
-                        </span>
-                      </div>
-                      {canSeeProfitCost && (
-                        <>
-                          <div className="text-sm">
-                            <span className="text-muted-foreground">Total Cost: </span>
-                            <span className="font-mono font-semibold">
-                              {formatCashAmount(
-                                voucherDetails.salesItems.reduce(
-                                  (sum: number, item: any) => sum + parseFloat(item.totalCost || "0"),
-                                  0
-                                )
-                              )}
-                            </span>
-                          </div>
-                          <div className="text-sm">
-                            <span className="text-muted-foreground">Total Profit: </span>
-                            <span
-                              className={`font-mono font-semibold ${totalProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
-                            >
-                              {formatCashAmount(totalProfit)}
-                            </span>
-                          </div>
-                          <div className="text-sm">
-                            <span className="text-muted-foreground">Hassan's Total: </span>
-                            <span className="font-mono font-semibold">
-                              {formatCashAmount(
-                                voucherDetails.salesItems.reduce(
-                                  (sum: number, item: any) => sum + parseFloat(item.hassansTotal || "0"),
-                                  0
-                                )
-                              )}
-                            </span>
-                          </div>
-                          <div className="text-sm">
-                            <span className="text-muted-foreground">Hassan's Profit: </span>
-                            <span
-                              className={`font-mono font-semibold ${totalHassansProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
-                            >
-                              {formatCashAmount(totalHassansProfit)}
-                            </span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  );
-                })()}
+                <div className="flex justify-end text-lg font-semibold">Total: {formatCashAmount(Number(voucherDetails.totalAmount || 0))}</div>
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">No items found for this transaction</div>
+              <div className="py-8 text-center text-muted-foreground">Sale details could not be loaded.</div>
             )}
           </div>
-
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            {isEditMode ? (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={handleCancelEdit}
-                  disabled={saveMutation.isPending}
-                  data-testid="button-cancel-edit"
-                >
-                  <X className="h-4 w-4 mr-2" />
-                  Cancel
-                </Button>
-                <Button onClick={handleSave} disabled={saveMutation.isPending} data-testid="button-save">
-                  <Save className="h-4 w-4 mr-2" />
-                  {saveMutation.isPending ? "Saving..." : "Save Changes"}
-                </Button>
-              </>
-            ) : (
-              <>
-                {/* Hidden print template for reprint — matches POS invoice exactly */}
-                <div className="hidden">
-                  <div
-                    ref={reprintRef}
-                    style={{
-                      fontFamily: "Arial, Helvetica, sans-serif",
-                      fontSize: "11pt",
-                      padding: "12px",
-                      backgroundColor: "white",
-                      color: "black",
-                      width: "100%",
-                      fontWeight: "normal",
-                      fontVariantNumeric: "tabular-nums",
-                    }}
-                  >
-                    <style
-                      dangerouslySetInnerHTML={{
-                        __html: `@media print { body { font-family: Arial, Helvetica, sans-serif !important; } * { font-family: Arial, Helvetica, sans-serif !important; font-variant-numeric: tabular-nums !important; } }`,
-                      }}
-                    />
-                    {/* Title */}
-                    <div
-                      style={{
-                        textAlign: "center",
-                        fontWeight: "900",
-                        fontSize: "18pt",
-                        letterSpacing: "2px",
-                        marginBottom: "6px",
-                      }}
+          <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
+            <Button variant="outline" onClick={() => setSelectedVoucher(null)}><X className="mr-2 h-4 w-4" />Close</Button>
+            <Button variant="outline" disabled={!voucherDetails} onClick={() => voucherDetails && setPrintVoucherId(voucherDetails.id)}>
+              <Printer className="mr-2 h-4 w-4" />Print
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!voucherDetails || whatsappMutation.isPending}
+              onClick={() => voucherDetails && whatsappMutation.mutate(voucherDetails)}
+            >
+              <MessageCircle className="mr-2 h-4 w-4" />Resend WhatsApp
+            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      disabled={!canEditDaybook || !selectedVoucher}
+                      onClick={() => selectedVoucher && navigate(`/pos/edit/${selectedVoucher.id}`)}
                     >
-                      POS INVOICE
-                    </div>
-                    {/* Date + User row */}
-                    <div
-                      style={{
-                        fontSize: "11pt",
-                        fontWeight: "700",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        borderTop: "2px solid black",
-                        borderBottom: "2px solid black",
-                        padding: "5px 0",
-                        marginBottom: "6px",
-                      }}
-                    >
-                      <span>Date: {voucherDetails?.voucherDate}</span>
-                      <span>
-                        User:{" "}
-                        {currentUser?.fullName || currentUser?.name || currentUser?.username || currentUser?.email}
-                      </span>
-                    </div>
-                    {/* Daily Rate — Mali company only */}
-                    {isMaliCompany && voucherDetails?.exchangeRate && (
-                      <div
-                        style={{
-                          fontSize: "11pt",
-                          fontWeight: "700",
-                          marginBottom: "6px",
-                          padding: "4px",
-                          border: "2px solid black",
-                          textAlign: "center",
-                        }}
-                      >
-                        <span style={{ fontWeight: "900" }}>Daily Rate:</span> $1 ={" "}
-                        {formatNumber(parseFloat(String(voucherDetails.exchangeRate)))} CFA
-                      </div>
-                    )}
-                    {/* Credit Sale */}
-                    {voucherDetails?.isCreditSale && (
-                      <div
-                        style={{
-                          fontSize: "10pt",
-                          fontWeight: "700",
-                          marginBottom: "6px",
-                          padding: "4px",
-                          border: "2px solid black",
-                        }}
-                      >
-                        <div style={{ fontWeight: "900" }}>CREDIT SALE</div>
-                        {voucherDetails.customerName && <div>Customer: {voucherDetails.customerName}</div>}
-                      </div>
-                    )}
-                    {/* Items table */}
-                    <table
-                      style={{
-                        width: "100%",
-                        borderCollapse: "collapse",
-                        fontSize: "11pt",
-                        marginBottom: "0",
-                        fontVariantNumeric: "tabular-nums",
-                        border: "1px solid #999",
-                      }}
-                    >
-                      <thead className="sticky top-0 z-30 bg-muted/50">
-                        <tr>
-                          <th
-                            style={{
-                              textAlign: "left",
-                              padding: "4px 7px",
-                              width: "30%",
-                              fontWeight: "900",
-                              fontSize: "9pt",
-                              border: "1px solid #999",
-                              backgroundColor: "#eeeeee",
-                            }}
-                          >
-                            Description
-                          </th>
-                          <th
-                            style={{
-                              textAlign: "center",
-                              padding: "4px 7px",
-                              width: "6%",
-                              fontWeight: "900",
-                              fontSize: "9pt",
-                              border: "1px solid #999",
-                              backgroundColor: "#eeeeee",
-                            }}
-                          >
-                            Qty
-                          </th>
-                          <th
-                            style={{
-                              textAlign: "center",
-                              padding: "4px 7px",
-                              width: "9%",
-                              fontWeight: "900",
-                              fontSize: "9pt",
-                              border: "1px solid #999",
-                              backgroundColor: "#eeeeee",
-                            }}
-                          >
-                            Rate
-                          </th>
-                          <th
-                            style={{
-                              textAlign: "center",
-                              padding: "4px 7px",
-                              width: "10%",
-                              fontWeight: "900",
-                              fontSize: "9pt",
-                              border: "1px solid #999",
-                              backgroundColor: "#eeeeee",
-                            }}
-                          >
-                            Amt
-                          </th>
-                          <th
-                            style={{
-                              textAlign: "center",
-                              padding: "4px 7px",
-                              width: "10%",
-                              fontWeight: "900",
-                              fontSize: "9pt",
-                              border: "1px solid #999",
-                              backgroundColor: "#eeeeee",
-                            }}
-                          >
-                            Config
-                          </th>
-                          <th
-                            style={{
-                              textAlign: "center",
-                              padding: "4px 7px",
-                              width: "12%",
-                              fontWeight: "900",
-                              fontSize: "9pt",
-                              border: "1px solid #999",
-                              backgroundColor: "#eeeeee",
-                            }}
-                          >
-                            P/L Bale
-                          </th>
-                          <th
-                            style={{
-                              textAlign: "center",
-                              padding: "4px 7px",
-                              width: "13%",
-                              fontWeight: "900",
-                              fontSize: "9pt",
-                              border: "1px solid #999",
-                              backgroundColor: "#eeeeee",
-                            }}
-                          >
-                            Total P/L
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(voucherDetails?.salesItems ?? []).map((item: any, idx) => {
-                          const rate = parseFloat(item.sellingPrice || "0");
-                          const qty = parseFloat(item.quantity || "0");
-                          const configPrice = parseFloat(item.configuredPrice || "0");
-                          const plPerBale = rate - configPrice;
-                          const totalPL = plPerBale * qty;
-                          const plBaleColor = plPerBale > 0 ? "#0a7e1f" : plPerBale < 0 ? "#c2272d" : undefined;
-                          const totalPLColor = totalPL > 0 ? "#0a7e1f" : totalPL < 0 ? "#c2272d" : undefined;
-                          const rowBg = idx % 2 === 0 ? "#ffffff" : "#f5f5f5";
-                          return (
-                            <tr key={idx} style={{ backgroundColor: rowBg }}>
-                              <td
-                                style={{
-                                  padding: "4px 7px",
-                                  verticalAlign: "top",
-                                  wordBreak: "break-word",
-                                  fontWeight: "600",
-                                  lineHeight: "1.3",
-                                  fontSize: "9pt",
-                                  border: "1px solid #c8c8c8",
-                                }}
-                              >
-                                {item.stockItemName}
-                              </td>
-                              <td
-                                style={{
-                                  textAlign: "center",
-                                  padding: "4px 7px",
-                                  verticalAlign: "top",
-                                  fontWeight: "600",
-                                  fontSize: "9pt",
-                                  border: "1px solid #c8c8c8",
-                                }}
-                              >
-                                {fmtPrint(qty)}
-                              </td>
-                              <td
-                                style={{
-                                  textAlign: "center",
-                                  padding: "4px 7px",
-                                  verticalAlign: "top",
-                                  fontWeight: "600",
-                                  fontSize: "9pt",
-                                  border: "1px solid #c8c8c8",
-                                }}
-                              >
-                                {fmtPrint(rate, "$")}
-                              </td>
-                              <td
-                                style={{
-                                  textAlign: "center",
-                                  padding: "4px 7px",
-                                  verticalAlign: "top",
-                                  fontWeight: "600",
-                                  fontSize: "9pt",
-                                  border: "1px solid #c8c8c8",
-                                }}
-                              >
-                                {fmtPrint(qty * rate, "$")}
-                              </td>
-                              <td
-                                style={{
-                                  textAlign: "center",
-                                  padding: "4px 7px",
-                                  verticalAlign: "top",
-                                  fontWeight: "600",
-                                  fontSize: "9pt",
-                                  border: "1px solid #c8c8c8",
-                                }}
-                              >
-                                {fmtPrint(configPrice, "$")}
-                              </td>
-                              <td
-                                style={{
-                                  textAlign: "center",
-                                  padding: "4px 7px",
-                                  verticalAlign: "top",
-                                  fontWeight: "600",
-                                  fontSize: "9pt",
-                                  border: "1px solid #c8c8c8",
-                                  color: plBaleColor,
-                                }}
-                              >
-                                {fmtPrint(plPerBale, "$")}
-                              </td>
-                              <td
-                                style={{
-                                  textAlign: "center",
-                                  padding: "4px 7px",
-                                  verticalAlign: "top",
-                                  fontWeight: "600",
-                                  fontSize: "9pt",
-                                  border: "1px solid #c8c8c8",
-                                  color: totalPLColor,
-                                }}
-                              >
-                                {fmtPrint(totalPL, "$")}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                      <tfoot>
-                        <tr>
-                          <td
-                            style={{
-                              padding: "4px 7px",
-                              fontWeight: "900",
-                              fontSize: "9pt",
-                              border: "1px solid #999",
-                              backgroundColor: "#eeeeee",
-                            }}
-                          >
-                            TOTAL
-                          </td>
-                          <td
-                            style={{
-                              textAlign: "center",
-                              padding: "4px 7px",
-                              fontWeight: "900",
-                              fontSize: "9pt",
-                              border: "1px solid #999",
-                              backgroundColor: "#eeeeee",
-                            }}
-                          >
-                            {fmtPrint(
-                              (voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0"), 0)
-                            )}
-                          </td>
-                          <td style={{ padding: "4px 7px", border: "1px solid #999", backgroundColor: "#eeeeee" }}></td>
-                          <td
-                            style={{
-                              textAlign: "center",
-                              padding: "4px 7px",
-                              fontWeight: "900",
-                              fontSize: "9pt",
-                              border: "1px solid #999",
-                              backgroundColor: "#eeeeee",
-                            }}
-                          >
-                            {fmtPrint(
-                              (voucherDetails?.salesItems ?? []).reduce(
-                                (s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"),
-                                0
-                              ),
-                              "$"
-                            )}
-                          </td>
-                          <td style={{ padding: "4px 7px", border: "1px solid #999", backgroundColor: "#eeeeee" }}></td>
-                          <td style={{ padding: "4px 7px", border: "1px solid #999", backgroundColor: "#eeeeee" }}></td>
-                          <td
-                            style={{
-                              textAlign: "center",
-                              padding: "4px 7px",
-                              fontWeight: "900",
-                              fontSize: "9pt",
-                              border: "1px solid #999",
-                              backgroundColor: "#eeeeee",
-                              color: (() => {
-                                const t = (voucherDetails?.salesItems ?? []).reduce(
-                                  (s, i) =>
-                                    s +
-                                    (parseFloat(i.sellingPrice || "0") - parseFloat(i.configuredPrice || "0")) *
-                                      parseFloat(i.quantity || "0"),
-                                  0
-                                );
-                                return t > 0 ? "#0a7e1f" : t < 0 ? "#c2272d" : undefined;
-                              })(),
-                            }}
-                          >
-                            {(() => {
-                              const t = (voucherDetails?.salesItems ?? []).reduce(
-                                (s, i) =>
-                                  s +
-                                  (parseFloat(i.sellingPrice || "0") - parseFloat(i.configuredPrice || "0")) *
-                                    parseFloat(i.quantity || "0"),
-                                0
-                              );
-                              return fmtPrint(t, "$");
-                            })()}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                    {/* Total Paid */}
-                    <div
-                      style={{
-                        fontSize: "14pt",
-                        fontWeight: "900",
-                        marginTop: "8px",
-                        paddingTop: "8px",
-                        borderTop: "1.5px solid #333",
-                        display: "flex",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <span>TOTAL PAID:</span>
-                      <span>
-                        {fmtPrint(
-                          (voucherDetails?.salesItems ?? []).reduce(
-                            (s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"),
-                            0
-                          ),
-                          "$"
-                        )}
-                      </span>
-                    </div>
-                    {/* Notes */}
-                    {voucherDetails?.description && (
-                      <div
-                        style={{
-                          fontSize: "9pt",
-                          fontWeight: "600",
-                          marginTop: "8px",
-                          padding: "4px",
-                          border: "2px solid black",
-                        }}
-                      >
-                        <span style={{ fontWeight: "900" }}>Note:</span> {voucherDetails.description}
-                      </div>
-                    )}
-                    {/* Footer */}
-                    <div
-                      style={{
-                        textAlign: "center",
-                        fontSize: "9pt",
-                        fontWeight: "700",
-                        marginTop: "10px",
-                        paddingTop: "5px",
-                        borderTop: "2px solid black",
-                      }}
-                    >
-                      <div>Thank you for your business!</div>
-                    </div>
-                  </div>
-                </div>
-
-                <Button variant="outline" onClick={() => setSelectedVoucher(null)} data-testid="button-close">
-                  Close
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleReprint()}
-                  disabled={!voucherDetails?.salesItems}
-                  data-testid="button-reprint"
-                >
-                  <Printer className="h-4 w-4 mr-2" />
-                  Reprint
-                </Button>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div>
-                        <Button
-                          onClick={handleEdit}
-                          disabled={!canEditDaybook}
-                          className={!canEditDaybook ? "opacity-50 cursor-not-allowed" : ""}
-                          data-testid="button-edit-transaction"
-                        >
-                          {!canEditDaybook && <Lock className="h-4 w-4 mr-2" />}
-                          {canEditDaybook && <Pencil className="h-4 w-4 mr-2" />}
-                          Edit Transaction
-                        </Button>
-                      </div>
-                    </TooltipTrigger>
-                    {!canEditDaybook && (
-                      <TooltipContent>
-                        <p>You don't have permission to edit daybook transactions</p>
-                      </TooltipContent>
-                    )}
-                  </Tooltip>
-                </TooltipProvider>
-              </>
-            )}
+                      {canEditDaybook ? <Pencil className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />}
+                      Edit Transaction
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {!canEditDaybook && <TooltipContent>Editing is disabled in Settings for this user.</TooltipContent>}
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function Stat({ label, value, icon, loading }: { label: string; value: string; icon: React.ReactNode; loading: boolean }) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-4 py-2.5">
+      <div className="text-muted-foreground">{icon}</div>
+      <div>
+        <p className="mb-0.5 text-xs leading-none text-muted-foreground">{label}</p>
+        {loading ? <Skeleton className="mt-1 h-5 w-16" /> : <p className="font-mono text-lg font-semibold leading-none">{value}</p>}
+      </div>
     </div>
   );
 }
