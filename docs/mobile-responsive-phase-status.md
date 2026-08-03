@@ -21,8 +21,8 @@ This document is the source of truth for converting the existing ERP web applica
 | 2 | Mobile navigation and top bar | Complete and merged | `agent/mobile-responsive-phase-2-navigation` / PR #411 | Full GitHub and CircleCI verification passed |
 | 3 | Shared page headers, filters, and actions | Complete and merged | `agent/mobile-responsive-phase-3-page-controls` / PR #416 | Full GitHub CI, Security, I18n, CircleCI, tests, smoke, and coverage passed |
 | 4 | Forms and dialogs | Implemented | `agent/mobile-responsive-phase-4-forms-dialogs` / PR #420 | Final CI validation pending |
-| 5 | Tables and mobile data lists | Implemented | `agent/mobile-responsive-phase-5-tables-data-lists` / PR pending | Final CI validation pending |
-| 6 | Core ERP mobile conversion | Not started | — | — |
+| 5 | Tables and mobile data lists | Implemented | `agent/mobile-responsive-phase-5-tables-data-lists` / PR #422 | Final CI validation pending |
+| 6 | Core ERP mobile conversion | Implemented | `agent/mobile-responsive-phase-6-core-erp` / PR pending | Final CI validation pending |
 | 7 | Factory mobile conversion | Not started | — | — |
 | 8 | POS mobile and tablet redesign | Not started | — | — |
 | 9 | Dashboards, reports, and charts | Not started | — | — |
@@ -164,6 +164,35 @@ This document is the source of truth for converting the existing ERP web applica
 - Verify keyboard focus, horizontal scrolling, sticky headers, pagination, long values, and row actions.
 - Confirm pages that need card-style rows can adopt the responsive data-list primitives without changing business behavior.
 
+## Phase 6 completion record
+
+### Delivered
+
+- Added reusable core ERP page, header, action, filter, summary, and content primitives for Accounts, Inventory, Customers, Suppliers, vouchers, Daybook, and transaction screens.
+- Made shared tabs horizontally scrollable, touch-sized, and semantically labelled on phones while preserving the existing desktop pill and underline layouts.
+- Made shared period filters full-width on phones, constrained their menus to the viewport, and reduced the custom range calendar from two months to one month on mobile devices.
+- Converted Daybook filters to a responsive core ERP grid with full-width phone controls and horizontally contained active-filter chips.
+- Converted Stock Item History to the shared core ERP page, action, summary, table, and mobile data-list contracts.
+- Added keyboard activation for tappable stock-history month cards without changing the month navigation target.
+- Preserved the existing desktop monthly table while adding an explicit minimum-width scroll contract.
+- Added browser-level containment for core ERP pages, filters, summaries, actions, and responsive tab lists.
+- Added focused source-contract coverage and a standalone Phase 6 verifier.
+
+### Deliberately unchanged
+
+- Daybook query parameters, filter state, voucher ordering, amount visibility, and row actions.
+- Stock Item History API requests, date/year filtering, monthly calculations, totals, chart data, and navigation routes.
+- Account, inventory, customer, supplier, voucher, and transaction business rules.
+- Permissions, company isolation, caching, accounting, inventory quantities, costing, and database schema.
+- Factory, POS, and report-specific page conversions, which remain in later phases.
+
+### Remaining verification
+
+- Complete TypeScript, production build, lint, exact formatting, focused tests, full tests, smoke, coverage, Security, I18n, and CircleCI checks.
+- Verify Daybook, All Daybook, Stock Item History, Accounts, Inventory, Customers, Suppliers, and vouchers at 320 px, 360 px, 390 px, phone landscape, tablet, and desktop widths.
+- Verify tab scrolling, custom date selection, on-screen keyboard behavior, long stock names, large amounts, empty states, and keyboard activation.
+- Retarget to `main` only after Phases 4 and 5 merge in order.
+
 ## Internal SQL ledger
 
 | Phase | SQL used |
@@ -173,5 +202,6 @@ This document is the source of truth for converting the existing ERP web applica
 | 3 | None |
 | 4 | None |
 | 5 | None |
+| 6 | None |
 
 Do not provide this ledger as the final SQL report until every phase is complete.
