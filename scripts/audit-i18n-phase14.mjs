@@ -7,7 +7,7 @@ import {
   renderMarkdown,
 } from "./i18n-audit-lib.mjs";
 
-const DETECTOR_VERSION = 5;
+const DETECTOR_VERSION = 6;
 const compatibilityTranslationFiles = [
   "client/src/i18n/sharedInterfaceTranslations.ts",
   "client/src/i18n/accountingDocumentTranslations.ts",
@@ -20,9 +20,12 @@ const compatibilityTranslationFiles = [
   "client/src/i18n/supplierPartnerPhase4Translations.part2.ts",
   "client/src/i18n/supplierPartnerPhase4Translations.part3.ts",
   "client/src/i18n/supplierPartnerPhase4Translations.part4.ts",
+  "client/src/i18n/propertiesRentalsPhase5Translations.part1.ts",
+  "client/src/i18n/propertiesRentalsPhase5Translations.part2.ts",
+  "client/src/i18n/propertiesRentalsPhase5Translations.part3.ts",
 ];
 
-const phase3ReviewedTechnicalValues = new Set([
+const reviewedTechnicalValues = new Set([
   "seg.isSkip ? (",
   "text-success",
   "text-warning",
@@ -33,6 +36,10 @@ const phase3ReviewedTechnicalValues = new Set([
   "useFormField should be used within <FormItem>",
   "useTheme must be used within ThemeProvider",
   "useChart must be used within a <ChartContainer />",
+  "${landlordUnitNames.get(r.unitId) ??",
+  "${unitNameById.get(r.unitId) ??",
+  "new Date().toISOString().slice(0, 10) && (",
+  "unit${row.unitId}${unit.unitNumber ?",
 ]);
 
 function argumentValue(name) {
@@ -74,7 +81,7 @@ function refineFinding(finding, compatibilityCoveredValues) {
       return null;
     }
   }
-  if (phase3ReviewedTechnicalValues.has(value)) {
+  if (reviewedTechnicalValues.has(value)) {
     return { ...finding, status: "excluded", category: "technical-identifier" };
   }
   if (compatibilityCoveredValues.has(value)) {
