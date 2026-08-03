@@ -1,5 +1,12 @@
 import { createContext, useContext, useEffect, useState, useRef, useCallback, type ReactNode } from "react";
 import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
+import {
+  getBrowserConnection,
+  getConnectivityPollDelay,
+  getQueueRefreshDelay,
+  isDocumentVisible,
+  runWhenIdle,
+} from "@/lib/mobilePerformance";
 
 export type ConnectivityStatus = "online" | "offline" | "syncing" | "error";
 
@@ -36,12 +43,13 @@ const PING_TIMEOUT_MS = 5_000;
 async function pingServer(): Promise<boolean> {
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), PING_TIMEOUT_MS);
+    const timer = window.setTimeout(() => controller.abort(), PING_TIMEOUT_MS);
     const res = await fetch("/api/health", {
       credentials: "include",
       signal: controller.signal,
+      cache: "no-store",
     });
-    clearTimeout(timer);
+    window.clearTimeout(timer);
     return res.ok;
   } catch {
     return false;
@@ -52,8 +60,6 @@ interface Props {
   children: ReactNode;
 }
 
-// ── Stub provider (offline mode disabled) ─────────────────────────────────────
-// Returns a static "always online" context with zero background work.
 function StubConnectivityProvider({ children }: Props) {
   return (
     <ConnectivityContext.Provider
@@ -74,15 +80,19 @@ function StubConnectivityProvider({ children }: Props) {
   );
 }
 
-// ── Full provider (offline mode enabled) ──────────────────────────────────────
 function FullConnectivityProvider({ children }: Props) {
-  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
   const [conflictCount, setConflictCount] = useState(0);
   const isMountedRef = useRef(true);
+  const onlineRef = useRef(isOnline);
+
+  useEffect(() => {
+    onlineRef.current = isOnline;
+  }, [isOnline]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -112,15 +122,15 @@ function FullConnectivityProvider({ children }: Props) {
         getConflictCount(),
       ]);
       const legacyQueue = getQueue();
-      const legacyPending = legacyQueue.filter((i: any) => i.status === "pending").length;
-      const legacyFailed = legacyQueue.filter((i: any) => i.status === "failed").length;
+      const legacyPending = legacyQueue.filter((item: any) => item.status === "pending").length;
+      const legacyFailed = legacyQueue.filter((item: any) => item.status === "failed").length;
       if (isMountedRef.current) {
         setPendingCount(idbPending + legacyPending);
         setFailedCount(idbFailed + legacyFailed);
         setConflictCount(conflicts);
       }
     } catch {
-      /* Non-critical */
+      // Offline queue counts are advisory and must never block the app shell.
     }
   }, []);
 
@@ -129,55 +139,121 @@ function FullConnectivityProvider({ children }: Props) {
   }, []);
 
   useEffect(() => {
-    let mounted = true;
-    const handleOnline = async () => {
-      const alive = await pingServer();
-      if (!mounted) return;
+    let stopped = false;
+    let pollTimer: number | undefined;
+    let pollInFlight = false;
+    const connection = getBrowserConnection();
+
+    const appendLog = (status: "online" | "offline", message: string) => {
+      import("@/lib/db").then(({ appendSyncLog }) => appendSyncLog(status, message)).catch(() => {});
+    };
+
+    const applyConnectivity = (alive: boolean, source: string) => {
+      if (stopped || !isMountedRef.current) return;
+      const changed = onlineRef.current !== alive;
+      onlineRef.current = alive;
       setIsOnline(alive);
+      if (!changed) return;
+
       if (alive) {
-        import("@/lib/db").then(({ appendSyncLog }) => appendSyncLog("online", "Connection restored"));
+        appendLog("online", `Connection restored (${source})`);
         triggerSync();
         import("@/lib/refPool").then(({ ensurePoolReady }) => ensurePoolReady()).catch(() => {});
+      } else {
+        appendLog("offline", `Connection lost (${source})`);
       }
     };
-    const handleOffline = () => {
-      if (!mounted) return;
-      setIsOnline(false);
-      import("@/lib/db").then(({ appendSyncLog }) => appendSyncLog("offline", "Connection lost"));
+
+    const schedulePoll = (delay?: number) => {
+      if (stopped) return;
+      if (pollTimer !== undefined) window.clearTimeout(pollTimer);
+      pollTimer = window.setTimeout(
+        () => void runPoll(),
+        delay ?? getConnectivityPollDelay({ isOnline: onlineRef.current })
+      );
     };
+
+    const runPoll = async () => {
+      if (stopped || pollInFlight) return;
+
+      // Browser online/offline events remain authoritative while a healthy tab is
+      // hidden. Avoid waking the radio only to reconfirm an already-online state.
+      if (!isDocumentVisible() && navigator.onLine && onlineRef.current) {
+        schedulePoll();
+        return;
+      }
+
+      pollInFlight = true;
+      const alive = navigator.onLine ? await pingServer() : false;
+      pollInFlight = false;
+      applyConnectivity(alive, "health check");
+      schedulePoll();
+    };
+
+    const handleOnline = () => schedulePoll(0);
+    const handleOffline = () => applyConnectivity(false, "browser event");
+    const handleVisibility = () => {
+      if (isDocumentVisible()) schedulePoll(0);
+      else schedulePoll();
+    };
+    const handleConnectionProfile = () => schedulePoll();
+
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
-    const pingInterval = setInterval(async () => {
-      if (!mounted) return;
-      const alive = await pingServer();
-      if (alive !== isOnline && mounted) {
-        setIsOnline(alive);
-        if (alive) {
-          import("@/lib/db").then(({ appendSyncLog }) => appendSyncLog("online", "Connection verified by ping"));
-          triggerSync();
-          import("@/lib/refPool").then(({ ensurePoolReady }) => ensurePoolReady()).catch(() => {});
-        } else {
-          import("@/lib/db").then(({ appendSyncLog }) => appendSyncLog("offline", "Connection lost (ping failed)"));
-        }
-      }
-    }, 30_000);
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("erp:app-visible", handleVisibility);
+    connection?.addEventListener?.("change", handleConnectionProfile);
+    schedulePoll(0);
+
     return () => {
-      mounted = false;
+      stopped = true;
+      if (pollTimer !== undefined) window.clearTimeout(pollTimer);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
-      clearInterval(pingInterval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("erp:app-visible", handleVisibility);
+      connection?.removeEventListener?.("change", handleConnectionProfile);
     };
-  }, [isOnline, triggerSync]);
+  }, [triggerSync]);
 
   useEffect(() => {
-    void refreshCounts();
-    const t = setInterval(() => void refreshCounts(), 15_000);
-    return () => clearInterval(t);
+    let stopped = false;
+    let countTimer: number | undefined;
+
+    const scheduleCounts = (delay?: number) => {
+      if (stopped) return;
+      if (countTimer !== undefined) window.clearTimeout(countTimer);
+      countTimer = window.setTimeout(
+        () => void runCounts(),
+        delay ?? getQueueRefreshDelay()
+      );
+    };
+
+    const runCounts = async () => {
+      if (stopped) return;
+      await refreshCounts();
+      scheduleCounts();
+    };
+
+    const refreshSoon = () => scheduleCounts(isDocumentVisible() ? 0 : getQueueRefreshDelay(false));
+
+    window.addEventListener("storage", refreshSoon);
+    window.addEventListener("erp:app-visible", refreshSoon);
+    window.addEventListener("erp:offline-queue-changed", refreshSoon);
+    scheduleCounts(0);
+
+    return () => {
+      stopped = true;
+      if (countTimer !== undefined) window.clearTimeout(countTimer);
+      window.removeEventListener("storage", refreshSoon);
+      window.removeEventListener("erp:app-visible", refreshSoon);
+      window.removeEventListener("erp:offline-queue-changed", refreshSoon);
+    };
   }, [refreshCounts]);
 
   useEffect(() => {
-    const handler = async (e: Event) => {
-      const evt = e as CustomEvent<{
+    const handler = async (event: Event) => {
+      const evt = event as CustomEvent<{
         syncing?: boolean;
         lastSyncedAt?: number;
         error?: string;
@@ -190,7 +266,9 @@ function FullConnectivityProvider({ children }: Props) {
         const { upsertGlobalSyncState } = await import("@/lib/db");
         const { queryClient } = await import("@/lib/queryClient");
         void upsertGlobalSyncState({ lastSyncedAt: evt.detail.lastSyncedAt });
-        void queryClient.invalidateQueries();
+        runWhenIdle(() => {
+          void queryClient.invalidateQueries({ refetchType: "active" });
+        });
       }
       void refreshCounts();
     };
@@ -219,7 +297,6 @@ function FullConnectivityProvider({ children }: Props) {
   );
 }
 
-// ── Public export — switches between stub and full based on feature flag ───────
 export function ConnectivityProvider({ children }: Props) {
   if (!OFFLINE_MODE_ENABLED) return <StubConnectivityProvider>{children}</StubConnectivityProvider>;
   return <FullConnectivityProvider>{children}</FullConnectivityProvider>;
