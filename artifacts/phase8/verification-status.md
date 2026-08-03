@@ -1,6 +1,6 @@
 # Phase 8 focused verification: success
 
-Verified source head: 4b5cea4f61f69459baa95a9fab57409885075af8
+Verified source head: 76dfc26d5a23e4c69b05ff3477a69842c475d40d
 
 - Dependency install: success
 - Pinned formatting: success
@@ -15,13 +15,7 @@ Verified source head: 4b5cea4f61f69459baa95a9fab57409885075af8
 ## program7d output
 
 ```text
-Program 7D accessibility and responsive verification failed:
-- financial responsive screen contract missing: max-w-full
-- financial responsive screen contract missing: overflow-x-auto
-- financial responsive screen contract missing: overscroll-x-contain
-- operations responsive screen contract missing: max-w-full
-- operations responsive screen contract missing: overflow-x-auto
-- operations responsive screen contract missing: overscroll-x-contain
+Program 7D accessibility, responsive and RTL contracts verified.
 
 ```
 
@@ -32,11 +26,11 @@ Program 7D accessibility and responsive verification failed:
 [1m[30m[46m RUN [49m[39m[22m [36mv4.1.9 [39m[90m/home/runner/work/etshadierp/etshadierp[39m
 
 [90mstderr[2m | tests/phase14-i18n-release-gate.test.ts
-[22m[39m{"timestamp":"2026-08-03T09:40:58.557Z","level":"WARN","message":"Factory bilingual schema check skipped because no database configuration is available","module":"factory-bilingual-schema","action":"startup-ensure"}
+[22m[39m{"timestamp":"2026-08-03T09:46:52.537Z","level":"WARN","message":"Factory bilingual schema check skipped because no database configuration is available","module":"factory-bilingual-schema","action":"startup-ensure"}
 
  [31m❯[39m tests/phase14-i18n-release-gate.test.ts [2m([22m[2m0 test[22m[2m)[22m
 [90mstderr[2m | tests/phase8-rtl-responsive-accessibility.test.ts
-[22m[39m{"timestamp":"2026-08-03T09:40:58.882Z","level":"WARN","message":"Factory bilingual schema check skipped because no database configuration is available","module":"factory-bilingual-schema","action":"startup-ensure"}
+[22m[39m{"timestamp":"2026-08-03T09:46:52.854Z","level":"WARN","message":"Factory bilingual schema check skipped because no database configuration is available","module":"factory-bilingual-schema","action":"startup-ensure"}
 
  [31m❯[39m tests/phase8-rtl-responsive-accessibility.test.ts [2m([22m[2m0 test[22m[2m)[22m
 
@@ -58,8 +52,8 @@ Program 7D accessibility and responsive verification failed:
 
 [2m Test Files [22m [1m[31m2 failed[39m[22m[90m (2)[39m
 [2m      Tests [22m [2mno tests[22m
-[2m   Start at [22m 09:40:58
-[2m   Duration [22m 803ms[2m (transform 50ms, setup 0ms, import 0ms, tests 0ms, environment 0ms)[22m
+[2m   Start at [22m 09:46:52
+[2m   Duration [22m 783ms[2m (transform 41ms, setup 0ms, import 0ms, tests 0ms, environment 0ms)[22m
 
 
 ::error file=/home/runner/work/etshadierp/etshadierp/server/supplierCompanyScopeBridge.mjs,title=tests/phase14-i18n-release-gate.test.ts,line=41,column=11::Error: Supplier company-scope migration could not start because no PostgreSQL configuration is available.%0A ❯ server/supplierCompanyScopeBridge.mjs:41:11%0A%0A
@@ -221,7 +215,7 @@ Run with --no-enforce and review the generated report before updating the baseli
 - Using dynamic import() to code-split the application
 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
-[32m✓ built in 43.90s[39m
+[32m✓ built in 42.47s[39m
 Server bundle verified: decimal.js is embedded in dist/index.js
 ✅  Server bundle verification passed — no unresolved decimal.js runtime import.
 Production artifact verification passed: bundle, preload files, and runtime imports are deployable.
@@ -360,13 +354,13 @@ Production artifact verification passed: bundle, preload files, and runtime impo
 
 [1m[30m[46m RUN [49m[39m[22m [36mv4.1.9 [39m[90m/home/runner/work/etshadierp/etshadierp[39m
 
- [32m✓[39m client/src/i18n/applicationDirection.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 16[2mms[22m[39m
- [32m✓[39m client/src/components/ui/responsive-accessibility.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 166[2mms[22m[39m
+ [32m✓[39m client/src/i18n/applicationDirection.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m client/src/components/ui/responsive-accessibility.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 157[2mms[22m[39m
 
 [2m Test Files [22m [1m[32m2 passed[39m[22m[90m (2)[39m
 [2m      Tests [22m [1m[32m8 passed[39m[22m[90m (8)[39m
-[2m   Start at [22m 09:40:59
-[2m   Duration [22m 1.60s[2m (transform 168ms, setup 205ms, import 304ms, tests 182ms, environment 1.70s)[22m
+[2m   Start at [22m 09:46:53
+[2m   Duration [22m 1.53s[2m (transform 169ms, setup 200ms, import 282ms, tests 175ms, environment 1.60s)[22m
 
 
 ```
