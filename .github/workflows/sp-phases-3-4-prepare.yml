@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - agent/sp-finalization-phases-3-4-lifecycle
+  pull_request:
 
 permissions:
   contents: write
