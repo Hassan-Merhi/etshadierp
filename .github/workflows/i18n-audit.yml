@@ -36,3 +36,87 @@ jobs:
           path: artifacts/i18n-audit
           if-no-files-found: warn
           retention-days: 7
+
+  phase7-verify:
+    name: Focused Phase 7 verification
+    if: github.head_ref == 'agent/phase-7-backend-message-conversion'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
+      NODE_ENV: test
+      SESSION_SECRET: phase7-ci-session-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Normalize registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: TypeScript
+        run: npm run check
+
+      - name: Check Phase 7 formatting
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --check \
+            client/src/components/ApplicationInterfaceTranslator.tsx \
+            client/src/i18n/backendMessagesPhase7TranslationTypes.ts \
+            client/src/i18n/backendMessagesPhase7Translations.part1.ts \
+            client/src/i18n/backendMessagesPhase7Translations.part2.ts \
+            client/src/i18n/backendMessagesPhase7Translations.part3.ts \
+            client/src/i18n/backendMessagesPhase7Translations.part4.ts \
+            client/src/i18n/backendMessagesPhase7Translations.part5.ts \
+            client/src/i18n/backendMessagesPhase7Translations.part6.ts \
+            client/src/i18n/backendMessagesPhase7Translations.part7.ts \
+            client/src/i18n/backendMessagesPhase7Translations.part8.ts \
+            client/src/i18n/backendMessagesPhase7Translations.ts
+
+      - name: Prepare disposable schema
+        run: node node_modules/drizzle-kit/bin.cjs push --force
+
+      - name: Phase 7 backend behavior and release gate
+        run: |
+          node node_modules/vitest/vitest.mjs run \
+            tests/phase7-backend-messages-translations.test.ts \
+            tests/phase14-i18n-release-gate.test.ts \
+            --maxWorkers=1 --no-file-parallelism
+
+      - name: Phase 7 runtime bridge behavior
+        run: |
+          node node_modules/vitest/vitest.mjs run \
+            --config vitest.config.frontend.ts \
+            tests/ui/application-interface-translator-runtime.test.ts \
+            --maxWorkers=1 --no-file-parallelism
+
+      - name: Enforce classified audit
+        run: node scripts/audit-i18n-phase14.mjs
