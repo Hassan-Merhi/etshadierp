@@ -47,10 +47,20 @@ async function ensureFactoryTrilingualSchema() {
     await client.connect();
     await client.query(frenchSql);
     await client.query(languagePreferenceSql);
+    await client.query(`
+      DO $$
+      BEGIN
+        IF to_regclass('public.bale_recode_items') IS NOT NULL THEN
+          ALTER TABLE public.bale_recode_items
+            ADD COLUMN IF NOT EXISTS product_id INTEGER;
+        END IF;
+      END
+      $$;
+    `);
     console.log(JSON.stringify({
       timestamp: new Date().toISOString(),
       level: "INFO",
-      message: "Factory French columns and user language preferences verified",
+      message: "Factory multilingual schema and language preferences verified",
       module: "factory-trilingual-schema",
     }));
   } catch (error) {
