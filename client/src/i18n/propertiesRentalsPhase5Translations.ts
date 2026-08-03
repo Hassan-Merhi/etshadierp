@@ -120,10 +120,7 @@ export function isPhase5PropertiesRentalsText(value: string): boolean {
   );
 }
 
-export function translatePhase5PropertiesRentalsText(
-  value: string,
-  language: ApplicationLanguage
-): string | null {
+export function translatePhase5PropertiesRentalsText(value: string, language: ApplicationLanguage): string | null {
   const leading = value.match(/^\s*/)?.[0] ?? "";
   const trailing = value.match(/\s*$/)?.[0] ?? "";
   const normalized = value.trim();

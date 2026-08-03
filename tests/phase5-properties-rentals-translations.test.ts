@@ -18,47 +18,33 @@ describe("Phase 5 Properties and Rentals translations", () => {
   });
 
   it("translates dashboard, contract, guarantee and payment copy", () => {
-    expect(translatePhase5PropertiesRentalsText("Properties workspace", "ar")).toBe(
-      "مساحة عمل العقارات",
-    );
-    expect(translatePhase5PropertiesRentalsText("Monthly Rental Amount *", "fr")).toBe(
-      "Montant du loyer mensuel *",
-    );
-    expect(translatePhase5PropertiesRentalsText("Guarantee applied to rent", "ar")).toBe(
-      "تم استخدام الضمان كإيجار",
-    );
-    expect(translatePhase5PropertiesRentalsText("Payment scheduled", "fr")).toBe(
-      "Paiement programmé",
-    );
+    expect(translatePhase5PropertiesRentalsText("Properties workspace", "ar")).toBe("مساحة عمل العقارات");
+    expect(translatePhase5PropertiesRentalsText("Monthly Rental Amount *", "fr")).toBe("Montant du loyer mensuel *");
+    expect(translatePhase5PropertiesRentalsText("Guarantee applied to rent", "ar")).toBe("تم استخدام الضمان كإيجار");
+    expect(translatePhase5PropertiesRentalsText("Payment scheduled", "fr")).toBe("Paiement programmé");
   });
 
   it("preserves dynamic amounts, dates, contract ids and unit references", () => {
     expect(
       translatePhase5PropertiesRentalsText(
         "Payment of 500 scheduled for 2026-08-05 (today is 2026-08-03). It will be posted automatically on that date.",
-        "ar",
-      ),
-    ).toBe(
-      "تمت جدولة دفعة بقيمة 500 بتاريخ 2026-08-05 (اليوم هو 2026-08-03). وسيتم ترحيلها تلقائيًا في ذلك التاريخ.",
-    );
+        "ar"
+      )
+    ).toBe("تمت جدولة دفعة بقيمة 500 بتاريخ 2026-08-05 (اليوم هو 2026-08-03). وسيتم ترحيلها تلقائيًا في ذلك التاريخ.");
     expect(
       translatePhase5PropertiesRentalsText(
         "Premature accrual: month 2026-08 accrued before billing date 2026-08-20 (contract 77)",
-        "fr",
-      ),
+        "fr"
+      )
     ).toBe(
-      "Régularisation prématurée : le mois 2026-08 a été comptabilisé avant la date de facturation 2026-08-20 (contrat 77)",
+      "Régularisation prématurée : le mois 2026-08 a été comptabilisé avant la date de facturation 2026-08-20 (contrat 77)"
     );
     expect(translatePhase5PropertiesRentalsText("KOLWEZI/A1", "ar")).toBe("KOLWEZI/A1");
   });
 
   it("switches directly between Arabic and French", () => {
-    expect(translatePhase5PropertiesRentalsText("لم يتم العثور على العقد", "fr")).toBe(
-      "Contrat introuvable",
-    );
-    expect(translatePhase5PropertiesRentalsText("Magasins loués", "ar")).toBe(
-      "المتاجر المؤجرة",
-    );
+    expect(translatePhase5PropertiesRentalsText("لم يتم العثور على العقد", "fr")).toBe("Contrat introuvable");
+    expect(translatePhase5PropertiesRentalsText("Magasins loués", "ar")).toBe("المتاجر المؤجرة");
   });
 
   it("recognizes reviewed messages but not stored business names", () => {
