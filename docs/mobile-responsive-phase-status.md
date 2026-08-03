@@ -22,7 +22,7 @@ This document is the source of truth for converting the existing ERP web applica
 | 3 | Shared page headers, filters, and actions | Complete and merged | `agent/mobile-responsive-phase-3-page-controls` / PR #416 | Full GitHub CI, Security, I18n, CircleCI, tests, smoke, and coverage passed |
 | 4 | Forms and dialogs | Implemented | `agent/mobile-responsive-phase-4-forms-dialogs` / PR #420 | Final CI validation pending |
 | 5 | Tables and mobile data lists | Implemented | `agent/mobile-responsive-phase-5-tables-data-lists` / PR #422 | Final CI validation pending |
-| 6 | Core ERP mobile conversion | Implemented | `agent/mobile-responsive-phase-6-core-erp` / PR pending | Final CI validation pending |
+| 6 | Core ERP mobile conversion | Implemented | `agent/mobile-responsive-phase-6-core-erp` / PR #430 | Final CI validation pending |
 | 7 | Factory mobile conversion | Not started | — | — |
 | 8 | POS mobile and tablet redesign | Not started | — | — |
 | 9 | Dashboards, reports, and charts | Not started | — | — |
