@@ -111,6 +111,21 @@ export const applicationTranslations = {
     ar: "الحساب واللغة",
     fr: "Compte et langue",
   },
+  "company.loadingSelector": {
+    en: "Loading company selector",
+    ar: "جارٍ تحميل محدد الشركة",
+    fr: "Chargement du sélecteur de société",
+  },
+  "company.current": {
+    en: "Current company",
+    ar: "الشركة الحالية",
+    fr: "Société actuelle",
+  },
+  "company.openSwitcher": {
+    en: "Open company switcher",
+    ar: "فتح مبدّل الشركة",
+    fr: "Ouvrir le sélecteur de société",
+  },
   "user.menu": {
     en: "Account menu",
     ar: "قائمة الحساب",
