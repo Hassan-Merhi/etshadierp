@@ -33,10 +33,16 @@ function resetTemplateRegexes() {
   indexedTemplateToken.lastIndex = 0;
 }
 
+function templateSpecificity(value: string): number {
+  indexedTemplateToken.lastIndex = 0;
+  return value.replace(indexedTemplateToken, "").length;
+}
+
 type CompiledTemplate = {
   patterns: Record<ApplicationLanguage, RegExp>;
   captureOrder: Record<ApplicationLanguage, readonly number[]>;
   render: Record<ApplicationLanguage, string>;
+  specificity: number;
 };
 
 function compileLanguageTemplate(
@@ -75,6 +81,7 @@ for (const entry of propertiesRentalsPhase5Translations) {
   const compiledByLanguage = Object.fromEntries(
     languages.map((language) => [language, compileLanguageTemplate(entry[language], language)])
   ) as Record<ApplicationLanguage, { pattern: RegExp; captureOrder: readonly number[] }>;
+  const englishRender = normalizeTemplate(entry.en, "en");
 
   compiledTemplates.push({
     patterns: Object.fromEntries(
@@ -86,8 +93,11 @@ for (const entry of propertiesRentalsPhase5Translations) {
     render: Object.fromEntries(
       languages.map((language) => [language, normalizeTemplate(entry[language], language)])
     ) as Record<ApplicationLanguage, string>,
+    specificity: templateSpecificity(englishRender),
   });
 }
+
+compiledTemplates.sort((left, right) => right.specificity - left.specificity);
 
 function renderTemplate(template: string, values: readonly string[]): string {
   indexedTemplateToken.lastIndex = 0;
