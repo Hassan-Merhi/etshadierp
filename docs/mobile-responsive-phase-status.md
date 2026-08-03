@@ -21,7 +21,7 @@ This document is the source of truth for converting the existing ERP web applica
 | 2 | Mobile navigation and top bar | Complete and merged | `agent/mobile-responsive-phase-2-navigation` / PR #411 | Full GitHub and CircleCI verification passed |
 | 3 | Shared page headers, filters, and actions | Complete and merged | `agent/mobile-responsive-phase-3-page-controls` / PR #416 | Full GitHub CI, Security, I18n, CircleCI, tests, smoke, and coverage passed |
 | 4 | Forms and dialogs | Implemented | `agent/mobile-responsive-phase-4-forms-dialogs` / PR #420 | Final CI validation pending |
-| 5 | Tables and mobile data lists | Not started | — | — |
+| 5 | Tables and mobile data lists | Implemented | `agent/mobile-responsive-phase-5-tables-data-lists` / PR #422 | Final CI validation pending |
 | 6 | Core ERP mobile conversion | Not started | — | — |
 | 7 | Factory mobile conversion | Not started | — | — |
 | 8 | POS mobile and tablet redesign | Not started | — | — |
@@ -135,6 +135,35 @@ This document is the source of truth for converting the existing ERP web applica
 - Verify on-screen keyboard access to focused fields and submit/cancel actions.
 - Verify long select lists, confirmation dialogs, and side sheets remain locally scrollable without page-level horizontal overflow.
 
+## Phase 5 completion record
+
+### Delivered
+
+- Converted the shared table wrapper into a keyboard-focusable, labelled horizontal scroll region without changing table markup or row data.
+- Added touch panning, contained overscroll, visible focus treatment, and an assistive description for wide tables.
+- Added an optional minimum table width so individual pages can preserve critical columns without causing page-level overflow.
+- Increased phone header and cell spacing while retaining the existing compact desktop density.
+- Preserved sticky table headers and improved their opaque mobile background for readable scrolling.
+- Added semantic responsive data-list primitives for card-style mobile representations of complex rows.
+- Added labelled definition fields, responsive metadata grids, touch-sized row actions, and an accessible empty state.
+- Made pagination horizontally contained, touch-sized, and icon-compact on phones while preserving text labels on larger screens.
+- Standardized generic horizontal-scroll regions with shared data attributes and accessible descriptions.
+- Added focused regression tests and a standalone Phase 5 source-contract verifier.
+
+### Deliberately unchanged
+
+- Table data, sorting, filtering, selection, row actions, pagination state, and page-size behavior.
+- API requests, caching, query keys, permissions, accounting, inventory, factory calculations, and database schema.
+- Desktop table column order and existing page-specific table implementations.
+- Page-by-page table-to-card decisions, which remain part of the Core ERP, Factory, POS, and reports conversion phases.
+
+### Remaining verification
+
+- Complete TypeScript, production build, lint, formatting, tests, smoke, coverage, Security, I18n, and CircleCI checks.
+- Verify representative narrow and wide tables at 320 px, 360 px, 390 px, phone landscape, tablet, and desktop widths.
+- Verify keyboard focus, horizontal scrolling, sticky headers, pagination, long values, and row actions.
+- Confirm pages that need card-style rows can adopt the responsive data-list primitives without changing business behavior.
+
 ## Internal SQL ledger
 
 | Phase | SQL used |
@@ -143,5 +172,6 @@ This document is the source of truth for converting the existing ERP web applica
 | 2 | None |
 | 3 | None |
 | 4 | None |
+| 5 | None |
 
 Do not provide this ledger as the final SQL report until every phase is complete.
