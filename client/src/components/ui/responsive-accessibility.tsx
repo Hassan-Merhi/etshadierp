@@ -9,7 +9,7 @@ export function SkipLink({ className, children = "Skip to main content", href = 
       href={href}
       className={cn(
         "sr-only z-50 rounded-md bg-background px-4 py-2 text-sm font-medium text-foreground shadow-lg transition focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 motion-reduce:transition-none",
-        className,
+        className
       )}
       {...props}
     >
@@ -57,7 +57,7 @@ export function ResponsiveActions({ className, label = "Page actions", ...props 
       aria-label={label}
       className={cn(
         "flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end [&>*]:min-h-10 [&>*]:w-full sm:[&>*]:w-auto",
-        className,
+        className
       )}
       {...props}
     />
@@ -75,7 +75,7 @@ export function ResponsiveToolbar({ className, label = "Page filters and tools",
       aria-label={label}
       className={cn(
         "flex w-full flex-col gap-3 rounded-lg border bg-card p-3 sm:flex-row sm:flex-wrap sm:items-end [&>*]:min-w-0 [&_button]:touch-manipulation",
-        className,
+        className
       )}
       {...props}
     />
@@ -112,7 +112,7 @@ type HorizontalScrollRegionProps = React.HTMLAttributes<HTMLDivElement> & {
 
 export function HorizontalScrollRegion({
   label,
-  description = "Scroll horizontally to view additional columns.",
+  description = "Scroll horizontally to view additional content.",
   className,
   tabIndex = 0,
   children,
@@ -126,9 +126,11 @@ export function HorizontalScrollRegion({
       aria-label={label}
       aria-describedby={descriptionId}
       tabIndex={tabIndex}
+      data-horizontal-scroll="true"
+      data-horizontal-scroll-region="true"
       className={cn(
         "max-w-full touch-pan-x overflow-x-auto overscroll-x-contain rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        className,
+        className
       )}
       {...props}
     >
