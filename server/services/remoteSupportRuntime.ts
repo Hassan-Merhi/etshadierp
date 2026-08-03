@@ -35,11 +35,7 @@ export interface RemoteSupportRuntimeSnapshot {
   metrics: RemoteSupportMetricsSnapshot;
 }
 
-type RemoteSupportMetric =
-  | "watcherStatusPoll"
-  | "viewerPoll"
-  | "frameAccepted"
-  | "frameRejected";
+type RemoteSupportMetric = "watcherStatusPoll" | "viewerPoll" | "frameAccepted" | "frameRejected";
 
 const HARD_DISABLED = process.env.DISABLE_SCREEN_FEED === "true";
 const startedAt = new Date();
@@ -96,10 +92,7 @@ function metricsSnapshot(): RemoteSupportMetricsSnapshot {
     framesAccepted: metrics.framesAccepted,
     framesRejected: metrics.framesRejected,
     totalFrameBytes: metrics.totalFrameBytes,
-    averageFrameBytes:
-      metrics.framesAccepted > 0
-        ? Math.round(metrics.totalFrameBytes / metrics.framesAccepted)
-        : 0,
+    averageFrameBytes: metrics.framesAccepted > 0 ? Math.round(metrics.totalFrameBytes / metrics.framesAccepted) : 0,
     lastFrameBytes: metrics.lastFrameBytes,
     lastFrameAcceptedAt: metrics.lastFrameAcceptedAt?.toISOString() ?? null,
     lastViewerPollAt: metrics.lastViewerPollAt?.toISOString() ?? null,
@@ -118,15 +111,13 @@ export function getRemoteSupportRuntimeSnapshot(): RemoteSupportRuntimeSnapshot 
   };
 }
 
-export function isRemoteSupportEnabled(
-  flag: RemoteSupportFlagName,
-): boolean {
+export function isRemoteSupportEnabled(flag: RemoteSupportFlagName): boolean {
   return flags[flag];
 }
 
 export function updateRemoteSupportFlags(
   patch: Partial<RemoteSupportFlags>,
-  actor: string,
+  actor: string
 ): RemoteSupportRuntimeSnapshot {
   const allowedKeys: RemoteSupportFlagName[] = [
     "screenFeedEnabled",
@@ -138,10 +129,8 @@ export function updateRemoteSupportFlags(
 
   const safePatch = Object.fromEntries(
     Object.entries(patch).filter(
-      ([key, value]) =>
-        allowedKeys.includes(key as RemoteSupportFlagName) &&
-        typeof value === "boolean",
-    ),
+      ([key, value]) => allowedKeys.includes(key as RemoteSupportFlagName) && typeof value === "boolean"
+    )
   ) as Partial<RemoteSupportFlags>;
 
   flags = normalizeFlags({ ...flags, ...safePatch });
@@ -151,9 +140,7 @@ export function updateRemoteSupportFlags(
   return getRemoteSupportRuntimeSnapshot();
 }
 
-export function emergencyDisableRemoteSupport(
-  actor: string,
-): RemoteSupportRuntimeSnapshot {
+export function emergencyDisableRemoteSupport(actor: string): RemoteSupportRuntimeSnapshot {
   flags = {
     screenFeedEnabled: false,
     fastScreenFeed: false,
@@ -167,9 +154,7 @@ export function emergencyDisableRemoteSupport(
   return getRemoteSupportRuntimeSnapshot();
 }
 
-export function restoreRemoteSupportBootDefaults(
-  actor: string,
-): RemoteSupportRuntimeSnapshot {
+export function restoreRemoteSupportBootDefaults(actor: string): RemoteSupportRuntimeSnapshot {
   flags = normalizeFlags({ ...bootFlags });
   revision += 1;
   updatedAt = new Date();
@@ -177,10 +162,7 @@ export function restoreRemoteSupportBootDefaults(
   return getRemoteSupportRuntimeSnapshot();
 }
 
-export function recordRemoteSupportMetric(
-  metric: RemoteSupportMetric,
-  frameBytes?: number,
-): void {
+export function recordRemoteSupportMetric(metric: RemoteSupportMetric, frameBytes?: number): void {
   switch (metric) {
     case "watcherStatusPoll":
       metrics.watcherStatusPolls += 1;
@@ -193,10 +175,7 @@ export function recordRemoteSupportMetric(
       metrics.framesRejected += 1;
       return;
     case "frameAccepted": {
-      const safeBytes =
-        Number.isFinite(frameBytes) && (frameBytes ?? 0) > 0
-          ? Math.floor(frameBytes as number)
-          : 0;
+      const safeBytes = Number.isFinite(frameBytes) && (frameBytes ?? 0) > 0 ? Math.floor(frameBytes as number) : 0;
       metrics.framesAccepted += 1;
       metrics.totalFrameBytes += safeBytes;
       metrics.lastFrameBytes = safeBytes;
