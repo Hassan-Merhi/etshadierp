@@ -42,6 +42,31 @@ jobs:
     if: github.head_ref == 'agent/phase-5-properties-rentals-conversion'
     runs-on: ubuntu-latest
     timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
+      NODE_ENV: test
+      SESSION_SECRET: phase5-ci-session-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -73,6 +98,9 @@ jobs:
             scripts/audit-i18n-phase14.mjs \
             tests/phase14-i18n-release-gate.test.ts \
             tests/phase5-properties-rentals-translations.test.ts
+
+      - name: Run application startup migrations
+        run: node --import tsx server/runStartupMigrations.ts
 
       - name: Run Phase 5 behavior and release-gate tests
         run: |
