@@ -1,9 +1,22 @@
 import type { Express, Request, Response } from "express";
 import { logger } from "../lib/logger";
 import { requireAuth, requireLogin } from "../auth";
-import { screenFeedStore, watcherPollStore, type ScreenFrame } from "../screenFeedStore";
+import {
+  screenFeedCursorStore,
+  screenFeedStore,
+  watcherPollStore,
+  type ScreenFeedCursor,
+  type ScreenFrame,
+} from "../screenFeedStore";
 import { screenFeedLiveHub } from "../services/screenFeedLiveHub";
-import { isValidScreenFeedDataUrl, sanitizeScreenFeedClicks } from "../services/screenFeedService";
+import {
+  isValidScreenFeedDataUrl,
+  sanitizeScreenFeedCapture,
+  sanitizeScreenFeedClicks,
+  sanitizeScreenFeedClientCapturedAt,
+  sanitizeScreenFeedCursor,
+  sanitizeScreenFeedViewport,
+} from "../services/screenFeedService";
 import {
   emergencyDisableRemoteSupport,
   getRemoteSupportRuntimeSnapshot,
@@ -68,12 +81,27 @@ function isUserBeingWatched(userId: string): boolean {
   return lastPoll > 0 && Date.now() - lastPoll < WATCHER_TIMEOUT_MS;
 }
 
+function serializeCursor(cursor: ScreenFeedCursor | null | undefined) {
+  if (!cursor) return null;
+  return {
+    x: cursor.x,
+    y: cursor.y,
+    ts: cursor.ts,
+    visible: cursor.visible,
+  };
+}
+
 function serializeFrame(frame: ScreenFrame) {
   return {
     dataUrl: frame.dataUrl,
     capturedAt: frame.capturedAt.toISOString(),
+    receivedAt: frame.capturedAt.toISOString(),
+    clientCapturedAt: frame.clientCapturedAt?.toISOString() ?? null,
     username: frame.username,
     clicks: frame.clicks,
+    cursor: serializeCursor(frame.cursor),
+    viewport: frame.viewport ?? null,
+    capture: frame.capture ?? null,
   };
 }
 
@@ -93,6 +121,7 @@ export function registerScreenFeedRoutes(app: Express) {
 
     if (!snapshot.flags.screenFeedEnabled) {
       watcherPollStore.clear();
+      screenFeedCursorStore.clear();
     }
     if (!snapshot.flags.screenFeedEnabled || !snapshot.flags.fastScreenFeed) {
       screenFeedLiveHub.disconnectAll();
@@ -105,6 +134,7 @@ export function registerScreenFeedRoutes(app: Express) {
   app.post("/api/screen-feed/admin/runtime/emergency-stop", requireAuth, (req, res) => {
     if (!requireDeveloper(req, res)) return;
     watcherPollStore.clear();
+    screenFeedCursorStore.clear();
     screenFeedLiveHub.disconnectAll();
     const snapshot = emergencyDisableRemoteSupport(runtimeActor(req));
     logger.warn(`[RemoteSupport] emergency stop activated by ${runtimeActor(req)}`);
@@ -164,7 +194,7 @@ export function registerScreenFeedRoutes(app: Express) {
   });
 
   // Event stream used by a Developer viewer. A connection marks the selected
-  // user as watched immediately and receives new frames as soon as they arrive.
+  // user as watched immediately and receives frames and pointer updates.
   app.get("/api/screen-feed/live/:userId", requireAuth, (req, res) => {
     if (!requireDeveloper(req, res)) return;
     if (!isRemoteSupportEnabled("screenFeedEnabled") || !isRemoteSupportEnabled("fastScreenFeed")) {
@@ -179,6 +209,9 @@ export function registerScreenFeedRoutes(app: Express) {
     const unsubscribeFrames = screenFeedLiveHub.subscribeFrames(watchedUserId, (frame) => {
       writeEvent(res, "frame", serializeFrame(frame));
     });
+    const unsubscribeCursors = screenFeedLiveHub.subscribeCursors(watchedUserId, (cursor) => {
+      writeEvent(res, "cursor", serializeCursor(cursor));
+    });
     let unsubscribeDisconnect = () => {};
     let closed = false;
 
@@ -192,6 +225,7 @@ export function registerScreenFeedRoutes(app: Express) {
       closed = true;
       clearInterval(heartbeatId);
       unsubscribeFrames();
+      unsubscribeCursors();
       unsubscribeDisconnect();
       if (!screenFeedLiveHub.hasViewer(watchedUserId)) {
         watcherPollStore.delete(watchedUserId);
@@ -207,6 +241,8 @@ export function registerScreenFeedRoutes(app: Express) {
     writeEvent(res, "ready", { userId: watchedUserId });
     const currentFrame = screenFeedStore.get(watchedUserId);
     if (currentFrame) writeEvent(res, "frame", serializeFrame(currentFrame));
+    const currentCursor = screenFeedCursorStore.get(watchedUserId);
+    if (currentCursor) writeEvent(res, "cursor", serializeCursor(currentCursor));
   });
 
   // GET: watched user asks "is anyone watching me right now?"
@@ -225,7 +261,7 @@ export function registerScreenFeedRoutes(app: Express) {
 
     if (isDev) {
       logger.info(
-        `[ScreenFeed] being-watched userId=${userId} watched=${watched} lastPollAgeMs=${lastPoll > 0 ? ageMs : "never"}`
+        `[ScreenFeed] being-watched userId=${userId} watched=${watched} lastPollAgeMs=${lastPoll > 0 ? ageMs : "never"}`,
       );
     }
 
@@ -248,6 +284,28 @@ export function registerScreenFeedRoutes(app: Express) {
     res.status(204).end();
   });
 
+  // Pointer updates are sent separately from image frames so cursor movement
+  // remains responsive without repeatedly uploading an unchanged screenshot.
+  app.post("/api/screen-feed/pointer", requireLogin, (req, res) => {
+    if (!isRemoteSupportEnabled("screenFeedEnabled")) return res.status(204).end();
+
+    const userId = String(getSessionUserId(req));
+    if (!isUserBeingWatched(userId)) return res.status(204).end();
+
+    const cursor = sanitizeScreenFeedCursor(req.body?.cursor ?? req.body);
+    if (!cursor) return res.status(400).json({ message: "Invalid pointer update." });
+
+    screenFeedCursorStore.set(userId, cursor);
+    const existingFrame = screenFeedStore.get(userId);
+    if (existingFrame) existingFrame.cursor = cursor;
+
+    if (isRemoteSupportEnabled("fastScreenFeed")) {
+      screenFeedLiveHub.publishCursor(userId, cursor);
+    }
+
+    res.status(204).end();
+  });
+
   // POST: watched user uploads their screenshot frame + recent clicks.
   app.post("/api/screen-feed", requireLogin, (req, res) => {
     if (!isRemoteSupportEnabled("screenFeedEnabled")) {
@@ -257,17 +315,17 @@ export function registerScreenFeedRoutes(app: Express) {
     const userId = String(getSessionUserId(req));
     if (isDev) {
       logger.info(
-        `[ScreenFeed] POST /api/screen-feed received from userId=${userId} body_keys=${Object.keys(req.body ?? {}).join(",")}`
+        `[ScreenFeed] POST /api/screen-feed received from userId=${userId} body_keys=${Object.keys(req.body ?? {}).join(",")}`,
       );
     }
 
-    const { dataUrl, clicks } = req.body ?? {};
+    const { dataUrl, clicks, cursor, viewport, capture, clientCapturedAt } = req.body ?? {};
 
     if (!isValidScreenFeedDataUrl(dataUrl)) {
       recordRemoteSupportMetric("frameRejected");
       if (isDev) {
         logger.warn(
-          `[ScreenFeed] POST rejected: missing or invalid dataUrl (type=${typeof dataUrl} starts=${typeof dataUrl === "string" ? dataUrl.slice(0, 30) : "N/A"})`
+          `[ScreenFeed] POST rejected: missing or invalid dataUrl (type=${typeof dataUrl} starts=${typeof dataUrl === "string" ? dataUrl.slice(0, 30) : "N/A"})`,
         );
       }
       return res.status(400).end();
@@ -278,16 +336,23 @@ export function registerScreenFeedRoutes(app: Express) {
       return res.status(204).end();
     }
 
+    const receivedAt = new Date();
     const username = getSessionUsername(req) || userId;
-    const safeClicks = sanitizeScreenFeedClicks(clicks);
+    const safeClicks = sanitizeScreenFeedClicks(clicks, receivedAt.getTime());
+    const safeCursor = sanitizeScreenFeedCursor(cursor, receivedAt.getTime()) ?? screenFeedCursorStore.get(userId) ?? null;
     const frame: ScreenFrame = {
       dataUrl,
-      capturedAt: new Date(),
+      capturedAt: receivedAt,
+      clientCapturedAt: sanitizeScreenFeedClientCapturedAt(clientCapturedAt, receivedAt.getTime()),
       userId,
       username,
       clicks: safeClicks,
+      cursor: safeCursor,
+      viewport: sanitizeScreenFeedViewport(viewport),
+      capture: sanitizeScreenFeedCapture(capture),
     };
     screenFeedStore.set(userId, frame);
+    if (safeCursor) screenFeedCursorStore.set(userId, safeCursor);
     recordRemoteSupportMetric("frameAccepted", Buffer.byteLength(dataUrl, "utf8"));
 
     if (isRemoteSupportEnabled("fastScreenFeed")) {
@@ -297,7 +362,7 @@ export function registerScreenFeedRoutes(app: Express) {
 
     if (isDev) {
       logger.info(
-        `[ScreenFeed] POST frame stored userId=${userId} frameLen=${dataUrl.length} clicks=${safeClicks.length}`
+        `[ScreenFeed] POST frame stored userId=${userId} frameLen=${dataUrl.length} clicks=${safeClicks.length}`,
       );
     }
 
@@ -326,11 +391,13 @@ export function registerScreenFeedRoutes(app: Express) {
     if (isDev) {
       const frameAgeMs = frame ? Date.now() - frame.capturedAt.getTime() : null;
       logger.info(
-        `[ScreenFeed] GET /:userId watchedUserId=${watchedUserId} hasFrame=${hasFrame} frameAgeMs=${frameAgeMs}`
+        `[ScreenFeed] GET /:userId watchedUserId=${watchedUserId} hasFrame=${hasFrame} frameAgeMs=${frameAgeMs}`,
       );
     }
 
     if (!frame) return res.json(null);
+    const latestCursor = screenFeedCursorStore.get(watchedUserId);
+    if (latestCursor) frame.cursor = latestCursor;
     res.json(serializeFrame(frame));
   });
 }
