@@ -72,6 +72,7 @@ jobs:
             client/src/app/PosShell.tsx \
             client/src/app/PropertiesShell.tsx \
             client/src/components/AppTopBar.tsx \
+            client/src/components/ApplicationInterfaceTranslator.tsx \
             client/src/components/ui/dialog.tsx \
             client/src/components/ui/responsive-accessibility.tsx \
             client/src/components/ui/sheet.tsx \
