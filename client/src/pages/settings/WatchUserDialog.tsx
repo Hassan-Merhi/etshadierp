@@ -260,7 +260,10 @@ export function WatchUserDialog({
                     .reverse()
                     .slice(0, 6)
                     .map((click, index) => (
-                      <div key={`${click.ts}-${index}`} className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <div
+                        key={`${click.ts}-${index}`}
+                        className="flex items-center gap-1 text-xs text-muted-foreground"
+                      >
                         <span className="truncate max-w-[160px]">{click.label || "—"}</span>
                         <span className="text-muted-foreground/50 shrink-0">
                           {new Date(click.ts).toLocaleTimeString([], {

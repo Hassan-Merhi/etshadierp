@@ -18,7 +18,7 @@ const SIGNATURE_HEIGHT = 18;
 
 const isDev = import.meta.env.DEV;
 
-type Html2Canvas = typeof import("html2canvas")["default"];
+type Html2Canvas = (typeof import("html2canvas"))["default"];
 let html2canvasPromise: Promise<Html2Canvas> | null = null;
 
 async function loadHtml2Canvas(): Promise<Html2Canvas> {
@@ -370,11 +370,7 @@ export function useScreenFeed() {
       busyRef.current = true;
 
       runWhenIdle(() => {
-        captureAndUpload(
-          fastModeRef.current,
-          lastSignatureRef.current,
-          lastUploadedClickTsRef.current
-        )
+        captureAndUpload(fastModeRef.current, lastSignatureRef.current, lastUploadedClickTsRef.current)
           .then((result) => {
             if (result.uploaded) {
               lastSignatureRef.current = result.signature;
