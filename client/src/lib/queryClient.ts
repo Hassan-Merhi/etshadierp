@@ -78,9 +78,12 @@ function scheduleSessionExpiredRedirect() {
   // wrong-password 401s and initial unauthenticated loads.
   const path = window.location.pathname;
   if (path === "/login" || path.startsWith("/login/")) return;
+
+  // Mark the expiry handled before navigation so later in-flight 401 responses
+  // do not start another /api/auth/me verification request.
   _sessionExpiredHandled = true;
-  // Small delay so the current render cycle finishes cleanly before we navigate.
-  setTimeout(() => { window.location.href = "/login"; }, 300);
+  resetCsrfToken();
+  window.location.replace("/login");
 }
 
 // ── Session verification (prevents false logout on business 401s) ──────────
@@ -131,6 +134,7 @@ export async function handlePossibleSessionExpiry(
   if (response.status !== 401) return;
   if (!pathname?.startsWith("/api/")) return;
   if (AUTH_PATHS.has(pathname)) return;
+  if (_sessionExpiredHandled) return;
   const expired = await verifySessionExpired(originalFetch);
   if (expired) scheduleSessionExpiredRedirect();
 }
