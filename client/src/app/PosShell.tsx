@@ -36,6 +36,7 @@ import { SkipLink } from "@/components/ui/responsive-accessibility";
 import { ArrowLeft, LogOut, Search, ShoppingCart } from "lucide-react";
 import { usePosNavigationItems } from "./usePosNavigationItems";
 import { canUseAdminSearch, type ShellUser } from "./shellUser";
+import "@/styles/pos-sidebar-modern.css";
 
 interface PosShellProps {
   user: ShellUser;
@@ -87,29 +88,27 @@ export function PosShell({
       <SidebarProvider style={posStyle as React.CSSProperties}>
         <div ref={posContainerRef} className="flex h-full w-full min-w-0 overflow-hidden bg-background">
           {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
-          <Sidebar className="border-r border-sidebar-border/70 bg-sidebar/95 backdrop-blur-xl">
-            <SidebarHeader className="border-b border-sidebar-border/60 p-3">
-              <div className="rounded-2xl border border-sidebar-border/70 bg-gradient-to-br from-primary/12 via-sidebar-accent/60 to-sidebar p-2.5 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 shrink-0 rounded-xl border border-sidebar-border/60 bg-background/60 hover:bg-background"
-                    onClick={handleGoBack}
-                    aria-label="Go back"
-                    data-testid="button-pos-back"
-                  >
-                    <ArrowLeft data-directional-icon="true" className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                  <ModuleIdentity
-                    compact
-                    moduleName={user.posStation ? `POS ${user.posStation}` : "POS"}
-                    companyName={selectedCompany?.name}
-                    icon={ShoppingCart}
-                    tone="pos"
-                    className="min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none"
-                  />
-                </div>
+          <Sidebar data-pos-sidebar="modern">
+            <SidebarHeader data-pos-sidebar-header>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0 rounded-xl border border-sidebar-border/60 bg-background/60 hover:bg-background"
+                  onClick={handleGoBack}
+                  aria-label="Go back"
+                  data-testid="button-pos-back"
+                >
+                  <ArrowLeft data-directional-icon="true" className="h-4 w-4" aria-hidden="true" />
+                </Button>
+                <ModuleIdentity
+                  compact
+                  moduleName={user.posStation ? `POS ${user.posStation}` : "POS"}
+                  companyName={selectedCompany?.name}
+                  icon={ShoppingCart}
+                  tone="pos"
+                  className="min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none"
+                />
               </div>
             </SidebarHeader>
             <SidebarContent className="px-2 py-3">
@@ -118,7 +117,7 @@ export function PosShell({
                   Workspace
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
-                  <SidebarMenu className="gap-1.5" aria-label="Point of sale navigation">
+                  <SidebarMenu aria-label="Point of sale navigation">
                     {posNavItems.map((item) => (
                       <SidebarMenuItem key={item.label}>
                         <SidebarMenuButton
@@ -126,9 +125,8 @@ export function PosShell({
                           onClick={item.onClick}
                           aria-current={item.active ? "page" : undefined}
                           data-testid={item.testId}
-                          className="group relative h-10 rounded-xl px-3 font-medium transition-all duration-200 hover:bg-sidebar-accent/80 hover:shadow-sm data-[active=true]:bg-primary data-[active=true]:text-primary-foreground data-[active=true]:shadow-md data-[active=true]:shadow-primary/20"
                         >
-                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent/70 transition-colors group-data-[active=true]:bg-primary-foreground/15">
+                          <span data-pos-nav-icon>
                             <item.icon className="h-4 w-4" aria-hidden="true" />
                           </span>
                           <span className="flex-1 truncate">{item.label}</span>
@@ -149,8 +147,8 @@ export function PosShell({
                 </SidebarGroupContent>
               </SidebarGroup>
             </SidebarContent>
-            <SidebarFooter className="border-t border-sidebar-border/60 p-3">
-              <div className="space-y-2 rounded-2xl border border-sidebar-border/70 bg-sidebar-accent/35 p-2.5 shadow-sm">
+            <SidebarFooter data-pos-sidebar-footer-card>
+              <div className="space-y-2">
                 <div className="flex items-center gap-2 px-1">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
                     {user.username?.slice(0, 2).toUpperCase()}
