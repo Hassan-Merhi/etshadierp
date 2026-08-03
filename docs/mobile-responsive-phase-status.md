@@ -23,7 +23,7 @@ This document is the source of truth for converting the existing ERP web applica
 | 4 | Forms and dialogs | Implemented | `agent/mobile-responsive-phase-4-forms-dialogs` / PR #420 | Final CI validation pending |
 | 5 | Tables and mobile data lists | Implemented | `agent/mobile-responsive-phase-5-tables-data-lists` / PR #422 | Final CI validation pending |
 | 6 | Core ERP mobile conversion | Implemented | `agent/mobile-responsive-phase-6-core-erp` / PR #430 | Final CI validation pending |
-| 7 | Factory mobile conversion | Not started | — | — |
+| 7 | Factory mobile conversion | Implemented | `agent/mobile-responsive-phase-7-factory` / PR #447 | Final CI and rendered validation pending |
 | 8 | POS mobile and tablet redesign | Not started | — | — |
 | 9 | Dashboards, reports, and charts | Not started | — | — |
 | 10 | Mobile performance and offline behavior | Not started | — | — |
@@ -193,6 +193,34 @@ This document is the source of truth for converting the existing ERP web applica
 - Verify tab scrolling, custom date selection, on-screen keyboard behavior, long stock names, large amounts, empty states, and keyboard activation.
 - Retarget to `main` only after Phases 4 and 5 merge in order.
 
+## Phase 7 completion record
+
+### Delivered
+
+- Added reusable Factory mobile page, header, action, workflow, scanner, live-status, and sticky action-bar primitives.
+- Applied phone-safe touch targets, input sizing, safe-area spacing, width containment, form containment, and local scroll boundaries to the entire Factory workspace.
+- Converted Bale Stock Entry page headers, actions, production summaries, and section tabs to mobile-first layouts.
+- Converted the stock-entry product scanner into an accessible combobox and listbox with keyboard navigation, large touch results, live errors, and a result panel that participates in phone layout instead of being clipped by the viewport.
+- Added semantic mobile cart cards with labelled quantity, weight, worker, logo, and removal controls.
+- Preserved the existing desktop cart table with an explicit local horizontal-scroll contract.
+- Made location, entry date, worker group, customer logo, totals, and confirmation controls responsive across phone, tablet, and desktop breakpoints.
+- Kept the final Confirm & Print Labels action visible through a safe-area-aware mobile action bar.
+- Added focused source-contract tests and a standalone Phase 7 verifier.
+
+### Deliberately unchanged
+
+- Stock-entry API requests, mutation payloads, quantity calculations, warehouse selection rules, worker assignment, and validation behavior.
+- Draft restoration, product creation, label design, label generation, browser printing, and WhatsApp behavior.
+- Factory permissions, routes, company isolation, inventory balances, costing, accounting, and database schema.
+- Existing desktop two-column stock-entry layout and desktop cart table.
+
+### Remaining verification
+
+- Complete TypeScript, production build, lint, exact formatting, focused tests, full tests, smoke, coverage, Security, I18n, and CircleCI checks.
+- Verify the Factory workspace and Bale Stock Entry at 320 px, 360 px, 390 px, phone landscape, tablet, and desktop widths.
+- Verify scanner autofocus, physical barcode scanner input, on-screen keyboard behavior, arrow-key selection, touch product selection, long product names, cart quantity and weight controls, worker and logo selectors, confirmation safeguards, and label printing.
+- Retarget to `main` only after Phases 4, 5, and 6 merge in order.
+
 ## Internal SQL ledger
 
 | Phase | SQL used |
@@ -203,5 +231,6 @@ This document is the source of truth for converting the existing ERP web applica
 | 4 | None |
 | 5 | None |
 | 6 | None |
+| 7 | None |
 
 Do not provide this ledger as the final SQL report until every phase is complete.
