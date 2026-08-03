@@ -31,15 +31,30 @@ interface FactoryShellProps {
   leaveConfirmDialog: React.ReactNode;
 }
 
-const factoryPosWorkspaceClasses = [
+const factoryWorkspaceClasses = [
   "[&_button]:touch-manipulation",
+  "max-sm:[&_button]:min-h-11",
+  "max-sm:[&_input]:min-h-11",
+  "max-sm:[&_input]:text-base",
+  "max-sm:[&_select]:min-h-11",
+  "max-sm:[&_textarea]:min-h-24",
+  "[&_form]:min-w-0",
+  "[&_form]:max-w-full",
+  "[&_fieldset]:min-w-0",
+  "[&_img]:max-w-full",
+  "[&_[role=tablist]]:max-w-full",
+  "[&_[role=listbox]]:max-h-[min(24rem,70dvh)]",
+  "[&_[data-mobile-data-list]]:max-w-full",
+  "[&_[data-responsive-table-scroll]]:max-w-full",
+].join(" ");
+
+const factoryPosWorkspaceClasses = [
   "[&_input]:min-h-10",
   "[&_select]:min-h-10",
   "[&_textarea]:min-h-20",
   "[&_table]:min-w-max",
   "[&_th]:whitespace-nowrap",
   "[&_td]:align-middle",
-  "[&_[role=listbox]]:max-h-[min(24rem,70dvh)]",
 ].join(" ");
 
 export function FactoryShell({
@@ -82,8 +97,9 @@ export function FactoryShell({
               id="main-content"
               tabIndex={-1}
               aria-label={isFactoryPosRoute ? "Factory point of sale workspace" : "Factory and inventory workspace"}
+              data-factory-workspace="true"
               data-pos-workspace={isFactoryPosRoute ? "true" : undefined}
-              className={`flex-1 overflow-y-auto overscroll-y-contain p-3 outline-none sm:p-6 ${isFactoryPosRoute ? factoryPosWorkspaceClasses : ""}`}
+              className={`flex-1 overflow-y-auto overscroll-y-contain p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] outline-none sm:p-6 ${factoryWorkspaceClasses} ${isFactoryPosRoute ? factoryPosWorkspaceClasses : ""}`}
             >
               <div className="w-full min-w-0 max-w-full [&_form]:min-w-0 [&_table]:w-full [&_[role=table]]:w-full [&_.overflow-x-auto]:overscroll-x-contain">
                 <FactoryCatalogLanguageSwitch />
