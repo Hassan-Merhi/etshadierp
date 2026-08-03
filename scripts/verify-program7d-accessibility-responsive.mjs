@@ -44,6 +44,8 @@ for (const token of [
   'role="search"',
   'role="group"',
   "overflow-x-auto",
+  "overscroll-x-contain",
+  "max-w-full",
   "sm:flex-row",
   "auto-fit",
   "minmax",
@@ -60,13 +62,11 @@ for (const [name, source] of [
   for (const token of [
     "ResponsiveActions",
     "ResponsiveToolbar",
+    "HorizontalScrollRegion",
     "aria-labelledby",
     "React.useId()",
     "break-words",
     "grid-cols-1",
-    "max-w-full",
-    "overflow-x-auto",
-    "overscroll-x-contain",
   ]) {
     if (!source.includes(token)) failures.push(`${name} responsive screen contract missing: ${token}`);
   }
