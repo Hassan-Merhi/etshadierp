@@ -4,6 +4,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: write
+
 concurrency:
   group: phase4-formatting-diagnostic-${{ github.ref }}
   cancel-in-progress: true
@@ -13,8 +16,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout repository
+      - name: Checkout pull request branch
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
 
       - name: Set up Node.js 22.14
         uses: actions/setup-node@v6
@@ -38,16 +44,28 @@ jobs:
             client/src/components/ui/sheet.tsx \
             client/src/components/ui/workflow-dialog.tsx
 
-      - name: Upload formatted source
-        uses: actions/upload-artifact@v7
-        with:
-          name: phase4-formatted-source
-          path: |
-            client/src/components/ui/alert-dialog.tsx
-            client/src/components/ui/dialog.tsx
-            client/src/components/ui/form.tsx
-            client/src/components/ui/select.tsx
-            client/src/components/ui/sheet.tsx
+      - name: Commit formatted source
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- \
+            client/src/components/ui/alert-dialog.tsx \
+            client/src/components/ui/dialog.tsx \
+            client/src/components/ui/form.tsx \
+            client/src/components/ui/select.tsx \
+            client/src/components/ui/sheet.tsx \
+            client/src/components/ui/workflow-dialog.tsx; then
+            echo "Source already matches the repository formatter."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            client/src/components/ui/alert-dialog.tsx \
+            client/src/components/ui/dialog.tsx \
+            client/src/components/ui/form.tsx \
+            client/src/components/ui/select.tsx \
+            client/src/components/ui/sheet.tsx \
             client/src/components/ui/workflow-dialog.tsx
-          if-no-files-found: error
-          retention-days: 1
+          git commit -m "style: apply exact Phase 4 formatting"
+          git push origin "HEAD:${{ github.head_ref }}"
