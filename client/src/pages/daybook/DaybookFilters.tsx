@@ -1,8 +1,9 @@
 import { Search, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PeriodFilter, PeriodFilterValue } from "@/components/ui/period-filter";
+import { ResponsiveToolbar } from "@/components/ui/responsive-accessibility";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface DaybookFiltersProps {
   periodFilter: PeriodFilterValue;
@@ -33,20 +34,15 @@ export function DaybookFilters({
     filters.statusFilter !== "all";
 
   return (
-    <div className="flex flex-col gap-2">
-      {/* Single row: date | types | status | search */}
-      <div className="flex flex-wrap items-center gap-2">
-        <PeriodFilter
-          value={periodFilter}
-          onChange={setPeriodFilter}
-          data-testid="period-filter"
-        />
+    <div className="flex min-w-0 flex-col gap-2">
+      <ResponsiveToolbar className="gap-2 p-2 sm:p-3" label="Daybook filters">
+        <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
 
         <Select value={filters.voucherType} onValueChange={(value) => setFilters({ ...filters, voucherType: value })}>
           <SelectTrigger
             id="voucher-type"
             data-testid="select-voucher-type"
-            className="w-[130px]"
+            className="w-full sm:w-[130px]"
           >
             <SelectValue />
           </SelectTrigger>
@@ -64,12 +60,14 @@ export function DaybookFilters({
 
         <Select
           value={filters.statusFilter}
-          onValueChange={(value) => setFilters({ ...filters, statusFilter: value as "all" | "active" | "optional" })}
+          onValueChange={(value) =>
+            setFilters({ ...filters, statusFilter: value as "all" | "active" | "optional" })
+          }
         >
           <SelectTrigger
             id="status-filter"
             data-testid="select-status-filter"
-            className="w-[130px]"
+            className="w-full sm:w-[130px]"
           >
             <SelectValue />
           </SelectTrigger>
@@ -80,26 +78,29 @@ export function DaybookFilters({
           </SelectContent>
         </Select>
 
-        <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <div className="relative w-full min-w-0 sm:min-w-[180px] sm:flex-1">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             id="search"
             placeholder="Voucher # or description..."
             value={filters.searchQuery}
             onChange={(e) => setFilters({ ...filters, searchQuery: e.target.value })}
             data-testid="input-search"
-            className="pl-9"
+            className="w-full pl-9"
           />
         </div>
-      </div>
+      </ResponsiveToolbar>
 
       {hasActiveFilters && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">Active:</span>
+        <div
+          className="flex max-w-full items-center gap-1.5 overflow-x-auto overscroll-x-contain pb-1"
+          aria-label="Active Daybook filters"
+        >
+          <span className="shrink-0 text-xs text-muted-foreground">Active:</span>
           {filters.voucherType !== "all" && (
             <Badge
               variant="secondary"
-              className="gap-1 cursor-pointer text-xs"
+              className="shrink-0 cursor-pointer gap-1 text-xs"
               onClick={() => setFilters({ ...filters, voucherType: "all" })}
               data-testid="chip-type"
             >
@@ -110,7 +111,7 @@ export function DaybookFilters({
           {filters.statusFilter !== "all" && (
             <Badge
               variant="secondary"
-              className="gap-1 cursor-pointer text-xs"
+              className="shrink-0 cursor-pointer gap-1 text-xs"
               onClick={() => setFilters({ ...filters, statusFilter: "all" })}
               data-testid="chip-status"
             >
@@ -121,7 +122,7 @@ export function DaybookFilters({
           {filters.minAmount && (
             <Badge
               variant="secondary"
-              className="gap-1 cursor-pointer text-xs"
+              className="shrink-0 cursor-pointer gap-1 text-xs"
               onClick={() => setFilters({ ...filters, minAmount: "" })}
               data-testid="chip-min"
             >
@@ -132,7 +133,7 @@ export function DaybookFilters({
           {filters.maxAmount && (
             <Badge
               variant="secondary"
-              className="gap-1 cursor-pointer text-xs"
+              className="shrink-0 cursor-pointer gap-1 text-xs"
               onClick={() => setFilters({ ...filters, maxAmount: "" })}
               data-testid="chip-max"
             >
@@ -143,7 +144,7 @@ export function DaybookFilters({
           {!!filters.searchQuery && (
             <Badge
               variant="secondary"
-              className="gap-1 cursor-pointer text-xs"
+              className="shrink-0 cursor-pointer gap-1 text-xs"
               onClick={() => setFilters({ ...filters, searchQuery: "" })}
               data-testid="chip-search"
             >
