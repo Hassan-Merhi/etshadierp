@@ -21,7 +21,8 @@ html[dir="rtl"] [role="navigation"] {
   text-align: start;
 }
 
-html[dir="rtl"] [data-slot="app-top-bar-actions"] {
+html[dir="rtl"] [data-slot="app-top-bar-actions"],
+html[dir="rtl"] [data-slot="pos-top-bar-actions"] {
   margin-left: 0;
   margin-inline-start: auto;
 }
@@ -160,7 +161,7 @@ html[dir="rtl"] a[href="#main-content"]:focus {
 [role="dialog"],
 [role="menu"],
 [role="listbox"] {
-  max-inline-size: min(100vw - 1rem, var(--radix-popper-available-width, 100vw));
+  max-inline-size: min(calc(100vw - 1rem), var(--radix-popper-available-width, 100vw));
 }
 
 [role="dialog"] {
