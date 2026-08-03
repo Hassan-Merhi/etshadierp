@@ -65,27 +65,41 @@ export function registerScreenFeedRoutes(app: Express) {
     res.json(snapshot);
   });
 
-  app.post("/api/screen-feed/admin/runtime/emergency-stop", requireAuth, (req, res) => {
-    if (!requireDeveloper(req, res)) return;
-    watcherPollStore.clear();
-    const snapshot = emergencyDisableRemoteSupport(runtimeActor(req));
-    logger.warn(`[RemoteSupport] emergency stop activated by ${runtimeActor(req)}`);
-    res.setHeader("Cache-Control", "no-store");
-    res.json(snapshot);
-  });
+  app.post(
+    "/api/screen-feed/admin/runtime/emergency-stop",
+    requireAuth,
+    (req, res) => {
+      if (!requireDeveloper(req, res)) return;
+      watcherPollStore.clear();
+      const snapshot = emergencyDisableRemoteSupport(runtimeActor(req));
+      logger.warn(
+        `[RemoteSupport] emergency stop activated by ${runtimeActor(req)}`,
+      );
+      res.setHeader("Cache-Control", "no-store");
+      res.json(snapshot);
+    },
+  );
 
-  app.post("/api/screen-feed/admin/runtime/restore-defaults", requireAuth, (req, res) => {
-    if (!requireDeveloper(req, res)) return;
-    const snapshot = restoreRemoteSupportBootDefaults(runtimeActor(req));
-    res.setHeader("Cache-Control", "no-store");
-    res.json(snapshot);
-  });
+  app.post(
+    "/api/screen-feed/admin/runtime/restore-defaults",
+    requireAuth,
+    (req, res) => {
+      if (!requireDeveloper(req, res)) return;
+      const snapshot = restoreRemoteSupportBootDefaults(runtimeActor(req));
+      res.setHeader("Cache-Control", "no-store");
+      res.json(snapshot);
+    },
+  );
 
-  app.post("/api/screen-feed/admin/runtime/reset-metrics", requireAuth, (req, res) => {
-    if (!requireDeveloper(req, res)) return;
-    res.setHeader("Cache-Control", "no-store");
-    res.json(resetRemoteSupportMetrics());
-  });
+  app.post(
+    "/api/screen-feed/admin/runtime/reset-metrics",
+    requireAuth,
+    (req, res) => {
+      if (!requireDeveloper(req, res)) return;
+      res.setHeader("Cache-Control", "no-store");
+      res.json(resetRemoteSupportMetrics());
+    },
+  );
 
   // GET: watched user asks "is anyone watching me right now?"
   // Must be registered BEFORE /:userId to avoid route conflict.
@@ -107,7 +121,12 @@ export function registerScreenFeedRoutes(app: Express) {
       );
     }
 
-    res.json({ watched, ...(isDev ? { userId, lastWatcherPollAgeMs: lastPoll > 0 ? ageMs : null } : {}) });
+    res.json({
+      watched,
+      ...(isDev
+        ? { userId, lastWatcherPollAgeMs: lastPoll > 0 ? ageMs : null }
+        : {}),
+    });
   });
 
   // GET-based trace: CSRF-exempt diagnostic ping from the watched user's browser.
@@ -118,7 +137,9 @@ export function registerScreenFeedRoutes(app: Express) {
     const userId = String(getSessionUserId(req));
     const event = req.params.event;
     const extra = req.query.d ? String(req.query.d) : "";
-    logger.info(`[ScreenFeed][TRACE] userId=${userId} event=${event}${extra ? " d=" + extra : ""}`);
+    logger.info(
+      `[ScreenFeed][TRACE] userId=${userId} event=${event}${extra ? " d=" + extra : ""}`,
+    );
     res.status(204).end();
   });
 
@@ -148,14 +169,26 @@ export function registerScreenFeedRoutes(app: Express) {
     }
     if (dataUrl.length > MAX_FRAME_SIZE) {
       recordRemoteSupportMetric("frameRejected");
-      if (isDev) logger.warn(`[ScreenFeed] POST rejected: frame too large (${dataUrl.length} bytes)`);
+      if (isDev)
+        logger.warn(
+          `[ScreenFeed] POST rejected: frame too large (${dataUrl.length} bytes)`,
+        );
       return res.status(204).end();
     }
 
     const username = getSessionUsername(req) || userId;
     const safeClicks = sanitizeScreenFeedClicks(clicks);
-    screenFeedStore.set(userId, { dataUrl, capturedAt: new Date(), userId, username, clicks: safeClicks });
-    recordRemoteSupportMetric("frameAccepted", Buffer.byteLength(dataUrl, "utf8"));
+    screenFeedStore.set(userId, {
+      dataUrl,
+      capturedAt: new Date(),
+      userId,
+      username,
+      clicks: safeClicks,
+    });
+    recordRemoteSupportMetric(
+      "frameAccepted",
+      Buffer.byteLength(dataUrl, "utf8"),
+    );
 
     if (isDev) {
       logger.info(
@@ -184,7 +217,9 @@ export function registerScreenFeedRoutes(app: Express) {
     const hasFrame = !!frame;
 
     if (isDev) {
-      const frameAgeMs = frame ? Date.now() - frame.capturedAt.getTime() : null;
+      const frameAgeMs = frame
+        ? Date.now() - frame.capturedAt.getTime()
+        : null;
       logger.info(
         `[ScreenFeed] GET /:userId watchedUserId=${watchedUserId} hasFrame=${hasFrame} frameAgeMs=${frameAgeMs}`,
       );
