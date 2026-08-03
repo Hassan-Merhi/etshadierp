@@ -7,7 +7,7 @@ import {
   renderMarkdown,
 } from "./i18n-audit-lib.mjs";
 
-const DETECTOR_VERSION = 8;
+const DETECTOR_VERSION = 9;
 const compatibilityTranslationFiles = [
   "client/src/i18n/applicationTranslations.ts",
   "client/src/i18n/sharedInterfaceTranslations.ts",
@@ -139,7 +139,7 @@ function rebuildReport(report, compatibilityCoveredValues) {
     },
     modules: Object.fromEntries(Object.entries(modules).sort(([left], [right]) => left.localeCompare(right))),
     excludedCategories: Object.fromEntries(
-      Object.entries(excludedCategories).sort(([, left], [, right]) => right - left)
+      Object.entries(excludedCategories).sort(([, left], [, right]) => right - left),
     ),
     topActionableFiles: Object.entries(filesByActionableCount)
       .sort(([, left], [, right]) => right - left)
@@ -168,7 +168,7 @@ if (suggestedBaselineOutput) {
 }
 
 console.log(
-  `I18n audit: ${report.totals.actionable} actionable, ${report.totals.excluded} reviewed exclusions, ${report.totals.candidates} total candidates.`
+  `I18n audit: ${report.totals.actionable} actionable, ${report.totals.excluded} reviewed exclusions, ${report.totals.candidates} total candidates.`,
 );
 for (const [module, counts] of Object.entries(report.modules)) {
   console.log(`${module}: ${counts.actionable} actionable / ${counts.excluded} excluded`);
