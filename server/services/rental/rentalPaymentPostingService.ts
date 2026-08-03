@@ -33,12 +33,12 @@ import {
   vouchers,
   voucherEntries,
 } from "@shared/schema";
-import { eq, and, sql, inArray, isNull } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 import Decimal from "decimal.js";
 import type { RentalModule } from "../../routes/rental/shared";
 import { normalizeVoucherEntryAmounts } from "../accounting/currencyAmounts";
 import { findOrCreateLedgerAccount, maybeRunAutoTransfer } from "../../routes/rental/shared";
-import { isRentalPeriodDue, getRentalBillingDay, getRentalPeriodDueDate, getDuePeriods } from "./rentalPeriodService";
+import { isRentalPeriodDue, getRentalBillingDay, getRentalPeriodDueDate } from "./rentalPeriodService";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

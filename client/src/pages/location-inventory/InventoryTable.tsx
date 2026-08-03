@@ -1,7 +1,6 @@
-import { TrendingUp, TrendingDown, Package, Badge as BadgeIcon } from "lucide-react";
+import { TrendingUp, TrendingDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 
 interface InventoryItem {
   inventoryId: number | null;

@@ -1,6 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -174,11 +173,7 @@ function CategoryGroup({
             </div>
           ))}
           {insuranceAccounts.length > 0 && (
-            <InsuranceSubGroup
-              accounts={insuranceAccounts}
-              amountColor={amountColor}
-              formatAmount={formatAmount}
-            />
+            <InsuranceSubGroup accounts={insuranceAccounts} amountColor={amountColor} formatAmount={formatAmount} />
           )}
         </div>
       )}
@@ -561,7 +556,9 @@ export default function FactoryNetPositionDetails() {
         const text = await res.text();
         // Attach the parsed code so the retry handler can inspect it
         const err: any = new Error(text);
-        try { err.code = JSON.parse(text)?.code; } catch {}
+        try {
+          err.code = JSON.parse(text)?.code;
+        } catch {}
         throw err;
       }
       return res.json();
@@ -569,8 +566,7 @@ export default function FactoryNetPositionDetails() {
     staleTime: isToday ? 60_000 : Infinity,
     refetchOnWindowFocus: false,
     // Auto-retry when the concurrency guard fires (max 3 attempts, 6 s apart)
-    retry: (failureCount, err: any) =>
-      err?.code === "ENDPOINT_BUSY" ? failureCount < 3 : false,
+    retry: (failureCount, err: any) => (err?.code === "ENDPOINT_BUSY" ? failureCount < 3 : false),
     retryDelay: (_, err: any) => (err?.code === "ENDPOINT_BUSY" ? 6_000 : 0),
   });
 
@@ -608,10 +604,7 @@ export default function FactoryNetPositionDetails() {
               <span>{friendlyMessage}</span>
             </div>
             {!isEndpointBusy && (
-              <button
-                className="mt-3 text-sm underline text-muted-foreground"
-                onClick={() => refetch()}
-              >
+              <button className="mt-3 text-sm underline text-muted-foreground" onClick={() => refetch()}>
                 Try again
               </button>
             )}

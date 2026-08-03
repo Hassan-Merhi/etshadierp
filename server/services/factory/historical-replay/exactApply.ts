@@ -6,19 +6,10 @@ import {
   type ReplayApplyParams,
   type ReplayApplyResult,
   type ReplayQueryExecutor,
-  type ReplayWriteScope,
 } from "./types";
-import {
-  buildExactHistoricalReplayScopeInternal,
-} from "./exactScope";
-import {
-  normalizeReplayWriteScope,
-  replayWriteScopesEqual,
-} from "./selectedScope";
-import {
-  computeReplayFingerprint,
-  loadReplayAuthoritativeInputDigest,
-} from "./fingerprint";
+import { buildExactHistoricalReplayScopeInternal } from "./exactScope";
+import { normalizeReplayWriteScope, replayWriteScopesEqual } from "./selectedScope";
+import { computeReplayFingerprint, loadReplayAuthoritativeInputDigest } from "./fingerprint";
 import { captureExactReplaySnapshot } from "./exactSnapshot";
 
 function sortNumbers(values: number[]): number[] {
@@ -28,7 +19,9 @@ function sortNumbers(values: number[]): number[] {
 function assertOne(rowCount: number | null | undefined, label: string): void {
   if (rowCount !== 1) {
     throw Object.assign(
-      new Error(`HISTORICAL_REPLAY_SCOPE_VIOLATION: expected exactly one ${label} row, updated ${rowCount ?? 0}. Rolling back.`),
+      new Error(
+        `HISTORICAL_REPLAY_SCOPE_VIOLATION: expected exactly one ${label} row, updated ${rowCount ?? 0}. Rolling back.`
+      ),
       { code: "HISTORICAL_REPLAY_SCOPE_VIOLATION" }
     );
   }
@@ -74,9 +67,7 @@ export async function applyExactHistoricalCostReplay(
     );
   }
   if (!expectedScope) {
-    throw new StaleTokenError(
-      "This token predates exact signed replay scopes. Re-run Prepare Historical Replay."
-    );
+    throw new StaleTokenError("This token predates exact signed replay scopes. Re-run Prepare Historical Replay.");
   }
 
   const result: ReplayApplyResult = {
@@ -127,9 +118,7 @@ export async function applyExactHistoricalCostReplay(
       publicScope
     );
     if (freshFingerprint !== expectedFingerprint) {
-      throw new StaleTokenError(
-        "Stale token — authoritative replay inputs changed since Prepare. Re-run the preview."
-      );
+      throw new StaleTokenError("Stale token — authoritative replay inputs changed since Prepare. Re-run the preview.");
     }
 
     result.skippedSupplierIds = supplierIds.filter((id) => !publicScope.supplierIds.includes(id));
@@ -147,9 +136,7 @@ export async function applyExactHistoricalCostReplay(
         [tokenHash, companyId, issuedByUserId, algorithmVersion, expectedFingerprint]
       );
       if (consumed.rowCount !== 1) {
-        throw new StaleTokenError(
-          "This confirmation token has already been used. Re-run Prepare Historical Replay."
-        );
+        throw new StaleTokenError("This confirmation token has already been used. Re-run Prepare Historical Replay.");
       }
     }
 
@@ -162,18 +149,37 @@ export async function applyExactHistoricalCostReplay(
       ? sortNumbers([...publicScope.availableBaleIdsToUpdate, ...publicScope.finalizedBaleIdsToUpdate])
       : sortNumbers(publicScope.availableBaleIdsToUpdate);
 
-    const snapshot = await captureExactReplaySnapshot(
-      executor,
-      companyId,
-      publicScope,
-      approvedBaleIds
+    const snapshot = await captureExactReplaySnapshot(executor, companyId, publicScope, approvedBaleIds);
+    assertSameIds(
+      publicScope.containerIdsToUpdate,
+      snapshot.containers.map((row: any) => Number(row.id)),
+      "container snapshot"
     );
-    assertSameIds(publicScope.containerIdsToUpdate, snapshot.containers.map((row: any) => Number(row.id)), "container snapshot");
-    assertSameIds(publicScope.rawStockIdsToUpdate, snapshot.rawStockRows.map((row: any) => Number(row.id)), "raw-stock snapshot");
-    assertSameIds(publicScope.sourceIdsToUpdate, snapshot.mixBatchSources.map((row: any) => Number(row.id)), "source snapshot");
-    assertSameIds(publicScope.batchIdsToUpdate, snapshot.mixBatches.map((row: any) => Number(row.id)), "batch snapshot");
-    assertSameIds(approvedBaleIds, snapshot.bales.map((row: any) => Number(row.id)), "bale snapshot");
-    assertSameIds(publicScope.supplierIds, snapshot.suppliers.map((row: any) => Number(row.id)), "supplier snapshot");
+    assertSameIds(
+      publicScope.rawStockIdsToUpdate,
+      snapshot.rawStockRows.map((row: any) => Number(row.id)),
+      "raw-stock snapshot"
+    );
+    assertSameIds(
+      publicScope.sourceIdsToUpdate,
+      snapshot.mixBatchSources.map((row: any) => Number(row.id)),
+      "source snapshot"
+    );
+    assertSameIds(
+      publicScope.batchIdsToUpdate,
+      snapshot.mixBatches.map((row: any) => Number(row.id)),
+      "batch snapshot"
+    );
+    assertSameIds(
+      approvedBaleIds,
+      snapshot.bales.map((row: any) => Number(row.id)),
+      "bale snapshot"
+    );
+    assertSameIds(
+      publicScope.supplierIds,
+      snapshot.suppliers.map((row: any) => Number(row.id)),
+      "supplier snapshot"
+    );
 
     for (const rawStockId of publicScope.rawStockIdsToUpdate) {
       if (!approvedRawStockIds.has(rawStockId)) throw new Error("Unapproved raw-stock ID");
@@ -302,7 +308,11 @@ export async function applyExactHistoricalCostReplay(
          ORDER BY id`,
         [approvedBaleIds, companyId]
       );
-      assertSameIds(approvedBaleIds, baleRows.rows.map((row) => row.id), "approved bale");
+      assertSameIds(
+        approvedBaleIds,
+        baleRows.rows.map((row) => row.id),
+        "approved bale"
+      );
 
       for (const bale of baleRows.rows) {
         if (bale.mix_batch_id == null || !approvedBatchIds.has(bale.mix_batch_id)) {
@@ -347,11 +357,7 @@ export async function applyExactHistoricalCostReplay(
            SET current_raw_material_cost_per_kg_usd = $1,
                updated_at = NOW()
            WHERE id = $2 AND company_id = $3`,
-          [
-            new Decimal(supplier.endingExpectedRate).toDecimalPlaces(8).toFixed(8),
-            supplierId,
-            companyId,
-          ]
+          [new Decimal(supplier.endingExpectedRate).toDecimalPlaces(8).toFixed(8), supplierId, companyId]
         );
         assertOne(update.rowCount, `supplier ${supplierId}`);
         result.supplierRatesUpdated += 1;

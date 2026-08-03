@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { groupBySupplier } from "./helpers";
-import type { GitContainersResponse, EnrichedContainerApi, CompanyViewMode, STATUS_BADGE } from "./types";
+import type { GitContainersResponse, EnrichedContainerApi, CompanyViewMode } from "./types";
 import { STATUS_BADGE as STATUS_BADGE_MAP } from "./types";
 
 export function TabTruckLocation() {
@@ -88,7 +88,7 @@ export function TabTruckLocation() {
         const msg =
           apiErr?.status === 413 || String(apiErr?.message).includes("too large")
             ? "Tracking report is too large to send to WhatsApp."
-            : apiErr?.message ?? "Failed to send";
+            : (apiErr?.message ?? "Failed to send");
         toast({ title: "Failed to send", description: msg, variant: "destructive" });
         return;
       }

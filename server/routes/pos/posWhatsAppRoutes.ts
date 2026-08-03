@@ -3,7 +3,6 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { getClientDate } from "../../lib/dateUtils";
 import { db } from "../../db";
-import { storage } from "../../storage";
 import { requireAuth } from "../../auth";
 import {
   locations,
@@ -21,11 +20,7 @@ import { format } from "date-fns";
 import { generateStockPdf } from "../../helpers/generateStockPdf";
 import { generateInvoicePdf } from "../../helpers/generateInvoicePdf";
 import { getErpExportVisibility } from "../../helpers/exportVisibility";
-import {
-  sendWhatsAppTextToChatIdPos,
-  sendWhatsAppFileToChatIdPos,
-  sendWhatsAppFileByUploadPos,
-} from "../../services/whatsappService";
+import { sendWhatsAppTextToChatIdPos, sendWhatsAppFileByUploadPos } from "../../services/whatsappService";
 
 export function registerPosWhatsAppRoutes(app: Express): void {
   // ── POS WhatsApp Shift Report ─────────────────────────────────────────────
@@ -293,10 +288,22 @@ export function registerPosWhatsAppRoutes(app: Express): void {
         return res.status(502).json({ message: result.error ?? "Failed to send WhatsApp PDF" });
       }
 
-      logger.info("WhatsApp invoice send succeeded", { module: "pos", action: "sendInvoiceWhatsApp", userId: (req as any).user?.id, companyId: req.session.currentCompanyId, voucherId });
+      logger.info("WhatsApp invoice send succeeded", {
+        module: "pos",
+        action: "sendInvoiceWhatsApp",
+        userId: (req as any).user?.id,
+        companyId: req.session.currentCompanyId,
+        voucherId,
+      });
       res.json({ success: true, message: "Invoice PDF sent to WhatsApp" });
     } catch (error: unknown) {
-      logger.error("WhatsApp invoice send failed", { module: "pos", action: "sendInvoiceWhatsApp", userId: (req as any).user?.id, companyId: req.session.currentCompanyId, error });
+      logger.error("WhatsApp invoice send failed", {
+        module: "pos",
+        action: "sendInvoiceWhatsApp",
+        userId: (req as any).user?.id,
+        companyId: req.session.currentCompanyId,
+        error,
+      });
       logger.error("[/api/pos/send-invoice-whatsapp]", { error: error });
       res.status(500).json({ message: getErrorMessage(error) });
     }

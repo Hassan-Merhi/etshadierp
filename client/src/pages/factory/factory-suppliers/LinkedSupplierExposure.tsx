@@ -1,8 +1,8 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowRightLeft, FileText, ChevronRight } from "lucide-react";
-import { StatementResponse, SupplierWithBalance } from "./factorySupplierTypes";
+import { FileText, ChevronRight } from "lucide-react";
+import { StatementResponse } from "./factorySupplierTypes";
 
 interface LinkedSupplierExposureProps {
   statementData: StatementResponse;

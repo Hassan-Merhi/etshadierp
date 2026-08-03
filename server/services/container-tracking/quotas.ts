@@ -1,13 +1,13 @@
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { containers, containerTrackingEvents, containerTrackingChecks } from "../../../shared/schema";
-import { and, eq, inArray, gte, sql, desc, isNotNull, isNull } from "drizzle-orm";
-import { scrapeTracking, isScraperAvailable } from "../../lib/parcelsAppScraper";
-import { httpScrapeTracking, isHttpScraperAvailable } from "../../lib/httpTrackingScraper";
-import { scrapeMaerskDirect, isMaerskDirectScraperAvailable } from "../../lib/maerskDirectScraper";
+import { containers, containerTrackingChecks } from "../../../shared/schema";
+import { and, eq, inArray, gte, sql } from "drizzle-orm";
+import { isScraperAvailable } from "../../lib/parcelsAppScraper";
+import { isHttpScraperAvailable } from "../../lib/httpTrackingScraper";
+import { isMaerskDirectScraperAvailable } from "../../lib/maerskDirectScraper";
 import * as seventeenTrack from "../../lib/trackingProviders/seventeenTrackProvider";
-import type { CarrierTrackResult, TrackingEvent } from "../../lib/trackingProviders/types";
+import type { CarrierTrackResult } from "../../lib/trackingProviders/types";
 
 export async function getParcelsAppUsageStats(): Promise<{ used: number; limit: number }> {
   const limit = Math.max(1, parseInt(process.env.PARCELSAPP_MONTHLY_LIMIT ?? "500") || 500);

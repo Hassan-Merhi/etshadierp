@@ -1,8 +1,8 @@
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { containers, containerTrackingEvents, containerTrackingChecks } from "../../../shared/schema";
-import { and, eq, inArray, gte, sql, desc, isNotNull, isNull } from "drizzle-orm";
+import { containers } from "../../../shared/schema";
+import { and, eq } from "drizzle-orm";
 import { getTrackingPriority, calcPerRunBudget } from "../../lib/trackingPriority";
 import { calcMaxOffloadDate, calcIsOverdue, calcDocsReadyNotSent } from "../../lib/gitHelpers";
 

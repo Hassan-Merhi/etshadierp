@@ -5,29 +5,19 @@ import { getClientDate } from "../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
-import { eq, and, desc, sql, ilike, gte, lte, inArray, isNotNull, isNull } from "drizzle-orm";
+import { eq, and, desc, sql, inArray, isNull } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import XLSX from "xlsx";
-import ExcelJS from "exceljs";
 import {
   factoryWorkers,
-  insertFactoryWorkerSchema,
   factoryDaybookEntries,
-  factoryBales,
   factoryPayrolls,
-  factoryWorkerDocuments,
   factoryWorkerAdvances,
   factoryAdvanceRepayments,
-  factoryWorkerDeductions,
-  factoryAttendance,
   ledgerAccounts,
-  bankAccounts,
   vouchers,
   voucherEntries,
-  companies,
-  companySettings,
 } from "@shared/schema";
 
 /** Prefer the factory-pinned company ID so cross-tab ERP company switches don't corrupt factory writes. */
@@ -80,7 +70,9 @@ async function findOrCreateLedger(companyId: number, name: string, accountType: 
   const [existing] = await db
     .select({ id: ledgerAccounts.id })
     .from(ledgerAccounts)
-    .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, name), isNull(ledgerAccounts.deletedAt)));
+    .where(
+      and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, name), isNull(ledgerAccounts.deletedAt))
+    );
   if (existing) return existing;
 
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -100,7 +92,13 @@ async function findOrCreateLedger(companyId: number, name: string, accountType: 
         const [nowFound] = await db
           .select({ id: ledgerAccounts.id })
           .from(ledgerAccounts)
-          .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, name), isNull(ledgerAccounts.deletedAt)));
+          .where(
+            and(
+              eq(ledgerAccounts.companyId, companyId),
+              eq(ledgerAccounts.name, name),
+              isNull(ledgerAccounts.deletedAt)
+            )
+          );
         if (nowFound) return nowFound;
         continue;
       }

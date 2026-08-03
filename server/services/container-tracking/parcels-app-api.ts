@@ -1,18 +1,10 @@
 import { db } from "../../db";
 import { logger } from "../../lib/logger";
-import { containers, containerTrackingEvents, containerTrackingChecks } from "../../../shared/schema";
-import { and, eq, inArray, gte, sql, desc, isNotNull, isNull } from "drizzle-orm";
-import {
-  trackContainer,
-  normaliseEvents,
-  deriveLastStatus,
-  deriveLastLocation,
-  deriveLastEventDate,
-  deriveEstimatedDeliveryDate,
-  type ParcelsAppShipment,
-} from "../../lib/parcelsAppClient";
+import { containers } from "../../../shared/schema";
+import { eq } from "drizzle-orm";
+import { trackContainer, deriveLastStatus, deriveLastLocation, deriveLastEventDate } from "../../lib/parcelsAppClient";
 import { logAndConfirmEta, logEtaResolution, resolveEtaFromShipment } from "./eta";
-import { backfillEtaFromEvents, saveParcelsAppEvents, saveTrackingCheck } from "./persistence";
+import { saveParcelsAppEvents, saveTrackingCheck } from "./persistence";
 import { checkParcelsAppQuota, getParcelsAppUsageStats } from "./quotas";
 import { ep } from "./validation-progress";
 

@@ -1,4 +1,4 @@
-import { CloudOff, RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
+import { CloudOff, RefreshCw, AlertTriangle } from "lucide-react";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "wouter";

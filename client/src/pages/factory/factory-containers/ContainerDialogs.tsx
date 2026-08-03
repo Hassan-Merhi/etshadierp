@@ -1,8 +1,7 @@
 import { useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { AlertTriangle, Download, Upload, CheckCircle2, AlertCircle, FileSpreadsheet, RotateCcw } from "lucide-react";
+import { AlertTriangle, FileSpreadsheet, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -11,12 +10,10 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { useAdminOverride } from "@/hooks/use-admin-override";
-import { ContainerStatusBadge } from "./ContainerBadges";
 import type { ContainerWithSupplier } from "./otwHelpers";
 
 // ── Import Dialog ─────────────────────────────────────────────────────────────

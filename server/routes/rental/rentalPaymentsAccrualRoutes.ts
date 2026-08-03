@@ -3,11 +3,7 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import {
   getCompanyId,
-  findOrCreateLedgerAccount,
-  maybeRunAutoTransfer,
   ensureMonthlyLedgerRows,
-  findEarliestOutstandingMonth,
-  buildAllocations,
   ensureMonthlyForCompany,
   postRentAccrualForCompany,
   type RentalModule,
@@ -20,23 +16,18 @@ import { db, pool } from "../../db";
 import { getRentalBillingDay, getRentalPeriodDueDate } from "../../services/rental/rentalPeriodService";
 import { requireAuth } from "../../auth";
 import { z } from "zod";
-import { eq, and, sql, desc, inArray, isNull, isNotNull, ne } from "drizzle-orm";
+import { eq, and, sql, desc, isNull } from "drizzle-orm";
 import {
   propertyUnits,
   propertyContracts,
   propertyMonthlyLedger,
   propertyPayments,
-  insertPropertyUnitSchema,
-  insertPropertyContractSchema,
   ledgerAccounts,
   vouchers,
   voucherEntries,
-  rentalAutoTransferConfigs,
   interCompanyTransfers,
-  companies,
 } from "@shared/schema";
-import { parseId, parseOptionalId } from "../../lib/parseId";
-import { logAudit } from "../_helpers";
+import { parseId } from "../../lib/parseId";
 import { getClientDate } from "../../lib/dateUtils";
 
 export function registerRentalPaymentsAccrualRoutes(

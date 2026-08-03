@@ -7,8 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Check, X, MapPin, Zap } from "lucide-react";
+import { Check, X, Zap } from "lucide-react";
 import { ConfirmPasswordDialog, PermissionSummaryCard } from "./InlineRoleEditorSections";
 import { PosLocationManager } from "./PosLocationManager";
 

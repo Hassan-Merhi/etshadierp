@@ -1,12 +1,6 @@
 import { logger } from "../../../lib/logger";
-import { db, pool } from "../../../db";
+import { db } from "../../../db";
 import {
-  propertyUnits,
-  propertyContracts,
-  propertyMonthlyLedger,
-  propertyPayments,
-  insertPropertyUnitSchema,
-  insertPropertyContractSchema,
   ledgerAccounts,
   vouchers,
   voucherEntries,
@@ -14,7 +8,7 @@ import {
   interCompanyTransfers,
   companies,
 } from "@shared/schema";
-import { eq, and, sql, desc, inArray, isNull, isNotNull, ne } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { RentalModule } from "./ledger";
 
 export async function maybeRunAutoTransfer(

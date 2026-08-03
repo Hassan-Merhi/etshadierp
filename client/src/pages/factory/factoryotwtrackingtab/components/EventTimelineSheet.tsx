@@ -3,12 +3,12 @@
  *
  * Extracted from FactoryOtwTrackingTab.tsx during the Phase 4 god-file split.
  */
-import {useQuery, useQueryClient as useTQClient} from "@tanstack/react-query";
-import {Sheet, SheetContent, SheetHeader, SheetTitle} from "@/components/ui/sheet";
-import {ScrollArea} from "@/components/ui/scroll-area";
-import {MapPin, Activity} from "lucide-react";
-import {factoryApiRequest} from "@/lib/factoryApi";
-import type {TrackingEvent} from "../types";
+import { useQuery } from "@tanstack/react-query";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { MapPin, Activity } from "lucide-react";
+import { factoryApiRequest } from "@/lib/factoryApi";
+import type { TrackingEvent } from "../types";
 
 export function EventTimelineSheet({
   containerId,

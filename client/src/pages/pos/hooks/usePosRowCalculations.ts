@@ -1,4 +1,4 @@
-import type { SaleRow, InventoryItem } from "../pos-components/posTypes";
+import type { SaleRow } from "../pos-components/posTypes";
 
 interface PosRowCalculationsParams {
   rows: SaleRow[];

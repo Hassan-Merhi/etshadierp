@@ -1,7 +1,6 @@
-import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -29,7 +28,7 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { NpSettings, WaRecipient } from "./ExportCenterTypes";
 import { StatusBadge } from "./ExportStatusBadge";
-import { fmtTime, scheduleLabel } from "./ExportCenterHelpers";
+import { fmtTime } from "./ExportCenterHelpers";
 import { DAYS, HOURS } from "./ExportCenterConstants";
 
 interface NetPositionTabProps {

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ShoppingCart, TrendingUp, CalendarRange, Layers, ArrowLeftRight } from "lucide-react";
 import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";

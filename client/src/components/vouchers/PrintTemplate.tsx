@@ -1,6 +1,4 @@
 import { format } from "date-fns";
-import { useDateFormat } from "@/contexts/DateFormatContext";
-import { formatNumber } from "@/lib/formatNumber";
 
 // Local shape matching how this component actually uses entries (accountId is
 // only used by callers for filtering before passing entries in, not read here).

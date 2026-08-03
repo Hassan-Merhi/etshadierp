@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "../../db";
 import { ensureCutoverSchema } from "./spMigrationCutoverState";
-import { pn, money } from "./spMigrationPhase2Common";
+import { pn } from "./spMigrationPhase2Common";
 import { resolveTargetLedgerAccount, resolveTargetLocation } from "./spMigrationCutoverReadiness";
 
 function roleSnapshot(row: any): any {
@@ -212,11 +212,15 @@ export async function moveUsersToTarget(
       WHERE id = ${pn(sourceRole.id)} AND company_id = ${sourceId}
     `);
 
-    await db.execute(sql`
+    await db
+      .execute(
+        sql`
       UPDATE user_presence
       SET company_id = ${targetId}, company_name = ${targetCompanyName}, role = ${effectiveTargetRole.role}
       WHERE user_id = ${sourceRole.user_id} AND company_id = ${sourceId}
-    `).catch(() => undefined);
+    `
+      )
+      .catch(() => undefined);
     usersMoved++;
   }
 
@@ -319,11 +323,15 @@ export async function restoreUsersToSource(
       targetRolesRemoved++;
     }
 
-    await db.execute(sql`
+    await db
+      .execute(
+        sql`
       UPDATE user_presence
       SET company_id = ${sourceId}, company_name = ${sourceCompanyName}, role = ${sourceRole.role}
       WHERE user_id = ${change.user_id} AND company_id = ${targetId}
-    `).catch(() => undefined);
+    `
+      )
+      .catch(() => undefined);
   }
 
   return { sourceRolesRestored, targetRolesRemoved, sessionsSwitched };

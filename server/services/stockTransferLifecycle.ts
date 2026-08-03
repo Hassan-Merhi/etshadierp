@@ -1,14 +1,7 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
 import { adjustInventory } from "../inventoryHelper";
-import {
-  inventory,
-  locations,
-  stockItems,
-  stockTransferItems,
-  stockTransferVouchers,
-  vouchers,
-} from "@shared/schema";
+import { locations, stockItems, stockTransferItems, stockTransferVouchers, vouchers } from "@shared/schema";
 
 export interface StockTransferLifecycleItem {
   stockItemId: number;
@@ -49,14 +42,18 @@ function positiveInteger(value: unknown, label: string): number {
   return parsed;
 }
 
-function normalizeItems(items: StockTransferLifecycleItem[], destinationLocationId: number): StockTransferLifecycleItem[] {
+function normalizeItems(
+  items: StockTransferLifecycleItem[],
+  destinationLocationId: number
+): StockTransferLifecycleItem[] {
   if (!Array.isArray(items) || items.length === 0) throw new Error("At least one stock transfer item is required");
 
   const merged = new Map<string, StockTransferLifecycleItem>();
   for (const raw of items) {
     const stockItemId = positiveInteger(raw.stockItemId, "Stock item ID");
     const sourceLocationId = positiveInteger(raw.sourceLocationId, "Source location ID");
-    if (sourceLocationId === destinationLocationId) throw new Error("Source and destination locations must be different");
+    if (sourceLocationId === destinationLocationId)
+      throw new Error("Source and destination locations must be different");
 
     const quantity = Number(raw.quantity);
     const rate = Number(raw.rate);
@@ -67,7 +64,8 @@ function normalizeItems(items: StockTransferLifecycleItem[], destinationLocation
     const existing = merged.get(key);
     if (existing) {
       const totalQuantity = existing.quantity + quantity;
-      const weightedRate = totalQuantity > 0 ? (existing.quantity * existing.rate + quantity * rate) / totalQuantity : rate;
+      const weightedRate =
+        totalQuantity > 0 ? (existing.quantity * existing.rate + quantity * rate) / totalQuantity : rate;
       merged.set(key, { stockItemId, sourceLocationId, quantity: totalQuantity, rate: weightedRate });
     } else {
       merged.set(key, { stockItemId, sourceLocationId, quantity, rate });
@@ -146,19 +144,11 @@ async function assertCompanyScope(
   destinationLocationId: number,
   items: StockTransferLifecycleItem[]
 ) {
-  const locationIds = Array.from(
-    new Set([destinationLocationId, ...items.map((item) => item.sourceLocationId)])
-  );
+  const locationIds = Array.from(new Set([destinationLocationId, ...items.map((item) => item.sourceLocationId)]));
   const companyLocations = await tx
     .select({ id: locations.id })
     .from(locations)
-    .where(
-      and(
-        eq(locations.companyId, companyId),
-        inArray(locations.id, locationIds),
-        isNull(locations.deletedAt)
-      )
-    );
+    .where(and(eq(locations.companyId, companyId), inArray(locations.id, locationIds), isNull(locations.deletedAt)));
   if (companyLocations.length !== locationIds.length) {
     throw new Error("One or more transfer locations do not belong to the current company");
   }
@@ -264,7 +254,9 @@ function headerSourceLocationId(items: StockTransferLifecycleItem[]): number | n
  * optional=true, inventoryApplied=true   -> unpost once, then records only
  * optional=false, inventoryApplied=true  -> reverse old + apply new posted edit
  */
-export async function saveStockTransferLifecycle(input: SaveStockTransferLifecycleInput): Promise<StockTransferLifecycleResult> {
+export async function saveStockTransferLifecycle(
+  input: SaveStockTransferLifecycleInput
+): Promise<StockTransferLifecycleResult> {
   const companyId = positiveInteger(input.companyId, "Company ID");
   const transferId = positiveInteger(input.transferId, "Transfer ID");
   const destinationLocationId = positiveInteger(input.destinationLocationId, "Destination location ID");
@@ -274,7 +266,11 @@ export async function saveStockTransferLifecycle(input: SaveStockTransferLifecyc
     const locked = await lockTransfer(tx, transferId);
     if (!locked) throw new Error("Stock transfer not found");
     if (Number(locked.company_id) !== companyId) throw new Error("Stock transfer belongs to a different company");
-    if (locked.voucher_type !== "Stock Transfer" && locked.voucher_type !== "StockTransfer" && locked.voucher_type !== "Transfer") {
+    if (
+      locked.voucher_type !== "Stock Transfer" &&
+      locked.voucher_type !== "StockTransfer" &&
+      locked.voucher_type !== "Transfer"
+    ) {
       throw new Error("Voucher is not a stock transfer");
     }
     if (locked.deleted_at) throw new Error("Deleted stock transfers cannot be changed");
@@ -285,7 +281,11 @@ export async function saveStockTransferLifecycle(input: SaveStockTransferLifecyc
     const oldDestinationLocationId = Number(locked.destination_location_id);
     const oldRows = await loadTransferItems(tx, transferId);
     const oldItems = oldRows.length
-      ? persistedRowsToItems(oldRows, locked.source_location_id ? Number(locked.source_location_id) : null, oldDestinationLocationId)
+      ? persistedRowsToItems(
+          oldRows,
+          locked.source_location_id ? Number(locked.source_location_id) : null,
+          oldDestinationLocationId
+        )
       : [];
 
     let transition: StockTransferLifecycleResult["transition"];
@@ -347,7 +347,11 @@ export async function finalizeOptionalStockTransfer(
     const locked = await lockTransferByVoucher(tx, voucherId);
     if (!locked) throw new Error("Stock transfer not found");
     if (Number(locked.company_id) !== companyId) throw new Error("Stock transfer belongs to a different company");
-    if (locked.voucher_type !== "Stock Transfer" && locked.voucher_type !== "StockTransfer" && locked.voucher_type !== "Transfer") {
+    if (
+      locked.voucher_type !== "Stock Transfer" &&
+      locked.voucher_type !== "StockTransfer" &&
+      locked.voucher_type !== "Transfer"
+    ) {
       throw new Error("Voucher is not a stock transfer");
     }
     if (locked.deleted_at) throw new Error("Deleted stock transfers cannot be finalized");
@@ -392,10 +396,7 @@ export async function finalizeOptionalStockTransfer(
       .update(stockTransferVouchers)
       .set({ inventoryApplied: true })
       .where(eq(stockTransferVouchers.id, transferId));
-    await tx
-      .update(vouchers)
-      .set({ optional: false, totalAmount })
-      .where(eq(vouchers.id, voucherId));
+    await tx.update(vouchers).set({ optional: false, totalAmount }).where(eq(vouchers.id, voucherId));
 
     return {
       voucherId,
@@ -434,7 +435,11 @@ export async function reopenStockTransferAsDraft(
     const locked = await lockTransferByVoucher(tx, voucherId);
     if (!locked) throw new Error("Stock transfer not found");
     if (Number(locked.company_id) !== companyId) throw new Error("Stock transfer belongs to a different company");
-    if (locked.voucher_type !== "Stock Transfer" && locked.voucher_type !== "StockTransfer" && locked.voucher_type !== "Transfer") {
+    if (
+      locked.voucher_type !== "Stock Transfer" &&
+      locked.voucher_type !== "StockTransfer" &&
+      locked.voucher_type !== "Transfer"
+    ) {
       throw new Error("Voucher is not a stock transfer");
     }
     if (locked.deleted_at) throw new Error("Deleted stock transfers cannot be changed");
@@ -448,7 +453,7 @@ export async function reopenStockTransferAsDraft(
       destinationLocationId
     );
 
-    if (Boolean(locked.inventory_applied)) {
+    if (locked.inventory_applied) {
       await reverseAppliedItems(tx, companyId, destinationLocationId, items);
     }
 
@@ -470,7 +475,7 @@ export async function reopenStockTransferAsDraft(
       transferId,
       optional: true,
       inventoryApplied: false,
-      transition: Boolean(locked.inventory_applied) ? "unpost" : "no-op",
+      transition: locked.inventory_applied ? "unpost" : "no-op",
       totalAmount: String(locked.total_amount ?? "0"),
       items: persistedRows,
     };

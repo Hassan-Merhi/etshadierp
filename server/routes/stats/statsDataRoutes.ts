@@ -7,7 +7,6 @@ import { requireAuth, requireNonPOS } from "../../auth";
 import { stockItems, stockGroups, vouchers, salesItems, locations, stockItemLocationPrices } from "@shared/schema";
 import { eq, and, sql, isNull } from "drizzle-orm";
 
-import { _getCached, _setCached } from "../../services/shared/ttlCache";
 import { getMonthlyData, getStockSummary, getExpenseBreakdown } from "../../services/stats/dashboardStatsService";
 
 export function registerStatsDataRoutes(app: Express) {

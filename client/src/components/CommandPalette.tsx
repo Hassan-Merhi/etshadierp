@@ -23,7 +23,6 @@ import {
   PieChart,
   BarChart3,
   AlertTriangle,
-  Package,
   Box,
   Archive,
   Users,

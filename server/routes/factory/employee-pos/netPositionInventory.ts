@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 
-import { db, pool } from "../../../db";
+import { db } from "../../../db";
 
 /**
  * The four inventory valuations in the factory net-position report: finished

@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { ChevronRight, ChevronDown, AlertTriangle, Loader2, Info } from "lucide-react";
-import { FEATURE_PAGE_INFO, FEATURE_KEYS, type FeatureKey } from "@shared/schema";
+import { type FeatureKey } from "@shared/schema";
 
 const CONFIGURABLE_ROLES = ["Owner", "Manager"];
 

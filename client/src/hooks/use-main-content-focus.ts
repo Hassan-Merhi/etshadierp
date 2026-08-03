@@ -26,12 +26,7 @@ export function useMainContentFocus(location: string, skip = false) {
       const active = document.activeElement as HTMLElement | null;
       if (active) {
         const tag = active.tagName;
-        if (
-          tag === "INPUT" ||
-          tag === "TEXTAREA" ||
-          tag === "SELECT" ||
-          active.isContentEditable
-        ) {
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || active.isContentEditable) {
           return;
         }
       }
@@ -41,10 +36,10 @@ export function useMainContentFocus(location: string, skip = false) {
       // that remain mounted in the DOM do NOT trigger this guard.
       const hasOpenOverlay = !!document.querySelector(
         '[role="dialog"][data-state="open"],' +
-        '[role="alertdialog"][data-state="open"],' +
-        '[data-radix-popper-content-wrapper][data-state="open"],' +
-        '[data-state="open"][role="listbox"],' +
-        '[data-state="open"][role="menu"]'
+          '[role="alertdialog"][data-state="open"],' +
+          '[data-radix-popper-content-wrapper][data-state="open"],' +
+          '[data-state="open"][role="listbox"],' +
+          '[data-state="open"][role="menu"]'
       );
       if (hasOpenOverlay) return;
 
@@ -58,5 +53,5 @@ export function useMainContentFocus(location: string, skip = false) {
     });
 
     return () => cancelAnimationFrame(frame);
-  }, [location, skip]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [location, skip]);
 }

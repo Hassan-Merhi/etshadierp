@@ -11,7 +11,6 @@ import {
   assertRequestCompanyMatchesSession,
 } from "./services/security/companyIsolationPolicy";
 import { decideExplicitCompanyScope } from "./services/security/companyRequestScopePolicy";
-import { resolveActiveCompanyId } from "./routes/helpers/resolveActiveCompanyId";
 
 function logDenied(params: {
   userId?: string | null;

@@ -11,8 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import { Upload, Printer, Trash2, Barcode, Check, FileSpreadsheet } from "lucide-react";
-import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
+import { Printer, Trash2, Barcode, Check, FileSpreadsheet } from "lucide-react";
+import { utils, read } from "@/lib/excelHelper";
 
 interface PendingBarcode {
   id: number;

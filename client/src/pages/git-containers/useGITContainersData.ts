@@ -1,8 +1,7 @@
-import { useMemo, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
+import { useEffect } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { EnrichedContainerRow, GitContainersResponse, AuthUser, BulkProgress } from "./gitContainerTypes";
+import { BulkProgress } from "./gitContainerTypes";
 
 interface UseGITContainersDataProps {
   isAllowed: boolean;

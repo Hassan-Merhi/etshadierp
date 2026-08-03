@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fmt, fmtD, parseNum, getRealRowBg } from "./helpers";
-import type { GitContainersResponse, EnrichedContainerApi, CompanyViewMode, PORT_BUCKETS } from "./types";
+import type { GitContainersResponse, EnrichedContainerApi, CompanyViewMode } from "./types";
 import { PORT_BUCKETS as BUCKETS } from "./types";
 
 export function TabPortReport() {

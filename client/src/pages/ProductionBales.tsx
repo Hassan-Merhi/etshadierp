@@ -16,7 +16,6 @@ import {
   Scale,
   Calendar,
   PlusCircle,
-  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -36,7 +35,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
-import type { FactoryBaleProduct, Location, FactoryMixBatch } from "@shared/schema";
+import type { Location, FactoryMixBatch } from "@shared/schema";
 import { useEscapeBack } from "@/hooks/use-escape-back";
 import { CreateMixBatchDialog } from "@/components/CreateMixBatchDialog";
 

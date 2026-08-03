@@ -1,4 +1,4 @@
-import { parseId, parseOptionalId } from "../../lib/parseId";
+import { parseId } from "../../lib/parseId";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import type { Express, Request, Response } from "express";
 import { db } from "../../db";
@@ -11,7 +11,7 @@ import {
   vouchers,
   voucherEntries,
 } from "@shared/schema";
-import { eq, and, asc, desc, sql } from "drizzle-orm";
+import { eq, and, asc, sql } from "drizzle-orm";
 import { z } from "zod";
 
 function getCompanyId(req: Request): number | null {

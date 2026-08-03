@@ -146,7 +146,13 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
       if (company?.companyType === "factory") useFactoryView = true;
     }
     if (useFactoryView && linkedCust) {
-      rawEntries = await buildFactoryCustomerLedgerEntries(linkedCust.id, accountId, linkedCust.companyId, startDate, endDate);
+      rawEntries = await buildFactoryCustomerLedgerEntries(
+        linkedCust.id,
+        accountId,
+        linkedCust.companyId,
+        startDate,
+        endDate
+      );
     } else {
       rawEntries = await storage.getVoucherEntriesByLedger(accountId, startDate, endDate, companyId);
     }
@@ -174,7 +180,11 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
   } else if (accountType === "employee") {
     rawEntries = await storage.getVoucherEntriesByEmployee(accountId, companyId, startDate, endDate);
     const [acct] = await db
-      .select({ firstName: employees.firstName, lastName: employees.lastName, openingBalance: employees.openingBalance })
+      .select({
+        firstName: employees.firstName,
+        lastName: employees.lastName,
+        openingBalance: employees.openingBalance,
+      })
       .from(employees)
       .where(eq(employees.id, accountId));
     accountName = acct ? `${acct.firstName} ${acct.lastName}` : "Employee";
@@ -210,7 +220,12 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
       if (linkedCust) {
         const company = await storage.getCompanyById(linkedCust.companyId);
         if (company?.companyType === "factory") {
-          const tot = await getFactoryCustomerLedgerPrePeriodTotals(linkedCust.id, accountId, linkedCust.companyId, startDate);
+          const tot = await getFactoryCustomerLedgerPrePeriodTotals(
+            linkedCust.id,
+            accountId,
+            linkedCust.companyId,
+            startDate
+          );
           openingBalance += tot.debit - tot.credit;
           factoryPrePeriodApplied = true;
         }
@@ -232,8 +247,7 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
       // Suppliers and ledger accounts are scoped to this company's own
       // vouchers only to prevent cross-company entries from skewing the
       // pre-period opening balance.
-      const scopeCondition =
-        isSupplier || accountType === "ledger" ? eq(vouchers.companyId, companyId) : sql`true`;
+      const scopeCondition = isSupplier || accountType === "ledger" ? eq(vouchers.companyId, companyId) : sql`true`;
       const [tot] = await db
         .select({
           d: sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}),0)`,
@@ -311,8 +325,18 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
   const logoUrl: string | null = (settings as any)?.logoUrl ?? null;
   const baseCurrency = (company as any)?.baseCurrency ?? "USD";
   const currencySymbolMap: Record<string, string> = {
-    USD: "$ ", GBP: "£", EUR: "€", CFA: "CFA ", XOF: "CFA ", XAF: "CFA ",
-    CAD: "CA$ ", AUD: "A$ ", CHF: "CHF ", JPY: "¥", INR: "₹", AED: "AED ",
+    USD: "$ ",
+    GBP: "£",
+    EUR: "€",
+    CFA: "CFA ",
+    XOF: "CFA ",
+    XAF: "CFA ",
+    CAD: "CA$ ",
+    AUD: "A$ ",
+    CHF: "CHF ",
+    JPY: "¥",
+    INR: "₹",
+    AED: "AED ",
   };
   const currSym = currencySymbolMap[baseCurrency.toUpperCase()] ?? baseCurrency + " ";
   const fmtAmt = (n: number) => {
@@ -352,7 +376,10 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
   const normalFont = isRTL && hasArabicFont ? "Arabic" : "Helvetica";
 
   let convertArabic: ((t: string) => string) | null = null;
-  let bidiInst: { getEmbeddingLevels: (t: string, d: string) => any; getReorderedString: (t: string, l: any) => string } | null = null;
+  let bidiInst: {
+    getEmbeddingLevels: (t: string, d: string) => any;
+    getReorderedString: (t: string, l: any) => string;
+  } | null = null;
   try {
     const reshaperMod = require("arabic-reshaper") as { convertArabic: (t: string) => string };
     convertArabic = reshaperMod.convertArabic;
@@ -370,7 +397,9 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
         return bidiInst.getReorderedString(reshaped, levels);
       }
       return reshaped;
-    } catch { return text; }
+    } catch {
+      return text;
+    }
   };
   const shapeText = (text: string): string => {
     if (!text) return text;
@@ -387,18 +416,18 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
   const USABLE = RM - LM; // 523
   const colDefs = isRTL
     ? [
-        { label: t.colBalance,     x: LM,       w: 65,  align: "right" as const },
-        { label: t.colCredit,      x: LM + 65,  w: 64,  align: "right" as const },
-        { label: t.colDebit,       x: LM + 129, w: 64,  align: "right" as const },
+        { label: t.colBalance, x: LM, w: 65, align: "right" as const },
+        { label: t.colCredit, x: LM + 65, w: 64, align: "right" as const },
+        { label: t.colDebit, x: LM + 129, w: 64, align: "right" as const },
         { label: t.colParticulars, x: LM + 193, w: 258, align: "right" as const },
-        { label: t.colDate,        x: LM + 451, w: 72,  align: "right" as const },
+        { label: t.colDate, x: LM + 451, w: 72, align: "right" as const },
       ]
     : [
-        { label: t.colDate,        x: LM,       w: 72,  align: "left"  as const },
-        { label: t.colParticulars, x: LM + 72,  w: 258, align: "left"  as const },
-        { label: t.colDebit,       x: LM + 330, w: 64,  align: "right" as const },
-        { label: t.colCredit,      x: LM + 394, w: 64,  align: "right" as const },
-        { label: t.colBalance,     x: LM + 458, w: 65,  align: "right" as const },
+        { label: t.colDate, x: LM, w: 72, align: "left" as const },
+        { label: t.colParticulars, x: LM + 72, w: 258, align: "left" as const },
+        { label: t.colDebit, x: LM + 330, w: 64, align: "right" as const },
+        { label: t.colCredit, x: LM + 394, w: 64, align: "right" as const },
+        { label: t.colBalance, x: LM + 458, w: 65, align: "right" as const },
       ];
 
   const PAGE_H = 841.89;
@@ -411,7 +440,7 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
   doc.on("data", (chunk: Buffer) => chunks.push(chunk));
 
   // ── Header block ──
-  let headerY = 36;
+  const headerY = 36;
   let logoWidth = 0;
 
   // Try company logo
@@ -438,20 +467,37 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
   const textX = LM + logoWidth;
   const textW = USABLE - logoWidth;
 
-  doc.fontSize(16).font(boldFont).fillColor("#1F3864")
+  doc
+    .fontSize(16)
+    .font(boldFont)
+    .fillColor("#1F3864")
     .text(shapeText(companyName), textX, headerY, { width: textW, align: isRTL ? "right" : "left" });
 
-  doc.fontSize(10).font(normalFont).fillColor("#333333")
-    .text(shapeText(`${t.accountStatement}: ${accountName}`), textX, doc.y + 2, { width: textW, align: isRTL ? "right" : "left" });
+  doc
+    .fontSize(10)
+    .font(normalFont)
+    .fillColor("#333333")
+    .text(shapeText(`${t.accountStatement}: ${accountName}`), textX, doc.y + 2, {
+      width: textW,
+      align: isRTL ? "right" : "left",
+    });
 
   const afterHeader = Math.max(doc.y, headerY + 50);
-  doc.moveTo(LM, afterHeader + 6).lineTo(RM, afterHeader + 6).lineWidth(0.75).strokeColor("#1F3864").stroke();
+  doc
+    .moveTo(LM, afterHeader + 6)
+    .lineTo(RM, afterHeader + 6)
+    .lineWidth(0.75)
+    .strokeColor("#1F3864")
+    .stroke();
   doc.lineWidth(1).strokeColor("#000000");
 
   const metaY = afterHeader + 12;
   doc.fillColor("#555555").fontSize(8).font(normalFont);
   doc.text(shapeText(`${t.period}: ${periodStr}`), LM, metaY, { width: USABLE, align: isRTL ? "right" : "left" });
-  doc.text(shapeText(`${t.generated}: ${generatedStr}`), LM, doc.y + 2, { width: USABLE, align: isRTL ? "right" : "left" });
+  doc.text(shapeText(`${t.generated}: ${generatedStr}`), LM, doc.y + 2, {
+    width: USABLE,
+    align: isRTL ? "right" : "left",
+  });
   doc.moveDown(0.6);
 
   // ── Table header ──
@@ -490,9 +536,11 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
       const v = vals[i];
       if (v) {
         const cellHasAr = !isRTL && hasArabicFont && containsArabic(v);
-        const cellFont = cellHasAr ? "Arabic" : (bold ? boldFont : normalFont);
+        const cellFont = cellHasAr ? "Arabic" : bold ? boldFont : normalFont;
         const cellAlign = cellHasAr ? "right" : col.align;
-        doc.font(cellFont).fontSize(FONT_SIZE)
+        doc
+          .font(cellFont)
+          .fontSize(FONT_SIZE)
           .text(shapeText(v), col.x + 2, y + 3, { width: col.w - 4, align: cellAlign });
       }
     });
@@ -510,9 +558,7 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
   // ── Opening balance row ──
   const obSideLabel = openingBalance >= 0 ? (isSupplier ? t.cr : t.dr) : isSupplier ? t.dr : t.cr;
   const obDisplay = `${fmtAmt(openingBalance)} ${obSideLabel}`;
-  const obVals = isRTL
-    ? [obDisplay, "-", "-", t.openingBalance, ""]
-    : ["", t.openingBalance, "-", "-", obDisplay];
+  const obVals = isRTL ? [obDisplay, "-", "-", t.openingBalance, ""] : ["", t.openingBalance, "-", "-", obDisplay];
   const obRowH = calcRowH(obVals);
   checkPageBreak(obRowH);
   drawDataRow(obVals, obRowH, "#EFF3FB", false);
@@ -537,29 +583,45 @@ export async function generateAccountStatementPdf(opts: StatementPdfOptions): Pr
 
   // ── Footer summary ──
   y += 4;
-  if (y + 36 > PAGE_H - 20) { doc.addPage(); y = 36; }
+  if (y + 36 > PAGE_H - 20) {
+    doc.addPage();
+    y = 36;
+  }
 
   const totD = rowsWithBalance.reduce((s, r) => s + r.totalDebit, 0);
   const totC = rowsWithBalance.reduce((s, r) => s + r.totalCredit, 0);
-  const closingBal = rowsWithBalance.length > 0 ? rowsWithBalance[rowsWithBalance.length - 1].runningBalance : openingBalance;
+  const closingBal =
+    rowsWithBalance.length > 0 ? rowsWithBalance[rowsWithBalance.length - 1].runningBalance : openingBalance;
   const closingSide = closingBal >= 0 ? (isSupplier ? t.cr : t.dr) : isSupplier ? t.dr : t.cr;
 
   const drawSummaryRow = (label: string, debit: string, credit: string, balance: string, navy: boolean) => {
     const bg = navy ? "#1F3864" : "#EFF3FB";
     const fg = navy ? "#ffffff" : "#000000";
     doc.rect(LM, y, USABLE, 17).fill(bg);
-    doc.fillColor(fg).font(navy ? boldFont : normalFont).fontSize(FONT_SIZE + 0.5);
+    doc
+      .fillColor(fg)
+      .font(navy ? boldFont : normalFont)
+      .fontSize(FONT_SIZE + 0.5);
     // label in PARTICULARS column
-    const partCol = colDefs.find((c) => c.label === t.colParticulars || c.label === "PARTICULARS" || c.label === "LIBELLÉ" || c.label === "البيان");
-    if (partCol) doc.text(shapeText(label), partCol.x + 2, y + 4.5, { width: partCol.w - 4, align: isRTL ? "right" : "left" });
+    const partCol = colDefs.find(
+      (c) => c.label === t.colParticulars || c.label === "PARTICULARS" || c.label === "LIBELLÉ" || c.label === "البيان"
+    );
+    if (partCol)
+      doc.text(shapeText(label), partCol.x + 2, y + 4.5, { width: partCol.w - 4, align: isRTL ? "right" : "left" });
     // debit
-    const drCol = colDefs.find((c) => c.label === t.colDebit || c.label === "DEBIT" || c.label === "DÉBIT" || c.label === "مدين");
+    const drCol = colDefs.find(
+      (c) => c.label === t.colDebit || c.label === "DEBIT" || c.label === "DÉBIT" || c.label === "مدين"
+    );
     if (drCol && debit) doc.text(shapeText(debit), drCol.x + 2, y + 4.5, { width: drCol.w - 4, align: "right" });
     // credit
-    const crCol = colDefs.find((c) => c.label === t.colCredit || c.label === "CREDIT" || c.label === "CRÉDIT" || c.label === "دائن");
+    const crCol = colDefs.find(
+      (c) => c.label === t.colCredit || c.label === "CREDIT" || c.label === "CRÉDIT" || c.label === "دائن"
+    );
     if (crCol && credit) doc.text(shapeText(credit), crCol.x + 2, y + 4.5, { width: crCol.w - 4, align: "right" });
     // balance
-    const balCol = colDefs.find((c) => c.label === t.colBalance || c.label === "BALANCE" || c.label === "SOLDE" || c.label === "الرصيد");
+    const balCol = colDefs.find(
+      (c) => c.label === t.colBalance || c.label === "BALANCE" || c.label === "SOLDE" || c.label === "الرصيد"
+    );
     if (balCol && balance) doc.text(shapeText(balance), balCol.x + 2, y + 4.5, { width: balCol.w - 4, align: "right" });
     doc.fillColor("#000000");
   };

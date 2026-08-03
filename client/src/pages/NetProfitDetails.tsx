@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   ArrowLeft,
-  Plus,
   Minus,
   AlertCircle,
   ChevronDown,
@@ -114,9 +113,7 @@ function CategoryGroup({
               ? "/properties/ledger-monthly"
               : "/ledger-monthly";
             const isCreditOnAsset = side === "asset" && acc.value < 0;
-            const rowColor = isCreditOnAsset
-              ? "text-rose-600 dark:text-rose-400"
-              : color;
+            const rowColor = isCreditOnAsset ? "text-rose-600 dark:text-rose-400" : color;
             return (
               <div
                 key={i}

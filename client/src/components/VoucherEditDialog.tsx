@@ -18,7 +18,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
@@ -26,7 +25,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CalendarIcon, Plus, X, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import { formatNumber } from "@/lib/formatNumber";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import type { Voucher } from "@shared/schema";
 
@@ -557,20 +555,30 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                                     const txCcy = form.watch(`entries.${index}.transactionCurrency`);
                                     const rate = form.watch(`entries.${index}.historicalExchangeRate`);
                                     if (!txCcy || txCcy === "USD" || !rate) return null;
-                                    const txDebit = parseFloat(form.watch(`entries.${index}.transactionDebitAmount`) || "0");
-                                    const txCredit = parseFloat(form.watch(`entries.${index}.transactionCreditAmount`) || "0");
+                                    const txDebit = parseFloat(
+                                      form.watch(`entries.${index}.transactionDebitAmount`) || "0"
+                                    );
+                                    const txCredit = parseFloat(
+                                      form.watch(`entries.${index}.transactionCreditAmount`) || "0"
+                                    );
                                     const txAmt = Math.max(txDebit, txCredit);
                                     const rateNum = parseFloat(rate);
                                     return (
                                       <div className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded px-2 py-0.5">
-                                        <span className="font-medium text-amber-700 dark:text-amber-400">
-                                          {txCcy}
-                                        </span>
+                                        <span className="font-medium text-amber-700 dark:text-amber-400">{txCcy}</span>
                                         {txAmt > 0 && (
-                                          <span>{txCcy === "CFA" ? Math.round(txAmt).toLocaleString() : txAmt.toFixed(2)}</span>
+                                          <span>
+                                            {txCcy === "CFA" ? Math.round(txAmt).toLocaleString() : txAmt.toFixed(2)}
+                                          </span>
                                         )}
                                         {rateNum > 0 && (
-                                          <span className="text-muted-foreground">@ {rateNum.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
+                                          <span className="text-muted-foreground">
+                                            @{" "}
+                                            {rateNum.toLocaleString(undefined, {
+                                              minimumFractionDigits: 2,
+                                              maximumFractionDigits: 4,
+                                            })}
+                                          </span>
                                         )}
                                         <span className="text-xs opacity-60">(historical)</span>
                                       </div>

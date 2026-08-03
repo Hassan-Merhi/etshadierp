@@ -1,4 +1,4 @@
-import { Printer, CalendarDays, Loader2, CheckCircle } from "lucide-react";
+import { Printer, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

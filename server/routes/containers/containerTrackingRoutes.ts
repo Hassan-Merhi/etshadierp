@@ -1,81 +1,16 @@
-import { parseId, parseOptionalId } from "../../lib/parseId";
+import { parseId } from "../../lib/parseId";
 import { getErrorMessage } from "../../lib/httpHandlers";
-import { getClientDate } from "../../lib/dateUtils";
-import type { Express, Request, Response, NextFunction } from "express";
+import type { Express } from "express";
 import { db } from "../../db";
-import { storage } from "../../storage";
-import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
-import { upload, logAudit, getCurrentExchangeRate } from "../_helpers";
+import { requireAuth, requireNonPOS } from "../../auth";
 import { logger } from "../../lib/logger";
 import {
-  inventory,
-  stockItems,
-  stockGroups,
-  stockItemCodeAliases,
-  stockItemLocationPrices,
-  stockTransferVouchers,
-  stockTransferItems,
-  stockAdjustmentVouchers,
-  stockAdjustmentItems,
   containers,
-  containerOffloads,
-  containerOffloadItems,
-  containerSales,
-  containerCharges,
   containerTrackingImportRowSchema,
   updateContainerTrackingSchema,
-  bankAccounts,
-  fixedAssets,
-  insertBankAccountSchema,
-  insertFixedAssetSchema,
-  insertStockGroupSchema,
-  insertStockItemSchema,
-  insertStockItemCodeAliasSchema,
-  insertContainerSchema,
-  offloadRequestSchema,
-  purchaseOrders,
-  poLineItems,
-  insertContainerSaleSchema,
-  vouchers,
-  voucherEntries,
-  salesItems,
-  suppliers,
-  customers,
-  locations,
-  employees,
-  userLocations,
-  auditLog,
-  interCompanyTransfers,
-  insertInterCompanyTransferSchema,
-  FEATURE_KEYS,
-  ledgerAccounts,
-  intercompanyPosConfigs,
-  stockItemMergeLogs,
   userCompanyRoles,
 } from "@shared/schema";
-import {
-  eq,
-  and,
-  or,
-  desc,
-  asc,
-  lt,
-  gt,
-  ne,
-  inArray,
-  sql,
-  isNull,
-  isNotNull,
-  not,
-  gte,
-  lte,
-  like,
-  ilike,
-} from "drizzle-orm";
-import { format } from "date-fns";
-import { z } from "zod";
-import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../../excelHelper";
-import { adjustInventory, reverseInventoryByExactValue } from "../../inventoryHelper";
+import { eq, and } from "drizzle-orm";
 import {
   refreshContainerEta,
   refreshMultipleContainerEtas,
@@ -90,7 +25,12 @@ export function registerContainerTrackingRoutes(app: Express) {
     const _uid = req.session.userId;
     const _cid = req.session.currentCompanyId;
     try {
-      logger.info("container tracking update started", { module: "containers", action: "updateTracking", userId: _uid, companyId: _cid });
+      logger.info("container tracking update started", {
+        module: "containers",
+        action: "updateTracking",
+        userId: _uid,
+        companyId: _cid,
+      });
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -190,20 +130,30 @@ export function registerContainerTrackingRoutes(app: Express) {
 
       await db.update(containers).set(updateData).where(eq(containers.id, id));
 
-      const [updated] = await db
-        .select()
-        .from(containers)
-        .where(eq(containers.id, id))
-        .limit(1);
+      const [updated] = await db.select().from(containers).where(eq(containers.id, id)).limit(1);
 
       if (!updated) {
         return res.status(404).json({ message: "Container not found" });
       }
 
-      logger.info("container tracking update succeeded", { module: "containers", action: "updateTracking", userId: _uid, companyId: _cid, containerId: id, durationMs: Date.now() - _t });
+      logger.info("container tracking update succeeded", {
+        module: "containers",
+        action: "updateTracking",
+        userId: _uid,
+        companyId: _cid,
+        containerId: id,
+        durationMs: Date.now() - _t,
+      });
       res.json(updated);
     } catch (error: unknown) {
-      logger.error("container tracking update failed", { module: "containers", action: "updateTracking", userId: _uid, companyId: _cid, durationMs: Date.now() - _t, error });
+      logger.error("container tracking update failed", {
+        module: "containers",
+        action: "updateTracking",
+        userId: _uid,
+        companyId: _cid,
+        durationMs: Date.now() - _t,
+        error,
+      });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });

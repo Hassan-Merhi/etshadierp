@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -313,8 +313,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
             <div className="space-y-1">
               <Badge variant="default">Active Shift</Badge>
               <p className="text-sm text-muted-foreground">
-                Started {formatDisplayDate(currentShift.openedAt)} at{" "}
-                {safeFmtTime(currentShift.openedAt)}
+                Started {formatDisplayDate(currentShift.openedAt)} at {safeFmtTime(currentShift.openedAt)}
               </p>
               <p className="text-sm">
                 Opening Cash:{" "}
@@ -411,8 +410,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
                         <TableCell className="text-sm hidden sm:table-cell text-muted-foreground">
                           {shift.closedAt ? (
                             <>
-                              {safeFmtTime(shift.openedAt)} –{" "}
-                              {safeFmtTime(shift.closedAt)}
+                              {safeFmtTime(shift.openedAt)} – {safeFmtTime(shift.closedAt)}
                             </>
                           ) : (
                             safeFmtTime(shift.openedAt) + " – Active"

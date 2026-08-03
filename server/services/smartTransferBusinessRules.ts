@@ -31,8 +31,7 @@ export interface SmartTransferBusinessRuleFields {
   mixAdjustmentReason: string;
 }
 
-export type SmartTransferBusinessRuleLine = SmartTransferSourceOptimizedLine &
-  SmartTransferBusinessRuleFields;
+export type SmartTransferBusinessRuleLine = SmartTransferSourceOptimizedLine & SmartTransferBusinessRuleFields;
 
 export interface SmartTransferMixSummaryRow {
   id: number | null;
@@ -45,8 +44,7 @@ export interface SmartTransferMixSummaryRow {
   priority: boolean;
 }
 
-export interface SmartTransferBusinessRuleResult
-  extends Omit<SmartTransferSourceOptimizedResult, "lines"> {
+export interface SmartTransferBusinessRuleResult extends Omit<SmartTransferSourceOptimizedResult, "lines"> {
   businessRulesVersion: 3;
   lines: SmartTransferBusinessRuleLine[];
   businessRules: {
@@ -102,9 +100,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function uniquePositiveIds(values: number[] | undefined): number[] {
-  return Array.from(
-    new Set((values ?? []).map(Number).filter((value) => Number.isInteger(value) && value > 0))
-  );
+  return Array.from(new Set((values ?? []).map(Number).filter((value) => Number.isInteger(value) && value > 0)));
 }
 
 function isoDaysAgo(asOfDate: string, daysAgo: number): string {
@@ -137,13 +133,11 @@ function buildMixTargets(
   const weightByKey = new Map<number, number>();
 
   for (const item of items) {
-    historicalQtyByKey.set(
-      item.key,
-      (historicalQtyByKey.get(item.key) ?? 0) + Math.max(0, item.historicalSalesQty)
-    );
-    const provenWeight = preserveDestinationMix && item.historicalSalesQty > 0
-      ? item.historicalSalesQty
-      : Math.max(1, item.fallbackWeight);
+    historicalQtyByKey.set(item.key, (historicalQtyByKey.get(item.key) ?? 0) + Math.max(0, item.historicalSalesQty));
+    const provenWeight =
+      preserveDestinationMix && item.historicalSalesQty > 0
+        ? item.historicalSalesQty
+        : Math.max(1, item.fallbackWeight);
     weightByKey.set(item.key, (weightByKey.get(item.key) ?? 0) + provenWeight);
   }
 
@@ -201,10 +195,18 @@ function allocateWithSharedCaps(input: {
         const itemRoom = Math.max(0, itemLimit - current);
         const categoryRoom = input.relaxBucketCaps
           ? remaining
-          : Math.max(0, (input.categoryCaps.get(item.categoryKey) ?? input.requested) - (categoryTotals.get(item.categoryKey) ?? 0));
+          : Math.max(
+              0,
+              (input.categoryCaps.get(item.categoryKey) ?? input.requested) -
+                (categoryTotals.get(item.categoryKey) ?? 0)
+            );
         const groupRoom = input.relaxBucketCaps
           ? remaining
-          : Math.max(0, (input.stockGroupCaps.get(item.stockGroupKey) ?? input.requested) - (groupTotals.get(item.stockGroupKey) ?? 0));
+          : Math.max(
+              0,
+              (input.stockGroupCaps.get(item.stockGroupKey) ?? input.requested) -
+                (groupTotals.get(item.stockGroupKey) ?? 0)
+            );
         const room = Math.min(itemRoom, categoryRoom, groupRoom, remaining);
         if (room <= 0) return null;
 
@@ -212,7 +214,8 @@ function allocateWithSharedCaps(input: {
         const groupTarget = input.stockGroupTargets.get(item.stockGroupKey) ?? 0;
         const categoryGap = Math.max(0, categoryTarget - (categoryTotals.get(item.categoryKey) ?? 0));
         const groupGap = Math.max(0, groupTarget - (groupTotals.get(item.stockGroupKey) ?? 0));
-        const dynamicWeight = item.weight * (1 + categoryGap / Math.max(1, input.requested) + groupGap / Math.max(1, input.requested));
+        const dynamicWeight =
+          item.weight * (1 + categoryGap / Math.max(1, input.requested) + groupGap / Math.max(1, input.requested));
 
         return { item, room, dynamicWeight };
       })
@@ -271,10 +274,7 @@ function removeTinyItems(
   return { allocations: next, removedQty, removedCount };
 }
 
-function allocateSourcesWithMinimumSplits(
-  sources: SourceOption[],
-  requested: number
-): Map<number, number> {
+function allocateSourcesWithMinimumSplits(sources: SourceOption[], requested: number): Map<number, number> {
   const result = new Map<number, number>();
   const target = wholeNonNegative(requested);
   if (target <= 0) return result;
@@ -353,9 +353,10 @@ export async function buildSmartTransferBusinessRulePreview(
   const preserveDestinationMix = options.preserveDestinationMix !== false;
   const priorityCategoryIds = uniquePositiveIds(options.priorityCategoryIds);
   const priorityStockGroupIds = uniquePositiveIds(options.priorityStockGroupIds);
-  const minItemQuantity = options.minItemQuantity && options.minItemQuantity > 0
-    ? wholeNonNegative(options.minItemQuantity)
-    : automaticMinimumItemQty(requestedTarget);
+  const minItemQuantity =
+    options.minItemQuantity && options.minItemQuantity > 0
+      ? wholeNonNegative(options.minItemQuantity)
+      : automaticMinimumItemQty(requestedTarget);
 
   const normalizedRules = {
     maxItemSharePct,
@@ -384,10 +385,14 @@ export async function buildSmartTransferBusinessRulePreview(
   const salesStart = isoDaysAgo(asOfDate, 179);
   const stockItemIds = Array.from(new Set(base.lines.map((line) => line.stockItemId)));
   const categoryIds = Array.from(
-    new Set(base.lines.map((line) => line.categoryId).filter((id): id is number => Number.isInteger(id) && Number(id) > 0))
+    new Set(
+      base.lines.map((line) => line.categoryId).filter((id): id is number => Number.isInteger(id) && Number(id) > 0)
+    )
   );
   const stockGroupIds = Array.from(
-    new Set(base.lines.map((line) => line.stockGroupId).filter((id): id is number => Number.isInteger(id) && Number(id) > 0))
+    new Set(
+      base.lines.map((line) => line.stockGroupId).filter((id): id is number => Number.isInteger(id) && Number(id) > 0)
+    )
   );
 
   const [salesRows, categoryRows, stockGroupRows] = await Promise.all([
@@ -498,12 +503,10 @@ export async function buildSmartTransferBusinessRulePreview(
   const uniqueCategoryKeys = new Set(rawItems.map((item) => item.categoryKey));
   const uniqueGroupKeys = new Set(rawItems.map((item) => item.stockGroupKey));
   const itemShareCap = rawItems.length <= 1 ? requestedTarget : Math.ceil((requestedTarget * maxItemSharePct) / 100);
-  const categoryShareCap = uniqueCategoryKeys.size <= 1
-    ? requestedTarget
-    : Math.ceil((requestedTarget * maxCategorySharePct) / 100);
-  const stockGroupShareCap = uniqueGroupKeys.size <= 1
-    ? requestedTarget
-    : Math.ceil((requestedTarget * maxStockGroupSharePct) / 100);
+  const categoryShareCap =
+    uniqueCategoryKeys.size <= 1 ? requestedTarget : Math.ceil((requestedTarget * maxCategorySharePct) / 100);
+  const stockGroupShareCap =
+    uniqueGroupKeys.size <= 1 ? requestedTarget : Math.ceil((requestedTarget * maxStockGroupSharePct) / 100);
 
   const priorityCategorySet = new Set(priorityCategoryIds);
   const priorityStockGroupSet = new Set(priorityStockGroupIds);
@@ -511,21 +514,13 @@ export async function buildSmartTransferBusinessRulePreview(
     const categoryTargetShare = categoryTargets.shareByKey.get(item.categoryKey) ?? 0;
     const groupTargetShare = stockGroupTargets.shareByKey.get(item.stockGroupKey) ?? 0;
     const priorityBoost =
-      (priorityCategorySet.has(item.categoryKey) ? 12 : 0) +
-      (priorityStockGroupSet.has(item.stockGroupKey) ? 12 : 0);
+      (priorityCategorySet.has(item.categoryKey) ? 12 : 0) + (priorityStockGroupSet.has(item.stockGroupKey) ? 12 : 0);
     const businessPriorityScore = Math.round(
-      clamp(
-        item.representative.itemScore + categoryTargetShare * 12 + groupTargetShare * 10 + priorityBoost,
-        0,
-        100
-      )
+      clamp(item.representative.itemScore + categoryTargetShare * 12 + groupTargetShare * 10 + priorityBoost, 0, 100)
     );
-    const mixMultiplier = preserveDestinationMix
-      ? 0.75 + categoryTargetShare + groupTargetShare
-      : 1;
-    const weight = Math.max(1, businessPriorityScore) *
-      Math.max(1, item.representative.forecastDailyRate * 10) *
-      mixMultiplier;
+    const mixMultiplier = preserveDestinationMix ? 0.75 + categoryTargetShare + groupTargetShare : 1;
+    const weight =
+      Math.max(1, businessPriorityScore) * Math.max(1, item.representative.forecastDailyRate * 10) * mixMultiplier;
 
     return {
       ...item,
@@ -576,7 +571,7 @@ export async function buildSmartTransferBusinessRulePreview(
     });
   }
 
-  let totalAfterBucketRelax = Array.from(allocations.values()).reduce((sum, quantity) => sum + quantity, 0);
+  const totalAfterBucketRelax = Array.from(allocations.values()).reduce((sum, quantity) => sum + quantity, 0);
   if (totalAfterBucketRelax < requestedTarget) {
     relaxedItemCaps = true;
     allocations = allocateWithSharedCaps({
@@ -596,7 +591,12 @@ export async function buildSmartTransferBusinessRulePreview(
   allocations = tinyResult.allocations;
   if (tinyResult.removedQty > 0) {
     allocations = allocateWithSharedCaps({
-      items: items.filter((item) => (allocations.get(item.stockItemId) ?? 0) >= minItemQuantity || item.representative.urgencyBand === "critical" || item.representative.urgencyBand === "high"),
+      items: items.filter(
+        (item) =>
+          (allocations.get(item.stockItemId) ?? 0) >= minItemQuantity ||
+          item.representative.urgencyBand === "critical" ||
+          item.representative.urgencyBand === "high"
+      ),
       requested: requestedTarget,
       allocations,
       categoryCaps,
@@ -619,22 +619,23 @@ export async function buildSmartTransferBusinessRulePreview(
     if (itemQty <= 0) continue;
     const sourceAllocations = allocateSourcesWithMinimumSplits(item.sources, itemQty);
     const previousSourceCount = linesByItem.get(item.stockItemId)?.length ?? 0;
-    if (previousSourceCount > sourceAllocations.size) sourceSplitsAvoided += previousSourceCount - sourceAllocations.size;
+    if (previousSourceCount > sourceAllocations.size)
+      sourceSplitsAvoided += previousSourceCount - sourceAllocations.size;
 
-    const categoryName = item.categoryKey === UNASSIGNED_KEY
-      ? "Unassigned category"
-      : categoryNameById.get(item.categoryKey) ?? `Category #${item.categoryKey}`;
-    const stockGroupName = item.stockGroupKey === UNASSIGNED_KEY
-      ? "Unassigned stock group"
-      : stockGroupNameById.get(item.stockGroupKey) ?? `Stock group #${item.stockGroupKey}`;
+    const categoryName =
+      item.categoryKey === UNASSIGNED_KEY
+        ? "Unassigned category"
+        : (categoryNameById.get(item.categoryKey) ?? `Category #${item.categoryKey}`);
+    const stockGroupName =
+      item.stockGroupKey === UNASSIGNED_KEY
+        ? "Unassigned stock group"
+        : (stockGroupNameById.get(item.stockGroupKey) ?? `Stock group #${item.stockGroupKey}`);
     const categoryTargetShare = categoryTargets.shareByKey.get(item.categoryKey) ?? 0;
     const groupTargetShare = stockGroupTargets.shareByKey.get(item.stockGroupKey) ?? 0;
-    const categoryFinalShare = finalAllocatedTarget > 0
-      ? (finalCategoryTotals.get(item.categoryKey) ?? 0) / finalAllocatedTarget
-      : 0;
-    const groupFinalShare = finalAllocatedTarget > 0
-      ? (finalGroupTotals.get(item.stockGroupKey) ?? 0) / finalAllocatedTarget
-      : 0;
+    const categoryFinalShare =
+      finalAllocatedTarget > 0 ? (finalCategoryTotals.get(item.categoryKey) ?? 0) / finalAllocatedTarget : 0;
+    const groupFinalShare =
+      finalAllocatedTarget > 0 ? (finalGroupTotals.get(item.stockGroupKey) ?? 0) / finalAllocatedTarget : 0;
     const adjustmentReason = mixReason({
       item,
       itemQty,
@@ -694,35 +695,40 @@ export async function buildSmartTransferBusinessRulePreview(
     (a, b) => b.suggestedQuantity - a.suggestedQuantity || a.sourceLocationName.localeCompare(b.sourceLocationName)
   );
 
-  const categoryMix: SmartTransferMixSummaryRow[] = Array.from(uniqueCategoryKeys).map((key) => {
-    const quantity = finalCategoryTotals.get(key) ?? 0;
-    const targetShare = categoryTargets.shareByKey.get(key) ?? 0;
-    return {
-      id: key === UNASSIGNED_KEY ? null : key,
-      name: key === UNASSIGNED_KEY ? "Unassigned category" : categoryNameById.get(key) ?? `Category #${key}`,
-      targetSharePct: roundNumber(targetShare * 100, 2),
-      finalSharePct: roundNumber((quantity / Math.max(1, achievedQuantity)) * 100, 2),
-      quantity,
-      historicalSalesQty: roundNumber(categoryTargets.historicalQtyByKey.get(key) ?? 0, 3),
-      capped: !relaxedBucketCaps && quantity >= (categoryCaps.get(key) ?? requestedTarget),
-      priority: priorityCategorySet.has(key),
-    };
-  }).sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name));
+  const categoryMix: SmartTransferMixSummaryRow[] = Array.from(uniqueCategoryKeys)
+    .map((key) => {
+      const quantity = finalCategoryTotals.get(key) ?? 0;
+      const targetShare = categoryTargets.shareByKey.get(key) ?? 0;
+      return {
+        id: key === UNASSIGNED_KEY ? null : key,
+        name: key === UNASSIGNED_KEY ? "Unassigned category" : (categoryNameById.get(key) ?? `Category #${key}`),
+        targetSharePct: roundNumber(targetShare * 100, 2),
+        finalSharePct: roundNumber((quantity / Math.max(1, achievedQuantity)) * 100, 2),
+        quantity,
+        historicalSalesQty: roundNumber(categoryTargets.historicalQtyByKey.get(key) ?? 0, 3),
+        capped: !relaxedBucketCaps && quantity >= (categoryCaps.get(key) ?? requestedTarget),
+        priority: priorityCategorySet.has(key),
+      };
+    })
+    .sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name));
 
-  const stockGroupMix: SmartTransferMixSummaryRow[] = Array.from(uniqueGroupKeys).map((key) => {
-    const quantity = finalGroupTotals.get(key) ?? 0;
-    const targetShare = stockGroupTargets.shareByKey.get(key) ?? 0;
-    return {
-      id: key === UNASSIGNED_KEY ? null : key,
-      name: key === UNASSIGNED_KEY ? "Unassigned stock group" : stockGroupNameById.get(key) ?? `Stock group #${key}`,
-      targetSharePct: roundNumber(targetShare * 100, 2),
-      finalSharePct: roundNumber((quantity / Math.max(1, achievedQuantity)) * 100, 2),
-      quantity,
-      historicalSalesQty: roundNumber(stockGroupTargets.historicalQtyByKey.get(key) ?? 0, 3),
-      capped: !relaxedBucketCaps && quantity >= (stockGroupCaps.get(key) ?? requestedTarget),
-      priority: priorityStockGroupSet.has(key),
-    };
-  }).sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name));
+  const stockGroupMix: SmartTransferMixSummaryRow[] = Array.from(uniqueGroupKeys)
+    .map((key) => {
+      const quantity = finalGroupTotals.get(key) ?? 0;
+      const targetShare = stockGroupTargets.shareByKey.get(key) ?? 0;
+      return {
+        id: key === UNASSIGNED_KEY ? null : key,
+        name:
+          key === UNASSIGNED_KEY ? "Unassigned stock group" : (stockGroupNameById.get(key) ?? `Stock group #${key}`),
+        targetSharePct: roundNumber(targetShare * 100, 2),
+        finalSharePct: roundNumber((quantity / Math.max(1, achievedQuantity)) * 100, 2),
+        quantity,
+        historicalSalesQty: roundNumber(stockGroupTargets.historicalQtyByKey.get(key) ?? 0, 3),
+        capped: !relaxedBucketCaps && quantity >= (stockGroupCaps.get(key) ?? requestedTarget),
+        priority: priorityStockGroupSet.has(key),
+      };
+    })
+    .sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name));
 
   const businessRulesApplied = [
     `Maximum ${maxItemSharePct}% per item`,

@@ -1,10 +1,10 @@
-import { parseId, parseOptionalId } from "../../lib/parseId";
+import { parseId } from "../../lib/parseId";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import type { Express } from "express";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { factorySheets } from "@shared/schema";
-import { eq, and, asc, ne } from "drizzle-orm";
+import { eq, and, asc } from "drizzle-orm";
 import multer from "multer";
 import { read as readExcel, utils as xlsxUtils, write as writeExcel, WorkBook } from "xlsx";
 

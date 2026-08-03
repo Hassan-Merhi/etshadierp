@@ -2,136 +2,30 @@ import { logAudit } from "../../helpers/auditHelpers";
 import { getErrorMessage, getErrorStack } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
 import { contentDisposition } from "../../../lib/contentDisposition";
-import { trackOneContainerById } from "../../../services/container-tracking";
-import { parseId, parseOptionalId } from "../../../lib/parseId";
-import { dispatchNotification } from "../../../lib/notificationService";
-import { getClientDate } from "../../../lib/dateUtils";
+import { parseId } from "../../../lib/parseId";
 import { getExportPriceVisibility } from "../../../helpers/exportVisibility";
-import { sendWhatsAppFileToChatIdPos } from "../../../services/whatsappService";
 import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
-import { classifyNetPositionAccounts } from "../../../netPositionHelper";
-import { adjustInventory } from "../../../inventoryHelper";
 import ExcelJS from "exceljs";
 import os from "os";
 import crypto from "crypto";
+
 import {
-  writeDaybookEntry,
-  getOrFetchFxRateToUsd,
-  getOrCreateLedgerAccount,
-  isLegacySHA256Hash,
-  verifySupervisorPassword,
-  recalculateOrderTotals,
-} from "../_helpers";
-import {
-  factorySuppliers,
-  factoryCategories,
   factoryBaleProducts,
-  factoryContainers,
-  factoryRawStock,
-  factoryMixBatches,
-  factoryMixBatchSources,
-  factoryDailyUsages,
-  factoryPressingBatches,
   factoryBales,
-  factoryBaleSequences,
-  factoryContainerCommissions,
-  baleLabelPrints,
-  stockItems,
-  stockGroups,
-  users,
-  insertFactorySupplierSchema,
-  insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema,
-  insertFactoryContainerSchema,
-  insertFactoryRawStockSchema,
-  insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema,
-  insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema,
-  customerProformas,
-  customerProformaLines,
   customerOrders,
   customerOrderLines,
   customerOrderBales,
   customerOrderCharges,
-  customerInvoiceSequences,
-  customerBalances,
   customers,
-  insertCustomerSchema,
-  ledgerAccounts,
-  voucherEntries,
   companies,
-  locations,
-  userCompanyRoles,
-  insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema,
-  insertCustomerOrderSchema,
-  factoryFxRates,
-  insertFactoryFxRateSchema,
-  factoryDaybookEntries,
-  containerDocumentTypes,
-  containerDocuments,
-  containerFreight,
-  containerFreightPayments,
-  factoryDaybookEntryEdits,
-  containers,
-  factoryUserProfiles,
-  factoryUserPageAccess,
-  insertUserSchema,
-  directMessages,
-  insertDirectMessageSchema,
-  userPresence,
-  factoryDutyAuditLog,
-  factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges,
-  companySettings,
-  factorySettings,
-  factoryWorkers,
-  factoryWorkerCategories,
-  insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments,
-  factoryPayrolls,
-  factoryWorkerDocuments,
-  factoryAlerts,
-  employees,
-  factoryWasteEntries,
-  factoryBalePhotos,
-  factoryDailyKpiSnapshots,
-  factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots,
-  factoryContainerProfitSnapshots,
-  bankAccounts,
-  inventory,
-  exchangeRates,
-  vouchers,
-  suppliers,
-  containerSales,
-  factorySupplierPayments,
-  insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers,
-  insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations,
-  baleRecodeSessions,
-  baleRecodeItems,
-  factoryWorkerAdvances,
-  factoryAdvanceRepayments,
-  factoryBaleWasteDispatches,
-  factoryPosSales,
-  factoryPosSaleItems,
-  proformaStockReservations,
-  customerOrderBaleRemovals,
-  customerOrderExpectedLines,
 } from "@shared/schema";
-import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
-import bcrypt from "bcryptjs";
-import CryptoJS from "crypto-js";
-import multer from "multer";
+import { eq, and, inArray } from "drizzle-orm";
 import path from "path";
 import fs from "fs";
 
-import { buildExportFilename, buildOrderExcelBuffer } from "./orderHelpers";
+import { buildExportFilename } from "./orderHelpers";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared invoice workbook builder

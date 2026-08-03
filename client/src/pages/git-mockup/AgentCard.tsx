@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,11 +26,11 @@ import {
 import { cn } from "@/lib/utils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { fmt, fmtD, clientReallocate } from "./helpers";
+import { fmt, clientReallocate } from "./helpers";
 import { sendAgentCardToWhatsApp } from "./agentCardWaSend";
 import { AgentCardTable } from "./AgentCardTable";
 import { AgentCardTransit } from "./AgentCardTransit";
-import type { AgentDutySummary, ApiAllocatedRow, ApiAllocStatus, ApiPreviewRow, WarningCode } from "./types";
+import type { AgentDutySummary, ApiAllocatedRow, ApiAllocStatus } from "./types";
 import { WARNING_META } from "./types";
 
 interface AdjEntry {
@@ -82,7 +82,8 @@ export function AgentCard({
     }
   });
   const saveOrder = (order: number[] | null) => {
-    if (order === null) localStorage.removeItem(storageKey); else localStorage.setItem(storageKey, JSON.stringify(order));
+    if (order === null) localStorage.removeItem(storageKey);
+    else localStorage.setItem(storageKey, JSON.stringify(order));
     setCustomOrder(order);
   };
   const resetOrder = () => saveOrder(null);

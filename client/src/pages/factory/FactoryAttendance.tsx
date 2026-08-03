@@ -1,23 +1,56 @@
-import {useState, useEffect, useCallback} from "react";
-import * as XLSX from "@/lib/excelHelper";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {Button} from "@/components/ui/button";
-import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
-import {Badge} from "@/components/ui/badge";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Skeleton} from "@/components/ui/skeleton";
-import {Dialog, DialogContent, DialogHeader, DialogTitle} from "@/components/ui/dialog";
-import {DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger} from "@/components/ui/dropdown-menu";
-import {useToast} from "@/hooks/use-toast";
-import {CalendarDays, CheckCircle, XCircle, RotateCcw, Save, Printer, FileDown, Users, UserCheck, UserX, Clock, Languages, ChevronDown} from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
+import {
+  CalendarDays,
+  CheckCircle,
+  XCircle,
+  RotateCcw,
+  Save,
+  Printer,
+  FileDown,
+  Users,
+  UserCheck,
+  UserX,
+  Clock,
+  Languages,
+  ChevronDown,
+} from "lucide-react";
 
-import type {AttendanceRecord, AttendanceStatus, ViewMode, WorkerRow} from "./factoryattendance/types";
-import {STATUS_COLORS, STATUS_OPTIONS, exportRangeExcel, exportWeeklyExcel, formatDate, generateDateRange, generateRangePrintHtml, generateWeeklyBlankSheetHtml, generateWeeklyResultsSheetHtml, getInitialMode, getWeekDays, setModeInUrl, todayStr} from "./factoryattendance/utils";
-import {PerWorkerView} from "./factoryattendance/components/PerWorkerView";
-import {SummaryCard} from "./factoryattendance/components/SummaryCard";
+import type { AttendanceRecord, AttendanceStatus, ViewMode, WorkerRow } from "./factoryattendance/types";
+import {
+  STATUS_COLORS,
+  STATUS_OPTIONS,
+  exportRangeExcel,
+  exportWeeklyExcel,
+  formatDate,
+  generateDateRange,
+  generateRangePrintHtml,
+  generateWeeklyBlankSheetHtml,
+  generateWeeklyResultsSheetHtml,
+  getInitialMode,
+  getWeekDays,
+  setModeInUrl,
+  todayStr,
+} from "./factoryattendance/utils";
+import { PerWorkerView } from "./factoryattendance/components/PerWorkerView";
+import { SummaryCard } from "./factoryattendance/components/SummaryCard";
 export default function FactoryAttendance() {
   const { toast } = useToast();
   const [mode, setMode] = useState<ViewMode>(getInitialMode);

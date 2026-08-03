@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { getErrorMessage } from "./lib/httpHandlers";
 import { eq, and, sql } from "drizzle-orm";
-import { users, baleProducts, baleLabelPrints, productionBales, baleSequences, mixBatches } from "@shared/schema";
+import { users, baleProducts, baleLabelPrints, baleSequences, mixBatches } from "@shared/schema";
 
 export async function runDevSeed() {
   const COMPANY_ID = 11;

@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
+import { utils, writeFile, read } from "@/lib/excelHelper";
 import { Download, Package } from "lucide-react";
 import type { Location } from "@shared/schema";
 import { Alert, AlertDescription } from "@/components/ui/alert";

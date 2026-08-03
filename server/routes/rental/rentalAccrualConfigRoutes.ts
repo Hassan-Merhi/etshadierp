@@ -4,9 +4,6 @@ import { logger } from "../../lib/logger";
 import {
   getCompanyId,
   findOrCreateLedgerAccount,
-  maybeRunAutoTransfer,
-  ensureMonthlyLedgerRows,
-  findEarliestOutstandingMonth,
   ensureMonthlyForCompany,
   postRentAccrualForCompany,
   type RentalModule,
@@ -14,24 +11,19 @@ import {
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { z } from "zod";
-import { eq, and, sql, desc, inArray, isNull, isNotNull, ne } from "drizzle-orm";
+import { eq, and, sql, inArray, isNull, isNotNull } from "drizzle-orm";
 import {
   propertyUnits,
   propertyContracts,
   propertyMonthlyLedger,
   propertyPayments,
-  insertPropertyUnitSchema,
-  insertPropertyContractSchema,
   ledgerAccounts,
   vouchers,
   voucherEntries,
   rentalAutoTransferConfigs,
-  interCompanyTransfers,
   companies,
 } from "@shared/schema";
-import { parseId, parseOptionalId } from "../../lib/parseId";
-import { logAudit } from "../_helpers";
-import { getClientDate } from "../../lib/dateUtils";
+import { parseId } from "../../lib/parseId";
 
 export function registerRentalAccrualConfigRoutes(
   app: Express,

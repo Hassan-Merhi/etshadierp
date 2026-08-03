@@ -3,140 +3,18 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { isReadonlyMigratedVoucher, READONLY_MIGRATED_VOUCHER_MESSAGE } from "../../lib/migratedVoucherGuard";
-import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
-import { requireActionAccess } from "../../lib/permissionMiddleware";
+import { requireAuth, requireNonPOS } from "../../auth";
+import { logAudit, buildItemLevelChanges } from "../_helpers";
 import {
-  upload,
-  logAudit,
-  getCurrentExchangeRate,
-  calculateHistoricalLocationInventory,
-  syncEmployeeBalancesFromEntries,
-  snapshotVoucherEntries,
-  buildVoucherChangesForCreate,
-  buildVoucherChangesForUpdate,
-  buildItemLevelChanges,
-} from "../_helpers";
-import { triggerIntercompanyNotifications } from "../intercompanyNotificationRoutes";
-import { autoReallocateLoansAccounts } from "../../lib/transporterAllocation";
-import {
-  inventory,
-  stockItems,
-  stockGroups,
-  stockItemCodeAliases,
-  stockItemLocationPrices,
-  stockTransferVouchers,
-  stockTransferItems,
   stockAdjustmentVouchers,
   stockAdjustmentItems,
   containers,
-  containerOffloads,
-  containerOffloadItems,
-  containerSales,
-  containerCharges,
-  containerTrackingImportRowSchema,
-  updateContainerTrackingSchema,
-  bankAccounts,
-  fixedAssets,
-  insertBankAccountSchema,
-  insertFixedAssetSchema,
-  insertStockGroupSchema,
-  insertStockItemSchema,
-  insertStockItemCodeAliasSchema,
-  insertContainerSchema,
-  offloadRequestSchema,
   purchaseOrders,
   poLineItems,
-  insertContainerSaleSchema,
   vouchers,
-  voucherEntries,
-  salesItems,
-  insertVoucherSchema,
-  insertVoucherEntrySchema,
-  insertSalesItemSchema,
-  suppliers,
-  customers,
-  customerBalances,
-  locations,
-  employees,
-  userLocations,
-  auditLog,
-  interCompanyTransfers,
-  insertInterCompanyTransferSchema,
-  ledgerAccounts,
-  insertLedgerAccountSchema,
-  companies,
-  users,
-  userCompanyRoles,
-  companySettings,
-  FEATURE_KEYS,
-  fiscalPeriodClosures,
-  wasteDispatches,
-  wasteDispatchItems,
-  insertWasteDispatchSchema,
-  bales,
-  baleProducts,
-  baleProductCategories,
-  baleTransfers,
-  insertBaleSchema,
-  insertBaleTransferSchema,
-  dashboardCashAccounts,
-  dashboardPayableAccounts,
-  dashboardAccountSelections,
-  insertDashboardCashAccountSchema,
-  insertDashboardPayableAccountSchema,
-  insertDashboardAccountSelectionSchema,
-  creditNoteItems,
-  pendingBarcodes,
-  insertPendingBarcodeSchema,
-  storedFiles,
-  spreadsheets,
-  liveSpreadsheets,
-  agentAccounts,
-  insertAgentAccountSchema,
-  salaryAdvances,
-  salaryAdvanceDeductions,
-  insertSalaryAdvanceSchema,
-  insertSalaryAdvanceDeductionSchema,
-  chatMessages,
 } from "@shared/schema";
-import {
-  eq,
-  and,
-  or,
-  desc,
-  asc,
-  lt,
-  gt,
-  ne,
-  inArray,
-  sql,
-  isNull,
-  isNotNull,
-  not,
-  gte,
-  lte,
-  like,
-  ilike,
-} from "drizzle-orm";
-import { format } from "date-fns";
-import { z } from "zod";
-import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../../excelHelper";
-import { adjustInventory, reverseInventoryByExactValue } from "../../inventoryHelper";
-import { checkAccountWhatsAppRule } from "../factoryWhatsappRoutes";
-import { classifyNetPositionAccounts, getAccountNetBalance } from "../../netPositionHelper";
-import path from "path";
-import fs from "fs";
-
-import { registerVoucherEntryRoutes } from "../voucher-entries";
-import { recalculateOrderTotals } from "../factory/_helpers";
-import {
-  customerOrderCharges,
-  customerOrders,
-  customerOrderBales,
-  customerOrderLines,
-  factorySettings as fSettings,
-  factoryDaybookEntries as fde,
-} from "@shared/schema";
+import { eq } from "drizzle-orm";
+import { adjustInventory } from "../../inventoryHelper";
 
 /**
  * After saving a journal voucher, if it has a customer entry + a ledger account entry,

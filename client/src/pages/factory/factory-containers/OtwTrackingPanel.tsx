@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient as useTQClient } from "@tanstack/react-query";
 import { Loader2, RefreshCw, Settings2, AlertTriangle, Boxes, XCircle, Clock } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Radio } from "lucide-react";

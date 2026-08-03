@@ -8,12 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
@@ -22,12 +17,10 @@ import {
   startOfDay,
   endOfDay,
   startOfWeek,
-  endOfWeek,
   startOfMonth,
   endOfMonth,
   subMonths,
   startOfYear,
-  endOfYear,
   subDays,
 } from "date-fns";
 import type { DateRange } from "react-day-picker";
@@ -206,10 +199,7 @@ export function PeriodFilter({
           <DropdownMenuItem onClick={() => handlePresetChange("this_month")} data-testid="period-preset-this-month">
             This Month
           </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => handlePresetChange("last_1_month")}
-            data-testid="period-preset-last-1-month"
-          >
+          <DropdownMenuItem onClick={() => handlePresetChange("last_1_month")} data-testid="period-preset-last-1-month">
             Last 1 Month
           </DropdownMenuItem>
           <DropdownMenuItem
@@ -252,9 +242,7 @@ export function PeriodFilter({
               />
             </div>
             {calendarRange?.from && !calendarRange?.to && (
-              <div className="px-4 pb-3 text-xs text-muted-foreground text-center">
-                Now click an end date
-              </div>
+              <div className="px-4 pb-3 text-xs text-muted-foreground text-center">Now click an end date</div>
             )}
             <div className="px-4 pb-4 flex justify-end">
               <Button variant="outline" size="sm" onClick={() => setCalendarOpen(false)}>

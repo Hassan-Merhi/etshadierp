@@ -1,107 +1,12 @@
-import { useState, useEffect, useRef } from "react";
-import { useConnectivity } from "@/contexts/ConnectivityContext";
-import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
-import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { z } from "zod";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 
-import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useAppMode } from "@/contexts/AppModeContext";
-import { getApiRequest, factoryApiRequest } from "@/lib/factoryApi";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Plus,
-  Edit,
-  Building2,
-  Users,
-  ChevronDown,
-  ChevronUp,
-  Trash2,
-  CalendarRange,
-  Settings2,
-  Wrench,
-  MapPin,
-  ChevronRight,
-  Bot,
-  MessageCircle,
-  RefreshCw,
-  Calculator,
-  Loader2,
-  Shield,
-  AlertTriangle,
-  PieChart,
-  Key,
-  Lock,
-  Package,
-  Eye,
-  History,
-  Clock,
-  Upload,
-  Download,
-  Database,
-  TrendingUp,
-  ShoppingCart,
-  Check,
-  X,
-  Copy,
-  ExternalLink,
-  ArrowLeftRight,
-  WifiOff,
-  Wifi,
-  CheckCircle2,
-  Printer,
-  Layers,
-} from "lucide-react";
-import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import {
-  insertUserSchema,
-  insertCompanySchema,
-  insertUserCompanyRoleSchema,
-  FEATURE_KEYS,
-  FEATURE_PAGE_INFO,
-  type FeatureKey,
-} from "@shared/schema";
-import { FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
-import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
-import { useCompany } from "@/contexts/CompanyContext";
-import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
-import { formatNumber } from "@/lib/formatNumber";
+import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema } from "@shared/schema";
 
 const userFormSchema = insertUserSchema;
 const companyFormSchema = insertCompanySchema;

@@ -1,4 +1,4 @@
-import { parseId, parseOptionalId } from "../lib/parseId";
+import { parseId } from "../lib/parseId";
 import { logger } from "../lib/logger";
 import { requireNonPOS } from "../auth";
 import type { Express } from "express";

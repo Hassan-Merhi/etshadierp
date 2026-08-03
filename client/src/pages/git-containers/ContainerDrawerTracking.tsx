@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Satellite, AlertTriangle, RefreshCw, History, Loader2, ExternalLink, Clock, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { EnrichedContainerRow, fmtSkipReason, UIPriority, getContainerPriority } from "./gitContainerTypes";
+import { EnrichedContainerRow, fmtSkipReason, getContainerPriority } from "./gitContainerTypes";
 
 interface ContainerDrawerTrackingProps {
   container: EnrichedContainerRow;
@@ -477,7 +477,12 @@ export function ContainerDrawerTracking({
               )}
 
               {container.trackingLink && (
-                <Button variant="ghost" size="sm" className="w-full text-[10px] h-auto py-0 text-sky-600 underline" asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-[10px] h-auto py-0 text-sky-600 underline"
+                  asChild
+                >
                   <a href={container.trackingLink} target="_blank" rel="noopener noreferrer">
                     View on carrier website <ExternalLink className="ml-1 h-2.5 w-2.5" />
                   </a>

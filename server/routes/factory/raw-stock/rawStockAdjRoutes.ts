@@ -1,125 +1,23 @@
-import { parseId, parseOptionalId } from "../../../lib/parseId";
+import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
-import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
-import { classifyNetPositionAccounts } from "../../../netPositionHelper";
-import { adjustInventory } from "../../../inventoryHelper";
 import { getLockedSupplierRate } from "../../../services/factory/rawStockLockedRate";
-import {
-  writeDaybookEntry,
-  getOrFetchFxRateToUsd,
-  getOrCreateLedgerAccount,
-  isLegacySHA256Hash,
-  verifySupervisorPassword,
-} from "../_helpers";
+import { writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount } from "../_helpers";
 import {
   factorySuppliers,
-  factoryCategories,
-  factoryBaleProducts,
   factoryContainers,
   factoryRawStock,
   factoryMixBatches,
   factoryMixBatchSources,
-  factoryDailyUsages,
-  factoryPressingBatches,
-  factoryBales,
-  factoryBaleSequences,
-  factoryContainerCommissions,
-  baleLabelPrints,
-  stockItems,
-  stockGroups,
-  users,
-  insertFactorySupplierSchema,
-  insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema,
-  insertFactoryContainerSchema,
-  insertFactoryRawStockSchema,
-  insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema,
-  insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema,
-  customerProformas,
-  customerProformaLines,
-  customerOrders,
-  customerOrderLines,
-  customerOrderBales,
-  customerOrderCharges,
-  customerInvoiceSequences,
-  customerBalances,
-  customers,
-  insertCustomerSchema,
-  ledgerAccounts,
   voucherEntries,
-  companies,
-  locations,
-  userCompanyRoles,
-  insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema,
-  insertCustomerOrderSchema,
-  factoryFxRates,
-  insertFactoryFxRateSchema,
   factoryDaybookEntries,
-  containerDocumentTypes,
-  containerDocuments,
-  containerFreight,
-  containerFreightPayments,
-  factoryDaybookEntryEdits,
-  containers,
-  factoryUserProfiles,
-  factoryUserPageAccess,
-  insertUserSchema,
-  directMessages,
-  insertDirectMessageSchema,
-  userPresence,
-  factoryDutyAuditLog,
-  factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges,
-  companySettings,
-  factorySettings,
-  factoryWorkers,
-  factoryWorkerCategories,
-  insertFactoryWorkerCategorySchema,
   factoryRawMaterialAdjustments,
-  factoryPayrolls,
-  factoryWorkerDocuments,
-  factoryAlerts,
-  employees,
-  factoryWasteEntries,
-  factoryBalePhotos,
-  factoryDailyKpiSnapshots,
-  factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots,
-  factoryContainerProfitSnapshots,
-  bankAccounts,
-  inventory,
-  exchangeRates,
   vouchers,
-  suppliers,
-  containerSales,
-  factorySupplierPayments,
-  insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers,
-  insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations,
-  baleRecodeSessions,
-  baleRecodeItems,
-  factoryWorkerAdvances,
-  factoryAdvanceRepayments,
-  factoryBaleWasteDispatches,
-  factoryPosSales,
-  factoryPosSaleItems,
-  proformaStockReservations,
-  factorySupplierCategories,
 } from "@shared/schema";
-import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
-import bcrypt from "bcryptjs";
-import CryptoJS from "crypto-js";
-import multer from "multer";
-import path from "path";
-import fs from "fs";
+import { eq, and, desc, sql, inArray, ilike, isNull } from "drizzle-orm";
 
 export function registerRawStockAdjRoutes(app: Express) {
   app.get("/api/factory/raw-stock/adjustments", requireAuth, async (req: any, res: any) => {
@@ -216,7 +114,13 @@ export function registerRawStockAdjRoutes(app: Express) {
         })
         .from(factoryMixBatchSources)
         .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
-        .where(and(eq(factoryMixBatches.companyId, companyId), eq(factoryMixBatchSources.supplierId, supplierId), isNull(factoryMixBatches.deletedAt)))
+        .where(
+          and(
+            eq(factoryMixBatches.companyId, companyId),
+            eq(factoryMixBatchSources.supplierId, supplierId),
+            isNull(factoryMixBatches.deletedAt)
+          )
+        )
         .orderBy(desc(factoryMixBatches.createdAt));
 
       // Aggregate multiple source rows for the same batch into one timeline entry.
@@ -822,9 +726,7 @@ export function registerRawStockAdjRoutes(app: Express) {
       // For PARTIALLY_RECEIVED containers, surface the fixed landed cost/kg from
       // raw stock so the offload dialog can display the established rate without
       // requiring the user to re-enter it.
-      const partialIds = validContainers
-        .filter((c) => c.status === "PARTIALLY_RECEIVED")
-        .map((c) => c.id);
+      const partialIds = validContainers.filter((c) => c.status === "PARTIALLY_RECEIVED").map((c) => c.id);
       const rawStockByContainer = new Map<number, { costPerKg: string | null; costPerKgUsd: string | null }>();
 
       if (partialIds.length > 0) {

@@ -1,4 +1,4 @@
-import { parseId, parseOptionalId } from "../lib/parseId";
+import { parseId } from "../lib/parseId";
 import { getErrorMessage } from "../lib/httpHandlers";
 import type { Express } from "express";
 import { eq, and, inArray, gte, lte } from "drizzle-orm";

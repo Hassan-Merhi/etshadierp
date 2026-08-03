@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Loader2, Layers, ArrowRight } from "lucide-react";
+import { Loader2, ArrowRight } from "lucide-react";
 
 function fmt(v: any, dec = 2) {
   const n = parseFloat(String(v ?? "0"));
@@ -225,37 +225,39 @@ export default function SpOpeningStock() {
           <Card>
             <CardContent className="py-3">
               <div className="overflow-x-auto">
-              <div className="space-y-0.5 min-w-[360px]">
-                <div className="grid grid-cols-6 text-xs font-medium text-muted-foreground pb-1 border-b border-border/40">
-                  <span className="col-span-2">Article</span>
-                  <span className="text-right">Qty In</span>
-                  <span className="text-right">Remaining</span>
-                  <span className="text-right">Base/u</span>
-                  <span className="text-right">Final/u</span>
-                </div>
-                {(past as any[]).map((p: any, i: number) => (
-                  <div
-                    key={p.id}
-                    className="grid grid-cols-6 text-xs py-1.5 border-b border-border/30 last:border-0"
-                    data-testid={`row-sp-opn-${i}`}
-                  >
-                    <div className="col-span-2">
-                      <p className="font-mono">{p.article_code || p.articleCode}</p>
-                      {p.description && <p className="text-muted-foreground">{p.description}</p>}
-                    </div>
-                    <span className="text-right tabular-nums text-muted-foreground">
-                      {parseFloat(p.qty_in ?? p.qtyIn ?? "0").toFixed(2)}
-                    </span>
-                    <span className="text-right tabular-nums font-semibold text-green-600">
-                      {parseFloat(p.qty_remaining ?? p.qtyRemaining ?? "0").toFixed(2)}
-                    </span>
-                    <span className="text-right tabular-nums">{fmt(p.base_unit_cost_usd ?? p.baseUnitCostUsd, 4)}</span>
-                    <span className="text-right tabular-nums">
-                      {fmt(p.final_unit_cost_usd ?? p.finalUnitCostUsd, 4)}
-                    </span>
+                <div className="space-y-0.5 min-w-[360px]">
+                  <div className="grid grid-cols-6 text-xs font-medium text-muted-foreground pb-1 border-b border-border/40">
+                    <span className="col-span-2">Article</span>
+                    <span className="text-right">Qty In</span>
+                    <span className="text-right">Remaining</span>
+                    <span className="text-right">Base/u</span>
+                    <span className="text-right">Final/u</span>
                   </div>
-                ))}
-              </div>
+                  {(past as any[]).map((p: any, i: number) => (
+                    <div
+                      key={p.id}
+                      className="grid grid-cols-6 text-xs py-1.5 border-b border-border/30 last:border-0"
+                      data-testid={`row-sp-opn-${i}`}
+                    >
+                      <div className="col-span-2">
+                        <p className="font-mono">{p.article_code || p.articleCode}</p>
+                        {p.description && <p className="text-muted-foreground">{p.description}</p>}
+                      </div>
+                      <span className="text-right tabular-nums text-muted-foreground">
+                        {parseFloat(p.qty_in ?? p.qtyIn ?? "0").toFixed(2)}
+                      </span>
+                      <span className="text-right tabular-nums font-semibold text-green-600">
+                        {parseFloat(p.qty_remaining ?? p.qtyRemaining ?? "0").toFixed(2)}
+                      </span>
+                      <span className="text-right tabular-nums">
+                        {fmt(p.base_unit_cost_usd ?? p.baseUnitCostUsd, 4)}
+                      </span>
+                      <span className="text-right tabular-nums">
+                        {fmt(p.final_unit_cost_usd ?? p.finalUnitCostUsd, 4)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </CardContent>
           </Card>

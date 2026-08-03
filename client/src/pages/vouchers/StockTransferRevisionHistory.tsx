@@ -1,13 +1,10 @@
 import { format } from "date-fns";
-import { Search, GitBranch } from "lucide-react";
+import { GitBranch } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { EmptyState } from "@/components/ui/empty-state";
-import { History, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { History, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface StockTransferRevisionHistoryProps {

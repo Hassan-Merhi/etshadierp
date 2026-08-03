@@ -1,24 +1,14 @@
-import { parseId, parseOptionalId } from "../lib/parseId";
+import { parseId } from "../lib/parseId";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { logAudit } from "./_helpers";
 import { Express } from "express";
 import { db } from "../db";
-import { eq, and, inArray, ne } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 import ExcelJS from "exceljs";
 import { buildAliasMap, resolveBarcode } from "./helpers/proformaBarcodeHelpers";
 import { registerContainerLoadedItemsRoutes } from "./container-loaded-items";
-import {
-  supplierProformas,
-  supplierProformaLines,
-  supplierContainerLoadedItems,
-  containers,
-  suppliers,
-  purchaseOrders,
-  poLineItems,
-  stockItems,
-  stockItemCodeAliases,
-} from "@shared/schema";
+import { supplierProformas, supplierProformaLines, suppliers } from "@shared/schema";
 
 /**
  * Parse a human-entered decimal value from Excel into a PostgreSQL-safe decimal string.

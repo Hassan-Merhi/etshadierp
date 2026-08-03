@@ -1,11 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, AlertCircle, CheckCircle, Loader2, Package, CalendarDays } from "lucide-react";
+import { Plus, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
@@ -13,10 +10,14 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useFormDraft } from "@/hooks/useFormDraft";
 import { DraftRestorePrompt } from "@/components/DraftRestorePrompt";
-import { isZebraMode } from "@/lib/zebraPrint";
 import { getPaperFormat } from "@/components/LabelPrintSettings";
 import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
-import { generateCombinedLabelsHtml, generateA5LabelsHtml, prefetchBannersForPrint, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
+import {
+  generateCombinedLabelsHtml,
+  generateA5LabelsHtml,
+  prefetchBannersForPrint,
+  type LabelData,
+} from "@/lib/labelHtml";
 import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
 
 import { StockEntryCart } from "./StockEntryCart";

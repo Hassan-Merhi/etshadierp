@@ -4,7 +4,7 @@ import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { parseId } from "../../lib/parseId";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import {
   factoryContainers,
   factoryContainerTrackingEvents,

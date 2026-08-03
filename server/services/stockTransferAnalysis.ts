@@ -13,7 +13,7 @@
  * goes through the existing /api/stock-transfers endpoint.
  */
 import { db } from "../db";
-import { and, desc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import {
   locations,
   stockItems,
@@ -168,10 +168,7 @@ function normalizeShopName(name: string | null | undefined): string {
  * as "shop unknown"), or clearly belongs to a different shop and must NOT
  * reduce this destination's need (`matchType: "other"`).
  */
-export async function loadOtwStockByItem(
-  companyId: number,
-  destinationLocationId?: number
-): Promise<OtwStockResult> {
+export async function loadOtwStockByItem(companyId: number, destinationLocationId?: number): Promise<OtwStockResult> {
   const otwQtyByItem = new Map<number, number>();
   const otwDetailsByItem = new Map<number, OtwContainerDetail[]>();
 
@@ -419,12 +416,7 @@ export async function buildStockTransferSuggestionContext(
       quantity: inventory.quantity,
     })
     .from(inventory)
-    .where(
-      and(
-        eq(inventory.companyId, companyId),
-        inArray(inventory.locationId, [fromLocationId, toLocationId])
-      )
-    );
+    .where(and(eq(inventory.companyId, companyId), inArray(inventory.locationId, [fromLocationId, toLocationId])));
 
   // ── Recent sales by item/location (same source pattern used by POS/location sales reports) ──
   const salesRows = await db
@@ -736,7 +728,10 @@ export async function buildStockTransferByTargetQuantityContext(
 
   const stockGroupIds = Array.from(new Set(invRows.map((r) => r.stockGroupId).filter((id): id is number => !!id)));
   const groupRows = stockGroupIds.length
-    ? await db.select({ id: stockGroups.id, name: stockGroups.name }).from(stockGroups).where(inArray(stockGroups.id, stockGroupIds))
+    ? await db
+        .select({ id: stockGroups.id, name: stockGroups.name })
+        .from(stockGroups)
+        .where(inArray(stockGroups.id, stockGroupIds))
     : [];
   const groupNameById = new Map(groupRows.map((g) => [g.id, g.name]));
 
@@ -760,7 +755,9 @@ export async function buildStockTransferByTargetQuantityContext(
     if (remaining <= 0) break;
     const sourceLocationName = locNameById.get(sourceLocationId) || `Location #${sourceLocationId}`;
 
-    let candidates = invRows.filter((r) => r.locationId === sourceLocationId && (parseFloat(r.quantity as any) || 0) > 0);
+    let candidates = invRows.filter(
+      (r) => r.locationId === sourceLocationId && (parseFloat(r.quantity as any) || 0) > 0
+    );
     if (onlyDestinationStockGroups) {
       candidates = candidates.filter((r) => r.stockGroupId && destGroupIds.has(r.stockGroupId));
     }
