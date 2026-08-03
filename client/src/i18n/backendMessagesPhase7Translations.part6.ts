@@ -22,17 +22,17 @@ export const backendMessagesPhase7TranslationsPart6: readonly Phase7BackendMessa
     fr: "Au moins une ligne d’article est requise",
   },
   {
-    en: "${unresolved.length} item(s) still unresolved: ${unresolved.map((l: any) => l.rawName || l.itemName).join(\", \")}",
+    en: '${unresolved.length} item(s) still unresolved: ${unresolved.map((l: any) => l.rawName || l.itemName).join(", ")}',
     ar: "لا يزال هناك {0} صنف غير محلول: {1}",
     fr: "{0} article(s) restent non résolus : {1}",
   },
   {
-    en: "A purchase order with number \"${poNumber}\" already exists. Please use a different PO number.",
+    en: 'A purchase order with number "${poNumber}" already exists. Please use a different PO number.',
     ar: "يوجد بالفعل أمر شراء بالرقم «{0}». يرجى استخدام رقم أمر شراء مختلف.",
     fr: "Un bon de commande portant le numéro « {0} » existe déjà. Utilisez un autre numéro.",
   },
   {
-    en: "Container \"${containerNumber}\" already has ${existingPOs.length} PO(s) imported (${existingPOs.map((p: any) => p.poNumber).join(\", \")}). To avoid duplicates, please delete the existing POs first or use a different container number.",
+    en: 'Container "${containerNumber}" already has ${existingPOs.length} PO(s) imported (${existingPOs.map((p: any) => p.poNumber).join(", ")}). To avoid duplicates, please delete the existing POs first or use a different container number.',
     ar: "الحاوية «{0}» لديها بالفعل {1} أمر شراء مستورد ({2}). لتجنب التكرار، احذف أوامر الشراء الحالية أولًا أو استخدم رقم حاوية مختلفًا.",
     fr: "Le conteneur « {0} » possède déjà {1} bon(s) de commande importé(s) ({2}). Pour éviter les doublons, supprimez d’abord les bons existants ou utilisez un autre numéro de conteneur.",
   },
@@ -232,7 +232,7 @@ export const backendMessagesPhase7TranslationsPart6: readonly Phase7BackendMessa
     fr: "Pièce déséquilibrée : {0} ({1}) - Débits : ${2}, Crédits : ${3}",
   },
   {
-    en: "Stale OTW container: ${container.containerNumber} (${daysSinceCreated} days old) from ${container.supplierName || \"Unknown Supplier\"}",
+    en: 'Stale OTW container: ${container.containerNumber} (${daysSinceCreated} days old) from ${container.supplierName || "Unknown Supplier"}',
     ar: "حاوية في الطريق متأخرة: {0} (منذ {1} يوم) من {2}",
     fr: "Conteneur en transit ancien : {0} ({1} jours) de {2}",
   },

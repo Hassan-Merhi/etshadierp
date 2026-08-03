@@ -52,12 +52,12 @@ export const backendMessagesPhase7TranslationsPart5: readonly Phase7BackendMessa
     fr: "{0} article(s) avec un stock négatif",
   },
   {
-    en: "${pendingCount} pending approval request${pendingCount !== 1 ? \"s\" : \"\"}",
+    en: '${pendingCount} pending approval request${pendingCount !== 1 ? "s" : ""}',
     ar: "طلبات الموافقة المعلقة: {0}",
     fr: "{0} demande(s) d’approbation en attente",
   },
   {
-    en: "${pendingCount} action${pendingCount !== 1 ? \"s\" : \"\"} are awaiting review by an Admin or Developer.",
+    en: '${pendingCount} action${pendingCount !== 1 ? "s" : ""} are awaiting review by an Admin or Developer.',
     ar: "هناك {0} إجراء بانتظار مراجعة مسؤول أو مطور.",
     fr: "{0} action(s) attendent l’examen d’un Administrateur ou d’un Développeur.",
   },
@@ -67,7 +67,7 @@ export const backendMessagesPhase7TranslationsPart5: readonly Phase7BackendMessa
     fr: "Retrait important : {0}",
   },
   {
-    en: "Voucher ${row.voucher_number ?? row.id}: \"${row.narration ?? \"No narration\"}\" — ${parseFloat(row.amount).toLocaleString()} from ${row.account}",
+    en: 'Voucher ${row.voucher_number ?? row.id}: "${row.narration ?? "No narration"}" — ${parseFloat(row.amount).toLocaleString()} from ${row.account}',
     ar: "السند {0}: «{1}» — {2} من {3}",
     fr: "Pièce {0} : « {1} » — {2} depuis {3}",
   },
@@ -87,7 +87,7 @@ export const backendMessagesPhase7TranslationsPart5: readonly Phase7BackendMessa
     fr: "Trop de messages. Veuillez patienter un moment avant d’envoyer à nouveau.",
   },
   {
-    en: "Chatbot ${enabled ? \"enabled\" : \"disabled\"} for user",
+    en: 'Chatbot ${enabled ? "enabled" : "disabled"} for user',
     ar: "روبوت المحادثة {0} للمستخدم",
     fr: "Chatbot {0} pour l’utilisateur",
   },

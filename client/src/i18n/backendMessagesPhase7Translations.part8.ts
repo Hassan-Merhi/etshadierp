@@ -232,7 +232,7 @@ export const backendMessagesPhase7TranslationsPart8: readonly Phase7BackendMessa
     fr: "WhatsApp n’est pas configuré ou n’est pas prêt : {0}.",
   },
   {
-    en: "WhatsApp send failed after ${waRes.attempts} attempt(s): ${result.error || \"Unknown error\"}",
+    en: 'WhatsApp send failed after ${waRes.attempts} attempt(s): ${result.error || "Unknown error"}',
     ar: "فشل الإرسال عبر واتساب بعد {0} محاولة: {1}",
     fr: "Échec de l’envoi WhatsApp après {0} tentative(s) : {1}",
   },

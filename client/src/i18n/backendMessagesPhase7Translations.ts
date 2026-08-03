@@ -140,10 +140,7 @@ export function isPhase7BackendMessageText(value: string): boolean {
   );
 }
 
-export function translatePhase7BackendMessageText(
-  value: string,
-  language: ApplicationLanguage
-): string | null {
+export function translatePhase7BackendMessageText(value: string, language: ApplicationLanguage): string | null {
   const leading = value.match(/^\s*/)?.[0] ?? "";
   const trailing = value.match(/\s*$/)?.[0] ?? "";
   const normalized = value.trim();

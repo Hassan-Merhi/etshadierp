@@ -2,17 +2,17 @@ import type { Phase7BackendMessagesEntry } from "./backendMessagesPhase7Translat
 
 export const backendMessagesPhase7TranslationsPart4: readonly Phase7BackendMessagesEntry[] = [
   {
-    en: "No name column found. Expected one of: ${NAME_HEADERS.slice(0, 5).join(\", \")}",
+    en: 'No name column found. Expected one of: ${NAME_HEADERS.slice(0, 5).join(", ")}',
     ar: "لم يتم العثور على عمود للأسماء. كان متوقعًا أحد الأعمدة التالية: {0}",
     fr: "Aucune colonne de noms trouvée. L’une des colonnes suivantes était attendue : {0}",
   },
   {
-    en: "Possible duplicate group: \"${norm}\" (${members.length} matches)",
+    en: 'Possible duplicate group: "${norm}" (${members.length} matches)',
     ar: "مجموعة مكررة محتملة: «{0}» ({1} تطابقات)",
     fr: "Groupe potentiellement dupliqué : « {0} » ({1} correspondance(s))",
   },
   {
-    en: "Likely duplicate of \"${members[0].original}\" (normalises to \"${norm}\")",
+    en: 'Likely duplicate of "${members[0].original}" (normalises to "${norm}")',
     ar: "يُحتمل أنه مكرر من «{0}» بعد التطبيع إلى «{1}»",
     fr: "Doublon probable de « {0} » après normalisation en « {1} »",
   },
@@ -22,7 +22,7 @@ export const backendMessagesPhase7TranslationsPart4: readonly Phase7BackendMessa
     fr: "Ce type de validation n’est pas encore implémenté.",
   },
   {
-    en: "\"${validationType}\" validation is coming soon.",
+    en: '"${validationType}" validation is coming soon.',
     ar: "التحقق «{0}» سيتوفر قريبًا.",
     fr: "La validation « {0} » sera bientôt disponible.",
   },

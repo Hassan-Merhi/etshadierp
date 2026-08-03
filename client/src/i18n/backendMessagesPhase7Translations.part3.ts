@@ -7,7 +7,7 @@ export const backendMessagesPhase7TranslationsPart3: readonly Phase7BackendMessa
     fr: "Aucune donnée de suivi reçue de la page ParcelsApp",
   },
   {
-    en: "Scraper error: ${getErrorMessage(err) ?? \"Unknown\"}",
+    en: 'Scraper error: ${getErrorMessage(err) ?? "Unknown"}',
     ar: "خطأ أداة الاستخراج: {0}",
     fr: "Erreur de l’extracteur : {0}",
   },
@@ -147,7 +147,7 @@ export const backendMessagesPhase7TranslationsPart3: readonly Phase7BackendMessa
     fr: "importType est requis",
   },
   {
-    en: "importType must be one of: ${SUPPORTED.join(\", \")}",
+    en: 'importType must be one of: ${SUPPORTED.join(", ")}',
     ar: "يجب أن يكون importType أحد القيم التالية: {0}",
     fr: "importType doit être l’une des valeurs suivantes : {0}",
   },
@@ -217,7 +217,7 @@ export const backendMessagesPhase7TranslationsPart3: readonly Phase7BackendMessa
     fr: "Impossible de détecter une colonne de codes dans le fichier.",
   },
   {
-    en: "No code column found. Expected one of: ${CODE_HEADERS.slice(0, 5).join(\", \")}",
+    en: 'No code column found. Expected one of: ${CODE_HEADERS.slice(0, 5).join(", ")}',
     ar: "لم يتم العثور على عمود للرموز. كان متوقعًا أحد الأعمدة التالية: {0}",
     fr: "Aucune colonne de codes trouvée. L’une des colonnes suivantes était attendue : {0}",
   },
@@ -227,17 +227,17 @@ export const backendMessagesPhase7TranslationsPart3: readonly Phase7BackendMessa
     fr: "Cellule de code vide",
   },
   {
-    en: "Duplicate code within file: \"${raw}\"",
+    en: 'Duplicate code within file: "${raw}"',
     ar: "رمز مكرر داخل الملف: «{0}»",
     fr: "Code dupliqué dans le fichier : « {0} »",
   },
   {
-    en: "\"${raw}\" not found — close matches: ${detail}",
+    en: '"${raw}" not found — close matches: ${detail}',
     ar: "لم يتم العثور على «{0}» — تطابقات قريبة: {1}",
     fr: "« {0} » introuvable — correspondances proches : {1}",
   },
   {
-    en: "Code \"${raw}\" not found in stock items or aliases",
+    en: 'Code "${raw}" not found in stock items or aliases',
     ar: "لم يتم العثور على الرمز «{0}» في عناصر المخزون أو الأسماء البديلة",
     fr: "Le code « {0} » est introuvable dans les articles de stock ou les alias",
   },

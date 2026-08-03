@@ -147,7 +147,7 @@ export const backendMessagesPhase7TranslationsPart7: readonly Phase7BackendMessa
     fr: "Conteneurs en transit depuis plus de 90 jours",
   },
   {
-    en: "You have ${staleContainers.length} container(s) worth $${totalStaleValue.toFixed(2)} that have been \"On The Way\" for more than 90 days. These may need to be offloaded or marked as lost.",
+    en: 'You have ${staleContainers.length} container(s) worth $${totalStaleValue.toFixed(2)} that have been "On The Way" for more than 90 days. These may need to be offloaded or marked as lost.',
     ar: "لديك {0} حاوية بقيمة ${1} في حالة «في الطريق» لأكثر من 90 يومًا. قد يلزم تفريغها أو تعليمها كمفقودة.",
     fr: "Vous avez {0} conteneur(s) d’une valeur de ${1} en statut « En transit » depuis plus de 90 jours. Ils doivent peut-être être déchargés ou marqués comme perdus.",
   },
@@ -157,7 +157,7 @@ export const backendMessagesPhase7TranslationsPart7: readonly Phase7BackendMessa
     fr: "Écritures de pièces déséquilibrées ({0})",
   },
   {
-    en: "${unbalancedVouchers.length} voucher(s) where debits don't equal credits. Total imbalance: ${totalImbalance.toFixed(2)}. Details: ${voucherDetails}${unbalancedVouchers.length > 10 ? \"...\" : \"\"}",
+    en: '${unbalancedVouchers.length} voucher(s) where debits don\'t equal credits. Total imbalance: ${totalImbalance.toFixed(2)}. Details: ${voucherDetails}${unbalancedVouchers.length > 10 ? "..." : ""}',
     ar: "يوجد {0} سند لا تتساوى فيه المدينات والدائنات. إجمالي عدم التوازن: {1}. التفاصيل: {2}{3}",
     fr: "{0} pièce(s) dont les débits ne sont pas égaux aux crédits. Déséquilibre total : {1}. Détails : {2}{3}",
   },
@@ -182,7 +182,7 @@ export const backendMessagesPhase7TranslationsPart7: readonly Phase7BackendMessa
     fr: "Vous devez un total de ${1} à {0} employé(s). Ce montant est enregistré comme passif.",
   },
   {
-    en: "Loans Account \"${loanAcct.name}\" Has Net Debit Balance — Office Charges May Be Posted Backwards",
+    en: 'Loans Account "${loanAcct.name}" Has Net Debit Balance — Office Charges May Be Posted Backwards',
     ar: "حساب القروض «{0}» لديه رصيد مدين صافٍ — قد تكون مصروفات المكتب مُرحلة بالعكس",
     fr: "Le compte de prêts « {0} » présente un solde débiteur net — les charges de bureau sont peut-être comptabilisées à l’envers",
   },
@@ -197,12 +197,12 @@ export const backendMessagesPhase7TranslationsPart7: readonly Phase7BackendMessa
     fr: "Un compte de fret de la société mère doit être sélectionné lorsque le fret est payé par la société mère",
   },
   {
-    en: "Container \"${containerNumber}\" already exists in the system. Each container number can only be imported once.",
+    en: 'Container "${containerNumber}" already exists in the system. Each container number can only be imported once.',
     ar: "الحاوية «{0}» موجودة بالفعل في النظام. لا يمكن استيراد رقم الحاوية نفسه إلا مرة واحدة.",
     fr: "Le conteneur « {0} » existe déjà dans le système. Chaque numéro de conteneur ne peut être importé qu’une seule fois.",
   },
   {
-    en: "${containerNumber} ${supplier?.legalName || \"Unknown\"}",
+    en: '${containerNumber} ${supplier?.legalName || "Unknown"}',
     ar: "{0} {1}",
     fr: "{0} {1}",
   },
@@ -232,7 +232,7 @@ export const backendMessagesPhase7TranslationsPart7: readonly Phase7BackendMessa
     fr: "Demande de paiement interentreprises",
   },
   {
-    en: "Payment request from voucher ${voucherNumber} — ${description || \"\"}",
+    en: 'Payment request from voucher ${voucherNumber} — ${description || ""}',
     ar: "طلب دفع من السند {0} — {1}",
     fr: "Demande de paiement provenant de la pièce {0} — {1}",
   },
