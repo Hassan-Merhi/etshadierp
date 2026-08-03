@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { ApplicationLanguage } from "@shared/applicationLanguageContract";
+import { translateApplicationLiteral } from "@/i18n/applicationTranslations";
 import { translateSharedInterfaceText } from "@/i18n/sharedInterfaceTranslations";
 import { translateAccountingDocumentText } from "@/i18n/accountingDocumentTranslations";
 import { isPhase3SharedUiText, translatePhase3SharedUiText } from "@/i18n/sharedUiPhase3Translations";
@@ -74,6 +75,7 @@ function isEligibleTextElement(element: Element): boolean {
 
 export function translateApprovedInterfaceText(value: string, language: ApplicationLanguage): string | null {
   return (
+    translateApplicationLiteral(value, language) ??
     translatePhase7BackendMessageText(value, language) ??
     translatePhase6ReportsExportsText(value, language) ??
     translatePhase5PropertiesRentalsText(value, language) ??
@@ -137,10 +139,10 @@ export function translateInterfaceTree(root: Node, language: ApplicationLanguage
  * The main observer is scoped to the React application root, while a lightweight
  * body observer only discovers portal roots. Mutation work is batched into one
  * animation frame. Plain spans/divs and table data cells remain business content
- * by default. Exact reviewed Phase 3 shared-interface, Phase 4 Supplier Partner,
- * Phase 5 Properties/Rentals, Phase 6 Reports/Exports, and Phase 7 backend messages
- * may translate outside normal control/heading selectors, while protected
- * business-value markers always take precedence.
+ * by default. Exact reviewed application labels, Phase 3 shared-interface,
+ * Phase 4 Supplier Partner, Phase 5 Properties/Rentals, Phase 6 Reports/Exports,
+ * and Phase 7 backend messages may translate outside normal control/heading
+ * selectors, while protected business-value markers always take precedence.
  */
 export function ApplicationInterfaceTranslator({ language }: { language: ApplicationLanguage }) {
   useEffect(() => {
