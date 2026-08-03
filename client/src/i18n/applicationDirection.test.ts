@@ -5,11 +5,11 @@ describe("application direction contract", () => {
   beforeEach(() => {
     document.documentElement.removeAttribute("lang");
     document.documentElement.removeAttribute("dir");
-    delete document.documentElement.dataset.applicationLanguage;
-    delete document.documentElement.dataset.applicationDirection;
+    document.documentElement.removeAttribute("data-application-language");
+    document.documentElement.removeAttribute("data-application-direction");
     document.body.removeAttribute("dir");
-    delete document.body.dataset.applicationLanguage;
-    delete document.body.dataset.applicationDirection;
+    document.body.removeAttribute("data-application-language");
+    document.body.removeAttribute("data-application-direction");
   });
 
   it("uses RTL only for Arabic", () => {
