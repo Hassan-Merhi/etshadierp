@@ -56,10 +56,8 @@ const TabsList = React.forwardRef<
     data-responsive-tabs="true"
     className={cn(
       "inline-flex max-w-full items-center justify-start gap-1 overflow-x-auto overscroll-x-contain touch-pan-x",
-      variant === "pill" &&
-        "rounded-full border border-border bg-muted/40 p-1 text-muted-foreground",
-      variant === "underline" &&
-        "border-b border-border bg-transparent p-0 text-muted-foreground",
+      variant === "pill" && "rounded-full border border-border bg-muted/40 p-1 text-muted-foreground",
+      variant === "underline" && "border-b border-border bg-transparent p-0 text-muted-foreground",
       className
     )}
     {...props}
