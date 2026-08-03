@@ -45,7 +45,7 @@ const factoryWorkspaceClasses = [
   "[&_[role=tablist]]:max-w-full",
   "[&_[role=listbox]]:max-h-[min(24rem,70dvh)]",
   "[&_[data-mobile-data-list]]:max-w-full",
-  "[&_[data-responsive-table-scroll]]:max-w-full",
+  "[&_[data-table-scroll-region]]:max-w-full",
 ].join(" ");
 
 const factoryPosWorkspaceClasses = [
