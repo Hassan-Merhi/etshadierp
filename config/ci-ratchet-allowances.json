@@ -44,6 +44,7 @@
     "POST /api/screen-feed/admin/runtime/reset-metrics [requireAuth > <anonymous>]",
     "GET /api/screen-feed/live/status [requireLogin > <anonymous>]",
     "GET /api/screen-feed/live/:userId [requireAuth > <anonymous>]",
+    "POST /api/screen-feed/pointer [requireLogin > <anonymous>]",
     "POST /api/sp/sales/:id/reverse [requireAuth > <anonymous> > <anonymous>]",
     "POST /api/sp/containers/:id/cancel [requireAuth > <anonymous> > <anonymous>]"
   ],
@@ -70,7 +71,9 @@
       "tests/phases-8-5-6-trilingual-expansion.test.ts",
       "tests/phases-12-9-11-module-surfaces.test.ts",
       "tests/phases-10-7-13-trilingual-surfaces.test.ts",
-      "tests/phase14-i18n-release-gate.test.ts"
+      "tests/phase14-i18n-release-gate.test.ts",
+      "tests/phase8-rtl-responsive-accessibility.test.ts",
+      "tests/phase9-final-release-gate.test.ts"
     ],
     "maxAdditionalTextAssertions": 266
   }
