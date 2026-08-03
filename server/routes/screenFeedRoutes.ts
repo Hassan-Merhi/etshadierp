@@ -1,16 +1,18 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { logger } from "../lib/logger";
 import { requireAuth, requireLogin } from "../auth";
 import { screenFeedStore, watcherPollStore } from "../screenFeedStore";
+import { isValidScreenFeedDataUrl, sanitizeScreenFeedClicks } from "../services/screenFeedService";
 import {
-  isValidScreenFeedDataUrl,
-  sanitizeScreenFeedClicks,
-} from "../services/screenFeedService";
-import {
-  getSessionRole,
-  getSessionUserId,
-  getSessionUsername,
-} from "../lib/requestContext";
+  emergencyDisableRemoteSupport,
+  getRemoteSupportRuntimeSnapshot,
+  isRemoteSupportEnabled,
+  recordRemoteSupportMetric,
+  resetRemoteSupportMetrics,
+  restoreRemoteSupportBootDefaults,
+  updateRemoteSupportFlags,
+} from "../services/remoteSupportRuntime";
+import { getSessionRole, getSessionUserId, getSessionUsername } from "../lib/requestContext";
 
 // How long (ms) after a watcher's last GET we still consider the user "being watched".
 // Must be comfortably larger than the watcher's poll interval (~3–5 s) to avoid
@@ -22,15 +24,70 @@ const MAX_FRAME_SIZE = 1_500_000;
 
 const isDev = process.env.NODE_ENV !== "production";
 
-// When DISABLE_SCREEN_FEED=true, the feature is fully disabled server-side:
-// being-watched always returns false (no captures start) and POST frames are dropped.
-const SCREEN_FEED_DISABLED = process.env.DISABLE_SCREEN_FEED === "true";
+function requireDeveloper(req: Request, res: Response): boolean {
+  if (getSessionRole(req) !== "Developer") {
+    res.status(403).json({ message: "Access denied." });
+    return false;
+  }
+  return true;
+}
+
+function runtimeActor(req: Request): string {
+  return getSessionUsername(req) || String(getSessionUserId(req));
+}
 
 export function registerScreenFeedRoutes(app: Express) {
+  // Runtime safety controls are intentionally registered before /:userId so
+  // "admin" can never be interpreted as a watched user ID.
+  app.get("/api/screen-feed/admin/runtime", requireAuth, (req, res) => {
+    if (!requireDeveloper(req, res)) return;
+    res.setHeader("Cache-Control", "no-store");
+    res.json(getRemoteSupportRuntimeSnapshot());
+  });
+
+  app.patch("/api/screen-feed/admin/runtime", requireAuth, (req, res) => {
+    if (!requireDeveloper(req, res)) return;
+    const patch = req.body?.flags ?? req.body ?? {};
+    const snapshot = updateRemoteSupportFlags(patch, runtimeActor(req));
+
+    if (!snapshot.flags.screenFeedEnabled) {
+      watcherPollStore.clear();
+    }
+
+    res.setHeader("Cache-Control", "no-store");
+    res.json(snapshot);
+  });
+
+  app.post("/api/screen-feed/admin/runtime/emergency-stop", requireAuth, (req, res) => {
+    if (!requireDeveloper(req, res)) return;
+    watcherPollStore.clear();
+    const snapshot = emergencyDisableRemoteSupport(runtimeActor(req));
+    logger.warn(`[RemoteSupport] emergency stop activated by ${runtimeActor(req)}`);
+    res.setHeader("Cache-Control", "no-store");
+    res.json(snapshot);
+  });
+
+  app.post("/api/screen-feed/admin/runtime/restore-defaults", requireAuth, (req, res) => {
+    if (!requireDeveloper(req, res)) return;
+    const snapshot = restoreRemoteSupportBootDefaults(runtimeActor(req));
+    res.setHeader("Cache-Control", "no-store");
+    res.json(snapshot);
+  });
+
+  app.post("/api/screen-feed/admin/runtime/reset-metrics", requireAuth, (req, res) => {
+    if (!requireDeveloper(req, res)) return;
+    res.setHeader("Cache-Control", "no-store");
+    res.json(resetRemoteSupportMetrics());
+  });
+
   // GET: watched user asks "is anyone watching me right now?"
   // Must be registered BEFORE /:userId to avoid route conflict.
   app.get("/api/screen-feed/being-watched", requireLogin, (req, res) => {
-    if (SCREEN_FEED_DISABLED) return res.json({ watched: false });
+    recordRemoteSupportMetric("watcherStatusPoll");
+
+    if (!isRemoteSupportEnabled("screenFeedEnabled")) {
+      return res.json({ watched: false });
+    }
 
     const userId = String(getSessionUserId(req));
     const lastPoll = watcherPollStore.get(userId) ?? 0;
@@ -39,11 +96,14 @@ export function registerScreenFeedRoutes(app: Express) {
 
     if (isDev) {
       logger.info(
-        `[ScreenFeed] being-watched userId=${userId} watched=${watched} lastPollAgeMs=${lastPoll > 0 ? ageMs : "never"}`,
+        `[ScreenFeed] being-watched userId=${userId} watched=${watched} lastPollAgeMs=${lastPoll > 0 ? ageMs : "never"}`
       );
     }
 
-    res.json({ watched, ...(isDev ? { userId, lastWatcherPollAgeMs: lastPoll > 0 ? ageMs : null } : {}) });
+    res.json({
+      watched,
+      ...(isDev ? { userId, lastWatcherPollAgeMs: lastPoll > 0 ? ageMs : null } : {}),
+    });
   });
 
   // GET-based trace: CSRF-exempt diagnostic ping from the watched user's browser.
@@ -60,37 +120,48 @@ export function registerScreenFeedRoutes(app: Express) {
 
   // POST: watched user uploads their screenshot frame + recent clicks.
   app.post("/api/screen-feed", requireLogin, (req, res) => {
-    if (SCREEN_FEED_DISABLED) return res.status(200).end();
+    if (!isRemoteSupportEnabled("screenFeedEnabled")) {
+      return res.status(200).end();
+    }
 
     const userId = String(getSessionUserId(req));
     if (isDev) {
       logger.info(
-        `[ScreenFeed] POST /api/screen-feed received from userId=${userId} body_keys=${Object.keys(req.body ?? {}).join(",")}`,
+        `[ScreenFeed] POST /api/screen-feed received from userId=${userId} body_keys=${Object.keys(req.body ?? {}).join(",")}`
       );
     }
 
     const { dataUrl, clicks } = req.body ?? {};
 
     if (!isValidScreenFeedDataUrl(dataUrl)) {
+      recordRemoteSupportMetric("frameRejected");
       if (isDev) {
         logger.warn(
-          `[ScreenFeed] POST rejected: missing or invalid dataUrl (type=${typeof dataUrl} starts=${typeof dataUrl === "string" ? dataUrl.slice(0, 30) : "N/A"})`,
+          `[ScreenFeed] POST rejected: missing or invalid dataUrl (type=${typeof dataUrl} starts=${typeof dataUrl === "string" ? dataUrl.slice(0, 30) : "N/A"})`
         );
       }
       return res.status(400).end();
     }
     if (dataUrl.length > MAX_FRAME_SIZE) {
+      recordRemoteSupportMetric("frameRejected");
       if (isDev) logger.warn(`[ScreenFeed] POST rejected: frame too large (${dataUrl.length} bytes)`);
       return res.status(204).end();
     }
 
     const username = getSessionUsername(req) || userId;
     const safeClicks = sanitizeScreenFeedClicks(clicks);
-    screenFeedStore.set(userId, { dataUrl, capturedAt: new Date(), userId, username, clicks: safeClicks });
+    screenFeedStore.set(userId, {
+      dataUrl,
+      capturedAt: new Date(),
+      userId,
+      username,
+      clicks: safeClicks,
+    });
+    recordRemoteSupportMetric("frameAccepted", Buffer.byteLength(dataUrl, "utf8"));
 
     if (isDev) {
       logger.info(
-        `[ScreenFeed] POST frame stored userId=${userId} frameLen=${dataUrl.length} clicks=${safeClicks.length}`,
+        `[ScreenFeed] POST frame stored userId=${userId} frameLen=${dataUrl.length} clicks=${safeClicks.length}`
       );
     }
 
@@ -99,8 +170,13 @@ export function registerScreenFeedRoutes(app: Express) {
 
   // GET: Developer polls the latest frame + clicks for a specific watched user.
   app.get("/api/screen-feed/:userId", requireAuth, (req, res) => {
-    if (getSessionRole(req) !== "Developer") {
-      return res.status(403).json({ message: "Access denied." });
+    if (!requireDeveloper(req, res)) return;
+
+    recordRemoteSupportMetric("viewerPoll");
+    res.setHeader("Cache-Control", "no-store");
+
+    if (!isRemoteSupportEnabled("screenFeedEnabled")) {
+      return res.json(null);
     }
 
     const watchedUserId = req.params.userId;
@@ -112,7 +188,7 @@ export function registerScreenFeedRoutes(app: Express) {
     if (isDev) {
       const frameAgeMs = frame ? Date.now() - frame.capturedAt.getTime() : null;
       logger.info(
-        `[ScreenFeed] GET /:userId watchedUserId=${watchedUserId} hasFrame=${hasFrame} frameAgeMs=${frameAgeMs}`,
+        `[ScreenFeed] GET /:userId watchedUserId=${watchedUserId} hasFrame=${hasFrame} frameAgeMs=${frameAgeMs}`
       );
     }
 

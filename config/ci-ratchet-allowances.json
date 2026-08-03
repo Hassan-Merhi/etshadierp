@@ -36,7 +36,12 @@
     "POST /api/factory/french-catalog/import/apply [requireAuth > <anonymous>]",
     "GET /api/factory/categories [requireAuth > <anonymous>]",
     "GET /api/factory/bale-products [requireAuth > <anonymous>]",
-    "GET /api/factory/bale-products/:id [requireAuth > <anonymous>]"
+    "GET /api/factory/bale-products/:id [requireAuth > <anonymous>]",
+    "GET /api/screen-feed/admin/runtime [requireAuth > <anonymous>]",
+    "PATCH /api/screen-feed/admin/runtime [requireAuth > <anonymous>]",
+    "POST /api/screen-feed/admin/runtime/emergency-stop [requireAuth > <anonymous>]",
+    "POST /api/screen-feed/admin/runtime/restore-defaults [requireAuth > <anonymous>]",
+    "POST /api/screen-feed/admin/runtime/reset-metrics [requireAuth > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
     "USE /api/factory/containers [postOffloadReconciliationMiddleware]",
