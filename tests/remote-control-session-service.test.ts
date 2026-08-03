@@ -15,7 +15,7 @@ import {
   updateRemoteSupportFlags,
 } from "../server/services/remoteSupportRuntime";
 
-const now = 1_800_000_000_000;
+const now = Date.now();
 
 function registerTab(userId = "22", tabId = "erp-tab-1") {
   return registerRemoteControlTab({
