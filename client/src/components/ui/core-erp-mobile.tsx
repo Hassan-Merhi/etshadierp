@@ -2,16 +2,14 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-const CoreErpPage = React.forwardRef<HTMLElement, React.HTMLAttributes<HTMLElement>>(
-  ({ className, ...props }, ref) => (
-    <section
-      ref={ref}
-      data-core-erp-page="true"
-      className={cn("flex min-w-0 max-w-full flex-col gap-4 p-3 sm:gap-5 sm:p-4 lg:p-6", className)}
-      {...props}
-    />
-  )
-);
+const CoreErpPage = React.forwardRef<HTMLElement, React.HTMLAttributes<HTMLElement>>(({ className, ...props }, ref) => (
+  <section
+    ref={ref}
+    data-core-erp-page="true"
+    className={cn("flex min-w-0 max-w-full flex-col gap-4 p-3 sm:gap-5 sm:p-4 lg:p-6", className)}
+    {...props}
+  />
+));
 CoreErpPage.displayName = "CoreErpPage";
 
 const CoreErpHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
@@ -19,10 +17,7 @@ const CoreErpHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTML
     <div
       ref={ref}
       data-core-erp-header="true"
-      className={cn(
-        "flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between",
-        className
-      )}
+      className={cn("flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between", className)}
       {...props}
     />
   )
@@ -72,10 +67,7 @@ const CoreErpSummaryGrid = React.forwardRef<HTMLDivElement, React.HTMLAttributes
     <div
       ref={ref}
       data-core-erp-summary="true"
-      className={cn(
-        "grid min-w-0 grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
-        className
-      )}
+      className={cn("grid min-w-0 grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4", className)}
       {...props}
     />
   )
@@ -84,11 +76,7 @@ CoreErpSummaryGrid.displayName = "CoreErpSummaryGrid";
 
 const CoreErpSummaryItem = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn("min-w-0 rounded-lg border bg-card p-3 shadow-xs sm:p-4", className)}
-      {...props}
-    />
+    <div ref={ref} className={cn("min-w-0 rounded-lg border bg-card p-3 shadow-xs sm:p-4", className)} {...props} />
   )
 );
 CoreErpSummaryItem.displayName = "CoreErpSummaryItem";
