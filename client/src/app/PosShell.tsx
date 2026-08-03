@@ -155,7 +155,11 @@ export function PosShell({
                     {user.username?.slice(0, 2).toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <div data-business-value="true" dir="auto" className="truncate text-sm font-medium text-sidebar-foreground">
+                    <div
+                      data-business-value="true"
+                      dir="auto"
+                      className="truncate text-sm font-medium text-sidebar-foreground"
+                    >
                       {user.username}
                     </div>
                     <div className="truncate text-[11px] text-sidebar-foreground/55">POS user</div>

@@ -279,10 +279,7 @@ export function getRemoteControlSession(sessionId: string): RemoteControlSession
   return copySession(sessions.get(cleanIdentifier(sessionId)));
 }
 
-export function getActiveRemoteControlSession(
-  targetUserId: string,
-  targetTabId?: string
-): RemoteControlSession | null {
+export function getActiveRemoteControlSession(targetUserId: string, targetTabId?: string): RemoteControlSession | null {
   cleanupRemoteControlState();
   const session = activeSessionRecord(cleanIdentifier(targetUserId));
   if (!session) return null;

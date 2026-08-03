@@ -10,10 +10,7 @@ import {
   startRemoteControlSession,
   stopRemoteControlSession,
 } from "../server/services/remoteControlSessionService";
-import {
-  restoreRemoteSupportBootDefaults,
-  updateRemoteSupportFlags,
-} from "../server/services/remoteSupportRuntime";
+import { restoreRemoteSupportBootDefaults, updateRemoteSupportFlags } from "../server/services/remoteSupportRuntime";
 
 const now = Date.now();
 
