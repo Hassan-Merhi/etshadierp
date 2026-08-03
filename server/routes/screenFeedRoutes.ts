@@ -26,6 +26,14 @@ import {
   restoreRemoteSupportBootDefaults,
   updateRemoteSupportFlags,
 } from "../services/remoteSupportRuntime";
+import {
+  RemoteControlSessionError,
+  heartbeatRemoteControlController,
+  startRemoteControlSession,
+  stopAllRemoteControlSessions,
+  stopRemoteControlSession,
+  type RemoteControlSession,
+} from "../services/remoteControlSessionService";
 import { getSessionRole, getSessionUserId, getSessionUsername } from "../lib/requestContext";
 
 // How long (ms) after a watcher's last GET we still consider the user "being watched".
@@ -105,6 +113,23 @@ function serializeFrame(frame: ScreenFrame) {
   };
 }
 
+function serializeControlSession(session: RemoteControlSession) {
+  return {
+    id: session.id,
+    targetUserId: session.targetUserId,
+    targetUsername: session.targetUsername,
+    targetTabId: session.targetTabId,
+    controllerUserId: session.controllerUserId,
+    controllerUsername: session.controllerUsername,
+    controllerRole: session.controllerRole,
+    scope: session.scope,
+    status: session.status,
+    startedAt: new Date(session.startedAt).toISOString(),
+    expiresAt: new Date(session.expiresAt).toISOString(),
+    capabilities: session.capabilities,
+  };
+}
+
 export function registerScreenFeedRoutes(app: Express) {
   // Runtime safety controls are intentionally registered before /:userId so
   // "admin" can never be interpreted as a watched user ID.
@@ -126,6 +151,9 @@ export function registerScreenFeedRoutes(app: Express) {
     if (!snapshot.flags.screenFeedEnabled || !snapshot.flags.fastScreenFeed) {
       screenFeedLiveHub.disconnectAll();
     }
+    if (!snapshot.flags.remoteControl) {
+      stopAllRemoteControlSessions("runtime-disabled");
+    }
 
     res.setHeader("Cache-Control", "no-store");
     res.json(snapshot);
@@ -136,6 +164,7 @@ export function registerScreenFeedRoutes(app: Express) {
     watcherPollStore.clear();
     screenFeedCursorStore.clear();
     screenFeedLiveHub.disconnectAll();
+    stopAllRemoteControlSessions("global-emergency-stop");
     const snapshot = emergencyDisableRemoteSupport(runtimeActor(req));
     logger.warn(`[RemoteSupport] emergency stop activated by ${runtimeActor(req)}`);
     res.setHeader("Cache-Control", "no-store");
@@ -144,6 +173,7 @@ export function registerScreenFeedRoutes(app: Express) {
 
   app.post("/api/screen-feed/admin/runtime/restore-defaults", requireAuth, (req, res) => {
     if (!requireDeveloper(req, res)) return;
+    stopAllRemoteControlSessions("runtime-defaults-restored");
     const snapshot = restoreRemoteSupportBootDefaults(runtimeActor(req));
     res.setHeader("Cache-Control", "no-store");
     res.json(snapshot);
@@ -202,9 +232,35 @@ export function registerScreenFeedRoutes(app: Express) {
     }
 
     const watchedUserId = req.params.userId;
+    const controllerUserId = String(getSessionUserId(req));
+    const controllerUsername = getSessionUsername(req) || controllerUserId;
+    const controllerRole = getSessionRole(req) || "";
     openEventStream(res);
     recordRemoteSupportMetric("liveViewerConnected");
     watcherPollStore.set(watchedUserId, Date.now());
+
+    let controlSessionId: string | null = null;
+    const tryStartControlSession = () => {
+      if (controlSessionId || !isRemoteSupportEnabled("remoteControl")) return;
+      try {
+        const session = startRemoteControlSession({
+          targetUserId: watchedUserId,
+          controllerUserId,
+          controllerUsername,
+          controllerRole,
+        });
+        controlSessionId = session.id;
+        writeEvent(res, "control-session", serializeControlSession(session));
+      } catch (error) {
+        if (
+          error instanceof RemoteControlSessionError &&
+          ["TARGET_TAB_UNAVAILABLE", "TARGET_ALREADY_CONTROLLED", "REMOTE_CONTROL_DISABLED"].includes(error.code)
+        ) {
+          return;
+        }
+        logger.warn(`[RemoteSupport] unable to start control session for user ${watchedUserId}: ${String(error)}`);
+      }
+    };
 
     const unsubscribeFrames = screenFeedLiveHub.subscribeFrames(watchedUserId, (frame) => {
       writeEvent(res, "frame", serializeFrame(frame));
@@ -215,8 +271,14 @@ export function registerScreenFeedRoutes(app: Express) {
     let unsubscribeDisconnect = () => {};
     let closed = false;
 
+    tryStartControlSession();
     const heartbeatId = setInterval(() => {
       watcherPollStore.set(watchedUserId, Date.now());
+      if (controlSessionId) {
+        const active = heartbeatRemoteControlController(controlSessionId, controllerUserId);
+        if (!active) controlSessionId = null;
+      }
+      tryStartControlSession();
       writeHeartbeat(res);
     }, LIVE_HEARTBEAT_MS);
 
@@ -230,6 +292,10 @@ export function registerScreenFeedRoutes(app: Express) {
       if (!screenFeedLiveHub.hasViewer(watchedUserId)) {
         watcherPollStore.delete(watchedUserId);
         screenFeedLiveHub.notifyStatus(watchedUserId);
+        if (controlSessionId) {
+          stopRemoteControlSession(controlSessionId, "controller-stopped");
+          controlSessionId = null;
+        }
       }
       if (!res.writableEnded) res.end();
     };
