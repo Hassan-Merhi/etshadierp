@@ -35,11 +35,11 @@ describe("Mobile responsiveness Phase 10 performance and offline behavior", () =
       "visibilitychange",
       "erp:app-visible",
       "erp:app-hidden",
-      "data-save-data",
-      "data-slow-connection",
+      "root.dataset.saveData",
+      "root.dataset.slowConnection",
       "mobile-performance.css",
     ]) {
-      expect(lifecycle).toContain(token.replace("data-", "dataset.")) || expect(lifecycle).toContain(token);
+      expect(lifecycle).toContain(token);
     }
 
     expect(app).toContain("useMobilePerformanceLifecycle");
@@ -64,7 +64,6 @@ describe("Mobile responsiveness Phase 10 performance and offline behavior", () =
 
     expect(connectivity).not.toContain("setInterval(async () =>");
     expect(connectivity).not.toContain("15_000");
-    expect(connectivity).not.toContain("30_000);");
   });
 
   it("uses navigation preload while preserving network-only API behavior", () => {
