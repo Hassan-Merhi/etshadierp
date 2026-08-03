@@ -79,23 +79,43 @@ function referencedTables(item: FactoryBilingualSnapshotTarget): string[] {
 
 async function targetExists(item: FactoryBilingualSnapshotTarget, executor: typeof db = db): Promise<boolean> {
   const relations = referencedTables(item);
-  const dependencyArray = sql.raw(`ARRAY[${relations.map((relation) => `'${relation}'`).join(", ")}]::text[]`);
-  const result = await executor.execute(sql`
-    SELECT
-      EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_schema='public' AND table_name=${item.table} AND column_name=${item.arabicColumn}
-      ) AS target_column_present,
-      NOT EXISTS (
+
+  try {
+    const columnResult = await executor.execute(sql`
+      SELECT EXISTS (
         SELECT 1
-        FROM unnest(${dependencyArray}) AS dependency(table_name)
-        WHERE to_regclass('public.' || dependency.table_name) IS NULL
-      ) AS dependencies_present
-  `);
-  const row = result.rows[0] as
-    | { target_column_present?: boolean; dependencies_present?: boolean }
-    | undefined;
-  return Boolean(row?.target_column_present && row?.dependencies_present);
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = ${item.table}
+          AND column_name = ${item.arabicColumn}
+      ) AS column_exists
+    `);
+
+    const columnExists = Boolean(
+      (columnResult.rows[0] as { column_exists?: boolean } | undefined)?.column_exists,
+    );
+    if (!columnExists) return false;
+
+    for (const relation of relations) {
+      const tableResult = await executor.execute(sql`
+        SELECT to_regclass(${`public.${relation}`}) IS NOT NULL AS table_exists
+      `);
+      const tableExists = Boolean(
+        (tableResult.rows[0] as { table_exists?: boolean } | undefined)?.table_exists,
+      );
+      if (!tableExists) return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Factory bilingual schema check failed", {
+      table: item.table,
+      arabicColumn: item.arabicColumn,
+      dependencies: relations,
+      error,
+    });
+    return false;
+  }
 }
 
 function resolverSql(item: FactoryBilingualSnapshotTarget): string {
