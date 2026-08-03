@@ -16,8 +16,8 @@ describe("screen feed viewing metadata", () => {
           { x: 0.25, y: 0.75, label: "Save", ts: now },
           { x: 2, y: 0.5, label: "invalid", ts: now },
         ],
-        now,
-      ),
+        now
+      )
     ).toEqual([{ x: 0.25, y: 0.75, label: "Save", ts: now }]);
   });
 
@@ -43,7 +43,7 @@ describe("screen feed viewing metadata", () => {
         documentHeight: 5000,
         devicePixelRatio: 2,
         visualScale: 1.1,
-      }),
+      })
     ).toEqual({
       width: 1440,
       height: 900,
@@ -63,7 +63,7 @@ describe("screen feed viewing metadata", () => {
         quality: 0.72,
         encodedBytes: 350000,
         durationMs: 420,
-      }),
+      })
     ).toEqual({
       width: 1440,
       height: 900,
@@ -76,11 +76,7 @@ describe("screen feed viewing metadata", () => {
 
   it("accepts only reasonably clock-aligned client capture times", () => {
     const now = Date.now();
-    expect(
-      sanitizeScreenFeedClientCapturedAt(new Date(now - 1000).toISOString(), now)?.getTime(),
-    ).toBe(now - 1000);
-    expect(
-      sanitizeScreenFeedClientCapturedAt(new Date(now - 20 * 60 * 1000).toISOString(), now),
-    ).toBeUndefined();
+    expect(sanitizeScreenFeedClientCapturedAt(new Date(now - 1000).toISOString(), now)?.getTime()).toBe(now - 1000);
+    expect(sanitizeScreenFeedClientCapturedAt(new Date(now - 20 * 60 * 1000).toISOString(), now)).toBeUndefined();
   });
 });
