@@ -42,9 +42,19 @@ export const applicationTranslations = {
     fr: "Aller au contenu principal",
   },
   "accessibility.toggleSidebar": {
-    en: "Toggle navigation sidebar",
+    en: "Toggle Sidebar",
     ar: "فتح أو إغلاق شريط التنقل الجانبي",
     fr: "Afficher ou masquer la barre de navigation",
+  },
+  "accessibility.sidebar": {
+    en: "Sidebar",
+    ar: "شريط التنقل الجانبي",
+    fr: "Barre de navigation",
+  },
+  "accessibility.sidebarDescription": {
+    en: "Displays the mobile sidebar.",
+    ar: "يعرض شريط التنقل الجانبي على الهاتف.",
+    fr: "Affiche la barre de navigation sur mobile.",
   },
   "accessibility.closeDialog": {
     en: "Close dialog",
@@ -88,4 +98,20 @@ export type ApplicationTranslationKey = keyof typeof applicationTranslations;
 export function translateApplicationText(key: ApplicationTranslationKey, language: ApplicationLanguage): string {
   const entry = applicationTranslations[key];
   return entry[language] || entry.en || key;
+}
+
+export function translateApplicationLiteral(value: string, language: ApplicationLanguage): string | null {
+  const leading = value.match(/^\s*/)?.[0] ?? "";
+  const trailing = value.match(/\s*$/)?.[0] ?? "";
+  const normalized = value.trim();
+  if (!normalized) return null;
+
+  const entries = Object.values(applicationTranslations) as readonly Record<ApplicationLanguage, string>[];
+  for (const entry of entries) {
+    if (entry.en === normalized || entry.ar === normalized || entry.fr === normalized) {
+      return `${leading}${entry[language]}${trailing}`;
+    }
+  }
+
+  return null;
 }
