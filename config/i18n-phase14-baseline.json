@@ -1,18 +1,18 @@
 {
   "schemaVersion": 2,
-  "detectorVersion": 8,
+  "detectorVersion": 9,
   "policyDigest": "c26178dd9bc7d71d34976e5bb87aa946cc5d59e6db54b7415f9e363514809f8f",
   "reviewedAt": "2026-08-03",
-  "reviewedHead": "fae9b807ffc806b5af9ca09d3a5abda5e9f65893",
-  "description": "Reviewed untranslated-text ratchet after Phase 7 backend and operational message conversion. Actionable counts may only decrease unless the detector or policy is explicitly re-reviewed. Compatibility-covered labels and documented technical exclusions are reported separately and do not consume the unresolved backlog.",
+  "reviewedHead": "0165e11ef7c738abc12eaadd5cea674dbe157ca7",
+  "description": "Reviewed untranslated-text ratchet after Phase 8 RTL, responsive-layout and accessibility hardening. Actionable counts may only decrease unless the detector or policy is explicitly re-reviewed. Application-level accessibility labels are included as reviewed compatibility coverage, while protected business values remain untranslated.",
   "reviewedTotals": {
-    "candidates": 22429,
-    "actionable": 12550,
-    "excluded": 9879,
-    "compatibilityCovered": 8819,
+    "candidates": 22430,
+    "actionable": 12545,
+    "excluded": 9885,
+    "compatibilityCovered": 8825,
     "unclassified": 0
   },
-  "maxActionable": 12550,
+  "maxActionable": 12545,
   "modules": {
     "accounting": {
       "maxActionable": 1441
@@ -27,13 +27,13 @@
       "maxActionable": 870
     },
     "factory": {
-      "maxActionable": 5501
+      "maxActionable": 5497
     },
     "inventory-logistics": {
       "maxActionable": 1381
     },
     "other-client": {
-      "maxActionable": 857
+      "maxActionable": 856
     },
     "payroll": {
       "maxActionable": 555
