@@ -73,7 +73,7 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
   );
   const appOverlays = (
     <>
-      <LanguageOnboardingDialog userId={user.id} />
+      <LanguageOnboardingDialog userId={user.id ?? user.username} />
       <RemoteSupportIndicator />
     </>
   );
