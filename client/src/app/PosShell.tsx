@@ -20,6 +20,7 @@ import {
 import { CurrencyToggle } from "@/components/CurrencyToggle";
 import { CompanySelector } from "@/components/CompanySelector";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { UserMenu } from "@/components/UserMenu";
 import { DailyRateModal } from "@/components/DailyRateModal";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { PendingSyncIndicator } from "@/components/PendingSyncIndicator";
@@ -73,8 +74,6 @@ export function PosShell({
 
   const posStyle = { "--sidebar-width": "11rem", "--sidebar-width-icon": "3rem" };
   const isPosRoute = currentLocation === "/pos" || currentLocation.startsWith("/pos/");
-  // Only the true full-screen POS canvas uses overflow-hidden on <main>.
-  // All other routes — including /tracking — are scrollable and must receive focus.
   const isFullHeightRoute = isPosRoute;
   const hasAdminSearch = canUseAdminSearch(user);
   const posContainerRef = useRef<HTMLDivElement>(null);
@@ -182,15 +181,7 @@ export function PosShell({
                     </kbd>
                   </Button>
                 )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleLogout}
-                  aria-label="Log out"
-                  data-testid="button-logout-header"
-                >
-                  <LogOut className="h-4 w-4" aria-hidden="true" />
-                </Button>
+                <UserMenu accentColor="#2563eb" user={user} onLogout={handleLogout} />
               </div>
             </header>
             <OfflineBanner />
