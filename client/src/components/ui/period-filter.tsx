@@ -252,12 +252,7 @@ export function PeriodFilter({
               <div className="px-4 text-center text-xs text-muted-foreground">Now click an end date</div>
             )}
             <div className="flex justify-end px-4 pb-4">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full sm:w-auto"
-                onClick={() => setCalendarOpen(false)}
-              >
+              <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={() => setCalendarOpen(false)}>
                 <X className="mr-1 h-3.5 w-3.5" /> Close
               </Button>
             </div>
