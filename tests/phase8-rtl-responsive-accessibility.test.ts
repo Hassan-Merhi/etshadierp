@@ -19,6 +19,15 @@ describe("Phase 8 RTL responsive accessibility contract", () => {
     expect(context).toContain("<LiveRegion");
   });
 
+  it("runs the release contracts without database startup side effects", () => {
+    const config = read("vitest.config.i18n-contracts.ts");
+
+    expect(config).toContain('"tests/phase14-i18n-release-gate.test.ts"');
+    expect(config).toContain('"tests/phase8-rtl-responsive-accessibility.test.ts"');
+    expect(config).not.toContain("setupFiles");
+    expect(config).not.toContain("supplierCompanyScopeBridge");
+  });
+
   it("keeps business values isolated while forcing codes and numbers to LTR", () => {
     const css = read("client/src/styles/rtl-hardening.css");
 
