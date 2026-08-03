@@ -6,7 +6,24 @@ import { ArrowLeft, Calendar } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  CoreErpHeader,
+  CoreErpHeaderActions,
+  CoreErpPage,
+  CoreErpSummaryGrid,
+  CoreErpSummaryItem,
+  CoreErpSummaryLabel,
+  CoreErpSummaryValue,
+} from "@/components/ui/core-erp-mobile";
 import { PageHeader } from "@/components/PageHeader";
+import {
+  ResponsiveDataList,
+  ResponsiveDataListField,
+  ResponsiveDataListFields,
+  ResponsiveDataListHeader,
+  ResponsiveDataListItem,
+  ResponsiveDataListTitle,
+} from "@/components/ui/responsive-data-list";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -98,36 +115,36 @@ export default function StockItemHistory() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-3 sm:p-6 space-y-6">
-        <Skeleton className="h-8 w-64" />
+      <CoreErpPage className="container mx-auto space-y-6">
+        <Skeleton className="h-8 w-64 max-w-full" />
         <Skeleton className="h-[400px] w-full" />
-      </div>
+      </CoreErpPage>
     );
   }
 
   return (
-    <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
+    <CoreErpPage className="container mx-auto">
+      <CoreErpHeader>
+        <div className="flex min-w-0 items-start gap-2 sm:gap-4">
+          <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back" className="shrink-0">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
+          <div className="min-w-0">
             <PageHeader title="Stock Item Monthly Summary" />
             {data?.stockItem && (
-              <p className="text-sm text-muted-foreground" data-testid="text-item-name">
+              <p className="break-words text-sm text-muted-foreground" data-testid="text-item-name">
                 {data.stockItem.name} ({data.stockItem.code})
               </p>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+        <CoreErpHeaderActions aria-label="Stock history filters">
           <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+          <div className="flex min-w-0 items-center gap-2">
+            <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
             <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="w-[100px] sm:w-[120px]" data-testid="select-year">
+              <SelectTrigger className="w-full sm:w-[120px]" data-testid="select-year">
                 <SelectValue placeholder="Year" />
               </SelectTrigger>
               <SelectContent>
@@ -139,25 +156,25 @@ export default function StockItemHistory() {
               </SelectContent>
             </Select>
           </div>
-        </div>
-      </div>
+        </CoreErpHeaderActions>
+      </CoreErpHeader>
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Monthly Summary - {selectedYear}</CardTitle>
+          <CardTitle className="break-words text-lg">Monthly Summary - {selectedYear}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="hidden md:block overflow-x-auto">
-            <Table>
+          <div className="hidden md:block">
+            <Table minimumWidth="52rem" scrollLabel="Stock item monthly summary">
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
                   <TableHead rowSpan={2} className="align-bottom border-r">
                     Particulars
                   </TableHead>
-                  <TableHead colSpan={2} className="text-center border-r">
+                  <TableHead colSpan={2} className="border-r text-center">
                     Inwards
                   </TableHead>
-                  <TableHead colSpan={2} className="text-center border-r">
+                  <TableHead colSpan={2} className="border-r text-center">
                     Outwards
                   </TableHead>
                   <TableHead colSpan={2} className="text-center">
@@ -166,9 +183,9 @@ export default function StockItemHistory() {
                 </TableRow>
                 <TableRow>
                   <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="text-right border-r">Value</TableHead>
+                  <TableHead className="border-r text-right">Value</TableHead>
                   <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="text-right border-r">Value</TableHead>
+                  <TableHead className="border-r text-right">Value</TableHead>
                   <TableHead className="text-right">Quantity</TableHead>
                   <TableHead className="text-right">Value</TableHead>
                 </TableRow>
@@ -183,23 +200,23 @@ export default function StockItemHistory() {
                       onClick={() => hasData && handleMonthClick(month.month)}
                       data-testid={`row-month-${month.month}`}
                     >
-                      <TableCell className="font-medium border-r">{month.monthName}</TableCell>
+                      <TableCell className="border-r font-medium">{month.monthName}</TableCell>
                       <TableCell className="text-right tabular-nums">
                         {month.inwardQty > 0 ? formatNumber(month.inwardQty, 0) : ""}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums border-r">
+                      <TableCell className="border-r text-right tabular-nums">
                         {month.inwardValue > 0 ? formatAmount(month.inwardValue) : ""}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {month.outwardQty > 0 ? formatNumber(month.outwardQty, 0) : ""}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums border-r">
+                      <TableCell className="border-r text-right tabular-nums">
                         {month.outwardValue > 0 ? formatAmount(month.outwardValue) : ""}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
+                      <TableCell className="text-right font-medium tabular-nums">
                         {month.closingQty !== 0 ? formatNumber(month.closingQty, 0) : ""}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">
+                      <TableCell className="text-right font-medium tabular-nums">
                         {month.closingValue !== 0 ? formatAmount(month.closingValue) : ""}
                       </TableCell>
                     </TableRow>
@@ -211,13 +228,13 @@ export default function StockItemHistory() {
                   <TableCell className="text-right tabular-nums">
                     {formatNumber(data?.grandTotal.inwardQty || 0, 0)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums border-r">
+                  <TableCell className="border-r text-right tabular-nums">
                     {formatAmount(data?.grandTotal.inwardValue || 0)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {formatNumber(data?.grandTotal.outwardQty || 0, 0)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums border-r">
+                  <TableCell className="border-r text-right tabular-nums">
                     {formatAmount(data?.grandTotal.outwardValue || 0)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
@@ -231,68 +248,83 @@ export default function StockItemHistory() {
             </Table>
           </div>
 
-          <div className="md:hidden space-y-2">
-            {data?.monthlyData.map((month) => {
-              const hasData = month.inwardQty > 0 || month.outwardQty > 0 || month.closingQty !== 0;
-              return (
-                <div
-                  key={month.month}
-                  className={`p-3 rounded-md border text-sm ${hasData ? "cursor-pointer hover-elevate" : "opacity-50"}`}
-                  onClick={() => hasData && handleMonthClick(month.month)}
-                  data-testid={`row-month-${month.month}`}
-                >
-                  <div className="font-medium text-base mb-2">{month.monthName}</div>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    <div>
-                      <div className="text-muted-foreground">In</div>
-                      <div className="font-mono">{month.inwardQty > 0 ? formatNumber(month.inwardQty, 0) : "-"}</div>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground">Out</div>
-                      <div className="font-mono">{month.outwardQty > 0 ? formatNumber(month.outwardQty, 0) : "-"}</div>
-                    </div>
-                    <div>
-                      <div className="text-muted-foreground">Closing</div>
-                      <div className="font-mono font-medium">
-                        {month.closingQty !== 0 ? formatNumber(month.closingQty, 0) : "-"}
-                      </div>
-                    </div>
-                  </div>
-                  {hasData && (
-                    <div className="grid grid-cols-3 gap-2 text-xs mt-1">
-                      <div className="font-mono text-muted-foreground">
-                        {month.inwardValue > 0 ? formatAmount(month.inwardValue) : ""}
-                      </div>
-                      <div className="font-mono text-muted-foreground">
-                        {month.outwardValue > 0 ? formatAmount(month.outwardValue) : ""}
-                      </div>
-                      <div className="font-mono text-muted-foreground">
-                        {month.closingValue !== 0 ? formatAmount(month.closingValue) : ""}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+          <div className="space-y-3 md:hidden">
+            <ResponsiveDataList>
+              {data?.monthlyData.map((month) => {
+                const hasData = month.inwardQty > 0 || month.outwardQty > 0 || month.closingQty !== 0;
+                return (
+                  <ResponsiveDataListItem
+                    key={month.month}
+                    role={hasData ? "button" : undefined}
+                    tabIndex={hasData ? 0 : undefined}
+                    aria-disabled={!hasData}
+                    className={hasData ? "cursor-pointer" : "opacity-50"}
+                    onClick={() => hasData && handleMonthClick(month.month)}
+                    onKeyDown={(event) => {
+                      if (!hasData || (event.key !== "Enter" && event.key !== " ")) return;
+                      event.preventDefault();
+                      handleMonthClick(month.month);
+                    }}
+                    data-testid={`row-month-${month.month}`}
+                  >
+                    <ResponsiveDataListHeader>
+                      <ResponsiveDataListTitle>{month.monthName}</ResponsiveDataListTitle>
+                    </ResponsiveDataListHeader>
+                    <ResponsiveDataListFields>
+                      <ResponsiveDataListField
+                        label="Inward quantity"
+                        value={month.inwardQty > 0 ? formatNumber(month.inwardQty, 0) : "—"}
+                      />
+                      <ResponsiveDataListField
+                        label="Inward value"
+                        value={month.inwardValue > 0 ? formatAmount(month.inwardValue) : "—"}
+                      />
+                      <ResponsiveDataListField
+                        label="Outward quantity"
+                        value={month.outwardQty > 0 ? formatNumber(month.outwardQty, 0) : "—"}
+                      />
+                      <ResponsiveDataListField
+                        label="Outward value"
+                        value={month.outwardValue > 0 ? formatAmount(month.outwardValue) : "—"}
+                      />
+                      <ResponsiveDataListField
+                        label="Closing quantity"
+                        value={month.closingQty !== 0 ? formatNumber(month.closingQty, 0) : "—"}
+                      />
+                      <ResponsiveDataListField
+                        label="Closing value"
+                        value={month.closingValue !== 0 ? formatAmount(month.closingValue) : "—"}
+                      />
+                    </ResponsiveDataListFields>
+                  </ResponsiveDataListItem>
+                );
+              })}
+            </ResponsiveDataList>
 
             {data && (
-              <div className="p-3 rounded-md border bg-muted/50 text-sm font-bold">
-                <div className="mb-2">Grand Total</div>
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div>
-                    <div className="text-muted-foreground font-normal">In</div>
-                    <div className="font-mono">{formatNumber(data.grandTotal.inwardQty, 0)}</div>
-                  </div>
-                  <div>
-                    <div className="text-muted-foreground font-normal">Out</div>
-                    <div className="font-mono">{formatNumber(data.grandTotal.outwardQty, 0)}</div>
-                  </div>
-                  <div>
-                    <div className="text-muted-foreground font-normal">Closing</div>
-                    <div className="font-mono">{formatNumber(data.grandTotal.closingQty, 0)}</div>
-                  </div>
-                </div>
-              </div>
+              <CoreErpSummaryGrid>
+                <CoreErpSummaryItem>
+                  <CoreErpSummaryLabel>Total inwards</CoreErpSummaryLabel>
+                  <CoreErpSummaryValue>{formatNumber(data.grandTotal.inwardQty, 0)}</CoreErpSummaryValue>
+                  <p className="mt-1 break-words text-xs text-muted-foreground">
+                    {formatAmount(data.grandTotal.inwardValue)}
+                  </p>
+                </CoreErpSummaryItem>
+                <CoreErpSummaryItem>
+                  <CoreErpSummaryLabel>Total outwards</CoreErpSummaryLabel>
+                  <CoreErpSummaryValue>{formatNumber(data.grandTotal.outwardQty, 0)}</CoreErpSummaryValue>
+                  <p className="mt-1 break-words text-xs text-muted-foreground">
+                    {formatAmount(data.grandTotal.outwardValue)}
+                  </p>
+                </CoreErpSummaryItem>
+                <CoreErpSummaryItem>
+                  <CoreErpSummaryLabel>Closing balance</CoreErpSummaryLabel>
+                  <CoreErpSummaryValue>{formatNumber(data.grandTotal.closingQty, 0)}</CoreErpSummaryValue>
+                  <p className="mt-1 break-words text-xs text-muted-foreground">
+                    {formatAmount(data.grandTotal.closingValue)}
+                  </p>
+                </CoreErpSummaryItem>
+              </CoreErpSummaryGrid>
             )}
           </div>
         </CardContent>
@@ -324,6 +356,6 @@ export default function StockItemHistory() {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </CoreErpPage>
   );
 }
