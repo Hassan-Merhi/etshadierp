@@ -1,4 +1,5 @@
 import "@/styles/rtl-hardening.css";
+import "@/styles/pos-revision-history.css";
 import { useEffect, useRef } from "react";
 import { Redirect, Switch, Route } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
