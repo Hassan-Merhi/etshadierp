@@ -31,13 +31,13 @@ describe("Phase 8 RTL responsive accessibility contract", () => {
   it("keeps business values isolated while forcing codes and numbers to LTR", () => {
     const css = read("client/src/styles/rtl-hardening.css");
 
-    expect(css).toContain('[data-business-value]');
-    expect(css).toContain('[data-company-name]');
-    expect(css).toContain('[data-account-name]');
-    expect(css).toContain('[data-article-code]');
-    expect(css).toContain('[data-container-number]');
-    expect(css).toContain('[data-voucher-number]');
-    expect(css).toContain('[data-currency-value]');
+    expect(css).toContain("[data-business-value]");
+    expect(css).toContain("[data-company-name]");
+    expect(css).toContain("[data-account-name]");
+    expect(css).toContain("[data-article-code]");
+    expect(css).toContain("[data-container-number]");
+    expect(css).toContain("[data-voucher-number]");
+    expect(css).toContain("[data-currency-value]");
     expect(css).toContain('input[inputmode="decimal"]');
     expect(css).toContain("unicode-bidi: isolate");
     expect(css).toContain("direction: ltr");
@@ -57,7 +57,7 @@ describe("Phase 8 RTL responsive accessibility contract", () => {
       '[data-slot="sidebar-trigger"]',
       '[data-slot="app-top-bar-actions"]',
       '[data-slot="pos-top-bar-actions"]',
-      '[data-horizontal-scroll-region]',
+      "[data-horizontal-scroll-region]",
       "prefers-reduced-motion",
       "forced-colors",
       "pointer: coarse",
@@ -72,7 +72,7 @@ describe("Phase 8 RTL responsive accessibility contract", () => {
     expect(dialog).toContain('data-slot="dialog-footer"');
     expect(sheet).toContain('data-slot="sheet-content"');
     expect(sheet).toContain('data-slot="sheet-close"');
-    expect(sheet).toContain('data-sheet-side={side}');
+    expect(sheet).toContain("data-sheet-side={side}");
     expect(topBar).toContain("useApplicationDirection");
     expect(topBar).toContain('data-slot="app-top-bar-actions"');
     expect(responsive).toContain('data-horizontal-scroll-region="true"');
