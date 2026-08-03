@@ -6,6 +6,7 @@ import { usePresence } from "@/hooks/use-presence";
 import { useScreenFeed } from "@/hooks/use-screen-feed";
 import { useWsInvalidation } from "@/hooks/use-ws-invalidation";
 import { LanguageOnboardingDialog } from "@/components/LanguageOnboardingDialog";
+import { RemoteSupportIndicator } from "@/components/RemoteSupportIndicator";
 import type { AuthenticatedUser } from "@/contracts/sessionContracts";
 import { useAppNavigation } from "./useAppNavigation";
 import { useAuthenticatedAppData } from "./useAuthenticatedAppData";
@@ -70,7 +71,12 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
   const leaveConfirmDialog = (
     <AppLeaveConfirmDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm} onConfirm={handleConfirmLeave} />
   );
-  const languageOnboarding = <LanguageOnboardingDialog userId={user.id} />;
+  const appOverlays = (
+    <>
+      <LanguageOnboardingDialog userId={user.id} />
+      <RemoteSupportIndicator />
+    </>
+  );
 
   if (isPOS) {
     return (
@@ -83,7 +89,7 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
           handleLogout={handleLogout}
           leaveConfirmDialog={leaveConfirmDialog}
         />
-        {languageOnboarding}
+        {appOverlays}
       </>
     );
   }
@@ -97,7 +103,7 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
           handleLogout={handleLogout}
           leaveConfirmDialog={leaveConfirmDialog}
         />
-        {languageOnboarding}
+        {appOverlays}
       </>
     );
   }
@@ -112,7 +118,7 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
           handleLogout={handleLogout}
           leaveConfirmDialog={leaveConfirmDialog}
         />
-        {languageOnboarding}
+        {appOverlays}
       </>
     );
   }
@@ -125,7 +131,7 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
         handleLogout={handleLogout}
         leaveConfirmDialog={leaveConfirmDialog}
       />
-      {languageOnboarding}
+      {appOverlays}
     </>
   );
 }
