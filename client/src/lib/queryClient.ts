@@ -78,9 +78,12 @@ function scheduleSessionExpiredRedirect() {
   // wrong-password 401s and initial unauthenticated loads.
   const path = window.location.pathname;
   if (path === "/login" || path.startsWith("/login/")) return;
+
+  // Mark the expiry handled before navigation so later in-flight 401 responses
+  // do not start another /api/auth/me verification request.
   _sessionExpiredHandled = true;
-  // Small delay so the current render cycle finishes cleanly before we navigate.
-  setTimeout(() => { window.location.href = "/login"; }, 300);
+  resetCsrfToken();
+  window.location.replace("/login");
 }
 
 // ── Session verification (prevents false logout on business 401s) ──────────
@@ -89,9 +92,7 @@ function scheduleSessionExpiredRedirect() {
 // window.fetch and avoid an infinite interception loop.
 let _sessionVerificationPromise: Promise<boolean> | null = null;
 
-export async function verifySessionExpired(
-  originalFetch: typeof window.fetch,
-): Promise<boolean> {
+export async function verifySessionExpired(originalFetch: typeof window.fetch): Promise<boolean> {
   if (_sessionVerificationPromise) return _sessionVerificationPromise;
   _sessionVerificationPromise = (async () => {
     try {
@@ -116,21 +117,17 @@ export async function verifySessionExpired(
 
 // Routes that must never trigger session verification to avoid recursion or
 // interfering with the login flow itself.
-const AUTH_PATHS = new Set([
-  "/api/auth/me",
-  "/api/auth/login",
-  "/api/auth/logout",
-  "/api/csrf-token",
-]);
+const AUTH_PATHS = new Set(["/api/auth/me", "/api/auth/login", "/api/auth/logout", "/api/csrf-token"]);
 
 export async function handlePossibleSessionExpiry(
   response: Response,
   pathname: string | null,
-  originalFetch: typeof window.fetch,
+  originalFetch: typeof window.fetch
 ): Promise<void> {
   if (response.status !== 401) return;
   if (!pathname?.startsWith("/api/")) return;
   if (AUTH_PATHS.has(pathname)) return;
+  if (_sessionExpiredHandled) return;
   const expired = await verifySessionExpired(originalFetch);
   if (expired) scheduleSessionExpiredRedirect();
 }
@@ -358,7 +355,9 @@ export async function apiRequest(
   } catch (error: any) {
     clearTimeout(timeoutId);
     if (error.name === "AbortError" && intentionalAbort) {
-      throw new Error(`Request timeout after ${Math.round(timeoutMs / 1000)} seconds for ${method} ${url}`, { cause: error });
+      throw new Error(`Request timeout after ${Math.round(timeoutMs / 1000)} seconds for ${method} ${url}`, {
+        cause: error,
+      });
     }
     const networkFail = error.name === "AbortError" ? true : isNetworkError(error);
     if (OFFLINE_MODE_ENABLED && networkFail && isSafeToQueue(method, url)) {
@@ -404,9 +403,7 @@ export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryF
     try {
       // Capacitor: resolve to absolute URL when VITE_API_BASE_URL is set; no-op on web.
       const _apiUrl =
-        _CAPACITOR_API_BASE && requestUrl.startsWith("/")
-          ? `${_CAPACITOR_API_BASE}${requestUrl}`
-          : requestUrl;
+        _CAPACITOR_API_BASE && requestUrl.startsWith("/") ? `${_CAPACITOR_API_BASE}${requestUrl}` : requestUrl;
       const res = await fetch(_apiUrl, {
         credentials: "include",
         signal: controller.signal,

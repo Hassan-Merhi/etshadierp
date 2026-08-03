@@ -182,7 +182,10 @@ export async function trackDueFactoryContainers(): Promise<void> {
       await trackOneContainer(row.id, row.containerNumber, destCountry, carrierHint);
       await new Promise((resolve) => setTimeout(resolve, 2000));
     } catch (err: unknown) {
-      logger.error(`[FactoryTracking] Error tracking `, { error: getErrorMessage(err) });
+      logger.error(`[FactoryTracking] Error tracking ${row.containerNumber}`, {
+        containerId: row.id,
+        error: getErrorMessage(err),
+      });
     }
   }
 
