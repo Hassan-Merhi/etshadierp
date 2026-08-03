@@ -1,0 +1,63 @@
+name: Remote support Phase 3 formatter
+
+on:
+  push:
+    branches:
+      - agent/remote-support-phase-3-viewing-quality
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: remote-support-phase3-format-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  format:
+    if: github.event_name == 'push' || github.head_ref == 'agent/remote-support-phase-3-viewing-quality'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: agent/remote-support-phase-3-viewing-quality
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Normalize Replit registry URLs for CI
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Format Phase 3 sources
+        run: >-
+          npx prettier --write
+          client/src/hooks/screen-feed-viewing-quality.ts
+          client/src/hooks/use-screen-feed.ts
+          client/src/pages/settings/WatchUserDialog.tsx
+          client/src/pages/settings/screen-feed-viewer-layout.ts
+          server/routes/screenFeedRoutes.ts
+          server/services/screenFeedService.ts
+
+      - name: Upload formatted sources
+        uses: actions/upload-artifact@v6
+        with:
+          name: phase3-formatted-sources
+          path: |
+            client/src/hooks/screen-feed-viewing-quality.ts
+            client/src/hooks/use-screen-feed.ts
+            client/src/pages/settings/WatchUserDialog.tsx
+            client/src/pages/settings/screen-feed-viewer-layout.ts
+            server/routes/screenFeedRoutes.ts
+            server/services/screenFeedService.ts
+          if-no-files-found: error
+          retention-days: 1
