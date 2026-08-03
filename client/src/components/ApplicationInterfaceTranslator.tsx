@@ -11,6 +11,10 @@ import {
   isPhase5PropertiesRentalsText,
   translatePhase5PropertiesRentalsText,
 } from "@/i18n/propertiesRentalsPhase5Translations";
+import {
+  isPhase6ReportsExportsText,
+  translatePhase6ReportsExportsText,
+} from "@/i18n/reportsExportsPhase6Translations";
 
 const EXCLUDED_SELECTOR = [
   "code",
@@ -69,6 +73,7 @@ function isEligibleTextElement(element: Element): boolean {
 
 export function translateApprovedInterfaceText(value: string, language: ApplicationLanguage): string | null {
   return (
+    translatePhase6ReportsExportsText(value, language) ??
     translatePhase5PropertiesRentalsText(value, language) ??
     translatePhase4SupplierPartnerText(value, language) ??
     translatePhase3SharedUiText(value, language) ??
@@ -86,7 +91,8 @@ function translateTextNode(node: Text, language: ApplicationLanguage) {
     !isEligibleTextElement(parent) &&
     !isPhase3SharedUiText(value) &&
     !isPhase4SupplierPartnerText(value) &&
-    !isPhase5PropertiesRentalsText(value)
+    !isPhase5PropertiesRentalsText(value) &&
+    !isPhase6ReportsExportsText(value)
   ) {
     return;
   }
@@ -129,8 +135,9 @@ export function translateInterfaceTree(root: Node, language: ApplicationLanguage
  * body observer only discovers portal roots. Mutation work is batched into one
  * animation frame. Plain spans/divs and table data cells remain business content
  * by default. Exact reviewed Phase 3 shared-interface, Phase 4 Supplier Partner,
- * and Phase 5 Properties/Rentals messages may translate outside normal control/
- * heading selectors, while protected business-value markers always take precedence.
+ * Phase 5 Properties/Rentals, and Phase 6 Reports/Exports messages may translate
+ * outside normal control/heading selectors, while protected business-value markers
+ * always take precedence.
  */
 export function ApplicationInterfaceTranslator({ language }: { language: ApplicationLanguage }) {
   useEffect(() => {
