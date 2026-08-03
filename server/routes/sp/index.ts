@@ -5,6 +5,7 @@ import { registerSpContainerRoutes } from "./spContainerRoutes";
 import { registerSpOffloadConcurrencyGuard } from "./spOffloadConcurrencyGuard";
 import { registerSpOffloadRoutes } from "./spOffloadRoutes";
 import { registerSpSalesRoutes } from "./spSalesRoutes";
+import { registerSpLifecycleRoutes } from "./spLifecycleRoutes";
 import { registerSpOpeningStockRoutes } from "./spOpeningStockRoutes";
 import { registerSpAliasRoutes } from "./spAliasRoutes";
 import { registerSpReportRoutes } from "./spReportRoutes";
@@ -61,6 +62,7 @@ export function registerSpRoutes(app: Express) {
   registerSpOffloadConcurrencyGuard(app);
   registerSpOffloadRoutes(app);
   registerSpSalesRoutes(app);
+  registerSpLifecycleRoutes(app);
   registerSpOpeningStockRoutes(app);
   registerSpAliasRoutes(app);
   registerSpReportRoutes(app);
