@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { queryClient } from "@/lib/queryClient";
 import AnalyticsLegacy from "./AnalyticsLegacy";
 
 const PATCH_KEY = "__analyticsAccountsResponsePatch";
@@ -7,6 +8,41 @@ type FetchPatchState = {
   originalFetch: typeof window.fetch;
   users: number;
 };
+
+type AccountsResponse = {
+  accounts?: unknown;
+};
+
+function isAccountsAllUrl(value: unknown): boolean {
+  if (typeof value !== "string") return false;
+
+  try {
+    return new URL(value, window.location.origin).pathname === "/api/accounts/all";
+  } catch {
+    return value.split("?")[0] === "/api/accounts/all";
+  }
+}
+
+function extractAccounts(payload: unknown): unknown[] | null {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== "object") return null;
+
+  const accounts = (payload as AccountsResponse).accounts;
+  return Array.isArray(accounts) ? accounts : null;
+}
+
+function normalizeCachedAccountsResponses(): void {
+  const cachedQueries = queryClient.getQueriesData({
+    predicate: (query) => isAccountsAllUrl(query.queryKey[0]),
+  });
+
+  for (const [queryKey, cachedValue] of cachedQueries) {
+    const accounts = extractAccounts(cachedValue);
+    if (accounts && cachedValue !== accounts) {
+      queryClient.setQueryData(queryKey, accounts);
+    }
+  }
+}
 
 function installAccountsResponsePatch(): () => void {
   const globalState = window as typeof window & { [PATCH_KEY]?: FetchPatchState };
@@ -21,17 +57,16 @@ function installAccountsResponsePatch(): () => void {
       const response = await originalFetch(input, init);
       const rawUrl = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
 
-      try {
-        const parsed = new URL(rawUrl, window.location.origin);
-        if (parsed.pathname !== "/api/accounts/all") return response;
+      if (!isAccountsAllUrl(rawUrl)) return response;
 
+      try {
         const payload = await response.clone().json();
-        if (Array.isArray(payload)) return response;
-        if (!payload || !Array.isArray(payload.accounts)) return response;
+        const accounts = extractAccounts(payload);
+        if (!accounts || payload === accounts) return response;
 
         const headers = new Headers(response.headers);
         headers.delete("content-length");
-        return new Response(JSON.stringify(payload.accounts), {
+        return new Response(JSON.stringify(accounts), {
           status: response.status,
           statusText: response.statusText,
           headers,
@@ -56,7 +91,10 @@ function installAccountsResponsePatch(): () => void {
 
 export default function Analytics() {
   const cleanupRef = useRef<(() => void) | null>(null);
-  if (!cleanupRef.current) cleanupRef.current = installAccountsResponsePatch();
+  if (!cleanupRef.current) {
+    normalizeCachedAccountsResponses();
+    cleanupRef.current = installAccountsResponsePatch();
+  }
 
   useEffect(
     () => () => {
