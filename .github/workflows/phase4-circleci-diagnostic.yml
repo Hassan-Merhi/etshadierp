@@ -1,55 +1,53 @@
-name: Phase 4 CircleCI Diagnostic
+name: Phase 4 Formatting Diagnostic
 
 on:
   pull_request:
     branches: [main]
 
 concurrency:
-  group: phase4-circleci-diagnostic-${{ github.ref }}
+  group: phase4-formatting-diagnostic-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  diagnose:
+  format:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - name: Fetch CircleCI failed-step output
-        shell: bash
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js 22.14
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.14"
+          cache: npm
+
+      - name: Normalize package registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Apply exact formatting
         run: |
-          set -euo pipefail
-          curl --location --silent --show-error --fail \
-            "https://circleci.com/api/v1.1/project/github/Hassan-Merhi/etshadierp/6901" \
-            -o circleci-job.json
-          node <<'NODE'
-          const fs = require("fs");
-          const { execFileSync } = require("child_process");
-          const job = JSON.parse(fs.readFileSync("circleci-job.json", "utf8"));
-          const failedSteps = job.steps.filter((step) =>
-            step.actions?.some((action) => action.failed || action.exit_code > 0),
-          );
-          if (!failedSteps.length) {
-            console.log(JSON.stringify(job.steps, null, 2));
-            process.exit(2);
-          }
-          for (const step of failedSteps) {
-            console.log(`===== ${step.name} =====`);
-            for (const action of step.actions ?? []) {
-              if (!action.output_url) continue;
-              const raw = execFileSync(
-                "curl",
-                ["--location", "--silent", "--show-error", "--fail", action.output_url],
-                { encoding: "utf8" },
-              );
-              try {
-                const parsed = JSON.parse(raw);
-                if (Array.isArray(parsed)) {
-                  for (const entry of parsed) console.log(entry.message ?? entry);
-                } else {
-                  console.log(parsed);
-                }
-              } catch {
-                console.log(raw);
-              }
-            }
-          }
-          NODE
+          node node_modules/prettier/bin/prettier.cjs --write \
+            client/src/components/ui/alert-dialog.tsx \
+            client/src/components/ui/dialog.tsx \
+            client/src/components/ui/form.tsx \
+            client/src/components/ui/select.tsx \
+            client/src/components/ui/sheet.tsx \
+            client/src/components/ui/workflow-dialog.tsx
+
+      - name: Upload formatted source
+        uses: actions/upload-artifact@v7
+        with:
+          name: phase4-formatted-source
+          path: |
+            client/src/components/ui/alert-dialog.tsx
+            client/src/components/ui/dialog.tsx
+            client/src/components/ui/form.tsx
+            client/src/components/ui/select.tsx
+            client/src/components/ui/sheet.tsx
+            client/src/components/ui/workflow-dialog.tsx
+          if-no-files-found: error
+          retention-days: 1
