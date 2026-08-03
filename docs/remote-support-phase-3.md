@@ -23,3 +23,10 @@ Phase 3 improves the existing read-only screen viewer without enabling remote mo
 - Unsafe cross-origin image assets are excluded from capture rather than tainting the canvas.
 - Frame payload and metadata are bounded and sanitized server-side.
 - No SQL or database migration is required.
+
+## Verification record
+
+- Added focused frontend coverage for safe asset handling, coordinate normalization, bounded capture scale, viewer containment, and connection-quality states.
+- Added focused backend coverage for metadata validation, stale and malformed input rejection, listener cleanup, broken-stream isolation, cursor delivery, and emergency disconnection.
+- Verified TypeScript, production build, lint, changed-source formatting, database preparation, startup migrations, backend tests, API smoke checks, backend coverage, frontend tests, frontend coverage, and the coverage ratchet.
+- Verified the exact CircleCI static-build command sequence independently before the final branch validation.
