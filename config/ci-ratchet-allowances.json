@@ -41,7 +41,9 @@
     "PATCH /api/screen-feed/admin/runtime [requireAuth > <anonymous>]",
     "POST /api/screen-feed/admin/runtime/emergency-stop [requireAuth > <anonymous>]",
     "POST /api/screen-feed/admin/runtime/restore-defaults [requireAuth > <anonymous>]",
-    "POST /api/screen-feed/admin/runtime/reset-metrics [requireAuth > <anonymous>]"
+    "POST /api/screen-feed/admin/runtime/reset-metrics [requireAuth > <anonymous>]",
+    "GET /api/screen-feed/live/status [requireLogin > <anonymous>]",
+    "GET /api/screen-feed/live/:userId [requireAuth > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
     "USE /api/factory/containers [postOffloadReconciliationMiddleware]",
