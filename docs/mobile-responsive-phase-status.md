@@ -17,8 +17,8 @@ This document is the source of truth for converting the existing ERP web applica
 
 | Phase | Scope | Status | Branch / PR | Validation |
 | --- | --- | --- | --- | --- |
-| 1 | Global responsive foundation | Complete | `agent/mobile-responsive-phase-1-foundation` | Static source review complete; PR checks and rendered viewport smoke required when available |
-| 2 | Mobile navigation and top bar | Not started | — | — |
+| 1 | Global responsive foundation | Complete and merged | `agent/mobile-responsive-phase-1-foundation` / PR #403 | Full CI, Security, I18n, tests, and coverage passed |
+| 2 | Mobile navigation and top bar | Implemented | `agent/mobile-responsive-phase-2-navigation` / PR #411 | Node 22 static-build and shallow-checkout diagnostics passed; final clean-branch validation in progress |
 | 3 | Shared page headers, filters, and actions | Not started | — | — |
 | 4 | Forms and dialogs | Not started | — | — |
 | 5 | Tables and mobile data lists | Not started | — | — |
@@ -34,34 +34,66 @@ This document is the source of truth for converting the existing ERP web applica
 ### Delivered
 
 - Restored browser zoom by removing the restrictive maximum-scale viewport setting.
-- Added shared viewport-height handling for legacy and modern mobile browsers.
+- Added shared mobile viewport-height handling for legacy and modern mobile browsers.
 - Added safe-area variables for notches, browser chrome, and installed-app layouts.
 - Added global width and overflow containment for the application root and main workspace.
 - Added local horizontal-scroll containment for tables and wide data regions.
 - Added touch manipulation and mobile input sizing to prevent accidental double-taps and iOS input zoom.
 - Added mobile dialog and popover viewport constraints.
 - Added reduced-motion compatibility.
-- Added reusable responsive page, section, form-grid, toolbar, action, sticky mobile-action, and horizontal-scroll primitives.
+- Confirmed the existing responsive page, toolbar, action, grid, accessibility, and horizontal-scroll primitives remain available for later phases.
+
+### Validation
+
+- Type-check passed.
+- Production build passed.
+- Lint and changed-file formatting passed.
+- Database schema preparation and startup migrations passed.
+- Backend tests, API smoke sweep, and backend coverage passed.
+- Frontend tests and frontend coverage passed.
+- Coverage ratchet, Security, and I18n audits passed.
+
+## Phase 2 completion record
+
+### Delivered
+
+- Kept the company switcher directly visible in the phone top bar instead of hiding it behind another control.
+- Removed phone-header crowding by moving logout, theme, currency, synchronization, search, and module actions into a dedicated mobile controls sheet.
+- Preserved the existing desktop top bar layout and keyboard search affordance.
+- Added a larger mobile navigation trigger and explicit accessible labels for icon-only controls.
+- Automatically closes the mobile sidebar after route navigation so the destination page becomes visible immediately.
+- Constrained the company menu to the mobile viewport and added touch-sized company rows.
+- Constrained the mobile sidebar to the viewport, added safe-area padding, restored an explicit close button, and increased navigation touch targets.
+- Repaired CircleCI's changed-source formatting comparison so shallow pull-request checkouts recover history before computing the `main` merge base.
 
 ### Deliberately unchanged
 
-- Business calculations and accounting behavior.
-- API routes and request payloads.
-- Database schema and SQL migrations.
-- Desktop navigation structure.
-- Individual page-specific table transformations, which belong to Phases 3–9.
+- Company selection behavior, offline synchronization, and server session handling.
+- Route permissions and role-based navigation visibility.
+- ERP, Factory, Properties, and Supplier Partner navigation data.
+- Desktop sidebar width, collapse behavior, and keyboard shortcut.
+- API routes, database schema, and business calculations.
+
+### Validation completed
+
+- The complete CircleCI static-build command sequence passed under Node.js 22.14.
+- The original shallow-checkout failure was reproduced and traced to a missing Git merge base.
+- The repaired shallow-checkout sequence passed before the permanent CircleCI configuration change was applied.
+- Security and I18n audits passed on the clean Phase 2 implementation before the CI repair commit.
 
 ### Remaining verification
 
-- Run `npm run check` or the repository TypeScript check on the phase branch.
-- Run `scripts/run-responsive-browser-smoke.mjs` against a branch preview.
-- Verify phone portrait and landscape, tablet portrait and landscape, desktop, and wide desktop.
-- Confirm no page-level component overrides conflict with the shared mobile dialog sizing.
+- Complete the final TypeScript, build, lint, format, tests, coverage, Security, I18n, and CircleCI checks on the clean Phase 2 branch.
+- Verify the top bar at 320 px, 360 px, 390 px, phone landscape, tablet, desktop, and wide desktop.
+- Verify company switching online and offline from a phone viewport.
+- Verify sidebar links close the drawer in ERP, Factory, Properties, and Supplier Partner modes.
+- Verify module-specific `extraActions` remain available in the mobile controls sheet.
 
 ## Internal SQL ledger
 
 | Phase | SQL used |
 | --- | --- |
 | 1 | None |
+| 2 | None |
 
 Do not provide this ledger as the final SQL report until every phase is complete.

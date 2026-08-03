@@ -37,7 +37,7 @@ function CompanyAvatar({ name, type, size = "sm" }: { name: string; type: Compan
   const dim = size === "md" ? "h-7 w-7 text-[11px]" : "h-5 w-5 text-[9px]";
   return (
     <span
-      className={`${dim} rounded-md flex items-center justify-center font-bold text-white shrink-0`}
+      className={`${dim} flex shrink-0 items-center justify-center rounded-md font-bold text-white`}
       style={{ backgroundColor: color }}
     >
       {getInitials(name)}
@@ -73,7 +73,7 @@ export function CompanySelector() {
           "/api/auth/set-company",
           "POST",
           JSON.stringify({ companyId: company.id }),
-          `Switch to ${company.name}`,
+          `Switch to ${company.name}`
         );
         toast({
           title: `Switched to ${company.name}`,
@@ -94,20 +94,36 @@ export function CompanySelector() {
 
   if (isLoading || !selectedCompany) {
     return (
-      <Button variant="outline" size="sm" disabled data-testid="button-company-selector">
-        <span className="h-5 w-5 rounded-md bg-muted animate-pulse shrink-0" />
-        <span className="hidden sm:inline ml-1.5">Loading…</span>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled
+        data-testid="button-company-selector"
+        aria-label="Loading company selector"
+        className="h-10 gap-1.5 px-2 sm:h-8"
+      >
+        <span className="h-5 w-5 shrink-0 animate-pulse rounded-md bg-muted" />
+        <span className="hidden sm:inline">Loading…</span>
       </Button>
     );
   }
 
   const activeType = selectedCompany.companyType;
+  const selectorLabel = `Current company: ${selectedCompany.name}`;
 
   if (companies.length <= 1) {
     return (
-      <Button variant="outline" size="sm" disabled data-testid="button-company-selector">
+      <Button
+        variant="outline"
+        size="sm"
+        disabled
+        data-testid="button-company-selector"
+        aria-label={selectorLabel}
+        title={selectedCompany.name}
+        className="h-10 gap-1.5 px-2 sm:h-8"
+      >
         <CompanyAvatar name={selectedCompany.name} type={activeType} />
-        <span className="hidden sm:inline ml-1.5 max-w-[120px] truncate">{selectedCompany.name}</span>
+        <span className="hidden max-w-[120px] truncate sm:inline">{selectedCompany.name}</span>
       </Button>
     );
   }
@@ -115,30 +131,42 @@ export function CompanySelector() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" data-testid="button-company-selector" className="gap-1.5 pr-2">
+        <Button
+          variant="outline"
+          size="sm"
+          data-testid="button-company-selector"
+          aria-label={`${selectorLabel}. Open company switcher.`}
+          title={selectedCompany.name}
+          className="h-10 max-w-[4.5rem] gap-1.5 px-2 sm:h-8 sm:max-w-[11rem] sm:pr-2"
+        >
           {isOnline ? (
             <CompanyAvatar name={selectedCompany.name} type={activeType} />
           ) : (
-            <WifiOff className="h-4 w-4 text-muted-foreground shrink-0" />
+            <WifiOff className="h-4 w-4 shrink-0 text-muted-foreground" />
           )}
-          <span className="hidden sm:inline max-w-[120px] truncate">{selectedCompany.name}</span>
-          <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+          <span className="hidden max-w-[120px] truncate sm:inline">{selectedCompany.name}</span>
+          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-64 p-1.5">
-        <div className="flex items-center justify-between px-2 py-1.5 mb-1">
+      <DropdownMenuContent
+        align="end"
+        sideOffset={8}
+        collisionPadding={8}
+        className="max-h-[calc(var(--app-viewport-height)_-_1rem)] w-[calc(100vw_-_1rem)] max-w-80 overflow-y-auto p-1.5 sm:max-h-[32rem]"
+      >
+        <div className="mb-1 flex items-center justify-between px-2 py-1.5">
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Layers className="h-3.5 w-3.5" />
             <span className="text-xs font-semibold uppercase tracking-wider">Switch workspace</span>
           </div>
-          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+          <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
             {companies.length}
           </Badge>
         </div>
 
         {!isOnline && (
-          <div className="px-2 py-1.5 text-xs text-muted-foreground flex items-center gap-1.5 bg-muted/50 rounded-md mb-1">
+          <div className="mb-1 flex items-center gap-1.5 rounded-md bg-muted/50 px-2 py-2 text-xs text-muted-foreground">
             <WifiOff className="h-3 w-3 shrink-0" />
             Offline — switch will sync on reconnect
           </div>
@@ -155,22 +183,22 @@ export function CompanySelector() {
               key={company.id}
               onClick={() => handleCompanyChange(company)}
               data-testid={`company-option-${company.id}`}
-              className="rounded-md px-2 py-2 gap-2.5 cursor-pointer"
+              className="min-h-11 cursor-pointer gap-2.5 rounded-md px-2 py-2"
               style={isActive ? { backgroundColor: `${color}14` } : undefined}
             >
               <CompanyAvatar name={company.name} type={company.companyType} size="md" />
-              <div className="flex flex-col flex-1 min-w-0">
-                <span className="text-sm font-medium leading-tight truncate">{company.name}</span>
+              <div className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-sm font-medium leading-tight">{company.name}</span>
                 <span className="text-[10px] leading-tight" style={{ color: `${color}cc` }}>
                   {label}
                 </span>
               </div>
               {isActive && (
                 <span
-                  className="h-4 w-4 rounded-full flex items-center justify-center shrink-0"
+                  className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full"
                   style={{ backgroundColor: color }}
                 >
-                  <svg viewBox="0 0 10 10" className="h-2.5 w-2.5" fill="none">
+                  <svg viewBox="0 0 10 10" className="h-2.5 w-2.5" fill="none" aria-hidden="true">
                     <polyline
                       points="1.5,5 4,7.5 8.5,2.5"
                       stroke="white"

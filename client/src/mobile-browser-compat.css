@@ -116,6 +116,35 @@ body {
   #main-content {
     scroll-padding-bottom: max(1rem, var(--safe-area-bottom));
   }
+
+  [data-mobile="true"][data-sidebar="sidebar"] {
+    width: min(20rem, calc(100vw - 0.5rem)) !important;
+    max-width: calc(100vw - 0.5rem) !important;
+    padding-top: var(--safe-area-top) !important;
+    padding-bottom: var(--safe-area-bottom) !important;
+    overscroll-behavior: contain;
+  }
+
+  [data-mobile="true"][data-sidebar="sidebar"] > button {
+    top: max(0.75rem, var(--safe-area-top)) !important;
+    right: 0.75rem !important;
+    z-index: 30;
+    display: inline-flex !important;
+    width: 2.5rem;
+    height: 2.5rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid hsl(var(--sidebar-border));
+    border-radius: 0.5rem;
+    background: hsl(var(--sidebar) / 0.94);
+    opacity: 1;
+    backdrop-filter: blur(8px);
+  }
+
+  [data-mobile="true"][data-sidebar="sidebar"] :where(a[data-testid^="link-"], button[data-testid^="button-section-"]) {
+    min-height: var(--mobile-control-min-height);
+    touch-action: manipulation;
+  }
 }
 
 @media (max-width: 639px) {
