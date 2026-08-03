@@ -5,6 +5,9 @@ on:
     branches:
       - agent/remote-support-phase-1-safety-foundation
 
+permissions:
+  contents: write
+
 concurrency:
   group: remote-support-format-${{ github.ref }}
   cancel-in-progress: true
@@ -16,6 +19,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          ref: agent/remote-support-phase-1-safety-foundation
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v6
@@ -32,12 +37,14 @@ jobs:
       - name: Format remote support sources
         run: npx prettier --write server/routes/screenFeedRoutes.ts server/services/remoteSupportRuntime.ts
 
-      - name: Upload formatted sources
-        uses: actions/upload-artifact@v7
-        with:
-          name: remote-support-formatted-sources
-          path: |
-            server/routes/screenFeedRoutes.ts
-            server/services/remoteSupportRuntime.ts
-          if-no-files-found: error
-          retention-days: 1
+      - name: Commit formatted sources
+        run: |
+          if git diff --quiet -- server/routes/screenFeedRoutes.ts server/services/remoteSupportRuntime.ts; then
+            echo "Sources already formatted."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/routes/screenFeedRoutes.ts server/services/remoteSupportRuntime.ts
+          git commit -m "style(remote-support): apply Prettier"
+          git push origin HEAD:agent/remote-support-phase-1-safety-foundation
