@@ -66,6 +66,34 @@ jobs:
         run: node node_modules/vitest/vitest.mjs run tests/route-manifest.test.ts --maxWorkers=1 --no-file-parallelism
       - name: Type-check
         run: npm run check
+      - name: Build production application
+        run: npm run build
+      - name: Run production startup migrations
+        run: |
+          node dist/index.js > sp-phases-3-4-startup.log 2>&1 &
+          app_pid=$!
+          cleanup() {
+            kill "$app_pid" 2>/dev/null || true
+            wait "$app_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for attempt in $(seq 1 180); do
+            if curl --fail --silent --show-error http://127.0.0.1:${PORT}/api/health/db > sp-phases-3-4-health.json; then
+              cat sp-phases-3-4-health.json
+              exit 0
+            fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              echo "Application exited before startup migrations became ready."
+              cat sp-phases-3-4-startup.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          echo "Timed out waiting for startup migrations."
+          cat sp-phases-3-4-startup.log
+          exit 1
       - name: Run Supplier Partner lifecycle integration tests
         run: node node_modules/vitest/vitest.mjs run tests/sp-lifecycle-phases-3-4.test.ts --maxWorkers=1 --no-file-parallelism
       - name: Commit prepared source
