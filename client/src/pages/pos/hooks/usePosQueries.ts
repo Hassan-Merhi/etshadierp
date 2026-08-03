@@ -1,16 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { APIInventoryItem, Location } from "../pos-components/posTypes";
-
-interface SpMovement {
-  id: number;
-  articleCode: string;
-  description: string | null;
-  stockItemId: number | null;
-  locationId: number | null;
-  qtyRemaining: string;
-  finalUnitCostUsd: string;
-}
+import { buildPosInventory, type SpMovement } from "./posInventory";
 
 interface PosQueriesParams {
   posUser: any;
@@ -53,57 +44,37 @@ export function usePosQueries({
     error: inventoryError,
   } = useQuery<APIInventoryItem[]>({
     queryKey: activeLocation ? [`/api/locations/${activeLocation.id}/inventory`] : [],
-    enabled: !!activeLocation && !isSpCompany,
+    // Supplier Partner offloads and migration keep the normal location inventory
+    // synchronized with sp_stock_movements. Fetching it here gives the shared POS
+    // the authoritative per-location item IDs, names and quantities instead of
+    // silently hiding stock when an older SP movement has a missing/stale location.
+    enabled: !!activeLocation,
   });
 
-  // Supplier Partner companies sell from sp_stock_movements (FIFO lots), not the
-  // normal inventory table. Group remaining qty by articleCode, same as the
-  // former standalone SpPOS component, so the shared grid/picker gets the same
-  // { code, name, stock, price, configuredPrice, stockItemId } shape.
-  const { data: spStock = [], isLoading: spStockLoading } = useQuery<SpMovement[]>({
-    queryKey: ["/api/sp/stock"],
+  // Supplier Partner companies still need the SP lots for final-cost/FIFO data.
+  // Scope the cache by location so switching locations (or companies, whose
+  // location IDs are globally unique) cannot reuse a stale empty stock response.
+  const {
+    data: spStock = [],
+    isLoading: spStockLoading,
+    error: spStockError,
+  } = useQuery<SpMovement[]>({
+    queryKey: activeLocation ? ["/api/sp/stock", activeLocation.id] : [],
+    queryFn: async () => {
+      const res = await fetch("/api/sp/stock", { credentials: "include" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.message || "Failed to load Supplier Partner stock");
+      }
+      return res.json();
+    },
     enabled: !!isSpCompany && !!activeLocation,
   });
 
-  const inventory = useMemo(() => {
-    if (isSpCompany) {
-      const atLocation = (Array.isArray(spStock) ? spStock : []).filter(
-        (m) => !activeLocation || m.locationId === activeLocation.id
-      );
-      // Key by stockItemId (the real item identity), not articleCode — two
-      // distinct stock items could share a display code, and merging them
-      // under one row would submit only one stockItemId at checkout.
-      const map = new Map<number, { code: string; name: string; stock: number; price: number; configuredPrice: number; stockItemId: number }>();
-      for (const m of atLocation) {
-        const qty = parseFloat(m.qtyRemaining) || 0;
-        if (qty <= 0 || m.stockItemId == null) continue;
-        const key = m.stockItemId;
-        const existing = map.get(key);
-        if (existing) {
-          existing.stock += qty;
-        } else {
-          const price = parseFloat(m.finalUnitCostUsd) || 0;
-          map.set(key, {
-            code: m.articleCode,
-            name: m.description || m.articleCode,
-            stock: qty,
-            price,
-            configuredPrice: price,
-            stockItemId: m.stockItemId,
-          });
-        }
-      }
-      return Array.from(map.values());
-    }
-    return (Array.isArray(apiInventory) ? apiInventory : []).map((item) => ({
-      code: (item.stockItemCode || "").trim(),
-      name: (item.stockItemName || "Unknown Item").trim(),
-      stock: parseFloat(item.quantity),
-      price: parseFloat(item.lastSellingPrice || item.averageRate),
-      configuredPrice: parseFloat(item.lastSellingPrice || "0"),
-      stockItemId: item.stockItemId,
-    }));
-  }, [apiInventory, spStock, isSpCompany, activeLocation]);
+  const inventory = useMemo(
+    () => buildPosInventory(apiInventory, spStock, !!isSpCompany, activeLocation ? Number(activeLocation.id) : null),
+    [apiInventory, spStock, isSpCompany, activeLocation]
+  );
 
   const { data: bankAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/bank-accounts"],
@@ -144,7 +115,7 @@ export function usePosQueries({
   const { data: authUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
 
   const { data: lastSoldPrices = {} } = useQuery<Record<number, string>>({
-    queryKey: activeLocation ? [`/api/pos/last-sold-prices`, { locationId: activeLocation.id }] : [],
+    queryKey: activeLocation ? ["/api/pos/last-sold-prices", { locationId: activeLocation.id }] : [],
     queryFn: async () => {
       if (!activeLocation) return {};
       const res = await fetch(`/api/pos/last-sold-prices?locationId=${activeLocation.id}`, { credentials: "include" });
@@ -171,9 +142,7 @@ export function usePosQueries({
     editVoucher && Array.isArray(editVoucher.salesItems) && editVoucher.salesItems.length > 0;
   const { data: editVoucherViewEntries = [] } = useQuery<any[]>({
     queryKey:
-      editVoucherId && editVoucher && !editVoucherHasSalesItems
-        ? [`/api/vouchers/${editVoucherId}/view-entries`]
-        : [],
+      editVoucherId && editVoucher && !editVoucherHasSalesItems ? [`/api/vouchers/${editVoucherId}/view-entries`] : [],
     enabled: !!editVoucherId && !!editVoucher && !editVoucherHasSalesItems,
     staleTime: 60_000,
   });
@@ -191,8 +160,8 @@ export function usePosQueries({
     allLocations,
     companySettings,
     apiInventory,
-    inventoryLoading,
-    inventoryError,
+    inventoryLoading: isSpCompany ? inventoryLoading || spStockLoading : inventoryLoading,
+    inventoryError: isSpCompany ? inventoryError || spStockError : inventoryError,
     inventory,
     bankAccounts,
     allLedgerAccounts,
