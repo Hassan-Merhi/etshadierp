@@ -3,13 +3,19 @@ import { cn } from "@/lib/utils";
 
 type SkipLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement>;
 
-export function SkipLink({ className, children = "Skip to main content", href = "#main-content", ...props }: SkipLinkProps) {
+export function SkipLink({
+  className,
+  children = "Skip to main content",
+  href = "#main-content",
+  ...props
+}: SkipLinkProps) {
   return (
     <a
       href={href}
+      data-slot="skip-link"
       className={cn(
         "sr-only z-50 rounded-md bg-background px-4 py-2 text-sm font-medium text-foreground shadow-lg transition focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 motion-reduce:transition-none",
-        className,
+        className
       )}
       {...props}
     >
@@ -21,7 +27,7 @@ export function SkipLink({ className, children = "Skip to main content", href = 
 type VisuallyHiddenProps = React.HTMLAttributes<HTMLSpanElement>;
 
 export function VisuallyHidden({ className, ...props }: VisuallyHiddenProps) {
-  return <span className={cn("sr-only", className)} {...props} />;
+  return <span data-slot="visually-hidden" className={cn("sr-only", className)} {...props} />;
 }
 
 type LiveRegionProps = React.HTMLAttributes<HTMLDivElement> & {
@@ -29,14 +35,10 @@ type LiveRegionProps = React.HTMLAttributes<HTMLDivElement> & {
   atomic?: boolean;
 };
 
-export function LiveRegion({
-  className,
-  politeness = "polite",
-  atomic = true,
-  ...props
-}: LiveRegionProps) {
+export function LiveRegion({ className, politeness = "polite", atomic = true, ...props }: LiveRegionProps) {
   return (
     <div
+      data-slot="live-region"
       role={politeness === "assertive" ? "alert" : "status"}
       aria-live={politeness}
       aria-atomic={atomic}
@@ -53,11 +55,12 @@ type ResponsiveActionsProps = React.HTMLAttributes<HTMLDivElement> & {
 export function ResponsiveActions({ className, label = "Page actions", ...props }: ResponsiveActionsProps) {
   return (
     <div
+      data-slot="responsive-actions"
       role="group"
       aria-label={label}
       className={cn(
         "flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end [&>*]:min-h-10 [&>*]:w-full sm:[&>*]:w-auto",
-        className,
+        className
       )}
       {...props}
     />
@@ -71,11 +74,12 @@ type ResponsiveToolbarProps = React.HTMLAttributes<HTMLDivElement> & {
 export function ResponsiveToolbar({ className, label = "Page filters and tools", ...props }: ResponsiveToolbarProps) {
   return (
     <div
+      data-slot="responsive-toolbar"
       role="search"
       aria-label={label}
       className={cn(
         "flex w-full flex-col gap-3 rounded-lg border bg-card p-3 sm:flex-row sm:flex-wrap sm:items-end [&>*]:min-w-0 [&_button]:touch-manipulation",
-        className,
+        className
       )}
       {...props}
     />
@@ -89,6 +93,7 @@ type ResponsiveGridProps = React.HTMLAttributes<HTMLDivElement> & {
 export function ResponsiveGrid({ className, minColumnWidth = "16rem", style, ...props }: ResponsiveGridProps) {
   return (
     <div
+      data-slot="responsive-grid"
       className={cn("grid min-w-0 gap-4", className)}
       style={{ gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${minColumnWidth}), 1fr))`, ...style }}
       {...props}
@@ -102,7 +107,7 @@ type AccessibleRegionProps = React.HTMLAttributes<HTMLElement> & {
 };
 
 export function AccessibleRegion({ label, as: Comp = "section", className, ...props }: AccessibleRegionProps) {
-  return <Comp aria-label={label} className={className} {...props} />;
+  return <Comp data-slot="accessible-region" aria-label={label} className={className} {...props} />;
 }
 
 type HorizontalScrollRegionProps = React.HTMLAttributes<HTMLDivElement> & {
@@ -122,13 +127,15 @@ export function HorizontalScrollRegion({
 
   return (
     <div
+      data-slot="horizontal-scroll-region"
+      data-horizontal-scroll-region="true"
       role="region"
       aria-label={label}
       aria-describedby={descriptionId}
       tabIndex={tabIndex}
       className={cn(
         "max-w-full touch-pan-x overflow-x-auto overscroll-x-contain rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        className,
+        className
       )}
       {...props}
     >

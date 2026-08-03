@@ -1,7 +1,22 @@
 import { useEffect } from "react";
 import type { ApplicationLanguage } from "@shared/applicationLanguageContract";
+import { translateApplicationLiteral } from "@/i18n/applicationTranslations";
 import { translateSharedInterfaceText } from "@/i18n/sharedInterfaceTranslations";
 import { translateAccountingDocumentText } from "@/i18n/accountingDocumentTranslations";
+import { isPhase3SharedUiText, translatePhase3SharedUiText } from "@/i18n/sharedUiPhase3Translations";
+import {
+  isPhase4SupplierPartnerText,
+  translatePhase4SupplierPartnerText,
+} from "@/i18n/supplierPartnerPhase4Translations";
+import {
+  isPhase5PropertiesRentalsText,
+  translatePhase5PropertiesRentalsText,
+} from "@/i18n/propertiesRentalsPhase5Translations";
+import { isPhase6ReportsExportsText, translatePhase6ReportsExportsText } from "@/i18n/reportsExportsPhase6Translations";
+import {
+  isPhase7BackendMessageText,
+  translatePhase7BackendMessageText,
+} from "@/i18n/backendMessagesPhase7Translations";
 
 const EXCLUDED_SELECTOR = [
   "code",
@@ -21,6 +36,10 @@ const EXCLUDED_SELECTOR = [
   "[data-account-code]",
   "[data-container-number]",
   "[data-voucher-number]",
+  "[data-property-name]",
+  "[data-unit-name]",
+  "[data-tenant-name]",
+  "[data-contract-reference]",
 ].join(",");
 
 const ELIGIBLE_TEXT_SELECTOR = [
@@ -55,13 +74,35 @@ function isEligibleTextElement(element: Element): boolean {
 }
 
 export function translateApprovedInterfaceText(value: string, language: ApplicationLanguage): string | null {
-  return translateSharedInterfaceText(value, language) ?? translateAccountingDocumentText(value, language);
+  return (
+    translateApplicationLiteral(value, language) ??
+    translatePhase7BackendMessageText(value, language) ??
+    translatePhase6ReportsExportsText(value, language) ??
+    translatePhase5PropertiesRentalsText(value, language) ??
+    translatePhase4SupplierPartnerText(value, language) ??
+    translatePhase3SharedUiText(value, language) ??
+    translateSharedInterfaceText(value, language) ??
+    translateAccountingDocumentText(value, language)
+  );
 }
 
 function translateTextNode(node: Text, language: ApplicationLanguage) {
   const parent = node.parentElement;
-  if (!parent || isProtected(parent) || !isEligibleTextElement(parent)) return;
-  const translated = translateApprovedInterfaceText(node.nodeValue ?? "", language);
+  if (!parent || isProtected(parent)) return;
+
+  const value = node.nodeValue ?? "";
+  if (
+    !isEligibleTextElement(parent) &&
+    !isPhase3SharedUiText(value) &&
+    !isPhase4SupplierPartnerText(value) &&
+    !isPhase5PropertiesRentalsText(value) &&
+    !isPhase6ReportsExportsText(value) &&
+    !isPhase7BackendMessageText(value)
+  ) {
+    return;
+  }
+
+  const translated = translateApprovedInterfaceText(value, language);
   if (translated !== null && translated !== node.nodeValue) node.nodeValue = translated;
 }
 
@@ -97,9 +138,11 @@ export function translateInterfaceTree(root: Node, language: ApplicationLanguage
  *
  * The main observer is scoped to the React application root, while a lightweight
  * body observer only discovers portal roots. Mutation work is batched into one
- * animation frame. Plain spans/divs and table data cells are treated as business
- * content by default; interface copy must live in an eligible control/heading or
- * be explicitly marked data-i18n-ui.
+ * animation frame. Plain spans/divs and table data cells remain business content
+ * by default. Exact reviewed application labels, Phase 3 shared-interface,
+ * Phase 4 Supplier Partner, Phase 5 Properties/Rentals, Phase 6 Reports/Exports,
+ * and Phase 7 backend messages may translate outside normal control/heading
+ * selectors, while protected business-value markers always take precedence.
  */
 export function ApplicationInterfaceTranslator({ language }: { language: ApplicationLanguage }) {
   useEffect(() => {

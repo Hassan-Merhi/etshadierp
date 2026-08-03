@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useMainContentFocus } from "@/hooks/use-main-content-focus";
 import { useWorkspaceWheelScroll } from "@/hooks/use-workspace-wheel-scroll";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import { AppModeProvider } from "@/contexts/AppModeContext";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { DailyRateModal } from "@/components/DailyRateModal";
@@ -12,6 +13,7 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPalette } from "@/components/CommandPalette";
 import { LoadingState } from "@/components/ui/page-state";
+import { SkipLink } from "@/components/ui/responsive-accessibility";
 import { Router } from "@/routes/AppRoutes";
 import { canUseAdminSearch, type ShellUser } from "./shellUser";
 import { MODULE_ACCENT } from "@/components/sidebar/sidebarPrimitives";
@@ -27,6 +29,7 @@ export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [currentLocation] = useLocation();
   const { selectedCompany } = useCompany();
+  const { t } = useApplicationLanguage();
   const style = { "--sidebar-width": "16rem", "--sidebar-width-icon": "3rem" };
   const hasAdminSearch = canUseAdminSearch(user);
   const erpContainerRef = useRef<HTMLDivElement>(null);
@@ -35,6 +38,7 @@ export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog 
 
   return (
     <AppModeProvider mode="erp">
+      <SkipLink>{t("accessibility.skipToMainContent")}</SkipLink>
       <SidebarProvider style={style as React.CSSProperties}>
         <div ref={erpContainerRef} className="flex h-full w-full min-w-0 overflow-hidden">
           {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
@@ -57,10 +61,7 @@ export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog 
                 <ErrorBoundary resetKey={currentLocation}>
                   <Suspense
                     fallback={
-                      <LoadingState
-                        title="Loading workspace"
-                        description="Preparing the latest ERP information."
-                      />
+                      <LoadingState title="Loading workspace" description="Preparing the latest ERP information." />
                     }
                   >
                     <Router user={user} />

@@ -1,0 +1,305 @@
+name: Phase 9 final verification and release
+
+on:
+  pull_request:
+    paths:
+      - "client/**"
+      - "server/**"
+      - "shared/**"
+      - "tests/**"
+      - "scripts/**"
+      - "config/**"
+      - "package.json"
+      - "package-lock.json"
+      - "vitest.config*.ts"
+      - ".github/workflows/phase9-final-release.yml"
+  push:
+    branches:
+      - agent/phase-9-final-verification-release
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase9-final-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
+      NODE_ENV: test
+      SESSION_SECRET: phase9-final-release-verification-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+      PORT: "5000"
+      ERP_SMOKE_BASE_URL: http://127.0.0.1:5000
+      ERP_SMOKE_OUTPUT_DIR: artifacts/phase9-language-browser
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Normalize registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        id: install
+        continue-on-error: true
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Verify lockfile and production dependencies
+        id: dependencies
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: |
+          npm run verify:lockfile
+          npm run verify:production-dependencies
+
+      - name: Check Phase 9 formatting
+        id: formatting
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --check \
+            .github/workflows/phase9-final-release.yml \
+            config/i18n-phase9-final-release.json \
+            scripts/run-phase9-language-browser-smoke.mjs \
+            scripts/verify-phase9-final-i18n-baseline.mjs \
+            tests/phase9-final-release-gate.test.ts \
+            vitest.config.phase9.ts
+
+      - name: TypeScript
+        id: typecheck
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run check
+
+      - name: Production build
+        id: build
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run build
+
+      - name: Lint
+        id: lint
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run lint
+
+      - name: Phase 9 release contracts
+        id: contracts
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: node node_modules/vitest/vitest.mjs run --config vitest.config.phase9.ts
+
+      - name: Final production readiness
+        id: readiness
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: |
+          npm run verify:final-production-readiness
+          npm run verify:server-bundle
+          npm run verify:program1-observability
+          npm run verify:stabilization
+          npm run verify:mobile-web-routing
+          npm run verify:bandwidth
+          node scripts/verify-program7d-accessibility-responsive.mjs
+
+      - name: Prepare disposable PostgreSQL schema
+        id: db_schema
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: node node_modules/drizzle-kit/bin.cjs push --force
+
+      - name: Application startup and multilingual browser smoke
+        id: browser_smoke
+        if: always() && steps.build.outcome == 'success' && steps.db_schema.outcome == 'success'
+        continue-on-error: true
+        run: |
+          mkdir -p artifacts/phase9-startup
+          node dist/index.js > artifacts/phase9-startup/server.log 2>&1 &
+          app_pid=$!
+          cleanup() {
+            kill "$app_pid" 2>/dev/null || true
+            wait "$app_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for attempt in $(seq 1 180); do
+            if curl --fail --silent --show-error http://127.0.0.1:${PORT}/api/health/db > artifacts/phase9-startup/health-db.json; then
+              break
+            fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              cat artifacts/phase9-startup/server.log
+              exit 1
+            fi
+            if [ "$attempt" = "180" ]; then
+              cat artifacts/phase9-startup/server.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          curl --fail --silent --show-error http://127.0.0.1:${PORT}/api/health > artifacts/phase9-startup/health.json
+          curl --fail --silent --show-error http://127.0.0.1:${PORT}/login > artifacts/phase9-startup/login.html
+          node scripts/run-phase9-language-browser-smoke.mjs
+
+      - name: Full backend tests
+        id: backend
+        if: always() && steps.db_schema.outcome == 'success'
+        continue-on-error: true
+        run: npm run test:backend
+
+      - name: API smoke sweep
+        id: smoke
+        if: always() && steps.db_schema.outcome == 'success'
+        continue-on-error: true
+        run: npm run test:smoke-sweep
+
+      - name: Backend coverage thresholds
+        id: backend_coverage
+        if: always() && steps.db_schema.outcome == 'success'
+        continue-on-error: true
+        run: npm run test:backend:coverage
+
+      - name: Full frontend tests
+        id: frontend
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run test:frontend
+
+      - name: Frontend coverage thresholds
+        id: frontend_coverage
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run test:frontend:coverage
+
+      - name: Final untranslated-text baseline
+        id: i18n
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: |
+          mkdir -p artifacts/phase9-i18n
+          node scripts/audit-i18n-phase14.mjs \
+            --json-out artifacts/phase9-i18n/report.json \
+            --markdown-out artifacts/phase9-i18n/report.md
+          node scripts/verify-phase9-final-i18n-baseline.mjs
+
+      - name: Focused security checks
+        id: security
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run check:program-6-security
+
+      - name: Critical production dependency audit
+        id: dependency_audit
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=critical
+
+      - name: Verified secret scan
+        id: secret_scan
+        if: always()
+        continue-on-error: true
+        uses: trufflesecurity/trufflehog@v3.90.4
+        with:
+          extra_args: --results=verified,unknown
+
+      - name: Upload Phase 9 evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: phase9-release-evidence
+          path: |
+            artifacts/phase9-startup
+            artifacts/phase9-language-browser
+            artifacts/phase9-i18n
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Record final release result
+        if: always()
+        env:
+          INSTALL: ${{ steps.install.outcome }}
+          DEPENDENCIES: ${{ steps.dependencies.outcome }}
+          FORMATTING: ${{ steps.formatting.outcome }}
+          TYPECHECK: ${{ steps.typecheck.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+          LINT: ${{ steps.lint.outcome }}
+          CONTRACTS: ${{ steps.contracts.outcome }}
+          READINESS: ${{ steps.readiness.outcome }}
+          DB_SCHEMA: ${{ steps.db_schema.outcome }}
+          BROWSER_SMOKE: ${{ steps.browser_smoke.outcome }}
+          BACKEND: ${{ steps.backend.outcome }}
+          SMOKE: ${{ steps.smoke.outcome }}
+          BACKEND_COVERAGE: ${{ steps.backend_coverage.outcome }}
+          FRONTEND: ${{ steps.frontend.outcome }}
+          FRONTEND_COVERAGE: ${{ steps.frontend_coverage.outcome }}
+          I18N: ${{ steps.i18n.outcome }}
+          SECURITY: ${{ steps.security.outcome }}
+          DEPENDENCY_AUDIT: ${{ steps.dependency_audit.outcome }}
+          SECRET_SCAN: ${{ steps.secret_scan.outcome }}
+        run: |
+          status=success
+          for value in "$INSTALL" "$DEPENDENCIES" "$FORMATTING" "$TYPECHECK" "$BUILD" "$LINT" "$CONTRACTS" "$READINESS" "$DB_SCHEMA" "$BROWSER_SMOKE" "$BACKEND" "$SMOKE" "$BACKEND_COVERAGE" "$FRONTEND" "$FRONTEND_COVERAGE" "$I18N" "$SECURITY" "$DEPENDENCY_AUDIT" "$SECRET_SCAN"; do
+            if [ "$value" != "success" ]; then status=failure; fi
+          done
+
+          cat >> "$GITHUB_STEP_SUMMARY" <<EOF
+          ## Phase 9 final verification: $status
+
+          | Check | Result |
+          |---|---|
+          | Dependency install | $INSTALL |
+          | Lockfile and production dependencies | $DEPENDENCIES |
+          | Phase 9 formatting | $FORMATTING |
+          | TypeScript | $TYPECHECK |
+          | Production build | $BUILD |
+          | Lint | $LINT |
+          | Release contracts | $CONTRACTS |
+          | Final production readiness | $READINESS |
+          | Disposable PostgreSQL schema | $DB_SCHEMA |
+          | Startup, migrations and multilingual browser smoke | $BROWSER_SMOKE |
+          | Full backend tests | $BACKEND |
+          | API smoke sweep | $SMOKE |
+          | Backend coverage | $BACKEND_COVERAGE |
+          | Full frontend tests | $FRONTEND |
+          | Frontend coverage | $FRONTEND_COVERAGE |
+          | Exact final untranslated baseline | $I18N |
+          | Focused security checks | $SECURITY |
+          | Critical production dependency audit | $DEPENDENCY_AUDIT |
+          | Verified/unknown secret scan | $SECRET_SCAN |
+          EOF
+          echo "PHASE9_STATUS=$status" >> "$GITHUB_ENV"
+
+      - name: Enforce successful release verification
+        if: always()
+        run: test "$PHASE9_STATUS" = "success"

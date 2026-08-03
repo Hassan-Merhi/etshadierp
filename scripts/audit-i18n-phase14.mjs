@@ -1,44 +1,188 @@
 import fs from "node:fs";
 import path from "node:path";
+import {
+  buildReport,
+  createSuggestedBaseline,
+  enforceBaseline,
+  renderMarkdown,
+} from "./i18n-audit-lib.mjs";
 
-const roots = ["client/src", "server", "shared"];
-const extensions = new Set([".ts", ".tsx"]);
-const ignored = new Set(["node_modules", "dist", "coverage"]);
-const findings = [];
+const DETECTOR_VERSION = 9;
+const compatibilityTranslationFiles = [
+  "client/src/i18n/applicationTranslations.ts",
+  "client/src/i18n/sharedInterfaceTranslations.ts",
+  "client/src/i18n/accountingDocumentTranslations.ts",
+  "client/src/i18n/sharedUiPhase3Translations.part1.ts",
+  "client/src/i18n/sharedUiPhase3Translations.part2.ts",
+  "client/src/i18n/sharedUiPhase3Translations.part3.ts",
+  "client/src/i18n/sharedUiPhase3Translations.part4.ts",
+  "client/src/i18n/sharedUiPhase3Translations.part5.ts",
+  "client/src/i18n/supplierPartnerPhase4Translations.part1.ts",
+  "client/src/i18n/supplierPartnerPhase4Translations.part2.ts",
+  "client/src/i18n/supplierPartnerPhase4Translations.part3.ts",
+  "client/src/i18n/supplierPartnerPhase4Translations.part4.ts",
+  "client/src/i18n/propertiesRentalsPhase5Translations.part1.ts",
+  "client/src/i18n/propertiesRentalsPhase5Translations.part2.ts",
+  "client/src/i18n/propertiesRentalsPhase5Translations.part3.ts",
+  "client/src/i18n/reportsExportsPhase6Translations.part1.ts",
+  "client/src/i18n/reportsExportsPhase6Translations.part2.ts",
+  "client/src/i18n/reportsExportsPhase6Translations.part3.ts",
+  "client/src/i18n/reportsExportsPhase6Translations.part4.ts",
+  "client/src/i18n/backendMessagesPhase7Translations.part1.ts",
+  "client/src/i18n/backendMessagesPhase7Translations.part2.ts",
+  "client/src/i18n/backendMessagesPhase7Translations.part3.ts",
+  "client/src/i18n/backendMessagesPhase7Translations.part4.ts",
+  "client/src/i18n/backendMessagesPhase7Translations.part5.ts",
+  "client/src/i18n/backendMessagesPhase7Translations.part6.ts",
+  "client/src/i18n/backendMessagesPhase7Translations.part7.ts",
+  "client/src/i18n/backendMessagesPhase7Translations.part8.ts",
+];
 
-function walk(directory) {
-  if (!fs.existsSync(directory)) return;
-  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-    if (ignored.has(entry.name)) continue;
-    const full = path.join(directory, entry.name);
-    if (entry.isDirectory()) walk(full);
-    else if (extensions.has(path.extname(entry.name))) inspect(full);
-  }
+const reviewedTechnicalValues = new Set([
+  "seg.isSkip ? (",
+  "text-success",
+  "text-warning",
+  "v.1.9.HMD",
+  "useSidebar must be used within a SidebarProvider.",
+  "useCarousel must be used within a <Carousel />",
+  "useFormField should be used within <FormField>",
+  "useFormField should be used within <FormItem>",
+  "useTheme must be used within ThemeProvider",
+  "useChart must be used within a <ChartContainer />",
+  "${landlordUnitNames.get(r.unitId) ??",
+  "${unitNameById.get(r.unitId) ??",
+  "new Date().toISOString().slice(0, 10) && (",
+  "unit${row.unitId}${unit.unitNumber ?",
+]);
+
+function argumentValue(name) {
+  const index = process.argv.indexOf(name);
+  return index >= 0 ? process.argv[index + 1] : null;
 }
 
-function inspect(file) {
-  const source = fs.readFileSync(file, "utf8");
-  const lines = source.split(/\r?\n/);
-  lines.forEach((line, index) => {
-    if (/data-no-translate|data-business-value|data-stock-name|data-account-code/.test(line)) return;
-    const jsxText = line.match(/>([A-Z][A-Za-z][^<{]{2,80})</g) ?? [];
-    const uiAttrs = line.match(/(?:title|placeholder|aria-label)="([A-Z][^"]{2,80})"/g) ?? [];
-    for (const value of [...jsxText, ...uiAttrs]) {
-      findings.push(`${file}:${index + 1}: ${value.trim()}`);
+function writeOutput(file, content) {
+  if (!file) return;
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, content);
+}
+
+function loadCompatibilityCoveredValues() {
+  const values = new Set();
+  for (const file of compatibilityTranslationFiles) {
+    if (!fs.existsSync(file)) continue;
+    const source = fs.readFileSync(file, "utf8");
+    for (const match of source.matchAll(/\ben\s*:\s*(["'`])((?:\\.|(?!\1).)*)\1/g)) {
+      values.add(match[2].replace(/\\(["'`])/g, "$1").trim());
     }
-  });
+  }
+  return values;
 }
 
-for (const root of roots) walk(root);
+function looksLikeCssClassList(value) {
+  const tokens = value.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length < 2) return false;
+  const utility = /^(?:!?-?(?:bg|text|border|ring|fill|stroke|font|leading|tracking|p[trblxy]?|m[trblxy]?|w|min-w|max-w|h|min-h|max-h|gap|space-[xy]|rounded|shadow|opacity|z|top|right|bottom|left|inset|grid|col|row|flex|items|justify|content|self|place|overflow|overscroll|whitespace|break|truncate|cursor|select|pointer-events|transition|duration|ease|delay|transform|translate|scale|rotate|skew|origin|animate|object|aspect|columns|divide|outline|decoration|underline|line-clamp|sr-only|hidden|block|inline|absolute|relative|fixed|sticky|grow|shrink|basis|order|visible|invisible)(?:[-:\[\]/.%#\w]+)?|(?:hover|focus|active|disabled|checked|data|aria|dark|sm|md|lg|xl|2xl):.+)$/;
+  return tokens.every((token) => utility.test(token));
+}
 
-const baselinePath = "config/i18n-phase14-baseline.json";
-const baseline = fs.existsSync(baselinePath)
-  ? JSON.parse(fs.readFileSync(baselinePath, "utf8"))
-  : { maxFindings: findings.length };
+function refineFinding(finding, compatibilityCoveredValues) {
+  const value = finding.text.trim();
+  if (finding.kind === "jsx-text") {
+    if (value.includes("\n")) return null;
+    if (!/^[A-Za-z][A-Za-z0-9\s,.'!?&/():%+\-–—…*#@]+$/.test(value)) return null;
+    if (/\b(?:return|const|let|var|useState|useRef|Promise|forwardRef|interface|type|extends)\b/.test(value)) {
+      return null;
+    }
+  }
+  if (reviewedTechnicalValues.has(value)) {
+    return { ...finding, status: "excluded", category: "technical-identifier" };
+  }
+  if (compatibilityCoveredValues.has(value)) {
+    return { ...finding, status: "excluded", category: "compatibility-covered" };
+  }
+  if (looksLikeCssClassList(value)) {
+    return { ...finding, status: "excluded", category: "style-token" };
+  }
+  if (finding.kind === "jsx-expression-text" && /(?:\\t|\\n|\t|\n)/.test(value)) {
+    return { ...finding, status: "excluded", category: "sample-data" };
+  }
+  if (finding.kind === "error-constructor" && /^[a-z][a-z0-9_-]{1,50}$/.test(value)) {
+    return { ...finding, status: "excluded", category: "technical-identifier" };
+  }
+  return finding;
+}
 
-console.log(`Phase 14 i18n audit: ${findings.length} candidate literals`);
-if (findings.length > baseline.maxFindings) {
-  console.error(`Untranslated-text candidates increased above baseline ${baseline.maxFindings}.`);
-  console.error(findings.slice(0, 50).join("\n"));
-  process.exit(1);
+function rebuildReport(report, compatibilityCoveredValues) {
+  const findings = report.findings.map((finding) => refineFinding(finding, compatibilityCoveredValues)).filter(Boolean);
+  const modules = {};
+  const excludedCategories = {};
+  const filesByActionableCount = {};
+  for (const finding of findings) {
+    modules[finding.module] ??= { candidates: 0, actionable: 0, excluded: 0 };
+    modules[finding.module].candidates += 1;
+    modules[finding.module][finding.status] += 1;
+    if (finding.status === "excluded") {
+      excludedCategories[finding.category] = (excludedCategories[finding.category] ?? 0) + 1;
+    } else {
+      filesByActionableCount[finding.file] = (filesByActionableCount[finding.file] ?? 0) + 1;
+    }
+  }
+  const actionable = findings.filter((finding) => finding.status === "actionable").length;
+  return {
+    ...report,
+    detectorVersion: DETECTOR_VERSION,
+    totals: {
+      candidates: findings.length,
+      actionable,
+      excluded: findings.length - actionable,
+      unclassified: 0,
+    },
+    modules: Object.fromEntries(Object.entries(modules).sort(([left], [right]) => left.localeCompare(right))),
+    excludedCategories: Object.fromEntries(
+      Object.entries(excludedCategories).sort(([, left], [, right]) => right - left),
+    ),
+    topActionableFiles: Object.entries(filesByActionableCount)
+      .sort(([, left], [, right]) => right - left)
+      .slice(0, 50)
+      .map(([file, count]) => ({ file, count })),
+    findings,
+  };
+}
+
+const policyPath = argumentValue("--policy") ?? "config/i18n-audit-policy.json";
+const baselinePath = argumentValue("--baseline") ?? "config/i18n-phase14-baseline.json";
+const jsonOutput = argumentValue("--json-out");
+const markdownOutput = argumentValue("--markdown-out");
+const suggestedBaselineOutput = argumentValue("--suggested-baseline-out");
+const noEnforce = process.argv.includes("--no-enforce");
+
+const policy = JSON.parse(fs.readFileSync(policyPath, "utf8"));
+const baseline = fs.existsSync(baselinePath) ? JSON.parse(fs.readFileSync(baselinePath, "utf8")) : null;
+const compatibilityCoveredValues = loadCompatibilityCoveredValues();
+const report = rebuildReport(buildReport(policy), compatibilityCoveredValues);
+
+writeOutput(jsonOutput, `${JSON.stringify(report, null, 2)}\n`);
+writeOutput(markdownOutput, renderMarkdown(report, baseline));
+if (suggestedBaselineOutput) {
+  writeOutput(suggestedBaselineOutput, `${JSON.stringify(createSuggestedBaseline(report), null, 2)}\n`);
+}
+
+console.log(
+  `I18n audit: ${report.totals.actionable} actionable, ${report.totals.excluded} reviewed exclusions, ${report.totals.candidates} total candidates.`,
+);
+for (const [module, counts] of Object.entries(report.modules)) {
+  console.log(`${module}: ${counts.actionable} actionable / ${counts.excluded} excluded`);
+}
+
+if (!noEnforce) {
+  if (!baseline) {
+    console.error(`Missing reviewed baseline: ${baselinePath}`);
+    process.exit(1);
+  }
+  const errors = enforceBaseline(report, baseline);
+  if (errors.length > 0) {
+    for (const error of errors) console.error(`- ${error}`);
+    console.error("Run with --no-enforce and review the generated report before updating the baseline.");
+    process.exit(1);
+  }
 }
