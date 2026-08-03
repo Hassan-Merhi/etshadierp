@@ -90,12 +90,7 @@ export function LanguageOnboardingDialog({ userId }: LanguageOnboardingDialogPro
           </DialogDescription>
         </DialogHeader>
 
-        <div
-          className="grid gap-2 sm:grid-cols-3"
-          role="radiogroup"
-          aria-label="Preferred language / اللغة المفضلة / Langue préférée"
-          data-no-translate
-        >
+        <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" data-no-translate aria-label="Preferred language / اللغة المفضلة / Langue préférée">
           {languageOptions.map((option) => {
             const selected = selectedLanguage === option.value;
             return (
