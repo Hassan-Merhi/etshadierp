@@ -1,10 +1,15 @@
+import { useState } from "react";
 import { Link } from "wouter";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Package, Eye, Search, X } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Plus, Package, Eye, Search, X, Ban, Loader2 } from "lucide-react";
 import { AddContainerDialog } from "../../components/AddContainerDialog";
 import type { Container, Supplier } from "@shared/schema";
 
@@ -33,20 +38,62 @@ export function ContainerSpView({
   setLocation,
   formatDisplayDate,
 }: ContainerSpViewProps) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [selectedContainer, setSelectedContainer] = useState<any | null>(null);
+  const [reason, setReason] = useState("");
+
+  const { data: currentUser } = useQuery<{ role?: string; currentRole?: string | null }>({
+    queryKey: ["/api/auth/me"],
+  });
+  const role = currentUser?.currentRole ?? currentUser?.role ?? "";
+  const canCancel = role === "Admin" || role === "Developer";
+
+  const cancelContainer = useMutation({
+    mutationFn: async () => {
+      if (!selectedContainer) throw new Error("No container selected");
+      const response = await apiRequest("POST", `/api/sp/containers/${selectedContainer.id}/cancel`, { reason });
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sp/containers"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/sp/containers/${selectedContainer?.id}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sp/report/payable"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      toast({
+        title: "Container cancelled",
+        description: data.cancellationVoucherId
+          ? `Goods OTW was reversed with voucher #${data.cancellationVoucherId}.`
+          : "The open container was cancelled without deleting its history.",
+      });
+      setSelectedContainer(null);
+      setReason("");
+    },
+    onError: (error: any) => {
+      toast({ title: "Cancellation failed", description: error.message, variant: "destructive" });
+    },
+  });
+
   // Normalize sp_containers rows to a common display shape
-  const spNative: any[] = (Array.isArray(spContainersList) ? spContainersList : []).map((c) => ({
-    _key: `sp-${c.id}`,
-    id: c.id,
-    _source: "sp",
-    displayName: c.invoiceNumber || c.containerNumber || `#${c.id}`,
-    subName: c.containerNumber && c.invoiceNumber ? c.containerNumber : null,
-    supplierName: c.supplierName ?? "",
-    statusLabel: c.status === "offloaded" ? "Offloaded" : "Open / OTW",
-    statusOffloaded: c.status === "offloaded",
-    date: c.invoiceDate,
-    dateLabel: "Invoice Date",
-    totalUsd: parseFloat(c.invoiceTotalUsd ?? "0"),
-  }));
+  const spNative: any[] = (Array.isArray(spContainersList) ? spContainersList : []).map((c) => {
+    const statusCancelled = c.status === "cancelled";
+    const statusOffloaded = c.status === "offloaded";
+    return {
+      _key: `sp-${c.id}`,
+      id: c.id,
+      _source: "sp",
+      displayName: c.invoiceNumber || c.containerNumber || `#${c.id}`,
+      subName: c.containerNumber && c.invoiceNumber ? c.containerNumber : null,
+      supplierName: c.supplierName ?? "",
+      status: c.status,
+      statusLabel: statusCancelled ? "Cancelled" : statusOffloaded ? "Offloaded" : "Open / OTW",
+      statusOffloaded,
+      statusCancelled,
+      date: c.invoiceDate,
+      dateLabel: "Invoice Date",
+      totalUsd: parseFloat(c.invoiceTotalUsd ?? "0"),
+    };
+  });
 
   // Normalize regular containers (from PO Import) to same shape
   const erpNormalized: any[] = allContainers.map((c) => {
@@ -59,8 +106,10 @@ export function ContainerSpView({
       displayName: c.containerNumber,
       subName: null,
       supplierName: (sup as any)?.legalName ?? (sup as any)?.name ?? "",
+      status: c.status,
       statusLabel: isOffloaded ? "Offloaded" : c.status === "OTW" ? "On The Way" : c.status,
       statusOffloaded: isOffloaded,
+      statusCancelled: false,
       date: c.importDate,
       dateLabel: "Import Date",
       totalUsd: parseFloat(c.grandTotal ?? "0"),
@@ -124,55 +173,132 @@ export function ContainerSpView({
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map((c: any) => (
-            <div
-              key={c._key}
-              className="flex items-center gap-4 p-4 rounded-md border border-border bg-card hover-elevate cursor-pointer"
-              onClick={() =>
-                setLocation(c._source === "erp" ? `/containers/${c.id}?src=erp` : `/containers/${c.id}`)
-              }
-              data-testid={`row-sp-container-${c.id}`}
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-sm">{c.displayName}</span>
-                  {c.subName && <span className="text-xs text-muted-foreground font-mono">{c.subName}</span>}
-                  <Badge
-                    variant="outline"
-                    className={
-                      c.statusOffloaded ? "text-green-600 border-green-600/40" : "text-blue-600 border-blue-600/40"
-                    }
-                  >
-                    {c.statusLabel}
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">{c.supplierName}</p>
-              </div>
-              <div className="text-right hidden sm:block">
-                <p className="text-xs text-muted-foreground">{c.dateLabel}</p>
-                <p className="text-sm font-mono">{formatDisplayDate(c.date)}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-muted-foreground hidden sm:block">Total (USD)</p>
-                <p className="text-sm font-mono font-semibold">
-                  ${c.totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </p>
-              </div>
-              <Link
-                href={c._source === "erp" ? `/containers/${c.id}?src=erp` : `/containers/${c.id}`}
-                onClick={(e) => e.stopPropagation()}
+          {filtered.map((c: any) => {
+            const detailPath = c._source === "erp" ? `/containers/${c.id}?src=erp` : `/containers/${c.id}`;
+            const rowIsNavigable = !c.statusCancelled;
+            return (
+              <div
+                key={c._key}
+                className={`flex items-center gap-4 p-4 rounded-md border border-border bg-card ${
+                  rowIsNavigable ? "hover-elevate cursor-pointer" : "opacity-75"
+                }`}
+                onClick={() => {
+                  if (rowIsNavigable) setLocation(detailPath);
+                }}
+                data-testid={`row-sp-container-${c.id}`}
               >
-                <Button size="sm" variant="outline" data-testid={`button-view-sp-${c.id}`}>
-                  <Eye className="h-4 w-4 mr-1" />
-                  View
-                </Button>
-              </Link>
-            </div>
-          ))}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-sm">{c.displayName}</span>
+                    {c.subName && <span className="text-xs text-muted-foreground font-mono">{c.subName}</span>}
+                    <Badge
+                      variant="outline"
+                      className={
+                        c.statusCancelled
+                          ? "text-muted-foreground border-muted-foreground/40"
+                          : c.statusOffloaded
+                            ? "text-green-600 border-green-600/40"
+                            : "text-blue-600 border-blue-600/40"
+                      }
+                    >
+                      {c.statusLabel}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">{c.supplierName}</p>
+                </div>
+                <div className="text-right hidden sm:block">
+                  <p className="text-xs text-muted-foreground">{c.dateLabel}</p>
+                  <p className="text-sm font-mono">{formatDisplayDate(c.date)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground hidden sm:block">Total (USD)</p>
+                  <p className="text-sm font-mono font-semibold">
+                    ${c.totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                {canCancel && c._source === "sp" && c.status === "open" && (
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setSelectedContainer(c);
+                      setReason("");
+                    }}
+                    data-testid={`button-cancel-sp-container-${c.id}`}
+                  >
+                    <Ban className="h-4 w-4 mr-1" />
+                    Cancel
+                  </Button>
+                )}
+                {rowIsNavigable && (
+                  <Link href={detailPath} onClick={(event) => event.stopPropagation()}>
+                    <Button size="sm" variant="outline" data-testid={`button-view-sp-${c.id}`}>
+                      <Eye className="h-4 w-4 mr-1" />
+                      View
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
       <AddContainerDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} isSP={true} />
+
+      <Dialog
+        open={!!selectedContainer}
+        onOpenChange={(open) => {
+          if (!open && !cancelContainer.isPending) {
+            setSelectedContainer(null);
+            setReason("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel Supplier Partner container</DialogTitle>
+            <DialogDescription>
+              Only an open container with no offload, stock movement, or used prepaid charge can be cancelled. The Goods
+              OTW voucher is reversed and unused prepaid charges are detached rather than deleted.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-md border bg-muted/30 p-3 text-sm">
+              <p className="font-medium">{selectedContainer?.displayName}</p>
+              <p className="text-muted-foreground">{selectedContainer?.supplierName}</p>
+            </div>
+            <label className="text-sm font-medium" htmlFor="sp-container-cancellation-reason">
+              Required reason
+            </label>
+            <textarea
+              id="sp-container-cancellation-reason"
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              rows={4}
+              maxLength={500}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              placeholder="Explain why the open container is being cancelled…"
+              data-testid="input-sp-container-cancellation-reason"
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setSelectedContainer(null)} disabled={cancelContainer.isPending}>
+                Keep container
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => cancelContainer.mutate()}
+                disabled={reason.trim().length < 5 || cancelContainer.isPending}
+                data-testid="confirm-cancel-sp-container"
+              >
+                {cancelContainer.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Cancel container
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

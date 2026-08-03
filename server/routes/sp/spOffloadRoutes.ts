@@ -15,7 +15,8 @@ import {
   spOffloadCharges,
   spStockMovements,
 } from "@shared/schema";
-import { adjustInventory } from "../../inventoryHelper";
+import { adjustSpInventoryAtomic, respondToSpInventoryIntegrityError } from "../../services/sp/spInventoryIntegrity";
+import { SP_RELEASE_CURRENCY, SP_RELEASE_EXCHANGE_RATE } from "../../services/sp/spReleasePolicy";
 import { requireSpCompany, getSpAccount, parseNum } from "./spHelpers";
 
 // ── Parent Company Agents + Offload ──────────────────────────────────────────
@@ -129,8 +130,8 @@ export function registerSpOffloadRoutes(app: Express) {
             voucherDate: offloadDate,
             description: `Goods OTW Reversal — ${container.supplierName} inv ${container.invoiceNumber}`,
             totalAmount: String(invoiceTotal),
-            currency: "USD",
-            exchangeRate: "1",
+            currency: SP_RELEASE_CURRENCY,
+            exchangeRate: SP_RELEASE_EXCHANGE_RATE,
             sourceModule: "SP",
           })
           .returning();
@@ -162,8 +163,8 @@ export function registerSpOffloadRoutes(app: Express) {
             voucherDate: offloadDate,
             description: `Stock offload — ${container.supplierName} inv ${container.invoiceNumber}`,
             totalAmount: String(totalFinalCost),
-            currency: "USD",
-            exchangeRate: "1",
+            currency: SP_RELEASE_CURRENCY,
+            exchangeRate: SP_RELEASE_EXCHANGE_RATE,
             sourceModule: "SP",
           })
           .returning();
@@ -222,8 +223,8 @@ export function registerSpOffloadRoutes(app: Express) {
               sql`UPDATE sp_prepaid_charges SET amount_used_usd = amount_used_usd + ${chargeAmt} WHERE id = ${parseInt(charge.prepaidChargeId)}`
             );
           } else if (charge.chargeType === "paid_now" && charge.creditBankAccountId) {
-            // Validate bank account belongs to company
-            const [bankRow] = await db
+            // Validate bank account belongs to company inside the same transaction.
+            const [bankRow] = await tx
               .select()
               .from(bankAccounts)
               .where(
@@ -239,8 +240,8 @@ export function registerSpOffloadRoutes(app: Express) {
               narration: `Cash paid at offload — ${charge.description || "charge"}`,
             });
           } else if (charge.chargeType === "unpaid_payable" && charge.creditLedgerAccountId) {
-            // Validate ledger account belongs to company
-            const [ledgerRow] = await db
+            // Validate ledger account belongs to company inside the same transaction.
+            const [ledgerRow] = await tx
               .select()
               .from(ledgerAccounts)
               .where(
@@ -261,8 +262,8 @@ export function registerSpOffloadRoutes(app: Express) {
               narration: `Payable — ${charge.description || "charge"}`,
             });
           } else if (charge.chargeType === "other" && charge.creditLedgerAccountId) {
-            // Validate ledger account belongs to company
-            const [otherRow] = await db
+            // Validate ledger account belongs to company inside the same transaction.
+            const [otherRow] = await tx
               .select()
               .from(ledgerAccounts)
               .where(
@@ -382,8 +383,8 @@ export function registerSpOffloadRoutes(app: Express) {
               voucherDate: offloadDate,
               description: `Agent charges for SP offload — ${container.supplierName} inv ${container.invoiceNumber}`,
               totalAmount: String(totalAgentAmt),
-              currency: "USD",
-              exchangeRate: "1",
+              currency: SP_RELEASE_CURRENCY,
+              exchangeRate: SP_RELEASE_EXCHANGE_RATE,
               sourceModule: "SP",
             })
             .returning();
@@ -410,44 +411,44 @@ export function registerSpOffloadRoutes(app: Express) {
           });
         }
 
-        // ── Insert stock movements + adjustInventory ──────────────────────────
+        // ── Insert stock movements + ERP inventory atomically ────────────────
         for (const line of containerLines) {
           const qty = parseNum(line.qty);
           const baseUnitCost = parseNum(line.unitRateUsd) * discountFactor;
           const finalUnitCost = baseUnitCost + landedPerUnit;
 
-          await tx.insert(spStockMovements).values({
+          const [movement] = await tx
+            .insert(spStockMovements)
+            .values({
+              companyId,
+              containerId: container.id,
+              offloadId: offload.id,
+              containerLineId: line.id,
+              articleCode: line.articleCode,
+              description: line.description || null,
+              stockItemId: line.stockItemId || null,
+              locationId: offloadLocation.id,
+              qtyIn: String(qty),
+              qtyRemaining: String(qty),
+              baseUnitCostUsd: String(baseUnitCost),
+              landedUnitCostUsd: String(landedPerUnit),
+              finalUnitCostUsd: String(finalUnitCost),
+            })
+            .returning();
+
+          await adjustSpInventoryAtomic(tx, {
             companyId,
-            containerId: container.id,
-            offloadId: offload.id,
-            containerLineId: line.id,
-            articleCode: line.articleCode,
-            description: line.description || null,
-            stockItemId: line.stockItemId || null,
             locationId: offloadLocation.id,
-            qtyIn: String(qty),
-            qtyRemaining: String(qty),
-            baseUnitCostUsd: String(baseUnitCost),
-            landedUnitCostUsd: String(landedPerUnit),
-            finalUnitCostUsd: String(finalUnitCost),
+            stockItemId: line.stockItemId,
+            deltaQty: qty,
+            incomingRate: finalUnitCost,
+            context: `SP offload container #${container.id} line #${line.id}`,
+            sourceVoucherType: "SP_OFFLOAD",
+            sourceVoucherId: offload.id,
           });
 
-          // Call adjustInventory if stock item + location are configured
-          if (line.stockItemId) {
-            try {
-              await adjustInventory(
-                tx,
-                offloadLocation.id,
-                line.stockItemId,
-                qty,
-                companyId,
-                finalUnitCost,
-                "SP_OFFLOAD",
-                offload.id
-              );
-            } catch {
-              // Non-blocking for Phase 1 — sp_stock_movements is the primary lot tracker
-            }
+          if (!movement) {
+            throw new Error(`SP offload container #${container.id} failed to create its stock movement`);
           }
         }
 
@@ -459,6 +460,7 @@ export function registerSpOffloadRoutes(app: Express) {
 
       res.json(result);
     } catch (error: unknown) {
+      if (respondToSpInventoryIntegrityError(res, error)) return;
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
