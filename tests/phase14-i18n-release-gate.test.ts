@@ -20,18 +20,20 @@ describe("Phase 14 trilingual release gate", () => {
     const workflow = fs.readFileSync(".github/workflows/i18n-audit.yml", "utf8");
 
     expect(audit).toContain("compatibility-covered");
+    expect(audit).toContain("reportsExportsPhase6Translations.part4.ts");
     expect(audit).toContain("enforceBaseline");
     expect(audit).toContain("process.exit(1)");
     expect(classifier).toContain("I18n audit classifier contract verified");
     expect(policy.ignoredPathRules.every((rule: { reason?: string }) => Boolean(rule.reason))).toBe(true);
     expect(baseline.schemaVersion).toBe(2);
-    expect(baseline.detectorVersion).toBe(6);
-    expect(baseline.maxActionable).toBe(14069);
+    expect(baseline.detectorVersion).toBe(7);
+    expect(baseline.maxActionable).toBe(13404);
     expect(baseline.maxUnclassified).toBe(0);
     expect(Object.keys(baseline.modules)).toHaveLength(14);
     expect(baseline.modules["shared-ui"].maxActionable).toBe(0);
     expect(baseline.modules["supplier-partner"].maxActionable).toBe(0);
     expect(baseline.modules["properties-rentals"].maxActionable).toBe(0);
+    expect(baseline.modules["reports-exports"].maxActionable).toBe(0);
     expect(workflow).toContain("verify-i18n-audit-classifier.mjs");
     expect(workflow).toContain("--json-out");
     expect(workflow).toContain("actions/upload-artifact@v7");
@@ -49,6 +51,7 @@ describe("Phase 14 trilingual release gate", () => {
     expect(translator).toContain('"[data-property-name]"');
     expect(translator).toContain('"[data-unit-name]"');
     expect(translator).toContain('"[data-tenant-name]"');
+    expect(translator).toContain("translatePhase6ReportsExportsText");
   });
 
   it("supports all three languages and Arabic-only RTL", () => {
