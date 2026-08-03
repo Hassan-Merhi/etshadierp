@@ -1,8 +1,8 @@
 import { Search, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { CoreErpFilterGrid } from "@/components/ui/core-erp-mobile";
 import { Input } from "@/components/ui/input";
 import { PeriodFilter, PeriodFilterValue } from "@/components/ui/period-filter";
-import { ResponsiveToolbar } from "@/components/ui/responsive-accessibility";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface DaybookFiltersProps {
@@ -35,15 +35,11 @@ export function DaybookFilters({
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <ResponsiveToolbar className="gap-2 p-2 sm:p-3" label="Daybook filters">
+      <CoreErpFilterGrid className="gap-2 p-2 sm:p-3">
         <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
 
         <Select value={filters.voucherType} onValueChange={(value) => setFilters({ ...filters, voucherType: value })}>
-          <SelectTrigger
-            id="voucher-type"
-            data-testid="select-voucher-type"
-            className="w-full sm:w-[130px]"
-          >
+          <SelectTrigger id="voucher-type" data-testid="select-voucher-type" className="w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -64,11 +60,7 @@ export function DaybookFilters({
             setFilters({ ...filters, statusFilter: value as "all" | "active" | "optional" })
           }
         >
-          <SelectTrigger
-            id="status-filter"
-            data-testid="select-status-filter"
-            className="w-full sm:w-[130px]"
-          >
+          <SelectTrigger id="status-filter" data-testid="select-status-filter" className="w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -78,7 +70,7 @@ export function DaybookFilters({
           </SelectContent>
         </Select>
 
-        <div className="relative w-full min-w-0 sm:min-w-[180px] sm:flex-1">
+        <div className="relative w-full min-w-0 lg:col-span-2 xl:col-span-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             id="search"
@@ -89,7 +81,7 @@ export function DaybookFilters({
             className="w-full pl-9"
           />
         </div>
-      </ResponsiveToolbar>
+      </CoreErpFilterGrid>
 
       {hasActiveFilters && (
         <div
