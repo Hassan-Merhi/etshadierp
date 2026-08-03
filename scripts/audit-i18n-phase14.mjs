@@ -9,6 +9,7 @@ import {
 
 const DETECTOR_VERSION = 8;
 const compatibilityTranslationFiles = [
+  "client/src/i18n/applicationTranslations.ts",
   "client/src/i18n/sharedInterfaceTranslations.ts",
   "client/src/i18n/accountingDocumentTranslations.ts",
   "client/src/i18n/sharedUiPhase3Translations.part1.ts",
