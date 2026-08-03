@@ -31,6 +31,31 @@ export const applicationTranslations = {
     ar: "تم تغيير اللغة على هذا الجهاز، لكن تعذر حفظ تفضيل الحساب.",
     fr: "La langue a été modifiée sur cet appareil, mais la préférence du compte n’a pas pu être enregistrée.",
   },
+  "language.changed": {
+    en: "Application language changed to English.",
+    ar: "تم تغيير لغة التطبيق إلى العربية.",
+    fr: "La langue de l’application est maintenant le français.",
+  },
+  "accessibility.skipToMainContent": {
+    en: "Skip to main content",
+    ar: "الانتقال إلى المحتوى الرئيسي",
+    fr: "Aller au contenu principal",
+  },
+  "accessibility.toggleSidebar": {
+    en: "Toggle navigation sidebar",
+    ar: "فتح أو إغلاق شريط التنقل الجانبي",
+    fr: "Afficher ou masquer la barre de navigation",
+  },
+  "accessibility.closeDialog": {
+    en: "Close dialog",
+    ar: "إغلاق مربع الحوار",
+    fr: "Fermer la boîte de dialogue",
+  },
+  "accessibility.closePanel": {
+    en: "Close panel",
+    ar: "إغلاق اللوحة",
+    fr: "Fermer le panneau",
+  },
   "user.menu": {
     en: "Account menu",
     ar: "قائمة الحساب",
