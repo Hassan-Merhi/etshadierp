@@ -72,7 +72,7 @@ export const backendMessagesPhase7TranslationsPart3: readonly Phase7BackendMessa
     fr: "Un message d’erreur non vide est requis.",
   },
   {
-    en: "${message}\\n${stack}",
+    en: "${message}\n${stack}",
     ar: "{0}\n{1}",
     fr: "{0}\n{1}",
   },
