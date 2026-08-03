@@ -78,8 +78,11 @@ export function PosShell({
   const posNavItems = usePosNavigationItems({ user, posImportEnabled, chatUnread });
 
   const posStyle = { "--sidebar-width": "11rem", "--sidebar-width-icon": "3rem" };
-  const isPosRoute = currentLocation === "/pos" || currentLocation.startsWith("/pos/");
-  const isFullHeightRoute = isPosRoute;
+  const isFullHeightRoute =
+    currentLocation === "/" ||
+    currentLocation === "/pos" ||
+    currentLocation === "/pos/" ||
+    currentLocation.startsWith("/pos/edit/");
   const hasAdminSearch = canUseAdminSearch(user);
   const posContainerRef = useRef<HTMLDivElement>(null);
   useMainContentFocus(currentLocation, isFullHeightRoute);
