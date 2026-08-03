@@ -2,9 +2,7 @@ import { sql } from "drizzle-orm";
 import { adjustInventory, type AdjustInventoryResult } from "../../inventoryHelper";
 import { getErrorMessage } from "../../lib/httpHandlers";
 
-type SpInventoryExecutor = {
-  execute: Function;
-};
+type SpInventoryExecutor = Parameters<typeof adjustInventory>[0];
 
 export class SpInventoryIntegrityError extends Error {
   readonly code: "SP_INVENTORY_LINK_REQUIRED" | "SP_INVENTORY_POST_FAILED";
