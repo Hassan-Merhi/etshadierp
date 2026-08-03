@@ -13,7 +13,14 @@ import {
   spSaleLines,
   stockItemCodeAliases,
 } from "@shared/schema";
-import { adjustInventory } from "../../inventoryHelper";
+import {
+  adjustSpInventoryAtomic,
+  respondToSpInventoryIntegrityError,
+} from "../../services/sp/spInventoryIntegrity";
+import {
+  SP_RELEASE_CURRENCY,
+  SP_RELEASE_EXCHANGE_RATE,
+} from "../../services/sp/spReleasePolicy";
 import { requireSpCompany, getSpAccount, parseNum } from "./spHelpers";
 
 // ── Sales + Stock Movements ───────────────────────────────────────────────────
@@ -127,7 +134,7 @@ export function registerSpSalesRoutes(app: Express) {
 
           // ── Alias resolution: articleCode → stockItemId ───────────────────
           if (!stockItemId && articleCode) {
-            const aliasRows = await db
+            const aliasRows = await tx
               .select()
               .from(stockItemCodeAliases)
               .where(
@@ -180,19 +187,14 @@ export function registerSpSalesRoutes(app: Express) {
               sql`UPDATE sp_stock_movements SET qty_remaining = ${String(parseNum(lot.qty_remaining) - qtyFromLot)} WHERE id = ${lot.id}`
             );
 
-            if (lot.stock_item_id && lot.location_id) {
-              try {
-                await adjustInventory(
-                  tx,
-                  parseInt(lot.location_id),
-                  parseInt(lot.stock_item_id),
-                  -qtyFromLot,
-                  companyId
-                );
-              } catch {
-                /* non-blocking */
-              }
-            }
+            await adjustSpInventoryAtomic(tx, {
+              companyId,
+              locationId: lot.location_id,
+              stockItemId: lot.stock_item_id,
+              deltaQty: -qtyFromLot,
+              context: `SP sale ${articleCode || `item #${stockItemId}`} from lot #${lot.id}`,
+              sourceVoucherType: "SP_SALE",
+            });
 
             postedLines.push({
               movementId: lot.id,
@@ -240,8 +242,8 @@ export function registerSpSalesRoutes(app: Express) {
             voucherDate: saleDate,
             description: `Sale — ${customerName}`,
             totalAmount: String(totalSalePrice),
-            currency: "USD",
-            exchangeRate: "1",
+            currency: SP_RELEASE_CURRENCY,
+            exchangeRate: SP_RELEASE_EXCHANGE_RATE,
             sourceModule: "SP",
           })
           .returning();
@@ -295,6 +297,7 @@ export function registerSpSalesRoutes(app: Express) {
 
       res.json(result);
     } catch (error: unknown) {
+      if (respondToSpInventoryIntegrityError(res, error)) return;
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
