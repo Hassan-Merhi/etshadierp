@@ -6,10 +6,7 @@ import { eq, and } from "drizzle-orm";
 import { getClientDate } from "./lib/dateUtils";
 import { enforceRuntimeSession } from "./services/security/sessionEnforcementAdapter";
 import { hydrateActiveCredentialVersion } from "./services/security/credentialVersionService";
-import {
-  CompanyIsolationError,
-  assertRequestCompanyMatchesSession,
-} from "./services/security/companyIsolationPolicy";
+import { CompanyIsolationError, assertRequestCompanyMatchesSession } from "./services/security/companyIsolationPolicy";
 import { decideExplicitCompanyScope } from "./services/security/companyRequestScopePolicy";
 
 function logDenied(params: {
@@ -351,9 +348,8 @@ export async function requirePasswordConfirmation(req: Request, res: Response, n
       requireRecentPasswordConfirmation: true,
     });
     if (!result.valid) {
-      const message = result.code === "SESSION_PASSWORD_CONFIRMATION_REQUIRED"
-        ? "Password confirmation required"
-        : "Unauthorized";
+      const message =
+        result.code === "SESSION_PASSWORD_CONFIRMATION_REQUIRED" ? "Password confirmation required" : "Unauthorized";
       return rejectInvalidSession(req, res, result, message);
     }
     next();
