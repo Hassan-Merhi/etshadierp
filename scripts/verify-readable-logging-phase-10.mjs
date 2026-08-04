@@ -2,10 +2,11 @@ import fs from "node:fs";
 
 const requiredFiles = [
   "server/lib/logger.ts",
-  "server/lib/logAlerts.ts",
+  "server/lib/logRedaction.ts",
+  "server/lib/logAlertDispatcher.ts",
   "server/lib/operationalEvents.ts",
-  "server/routes/auth/auditLogRoutes.ts",
-  "docs/render-readable-logging.md",
+  "server/routes/auth/activityOverviewRoutes.ts",
+  "docs/render-production-logging.md",
   "docs/logging-phases-8-9.md",
   "docs/logging-phase-10-release.md",
   "scripts/verify-readable-logging-phases-1-7.mjs",
@@ -26,12 +27,17 @@ function requireText(file, fragments) {
 }
 
 requireText("server/lib/logger.ts", [
-  "LOG_REDACT_SENSITIVE",
+  "redactLogString",
   "getLoggerConfiguration",
   "requestId",
   "buildVersion",
 ]);
-requireText("server/lib/logAlerts.ts", [
+requireText("server/lib/logRedaction.ts", [
+  "redactLogString",
+  "WHATSAPP_GROUP_PATTERN",
+  "QUERY_SECRET_PATTERN",
+]);
+requireText("server/lib/logAlertDispatcher.ts", [
   "LOG_ALERTS_ENABLED",
   "LOG_ALERT_WEBHOOK_URL",
   "LOG_ALERT_MIN_SEVERITY",
@@ -39,11 +45,16 @@ requireText("server/lib/logAlerts.ts", [
   "LOG_ALERT_TIMEOUT_MS",
 ]);
 requireText("server/lib/operationalEvents.ts", ["dispatchOperationalAlert"]);
-requireText("server/routes/auth/auditLogRoutes.ts", [
+requireText("server/routes/auth/activityOverviewRoutes.ts", [
   '"/api/audit-log/overview"',
   "getLoggerConfiguration",
   "getLogAlertConfiguration",
   "getOperationalEventSnapshot",
+]);
+requireText("docs/render-production-logging.md", [
+  "LOG_REDACT_SENSITIVE=true",
+  "X-Request-Id",
+  "LOG_FORMAT=pretty",
 ]);
 requireText("docs/logging-phase-10-release.md", [
   "Stage 1",
