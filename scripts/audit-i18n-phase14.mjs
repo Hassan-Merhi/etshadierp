@@ -40,6 +40,7 @@ const compatibilityTranslationFiles = [
   "client/src/i18n/remoteSupportPhase4Translations.ts",
   "client/src/i18n/remoteSupportPhase5Translations.ts",
   "client/src/i18n/remoteSupportPhase6Translations.ts",
+  "client/src/i18n/remoteSupportReleaseTranslations.ts",
 ];
 
 const reviewedTechnicalValues = new Set([
@@ -47,6 +48,7 @@ const reviewedTechnicalValues = new Set([
   "text-success",
   "text-warning",
   "v.1.9.HMD",
+  "requestJson",
   "useSidebar must be used within a SidebarProvider.",
   "useCarousel must be used within a <Carousel />",
   "useFormField should be used within <FormField>",
