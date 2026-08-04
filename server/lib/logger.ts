@@ -155,6 +155,69 @@ function resolveEvent(ctx: LogContext): string | undefined {
     .slice(0, 120);
 }
 
+function formatRankedEndpoints(value: unknown): string {
+  if (!Array.isArray(value)) return "";
+  const summaries = value
+    .slice(0, 3)
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") return "";
+      const row = entry as Record<string, unknown>;
+      const method = typeof row.method === "string" ? row.method.toUpperCase() : "HTTP";
+      const path = typeof row.path === "string" ? row.path : "unknown endpoint";
+      const bytes = row.totalResponseBytes;
+      return `${method} ${path} ${formatBytes(bytes)}`;
+    })
+    .filter(Boolean);
+  return summaries.join("; ");
+}
+
+function parseAccessDeniedMessage(text: string): Record<string, unknown> | undefined {
+  if (!text.startsWith("{") || !text.endsWith("}")) return undefined;
+  try {
+    const parsed = JSON.parse(text) as Record<string, unknown>;
+    return parsed.event === "access_denied" ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function resolveEffectiveLevel(level: LogLevel, message: string, ctx: LogContext): LogLevel {
+  if (level !== "info") return level;
+
+  const text = message.trim();
+  const moduleName = String(ctx.module || "").toLowerCase();
+  const actionName = String(ctx.action || "").toLowerCase();
+  const isStartupModule = /(?:startup|server|scheduler|migration|bootstrap)/.test(moduleName);
+
+  if (
+    !isStartupModule &&
+    (/(?:^|\s)(?:started|starting|beginning)$/.test(text.toLowerCase()) ||
+      /(?:^|[_.-])(?:start|started|begin|beginning)$/.test(actionName))
+  ) {
+    return "debug";
+  }
+
+  if (/^\[getLocationInventory\]/i.test(text)) return "debug";
+  if (/\[express\]\s*\[SLOW API\]/i.test(text)) return "debug";
+  if (/^\[(?:POS Sale|Stock Transfer|Inventory|Cache|Query|Auth|Session)\]/i.test(text)) return "debug";
+  if (/\b(?:polling?|heartbeat|keepalive|cache hit|cache miss|query started|query completed|auth check|session check|reference data loaded)\b/i.test(text)) {
+    return "debug";
+  }
+  if (/(?:poll|heartbeat|keepalive|cache_hit|cache_miss|auth_check|session_check|reference_data)/.test(actionName)) {
+    return "debug";
+  }
+
+  const accessDenied = parseAccessDeniedMessage(text);
+  if (
+    accessDenied?.reason === "SESSION_REQUIRED" &&
+    accessDenied.path === "/api/auth/me"
+  ) {
+    return "debug";
+  }
+
+  return level;
+}
+
 function humanizeLegacyMessage(message: string, ctx: LogContext): string {
   const text = message.trim();
   let match: RegExpMatchArray | null;
@@ -215,13 +278,16 @@ function humanizeLegacyMessage(message: string, ctx: LogContext): string {
     const windowMs = Number(ctx.windowMs);
     const windowText = Number.isFinite(windowMs) ? ` during the last ${formatDuration(windowMs)}` : " in the current reporting window";
     const endpointCount = Number(ctx.apiEndpointCount ?? ctx.endpointCount ?? 0);
-    return `API responses transferred ${formatBytes(ctx.totalApiResponseBytes)} across ${plural(endpointCount, "endpoint")}${windowText}`;
+    const topEndpoints = formatRankedEndpoints(ctx.ranked);
+    const topText = topEndpoints ? `. Top endpoints: ${topEndpoints}` : "";
+    return `API responses transferred ${formatBytes(ctx.totalApiResponseBytes)} across ${plural(endpointCount, "endpoint")}${windowText}${topText}`;
   }
 
   if (text === "Large HTTP response detected") {
     const method = typeof ctx.method === "string" ? ctx.method : "HTTP";
     const path = typeof ctx.path === "string" ? ctx.path : "request";
-    return `${method} ${path} returned a large ${formatBytes(ctx.responseBytes)} response`;
+    const threshold = ctx.budgetBytes == null ? "" : `, exceeding the ${formatBytes(ctx.budgetBytes)} warning threshold`;
+    return `${method} ${path} returned a large ${formatBytes(ctx.responseBytes)} response${threshold}`;
   }
 
   match = text.match(/^(GET|POST|PUT|PATCH|DELETE|OPTIONS|HEAD)\s+(\S+)\s+(\d{3})$/i);
@@ -229,20 +295,17 @@ function humanizeLegacyMessage(message: string, ctx: LogContext): string {
     const status = Number(match[3]);
     const outcome = status >= 500 ? "failed" : status >= 400 ? "was rejected" : "completed";
     const duration = ctx.durationMs == null ? "" : ` in ${formatDuration(ctx.durationMs)}`;
-    return `${match[1].toUpperCase()} ${match[2]} ${outcome} with status ${status}${duration}`;
+    const threshold = ctx.slow === true && ctx.thresholdMs != null
+      ? `; warning threshold ${formatDuration(ctx.thresholdMs)}`
+      : "";
+    return `${match[1].toUpperCase()} ${match[2]} ${outcome} with status ${status}${duration}${threshold}`;
   }
 
-  if (text.startsWith("{") && text.endsWith("}")) {
-    try {
-      const parsed = JSON.parse(text) as Record<string, unknown>;
-      if (parsed.event === "access_denied") {
-        const path = typeof parsed.path === "string" ? parsed.path : "the requested page";
-        const reason = parsed.reason === "SESSION_REQUIRED" ? "an active session was required" : "access was not permitted";
-        return `Access to ${path} was denied because ${reason}`;
-      }
-    } catch {
-      // Keep the original text when it is not valid JSON.
-    }
+  const parsedAccessDenied = parseAccessDeniedMessage(text);
+  if (parsedAccessDenied) {
+    const path = typeof parsedAccessDenied.path === "string" ? parsedAccessDenied.path : "the requested page";
+    const reason = parsedAccessDenied.reason === "SESSION_REQUIRED" ? "an active session was required" : "access was not permitted";
+    return `Access to ${path} was denied because ${reason}`;
   }
 
   match = text.match(/^\[([^\]]+)\]\s*(.*)$/);
@@ -273,7 +336,10 @@ function formatPrettyContext(ctx: Record<string, unknown>): string[] {
     "orderId",
     "status",
     "durationMs",
+    "thresholdMs",
+    "thresholdClass",
     "responseBytes",
+    "budgetBytes",
     "dbQueryCount",
     "dbDurationMs",
     "buildVersion",
@@ -282,16 +348,17 @@ function formatPrettyContext(ctx: Record<string, unknown>): string[] {
   for (const key of keys) {
     const value = ctx[key];
     if (value === undefined || value === null || value === "") continue;
-    if (key === "durationMs" || key === "dbDurationMs") parts.push(`${key}=${formatDuration(value)}`);
-    else if (key === "responseBytes") parts.push(`${key}=${formatBytes(value)}`);
+    if (key === "durationMs" || key === "dbDurationMs" || key === "thresholdMs") parts.push(`${key}=${formatDuration(value)}`);
+    else if (key === "responseBytes" || key === "budgetBytes") parts.push(`${key}=${formatBytes(value)}`);
     else parts.push(`${key}=${String(value)}`);
   }
   return parts;
 }
 
 function emit(level: LogLevel, message: string, ctx: LogContext = {}): void {
-  if (!shouldLog(level)) return;
-  if (level === "error") markRuntimeFailure();
+  const effectiveLevel = resolveEffectiveLevel(level, message, ctx);
+  if (!shouldLog(effectiveLevel)) return;
+  if (effectiveLevel === "error") markRuntimeFailure();
 
   const trace = getTraceContext();
   const mergedContext: LogContext = { ...(trace || {}), ...ctx };
@@ -302,18 +369,18 @@ function emit(level: LogLevel, message: string, ctx: LogContext = {}): void {
   const error = safeError(mergedContext.error);
 
   if (outputFormat === "pretty") {
-    const parts: string[] = [`[${level.toUpperCase()}]`, readableMessage, ...formatPrettyContext(safeContext)];
+    const parts: string[] = [`[${effectiveLevel.toUpperCase()}]`, readableMessage, ...formatPrettyContext(safeContext)];
     if (error) parts.push(`error=${error.message}`);
     const line = parts.join(" ");
-    if (level === "error") console.error(line);
-    else if (level === "warn") console.warn(line);
+    if (effectiveLevel === "error") console.error(line);
+    else if (effectiveLevel === "warn") console.warn(line);
     else console.log(line);
     return;
   }
 
   const entry: Record<string, unknown> = {
     timestamp: new Date().toISOString(),
-    level: level.toUpperCase(),
+    level: effectiveLevel.toUpperCase(),
     message: readableMessage.slice(0, MAX_STRING_LENGTH),
     ...safeContext,
   };
@@ -332,8 +399,8 @@ function emit(level: LogLevel, message: string, ctx: LogContext = {}): void {
       event: "logger.serialize",
     });
   }
-  if (level === "error") console.error(line);
-  else if (level === "warn") console.warn(line);
+  if (effectiveLevel === "error") console.error(line);
+  else if (effectiveLevel === "warn") console.warn(line);
   else console.log(line);
 }
 
@@ -365,7 +432,9 @@ export function createScopedLogger(module: string, defaults: LogContext = {}) {
 export const __loggerTesting = {
   formatBytes,
   formatDuration,
+  formatRankedEndpoints,
   humanizeLegacyMessage,
+  resolveEffectiveLevel,
   resolveEvent,
   outputFormat,
   minimumLevel,
