@@ -13,7 +13,8 @@ export function formatDate(dateStr: string) {
   }
 }
 
-export function formatDateTime(dateStr: string) {
+export function formatDateTime(dateStr: string | null | undefined) {
+  if (!dateStr) return "";
   try {
     return format(parseISO(dateStr), "MM/dd/yyyy HH:mm");
   } catch {
