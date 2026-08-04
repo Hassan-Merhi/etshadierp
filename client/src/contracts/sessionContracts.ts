@@ -35,7 +35,7 @@ function parseContract<T>(contract: SessionContractError["contract"], schema: Zo
 
 export const authenticatedUserSchema = z
   .object({
-    id: z.union([z.string().min(1), z.number().int()]).optional(),
+    id: z.union([z.string().min(1), z.number().int()]),
     username: z.string().min(1),
     role: z.string().min(1).nullable().optional(),
     currentRole: z.string().min(1).nullable().optional(),
