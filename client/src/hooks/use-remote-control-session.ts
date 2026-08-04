@@ -16,8 +16,8 @@ export interface RemoteControlSessionView {
   stoppedAt: string | null;
   stopReason: string | null;
   capabilities: {
-    mouse: false;
-    keyboard: false;
+    mouse: boolean;
+    keyboard: boolean;
     browserTabOnly: true;
   };
 }

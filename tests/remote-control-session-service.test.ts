@@ -7,6 +7,7 @@ import {
   isRemoteControlControllerRole,
   registerRemoteControlTab,
   resetRemoteControlSessionStateForTests,
+  setRemoteControlMouseCapability,
   startRemoteControlSession,
   stopRemoteControlSession,
 } from "../server/services/remoteControlSessionService";
@@ -46,13 +47,13 @@ describe("remote control session safety", () => {
         keyboardControl: false,
         sensitiveActionProtection: true,
       },
-      "phase-4-test"
+      "phase-5-test"
     );
   });
 
   afterEach(() => {
     resetRemoteControlSessionStateForTests();
-    restoreRemoteSupportBootDefaults("phase-4-test-cleanup");
+    restoreRemoteSupportBootDefaults("phase-5-test-cleanup");
   });
 
   it("allows only configured controller roles", () => {
@@ -68,7 +69,7 @@ describe("remote control session safety", () => {
     ).toThrow(RemoteControlSessionError);
   });
 
-  it("binds a session to one active ERP browser tab", () => {
+  it("binds a passive session to one active ERP browser tab", () => {
     registerTab("22", "erp-tab-1");
     registerRemoteControlTab({
       userId: "22",
@@ -84,6 +85,16 @@ describe("remote control session safety", () => {
     expect(session.capabilities).toEqual({ mouse: false, keyboard: false, browserTabOnly: true });
     expect(getActiveRemoteControlSession("22", "erp-tab-2")?.id).toBe(session.id);
     expect(getActiveRemoteControlSession("22", "erp-tab-1")).toBeNull();
+  });
+
+  it("notifies the exact target session when mouse capability changes", () => {
+    registerTab();
+    const session = startSession();
+
+    expect(setRemoteControlMouseCapability(session.id, true)?.capabilities.mouse).toBe(true);
+    expect(getActiveRemoteControlSession("22")?.capabilities.mouse).toBe(true);
+    expect(setRemoteControlMouseCapability(session.id, false)?.capabilities.mouse).toBe(false);
+    expect(getActiveRemoteControlSession("22")?.capabilities.mouse).toBe(false);
   });
 
   it("prevents two different controllers from controlling the same user", () => {
@@ -104,10 +115,12 @@ describe("remote control session safety", () => {
   it("supports controller heartbeat, target stop, and automatic expiration", () => {
     registerTab();
     const session = startSession();
+    setRemoteControlMouseCapability(session.id, true);
     expect(heartbeatRemoteControlController(session.id, "1", now + 5000)?.id).toBe(session.id);
 
     const stopped = stopRemoteControlSession(session.id, "target-emergency-stop", now + 6000);
     expect(stopped?.status).toBe("stopped");
+    expect(stopped?.capabilities.mouse).toBe(false);
     expect(stopped?.stopReason).toBe("target-emergency-stop");
     expect(getActiveRemoteControlSession("22")).toBeNull();
 

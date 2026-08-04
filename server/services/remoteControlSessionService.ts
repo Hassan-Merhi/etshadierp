@@ -29,8 +29,8 @@ export interface RemoteControlSession {
   stoppedAt: number | null;
   stopReason: string | null;
   capabilities: {
-    mouse: false;
-    keyboard: false;
+    mouse: boolean;
+    keyboard: boolean;
     browserTabOnly: true;
   };
 }
@@ -117,6 +117,7 @@ function stopSessionInternal(
 ): RemoteControlSession {
   if (session.status !== "active") return session;
   session.status = status;
+  session.capabilities.mouse = false;
   session.stoppedAt = now;
   session.stopReason = cleanIdentifier(reason, 160) || "stopped";
   if (activeByTargetUser.get(session.targetUserId) === session.id) {
@@ -153,6 +154,15 @@ export function isRemoteControlControllerRole(role: unknown): boolean {
 
 export function listRemoteControlTabs(userId: string, now = Date.now()): RemoteControlTabPresence[] {
   return freshTabs(cleanIdentifier(userId), now);
+}
+
+export function listActiveRemoteControlSessionsForController(controllerUserId: string): RemoteControlSession[] {
+  cleanupRemoteControlState();
+  const normalizedControllerId = cleanIdentifier(controllerUserId);
+  return [...sessions.values()]
+    .filter((session) => session.status === "active" && session.controllerUserId === normalizedControllerId)
+    .sort((left, right) => right.startedAt - left.startedAt)
+    .map((session) => copySession(session) as RemoteControlSession);
 }
 
 export function registerRemoteControlTab(input: {
@@ -259,6 +269,16 @@ export function startRemoteControlSession(input: StartRemoteControlSessionInput)
   activeByTargetUser.set(targetUserId, session.id);
   notifyTarget(targetUserId);
   return copySession(session) as RemoteControlSession;
+}
+
+export function setRemoteControlMouseCapability(sessionId: string, enabled: boolean): RemoteControlSession | null {
+  cleanupRemoteControlState();
+  const session = sessions.get(cleanIdentifier(sessionId));
+  if (!session || session.status !== "active") return null;
+  if (session.capabilities.mouse === enabled) return copySession(session);
+  session.capabilities.mouse = enabled;
+  notifyTarget(session.targetUserId);
+  return copySession(session);
 }
 
 export function heartbeatRemoteControlController(
