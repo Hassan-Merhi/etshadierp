@@ -22,7 +22,7 @@ export type ExportAttachmentSource =
 
 function getMarkerPayload(source: ExportAttachmentSource): ExportFileMarkerPayload | undefined {
   if (!Buffer.isBuffer(source)) return undefined;
-  const payload = (source as any)[EXPORT_MARKER_KEY] as ExportFileMarkerPayload | undefined;
+  const payload = (source as Buffer & { [EXPORT_MARKER_KEY]?: ExportFileMarkerPayload })[EXPORT_MARKER_KEY];
   return payload?.kind === "file" && payload.path ? payload : undefined;
 }
 
@@ -35,7 +35,7 @@ function getFileAttachment(source: ExportAttachmentSource): { filePath: string; 
 
 export function armExportAttachmentCleanup(
   source: ExportAttachmentSource,
-  delayMs = DEFAULT_CLEANUP_DELAY_MS
+  delayMs = DEFAULT_CLEANUP_DELAY_MS,
 ): void {
   const marker = getMarkerPayload(source);
   if (!marker?.managedAttachment) return;
@@ -43,9 +43,9 @@ export function armExportAttachmentCleanup(
   if (marker.cleanupTimer) clearTimeout(marker.cleanupTimer);
   marker.cleanupTimer = setTimeout(() => {
     marker.cleanupTimer = undefined;
-    fs.promises.rm(marker.path, { force: true }).catch((error: any) => {
-      if (error?.code !== "ENOENT") {
-        logger.warn(`[ExportAttachment] Failed to remove managed attachment ${marker.path}:`, { error: error });
+    fs.promises.rm(marker.path, { force: true }).catch((error: unknown) => {
+      if ((error as { code?: string }).code !== "ENOENT") {
+        logger.warn(`[ExportAttachment] Failed to remove managed attachment ${marker.path}:`, { error });
       }
     });
   }, marker.cleanupDelayMs ?? delayMs);
@@ -57,26 +57,26 @@ export async function releaseManagedExportAttachment(source: ExportAttachmentSou
   if (!marker?.managedAttachment) return;
   if (marker.cleanupTimer) clearTimeout(marker.cleanupTimer);
   marker.cleanupTimer = undefined;
-  await fs.promises.rm(marker.path, { force: true }).catch((error: any) => {
-    if (error?.code !== "ENOENT") throw error;
+  await fs.promises.rm(marker.path, { force: true }).catch((error: unknown) => {
+    if ((error as { code?: string }).code !== "ENOENT") throw error;
   });
 }
 
 export function isFileExportAttachment(
-  source: ExportAttachmentSource
+  source: ExportAttachmentSource,
 ): source is { filePath: string; sizeBytes: number } {
   return !Buffer.isBuffer(source);
 }
 
 export function getExportAttachmentSize(source: ExportAttachmentSource): number {
   const file = getFileAttachment(source);
-  return file ? file.sizeBytes : (source as Buffer).length;
+  return file ? file.sizeBytes : source.length;
 }
 
 export function toNodemailerAttachment(
   source: ExportAttachmentSource,
   filename: string,
-  contentType: string
+  contentType: string,
 ): { filename: string; contentType: string; content?: Buffer; path?: string } {
   const file = getFileAttachment(source);
   if (file) {
@@ -84,12 +84,12 @@ export function toNodemailerAttachment(
     return { filename, contentType, path: file.filePath };
   }
 
-  return { filename, contentType, content: source as Buffer };
+  return { filename, contentType, content: source };
 }
 
 export async function readExportAttachmentBuffer(source: ExportAttachmentSource): Promise<Buffer> {
   const file = getFileAttachment(source);
-  if (!file) return source as Buffer;
+  if (!file) return source;
   armExportAttachmentCleanup(source);
   return fs.promises.readFile(file.filePath);
 }
@@ -97,7 +97,7 @@ export async function readExportAttachmentBuffer(source: ExportAttachmentSource)
 export async function assertExportAttachmentAvailable(source: ExportAttachmentSource): Promise<void> {
   const file = getFileAttachment(source);
   if (!file) {
-    if ((source as Buffer).length <= 0) throw new Error("Export attachment is empty");
+    if (source.length <= 0) throw new Error("Export attachment is empty");
     return;
   }
 
@@ -105,5 +105,32 @@ export async function assertExportAttachmentAvailable(source: ExportAttachmentSo
   if (!stat.isFile() || stat.size <= 0) throw new Error("Export attachment file is unavailable or empty");
   if (stat.size !== file.sizeBytes) {
     throw new Error(`Export attachment size changed unexpectedly (${file.sizeBytes} expected, ${stat.size} found)`);
+  }
+}
+
+let materializationTail: Promise<void> = Promise.resolve();
+
+/**
+ * Materialize at most one complete file-backed attachment at a time. This is
+ * required for providers such as Green API that still require a complete
+ * multipart Buffer. The reusable export remains on disk between retries.
+ */
+export async function withSerializedExportAttachmentBuffer<T>(
+  source: ExportAttachmentSource,
+  work: (buffer: Buffer) => Promise<T>,
+): Promise<T> {
+  const previous = materializationTail;
+  let release!: () => void;
+  materializationTail = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  await previous.catch(() => undefined);
+  try {
+    await assertExportAttachmentAvailable(source);
+    const buffer = await readExportAttachmentBuffer(source);
+    return await work(buffer);
+  } finally {
+    release();
   }
 }
