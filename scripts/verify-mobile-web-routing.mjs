@@ -54,8 +54,11 @@ for (const token of ["!client/.env.capacitor", "artifacts/responsive-smoke/"]) {
   if (!gitignore.includes(token)) failures.push(`Gitignore contract missing: ${token}`);
 }
 
+if (!/const CACHE_VERSION = "erp-v\d+"/.test(serviceWorker)) {
+  failures.push('Service-worker recovery contract missing: versioned CACHE_VERSION (for example "erp-v11")');
+}
+
 for (const token of [
-  'const CACHE_VERSION = "erp-v9"',
   'const CACHE_PREFIX = "erp-"',
   'type: "SW_UPDATED", version: CACHE_VERSION',
   'event.data?.type === "CLEAR_APP_CACHES"',
@@ -70,12 +73,12 @@ for (const token of [
 
 for (const token of [
   'const ASSET_RECOVERY_PREFIX = "assetRecovery:"',
-  'const SW_RELOAD_PREFIX = "swReload:"',
+  'const LEGACY_RECOVERY_PREFIXES = ["swReload:", "chunkReload:", "chunkRetry:"]',
   "const RECOVERY_STABLE_MS = 10_000",
   "event.preventDefault()",
   'type: "CLEAR_APP_CACHES"',
   'currentUrl.searchParams.set("_asset_recovery"',
-  'url.searchParams.set("_sw", version)',
+  'url.searchParams.delete("_sw")',
   "showStaleAssetRecoveryMessage()",
   "removeRecoveryMarkersAfterStableLoad()",
 ]) {
@@ -87,8 +90,8 @@ for (const token of ['"assetRecovery:"', '"swReload:"', '"chunkReload:"', '"chun
 }
 
 for (const token of [
-  "register('/sw.js', { updateViaCache: 'none' })",
-  "return navigator.serviceWorker.register('/sw.js')",
+  'register("/sw.js", { updateViaCache: "none" })',
+  'return navigator.serviceWorker.register("/sw.js")',
 ]) {
   if (!indexHtml.includes(token)) failures.push(`Service-worker registration contract missing: ${token}`);
 }
