@@ -1,19 +1,31 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
-import { db, pool } from "../server/db";
+import { db } from "../server/db";
 import { ensureSpAccessControlStorage } from "../server/routes/sp/spAccessControl";
+import { ensureCutoverSchema } from "../server/routes/sp/spMigrationCutoverState";
+import {
+  buildSpProductionClosureStatus,
+} from "../server/routes/sp/spProductionClosureRoutes";
 import { ensureSpProductionClosureStorage } from "../server/routes/sp/spProductionClosureStorage";
 
 const hasDatabase = Boolean(process.env.DATABASE_URL);
 const databaseDescribe = hasDatabase ? describe : describe.skip;
 
-databaseDescribe("Supplier Partner production closure storage", () => {
-  afterAll(async () => {
-    await pool.end();
-  });
+const requiredChecks = [
+  "daily_sales_stock",
+  "container_offload_postings",
+  "supplier_statement_ledger",
+  "sales_form_profit_split",
+  "source_write_lock",
+  "production_logs",
+  "supplier_links",
+  "migration_suspense",
+] as const;
 
+databaseDescribe("Supplier Partner production closure database", () => {
   it("creates startup-managed evidence and immutable completion tables idempotently", async () => {
     await ensureSpAccessControlStorage();
+    await ensureCutoverSchema();
     await ensureSpProductionClosureStorage();
     await ensureSpProductionClosureStorage();
 
@@ -31,7 +43,7 @@ databaseDescribe("Supplier Partner production closure storage", () => {
     ]);
   });
 
-  it("enforces company/cutover evidence idempotency and immutable completion uniqueness", async () => {
+  it("enforces company/cutover evidence upsert and immutable completion uniqueness", async () => {
     const companyId = 900000001;
     const cutoverId = 900000001;
     await db.execute(sql`DELETE FROM sp_completion_records WHERE company_id = ${companyId}`);
@@ -71,20 +83,85 @@ databaseDescribe("Supplier Partner production closure storage", () => {
     await db.execute(sql`DELETE FROM sp_completion_records WHERE company_id = ${companyId}`);
     await db.execute(sql`DELETE FROM sp_production_evidence WHERE company_id = ${companyId}`);
   });
+
+  it("builds a PASS status only from the active cutover and same-company evidence", async () => {
+    const sourceCompanyId = 900000011;
+    const targetCompanyId = 900000012;
+    const otherCompanyId = 900000013;
+
+    await ensureCutoverSchema();
+    await ensureSpProductionClosureStorage();
+    await db.execute(sql`
+      DELETE FROM sp_completion_records
+      WHERE company_id IN (${targetCompanyId}, ${otherCompanyId})
+    `);
+    await db.execute(sql`
+      DELETE FROM sp_production_evidence
+      WHERE company_id IN (${targetCompanyId}, ${otherCompanyId})
+    `);
+    await db.execute(sql`
+      DELETE FROM sp_migration_cutovers
+      WHERE source_company_id = ${sourceCompanyId}
+        OR target_company_id IN (${targetCompanyId}, ${otherCompanyId})
+    `);
+
+    const cutoverResult = await db.execute(sql`
+      INSERT INTO sp_migration_cutovers(
+        source_company_id, target_company_id, status,
+        source_company_name, target_company_name, activated_at
+      ) VALUES (
+        ${sourceCompanyId}, ${targetCompanyId}, 'active',
+        'SP closure test source', 'SP closure test target', now()
+      )
+      RETURNING id
+    `);
+    const cutoverId = Number((cutoverResult as any).rows[0].id);
+
+    for (const evidenceType of requiredChecks) {
+      await db.execute(sql`
+        INSERT INTO sp_production_evidence(
+          company_id, cutover_id, evidence_type, status, detail
+        ) VALUES (
+          ${targetCompanyId}, ${cutoverId}, ${evidenceType}, 'PASS', '{}'::jsonb
+        )
+      `);
+      await db.execute(sql`
+        INSERT INTO sp_production_evidence(
+          company_id, cutover_id, evidence_type, status, detail
+        ) VALUES (
+          ${otherCompanyId}, ${cutoverId}, ${evidenceType}, 'FAIL', '{}'::jsonb
+        )
+      `);
+    }
+
+    const status = await buildSpProductionClosureStatus(targetCompanyId);
+    expect(status.status).toBe("PASS");
+    expect(status.failureCount).toBe(0);
+    expect(status.checks).toHaveLength(requiredChecks.length);
+    expect(status.checks.every((check: any) => check.status === "PASS")).toBe(true);
+
+    await db.execute(sql`DELETE FROM sp_production_evidence WHERE cutover_id = ${cutoverId}`);
+    await db.execute(sql`DELETE FROM sp_completion_records WHERE cutover_id = ${cutoverId}`);
+    await db.execute(sql`DELETE FROM sp_migration_cutovers WHERE id = ${cutoverId}`);
+  });
 });
 
-describe("Supplier Partner production closure route contract", () => {
-  it("keeps the three controlled endpoints and Phase 7 safeguards in the implementation", async () => {
-    const source = await import("node:fs/promises").then((fs) =>
-      fs.readFile("server/routes/sp/spProductionClosureRoutes.ts", "utf8"),
-    );
-    expect(source).toContain('app.get("/api/sp/production/closure-status"');
-    expect(source).toContain('app.post("/api/sp/production/evidence"');
-    expect(source).toContain('app.post("/api/sp/production/close-rollback-window"');
-    expect(source).toContain("sp_migration");
-    expect(source).toContain("Idempotency-Key");
-    expect(source).toContain("CLOSE SP ROLLBACK WINDOW");
-    expect(source).toContain("sp_audit_events");
-    expect(source).toContain("target_company_id = ${companyId}");
+describe("Supplier Partner production closure Phase 7 contract", () => {
+  it("registers all routes behind the centralized migration safeguards", async () => {
+    const fs = await import("node:fs/promises");
+    const routeSource = await fs.readFile("server/routes/sp/spProductionClosureRoutes.ts", "utf8");
+    const accessSource = await fs.readFile("server/routes/sp/spAccessControl.ts", "utf8");
+
+    expect(routeSource).toContain('app.get("/api/sp/production/closure-status", requireAuth');
+    expect(routeSource).toContain('app.post("/api/sp/production/evidence", requireAuth');
+    expect(routeSource).toContain('app.post("/api/sp/production/close-rollback-window", requireAuth');
+    expect(routeSource).toContain("target_company_id = ${companyId}");
+
+    expect(accessSource).toContain('path.startsWith("/production/")');
+    expect(accessSource).toContain('return "sp_migration"');
+    expect(accessSource).toContain("RECORD SP PRODUCTION EVIDENCE");
+    expect(accessSource).toContain("CLOSE SP ROLLBACK WINDOW");
+    expect(accessSource).toContain("sp_idempotency_keys");
+    expect(accessSource).toContain("sp_audit_events");
   });
 });
