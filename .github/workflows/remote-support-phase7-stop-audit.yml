@@ -1,0 +1,137 @@
+name: Remote support Phase 7 stop audit wiring
+
+on:
+  push:
+    branches:
+      - agent/remote-support-phase-7-audit-protection
+  pull_request:
+    branches:
+      - agent/remote-support-phase-6-keyboard-control
+
+permissions:
+  contents: write
+
+concurrency:
+  group: remote-support-phase7-stop-audit
+  cancel-in-progress: false
+
+jobs:
+  wire:
+    if: github.event_name == 'push' || github.head_ref == 'agent/remote-support-phase-7-audit-protection'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/remote-support-phase-7-audit-protection
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - run: npm ci --no-audit --bin-links=true
+      - name: Wire stop listener and audit installer
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path("server/services/remoteControlSessionService.ts")
+          text = p.read_text()
+          if "type SessionStopListener" not in text:
+              text = text.replace(
+                  "type TargetListener = () => void;\n",
+                  "type TargetListener = () => void;\ntype SessionStopListener = (session: RemoteControlSession) => void;\n",
+                  1,
+              )
+          if "const sessionStopListeners" not in text:
+              text = text.replace(
+                  "const targetListeners = new Map<string, Set<TargetListener>>();\n",
+                  "const targetListeners = new Map<string, Set<TargetListener>>();\nconst sessionStopListeners = new Set<SessionStopListener>();\n",
+                  1,
+              )
+          marker = "  notifyTarget(session.targetUserId);\n  return session;\n"
+          replacement = '''  notifyTarget(session.targetUserId);
+          const stoppedSnapshot = copySession(session) as RemoteControlSession;
+          for (const listener of sessionStopListeners) {
+            try {
+              listener(stoppedSnapshot);
+            } catch {
+              // Stop auditing and observers must never prevent the emergency stop.
+            }
+          }
+          return session;
+          '''
+          if "const stoppedSnapshot = copySession(session)" not in text:
+              if marker not in text:
+                  raise SystemExit("stopSessionInternal marker missing")
+              text = text.replace(marker, replacement, 1)
+          subscribe_marker = "export function cleanupRemoteControlState(now = Date.now()): void {\n"
+          subscribe_code = '''export function subscribeRemoteControlSessionStops(listener: SessionStopListener): () => void {
+            sessionStopListeners.add(listener);
+            return () => sessionStopListeners.delete(listener);
+          }
+
+          export function cleanupRemoteControlState(now = Date.now()): void {
+          '''
+          if "export function subscribeRemoteControlSessionStops" not in text:
+              if subscribe_marker not in text:
+                  raise SystemExit("cleanup marker missing")
+              text = text.replace(subscribe_marker, subscribe_code, 1)
+          if "sessionStopListeners.clear();" not in text:
+              text = text.replace(
+                  "  targetListeners.clear();\n}\n\nconst cleanupTimer",
+                  "  targetListeners.clear();\n  sessionStopListeners.clear();\n}\n\nconst cleanupTimer",
+                  1,
+              )
+          p.write_text(text)
+
+          p = Path("server/routes/applicationRoutes.ts")
+          text = p.read_text()
+          if 'installRemoteSupportSessionStopAudit' not in text:
+              anchor = 'import { registerRemoteSupportAuditRoutes } from "./remoteSupportAuditRoutes";\n'
+              if anchor not in text:
+                  anchor2 = 'import { registerRemoteKeyboardControlRoutes } from "./remoteKeyboardControlRoutes";\n'
+                  if anchor2 not in text:
+                      raise SystemExit("application import anchor missing")
+                  text = text.replace(
+                      anchor2,
+                      anchor2 + 'import { registerRemoteSupportAuditRoutes } from "./remoteSupportAuditRoutes";\n',
+                      1,
+                  )
+              audit_import_anchor = 'import { registerRemoteSupportAuditRoutes } from "./remoteSupportAuditRoutes";\n'
+              text = text.replace(
+                  audit_import_anchor,
+                  audit_import_anchor + 'import { installRemoteSupportSessionStopAudit } from "../services/remoteSupportAuditService";\n',
+                  1,
+              )
+          if "installRemoteSupportSessionStopAudit();" not in text:
+              text = text.replace(
+                  "export async function registerApplicationRoutes(app: Express): Promise<Server> {\n",
+                  "export async function registerApplicationRoutes(app: Express): Promise<Server> {\n  installRemoteSupportSessionStopAudit();\n",
+                  1,
+              )
+          if "registerRemoteSupportAuditRoutes(app);" not in text:
+              text = text.replace(
+                  "  registerRemoteKeyboardControlRoutes(app);\n",
+                  "  registerRemoteKeyboardControlRoutes(app);\n  registerRemoteSupportAuditRoutes(app);\n",
+                  1,
+              )
+          p.write_text(text)
+          PY
+      - name: Format
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            server/services/remoteControlSessionService.ts \
+            server/services/remoteSupportAuditService.ts \
+            server/routes/applicationRoutes.ts \
+            tests/remote-support-audit-service.test.ts \
+            tests/remote-support-sensitive-action-policy.test.ts \
+            tests/remote-support-permission-contract.test.ts
+      - name: Commit
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server tests
+          git commit -m "feat(remote-support): audit automatic session stops"
+          git push origin HEAD:agent/remote-support-phase-7-audit-protection
