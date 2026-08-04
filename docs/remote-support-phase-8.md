@@ -50,7 +50,9 @@ For a full screen-feed shutdown, the existing emergency-stop endpoint or `DISABL
 
 ## Verification
 
-The integrated Phase 4–8 branch passes TypeScript validation and the focused remote-support suite covering sessions, mouse commands, keyboard commands, permissions, sensitive-action policy, permanent audit, rollout eligibility, and emergency rollback. Repository-wide CI, security, i18n, build, and regression checks remain release gates on the final pull-request head.
+The final focused verification passed environment-documentation validation, TypeScript, disposable PostgreSQL schema setup, source formatting, and 48 remote-support tests. The tests cover sessions, mouse commands, keyboard commands, permissions, sensitive-action policy, permanent audit, rollout eligibility, exact-tab scope, local-user priority, unavailable target channels, and emergency rollback.
+
+Repository-wide CI, security, i18n, production build, backend and frontend regression, coverage ratchets, and CircleCI remain release gates on the exact final pull-request head.
 
 ## Storage
 
