@@ -1,5 +1,3 @@
-import type { Query } from "@tanstack/react-query";
-
 export const QUERY_STALE_TIMES = {
   liveCount: 45_000,
   access: 5 * 60_000,
@@ -20,7 +18,7 @@ export const QUERY_GC_TIMES = {
  * behaviour deterministic across browsers and test environments.
  */
 export function visibleTabInterval(intervalMs: number) {
-  return (_query: Query) => {
+  return () => {
     if (typeof document !== "undefined" && document.visibilityState === "hidden") {
       return false;
     }

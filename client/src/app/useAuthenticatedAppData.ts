@@ -2,11 +2,7 @@ import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { companyQueryKey } from "@/lib/companyQueryScope";
 import { setAppTimezone } from "@/lib/queryClient";
-import {
-  accessQueryPolicy,
-  liveCountQueryPolicy,
-  stableSettingsQueryPolicy,
-} from "@/lib/queryPolicies";
+import { accessQueryPolicy, liveCountQueryPolicy, stableSettingsQueryPolicy } from "@/lib/queryPolicies";
 import { useToast } from "@/hooks/use-toast";
 
 export interface FactoryAccess {
