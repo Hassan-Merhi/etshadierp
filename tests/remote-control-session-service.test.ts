@@ -7,6 +7,7 @@ import {
   isRemoteControlControllerRole,
   registerRemoteControlTab,
   resetRemoteControlSessionStateForTests,
+  setRemoteControlKeyboardCapability,
   setRemoteControlMouseCapability,
   startRemoteControlSession,
   stopRemoteControlSession,
@@ -44,16 +45,16 @@ describe("remote control session safety", () => {
         screenFeedEnabled: true,
         fastScreenFeed: true,
         remoteControl: true,
-        keyboardControl: false,
+        keyboardControl: true,
         sensitiveActionProtection: true,
       },
-      "phase-5-test"
+      "phase-6-test"
     );
   });
 
   afterEach(() => {
     resetRemoteControlSessionStateForTests();
-    restoreRemoteSupportBootDefaults("phase-5-test-cleanup");
+    restoreRemoteSupportBootDefaults("phase-6-test-cleanup");
   });
 
   it("allows only configured controller roles", () => {
@@ -87,14 +88,29 @@ describe("remote control session safety", () => {
     expect(getActiveRemoteControlSession("22", "erp-tab-1")).toBeNull();
   });
 
-  it("notifies the exact target session when mouse capability changes", () => {
+  it("enforces mouse before keyboard and disables keyboard with mouse", () => {
     registerTab();
     const session = startSession();
 
+    expect(setRemoteControlKeyboardCapability(session.id, true)).toBeNull();
     expect(setRemoteControlMouseCapability(session.id, true)?.capabilities.mouse).toBe(true);
-    expect(getActiveRemoteControlSession("22")?.capabilities.mouse).toBe(true);
-    expect(setRemoteControlMouseCapability(session.id, false)?.capabilities.mouse).toBe(false);
-    expect(getActiveRemoteControlSession("22")?.capabilities.mouse).toBe(false);
+    expect(setRemoteControlKeyboardCapability(session.id, true)?.capabilities.keyboard).toBe(true);
+    expect(getActiveRemoteControlSession("22")?.capabilities).toMatchObject({ mouse: true, keyboard: true });
+
+    const mouseStopped = setRemoteControlMouseCapability(session.id, false);
+    expect(mouseStopped?.capabilities).toMatchObject({ mouse: false, keyboard: false });
+  });
+
+  it("disables active keyboard capability when the runtime flag is turned off", () => {
+    registerTab();
+    const session = startSession();
+    setRemoteControlMouseCapability(session.id, true);
+    setRemoteControlKeyboardCapability(session.id, true);
+
+    updateRemoteSupportFlags({ keyboardControl: false }, "test-disable-keyboard");
+    cleanupRemoteControlState(now + 1000);
+
+    expect(getActiveRemoteControlSession("22")?.capabilities).toMatchObject({ mouse: true, keyboard: false });
   });
 
   it("prevents two different controllers from controlling the same user", () => {
@@ -116,11 +132,12 @@ describe("remote control session safety", () => {
     registerTab();
     const session = startSession();
     setRemoteControlMouseCapability(session.id, true);
+    setRemoteControlKeyboardCapability(session.id, true);
     expect(heartbeatRemoteControlController(session.id, "1", now + 5000)?.id).toBe(session.id);
 
     const stopped = stopRemoteControlSession(session.id, "target-emergency-stop", now + 6000);
     expect(stopped?.status).toBe("stopped");
-    expect(stopped?.capabilities.mouse).toBe(false);
+    expect(stopped?.capabilities).toMatchObject({ mouse: false, keyboard: false });
     expect(stopped?.stopReason).toBe("target-emergency-stop");
     expect(getActiveRemoteControlSession("22")).toBeNull();
 
