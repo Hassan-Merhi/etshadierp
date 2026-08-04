@@ -36,6 +36,10 @@ const compatibilityTranslationFiles = [
   "client/src/i18n/backendMessagesPhase7Translations.part6.ts",
   "client/src/i18n/backendMessagesPhase7Translations.part7.ts",
   "client/src/i18n/backendMessagesPhase7Translations.part8.ts",
+  "client/src/i18n/currentMainSupplierPartnerTranslations.ts",
+  "client/src/i18n/remoteSupportPhase4Translations.ts",
+  "client/src/i18n/remoteSupportPhase5Translations.ts",
+  "client/src/i18n/remoteSupportPhase6Translations.ts",
 ];
 
 const reviewedTechnicalValues = new Set([

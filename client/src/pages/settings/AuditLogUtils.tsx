@@ -162,7 +162,8 @@ export function securityActionSummary(logOrAction: any): string {
   if (combined.includes("company") && combined.includes("context")) subject = "Company access";
   else if (combined.includes("privileged")) subject = "Privileged action";
   else if (combined.includes("sensitive") && combined.includes("input")) subject = "Sensitive input";
-  else if (combined.includes("protected") && (combined.includes("file") || combined.includes("asset"))) subject = "File access";
+  else if (combined.includes("protected") && (combined.includes("file") || combined.includes("asset")))
+    subject = "File access";
   else if (combined.includes("permission")) subject = "Permission check";
   else if (combined.includes("session")) subject = "Session check";
 
@@ -270,6 +271,7 @@ const MODULE_LABEL_MAP: Record<string, string> = {
   company_settings: "Company Settings",
   reports: "Reports",
   security_events: "Security Events",
+  remote_support_sessions: "Remote Support",
   payroll_workers: "Payroll Workers",
   payroll_salaries: "Payroll Salaries",
   rental_properties: "Rental Properties",
@@ -313,6 +315,18 @@ const ACTION_LABEL_MAP: Record<string, string> = {
   login: "Login",
   permission_change: "Permissions Changed",
   settings_change: "Settings Changed",
+  remote_support_session_started: "Support Session Started",
+  remote_support_session_stopped: "Support Session Stopped",
+  remote_support_mouse_authorized: "Mouse Control Enabled",
+  remote_support_mouse_revoked: "Mouse Control Disabled",
+  remote_support_keyboard_authorized: "Keyboard Control Enabled",
+  remote_support_keyboard_revoked: "Keyboard Control Disabled",
+  remote_support_mouse_command: "Mouse Command Requested",
+  remote_support_mouse_result: "Mouse Command Result",
+  remote_support_keyboard_command: "Keyboard Command Requested",
+  remote_support_keyboard_result: "Keyboard Command Result",
+  remote_support_command_blocked: "Remote Command Blocked",
+  remote_support_permission_denied: "Remote Support Permission Denied",
 };
 
 /** Returns a readable label for an audit action string. */
@@ -347,14 +361,27 @@ export function actionBadgeVariant(action: string): BadgeVariant {
 
 /** All action values accepted by the /api/audit-log endpoint. */
 export const ALL_SUPPORTED_ACTIONS = [
-  "create", "update", "delete",
-  "restore", "reverse", "void", "return",
-  "recalculate", "repair",
-  "import", "export",
-  "send_whatsapp", "send_email",
-  "approve", "cancel",
-  "offload", "transfer", "adjust",
-  "login", "permission_change", "settings_change",
+  "create",
+  "update",
+  "delete",
+  "restore",
+  "reverse",
+  "void",
+  "return",
+  "recalculate",
+  "repair",
+  "import",
+  "export",
+  "send_whatsapp",
+  "send_email",
+  "approve",
+  "cancel",
+  "offload",
+  "transfer",
+  "adjust",
+  "login",
+  "permission_change",
+  "settings_change",
 ] as const;
 
 // ── Record / diff helpers ────────────────────────────────────────────────────
@@ -364,7 +391,12 @@ export function isItemDiffKey(field: string): boolean {
 }
 
 export function getRecordLabel(log: any): string {
-  if (log?.tableName === "security_events" || String(log?.action || "").toUpperCase().startsWith("SECURITY:")) {
+  if (
+    log?.tableName === "security_events" ||
+    String(log?.action || "")
+      .toUpperCase()
+      .startsWith("SECURITY:")
+  ) {
     const changes = normalizeAuditChanges(log);
     const targetType = changeValue(changes, "targetType");
     const targetId = changeValue(changes, "targetId");
@@ -412,10 +444,17 @@ function fallbackDetails(action: string): string {
 }
 
 export function getDetailsSentence(log: any): string {
-  if (log?.tableName === "security_events" || String(log?.action || "").toUpperCase().startsWith("SECURITY:")) {
+  if (
+    log?.tableName === "security_events" ||
+    String(log?.action || "")
+      .toUpperCase()
+      .startsWith("SECURITY:")
+  ) {
     const changes = normalizeAuditChanges(log);
     const reason = changeValue(changes, "reasonCode") ?? changeValue(changes, "reason");
-    return reason ? `${securityActionSummary(log)} — ${fmtBusinessValue("reasonCode", reason)}` : securityActionSummary(log);
+    return reason
+      ? `${securityActionSummary(log)} — ${fmtBusinessValue("reasonCode", reason)}`
+      : securityActionSummary(log);
   }
 
   const changes = normalizeAuditChanges(log);

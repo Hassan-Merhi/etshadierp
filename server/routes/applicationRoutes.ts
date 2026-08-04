@@ -47,6 +47,11 @@ import { registerNotificationRoutes } from "./notificationRoutes";
 import { registerPasskeyRoutes } from "./passkeyRoutes";
 import { registerPosRoutes } from "./posRoutes";
 import { registerPropertiesRentalRoutes } from "./propertiesRentalRoutes";
+import { registerRemoteControlSessionRoutes } from "./remoteControlSessionRoutes";
+import { registerRemoteKeyboardControlRoutes } from "./remoteKeyboardControlRoutes";
+import { registerRemoteSupportAuditRoutes } from "./remoteSupportAuditRoutes";
+import { registerRemoteSupportRolloutRoutes } from "./remoteSupportRolloutRoutes";
+import { installRemoteSupportSessionStopAudit } from "../services/remoteSupportAuditService";
 import { registerReportsRoutes } from "./reportsRoutes";
 import { registerScreenFeedRoutes } from "./screenFeedRoutes";
 import { registerSpRoutes } from "./sp";
@@ -94,6 +99,7 @@ function registerWriteInvalidationSignal(app: Express): void {
 }
 
 export async function registerApplicationRoutes(app: Express): Promise<Server> {
+  installRemoteSupportSessionStopAudit();
   registerWriteInvalidationSignal(app);
   registerPermissionBoundaryRoutes(app);
 
@@ -127,6 +133,10 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerAuthRoutes(app);
   registerPasskeyRoutes(app);
   registerScreenFeedRoutes(app);
+  registerRemoteControlSessionRoutes(app);
+  registerRemoteKeyboardControlRoutes(app);
+  registerRemoteSupportAuditRoutes(app);
+  registerRemoteSupportRolloutRoutes(app);
   registerLocationRoutes(app);
   registerInventoryRoutes(app);
   registerLedgerRoutes(app);

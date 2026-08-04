@@ -3,12 +3,12 @@
   "detectorVersion": 9,
   "policyDigest": "c26178dd9bc7d71d34976e5bb87aa946cc5d59e6db54b7415f9e363514809f8f",
   "reviewedAt": "2026-08-04",
-  "reviewedHead": "agent/sp-phases-11-12-current-main",
-  "description": "Reviewed untranslated-text ratchet after Supplier Partner Phases 11-12 production evidence and closure safeguards. The new Supplier Partner and backend literals are API/operator control messages rather than client-rendered interface copy. Current-main container literals are also retained at their observed reviewed level.",
+  "reviewedHead": "agent/remote-support-phase-8-current-main",
+  "description": "Reviewed untranslated-text ratchet after Remote Support Phases 4-8 integration. The added backend literals are bounded API, authorization, rollout-readiness, and rollback messages. The sales/POS and shared UI additions are compact active-support safety controls backed by the dedicated English, Arabic, and French remote-support dictionaries. No business content, stock item names, or stock group names are translated by this change.",
   "reviewedTotals": {
-    "candidates": 22439,
-    "actionable": 12453,
-    "excluded": 9986,
+    "candidates": 22496,
+    "actionable": 12488,
+    "excluded": 10008,
     "compatibilityCovered": 8825,
     "unclassified": 0
   },
@@ -16,7 +16,7 @@
   "modules": {
     "accounting": { "maxActionable": 1441 },
     "administration": { "maxActionable": 1165 },
-    "backend-messages": { "maxActionable": 1 },
+    "backend-messages": { "maxActionable": 14 },
     "container-purchasing": { "maxActionable": 873 },
     "factory": { "maxActionable": 5497 },
     "inventory-logistics": { "maxActionable": 1381 },
@@ -24,9 +24,9 @@
     "payroll": { "maxActionable": 555 },
     "properties-rentals": { "maxActionable": 0 },
     "reports-exports": { "maxActionable": 0 },
-    "sales-pos": { "maxActionable": 776 },
+    "sales-pos": { "maxActionable": 782 },
     "shared-contracts": { "maxActionable": 4 },
-    "shared-ui": { "maxActionable": 0 },
+    "shared-ui": { "maxActionable": 4 },
     "supplier-partner": { "maxActionable": 39 }
   },
   "maxUnclassified": 0
