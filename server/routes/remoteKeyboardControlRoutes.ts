@@ -1,6 +1,12 @@
 import type { Express, Request, Response } from "express";
 import { requireAuth, requireLogin } from "../auth";
-import { getSessionRole, getSessionUserId } from "../lib/requestContext";
+import { requireActionAccess } from "../lib/permissionMiddleware";
+import {
+  getSessionCompanyId,
+  getSessionRole,
+  getSessionUserId,
+  getSessionUsername,
+} from "../lib/requestContext";
 import {
   RemoteKeyboardControlError,
   authorizeRemoteKeyboardControl,
@@ -13,14 +19,27 @@ import {
   type RemoteKeyboardCommand,
   type RemoteKeyboardCommandResult,
 } from "../services/remoteKeyboardCommandService";
-import { isRemoteControlControllerRole } from "../services/remoteControlSessionService";
+import {
+  getRemoteControlSession,
+  isRemoteControlControllerRole,
+} from "../services/remoteControlSessionService";
+import {
+  remoteSupportCommandAuditDetails,
+  writeRemoteSupportAudit,
+} from "../services/remoteSupportAuditService";
+import { isRemoteKeyboardAllowedOnRoute } from "../services/remoteSupportSensitiveActionPolicy";
 
 const STREAM_HEARTBEAT_MS = 5000;
+const keyboardPermission = requireActionAccess("remote_support_keyboard");
 type FlushableResponse = Response & { flush?: () => void };
 
 function sessionUserId(req: Request): string {
   const value = getSessionUserId(req);
   return value === null || value === undefined ? "" : String(value);
+}
+
+function sessionUsername(req: Request): string {
+  return getSessionUsername(req) || sessionUserId(req);
 }
 
 function passwordConfirmedAt(req: Request): number | null {
@@ -67,17 +86,11 @@ function serializeAuthorization(authorization: RemoteKeyboardAuthorization) {
 }
 
 function serializeCommand(command: RemoteKeyboardCommand) {
-  return {
-    ...command,
-    createdAt: new Date(command.createdAt).toISOString(),
-  };
+  return { ...command, createdAt: new Date(command.createdAt).toISOString() };
 }
 
 function serializeResult(result: RemoteKeyboardCommandResult) {
-  return {
-    ...result,
-    completedAt: new Date(result.completedAt).toISOString(),
-  };
+  return { ...result, completedAt: new Date(result.completedAt).toISOString() };
 }
 
 function handleError(error: unknown, res: Response): void {
@@ -88,11 +101,28 @@ function handleError(error: unknown, res: Response): void {
   res.status(500).json({ message: "Unable to manage keyboard control." });
 }
 
+async function auditOrBlock(
+  input: Parameters<typeof writeRemoteSupportAudit>[0],
+  res: Response
+): Promise<boolean> {
+  try {
+    await writeRemoteSupportAudit(input);
+    return true;
+  } catch {
+    res.status(503).json({
+      code: "REMOTE_SUPPORT_AUDIT_UNAVAILABLE",
+      message: "Remote support auditing is temporarily unavailable. Keyboard control remains blocked.",
+    });
+    return false;
+  }
+}
+
 export function registerRemoteKeyboardControlRoutes(app: Express): void {
   app.post(
     "/api/screen-feed/control/sessions/:sessionId/keyboard-authorization",
     requireAuth,
-    (req, res) => {
+    keyboardPermission,
+    async (req, res) => {
       if (!requireController(req, res)) return;
       try {
         const authorization = authorizeRemoteKeyboardControl({
@@ -100,6 +130,25 @@ export function registerRemoteKeyboardControlRoutes(app: Express): void {
           controllerUserId: sessionUserId(req),
           passwordConfirmedAt: passwordConfirmedAt(req),
         });
+        const session = getRemoteControlSession(req.params.sessionId);
+        if (!session || session.companyId !== getSessionCompanyId(req)) {
+          revokeRemoteKeyboardControl({ sessionId: req.params.sessionId, controllerUserId: sessionUserId(req) });
+          return res.status(404).json({ message: "Support session not found." });
+        }
+        const audited = await auditOrBlock(
+          {
+            event: "keyboard_authorized",
+            session,
+            actorUserId: sessionUserId(req),
+            actorUsername: sessionUsername(req),
+            details: { capability: "keyboard", status: "requested", route: session.targetRoute },
+          },
+          res
+        );
+        if (!audited) {
+          revokeRemoteKeyboardControl({ sessionId: session.id, controllerUserId: sessionUserId(req) });
+          return;
+        }
         res.setHeader("Cache-Control", "no-store");
         res.json({ authorization: serializeAuthorization(authorization) });
       } catch (error) {
@@ -111,12 +160,21 @@ export function registerRemoteKeyboardControlRoutes(app: Express): void {
   app.post(
     "/api/screen-feed/control/sessions/:sessionId/keyboard-authorization/revoke",
     requireAuth,
-    (req, res) => {
+    keyboardPermission,
+    async (req, res) => {
       if (!requireController(req, res)) return;
       try {
-        revokeRemoteKeyboardControl({
-          sessionId: req.params.sessionId,
-          controllerUserId: sessionUserId(req),
+        const session = getRemoteControlSession(req.params.sessionId);
+        if (!session || session.companyId !== getSessionCompanyId(req)) {
+          return res.status(404).json({ message: "Support session not found." });
+        }
+        revokeRemoteKeyboardControl({ sessionId: session.id, controllerUserId: sessionUserId(req) });
+        await writeRemoteSupportAudit({
+          event: "keyboard_revoked",
+          session: getRemoteControlSession(session.id) ?? session,
+          actorUserId: sessionUserId(req),
+          actorUsername: sessionUsername(req),
+          details: { capability: "keyboard", status: "requested", route: session.targetRoute },
         });
         res.setHeader("Cache-Control", "no-store");
         res.json({ authorization: null });
@@ -132,7 +190,6 @@ export function registerRemoteKeyboardControlRoutes(app: Express): void {
     if (!sessionId || !tabId) {
       return res.status(400).json({ message: "A support session and browser tab are required." });
     }
-
     let unsubscribe = () => {};
     try {
       unsubscribe = subscribeRemoteKeyboardCommands({
@@ -144,7 +201,6 @@ export function registerRemoteKeyboardControlRoutes(app: Express): void {
     } catch (error) {
       return handleError(error, res);
     }
-
     openEventStream(res);
     let closed = false;
     const heartbeatId = setInterval(() => writeHeartbeat(res), STREAM_HEARTBEAT_MS);
@@ -163,11 +219,52 @@ export function registerRemoteKeyboardControlRoutes(app: Express): void {
   app.post(
     "/api/screen-feed/control/sessions/:sessionId/keyboard-commands",
     requireAuth,
-    (req, res) => {
+    keyboardPermission,
+    async (req, res) => {
       if (!requireController(req, res)) return;
       try {
+        const session = getRemoteControlSession(req.params.sessionId);
+        if (!session || session.companyId !== getSessionCompanyId(req)) {
+          return res.status(404).json({ message: "Support session not found." });
+        }
+        if (!isRemoteKeyboardAllowedOnRoute(session.targetRoute)) {
+          await writeRemoteSupportAudit({
+            event: "command_blocked",
+            session,
+            actorUserId: sessionUserId(req),
+            actorUsername: sessionUsername(req),
+            details: {
+              capability: "keyboard",
+              commandType: typeof req.body?.type === "string" ? req.body.type : "invalid",
+              status: "denied",
+              reason: "sensitive-route",
+              route: session.targetRoute,
+            },
+          });
+          return res.status(403).json({
+            code: "SENSITIVE_REMOTE_ACTION_BLOCKED",
+            message: "Keyboard control is blocked on this sensitive ERP route.",
+          });
+        }
+        const audited = await auditOrBlock(
+          {
+            event: "keyboard_command",
+            session,
+            actorUserId: sessionUserId(req),
+            actorUsername: sessionUsername(req),
+            details: remoteSupportCommandAuditDetails({
+              capability: "keyboard",
+              commandType: typeof req.body?.type === "string" ? req.body.type : "invalid",
+              key: typeof req.body?.key === "string" ? req.body.key : undefined,
+              text: typeof req.body?.text === "string" ? req.body.text : undefined,
+              route: session.targetRoute,
+            }),
+          },
+          res
+        );
+        if (!audited) return;
         const command = publishRemoteKeyboardCommand({
-          sessionId: req.params.sessionId,
+          sessionId: session.id,
           controllerUserId: sessionUserId(req),
           type: req.body?.type,
           text: req.body?.text,
@@ -184,9 +281,9 @@ export function registerRemoteKeyboardControlRoutes(app: Express): void {
   app.get(
     "/api/screen-feed/control/sessions/:sessionId/keyboard-results",
     requireAuth,
+    keyboardPermission,
     (req, res) => {
       if (!requireController(req, res)) return;
-
       let unsubscribe = () => {};
       try {
         unsubscribe = subscribeRemoteKeyboardResults({
@@ -197,7 +294,6 @@ export function registerRemoteKeyboardControlRoutes(app: Express): void {
       } catch (error) {
         return handleError(error, res);
       }
-
       openEventStream(res);
       let closed = false;
       const heartbeatId = setInterval(() => writeHeartbeat(res), STREAM_HEARTBEAT_MS);
@@ -217,7 +313,7 @@ export function registerRemoteKeyboardControlRoutes(app: Express): void {
   app.post(
     "/api/screen-feed/control/sessions/:sessionId/keyboard-commands/:commandId/result",
     requireLogin,
-    (req, res) => {
+    async (req, res) => {
       try {
         const result = publishRemoteKeyboardCommandResult({
           sessionId: req.params.sessionId,
@@ -227,6 +323,21 @@ export function registerRemoteKeyboardControlRoutes(app: Express): void {
           status: req.body?.status,
           reason: req.body?.reason,
         });
+        const session = getRemoteControlSession(req.params.sessionId);
+        if (session) {
+          await writeRemoteSupportAudit({
+            event: result.status === "blocked" ? "command_blocked" : "keyboard_result",
+            session,
+            actorUserId: sessionUserId(req),
+            actorUsername: sessionUsername(req),
+            details: {
+              capability: "keyboard",
+              status: result.status,
+              reason: result.reason,
+              route: session.targetRoute,
+            },
+          });
+        }
         res.setHeader("Cache-Control", "no-store");
         res.json({ result: serializeResult(result) });
       } catch (error) {
