@@ -5,10 +5,14 @@ import {
   translatePhase7BackendMessageText,
 } from "../client/src/i18n/backendMessagesPhase7Translations";
 
+const REVIEWED_BACKEND_MESSAGE_COUNT = 416;
+
 describe("Phase 7 backend-message translations", () => {
   it("covers every reviewed backend phrase exactly once", () => {
-    expect(backendMessagesPhase7Translations).toHaveLength(400);
-    expect(new Set(backendMessagesPhase7Translations.map((entry) => entry.en)).size).toBe(400);
+    expect(backendMessagesPhase7Translations).toHaveLength(REVIEWED_BACKEND_MESSAGE_COUNT);
+    expect(new Set(backendMessagesPhase7Translations.map((entry) => entry.en)).size).toBe(
+      REVIEWED_BACKEND_MESSAGE_COUNT
+    );
 
     for (const entry of backendMessagesPhase7Translations) {
       expect(entry.en.trim()).not.toBe("");

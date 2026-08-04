@@ -3,20 +3,20 @@
   "detectorVersion": 9,
   "policyDigest": "c26178dd9bc7d71d34976e5bb87aa946cc5d59e6db54b7415f9e363514809f8f",
   "reviewedAt": "2026-08-04",
-  "reviewedHead": "agent/remote-support-phase-8-current-main",
-  "description": "Reviewed untranslated-text ratchet after Remote Support Phases 4-8 integration. The added backend literals are bounded API, authorization, rollout-readiness, and rollback messages. The sales/POS and shared UI additions are compact active-support safety controls backed by the dedicated English, Arabic, and French remote-support dictionaries. No business content, stock item names, or stock group names are translated by this change.",
+  "reviewedHead": "agent/fix-core-entry-bandwidth-budget",
+  "description": "Reviewed untranslated-text ratchet after the Remote Support Phases 4-8 CI repair. Remote-support API and interface literals are now covered by the English, Arabic, and French release dictionary, while requestJson remains a reviewed technical identifier. No business content, stock item names, stock group names, account names, or user-entered values are translated by this change.",
   "reviewedTotals": {
     "candidates": 22496,
-    "actionable": 12488,
-    "excluded": 10008,
-    "compatibilityCovered": 8825,
+    "actionable": 12470,
+    "excluded": 10026,
+    "compatibilityCovered": 8841,
     "unclassified": 0
   },
   "maxActionable": 12545,
   "modules": {
     "accounting": { "maxActionable": 1441 },
     "administration": { "maxActionable": 1165 },
-    "backend-messages": { "maxActionable": 14 },
+    "backend-messages": { "maxActionable": 0 },
     "container-purchasing": { "maxActionable": 873 },
     "factory": { "maxActionable": 5497 },
     "inventory-logistics": { "maxActionable": 1381 },
@@ -26,7 +26,7 @@
     "reports-exports": { "maxActionable": 0 },
     "sales-pos": { "maxActionable": 782 },
     "shared-contracts": { "maxActionable": 4 },
-    "shared-ui": { "maxActionable": 4 },
+    "shared-ui": { "maxActionable": 0 },
     "supplier-partner": { "maxActionable": 39 }
   },
   "maxUnclassified": 0

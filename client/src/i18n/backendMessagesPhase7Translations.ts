@@ -8,6 +8,7 @@ import { backendMessagesPhase7TranslationsPart5 } from "./backendMessagesPhase7T
 import { backendMessagesPhase7TranslationsPart6 } from "./backendMessagesPhase7Translations.part6";
 import { backendMessagesPhase7TranslationsPart7 } from "./backendMessagesPhase7Translations.part7";
 import { backendMessagesPhase7TranslationsPart8 } from "./backendMessagesPhase7Translations.part8";
+import { remoteSupportReleaseTranslations } from "./remoteSupportReleaseTranslations";
 
 export const backendMessagesPhase7Translations: readonly Phase7BackendMessagesEntry[] = [
   ...backendMessagesPhase7TranslationsPart1,
@@ -18,6 +19,7 @@ export const backendMessagesPhase7Translations: readonly Phase7BackendMessagesEn
   ...backendMessagesPhase7TranslationsPart6,
   ...backendMessagesPhase7TranslationsPart7,
   ...backendMessagesPhase7TranslationsPart8,
+  ...remoteSupportReleaseTranslations,
 ];
 
 const languages = ["en", "ar", "fr"] as const;
