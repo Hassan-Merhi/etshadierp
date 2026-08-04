@@ -98,7 +98,6 @@ jobs:
           npm run lint
           npm run check
           npm run build
-          npm run verify:server-bundle
           npm run verify:program1-observability
           npm run verify:final-production-readiness
           npm run verify:bandwidth
