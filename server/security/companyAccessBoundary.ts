@@ -8,7 +8,7 @@ export class CompanyAccessError extends Error {
   constructor(
     public readonly status: number,
     message: string,
-    public readonly code: string,
+    public readonly code: string
   ) {
     super(message);
     this.name = "CompanyAccessError";
@@ -44,12 +44,31 @@ export function isPrivilegedRole(role: string | null | undefined): role is Privi
   return role === "Admin" || role === "Owner" || role === "Developer";
 }
 
+/**
+ * Resolves the companies available to a user using the same policy as the
+ * company selector and set-company route.
+ *
+ * Developer accounts intentionally receive synthetic access to every company
+ * in those routes. The shared boundary must mirror that policy; otherwise a
+ * Developer can validly select a company and then have every protected data
+ * endpoint reject it with COMPANY_ACCESS_DENIED. All other roles remain limited
+ * to explicit user_company_roles assignments.
+ */
 export async function getAccessibleCompanyIds(userId: string): Promise<Set<number>> {
   const roles = await storage.getUserCompaniesWithRoles(userId);
+  if (roles.some((entry: any) => entry.role === "Developer")) {
+    const companies = await storage.getAllCompanies();
+    return new Set(
+      companies
+        .map((company: any) => Number(company.id))
+        .filter((companyId: number) => Number.isInteger(companyId) && companyId > 0)
+    );
+  }
+
   return new Set(
     roles
       .map((entry: any) => Number(entry.companyId))
-      .filter((companyId: number) => Number.isInteger(companyId) && companyId > 0),
+      .filter((companyId: number) => Number.isInteger(companyId) && companyId > 0)
   );
 }
 
@@ -72,14 +91,11 @@ export async function assertCompaniesAccess(userId: string, companyIds: readonly
 
 /**
  * Resolves a company-scoped request. A query/body override is accepted only for
- * privileged roles, and privileged users must still hold an explicit role in
- * the requested company. This prevents Admin/Developer endpoints from becoming
- * unrestricted cross-tenant reads.
+ * privileged roles. Admin and Owner accounts must hold an explicit assignment
+ * in the requested company; Developer accounts use the existing synthetic
+ * all-company scope exposed by the company selector.
  */
-export async function resolveAuthorizedCompanyId(
-  req: Request,
-  requestedCompanyId?: unknown,
-): Promise<number> {
+export async function resolveAuthorizedCompanyId(req: Request, requestedCompanyId?: unknown): Promise<number> {
   const context = getCompanyAccessContext(req);
   const hasOverride = requestedCompanyId !== undefined && requestedCompanyId !== null && requestedCompanyId !== "";
   const targetCompanyId = hasOverride
