@@ -16,15 +16,14 @@ describe("active company permission context", () => {
   });
 
   it("does not reuse an Admin role from another company", () => {
-    expect(
-      chooseActiveCompanyRole(20, [{ companyId: 10, role: "Admin" }])
-    ).toBeNull();
+    expect(chooseActiveCompanyRole(20, [{ companyId: 10, role: "Admin" }])).toBeNull();
   });
 
   it("preserves the explicit Developer all-company bypass", () => {
-    expect(
-      chooseActiveCompanyRole(99, [{ companyId: 10, role: "Developer" }])
-    ).toEqual({ role: "Developer", developerBypass: true });
+    expect(chooseActiveCompanyRole(99, [{ companyId: 10, role: "Developer" }])).toEqual({
+      role: "Developer",
+      developerBypass: true,
+    });
   });
 
   it("prefers the active company's concrete role over a Developer role elsewhere", () => {
@@ -95,7 +94,7 @@ describe("active company permission context", () => {
         originalUrl: "/api/admin/users?companyId=10",
         path: "/api/admin/users",
         session,
-      } as any),
+      } as any)
     ).toBe(10);
 
     expect(
@@ -103,7 +102,7 @@ describe("active company permission context", () => {
         originalUrl: "/api/factory/raw-stock",
         path: "/api/factory/raw-stock",
         session,
-      } as any),
+      } as any)
     ).toBe(20);
   });
 });

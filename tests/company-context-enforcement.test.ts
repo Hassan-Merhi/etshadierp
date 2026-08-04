@@ -56,12 +56,7 @@ describe("explicit company context enforcement", () => {
 
 describe("route-aware company context enforcement", () => {
   it("uses the pinned company for Factory raw-stock routes", () => {
-    expect(
-      decideRouteCompanyContext(
-        { currentCompanyId: 7, factoryCompanyId: 8 },
-        "/api/factory/raw-stock",
-      ),
-    ).toEqual({
+    expect(decideRouteCompanyContext({ currentCompanyId: 7, factoryCompanyId: 8 }, "/api/factory/raw-stock")).toEqual({
       allowed: true,
       companyId: 8,
       code: "COMPANY_CONTEXT_OK",
@@ -69,12 +64,7 @@ describe("route-aware company context enforcement", () => {
   });
 
   it("keeps ERP administration routes on currentCompanyId across tabs", () => {
-    expect(
-      decideRouteCompanyContext(
-        { currentCompanyId: 7, factoryCompanyId: 8 },
-        "/api/admin/users",
-      ),
-    ).toEqual({
+    expect(decideRouteCompanyContext({ currentCompanyId: 7, factoryCompanyId: 8 }, "/api/admin/users")).toEqual({
       allowed: true,
       companyId: 7,
       code: "COMPANY_CONTEXT_OK",
@@ -83,11 +73,7 @@ describe("route-aware company context enforcement", () => {
 
   it("rejects a request assertion that targets the wrong route company", () => {
     expect(
-      decideRouteCompanyContext(
-        { currentCompanyId: 7, factoryCompanyId: 8 },
-        "/api/factory/raw-stock",
-        [7],
-      ),
+      decideRouteCompanyContext({ currentCompanyId: 7, factoryCompanyId: 8 }, "/api/factory/raw-stock", [7])
     ).toEqual({
       allowed: false,
       companyId: 8,

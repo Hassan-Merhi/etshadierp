@@ -2,10 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { persistSecurityEvent } from "./securityAuditRuntime";
-import {
-  isPinnedCompanyRoute,
-  resolvePermissionCompanyId,
-} from "./activeCompanyPermissionPolicy";
+import { isPinnedCompanyRoute, resolvePermissionCompanyId } from "./activeCompanyPermissionPolicy";
 
 export type CompanyAssertionSource = "body" | "query" | "params";
 
@@ -54,7 +51,11 @@ export function decideExplicitCompanyContext(
   if (!companyId) return { allowed: false, companyId: null, code: "COMPANY_CONTEXT_REQUIRED" };
 
   const assertions = [...requestAssertions];
-  if (includeLegacyFactorySessionAssertion && session?.factoryCompanyId !== undefined && session?.factoryCompanyId !== null) {
+  if (
+    includeLegacyFactorySessionAssertion &&
+    session?.factoryCompanyId !== undefined &&
+    session?.factoryCompanyId !== null
+  ) {
     const legacy = positiveInteger(session.factoryCompanyId);
     if (legacy === null) return { allowed: false, companyId, code: "COMPANY_CONTEXT_MISMATCH" };
     assertions.push(legacy);
