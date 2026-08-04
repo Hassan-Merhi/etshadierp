@@ -30,7 +30,7 @@ interface UseStockItemSearchOptions {
   pageSize?: number;
 }
 
-export function useStockItemSearch<T extends LightweightStockItem = LightweightStockItem>({
+export function useStockItemSearch<T = LightweightStockItem>({
   companyId,
   search = "",
   selectedIds = [],
