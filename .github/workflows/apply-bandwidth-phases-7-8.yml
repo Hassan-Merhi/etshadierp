@@ -1,0 +1,37 @@
+name: Apply bandwidth phases 7-8
+
+on:
+  push:
+    branches:
+      - agent/bandwidth-phases-7-8
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-bandwidth-phases-7-8
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/bandwidth-phases-7-8
+          fetch-depth: 0
+      - name: Apply Phase 7-8 source integration
+        run: python scripts/apply-bandwidth-phases-7-8.py
+      - name: Remove temporary implementation machinery
+        run: |
+          rm -f scripts/apply-bandwidth-phases-7-8.py
+          rm -f .github/workflows/apply-bandwidth-phases-7-8.yml
+      - name: Commit completed source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Complete bandwidth company isolation and frontend data architecture phases"
+          git push origin HEAD:agent/bandwidth-phases-7-8
