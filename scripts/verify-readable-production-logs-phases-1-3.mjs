@@ -26,7 +26,7 @@ const tests = read("server/lib/logger.test.ts");
 
 requireText(logger, "process.env.LOG_LEVEL", "shared logger must support LOG_LEVEL");
 requireText(logger, "process.env.LOG_FORMAT", "shared logger must support LOG_FORMAT");
-requireText(logger, "isRender ? \"pretty\" : \"json\"", "Render must default to readable output");
+requireText(logger, "isDev || isRender ? \"pretty\" : \"json\"", "Render must default to readable output");
 requireText(logger, "humanizeLegacyMessage", "shared logger must provide legacy message humanisation");
 requireText(logger, "createScopedLogger", "shared logger must provide scoped module logging");
 requireText(logger, "globalThis as unknown as { __erpLogger?", "shared logger must register the bootstrap bridge");
