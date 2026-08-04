@@ -3,8 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2, LockKeyhole, MousePointer2, ShieldCheck, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import type { RemoteControlSessionView } from "@/hooks/use-remote-control-session";
 import { normalizeRemoteMousePoint, type RemoteMouseCommandType } from "@/hooks/remote-mouse-control-policy";
+import { translateRemoteSupportPhase4Text } from "@/i18n/remoteSupportPhase4Translations";
+import { translateRemoteSupportPhase5Text } from "@/i18n/remoteSupportPhase5Translations";
 
 interface MouseAuthorizationView {
   sessionId: string;
@@ -41,13 +44,12 @@ class RemoteRequestError extends Error {
 }
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers);
+  if (init?.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   const response = await fetch(url, {
     credentials: "include",
     ...init,
-    headers: {
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...init?.headers,
-    },
+    headers,
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -78,6 +80,7 @@ function authorizationIsFresh(authorization: MouseAuthorizationView | null): boo
 }
 
 export function RemoteMouseControllerOverlay() {
+  const { language } = useApplicationLanguage();
   const [watchDialogOpen, setWatchDialogOpen] = useState(() => !!findWatchDialog());
   const [armedSessionId, setArmedSessionId] = useState<string | null>(null);
   const [passwordOpen, setPasswordOpen] = useState(false);
@@ -87,6 +90,10 @@ export function RemoteMouseControllerOverlay() {
   const [lastResult, setLastResult] = useState<CommandResultView | null>(null);
   const pointerSentAtRef = useRef(0);
   const wheelSentAtRef = useRef(0);
+  const t = useCallback(
+    (value: string) => translateRemoteSupportPhase5Text(value, language),
+    [language]
+  );
 
   useEffect(() => {
     const update = () => setWatchDialogOpen(!!findWatchDialog());
@@ -124,19 +131,24 @@ export function RemoteMouseControllerOverlay() {
     setPassword("");
   }, [session?.id]);
 
+  const requestMouseAuthorization = useCallback(async () => {
+    if (!session) return;
+    await requestJson(
+      `/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/mouse-authorization`,
+      { method: "POST", body: JSON.stringify({}) }
+    );
+    await sessionsQuery.refetch();
+    setArmedSessionId(session.id);
+    setPasswordOpen(false);
+    setPassword("");
+  }, [session, sessionsQuery]);
+
   const authorizeMouse = useCallback(async () => {
     if (!session || busy) return;
     setBusy(true);
     setError(null);
     try {
-      await requestJson(
-        `/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/mouse-authorization`,
-        { method: "POST", body: JSON.stringify({}) }
-      );
-      await sessionsQuery.refetch();
-      setArmedSessionId(session.id);
-      setPasswordOpen(false);
-      setPassword("");
+      await requestMouseAuthorization();
     } catch (requestError) {
       if (
         requestError instanceof RemoteRequestError &&
@@ -144,15 +156,15 @@ export function RemoteMouseControllerOverlay() {
       ) {
         setPasswordOpen(true);
       } else {
-        setError(requestError instanceof Error ? requestError.message : "Unable to enable mouse control.");
+        setError(requestError instanceof Error ? requestError.message : t("Unable to enable mouse control."));
       }
     } finally {
       setBusy(false);
     }
-  }, [busy, session, sessionsQuery]);
+  }, [busy, requestMouseAuthorization, session, t]);
 
   const confirmPasswordAndAuthorize = useCallback(async () => {
-    if (!password || busy) return;
+    if (!password || busy || !session) return;
     setBusy(true);
     setError(null);
     try {
@@ -160,13 +172,13 @@ export function RemoteMouseControllerOverlay() {
         method: "POST",
         body: JSON.stringify({ password }),
       });
-      setBusy(false);
-      await authorizeMouse();
+      await requestMouseAuthorization();
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Password confirmation failed.");
+      setError(requestError instanceof Error ? requestError.message : t("Password confirmation failed."));
+    } finally {
       setBusy(false);
     }
-  }, [authorizeMouse, busy, password]);
+  }, [busy, password, requestMouseAuthorization, session, t]);
 
   const sendCommand = useCallback(
     async (
@@ -188,10 +200,10 @@ export function RemoteMouseControllerOverlay() {
           setArmedSessionId(null);
           setPasswordOpen(true);
         }
-        setError(requestError instanceof Error ? requestError.message : "Mouse command failed.");
+        setError(requestError instanceof Error ? requestError.message : t("Mouse command failed."));
       }
     },
-    [controlEnabled, session]
+    [controlEnabled, session, t]
   );
 
   useEffect(() => {
@@ -264,7 +276,7 @@ export function RemoteMouseControllerOverlay() {
         if (result?.sessionId === session.id) {
           setLastResult(result);
           if (result.status === "blocked") {
-            setError("That control is protected and cannot be activated remotely.");
+            setError(t("That control is protected and cannot be activated remotely."));
           }
         }
       } catch {
@@ -272,9 +284,13 @@ export function RemoteMouseControllerOverlay() {
       }
     });
     return () => eventSource.close();
-  }, [controlEnabled, session]);
+  }, [controlEnabled, session, t]);
 
   if (!watchDialogOpen || !session?.capabilities.mouse) return null;
+
+  const statusLabel = lastResult
+    ? t(lastResult.status === "executed" ? "Executed" : lastResult.status === "blocked" ? "Blocked" : "Ignored")
+    : null;
 
   return (
     <div
@@ -287,9 +303,12 @@ export function RemoteMouseControllerOverlay() {
           {controlEnabled ? <MousePointer2 className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">Mouse control · {session.targetUsername}</p>
+          <p className="truncate text-sm font-semibold">
+            {t("Mouse control")} · {session.targetUsername}
+          </p>
           <p className="text-xs text-muted-foreground">
-            ERP tab only · safe viewing and navigation · keyboard disabled
+            {translateRemoteSupportPhase4Text("ERP tab only", language)} · {t("Safe viewing and navigation")} ·{" "}
+            {t("Keyboard disabled")}
           </p>
         </div>
         {controlEnabled ? (
@@ -300,7 +319,7 @@ export function RemoteMouseControllerOverlay() {
             onClick={() => setArmedSessionId(null)}
             data-testid="button-disable-remote-mouse"
           >
-            <Square className="mr-1 h-3 w-3" /> Stop mouse
+            <Square className="mr-1 h-3 w-3" /> {t("Stop mouse")}
           </Button>
         ) : (
           <Button
@@ -311,7 +330,7 @@ export function RemoteMouseControllerOverlay() {
             data-testid="button-enable-remote-mouse"
           >
             {busy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <LockKeyhole className="mr-1 h-3 w-3" />}
-            Enable
+            {t("Enable")}
           </Button>
         )}
       </div>
@@ -324,29 +343,39 @@ export function RemoteMouseControllerOverlay() {
             void confirmPasswordAndAuthorize();
           }}
         >
-          <p className="text-xs font-medium">Confirm your password to enable mouse control for up to 5 minutes.</p>
+          <p className="text-xs font-medium">
+            {t("Confirm your password to enable mouse control for up to 5 minutes.")}
+          </p>
           <div className="flex gap-2">
             <Input
               type="password"
               autoComplete="current-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="Password"
+              placeholder={t("Password")}
               className="h-9"
               data-testid="input-remote-mouse-password"
             />
             <Button type="submit" size="sm" className="h-9" disabled={!password || busy}>
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm"}
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : t("Confirm")}
             </Button>
           </div>
         </form>
       )}
 
       <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-        <span>{controlEnabled ? "Active: click and scroll on allowlisted controls" : "Read-only until explicitly enabled"}</span>
-        {lastResult && <span className="shrink-0 capitalize">{lastResult.status}</span>}
+        <span>
+          {controlEnabled
+            ? t("Active: click and scroll on allowlisted controls")
+            : t("Read-only until explicitly enabled")}
+        </span>
+        {statusLabel && <span className="shrink-0">{statusLabel}</span>}
       </div>
-      {error && <p className="mt-2 text-xs text-destructive" role="alert">{error}</p>}
+      {error && (
+        <p className="mt-2 text-xs text-destructive" role="alert">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
