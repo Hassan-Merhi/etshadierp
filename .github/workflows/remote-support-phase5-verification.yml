@@ -94,6 +94,7 @@ jobs:
           node node_modules/vitest/vitest.mjs run
           --config vitest.config.frontend.ts
           client/src/hooks/remote-mouse-control-policy.test.ts
+          client/src/components/remote-support-indicator-policy.test.ts
           --maxWorkers=1 --no-file-parallelism
 
       - name: Repository safety contracts
