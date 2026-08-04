@@ -1,0 +1,216 @@
+name: Temporary readable logging phases 6-7
+
+on:
+  push:
+    branches:
+      - chore/readable-production-logs-phases-6-7
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: chore/readable-production-logs-phases-6-7
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Normalize registry URLs
+        run: |
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+          sed -i 's#https://registry.replit.com/#https://registry.npmjs.org/#g' package-lock.json
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+      - name: Apply phases 6 and 7
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          redaction = r'''const FULLY_SENSITIVE_KEY_PATTERN =
+  /(?:password|passwd|secret|token|authorization|cookie|session|csrf|api[-_]?key|private[-_]?key|credential)/i;
+const PHONE_KEY_PATTERN = /(?:phone|mobile|msisdn|whatsapp|chat[-_]?id|recipient)/i;
+const EMAIL_KEY_PATTERN = /email/i;
+const URL_KEY_PATTERN = /(?:url|uri|link|download|upload)/i;
+const PRIVATE_FILE_URL_PATTERN = /(?:green-api|storage|signed|presigned|private|attachment)/i;
+const JWT_PATTERN = /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g;
+const AUTH_PATTERN = /\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+\/=:-]+/gi;
+const WHATSAPP_GROUP_PATTERN = /\b(\d{6,})-\d+@g\.us\b/gi;
+const WHATSAPP_CONTACT_PATTERN = /\b(\d{7,})@c\.us\b/gi;
+const QUERY_SECRET_PATTERN = /([?&](?:access_token|token|api_key|apikey|key|signature|sig|secret|auth)=)[^&#\s]+/gi;
+const CONNECTION_STRING_PATTERN = /\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis):\/\/[^\s]+/gi;
+
+function maskTail(value: string, label: string): string {
+  const digits = value.replace(/\D/g, "");
+  const tail = digits.slice(-4) || "hidden";
+  return `${label} …${tail}`;
+}
+
+function redactUrl(value: string): string {
+  try {
+    const parsed = new URL(value);
+    parsed.username = "";
+    parsed.password = "";
+    for (const key of [...parsed.searchParams.keys()]) {
+      if (FULLY_SENSITIVE_KEY_PATTERN.test(key) || /(?:signature|sig|auth|key)/i.test(key)) {
+        parsed.searchParams.set(key, "[REDACTED]");
+      }
+    }
+    if (PRIVATE_FILE_URL_PATTERN.test(parsed.hostname) || PRIVATE_FILE_URL_PATTERN.test(parsed.pathname)) {
+      const fileName = parsed.pathname.split("/").filter(Boolean).pop();
+      return fileName ? `[PRIVATE_URL:${fileName}]` : "[PRIVATE_URL]";
+    }
+    return parsed.toString();
+  } catch {
+    return value.replace(QUERY_SECRET_PATTERN, "$1[REDACTED]");
+  }
+}
+
+export function redactLogString(value: string, key = ""): string {
+  if (FULLY_SENSITIVE_KEY_PATTERN.test(key)) return "[REDACTED]";
+
+  let output = value
+    .replace(AUTH_PATTERN, "[AUTH_REDACTED]")
+    .replace(JWT_PATTERN, "[JWT_REDACTED]")
+    .replace(CONNECTION_STRING_PATTERN, "[CONNECTION_STRING_REDACTED]")
+    .replace(QUERY_SECRET_PATTERN, "$1[REDACTED]")
+    .replace(WHATSAPP_GROUP_PATTERN, (_, digits: string) => maskTail(digits, "WhatsApp group"))
+    .replace(WHATSAPP_CONTACT_PATTERN, (_, digits: string) => maskTail(digits, "WhatsApp contact"));
+
+  if (URL_KEY_PATTERN.test(key) || /^https?:\/\//i.test(output)) output = redactUrl(output);
+  if (PHONE_KEY_PATTERN.test(key) && /\d{7,}/.test(output)) return maskTail(output, "contact");
+  if (EMAIL_KEY_PATTERN.test(key)) {
+    output = output.replace(/\b([A-Z0-9._%+-]{1,})@([A-Z0-9.-]+\.[A-Z]{2,})\b/gi, (_, local: string, domain: string) => {
+      const visible = local.slice(0, 1) || "x";
+      return `${visible}***@${domain}`;
+    });
+  }
+  return output;
+}
+
+export function redactLogValue(value: unknown, key = ""): unknown {
+  if (FULLY_SENSITIVE_KEY_PATTERN.test(key)) return "[REDACTED]";
+  if (typeof value === "string") return redactLogString(value, key);
+  return value;
+}
+
+export const __logRedactionTesting = {
+  redactUrl,
+};
+'''
+          Path('server/lib/logRedaction.ts').write_text(redaction)
+
+          tests = r'''import { describe, expect, it } from "vitest";
+import { redactLogString, redactLogValue } from "./logRedaction";
+
+describe("log redaction", () => {
+  it("fully redacts credentials and authorization values", () => {
+    expect(redactLogValue("super-secret", "password")).toBe("[REDACTED]");
+    expect(redactLogString("Authorization: Bearer abc.def.ghi")).toContain("[AUTH_REDACTED]");
+  });
+
+  it("masks WhatsApp groups and contacts", () => {
+    expect(redactLogString("243900005252-1614178245@g.us")).toBe("WhatsApp group …5252");
+    expect(redactLogString("243900005252@c.us")).toBe("WhatsApp contact …5252");
+  });
+
+  it("removes signed query values and private file URLs", () => {
+    expect(redactLogString("https://example.com/file.pdf?token=abc&signature=xyz")).toContain("token=%5BREDACTED%5D");
+    expect(redactLogString("https://storage.example.com/private/invoice-1.pdf?token=abc", "fileUrl")).toBe(
+      "[PRIVATE_URL:invoice-1.pdf]",
+    );
+  });
+
+  it("masks phone and email fields while keeping diagnostic usefulness", () => {
+    expect(redactLogString("+243900005252", "customerPhone")).toBe("contact …5252");
+    expect(redactLogString("adam@example.com", "email")).toBe("a***@example.com");
+  });
+});
+'''
+          Path('server/lib/logRedaction.test.ts').write_text(tests)
+
+          logger_path = Path('server/lib/logger.ts')
+          logger = logger_path.read_text()
+          logger = logger.replace('import { markRuntimeFailure } from "./runtimePerformance";\n', 'import { redactLogString, redactLogValue } from "./logRedaction";\nimport { markRuntimeFailure } from "./runtimePerformance";\n')
+          logger = logger.replace('      message: err.message.slice(0, MAX_STRING_LENGTH),', '      message: redactLogString(err.message).slice(0, MAX_STRING_LENGTH),')
+          logger = logger.replace('if (typeof e["detail"] === "string") out.detail = e["detail"].slice(0, MAX_STRING_LENGTH);', 'if (typeof e["detail"] === "string") out.detail = redactLogString(e["detail"]).slice(0, MAX_STRING_LENGTH);')
+          logger = logger.replace('  if (typeof value === "string")\n    return value.length > MAX_STRING_LENGTH ? `${value.slice(0, MAX_STRING_LENGTH)}…` : value;', '  if (typeof value === "string") {\n    const redacted = redactLogString(value);\n    return redacted.length > MAX_STRING_LENGTH ? `${redacted.slice(0, MAX_STRING_LENGTH)}…` : redacted;\n  }')
+          logger = logger.replace('      output[key] = SENSITIVE_KEY_PATTERN.test(key) ? "[REDACTED]" : sanitiseValue(entry, depth + 1, seen);', '      output[key] = SENSITIVE_KEY_PATTERN.test(key)\n        ? "[REDACTED]"\n        : sanitiseValue(redactLogValue(entry, key), depth + 1, seen);')
+          logger = logger.replace('    output[key] = SENSITIVE_KEY_PATTERN.test(key) ? "[REDACTED]" : sanitiseValue(value);', '    output[key] = SENSITIVE_KEY_PATTERN.test(key)\n      ? "[REDACTED]"\n      : sanitiseValue(redactLogValue(value, key));')
+          logger = logger.replace('  const readableMessage = ensureSentence(humanizeLegacyMessage(message, mergedContext));', '  const readableMessage = ensureSentence(redactLogString(humanizeLegacyMessage(message, mergedContext)));')
+          logger = logger.replace('  minimumLevel,\n};', '  minimumLevel,\n  redactionEnabled: process.env.NODE_ENV === "production" || process.env.LOG_REDACT_SENSITIVE !== "false",\n};')
+          logger_path.write_text(logger)
+
+          request_path = Path('server/middleware/requestLogger.ts')
+          request = request_path.read_text()
+          request = request.replace('import { logger } from "../lib/logger";', 'import { __loggerTesting, logger } from "../lib/logger";')
+          request = request.replace('    operationalEvents: getOperationalEventSnapshot(),', '    operationalEvents: getOperationalEventSnapshot(),\n    logging: {\n      level: __loggerTesting.minimumLevel,\n      format: __loggerTesting.outputFormat,\n      redactionEnabled: __loggerTesting.redactionEnabled,\n      requestSamplingRate: SUCCESS_SAMPLE_RATE,\n      runtimeRequestLogsEnabled: process.env.RUNTIME_OBSERVABILITY_REQUEST_LOGS === "true",\n    },')
+          request_path.write_text(request)
+
+          docs = r'''# Render production logging
+
+Use these environment variables on the Render web service:
+
+```env
+NODE_ENV=production
+LOG_LEVEL=info
+LOG_FORMAT=pretty
+LOG_REDACT_SENSITIVE=true
+REQUEST_LOG_SAMPLE_RATE=0
+RUNTIME_OBSERVABILITY_REQUEST_LOGS=false
+BANDWIDTH_DEBUG=true
+BANDWIDTH_DEBUG_REPORT_INTERVAL_MS=300000
+BANDWIDTH_DEBUG_LOG_TOP_N=3
+```
+
+`LOG_FORMAT=pretty` gives readable sentences in the Render dashboard. Use `json` only when a downstream log provider needs structured JSON. Production always keeps sensitive-value redaction active, including tokens, authorization values, cookies, credentials, signed URLs, private upload links, WhatsApp chat IDs, phone fields and email fields.
+
+Every HTTP response includes `X-Request-Id`. The same request ID, user/company/location context and Render build version are propagated into application logs through the trace context. Administrators and developers can inspect the active logging configuration through the protected `GET /api/health/metrics` endpoint.
+
+Normal production output should use `LOG_LEVEL=info`. Enable `debug` only temporarily while diagnosing a specific problem, then return it to `info`.
+'''
+          Path('docs/render-production-logging.md').write_text(docs)
+
+          verifier = r'''import fs from "node:fs";
+
+const checks = [
+  ["server/lib/logRedaction.ts", ["redactLogString", "WHATSAPP_GROUP_PATTERN", "QUERY_SECRET_PATTERN"]],
+  ["server/lib/logger.ts", ["redactLogString", "redactLogValue", "redactionEnabled"]],
+  ["server/middleware/requestLogger.ts", ["logging:", "runtimeRequestLogsEnabled", "requestSamplingRate"]],
+  ["docs/render-production-logging.md", ["LOG_REDACT_SENSITIVE=true", "X-Request-Id", "/api/health/metrics"]],
+];
+
+const failures = [];
+for (const [file, needles] of checks) {
+  const content = fs.readFileSync(file, "utf8");
+  for (const needle of needles) if (!content.includes(needle)) failures.push(`${file} missing ${needle}`);
+}
+if (failures.length) {
+  console.error("Readable logging phases 6-7 verification failed:\n- " + failures.join("\n- "));
+  process.exit(1);
+}
+console.log("Readable logging phases 1-7 contracts verified.");
+'''
+          Path('scripts/verify-readable-logging-phases-1-7.mjs').write_text(verifier)
+          PY
+      - name: Format changed files
+        run: npx biome format --write server/lib/logRedaction.ts server/lib/logRedaction.test.ts server/lib/logger.ts server/middleware/requestLogger.ts
+      - name: Run targeted tests
+        run: npx vitest run server/lib/logRedaction.test.ts server/lib/logger.test.ts server/middleware/bandwidthDebug.test.ts
+      - name: Verify phases 1-7
+        run: node scripts/verify-readable-logging-phases-1-7.mjs
+      - name: TypeScript
+        run: npm run check
+      - name: Commit changes and remove temporary workflow
+        run: |
+          rm .github/workflows/temp-readable-logging-phases-6-7.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/lib/logRedaction.ts server/lib/logRedaction.test.ts server/lib/logger.ts server/middleware/requestLogger.ts docs/render-production-logging.md scripts/verify-readable-logging-phases-1-7.mjs .github/workflows/temp-readable-logging-phases-6-7.yml
+          git commit -m "feat: secure and configure Render logging phases 6-7"
+          git push origin HEAD:chore/readable-production-logs-phases-6-7
