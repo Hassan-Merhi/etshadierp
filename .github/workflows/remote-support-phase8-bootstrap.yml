@@ -1,0 +1,41 @@
+name: Remote support Phase 8 bootstrap
+
+on:
+  push:
+    branches:
+      - agent/remote-support-phase-7-audit-protection
+    paths:
+      - .github/workflows/remote-support-phase8-bootstrap.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: remote-support-phase8-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/remote-support-phase-7-audit-protection
+          fetch-depth: 0
+      - name: Build Phase 8 branch from the complete stack
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main \
+            agent/remote-support-phase-6-keyboard-control \
+            agent/remote-support-phase-7-audit-protection
+          git checkout -B agent/remote-support-phase-8-controlled-rollout origin/agent/remote-support-phase-7-audit-protection
+          git merge --no-edit origin/agent/remote-support-phase-6-keyboard-control
+          if ! git merge --no-edit origin/main; then
+            echo "Merge conflicts while reconciling current main:" >&2
+            git diff --name-only --diff-filter=U >&2
+            exit 1
+          fi
+          git push --force-with-lease origin HEAD:agent/remote-support-phase-8-controlled-rollout
