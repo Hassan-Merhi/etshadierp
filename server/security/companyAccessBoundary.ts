@@ -5,11 +5,7 @@ import { storage } from "../storage";
 export type PrivilegedRole = "Admin" | "Owner" | "Developer";
 
 export class CompanyAccessError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string,
-    public readonly code: string,
-  ) {
+  constructor(public readonly status: number, message: string, public readonly code: string) {
     super(message);
     this.name = "CompanyAccessError";
   }
@@ -61,14 +57,14 @@ export async function getAccessibleCompanyIds(userId: string): Promise<Set<numbe
     return new Set(
       companies
         .map((company: any) => Number(company.id))
-        .filter((companyId: number) => Number.isInteger(companyId) && companyId > 0),
+        .filter((companyId: number) => Number.isInteger(companyId) && companyId > 0)
     );
   }
 
   return new Set(
     roles
       .map((entry: any) => Number(entry.companyId))
-      .filter((companyId: number) => Number.isInteger(companyId) && companyId > 0),
+      .filter((companyId: number) => Number.isInteger(companyId) && companyId > 0)
   );
 }
 
@@ -95,10 +91,7 @@ export async function assertCompaniesAccess(userId: string, companyIds: readonly
  * in the requested company; Developer accounts use the existing synthetic
  * all-company scope exposed by the company selector.
  */
-export async function resolveAuthorizedCompanyId(
-  req: Request,
-  requestedCompanyId?: unknown,
-): Promise<number> {
+export async function resolveAuthorizedCompanyId(req: Request, requestedCompanyId?: unknown): Promise<number> {
   const context = getCompanyAccessContext(req);
   const hasOverride = requestedCompanyId !== undefined && requestedCompanyId !== null && requestedCompanyId !== "";
   const targetCompanyId = hasOverride
