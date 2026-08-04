@@ -54,6 +54,10 @@ Call `POST /api/screen-feed/admin/rollout/rollback` as a Developer. This:
 
 For a full screen-feed shutdown, the existing emergency-stop endpoint or `DISABLE_SCREEN_FEED=true` remains stronger.
 
+## Verification
+
+The integrated Phase 4–8 branch passes TypeScript validation and the focused remote-support suite covering sessions, mouse commands, keyboard commands, permissions, sensitive-action policy, permanent audit, rollout eligibility, and emergency rollback. Repository-wide CI, security, i18n, build, and regression checks remain release gates on the final pull-request head.
+
 ## Storage
 
 Rollout configuration is runtime state and can be supplied by environment variables at boot. Phase 8 adds no SQL table and no database migration. Permanent session and command metadata continues to use the existing `audit_log` table without storing screenshots, field values, passwords, clipboard contents, or typed text.
