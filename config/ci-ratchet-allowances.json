@@ -55,6 +55,7 @@
     "POST /api/screen-feed/control/sessions [requireAuth > <anonymous>]",
     "POST /api/screen-feed/control/sessions/:sessionId/heartbeat [requireAuth > <anonymous>]",
     "POST /api/screen-feed/control/sessions/:sessionId/mouse-authorization [requireAuth > <anonymous>]",
+    "POST /api/screen-feed/control/sessions/:sessionId/mouse-authorization/revoke [requireAuth > <anonymous>]",
     "GET /api/screen-feed/control/commands [requireLogin > <anonymous>]",
     "POST /api/screen-feed/control/sessions/:sessionId/commands [requireAuth > <anonymous>]",
     "GET /api/screen-feed/control/sessions/:sessionId/results [requireAuth > <anonymous>]",
