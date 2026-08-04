@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/mobile-phases-8-10-validation-current-main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 concurrency:
@@ -15,6 +18,7 @@ permissions:
 
 jobs:
   validate:
+    if: github.event_name != 'pull_request' || github.head_ref == 'agent/mobile-phases-8-10-validation-current-main'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
