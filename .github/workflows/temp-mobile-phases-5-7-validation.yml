@@ -38,6 +38,21 @@ jobs:
           sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
           npm ci --no-audit --bin-links=true
           python scripts/temp-repair-mobile-phases-5-7.py
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path("client/src/components/ui/responsive-accessibility.tsx")
+          text = path.read_text()
+          marker = '      data-horizontal-scroll-region="true"\n'
+          slot = '      data-slot="horizontal-scroll-region"\n'
+          if marker not in text:
+              if slot not in text:
+                  raise SystemExit("Horizontal scroll slot was not found")
+              text = text.replace(slot, slot + marker, 1)
+              path.write_text(text)
+          if path.read_text().count('data-horizontal-scroll-region="true"') != 1:
+              raise SystemExit("Expected exactly one horizontal scroll region marker")
+          PY
           npm audit fix --package-lock-only --omit=dev || true
           npm ci --no-audit --bin-links=true
           npm run verify:dependency-audit
