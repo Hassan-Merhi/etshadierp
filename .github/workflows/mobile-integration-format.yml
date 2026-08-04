@@ -34,12 +34,14 @@ jobs:
           mapfile -t files < <(
             git diff --name-only origin/main...HEAD | \
               grep -E '\.(css|js|json|md|mjs|ts|tsx|ya?ml)$' | \
-              grep -v '^\.github/workflows/mobile-integration-format.yml$' || true
+              grep -v '^\.github/workflows/mobile-integration-format.yml$' | \
+              grep -v '^\.github/mobile-integration-format-trigger.txt$' || true
           )
           if [ "${#files[@]}" -gt 0 ]; then
             node node_modules/prettier/bin/prettier.cjs --write "${files[@]}"
           fi
           rm -f .github/workflows/mobile-integration-format.yml
+          rm -f .github/mobile-integration-format-trigger.txt
           git add -A
           git commit -m "Format mobile phases 5-10 integration"
           git push origin HEAD:agent/mobile-responsive-phases-5-10-integration
