@@ -1,0 +1,83 @@
+name: Temporary company access static diagnostic
+
+on:
+  push:
+    branches:
+      - agent/fix-route-aware-company-context-rebased
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    if: github.actor != 'github-actions[bot]' || contains(github.event.head_commit.message, 'Trigger company access static diagnostic')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/fix-route-aware-company-context-rebased
+          fetch-depth: 0
+
+      - name: Reproduce first static-build failure
+        shell: bash
+        run: |
+          set +e
+          diagnostic="tmp-company-access-static-diagnostic.txt"
+          rm -f "$diagnostic"
+
+          record_failure() {
+            local name="$1"
+            local log="$2"
+            {
+              echo "FAILED STEP: $name"
+              echo
+              tail -n 400 "$log"
+            } > "$diagnostic"
+            return 0
+          }
+
+          run_check() {
+            local name="$1"
+            shift
+            local log
+            log="$(mktemp)"
+            "$@" >"$log" 2>&1
+            local status=$?
+            if [ $status -ne 0 ]; then
+              record_failure "$name" "$log"
+              return 1
+            fi
+            return 0
+          }
+
+          run_check "npm ci" npm ci --no-audit --bin-links=true || true
+          if [ ! -f "$diagnostic" ]; then run_check "verify lockfile" npm run verify:lockfile || true; fi
+          if [ ! -f "$diagnostic" ]; then run_check "verify production dependencies" npm run verify:production-dependencies || true; fi
+          if [ ! -f "$diagnostic" ]; then
+            run_check "formatting" node node_modules/prettier/bin/prettier.cjs --check \
+              server/routes/containers/containerFreightReadRoutes.ts \
+              server/routes/erp-payroll/runs.ts \
+              server/routes/helpers/resolveActiveCompanyId.ts \
+              server/routes/helpers/supplierBalanceHelpers.ts \
+              server/routes/reportsClosingStockRoutes.ts \
+              server/routes/reportsContainerTrackingRoutes.ts \
+              server/routes/stats/statsDataRoutes.ts \
+              server/services/security/companyContextEnforcementAdapter.ts \
+              tests/active-company-permission-context.test.ts \
+              tests/company-access-boundary-contract.test.ts \
+              tests/company-context-enforcement.test.ts || true
+          fi
+          if [ ! -f "$diagnostic" ]; then run_check "lint" npm run lint || true; fi
+          if [ ! -f "$diagnostic" ]; then run_check "TypeScript" npm run check || true; fi
+          if [ ! -f "$diagnostic" ]; then run_check "production build" npm run build || true; fi
+          if [ ! -f "$diagnostic" ]; then run_check "server bundle" npm run verify:server-bundle || true; fi
+          if [ ! -f "$diagnostic" ]; then run_check "observability" npm run verify:program1-observability || true; fi
+          if [ ! -f "$diagnostic" ]; then run_check "production readiness" npm run verify:final-production-readiness || true; fi
+          if [ ! -f "$diagnostic" ]; then run_check "bandwidth" npm run verify:bandwidth || true; fi
+          if [ ! -f "$diagnostic" ]; then echo "ALL STATIC STEPS PASSED" > "$diagnostic"; fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$diagnostic"
+          git commit -m "Record company access static diagnostic"
+          git push origin HEAD:agent/fix-route-aware-company-context-rebased
