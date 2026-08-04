@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { classifyCompanyOwnedRoute } from "../server/services/security/companyResourceRoutePolicy";
+import {
+  classifyCompanyOwnedRoute,
+  isFactoryCompanyOptionalRoute,
+} from "../server/services/security/companyResourceRoutePolicy";
 
 describe("company-owned resource route policy", () => {
   it("classifies accounting resources with numeric IDs", () => {
@@ -41,6 +44,14 @@ describe("company-owned resource route policy", () => {
   it("preserves historical ERP container aliases below the factory path", () => {
     expect(classifyCompanyOwnedRoute("/api/factory/containers/55/documents")).toBeNull();
     expect(classifyCompanyOwnedRoute("/api/factory/containers/55/freight")).toBeNull();
+  });
+
+  it("allows active-company user administration without a factory assignment", () => {
+    expect(isFactoryCompanyOptionalRoute("/api/factory/users")).toBe(true);
+    expect(isFactoryCompanyOptionalRoute("/api/factory/users/user-123")).toBe(true);
+    expect(isFactoryCompanyOptionalRoute("/users")).toBe(true);
+    expect(isFactoryCompanyOptionalRoute("/users/user-123")).toBe(true);
+    expect(isFactoryCompanyOptionalRoute("/api/factory/bales")).toBe(false);
   });
 
   it("does not mistake literal route names for record IDs", () => {
