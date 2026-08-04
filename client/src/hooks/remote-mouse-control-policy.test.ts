@@ -6,9 +6,14 @@ import {
   isAllowedRemoteClickElement,
   isRemoteMouseBlockedElement,
   normalizeRemoteMousePoint,
+  type RemoteMouseCommandType,
+  type RemoteMouseCommandView,
 } from "./remote-mouse-control-policy";
 
-function command(type: "pointer-move" | "click" | "scroll", overrides: Record<string, unknown> = {}) {
+function command(
+  type: RemoteMouseCommandType,
+  overrides: Partial<RemoteMouseCommandView> = {}
+): RemoteMouseCommandView {
   return {
     id: "command-1",
     sessionId: "session-1",
@@ -17,7 +22,7 @@ function command(type: "pointer-move" | "click" | "scroll", overrides: Record<st
     x: 0.5,
     y: 0.5,
     ...overrides,
-  } as any;
+  };
 }
 
 describe("remote mouse execution policy", () => {
@@ -163,6 +168,15 @@ describe("remote mouse execution policy", () => {
       applyRemoteMouseCommand(command("scroll", { deltaX: 0, deltaY: 240 }))
     ).toMatchObject({ status: "executed", reason: null });
     expect(scrollBy).toHaveBeenCalledWith({ left: 0, top: 240, behavior: "auto" });
+
+    const plainTarget = document.createElement("div");
+    document.body.appendChild(plainTarget);
+    document.elementFromPoint = vi.fn(() => plainTarget);
+    const windowScrollBy = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
+    expect(
+      applyRemoteMouseCommand(command("scroll", { deltaX: 10, deltaY: 40 }))
+    ).toMatchObject({ status: "executed", reason: null });
+    expect(windowScrollBy).toHaveBeenCalledWith({ left: 10, top: 40, behavior: "auto" });
   });
 
   it("ignores malformed coordinates, empty scrolls, and missing targets", () => {
@@ -171,13 +185,17 @@ describe("remote mouse execution policy", () => {
       status: "ignored",
       reason: "invalid-coordinates",
     });
-    expect(applyRemoteMouseCommand(command("scroll", { deltaX: 0, deltaY: 0 }))).toMatchObject({
-      status: "ignored",
-      reason: "no-target",
-    });
     expect(applyRemoteMouseCommand(command("click"))).toMatchObject({
       status: "ignored",
       reason: "no-target",
+    });
+
+    const target = document.createElement("div");
+    document.body.appendChild(target);
+    document.elementFromPoint = vi.fn(() => target);
+    expect(applyRemoteMouseCommand(command("scroll", { deltaX: 0, deltaY: 0 }))).toMatchObject({
+      status: "ignored",
+      reason: "empty-scroll",
     });
   });
 });
