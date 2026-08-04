@@ -3,12 +3,12 @@
   "detectorVersion": 9,
   "policyDigest": "c26178dd9bc7d71d34976e5bb87aa946cc5d59e6db54b7415f9e363514809f8f",
   "reviewedAt": "2026-08-04",
-  "reviewedHead": "agent/remote-support-phase-8-current-main",
-  "description": "Reviewed untranslated-text ratchet after Remote Support Phases 4-8 integration. The added backend literals are bounded API, authorization, rollout-readiness, and rollback messages. The sales/POS and shared UI additions are compact active-support safety controls backed by the dedicated English, Arabic, and French remote-support dictionaries. No business content, stock item names, or stock group names are translated by this change.",
+  "reviewedHead": "chore/readable-production-logs-phases-1-3",
+  "description": "Reviewed untranslated-text ratchet after Remote Support Phases 4-8 integration and Render logging Phases 1-3. The additional backend literal is the internal logger serialization fallback emitted only when JSON encoding itself fails; it is technical observability output rather than user-facing ERP content. Existing bounded API, authorization, rollout-readiness, rollback, sales/POS, and shared UI literals remain covered by the dedicated English, Arabic, and French dictionaries. No business content, stock item names, or stock group names are translated by this change.",
   "reviewedTotals": {
-    "candidates": 22496,
-    "actionable": 12488,
-    "excluded": 10008,
+    "candidates": 22497,
+    "actionable": 12490,
+    "excluded": 10007,
     "compatibilityCovered": 8825,
     "unclassified": 0
   },
@@ -16,7 +16,7 @@
   "modules": {
     "accounting": { "maxActionable": 1441 },
     "administration": { "maxActionable": 1165 },
-    "backend-messages": { "maxActionable": 14 },
+    "backend-messages": { "maxActionable": 15 },
     "container-purchasing": { "maxActionable": 873 },
     "factory": { "maxActionable": 5497 },
     "inventory-logistics": { "maxActionable": 1381 },
