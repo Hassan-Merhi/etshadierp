@@ -13,7 +13,7 @@ permissions:
 
 concurrency:
   group: remote-support-phase5-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   verify:
