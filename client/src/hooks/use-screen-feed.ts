@@ -22,6 +22,7 @@ const MAX_DATA_URL_LEN = 1_300_000;
 const FAST_MAX_DATA_URL_LEN = 560_000;
 const SIGNATURE_WIDTH = 32;
 const SIGNATURE_HEIGHT = 18;
+const UNSUPPORTED_COLOR_FUNCTION_RE = /\b(?:color|color-mix|lab|lch|oklab|oklch)\(/i;
 
 const isDev = import.meta.env.DEV;
 
@@ -173,10 +174,100 @@ function copyScrollablePositions(doc: Document): void {
   });
 }
 
+function createCssColorNormalizer(doc: Document): (value: string, fallback: string) => string {
+  const canvas = doc.createElement("canvas");
+  canvas.width = 1;
+  canvas.height = 1;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  const cache = new Map<string, string>();
+
+  return (value: string, fallback: string): string => {
+    const key = `${value}\u0000${fallback}`;
+    const cached = cache.get(key);
+    if (cached) return cached;
+    if (!context) return fallback;
+
+    try {
+      context.clearRect(0, 0, 1, 1);
+      context.fillStyle = fallback;
+      context.fillStyle = value;
+      context.fillRect(0, 0, 1, 1);
+      const [red, green, blue, alphaByte] = context.getImageData(0, 0, 1, 1).data;
+      const alpha = Math.round((alphaByte / 255) * 1000) / 1000;
+      const normalized =
+        alpha >= 1
+          ? `rgb(${red}, ${green}, ${blue})`
+          : `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+      cache.set(key, normalized);
+      return normalized;
+    } catch {
+      cache.set(key, fallback);
+      return fallback;
+    }
+  };
+}
+
+function sanitizeComputedStyle(
+  element: HTMLElement,
+  computed: CSSStyleDeclaration,
+  origin: string,
+  normalizeColor: (value: string, fallback: string) => string,
+): void {
+  const backgroundImage = computed.backgroundImage;
+  if (
+    !shouldPreserveScreenFeedBackground(backgroundImage, origin) ||
+    UNSUPPORTED_COLOR_FUNCTION_RE.test(backgroundImage)
+  ) {
+    element.style.backgroundImage = "none";
+  }
+
+  element.style.color = normalizeColor(computed.color, "rgb(0, 0, 0)");
+  element.style.backgroundColor = normalizeColor(computed.backgroundColor, "rgba(0, 0, 0, 0)");
+  element.style.borderTopColor = normalizeColor(computed.borderTopColor, "rgba(0, 0, 0, 0)");
+  element.style.borderRightColor = normalizeColor(computed.borderRightColor, "rgba(0, 0, 0, 0)");
+  element.style.borderBottomColor = normalizeColor(computed.borderBottomColor, "rgba(0, 0, 0, 0)");
+  element.style.borderLeftColor = normalizeColor(computed.borderLeftColor, "rgba(0, 0, 0, 0)");
+  element.style.outlineColor = normalizeColor(computed.outlineColor, "rgba(0, 0, 0, 0)");
+  element.style.textDecorationColor = normalizeColor(computed.textDecorationColor, computed.color);
+  element.style.caretColor = "transparent";
+
+  if (computed.boxShadow !== "none" && UNSUPPORTED_COLOR_FUNCTION_RE.test(computed.boxShadow)) {
+    element.style.boxShadow = "none";
+  }
+  if (computed.textShadow !== "none" && UNSUPPORTED_COLOR_FUNCTION_RE.test(computed.textShadow)) {
+    element.style.textShadow = "none";
+  }
+  if (computed.borderImageSource !== "none" && UNSUPPORTED_COLOR_FUNCTION_RE.test(computed.borderImageSource)) {
+    element.style.borderImageSource = "none";
+  }
+  if (computed.filter !== "none") element.style.filter = "none";
+  if (computed.backdropFilter !== "none") element.style.backdropFilter = "none";
+  if (computed.mixBlendMode !== "normal") element.style.mixBlendMode = "normal";
+}
+
 function sanitizeClone(doc: Document): void {
   const origin = window.location.origin;
+  const view = doc.defaultView ?? window;
+  const normalizeColor = createCssColorNormalizer(doc);
   copyLiveFormState(doc);
   copyScrollablePositions(doc);
+
+  const captureOverrides = doc.createElement("style");
+  captureOverrides.setAttribute("data-screenfeed-capture-styles", "true");
+  captureOverrides.textContent = `
+    *::before,
+    *::after {
+      color: inherit !important;
+      background-color: transparent !important;
+      background-image: none !important;
+      border-color: currentColor !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+      filter: none !important;
+      backdrop-filter: none !important;
+    }
+  `;
+  doc.head.appendChild(captureOverrides);
 
   doc.querySelectorAll<HTMLImageElement>("img").forEach((element) => {
     const src = element.currentSrc || element.getAttribute("src") || "";
@@ -194,17 +285,25 @@ function sanitizeClone(doc: Document): void {
 
   doc.querySelectorAll<HTMLElement>("*").forEach((element) => {
     try {
-      const computed = (doc.defaultView ?? window).getComputedStyle(element);
-      if (!shouldPreserveScreenFeedBackground(computed.backgroundImage, origin)) {
-        element.style.backgroundImage = "none";
-      }
-      if (computed.filter !== "none") element.style.filter = "none";
-      if (computed.backdropFilter !== "none") element.style.backdropFilter = "none";
-      if (computed.mixBlendMode !== "normal") element.style.mixBlendMode = "normal";
+      sanitizeComputedStyle(element, view.getComputedStyle(element), origin, normalizeColor);
     } catch {
       element.style.backgroundImage = "none";
       element.style.filter = "none";
       element.style.backdropFilter = "none";
+      element.style.boxShadow = "none";
+      element.style.textShadow = "none";
+    }
+  });
+
+  doc.querySelectorAll<SVGElement>("svg, svg *").forEach((element) => {
+    try {
+      const computed = view.getComputedStyle(element);
+      element.style.setProperty("color", normalizeColor(computed.color, "rgb(0, 0, 0)"));
+      element.style.setProperty("fill", normalizeColor(computed.fill, "rgba(0, 0, 0, 0)"));
+      element.style.setProperty("stroke", normalizeColor(computed.stroke, "rgba(0, 0, 0, 0)"));
+      element.style.setProperty("filter", "none");
+    } catch {
+      element.style.setProperty("filter", "none");
     }
   });
 }
@@ -215,7 +314,7 @@ function buildHtml2CanvasOptions() {
     useCORS: true,
     allowTaint: false,
     logging: false,
-    foreignObjectRendering: false,
+    foreignObjectRendering: true,
     imageTimeout: 2500,
     removeContainer: true,
     onclone: (doc: Document) => sanitizeClone(doc),
@@ -355,7 +454,15 @@ async function captureCanvas(): Promise<CaptureCanvasResult> {
     trace("capture-fail-p1", firstReason);
     try {
       const canvas = await withSafeCreatePattern(() =>
-        tryCapture({ ...options, scale: 0.5, imageTimeout: 800 }, RETRY_CAPTURE_TIMEOUT_MS)
+        tryCapture(
+          {
+            ...options,
+            scale: 0.5,
+            imageTimeout: 800,
+            foreignObjectRendering: false,
+          },
+          RETRY_CAPTURE_TIMEOUT_MS,
+        )
       );
       trace("capture-ok-retry");
       return { canvas, source: "retry", failureReason: firstReason };
