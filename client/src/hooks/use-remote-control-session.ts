@@ -3,9 +3,11 @@ import { apiRequest } from "@/lib/queryClient";
 
 export interface RemoteControlSessionView {
   id: string;
+  companyId: number;
   targetUserId: string;
   targetUsername: string;
   targetTabId: string;
+  targetRoute: string;
   controllerUserId: string;
   controllerUsername: string;
   controllerRole: string;
@@ -48,7 +50,15 @@ export function getRemoteSupportTabId(): string {
 function normalizeSession(value: unknown): RemoteControlSessionView | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const session = value as Partial<RemoteControlSessionView>;
-  if (!session.id || session.status !== "active" || !session.targetTabId) return null;
+  if (
+    !session.id ||
+    session.status !== "active" ||
+    !session.targetTabId ||
+    !Number.isInteger(session.companyId) ||
+    typeof session.targetRoute !== "string"
+  ) {
+    return null;
+  }
   return session as RemoteControlSessionView;
 }
 
