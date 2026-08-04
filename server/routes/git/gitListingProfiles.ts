@@ -21,6 +21,13 @@ export interface GitListingQuery extends Record<string, string | string[] | unde
   sort?: string;
   search?: string;
   q?: string;
+  status?: string;
+  transporter?: string;
+  agent?: string;
+  location?: string;
+  docsReady?: string;
+  delayed?: string;
+  overdue?: string;
 }
 
 export interface GitListingSummary {
@@ -91,6 +98,13 @@ export function applyGitTableFilters(rows: EnrichedContainer[], query: GitListin
 
   return rows.filter((row) => {
     if (query.company && query.company !== "ALL" && row.companyName !== query.company) return false;
+    if (query.status && row.status !== query.status) return false;
+    if (query.transporter && row.transporter !== query.transporter) return false;
+    if (query.agent && row.agent !== query.agent) return false;
+    if (query.location && row.trackingLocation !== query.location) return false;
+    if (query.docsReady === "true" && !row.docsReadyNotSent) return false;
+    if (query.delayed === "true" && !(row.daysDelayed && row.daysDelayed > 0)) return false;
+    if (query.overdue === "true" && !row.isOverdue) return false;
     if (selectedContainers.length > 0 && !selectedContainers.includes(row.containerNumber)) return false;
     if (selectedSuppliers.length > 0 && !selectedSuppliers.includes(row.supplierCode ?? "")) return false;
     if (!includesOrSentinel(selectedTransporters, row.transporter, "NO_TRANSPORTER")) return false;

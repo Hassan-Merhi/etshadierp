@@ -164,7 +164,7 @@ export function useGITContainersData({
       if (intervalId) clearInterval(intervalId);
       if (stopTimeoutId) clearTimeout(stopTimeoutId);
     };
-  }, [isBulkPending, showProgressBanner, isAllowed, queryUrl, queryClient]);
+  }, [isBulkPending, showProgressBanner, isAllowed, queryClient]);
 
   return {
     importMutation,

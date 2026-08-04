@@ -113,7 +113,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const effectiveRole = user?.currentRole ?? user?.role ?? "";
   const isAllowed = allowedRoles.includes(effectiveRole);
 
-  const { data, isLoading, isError, error, refetch, queryUrl, loadContainerDetail } =
+  const { data, isLoading, isError, error, refetch, loadContainerDetail } =
     usePaginatedGITContainers({
       allCompanies,
       page,
@@ -469,7 +469,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
           <ContainerBulkActions
             isAllowed={isAllowed}
             isBulkPending={isBulkPending}
-            allContainersCount={allContainers.length}
+            allContainersCount={data?.total ?? allContainers.length}
             waSending={waSending}
             onTrackAll={() => bulkTrackMutation.mutate()}
             onImportClick={() => fileInputRef.current?.click()}
