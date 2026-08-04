@@ -23,7 +23,9 @@ describe("company query scope", () => {
     expect(isGlobalQueryKey(["/api/auth/me"])).toBe(true);
     expect(isGlobalQueryKey(["/api/user/companies"])).toBe(true);
     expect(isCompanySessionQueryKey(["/api/accounts/all", 1])).toBe(true);
-    expect(isCompanySessionQueryKey(["account-statement", 1, "ledger", 10])).toBe(true);
+    expect(
+      isCompanySessionQueryKey(["account-statement", 1, "ledger", 10]),
+    ).toBe(true);
   });
 
   it("removes company data and resets active-company authentication fields", () => {
@@ -39,9 +41,13 @@ describe("company query scope", () => {
       { companyId: 1 },
       { companyId: 2 },
     ]);
-    client.setQueryData(["/api/accounts/all", 1], { accounts: [{ id: 1 }] });
+    client.setQueryData(["/api/accounts/all", 1], {
+      accounts: [{ id: 1 }],
+    });
     client.setQueryData(["/api/inventory", 1], [{ id: 2 }]);
-    client.setQueryData(["account-statement", 1, "ledger", 10], [{ id: 3 }]);
+    client.setQueryData(["account-statement", 1, "ledger", 10], [
+      { id: 3 },
+    ]);
 
     removeCompanySessionQueries(client);
 
