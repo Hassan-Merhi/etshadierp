@@ -1,0 +1,48 @@
+name: Temporary Phase 4 formatting repair
+
+on:
+  push:
+    branches:
+      - fix/phase4-post-merge-formatting
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/phase4-post-merge-formatting
+          fetch-depth: 0
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Normalize registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Format exact failing files
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            client/src/app/PosShell.tsx \
+            client/src/components/ui/dialog.tsx \
+            client/src/i18n/applicationTranslations.ts \
+            client/src/styles/rtl-hardening.css
+
+      - name: Remove temporary workflow and commit
+        run: |
+          rm .github/workflows/temp-phase4-format.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/src/app/PosShell.tsx client/src/components/ui/dialog.tsx client/src/i18n/applicationTranslations.ts client/src/styles/rtl-hardening.css .github/workflows/temp-phase4-format.yml
+          git commit -m "Fix Phase 4 post-merge formatting"
+          git push origin HEAD:fix/phase4-post-merge-formatting
