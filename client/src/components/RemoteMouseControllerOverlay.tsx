@@ -67,8 +67,15 @@ function findWatchDialog(): HTMLElement | null {
 }
 
 function matchingSession(sessions: ControllerSessionView[]): ControllerSessionView | null {
-  const dialogText = findWatchDialog()?.textContent ?? "";
-  return sessions.find((session) => dialogText.includes(`Watching: ${session.targetUsername}`)) ?? sessions[0] ?? null;
+  const dialog = findWatchDialog();
+  const watchedUserId = dialog?.dataset.watchedUserId;
+  const dialogText = dialog?.textContent ?? "";
+  return (
+    sessions.find((session) => watchedUserId && session.targetUserId === watchedUserId) ??
+    sessions.find((session) => dialogText.includes(session.targetUsername)) ??
+    sessions[0] ??
+    null
+  );
 }
 
 function authorizationIsFresh(authorization: MouseAuthorizationView | null): boolean {

@@ -71,8 +71,15 @@ function findWatchDialog(): HTMLElement | null {
 }
 
 function matchingSession(sessions: RemoteControlSessionView[]): RemoteControlSessionView | null {
-  const dialogText = findWatchDialog()?.textContent ?? "";
-  return sessions.find((session) => dialogText.includes(`Watching: ${session.targetUsername}`)) ?? sessions[0] ?? null;
+  const dialog = findWatchDialog();
+  const watchedUserId = dialog?.dataset.watchedUserId;
+  const dialogText = dialog?.textContent ?? "";
+  return (
+    sessions.find((session) => watchedUserId && session.targetUserId === watchedUserId) ??
+    sessions.find((session) => dialogText.includes(session.targetUsername)) ??
+    sessions[0] ??
+    null
+  );
 }
 
 export function RemoteKeyboardControllerOverlay() {
@@ -122,10 +129,10 @@ export function RemoteKeyboardControllerOverlay() {
 
   const requestKeyboardAuthorization = useCallback(async () => {
     if (!session) return;
-    await requestJson(
-      `/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/keyboard-authorization`,
-      { method: "POST", body: JSON.stringify({}) }
-    );
+    await requestJson(`/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/keyboard-authorization`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
     await sessionsQuery.refetch();
     setPasswordOpen(false);
     setPassword("");
@@ -145,9 +152,7 @@ export function RemoteKeyboardControllerOverlay() {
       ) {
         setPasswordOpen(true);
       } else {
-        setError(
-          requestError instanceof Error ? t(requestError.message) : t("Unable to enable keyboard control.")
-        );
+        setError(requestError instanceof Error ? t(requestError.message) : t("Unable to enable keyboard control."));
       }
     } finally {
       setBusy(false);
@@ -194,13 +199,15 @@ export function RemoteKeyboardControllerOverlay() {
   }, [busy, session, sessionsQuery, t]);
 
   const sendCommand = useCallback(
-    async (payload: { type: "insert-text"; text: string } | { type: "key"; key: RemoteKeyboardKey; shiftKey: boolean }) => {
+    async (
+      payload: { type: "insert-text"; text: string } | { type: "key"; key: RemoteKeyboardKey; shiftKey: boolean }
+    ) => {
       if (!session || !keyboardActive) return;
       try {
-        await requestJson(
-          `/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/keyboard-commands`,
-          { method: "POST", body: JSON.stringify(payload) }
-        );
+        await requestJson(`/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/keyboard-commands`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
       } catch (requestError) {
         if (
           requestError instanceof RemoteKeyboardRequestError &&
@@ -260,7 +267,9 @@ export function RemoteKeyboardControllerOverlay() {
             {t("Keyboard control")} · {session.targetUsername}
           </p>
           <p className="text-xs text-muted-foreground">
-            {mouseActive ? t("Only safe search, filter and explicitly approved fields can be edited.") : t("Mouse control required")}
+            {mouseActive
+              ? t("Only safe search, filter and explicitly approved fields can be edited.")
+              : t("Mouse control required")}
           </p>
         </div>
         {keyboardActive ? (
@@ -311,7 +320,11 @@ export function RemoteKeyboardControllerOverlay() {
               data-testid="input-remote-keyboard-password"
             />
             <Button type="submit" size="sm" className="h-9" disabled={!password || busy}>
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : translateRemoteSupportPhase5Text("Confirm", language)}
+              {busy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                translateRemoteSupportPhase5Text("Confirm", language)
+              )}
             </Button>
           </div>
         </form>
@@ -354,7 +367,9 @@ export function RemoteKeyboardControllerOverlay() {
       )}
 
       <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-        <span>{keyboardActive ? t("Keyboard active") : mouseActive ? t("Enable keyboard") : t("Mouse control required")}</span>
+        <span>
+          {keyboardActive ? t("Keyboard active") : mouseActive ? t("Enable keyboard") : t("Mouse control required")}
+        </span>
         {statusLabel && <span className="shrink-0">{statusLabel}</span>}
       </div>
       {error && (
