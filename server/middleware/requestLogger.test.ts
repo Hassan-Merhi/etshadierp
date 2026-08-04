@@ -55,7 +55,7 @@ describe("requestLogger health metrics", () => {
       maxDurationMs: 0,
       slowPercent: 0,
       serverErrorPercent: 0,
-      slowRequestThresholdMs: 500,
+      slowRequestThresholdMs: 1000,
     });
     expect(snapshot.requests.durationBuckets).toEqual({
       under100: 0,
