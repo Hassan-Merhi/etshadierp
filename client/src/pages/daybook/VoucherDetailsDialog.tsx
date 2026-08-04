@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getVoucherTypeBadge } from "@/lib/voucherTypeBadge";
 import { ViewVoucherEntry } from "./types";
 
@@ -341,6 +341,17 @@ export function VoucherDetailsDialog({
                       0
                     );
                     const totalProfit = filteredItems.reduce((s, e) => s + parseFloat(e.profit || "0"), 0);
+                    const totalHassansPrice = filteredItems.reduce(
+                      (s, e) =>
+                        s + parseFloat(e.hassansPrice || "0") * parseFloat(e.quantity || "0"),
+                      0
+                    );
+                    const totalHassansProfit = filteredItems.reduce(
+                      (s, e) => s + parseFloat(e.hassansProfit || "0"),
+                      0
+                    );
+                    const totalHassansPercentage =
+                      totalHassansPrice > 0 ? (totalHassansProfit / totalHassansPrice) * 100 : 0;
 
                     return (
                       <div>
@@ -385,7 +396,10 @@ export function VoucherDetailsDialog({
                           <TableBody>
                             {filteredItems.length === 0 && (
                               <TableRow>
-                                <TableCell colSpan={9} className="text-center text-muted-foreground py-8 text-sm">
+                                <TableCell
+                                  colSpan={hasHassans ? 9 : 6}
+                                  className="text-center text-muted-foreground py-8 text-sm"
+                                >
                                   No items found for this voucher
                                 </TableCell>
                               </TableRow>
@@ -454,30 +468,54 @@ export function VoucherDetailsDialog({
                               );
                             })}
                           </TableBody>
+                          {!isPOSUser && filteredItems.length > 0 && (
+                            <TableFooter>
+                              <TableRow className="bg-muted/20 hover:bg-muted/20 font-semibold">
+                                <TableCell>Total</TableCell>
+                                <TableCell className="text-right font-mono text-muted-foreground">
+                                  {totalQty}
+                                </TableCell>
+                                <TableCell aria-label="No price total" />
+                                <TableCell className="text-right font-mono text-muted-foreground">
+                                  {formatAmount(totalCost)}
+                                </TableCell>
+                                <TableCell className="text-right font-mono">{formatAmount(totalAmt)}</TableCell>
+                                <TableCell
+                                  className={`text-right font-mono ${
+                                    totalProfit > 0.01
+                                      ? "text-emerald-600 dark:text-emerald-400"
+                                      : totalProfit < -0.01
+                                        ? "text-destructive"
+                                        : "text-muted-foreground"
+                                  }`}
+                                >
+                                  {formatAmount(totalProfit)}
+                                </TableCell>
+                                {hasHassans && (
+                                  <>
+                                    <TableCell className="text-right font-mono text-muted-foreground">
+                                      {formatAmount(totalHassansPrice)}
+                                    </TableCell>
+                                    <TableCell
+                                      className={`text-right font-mono ${
+                                        totalHassansProfit > 0.01
+                                          ? "text-emerald-600 dark:text-emerald-400"
+                                          : totalHassansProfit < -0.01
+                                            ? "text-destructive"
+                                            : "text-muted-foreground"
+                                      }`}
+                                    >
+                                      {formatAmount(totalHassansProfit)}
+                                    </TableCell>
+                                    <TableCell className="text-right font-mono text-muted-foreground">
+                                      {totalHassansPercentage.toFixed(1)}%
+                                    </TableCell>
+                                  </>
+                                )}
+                              </TableRow>
+                            </TableFooter>
+                          )}
                         </Table>
-                        {/* Totals row */}
-                        {!isPOSUser && filteredItems.length > 0 && (
-                          <div className="flex items-center justify-between border-t px-4 py-2.5 font-semibold text-sm bg-muted/20">
-                            <span>Total</span>
-                            <div className="flex items-center gap-6 font-mono">
-                              <span className="text-muted-foreground">{totalQty}</span>
-                              <span className="text-muted-foreground">{formatAmount(totalCost)}</span>
-                              <span>{formatAmount(totalAmt)}</span>
-                              <span
-                                className={
-                                  totalProfit > 0.01
-                                    ? "text-emerald-600 dark:text-emerald-400"
-                                    : totalProfit < -0.01
-                                      ? "text-destructive"
-                                      : "text-muted-foreground"
-                                }
-                              >
-                                {formatAmount(totalProfit)}
-                              </span>
-                              {hasHassans && <span className="text-muted-foreground">$ 0</span>}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     );
                   })()
