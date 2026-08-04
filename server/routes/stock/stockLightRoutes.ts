@@ -58,10 +58,10 @@ export function registerStockLightRoutes(app: Express) {
         maxPageSize: MAX_STOCK_ITEM_PAGE_SIZE,
       });
 
-      const values: unknown[] = [companyId];
+      const filterValues: unknown[] = [companyId];
       const addValue = (value: unknown) => {
-        values.push(value);
-        return `$${values.length}`;
+        filterValues.push(value);
+        return `$${filterValues.length}`;
       };
       const conditions = ["si.company_id = $1", "si.deleted_at IS NULL"];
       if (!includeInactive) conditions.push("si.active = true");
@@ -94,7 +94,11 @@ export function registerStockLightRoutes(app: Express) {
 
       if (selectedIds.length > 0) {
         const idsParam = addValue(selectedIds);
-        conditions.push(searchCondition ? `(${searchCondition} OR si.id = ANY(${idsParam}::int[]))` : `si.id = ANY(${idsParam}::int[])`);
+        conditions.push(
+          searchCondition
+            ? `(${searchCondition} OR si.id = ANY(${idsParam}::int[]))`
+            : `si.id = ANY(${idsParam}::int[])`
+        );
       } else if (searchCondition) {
         conditions.push(searchCondition);
       }
@@ -123,13 +127,17 @@ export function registerStockLightRoutes(app: Express) {
       if (!paginated) {
         res.setHeader("Deprecation", "true");
         res.setHeader("Warning", '299 - "Unpaginated stock-items/light response is deprecated"');
-        const legacyResult = await pool.query(selectSql, values);
+        const legacyResult = await pool.query(selectSql, filterValues);
         return res.json(legacyResult.rows);
       }
 
+      const countValues = [...filterValues];
+      const rowValues = [...filterValues, pageSize, offset];
+      const limitParam = `$${filterValues.length + 1}`;
+      const offsetParam = `$${filterValues.length + 2}`;
       const [countResult, rowsResult] = await Promise.all([
-        pool.query(`SELECT COUNT(*)::int AS total FROM stock_items si WHERE ${whereSql}`, values),
-        pool.query(`${selectSql} LIMIT ${addValue(pageSize)} OFFSET ${addValue(offset)}`, values),
+        pool.query(`SELECT COUNT(*)::int AS total FROM stock_items si WHERE ${whereSql}`, countValues),
+        pool.query(`${selectSql} LIMIT ${limitParam} OFFSET ${offsetParam}`, rowValues),
       ]);
       const total = Number(countResult.rows[0]?.total ?? 0);
 
