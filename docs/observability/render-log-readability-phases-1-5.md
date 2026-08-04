@@ -88,7 +88,7 @@ Each slow warning includes its threshold and timing class so a normal 1–3 seco
 
 ### Concise bandwidth reporting
 
-The five-minute Render message includes total API traffic and only the top three endpoints by transferred bytes. `BANDWIDTH_DEBUG_LOG_TOP_N` may increase this to a maximum of five.
+The five-minute Render message includes total API traffic and only the top three endpoints by transferred bytes. `BANDWIDTH_DEBUG_LOG_TOP_N` may increase this to a maximum of five. The older `BANDWIDTH_DEBUG_TOP_N` name remains accepted as a fallback so existing Render settings do not break.
 
 The complete current-window ranking remains available to Admin and Developer users through:
 
@@ -125,12 +125,17 @@ Phase 5 is complete when Render bandwidth lines are concise, full rankings remai
 
 ## Verification
 
-The implementation is covered by:
+Run the focused static contract with:
+
+```bash
+node scripts/verify-readable-production-logs-phases-1-5.mjs
+```
+
+The implementation is also covered by:
 
 - logger readability and noise-policy tests;
 - request timing-class and threshold tests;
 - bandwidth response-threshold tests;
-- a static phases 1–5 contract verifier;
 - repository TypeScript, build, lint and test workflows.
 
 ## Deferred to later phases
