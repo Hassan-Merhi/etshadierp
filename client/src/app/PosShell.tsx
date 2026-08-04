@@ -162,10 +162,7 @@ export function PosShell({
                 </SidebarGroupContent>
               </SidebarGroup>
             </SidebarContent>
-            <SidebarFooter
-              data-pos-sidebar-footer-card
-              className="pb-[max(0.5rem,env(safe-area-inset-bottom))]"
-            >
+            <SidebarFooter data-pos-sidebar-footer-card className="pb-[max(0.5rem,env(safe-area-inset-bottom))]">
               <div className="space-y-2">
                 <div className="flex items-center gap-2 px-1">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
@@ -251,10 +248,7 @@ export function PosShell({
                 <ErrorBoundary resetKey={currentLocation}>
                   <Suspense
                     fallback={
-                      <LoadingState
-                        title="Loading point of sale"
-                        description="Preparing the latest sales workspace."
-                      />
+                      <LoadingState title="Loading point of sale" description="Preparing the latest sales workspace." />
                     }
                   >
                     <Router user={user} posImportEnabled={posImportEnabled} />
@@ -265,9 +259,7 @@ export function PosShell({
           </div>
         </div>
       </SidebarProvider>
-      {hasAdminSearch && (
-        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} isPOS={true} user={user} />
-      )}
+      {hasAdminSearch && <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} isPOS={true} user={user} />}
       {leaveConfirmDialog}
     </>
   );

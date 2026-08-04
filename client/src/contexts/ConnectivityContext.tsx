@@ -223,10 +223,7 @@ function FullConnectivityProvider({ children }: Props) {
     const scheduleCounts = (delay?: number) => {
       if (stopped) return;
       if (countTimer !== undefined) window.clearTimeout(countTimer);
-      countTimer = window.setTimeout(
-        () => void runCounts(),
-        delay ?? getQueueRefreshDelay()
-      );
+      countTimer = window.setTimeout(() => void runCounts(), delay ?? getQueueRefreshDelay());
     };
 
     const runCounts = async () => {

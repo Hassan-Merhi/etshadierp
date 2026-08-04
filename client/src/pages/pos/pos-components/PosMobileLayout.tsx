@@ -100,7 +100,10 @@ export function PosMobileLayout({
       data-pos-mobile-page="true"
       className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain pb-[calc(7.5rem+env(safe-area-inset-bottom))] lg:hidden"
     >
-      <section className="sticky top-0 z-30 border-b bg-background/95 px-3 pb-3 pt-3 shadow-sm backdrop-blur sm:px-4" aria-label="Product search">
+      <section
+        className="sticky top-0 z-30 border-b bg-background/95 px-3 pb-3 pt-3 shadow-sm backdrop-blur sm:px-4"
+        aria-label="Product search"
+      >
         <label htmlFor="pos-mobile-product-search" className="mb-2 block text-sm font-semibold">
           Add an item
         </label>
@@ -159,8 +162,12 @@ export function PosMobileLayout({
                     data-testid={`button-mobile-select-item-${item.stockItemId ?? item.code}`}
                   >
                     <span className="min-w-0 flex-1">
-                      <span className="block break-words text-sm font-semibold leading-snug sm:text-base">{item.name}</span>
-                      <span className="mt-0.5 block break-all font-mono text-xs text-muted-foreground">{item.code}</span>
+                      <span className="block break-words text-sm font-semibold leading-snug sm:text-base">
+                        {item.name}
+                      </span>
+                      <span className="mt-0.5 block break-all font-mono text-xs text-muted-foreground">
+                        {item.code}
+                      </span>
                     </span>
                     <span
                       className={`shrink-0 rounded-md px-2 py-1 text-xs font-bold tabular-nums ${
@@ -171,7 +178,11 @@ export function PosMobileLayout({
                             : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
                       }`}
                     >
-                      {isOut ? "Out" : isLow ? `${Math.round(item.stock)} low` : Math.round(item.stock).toLocaleString()}
+                      {isOut
+                        ? "Out"
+                        : isLow
+                          ? `${Math.round(item.stock)} low`
+                          : Math.round(item.stock).toLocaleString()}
                     </span>
                   </button>
                 );
@@ -269,7 +280,8 @@ export function PosMobileLayout({
                   <User className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span className="min-w-0 flex-1 truncate text-left">
                     {selectedCustomerId
-                      ? customerAccounts.find((account: any) => String(account.id) === selectedCustomerId)?.name || "Customer"
+                      ? customerAccounts.find((account: any) => String(account.id) === selectedCustomerId)?.name ||
+                        "Customer"
                       : "Select customer…"}
                   </span>
                   <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
@@ -397,7 +409,9 @@ export function PosMobileLayout({
                         variant="outline"
                         size="icon"
                         className="h-11 w-11"
-                        onClick={() => updateRow(actualIndex, "quantity", String(Math.max(0, Number(row.quantity || 0) - 1)))}
+                        onClick={() =>
+                          updateRow(actualIndex, "quantity", String(Math.max(0, Number(row.quantity || 0) - 1)))
+                        }
                         aria-label={`Decrease quantity for ${row.itemName}`}
                       >
                         <Minus className="h-4 w-4" />
@@ -478,7 +492,9 @@ export function PosMobileLayout({
             <p className="text-xs text-muted-foreground">
               {validRows.length} {validRows.length === 1 ? "item" : "items"} · Qty {quantity.toFixed(0)}
             </p>
-            <p className="truncate font-mono text-xl font-bold tabular-nums sm:text-2xl">{formatDisplayAmount(total)}</p>
+            <p className="truncate font-mono text-xl font-bold tabular-nums sm:text-2xl">
+              {formatDisplayAmount(total)}
+            </p>
           </div>
           <Button
             className="min-h-12 min-w-[8.5rem] shrink-0 px-5 text-base font-semibold"

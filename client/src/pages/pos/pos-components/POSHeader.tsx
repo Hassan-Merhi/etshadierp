@@ -8,7 +8,18 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { FileDown, MoreHorizontal, Eye, Upload, Download, FileText, FileSpreadsheet, Save, Check, Sheet } from "lucide-react";
+import {
+  FileDown,
+  MoreHorizontal,
+  Eye,
+  Upload,
+  Download,
+  FileText,
+  FileSpreadsheet,
+  Save,
+  Check,
+  Sheet,
+} from "lucide-react";
 import { Link } from "wouter";
 
 export interface POSHeaderProps {

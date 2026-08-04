@@ -174,7 +174,10 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
       {isLoading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((item) => (
-            <div key={item} className="flex min-w-0 flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center">
+            <div
+              key={item}
+              className="flex min-w-0 flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center"
+            >
               <div className="flex min-w-0 flex-1 items-center gap-3">
                 <Skeleton className="h-3 w-3 shrink-0 rounded-full" />
                 <div className="min-w-0 flex-1 space-y-2">
@@ -187,7 +190,10 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
           ))}
         </div>
       ) : transfers.length === 0 ? (
-        <div className="rounded-xl border border-dashed bg-card py-14 text-center text-muted-foreground" data-testid="text-empty">
+        <div
+          className="rounded-xl border border-dashed bg-card py-14 text-center text-muted-foreground"
+          data-testid="text-empty"
+        >
           <Package2 className="mx-auto mb-3 h-10 w-10 opacity-20" />
           <p className="text-sm font-medium">No transfer orders found</p>
           {hasFilters && <p className="mt-1 text-xs opacity-70">Try clearing your filters.</p>}
@@ -211,7 +217,10 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
 
                 <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="break-all font-mono text-sm font-semibold" data-testid={`text-voucher-${transfer.voucherId}`}>
+                    <span
+                      className="break-all font-mono text-sm font-semibold"
+                      data-testid={`text-voucher-${transfer.voucherId}`}
+                    >
                       {transfer.voucherNumber}
                     </span>
                     <span className="text-xs text-muted-foreground">{formatDate(transfer.voucherDate)}</span>
