@@ -12,12 +12,11 @@ import {
   shouldPreserveScreenFeedBackground,
 } from "./screen-feed-viewing-quality";
 
-// Polling remains as a fallback for browsers or proxies that cannot keep an
-// event stream open. The live path normally detects a viewer immediately.
 const POLL_INTERVAL_MS = 15000;
 const LEGACY_CAPTURE_INTERVAL_MS = 3000;
 const POINTER_INTERVAL_MS = 250;
-const CAPTURE_TIMEOUT_MS = 4000;
+const CAPTURE_TIMEOUT_MS = 12000;
+const RETRY_CAPTURE_TIMEOUT_MS = 7000;
 const CLICK_RETAIN_MS = 8000;
 const MAX_DATA_URL_LEN = 1_300_000;
 const FAST_MAX_DATA_URL_LEN = 560_000;
@@ -65,6 +64,7 @@ interface EncodedFrame {
 interface CaptureCanvasResult {
   canvas: HTMLCanvasElement;
   source: CaptureSource;
+  failureReason?: string;
 }
 
 interface CaptureResult {
@@ -94,11 +94,7 @@ if (typeof window !== "undefined") {
       const target = event.target as HTMLElement;
       if (target.closest("[data-screenfeed-ignore='true']")) return;
       const point = normalizeScreenFeedPoint(event.clientX, event.clientY, window.innerWidth, window.innerHeight);
-      clickBuffer.push({
-        ...point,
-        label: trimLabel(target),
-        ts: Date.now(),
-      });
+      clickBuffer.push({ ...point, label: trimLabel(target), ts: Date.now() });
       if (clickBuffer.length > 50) clickBuffer.shift();
     },
     { capture: true }
@@ -107,25 +103,88 @@ if (typeof window !== "undefined") {
 
 function runWhenIdle(fn: () => void): void {
   if (typeof window.requestIdleCallback === "function") {
-    window.requestIdleCallback(fn, { timeout: 500 });
+    window.requestIdleCallback(fn, { timeout: 750 });
   } else {
     setTimeout(fn, 0);
   }
 }
 
-// GET-based trace bypasses CSRF and Origin checks and is development-only.
 function trace(event: string, extra?: string): void {
   if (!isDev) return;
   const url = `/api/screen-feed/trace/${encodeURIComponent(event)}${extra ? `?d=${encodeURIComponent(extra)}` : ""}`;
   fetch(url, { credentials: "include" }).catch(() => {});
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message.slice(0, 180) : String(error).slice(0, 180);
+}
+
+async function waitForCaptureReady(): Promise<void> {
+  await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  try {
+    await Promise.race([
+      document.fonts?.ready ?? Promise.resolve(),
+      new Promise<void>((resolve) => setTimeout(resolve, 1500)),
+    ]);
+  } catch {
+    // Font readiness must never block capture.
+  }
+}
+
+function copyLiveFormState(doc: Document): void {
+  const originals = Array.from(document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("input, textarea, select"));
+  const clones = Array.from(doc.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("input, textarea, select"));
+
+  originals.forEach((original, index) => {
+    const clone = clones[index];
+    if (!clone) return;
+    if (original instanceof HTMLInputElement && clone instanceof HTMLInputElement) {
+      clone.value = original.value;
+      clone.checked = original.checked;
+      clone.setAttribute("value", original.value);
+      if (original.checked) clone.setAttribute("checked", "checked");
+      else clone.removeAttribute("checked");
+    } else if (original instanceof HTMLTextAreaElement && clone instanceof HTMLTextAreaElement) {
+      clone.value = original.value;
+      clone.textContent = original.value;
+    } else if (original instanceof HTMLSelectElement && clone instanceof HTMLSelectElement) {
+      clone.value = original.value;
+      Array.from(clone.options).forEach((option, optionIndex) => {
+        option.selected = original.options[optionIndex]?.selected ?? false;
+      });
+    }
+  });
+
+  const editableOriginals = Array.from(document.querySelectorAll<HTMLElement>("[contenteditable='true']"));
+  const editableClones = Array.from(doc.querySelectorAll<HTMLElement>("[contenteditable='true']"));
+  editableOriginals.forEach((original, index) => {
+    if (editableClones[index]) editableClones[index].innerHTML = original.innerHTML;
+  });
+}
+
+function copyScrollablePositions(doc: Document): void {
+  const originals = Array.from(document.querySelectorAll<HTMLElement>("*"));
+  const clones = Array.from(doc.querySelectorAll<HTMLElement>("*"));
+  originals.forEach((original, index) => {
+    const clone = clones[index];
+    if (!clone || (original.scrollTop === 0 && original.scrollLeft === 0)) return;
+    clone.scrollTop = original.scrollTop;
+    clone.scrollLeft = original.scrollLeft;
+  });
+}
+
 function sanitizeClone(doc: Document): void {
   const origin = window.location.origin;
+  copyLiveFormState(doc);
+  copyScrollablePositions(doc);
 
   doc.querySelectorAll<HTMLImageElement>("img").forEach((element) => {
     const src = element.currentSrc || element.getAttribute("src") || "";
-    if (src && !isSafeScreenFeedAssetUrl(src, origin)) element.remove();
+    if (src && !isSafeScreenFeedAssetUrl(src, origin)) {
+      element.removeAttribute("src");
+      element.removeAttribute("srcset");
+      element.style.visibility = "hidden";
+    }
   });
 
   doc.querySelectorAll<SVGImageElement>("image").forEach((element) => {
@@ -135,12 +194,17 @@ function sanitizeClone(doc: Document): void {
 
   doc.querySelectorAll<HTMLElement>("*").forEach((element) => {
     try {
-      const backgroundImage = (doc.defaultView ?? window).getComputedStyle(element).backgroundImage;
-      if (!shouldPreserveScreenFeedBackground(backgroundImage, origin)) {
+      const computed = (doc.defaultView ?? window).getComputedStyle(element);
+      if (!shouldPreserveScreenFeedBackground(computed.backgroundImage, origin)) {
         element.style.backgroundImage = "none";
       }
+      if (computed.filter !== "none") element.style.filter = "none";
+      if (computed.backdropFilter !== "none") element.style.backdropFilter = "none";
+      if (computed.mixBlendMode !== "normal") element.style.mixBlendMode = "normal";
     } catch {
       element.style.backgroundImage = "none";
+      element.style.filter = "none";
+      element.style.backdropFilter = "none";
     }
   });
 }
@@ -152,35 +216,41 @@ function buildHtml2CanvasOptions() {
     allowTaint: false,
     logging: false,
     foreignObjectRendering: false,
-    imageTimeout: 1200,
+    imageTimeout: 2500,
+    removeContainer: true,
     onclone: (doc: Document) => sanitizeClone(doc),
     ignoreElements: (element: Element) => element.getAttribute("data-screenfeed-ignore") === "true",
   } as const;
 }
 
-async function tryCapture(opts: Record<string, unknown>): Promise<HTMLCanvasElement> {
+async function tryCapture(opts: Record<string, unknown>, timeoutMs: number): Promise<HTMLCanvasElement> {
   const html2canvas = await loadHtml2Canvas();
-  return Promise.race([
-    html2canvas(document.body, {
-      ...opts,
-      x: window.scrollX,
-      y: window.scrollY,
-      width: window.innerWidth,
-      height: window.innerHeight,
-      scrollX: -window.scrollX,
-      scrollY: -window.scrollY,
-      windowWidth: window.innerWidth,
-      windowHeight: window.innerHeight,
-    }),
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`timeout-${CAPTURE_TIMEOUT_MS}ms`)), CAPTURE_TIMEOUT_MS)
-    ),
-  ]);
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      html2canvas(document.body, {
+        ...opts,
+        x: window.scrollX,
+        y: window.scrollY,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        scrollX: -window.scrollX,
+        scrollY: -window.scrollY,
+        windowWidth: window.innerWidth,
+        windowHeight: window.innerHeight,
+      }),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(`timeout-${timeoutMs}ms`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 }
 
-function buildFallbackCanvas(): HTMLCanvasElement {
-  const width = 800;
-  const height = 480;
+function buildFallbackCanvas(reason: string): HTMLCanvasElement {
+  const width = Math.max(800, Math.min(1440, window.innerWidth));
+  const height = Math.max(480, Math.round(width * (window.innerHeight / Math.max(1, window.innerWidth))));
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -192,33 +262,23 @@ function buildFallbackCanvas(): HTMLCanvasElement {
   ctx.fillRect(0, 0, width, height);
   ctx.fillStyle = dark ? "#e5e5e5" : "#111";
   ctx.font = "bold 18px system-ui, sans-serif";
-  ctx.fillText(document.title.slice(0, 70), 24, 48);
+  ctx.fillText(document.title.slice(0, 90), 24, 48);
   ctx.fillStyle = dark ? "#aaa" : "#555";
   ctx.font = "14px monospace";
-  ctx.fillText(window.location.href.slice(0, 90), 24, 80);
+  ctx.fillText(window.location.href.slice(0, 120), 24, 80);
   ctx.fillStyle = "#888";
   ctx.font = "12px system-ui, sans-serif";
   ctx.fillText(new Date().toLocaleTimeString(), 24, 110);
-  ctx.fillText("(html2canvas unavailable — simplified frame)", 24, 132);
+  ctx.fillText(`Capture fallback: ${reason.slice(0, 120)}`, 24, 132);
 
-  const headerEl = document.querySelector("header");
-  if (headerEl) {
-    ctx.fillStyle = dark ? "#2c2c2e" : "#ddd";
-    ctx.fillRect(0, 160, width, 40);
-    ctx.fillStyle = dark ? "#ccc" : "#333";
-    ctx.font = "13px system-ui, sans-serif";
-    ctx.fillText(headerEl.textContent?.trim().slice(0, 80) ?? "", 12, 186);
-  }
-
-  let y = 220;
-  document.querySelectorAll("h1, h2, h3").forEach((element) => {
-    const text = element.textContent?.trim().slice(0, 80);
-    if (text && y < height - 20) {
-      ctx.fillStyle = dark ? "#ccc" : "#222";
-      ctx.font = element.tagName === "H1" ? "bold 16px system-ui" : "14px system-ui, sans-serif";
-      ctx.fillText(text, 24, y);
-      y += 24;
-    }
+  let y = 170;
+  document.querySelectorAll<HTMLElement>("header, nav, h1, h2, h3, button, [role='dialog']").forEach((element) => {
+    const text = element.textContent?.replace(/\s+/g, " ").trim().slice(0, 120);
+    if (!text || y > height - 24) return;
+    ctx.fillStyle = dark ? "#ccc" : "#222";
+    ctx.font = element.matches("h1, h2, h3") ? "bold 15px system-ui" : "13px system-ui, sans-serif";
+    ctx.fillText(text, 24, y);
+    y += 22;
   });
 
   return canvas;
@@ -226,10 +286,7 @@ function buildFallbackCanvas(): HTMLCanvasElement {
 
 async function withSafeCreatePattern<T>(fn: () => Promise<T>): Promise<T> {
   const original = CanvasRenderingContext2D.prototype.createPattern;
-  CanvasRenderingContext2D.prototype.createPattern = function (
-    image: CanvasImageSource,
-    repetition: string | null
-  ): CanvasPattern | null {
+  CanvasRenderingContext2D.prototype.createPattern = function (image: CanvasImageSource, repetition: string | null): CanvasPattern | null {
     try {
       return original.call(this, image, repetition);
     } catch {
@@ -275,7 +332,6 @@ function encodeFastFrame(canvas: HTMLCanvasElement): EncodedFrame | null {
     { maxWidth: 960, quality: 0.5 },
     { maxWidth: 800, quality: 0.44 },
   ];
-
   let lastFrame: EncodedFrame | null = null;
   for (const attempt of attempts) {
     const candidate = resizeCanvas(canvas, attempt.maxWidth);
@@ -283,33 +339,30 @@ function encodeFastFrame(canvas: HTMLCanvasElement): EncodedFrame | null {
     lastFrame = { dataUrl, canvas: candidate, quality: attempt.quality };
     if (dataUrl.length <= FAST_MAX_DATA_URL_LEN) return lastFrame;
   }
-
   return lastFrame && lastFrame.dataUrl.length <= MAX_DATA_URL_LEN ? lastFrame : null;
 }
 
 async function captureCanvas(): Promise<CaptureCanvasResult> {
   trace("capture-start");
+  await waitForCaptureReady();
   const options = buildHtml2CanvasOptions();
   try {
-    const canvas = await withSafeCreatePattern(() => tryCapture(options));
+    const canvas = await withSafeCreatePattern(() => tryCapture(options, CAPTURE_TIMEOUT_MS));
     trace("capture-ok");
     return { canvas, source: "dom" };
   } catch (error) {
-    trace("capture-fail-p1", String(error).slice(0, 80));
+    const firstReason = errorMessage(error);
+    trace("capture-fail-p1", firstReason);
     try {
       const canvas = await withSafeCreatePattern(() =>
-        tryCapture({
-          ...options,
-          scale: 0.35,
-          imageTimeout: 300,
-        })
+        tryCapture({ ...options, scale: 0.5, imageTimeout: 800 }, RETRY_CAPTURE_TIMEOUT_MS)
       );
       trace("capture-ok-retry");
-      return { canvas, source: "retry" };
+      return { canvas, source: "retry", failureReason: firstReason };
     } catch (retryError) {
-      trace("capture-fail-p2", String(retryError).slice(0, 80));
-      trace("capture-fallback");
-      return { canvas: buildFallbackCanvas(), source: "fallback" };
+      const reason = `${firstReason}; retry: ${errorMessage(retryError)}`;
+      trace("capture-fallback", reason);
+      return { canvas: buildFallbackCanvas(reason), source: "fallback", failureReason: reason };
     }
   }
 }
@@ -333,51 +386,37 @@ async function captureAndUpload(
   fast: boolean,
   lastSignature: string | null,
   lastUploadedClickTs: number,
-  cursor: CursorEvent | null
+  cursor: CursorEvent | null,
+  expectedPath: string
 ): Promise<CaptureResult> {
   const startedAt = Date.now();
-  const { canvas, source } = await captureCanvas();
+  const { canvas, source, failureReason } = await captureCanvas();
+  if (window.location.href !== expectedPath) {
+    trace("capture-discarded-navigation");
+    return { uploaded: false, unchanged: false, failed: false, signature: null, latestClickTs: lastUploadedClickTs };
+  }
   const signature = buildFrameSignature(canvas);
   const cutoff = Date.now() - CLICK_RETAIN_MS;
   const clicks = clickBuffer.filter((click) => click.ts >= cutoff);
   const latestClickTs = clicks.reduce((latest, click) => Math.max(latest, click.ts), 0);
 
-  if (
-    !shouldUploadScreenFrame({
-      signature,
-      lastSignature,
-      latestClickTs,
-      lastUploadedClickTs,
-    })
-  ) {
-    trace("unchanged");
+  if (!shouldUploadScreenFrame({ signature, lastSignature, latestClickTs, lastUploadedClickTs })) {
     return { uploaded: false, unchanged: true, failed: false, signature, latestClickTs };
   }
 
   let encoded: EncodedFrame | null;
   try {
-    encoded = fast
-      ? encodeFastFrame(canvas)
-      : {
-          dataUrl: canvas.toDataURL("image/jpeg", 0.75),
-          canvas,
-          quality: 0.75,
-        };
+    encoded = fast ? encodeFastFrame(canvas) : { dataUrl: canvas.toDataURL("image/jpeg", 0.75), canvas, quality: 0.75 };
   } catch (error) {
-    trace("to-data-url-failed", String(error).slice(0, 80));
+    trace("to-data-url-failed", errorMessage(error));
     return { uploaded: false, unchanged: false, failed: true, signature, latestClickTs };
   }
 
-  if (!encoded?.dataUrl.startsWith("data:image/")) {
-    trace("bad-prefix");
-    return { uploaded: false, unchanged: false, failed: true, signature, latestClickTs };
-  }
-  if (encoded.dataUrl.length > MAX_DATA_URL_LEN) {
-    trace("too-large", String(encoded.dataUrl.length));
+  if (!encoded?.dataUrl.startsWith("data:image/") || encoded.dataUrl.length > MAX_DATA_URL_LEN) {
+    trace("encode-invalid", String(encoded?.dataUrl.length ?? 0));
     return { uploaded: false, unchanged: false, failed: true, signature, latestClickTs };
   }
 
-  trace("uploading", String(encoded.dataUrl.length));
   const completedAt = Date.now();
   try {
     const response = await fetch("/api/screen-feed", {
@@ -397,31 +436,20 @@ async function captureAndUpload(
           quality: encoded.quality,
           encodedBytes: approximateDataUrlBytes(encoded.dataUrl),
           durationMs: completedAt - startedAt,
+          failureReason,
         },
       }),
     });
-    trace("upload-done", String(response.status));
-    return {
-      uploaded: response.ok,
-      unchanged: false,
-      failed: !response.ok,
-      signature,
-      latestClickTs,
-    };
+    return { uploaded: response.ok, unchanged: false, failed: !response.ok, signature, latestClickTs };
   } catch (error) {
-    trace("upload-error", String(error).slice(0, 80));
+    trace("upload-error", errorMessage(error));
     return { uploaded: false, unchanged: false, failed: true, signature, latestClickTs };
   }
 }
 
 function cursorsDiffer(previous: CursorEvent | null, next: CursorEvent): boolean {
   if (!previous) return true;
-  return (
-    previous.visible !== next.visible ||
-    Math.abs(previous.x - next.x) > 0.002 ||
-    Math.abs(previous.y - next.y) > 0.002 ||
-    next.ts - previous.ts > 1000
-  );
+  return previous.visible !== next.visible || Math.abs(previous.x - next.x) > 0.002 || Math.abs(previous.y - next.y) > 0.002 || next.ts - previous.ts > 1000;
 }
 
 export function useScreenFeed() {
@@ -438,8 +466,6 @@ export function useScreenFeed() {
 
   useEffect(() => {
     busyRef.current = false;
-    trace("hook-mounted");
-
     const onPointerMove = (event: PointerEvent) => {
       const point = normalizeScreenFeedPoint(event.clientX, event.clientY, window.innerWidth, window.innerHeight);
       pointerRef.current = { ...point, visible: true, ts: Date.now() };
@@ -452,20 +478,14 @@ export function useScreenFeed() {
     document.documentElement.addEventListener("pointerleave", onPointerLeave, { passive: true });
 
     const clearCaptureTimer = () => {
-      if (captureTimerRef.current) {
-        clearTimeout(captureTimerRef.current);
-        captureTimerRef.current = null;
-      }
+      if (captureTimerRef.current) clearTimeout(captureTimerRef.current);
+      captureTimerRef.current = null;
     };
-
     const stopPointerLoop = () => {
-      if (pointerTimerRef.current) {
-        clearInterval(pointerTimerRef.current);
-        pointerTimerRef.current = null;
-      }
+      if (pointerTimerRef.current) clearInterval(pointerTimerRef.current);
+      pointerTimerRef.current = null;
       lastSentPointerRef.current = null;
     };
-
     const sendPointerUpdate = () => {
       const cursor = pointerRef.current;
       if (!watchedRef.current || !cursor || !cursorsDiffer(lastSentPointerRef.current, cursor)) return;
@@ -475,17 +495,13 @@ export function useScreenFeed() {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ cursor }),
-      }).catch(() => {
-        lastSentPointerRef.current = null;
-      });
+      }).catch(() => { lastSentPointerRef.current = null; });
     };
-
     const startPointerLoop = () => {
       if (pointerTimerRef.current) return;
       sendPointerUpdate();
       pointerTimerRef.current = setInterval(sendPointerUpdate, POINTER_INTERVAL_MS);
     };
-
     const stopCapturing = () => {
       clearCaptureTimer();
       stopPointerLoop();
@@ -493,25 +509,17 @@ export function useScreenFeed() {
       lastUploadedClickTsRef.current = 0;
       unchangedFramesRef.current = 0;
     };
-
     const scheduleCapture = (delayMs: number) => {
       clearCaptureTimer();
-      if (!watchedRef.current) return;
-      captureTimerRef.current = setTimeout(runCaptureCycle, delayMs);
+      if (watchedRef.current) captureTimerRef.current = setTimeout(runCaptureCycle, delayMs);
     };
-
     const runCaptureCycle = () => {
       captureTimerRef.current = null;
       if (!watchedRef.current || busyRef.current) return;
       busyRef.current = true;
-
+      const expectedPath = window.location.href;
       runWhenIdle(() => {
-        captureAndUpload(
-          fastModeRef.current,
-          lastSignatureRef.current,
-          lastUploadedClickTsRef.current,
-          pointerRef.current
-        )
+        captureAndUpload(fastModeRef.current, lastSignatureRef.current, lastUploadedClickTsRef.current, pointerRef.current, expectedPath)
           .then((result) => {
             if (result.uploaded) {
               lastSignatureRef.current = result.signature;
@@ -520,42 +528,29 @@ export function useScreenFeed() {
             } else if (result.unchanged) {
               unchangedFramesRef.current += 1;
             }
-
             if (!watchedRef.current) return;
-            const delay = fastModeRef.current
-              ? nextScreenFeedCaptureDelay(unchangedFramesRef.current, result.failed)
-              : LEGACY_CAPTURE_INTERVAL_MS;
+            const delay = fastModeRef.current ? nextScreenFeedCaptureDelay(unchangedFramesRef.current, result.failed) : LEGACY_CAPTURE_INTERVAL_MS;
             scheduleCapture(delay);
           })
-          .finally(() => {
-            busyRef.current = false;
-          });
+          .finally(() => { busyRef.current = false; });
       });
     };
-
     const applyWatchStatus = (watched: boolean, fast: boolean) => {
       fastModeRef.current = fast;
       if (watched) {
         const wasWatched = watchedRef.current;
         watchedRef.current = true;
         startPointerLoop();
-        if (!wasWatched && !busyRef.current) {
-          trace("start-capturing");
-          scheduleCapture(0);
-        }
+        if (!wasWatched && !busyRef.current) scheduleCapture(0);
       } else if (watchedRef.current) {
         watchedRef.current = false;
         stopCapturing();
       }
     };
-
     const pollWatcherStatus = async () => {
       try {
         const response = await fetch("/api/screen-feed/being-watched", { credentials: "include" });
-        if (!response.ok) {
-          applyWatchStatus(false, false);
-          return;
-        }
+        if (!response.ok) return applyWatchStatus(false, false);
         const data = await response.json();
         applyWatchStatus(Boolean(data?.watched), Boolean(data?.fast));
       } catch {
@@ -565,10 +560,8 @@ export function useScreenFeed() {
 
     let pollId: ReturnType<typeof setInterval> | null = null;
     const stopFallbackPolling = () => {
-      if (pollId) {
-        clearInterval(pollId);
-        pollId = null;
-      }
+      if (pollId) clearInterval(pollId);
+      pollId = null;
     };
     const startFallbackPolling = () => {
       if (pollId) return;
@@ -579,10 +572,7 @@ export function useScreenFeed() {
     let eventSource: EventSource | null = null;
     try {
       eventSource = new EventSource("/api/screen-feed/live/status", { withCredentials: true });
-      eventSource.onopen = () => {
-        trace("live-status-open");
-        stopFallbackPolling();
-      };
+      eventSource.onopen = stopFallbackPolling;
       eventSource.addEventListener("status", (event) => {
         try {
           const data = JSON.parse((event as MessageEvent<string>).data);
@@ -591,13 +581,17 @@ export function useScreenFeed() {
           startFallbackPolling();
         }
       });
-      eventSource.onerror = () => {
-        trace("live-status-error");
-        startFallbackPolling();
-      };
+      eventSource.onerror = startFallbackPolling;
     } catch {
       startFallbackPolling();
     }
+
+    const onNavigation = () => {
+      lastSignatureRef.current = null;
+      if (watchedRef.current && !busyRef.current) scheduleCapture(0);
+    };
+    window.addEventListener("popstate", onNavigation);
+    window.addEventListener("hashchange", onNavigation);
 
     return () => {
       eventSource?.close();
@@ -606,6 +600,8 @@ export function useScreenFeed() {
       stopCapturing();
       window.removeEventListener("pointermove", onPointerMove);
       document.documentElement.removeEventListener("pointerleave", onPointerLeave);
+      window.removeEventListener("popstate", onNavigation);
+      window.removeEventListener("hashchange", onNavigation);
     };
   }, []);
 }
