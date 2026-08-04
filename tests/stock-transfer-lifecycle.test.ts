@@ -199,21 +199,21 @@ describe("stock transfer optional lifecycle", () => {
     expect(await inventoryQty(destinationId)).toBe(0);
   });
 
-  it("rolls back finalization when current source stock is insufficient", async () => {
+  it("allows finalization into negative source stock when policy permits it", async () => {
     await db
       .update(inventory)
       .set({ quantity: "5", totalValue: "50" })
       .where(and(eq(inventory.locationId, sourceBId), eq(inventory.stockItemId, itemId)));
 
-    const before = [await inventoryQty(sourceBId), await inventoryQty(destinationId)];
-    await expect(finalizeOptionalStockTransfer(companyId, voucherId)).rejects.toMatchObject({
-      code: "STOCK_TRANSFER_INSUFFICIENT_STOCK",
-    });
+    const finalized = await finalizeOptionalStockTransfer(companyId, voucherId);
+    expect(finalized.transition).toBe("post");
+    expect(finalized.inventoryApplied).toBe(true);
 
     const [voucher] = await db.select().from(vouchers).where(eq(vouchers.id, voucherId));
     const [transfer] = await db.select().from(stockTransferVouchers).where(eq(stockTransferVouchers.id, transferId));
-    expect(voucher.optional).toBe(true);
-    expect(transfer.inventoryApplied).toBe(false);
-    expect([await inventoryQty(sourceBId), await inventoryQty(destinationId)]).toEqual(before);
+    expect(voucher.optional).toBe(false);
+    expect(transfer.inventoryApplied).toBe(true);
+    expect(await inventoryQty(sourceBId)).toBe(-4);
+    expect(await inventoryQty(destinationId)).toBe(9);
   });
 });
