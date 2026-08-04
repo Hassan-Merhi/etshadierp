@@ -11,9 +11,15 @@ const inventoryQuery = read("server/routes/inventory/inventoryQueryService.ts");
 const posRoutes = read("server/routes/stock/transfer-adj/price-list.ts");
 const posPaging = read("server/routes/stock/transfer-adj/posPriceListPaging.ts");
 const stockTransfer = read("client/src/pages/vouchers/StockTransferForm.tsx");
+const stockAdjustment = read("client/src/pages/vouchers/StockAdjustmentForm.tsx");
+const stockTransferOrder = read("client/src/pages/StockTransferOrder.tsx");
+const voucherQueries = read("client/src/pages/vouchers/useVoucherQueries.ts");
 const inventoryQueries = read("client/src/pages/location-inventory/useLocationInventoryQueries.ts");
 const combinedRows = read("client/src/pages/location-inventory/useCombinedStockRows.ts");
+const combinedView = read("client/src/pages/location-inventory/CombinedStockView.tsx");
+const stockGroupSummaries = read("client/src/pages/location-inventory/useStockGroupSummaries.ts");
 const posPage = read("client/src/pages/pos/POSPriceList.tsx");
+const posTypes = read("client/src/pages/pos/pospricelist/types.ts");
 const indexes = read("server/startup-schema/011-bandwidth-search-indexes.ts");
 const startupIndex = read("server/startup-schema/index.ts");
 
@@ -32,7 +38,9 @@ requireText(stockLight, "parseSearchQuery", "stock-items/light does not support 
 requireText(stockLight, "stock_item_code_aliases", "stock-items/light does not search or return aliases");
 requireText(stockLight, 'req.query.locationId', "stock-items/light location filter is missing");
 requireText(stockLight, 'req.query.ids', "stock-items/light selected-ID hydration is missing");
-requireText(stockLight, '"Deprecation"', "legacy stock-items/light callers are not explicitly deprecated");
+requireText(stockLight, 'req.query.all === "true"', "explicit full-list opt-in is missing");
+requireText(stockLight, "paginated = !explicitFullList", "stock-items/light is not paginated by default");
+requireText(stockLight, '"Deprecation"', "explicit full-list callers are not marked as deprecated");
 requireText(itemDetail, 'app.get("/api/stock-items/:id"', "dedicated full item-details endpoint is missing");
 forbidText(stockLight, "openingQty", "stock-items/light leaks opening quantity");
 forbidText(stockLight, "openingRate", "stock-items/light leaks opening rate");
@@ -43,36 +51,8 @@ requireText(indexes, "stock_items_name_trgm_idx", "stock item searchable-name in
 requireText(indexes, "stock_items_code_trgm_idx", "stock item code search index is missing");
 requireText(indexes, "stock_item_aliases_alias_trgm_idx", "stock item alias search index is missing");
 
-// Phase 4 — current location inventory uses one canonical route with page/summary profiles.
-requireText(locationRoutes, "getPaginatedLocationInventory", "canonical location inventory route is not paginated");
-requireText(locationRoutes, "getLocationInventorySummary", "location inventory summary profile is missing");
-requireText(locationPaging, "maxPageSize: 100", "location inventory page-size cap is missing");
-requireText(locationPaging, 'query.search', "location inventory server search is missing");
-requireText(locationPaging, 'query.groupId', "location inventory group filter is missing");
-requireText(locationPaging, 'query.categoryId', "location inventory category filter is missing");
-requireText(locationPaging, 'averageRate: null', "POS inventory cost fields are not protected");
-requireText(inventoryContext, "Math.min(100", "company inventory page-size cap is missing");
-requireText(inventoryQuery, 'filters.profile === "combined"', "combined inventory profile is missing");
-requireText(inventoryQuery, ".limit(filters.pageSize)", "combined inventory is not page bounded");
-requireText(inventoryQuery, "qtyByLocationName", "combined inventory does not return visible table quantities");
-requireText(inventoryQueries, 'summary: "true"', "inventory screen does not load summary first");
-requireText(inventoryQueries, 'pageSize: "50"', "inventory screen does not request bounded pages");
-requireText(inventoryQueries, 'profile: "combined"', "all-stock screen does not use combined server profile");
-forbidText(inventoryQueries, "PAGE_SIZE = 5000", "inventory screen still requests 5,000-row pages");
-forbidText(inventoryQueries, "remaining.flat()", "inventory screen still downloads every page automatically");
-requireText(combinedRows, "qtyByLocationName", "combined stock rows do not consume server aggregates");
-
-// POS price list: server paging/search and visible-page-only cost queries.
-requireText(posRoutes, "getPaginatedPosPriceList", "POS price-list route is not paginated");
-requireText(posPaging, "maxPageSize: 100", "POS price-list page-size cap is missing");
-requireText(posPaging, "stock_item_code_aliases", "POS alias search is missing");
-requireText(posPaging, "pli.stock_item_id = ANY($2::int[])", "POS cost lookup is not limited to visible item IDs");
-requireText(posPage, "PaginatedPriceListResponse", "POS screen does not consume paginated responses");
-requireText(posPage, "useDebouncedValue(search, 250)", "POS search is not debounced");
-requireText(posPage, 'pageSize: String(pricePageSize)', "POS screen does not send a page size");
-requireText(posPage, "<PaginationBar", "POS screen pagination controls are missing");
-
-// Stock-transfer selectors/rates must not load a complete source inventory per row.
+// Ordinary voucher selectors must not request the explicit full company list.
+forbidText(voucherQueries, "/api/stock-items/light", "voucher shell still downloads a full stock-item list");
 requireText(stockTransfer, "useStockItemSearch", "stock transfer does not use server-backed stock search");
 requireText(stockTransfer, "inventory-rates?stockItemIds=", "stock transfer selected-rate batching is missing");
 requireText(stockTransfer, 'pageSize: "100"', "stock transfer source inventory is not page bounded");
@@ -81,6 +61,59 @@ forbidText(
   "fetch(`/api/locations/${entry.sourceLocationId}/inventory`)",
   "stock transfer still downloads a full location inventory per selected row"
 );
+requireText(stockAdjustment, "effectiveAdjustmentLocationId", "stock adjustment location-scoped search is missing");
+requireText(stockAdjustment, 'includeZero: "true"', "stock adjustment cannot search zero-stock production items");
+requireText(stockAdjustment, 'params.set("ids"', "stock adjustment selected/edit item hydration is missing");
+forbidText(stockAdjustment, "/api/stock-items/light", "stock adjustment still downloads a full item list");
+requireText(stockTransferOrder, "useStockItemSearch", "transfer order edit hydration is not bounded");
+requireText(stockTransferOrder, "summaryData?.stockGroups", "transfer order does not reuse location-summary item identity");
+forbidText(
+  stockTransferOrder,
+  'queryKey: ["/api/stock-items/light"',
+  "transfer order still downloads a full item list"
+);
+
+// Phase 4 — current location inventory uses one canonical route with page/summary profiles.
+requireText(locationRoutes, "getPaginatedLocationInventory", "canonical location inventory route is not paginated");
+requireText(locationRoutes, "getLocationInventorySummary", "location inventory summary profile is missing");
+requireText(locationPaging, "maxPageSize: 100", "location inventory page-size cap is missing");
+requireText(locationPaging, 'query.search', "location inventory server search is missing");
+requireText(locationPaging, 'query.groupId', "location inventory group filter is missing");
+requireText(locationPaging, 'query.categoryIds', "location inventory multi-category filter is missing");
+requireText(locationPaging, "parseIdList(query.ids)", "location inventory selected-ID hydration is missing");
+requireText(locationPaging, '"hasUncategorized"', "location inventory uncategorized summary metadata is missing");
+requireText(locationPaging, 'averageRate: null', "POS inventory cost fields are not protected");
+requireText(inventoryContext, "Math.min(100", "company inventory page-size cap is missing");
+requireText(inventoryQuery, 'filters.profile === "combined"', "combined inventory profile is missing");
+requireText(inventoryQuery, ".limit(filters.pageSize)", "combined inventory is not page bounded");
+requireText(inventoryQuery, "qtyByLocationName", "combined inventory does not return visible table quantities");
+requireText(inventoryQuery, "totalQuantity", "combined inventory global quantity totals are missing");
+requireText(inventoryQuery, "totalValue", "combined inventory global value totals are missing");
+requireText(inventoryQueries, 'summary: "true"', "inventory screen does not load summary first");
+requireText(inventoryQueries, 'pageSize: "50"', "inventory screen does not request bounded pages");
+requireText(inventoryQueries, 'profile: "combined"', "all-stock screen does not use combined server profile");
+requireText(inventoryQueries, 'params.set("categoryIds"', "inventory screen does not send all selected categories");
+requireText(inventoryQueries, "allInventoryTotals", "all-stock global totals are not preserved");
+forbidText(inventoryQueries, "PAGE_SIZE = 5000", "inventory screen still requests 5,000-row pages");
+forbidText(inventoryQueries, "remaining.flat()", "inventory screen still downloads every page automatically");
+requireText(combinedRows, "qtyByLocationName", "combined stock rows do not consume server aggregates");
+requireText(combinedView, "Number(totals.value ?? 0)", "all-stock value card still uses page-only totals");
+requireText(stockGroupSummaries, "hasUncategorized", "uncategorized group filtering is not reliable");
+
+// POS price list: server paging/search, global KPIs, page-scoped costs, and on-demand full export.
+requireText(posRoutes, "getPaginatedPosPriceList", "POS price-list route is not paginated");
+requireText(posPaging, "maxPageSize: 100", "POS price-list page-size cap is missing");
+requireText(posPaging, "stock_item_code_aliases", "POS alias search is missing");
+requireText(posPaging, "pli.stock_item_id = ANY($2::int[])", "POS cost lookup is not limited to visible item IDs");
+requireText(posPaging, "unpricedByGroup", "POS group-level unpriced counts are missing");
+requireText(posPaging, "scopeCountResult", "POS global location KPI counts are missing");
+requireText(posPage, "PaginatedPriceListResponse", "POS screen does not consume paginated responses");
+requireText(posPage, "useDebouncedValue(search, 250)", "POS search is not debounced");
+requireText(posPage, 'pageSize: String(pricePageSize)', "POS screen does not send a page size");
+requireText(posPage, "<PaginationBar", "POS screen pagination controls are missing");
+requireText(posPage, "firstPage.totalPages", "POS export does not fetch the complete filtered result on demand");
+requireText(posPage, 'refetchType: "active"', "POS mutations do not refetch the active paged query family");
+requireText(posTypes, "unpricedByGroup", "POS paginated response type is incomplete");
 
 // Runtime schema registration and original-name safety.
 requireText(startupIndex, '"./011-bandwidth-search-indexes"', "bandwidth search indexes are not registered");
@@ -98,9 +131,28 @@ console.log(
     {
       phases: [3, 4],
       status: "complete",
-      stockItems: { maxPageSize: 100, serverSearch: true, aliases: true, fullDetailsOnDemand: true },
-      inventory: { canonicalRoute: true, serverPagination: true, summaryFirst: true },
-      pos: { serverPagination: true, serverSearch: true, visiblePageCostLookups: true },
+      stockItems: {
+        maxPageSize: 100,
+        paginatedByDefault: true,
+        serverSearch: true,
+        aliases: true,
+        selectedIdHydration: true,
+        fullDetailsOnDemand: true,
+      },
+      inventory: {
+        canonicalRoute: true,
+        serverPagination: true,
+        summaryFirst: true,
+        multiCategoryFilters: true,
+        globalTotals: true,
+      },
+      pos: {
+        serverPagination: true,
+        serverSearch: true,
+        visiblePageCostLookups: true,
+        globalKpis: true,
+        fullExportOnDemand: true,
+      },
       sqlRequired: true,
     },
     null,
