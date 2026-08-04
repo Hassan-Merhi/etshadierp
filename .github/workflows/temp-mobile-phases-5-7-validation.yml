@@ -91,16 +91,29 @@ jobs:
             tests/ui/mobile-responsive-phase7-factory.test.ts \
             --maxWorkers=1 --no-file-parallelism
 
-      - name: Verify static build and release safety
-        run: |
-          npm run verify:lockfile
-          npm run verify:production-dependencies
-          npm run lint
-          npm run check
-          npm run build
-          npm run verify:program1-observability
-          npm run verify:final-production-readiness
-          npm run verify:bandwidth
+      - name: Verify lockfile
+        run: npm run verify:lockfile
+
+      - name: Verify production dependencies
+        run: npm run verify:production-dependencies
+
+      - name: Lint
+        run: npm run lint
+
+      - name: TypeScript
+        run: npm run check
+
+      - name: Production build
+        run: npm run build
+
+      - name: Program 1 observability
+        run: npm run verify:program1-observability
+
+      - name: Final production readiness
+        run: npm run verify:final-production-readiness
+
+      - name: Bandwidth contract
+        run: npm run verify:bandwidth
 
       - name: Push verified source repair
         run: |
