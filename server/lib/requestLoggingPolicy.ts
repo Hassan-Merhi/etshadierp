@@ -1,9 +1,4 @@
-export type RequestTimingClass =
-  | "default"
-  | "pdf"
-  | "whatsapp"
-  | "report_export"
-  | "background_job";
+export type RequestTimingClass = "default" | "pdf" | "whatsapp" | "report_export" | "background_job";
 
 export interface SlowRequestThresholdConfig {
   default: number;
@@ -25,7 +20,9 @@ function positiveNumber(value: string | undefined, fallback: number): number {
 }
 
 function normalisePath(path: string): string {
-  return String(path || "/").split("?")[0].toLowerCase();
+  return String(path || "/")
+    .split("?")[0]
+    .toLowerCase();
 }
 
 export function classifyRequestTiming(path: string): RequestTimingClass {
@@ -49,7 +46,9 @@ export function classifyRequestTiming(path: string): RequestTimingClass {
 
   if (
     /(?:export|download|excel|xlsx|csv)/.test(normalized) &&
-    /(?:report|statement|daybook|inventory|stock|sales|payroll|container|account|voucher|ledger|summary)/.test(normalized)
+    /(?:report|statement|daybook|inventory|stock|sales|payroll|container|account|voucher|ledger|summary)/.test(
+      normalized
+    )
   ) {
     return "report_export";
   }
@@ -60,28 +59,19 @@ export function classifyRequestTiming(path: string): RequestTimingClass {
 }
 
 export function getSlowRequestThresholdConfig(
-  env: Record<string, string | undefined> = process.env,
+  env: Record<string, string | undefined> = process.env
 ): SlowRequestThresholdConfig {
   const legacyDefault = positiveNumber(env.SLOW_REQUEST_MS, DEFAULT_SLOW_REQUEST_MS);
   return {
     default: positiveNumber(env.SLOW_REQUEST_DEFAULT_MS, legacyDefault),
     pdf: positiveNumber(env.SLOW_REQUEST_PDF_MS, DEFAULT_PDF_SLOW_REQUEST_MS),
     whatsapp: positiveNumber(env.SLOW_REQUEST_WHATSAPP_MS, DEFAULT_WHATSAPP_SLOW_REQUEST_MS),
-    reportExport: positiveNumber(
-      env.SLOW_REQUEST_REPORT_EXPORT_MS,
-      DEFAULT_REPORT_EXPORT_SLOW_REQUEST_MS,
-    ),
-    backgroundJob: positiveNumber(
-      env.SLOW_REQUEST_BACKGROUND_JOB_MS,
-      DEFAULT_BACKGROUND_JOB_SLOW_REQUEST_MS,
-    ),
+    reportExport: positiveNumber(env.SLOW_REQUEST_REPORT_EXPORT_MS, DEFAULT_REPORT_EXPORT_SLOW_REQUEST_MS),
+    backgroundJob: positiveNumber(env.SLOW_REQUEST_BACKGROUND_JOB_MS, DEFAULT_BACKGROUND_JOB_SLOW_REQUEST_MS),
   };
 }
 
-export function getSlowRequestThresholdMs(
-  path: string,
-  env: Record<string, string | undefined> = process.env,
-): number {
+export function getSlowRequestThresholdMs(path: string, env: Record<string, string | undefined> = process.env): number {
   const config = getSlowRequestThresholdConfig(env);
   switch (classifyRequestTiming(path)) {
     case "whatsapp":

@@ -49,13 +49,17 @@ const LEVEL_WEIGHT: Record<LogLevel, number> = {
 };
 
 const configuredLevel = String(process.env.LOG_LEVEL || (isDev ? "debug" : "info")).toLowerCase();
-const minimumLevel: LogLevel = configuredLevel in LEVEL_WEIGHT ? configuredLevel as LogLevel : "info";
+const minimumLevel: LogLevel = configuredLevel in LEVEL_WEIGHT ? (configuredLevel as LogLevel) : "info";
 const configuredFormat = String(process.env.LOG_FORMAT || "").toLowerCase();
-const outputFormat: LogFormat = configuredFormat === "json" || configuredFormat === "pretty"
-  ? configuredFormat
-  : (isDev || isRender ? "pretty" : "json");
+const outputFormat: LogFormat =
+  configuredFormat === "json" || configuredFormat === "pretty"
+    ? configuredFormat
+    : isDev || isRender
+      ? "pretty"
+      : "json";
 
-const SENSITIVE_KEY_PATTERN = /(?:password|passwd|secret|token|authorization|cookie|session|csrf|api[-_]?key|private[-_]?key)/i;
+const SENSITIVE_KEY_PATTERN =
+  /(?:password|passwd|secret|token|authorization|cookie|session|csrf|api[-_]?key|private[-_]?key)/i;
 const MAX_STRING_LENGTH = 2_000;
 const MAX_DEPTH = 4;
 
@@ -82,7 +86,8 @@ function safeError(
 
 function sanitiseValue(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
   if (value === null || value === undefined || typeof value === "number" || typeof value === "boolean") return value;
-  if (typeof value === "string") return value.length > MAX_STRING_LENGTH ? `${value.slice(0, MAX_STRING_LENGTH)}…` : value;
+  if (typeof value === "string")
+    return value.length > MAX_STRING_LENGTH ? `${value.slice(0, MAX_STRING_LENGTH)}…` : value;
   if (typeof value === "bigint") return value.toString();
   if (typeof value === "function" || typeof value === "symbol") return String(value);
   if (value instanceof Error) return safeError(value);
@@ -116,7 +121,8 @@ function formatBytes(value: unknown): string {
   if (!Number.isFinite(bytes) || bytes < 0) return "an unknown amount of data";
   if (bytes < 1_024) return `${Math.round(bytes)} B`;
   if (bytes < 1_024 * 1_024) return `${(bytes / 1_024).toFixed(bytes >= 10_240 ? 0 : 1)} KB`;
-  if (bytes < 1_024 * 1_024 * 1_024) return `${(bytes / (1_024 * 1_024)).toFixed(bytes >= 10 * 1_024 * 1_024 ? 1 : 2)} MB`;
+  if (bytes < 1_024 * 1_024 * 1_024)
+    return `${(bytes / (1_024 * 1_024)).toFixed(bytes >= 10 * 1_024 * 1_024 ? 1 : 2)} MB`;
   return `${(bytes / (1_024 * 1_024 * 1_024)).toFixed(2)} GB`;
 }
 
@@ -140,9 +146,16 @@ function plural(value: number, singular: string, pluralForm = `${singular}s`): s
 
 function resolveEvent(ctx: LogContext): string | undefined {
   const explicit = typeof ctx.event === "string" ? ctx.event.trim() : "";
-  if (explicit) return explicit.toLowerCase().replace(/[^a-z0-9_.-]+/g, "_").slice(0, 120);
+  if (explicit)
+    return explicit
+      .toLowerCase()
+      .replace(/[^a-z0-9_.-]+/g, "_")
+      .slice(0, 120);
   if (ctx.module === "operational_events" && typeof ctx.code === "string" && ctx.code.trim()) {
-    return `operational.${ctx.code.trim().toLowerCase().replace(/[^a-z0-9_.-]+/g, "_")}`.slice(0, 120);
+    return `operational.${ctx.code
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_.-]+/g, "_")}`.slice(0, 120);
   }
   const moduleName = typeof ctx.module === "string" ? ctx.module.trim() : "";
   const actionName = typeof ctx.action === "string" ? ctx.action.trim() : "";
@@ -200,7 +213,11 @@ function resolveEffectiveLevel(level: LogLevel, message: string, ctx: LogContext
   if (/^\[getLocationInventory\]/i.test(text)) return "debug";
   if (/\[express\]\s*\[SLOW API\]/i.test(text)) return "debug";
   if (/^\[(?:POS Sale|Stock Transfer|Inventory|Cache|Query|Auth|Session)\]/i.test(text)) return "debug";
-  if (/\b(?:polling?|heartbeat|keepalive|cache hit|cache miss|query started|query completed|auth check|session check|reference data loaded)\b/i.test(text)) {
+  if (
+    /\b(?:polling?|heartbeat|keepalive|cache hit|cache miss|query started|query completed|auth check|session check|reference data loaded)\b/i.test(
+      text
+    )
+  ) {
     return "debug";
   }
   if (/(?:poll|heartbeat|keepalive|cache_hit|cache_miss|auth_check|session_check|reference_data)/.test(actionName)) {
@@ -208,10 +225,7 @@ function resolveEffectiveLevel(level: LogLevel, message: string, ctx: LogContext
   }
 
   const accessDenied = parseAccessDeniedMessage(text);
-  if (
-    accessDenied?.reason === "SESSION_REQUIRED" &&
-    accessDenied.path === "/api/auth/me"
-  ) {
+  if (accessDenied?.reason === "SESSION_REQUIRED" && accessDenied.path === "/api/auth/me") {
     return "debug";
   }
 
@@ -222,13 +236,17 @@ function humanizeLegacyMessage(message: string, ctx: LogContext): string {
   const text = message.trim();
   let match: RegExpMatchArray | null;
 
-  match = text.match(/^\[getLocationInventory\] companyId=(\d+) locationId=(\d+) includeZero=(true|false) → (\d+) rows$/i);
+  match = text.match(
+    /^\[getLocationInventory\] companyId=(\d+) locationId=(\d+) includeZero=(true|false) → (\d+) rows$/i
+  );
   if (match) {
     const itemCount = Number(match[4]);
     return `Inventory loaded for location ${match[2]} with ${plural(itemCount, "item")}`;
   }
 
-  match = text.match(/^\[WA invoice backend\] voucherId=(\d+) locationId=(\d+) itemCount=(\d+) pageCount=(\d+) pdfSize=(\d+) compactMode=(true|false) dryRun=(true|false)$/i);
+  match = text.match(
+    /^\[WA invoice backend\] voucherId=(\d+) locationId=(\d+) itemCount=(\d+) pageCount=(\d+) pdfSize=(\d+) compactMode=(true|false) dryRun=(true|false)$/i
+  );
   if (match) {
     const itemCount = Number(match[3]);
     const pageCount = Number(match[4]);
@@ -258,25 +276,37 @@ function humanizeLegacyMessage(message: string, ctx: LogContext): string {
     return ctx.voucherId != null ? `Updating POS sale ${ctx.voucherId}` : "Updating a POS sale";
   }
   if (text === "POS sale update succeeded") {
-    return ctx.voucherId != null ? `POS sale ${ctx.voucherId} was updated successfully` : "The POS sale was updated successfully";
+    return ctx.voucherId != null
+      ? `POS sale ${ctx.voucherId} was updated successfully`
+      : "The POS sale was updated successfully";
   }
   if (text === "POS sale update failed") {
-    return ctx.voucherId != null ? `POS sale ${ctx.voucherId} could not be updated` : "The POS sale could not be updated";
+    return ctx.voucherId != null
+      ? `POS sale ${ctx.voucherId} could not be updated`
+      : "The POS sale could not be updated";
   }
 
   if (text === "container tracking update started") {
-    return ctx.containerId != null ? `Updating tracking for container ${ctx.containerId}` : "Updating container tracking";
+    return ctx.containerId != null
+      ? `Updating tracking for container ${ctx.containerId}`
+      : "Updating container tracking";
   }
   if (text === "container tracking update succeeded") {
-    return ctx.containerId != null ? `Tracking for container ${ctx.containerId} was updated successfully` : "Container tracking was updated successfully";
+    return ctx.containerId != null
+      ? `Tracking for container ${ctx.containerId} was updated successfully`
+      : "Container tracking was updated successfully";
   }
   if (text === "container tracking update failed") {
-    return ctx.containerId != null ? `Tracking for container ${ctx.containerId} could not be updated` : "Container tracking could not be updated";
+    return ctx.containerId != null
+      ? `Tracking for container ${ctx.containerId} could not be updated`
+      : "Container tracking could not be updated";
   }
 
   if (text === "Ranked endpoint performance and bandwidth snapshot") {
     const windowMs = Number(ctx.windowMs);
-    const windowText = Number.isFinite(windowMs) ? ` during the last ${formatDuration(windowMs)}` : " in the current reporting window";
+    const windowText = Number.isFinite(windowMs)
+      ? ` during the last ${formatDuration(windowMs)}`
+      : " in the current reporting window";
     const endpointCount = Number(ctx.apiEndpointCount ?? ctx.endpointCount ?? 0);
     const topEndpoints = formatRankedEndpoints(ctx.ranked);
     const topText = topEndpoints ? `. Top endpoints: ${topEndpoints}` : "";
@@ -286,7 +316,8 @@ function humanizeLegacyMessage(message: string, ctx: LogContext): string {
   if (text === "Large HTTP response detected") {
     const method = typeof ctx.method === "string" ? ctx.method : "HTTP";
     const path = typeof ctx.path === "string" ? ctx.path : "request";
-    const threshold = ctx.budgetBytes == null ? "" : `, exceeding the ${formatBytes(ctx.budgetBytes)} warning threshold`;
+    const threshold =
+      ctx.budgetBytes == null ? "" : `, exceeding the ${formatBytes(ctx.budgetBytes)} warning threshold`;
     return `${method} ${path} returned a large ${formatBytes(ctx.responseBytes)} response${threshold}`;
   }
 
@@ -295,22 +326,25 @@ function humanizeLegacyMessage(message: string, ctx: LogContext): string {
     const status = Number(match[3]);
     const outcome = status >= 500 ? "failed" : status >= 400 ? "was rejected" : "completed";
     const duration = ctx.durationMs == null ? "" : ` in ${formatDuration(ctx.durationMs)}`;
-    const threshold = ctx.slow === true && ctx.thresholdMs != null
-      ? `; warning threshold ${formatDuration(ctx.thresholdMs)}`
-      : "";
+    const threshold =
+      ctx.slow === true && ctx.thresholdMs != null ? `; warning threshold ${formatDuration(ctx.thresholdMs)}` : "";
     return `${match[1].toUpperCase()} ${match[2]} ${outcome} with status ${status}${duration}${threshold}`;
   }
 
   const parsedAccessDenied = parseAccessDeniedMessage(text);
   if (parsedAccessDenied) {
     const path = typeof parsedAccessDenied.path === "string" ? parsedAccessDenied.path : "the requested page";
-    const reason = parsedAccessDenied.reason === "SESSION_REQUIRED" ? "an active session was required" : "access was not permitted";
+    const reason =
+      parsedAccessDenied.reason === "SESSION_REQUIRED" ? "an active session was required" : "access was not permitted";
     return `Access to ${path} was denied because ${reason}`;
   }
 
   match = text.match(/^\[([^\]]+)\]\s*(.*)$/);
   if (match) {
-    const prefix = match[1].replace(/^\//, "").replace(/[-_/]+/g, " ").trim();
+    const prefix = match[1]
+      .replace(/^\//, "")
+      .replace(/[-_/]+/g, " ")
+      .trim();
     const rest = match[2].trim();
     return rest ? `${prefix}: ${rest}` : `${prefix} event recorded`;
   }
@@ -348,7 +382,8 @@ function formatPrettyContext(ctx: Record<string, unknown>): string[] {
   for (const key of keys) {
     const value = ctx[key];
     if (value === undefined || value === null || value === "") continue;
-    if (key === "durationMs" || key === "dbDurationMs" || key === "thresholdMs") parts.push(`${key}=${formatDuration(value)}`);
+    if (key === "durationMs" || key === "dbDurationMs" || key === "thresholdMs")
+      parts.push(`${key}=${formatDuration(value)}`);
     else if (key === "responseBytes" || key === "budgetBytes") parts.push(`${key}=${formatBytes(value)}`);
     else parts.push(`${key}=${String(value)}`);
   }

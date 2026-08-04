@@ -1,9 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { recordOperationalEvent } from "../lib/operationalEvents";
-import {
-  getRequestPerformanceMetrics,
-  runWithRequestPerformanceContext,
-} from "../lib/requestPerformanceContext";
+import { getRequestPerformanceMetrics, runWithRequestPerformanceContext } from "../lib/requestPerformanceContext";
 
 const DEFAULT_THRESHOLD_BYTES = 500 * 1024;
 const DEFAULT_STATIC_THRESHOLD_BYTES = 2 * 1024 * 1024;
@@ -108,17 +105,14 @@ function kilobytesToBytes(value: string | undefined, fallbackBytes: number): num
 
 function getBandwidthBudgetConfig(): BandwidthBudgetConfig {
   return {
-    apiWindowBytes: megabytesToBytes(
-      process.env.BANDWIDTH_DEBUG_API_WINDOW_BUDGET_MB,
-      DEFAULT_API_WINDOW_BUDGET_MB,
-    ),
+    apiWindowBytes: megabytesToBytes(process.env.BANDWIDTH_DEBUG_API_WINDOW_BUDGET_MB, DEFAULT_API_WINDOW_BUDGET_MB),
     staticWindowBytes: megabytesToBytes(
       process.env.BANDWIDTH_DEBUG_STATIC_WINDOW_BUDGET_MB,
-      DEFAULT_STATIC_WINDOW_BUDGET_MB,
+      DEFAULT_STATIC_WINDOW_BUDGET_MB
     ),
     endpointWindowBytes: megabytesToBytes(
       process.env.BANDWIDTH_DEBUG_ENDPOINT_WINDOW_BUDGET_MB,
-      DEFAULT_ENDPOINT_WINDOW_BUDGET_MB,
+      DEFAULT_ENDPOINT_WINDOW_BUDGET_MB
     ),
   };
 }
@@ -151,26 +145,19 @@ function isStaticAsset(path: string): boolean {
 }
 
 function isDocumentOrExportPath(path: string): boolean {
-  return /(?:whatsapp|green-api|pdf|receipt|print|export|download|excel|xlsx|csv|send-invoice-pdf-backend|send-stock-pdf-backend)/i.test(path);
+  return /(?:whatsapp|green-api|pdf|receipt|print|export|download|excel|xlsx|csv|send-invoice-pdf-backend|send-stock-pdf-backend)/i.test(
+    path
+  );
 }
 
 function getLargeResponseThresholdBytes(path: string): number {
   if (isStaticAsset(path)) {
-    return kilobytesToBytes(
-      process.env.BANDWIDTH_DEBUG_STATIC_THRESHOLD_KB,
-      DEFAULT_STATIC_THRESHOLD_BYTES,
-    );
+    return kilobytesToBytes(process.env.BANDWIDTH_DEBUG_STATIC_THRESHOLD_KB, DEFAULT_STATIC_THRESHOLD_BYTES);
   }
   if (isDocumentOrExportPath(path)) {
-    return kilobytesToBytes(
-      process.env.BANDWIDTH_DEBUG_DOCUMENT_THRESHOLD_KB,
-      DEFAULT_DOCUMENT_THRESHOLD_BYTES,
-    );
+    return kilobytesToBytes(process.env.BANDWIDTH_DEBUG_DOCUMENT_THRESHOLD_KB, DEFAULT_DOCUMENT_THRESHOLD_BYTES);
   }
-  return kilobytesToBytes(
-    process.env.BANDWIDTH_DEBUG_THRESHOLD_KB,
-    DEFAULT_THRESHOLD_BYTES,
-  );
+  return kilobytesToBytes(process.env.BANDWIDTH_DEBUG_THRESHOLD_KB, DEFAULT_THRESHOLD_BYTES);
 }
 
 function formatRow(aggregate: EndpointAggregate): EndpointDiagnosticRow {
@@ -196,7 +183,7 @@ function sortRows(rows: EndpointAggregate[]): EndpointDiagnosticRow[] {
     .sort((left, right) =>
       right.totalResponseBytes !== left.totalResponseBytes
         ? right.totalResponseBytes - left.totalResponseBytes
-        : right.requests - left.requests,
+        : right.requests - left.requests
     );
 }
 
@@ -227,7 +214,7 @@ function calculateRankScore(aggregate: EndpointAggregate): number {
 function evaluateBandwidthBudgets(
   apiAggregates: EndpointAggregate[],
   staticAggregates: EndpointAggregate[],
-  config: BandwidthBudgetConfig = getBandwidthBudgetConfig(),
+  config: BandwidthBudgetConfig = getBandwidthBudgetConfig()
 ) {
   const totalApiResponseBytes = sumResponseBytes(apiAggregates);
   const totalStaticAssetResponseBytes = sumResponseBytes(staticAggregates);
@@ -285,7 +272,9 @@ function emitRanking(): void {
 
   const logTopN = Math.min(
     MAX_LOG_TOP_N,
-    Math.round(positiveNumber(process.env.BANDWIDTH_DEBUG_LOG_TOP_N, DEFAULT_LOG_TOP_N)),
+    Math.round(
+      positiveNumber(process.env.BANDWIDTH_DEBUG_LOG_TOP_N || process.env.BANDWIDTH_DEBUG_TOP_N, DEFAULT_LOG_TOP_N)
+    )
   );
   const windowMs = positiveNumber(process.env.BANDWIDTH_DEBUG_REPORT_INTERVAL_MS, DEFAULT_REPORT_INTERVAL_MS);
   const all = [...aggregates.values()];
@@ -353,10 +342,7 @@ function emitRanking(): void {
 
 function ensureReportTimer(): void {
   if (reportTimer) return;
-  const intervalMs = positiveNumber(
-    process.env.BANDWIDTH_DEBUG_REPORT_INTERVAL_MS,
-    DEFAULT_REPORT_INTERVAL_MS,
-  );
+  const intervalMs = positiveNumber(process.env.BANDWIDTH_DEBUG_REPORT_INTERVAL_MS, DEFAULT_REPORT_INTERVAL_MS);
   reportTimer = setInterval(emitRanking, intervalMs);
   reportTimer.unref();
 }

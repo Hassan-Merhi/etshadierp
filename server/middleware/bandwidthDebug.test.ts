@@ -22,44 +22,26 @@ describe("bandwidth logging policy", () => {
     delete process.env.BANDWIDTH_DEBUG_STATIC_THRESHOLD_KB;
     delete process.env.BANDWIDTH_DEBUG_DOCUMENT_THRESHOLD_KB;
 
-    expect(
-      __bandwidthDebugTesting.getLargeResponseThresholdBytes(
-        "/api/pos/send-invoice-pdf-backend",
-      ),
-    ).toBe(10 * 1024 * 1024);
-    expect(
-      __bandwidthDebugTesting.getLargeResponseThresholdBytes(
-        "/api/reports/sales/export-xlsx",
-      ),
-    ).toBe(10 * 1024 * 1024);
+    expect(__bandwidthDebugTesting.getLargeResponseThresholdBytes("/api/pos/send-invoice-pdf-backend")).toBe(
+      10 * 1024 * 1024
+    );
+    expect(__bandwidthDebugTesting.getLargeResponseThresholdBytes("/api/reports/sales/export-xlsx")).toBe(
+      10 * 1024 * 1024
+    );
   });
 
   it("uses a higher threshold for static bundles than normal API responses", () => {
     delete process.env.BANDWIDTH_DEBUG_THRESHOLD_KB;
     delete process.env.BANDWIDTH_DEBUG_STATIC_THRESHOLD_KB;
 
-    expect(
-      __bandwidthDebugTesting.getLargeResponseThresholdBytes(
-        "/assets/index-D63eTXMH.js",
-      ),
-    ).toBe(2 * 1024 * 1024);
-    expect(
-      __bandwidthDebugTesting.getLargeResponseThresholdBytes(
-        "/api/factory/bales/stock-entry-history",
-      ),
-    ).toBe(500 * 1024);
+    expect(__bandwidthDebugTesting.getLargeResponseThresholdBytes("/assets/index-D63eTXMH.js")).toBe(2 * 1024 * 1024);
+    expect(__bandwidthDebugTesting.getLargeResponseThresholdBytes("/api/factory/bales/stock-entry-history")).toBe(
+      500 * 1024
+    );
   });
 
   it("recognises document and export endpoints", () => {
-    expect(
-      __bandwidthDebugTesting.isDocumentOrExportPath(
-        "/api/factory/customer-statement/download-pdf",
-      ),
-    ).toBe(true);
-    expect(
-      __bandwidthDebugTesting.isDocumentOrExportPath(
-        "/api/locations/135/inventory",
-      ),
-    ).toBe(false);
+    expect(__bandwidthDebugTesting.isDocumentOrExportPath("/api/factory/customer-statement/download-pdf")).toBe(true);
+    expect(__bandwidthDebugTesting.isDocumentOrExportPath("/api/locations/135/inventory")).toBe(false);
   });
 });

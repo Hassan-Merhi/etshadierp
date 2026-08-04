@@ -6,8 +6,8 @@ describe("shared logger readability", () => {
     expect(
       __loggerTesting.humanizeLegacyMessage(
         "[getLocationInventory] companyId=1 locationId=135 includeZero=false → 820 rows",
-        {},
-      ),
+        {}
+      )
     ).toBe("Inventory loaded for location 135 with 820 items");
   });
 
@@ -16,7 +16,7 @@ describe("shared logger readability", () => {
       __loggerTesting.humanizeLegacyMessage("[WA upload] Green API response", {
         fileName: "Hadi 2 Invoice 2026-08-04.pdf",
         size: 6779,
-      }),
+      })
     ).toBe("WhatsApp uploaded Hadi 2 Invoice 2026-08-04.pdf successfully (6.6 KB)");
   });
 
@@ -26,9 +26,9 @@ describe("shared logger readability", () => {
         durationMs: 6121,
         slow: true,
         thresholdMs: 5000,
-      }),
+      })
     ).toBe(
-      "POST /api/pos/send-invoice-pdf-backend completed with status 200 in 6.12 seconds; warning threshold 5.00 seconds",
+      "POST /api/pos/send-invoice-pdf-backend completed with status 200 in 6.12 seconds; warning threshold 5.00 seconds"
     );
   });
 
@@ -50,9 +50,9 @@ describe("shared logger readability", () => {
             totalResponseBytes: 4017216,
           },
         ],
-      }),
+      })
     ).toBe(
-      "API responses transferred 23.1 MB across 42 endpoints during the last 5.0 minutes. Top endpoints: GET /api/locations/:id/inventory 6.39 MB; GET /api/ledger-accounts 3.83 MB",
+      "API responses transferred 23.1 MB across 42 endpoints during the last 5.0 minutes. Top endpoints: GET /api/locations/:id/inventory 6.39 MB; GET /api/ledger-accounts 3.83 MB"
     );
   });
 
@@ -61,20 +61,20 @@ describe("shared logger readability", () => {
       __loggerTesting.resolveEffectiveLevel(
         "info",
         "[getLocationInventory] companyId=1 locationId=135 includeZero=false → 820 rows",
-        {},
-      ),
+        {}
+      )
     ).toBe("debug");
     expect(
       __loggerTesting.resolveEffectiveLevel("info", "POS sale update started", {
         module: "pos",
         action: "updateSale",
-      }),
+      })
     ).toBe("debug");
     expect(
       __loggerTesting.resolveEffectiveLevel("info", "POS sale update succeeded", {
         module: "pos",
         action: "updateSale",
-      }),
+      })
     ).toBe("info");
   });
 
@@ -83,8 +83,8 @@ describe("shared logger readability", () => {
       __loggerTesting.resolveEffectiveLevel(
         "info",
         "12:28:13 PM [express] [SLOW API] POST /api/pos/send-invoice-pdf-backend 200 in 1121ms",
-        {},
-      ),
+        {}
+      )
     ).toBe("debug");
   });
 
@@ -94,7 +94,7 @@ describe("shared logger readability", () => {
         module: "operational_events",
         action: "event_detected",
         code: "large_http_response",
-      }),
+      })
     ).toBe("operational.large_http_response");
   });
 });

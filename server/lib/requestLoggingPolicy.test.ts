@@ -29,7 +29,7 @@ describe("request logging policy", () => {
       getSlowRequestThresholdConfig({
         SLOW_REQUEST_MS: "2500",
         SLOW_REQUEST_WHATSAPP_MS: "7000",
-      }).whatsapp,
+      }).whatsapp
     ).toBe(7_000);
   });
 });
