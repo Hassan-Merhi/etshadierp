@@ -18,6 +18,7 @@ import {
   locationPriceGroups,
 } from "@shared/schema";
 import { eq, and, inArray, sql, isNull } from "drizzle-orm";
+import { getPaginatedPosPriceList } from "./posPriceListPaging";
 
 export function registerPosPriceListRoutes(app: Express) {
   // POS Price List: get all stock items with location-specific selling prices
@@ -63,6 +64,25 @@ export function registerPosPriceListRoutes(app: Express) {
             return res.status(403).json({ message: "Forbidden: location not found" });
           }
         }
+      }
+
+      const wantsPagedPriceList =
+        req.query.page != null ||
+        req.query.pageSize != null ||
+        req.query.search != null ||
+        req.query.group != null ||
+        req.query.unpriced != null ||
+        req.query.availableOnly != null;
+      if (!showAll && wantsPagedPriceList) {
+        const result = await getPaginatedPosPriceList({
+          companyId,
+          locationId: locationId as number,
+          query: req.query as Record<string, unknown>,
+          isPrivileged,
+          isPOS,
+        });
+        res.setHeader("Cache-Control", "private, max-age=20, stale-while-revalidate=30");
+        return res.json(result);
       }
 
       let rows: any[];

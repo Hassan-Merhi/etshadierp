@@ -1,6 +1,7 @@
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { InventoryTable } from "./InventoryTable";
+import { PaginationBar } from "@/components/PaginationBar";
 import type { InventoryItem } from "./locationInventoryTypes";
 
 interface AllItemsViewProps {
@@ -18,6 +19,13 @@ interface AllItemsViewProps {
   setSelectedRowIndex: (v: number) => void;
   navigate: (path: string) => void;
   inventory: InventoryItem[];
+  pagination?: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    onPageChange: (page: number) => void;
+  };
 }
 
 export function AllItemsView({
@@ -35,6 +43,7 @@ export function AllItemsView({
   setSelectedRowIndex,
   navigate,
   inventory,
+  pagination,
 }: AllItemsViewProps) {
   return (
     <>
@@ -42,10 +51,8 @@ export function AllItemsView({
       <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
         <span className="font-semibold text-foreground">{totalItems}</span> Items
         <span className="text-muted-foreground">·</span>
-        <span className="font-semibold text-foreground font-mono">
-          {Math.floor(totalQty).toLocaleString()}
-        </span>{" "}
-        BL total
+        <span className="font-semibold text-foreground font-mono">{Math.floor(totalQty).toLocaleString()}</span> BL
+        total
         {!posUser && (
           <>
             <span className="text-muted-foreground">·</span>
@@ -79,6 +86,15 @@ export function AllItemsView({
         inventory={inventory}
         selectedGroup={null}
       />
+      {pagination && (
+        <PaginationBar
+          page={pagination.page}
+          pageSize={pagination.pageSize}
+          total={pagination.total}
+          totalPages={pagination.totalPages}
+          onPageChange={pagination.onPageChange}
+        />
+      )}
     </>
   );
 }

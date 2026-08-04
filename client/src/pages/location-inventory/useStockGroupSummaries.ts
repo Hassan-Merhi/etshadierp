@@ -1,10 +1,17 @@
 import { useMemo } from "react";
 import type { InventoryItem, StockGroupSummary } from "./locationInventoryTypes";
 
+interface InventorySummary {
+  groups: Array<StockGroupSummary & { hasNegative?: boolean; categoryIds?: number[] }>;
+  totals: { items: number; quantity: number; value: number | null };
+}
+
 interface UseStockGroupSummariesParams {
+  inventorySummary: InventorySummary;
   openingInventoryData: any[];
   inventoryData: any[];
   closingInventoryData: any[];
+  inventorySummaryLoading: boolean;
   openingInventoryLoading: boolean;
   closingInventoryLoading: boolean;
   inventoryLoading: boolean;
@@ -19,16 +26,50 @@ interface UseStockGroupSummariesParams {
   selectedGroup: StockGroupSummary | null;
 }
 
+function buildGroups(items: InventoryItem[]): StockGroupSummary[] {
+  const groups = new Map<string, StockGroupSummary>();
+  for (const item of items) {
+    const groupId = item.stockGroupId ?? null;
+    const key = String(groupId);
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        groupId,
+        groupCode: item.stockGroupCode,
+        groupName: item.stockGroupName || "Ungrouped",
+        totalQuantity: 0,
+        totalValue: 0,
+        averageRate: 0,
+        itemCount: 0,
+        items: [],
+      };
+      groups.set(key, group);
+    }
+    const quantity = Number.parseFloat(item.quantity || "0");
+    group.totalQuantity += quantity;
+    group.totalValue += Number.parseFloat(item.totalValue || "0");
+    group.itemCount += 1;
+    group.items.push(item);
+  }
+  return Array.from(groups.values())
+    .map((group) => ({
+      ...group,
+      averageRate: group.totalQuantity !== 0 ? group.totalValue / group.totalQuantity : 0,
+    }))
+    .sort((a, b) => a.groupName.localeCompare(b.groupName));
+}
+
 export function useStockGroupSummaries({
+  inventorySummary,
   openingInventoryData,
   inventoryData,
   closingInventoryData,
+  inventorySummaryLoading,
   openingInventoryLoading,
   closingInventoryLoading,
   inventoryLoading,
   fromDate,
   asOfDate,
-  showZeroStock,
   showNegativeStock,
   groupSearchTerm,
   groupCategoryFilter,
@@ -39,101 +80,85 @@ export function useStockGroupSummaries({
   const openingInventoryMap = useMemo(() => {
     const map = new Map<number, number>();
     openingInventoryData.forEach((item: InventoryItem) =>
-      map.set(item.stockItemId, parseFloat(item.quantity || "0"))
+      map.set(item.stockItemId, Number.parseFloat(item.quantity || "0"))
     );
     return map;
   }, [openingInventoryData]);
 
-  const showMovement = !!(fromDate && asOfDate);
-  const activeInventoryData = showMovement ? closingInventoryData : inventoryData;
+  const showMovement = Boolean(fromDate && asOfDate);
+  const historicalInventory = useMemo(
+    () =>
+      closingInventoryData.filter(
+        (item) => !showNegativeStock || Number.parseFloat(item.quantity || "0") < 0
+      ) as InventoryItem[],
+    [closingInventoryData, showNegativeStock]
+  );
+  const historicalGroups = useMemo(() => buildGroups(historicalInventory), [historicalInventory]);
+
+  const inventory = (showMovement ? historicalInventory : inventoryData) as InventoryItem[];
+  const stockGroups = showMovement ? historicalGroups : inventorySummary.groups;
   const activeInventoryLoading = showMovement
     ? closingInventoryLoading || openingInventoryLoading
-    : inventoryLoading;
+    : inventorySummaryLoading || inventoryLoading;
 
-  // All items (respecting zero filter)
-  const inventory: InventoryItem[] = showZeroStock
-    ? activeInventoryData
-    : activeInventoryData.filter((item) => parseFloat(item.quantity || "0") !== 0);
-
-  // Stock groups built from inventory
-  const stockGroups: StockGroupSummary[] = useMemo(() => {
-    const groups: StockGroupSummary[] = [];
-    inventory.forEach((item) => {
-      const groupId = item.stockGroupId ?? null;
-      let group = groups.find((g) => g.groupId === groupId);
-      if (!group) {
-        group = {
-          groupId,
-          groupCode: item.stockGroupCode,
-          groupName: item.stockGroupName || "Ungrouped",
-          totalQuantity: 0,
-          totalValue: 0,
-          averageRate: 0,
-          itemCount: 0,
-          items: [],
-        };
-        groups.push(group);
-      }
-      const qty = parseFloat(item.quantity || "0");
-      group.totalQuantity += qty;
-      group.totalValue += parseFloat(item.totalValue || "0");
-      group.itemCount += 1;
-      group.items.push(item);
-    });
-    groups.forEach((g) => {
-      if (g.totalQuantity > 0) g.averageRate = g.totalValue / g.totalQuantity;
-    });
-    return groups.sort((a, b) => a.groupName.localeCompare(b.groupName));
-  }, [inventory]);
-
-  // Filter stock groups by search + category + negative stock toggle
   const filteredStockGroups = useMemo(() => {
-    return stockGroups.filter((g) => {
-      if (showNegativeStock && !g.items.some((item) => parseFloat(item.quantity || "0") < 0)) return false;
-      if (groupSearchTerm && !g.groupName.toLowerCase().includes(groupSearchTerm.toLowerCase())) return false;
+    const search = groupSearchTerm.trim().toLowerCase();
+    return stockGroups.filter((group: any) => {
+      if (showNegativeStock) {
+        const containsNegative = showMovement
+          ? group.items.some((item: InventoryItem) => Number.parseFloat(item.quantity || "0") < 0)
+          : Boolean(group.hasNegative);
+        if (!containsNegative) return false;
+      }
+      if (search && !group.groupName.toLowerCase().includes(search)) return false;
       if (groupCategoryFilter) {
-        if (
-          !g.items.some((item) => {
-            if (groupCategoryFilter === "none") return item.categoryId == null;
-            return String(item.categoryId) === groupCategoryFilter;
-          })
-        )
-          return false;
+        if (showMovement) {
+          const matches = group.items.some((item: InventoryItem) =>
+            groupCategoryFilter === "none" ? item.categoryId == null : String(item.categoryId) === groupCategoryFilter
+          );
+          if (!matches) return false;
+        } else {
+          const categoryIds = (group.categoryIds ?? []).map(String);
+          if (groupCategoryFilter === "none") {
+            if (!categoryIds.includes("null") && categoryIds.length === group.itemCount) return false;
+          } else if (!categoryIds.includes(groupCategoryFilter)) {
+            return false;
+          }
+        }
       }
       return true;
     });
-  }, [stockGroups, groupSearchTerm, groupCategoryFilter, showNegativeStock]);
+  }, [stockGroups, groupSearchTerm, groupCategoryFilter, showNegativeStock, showMovement]);
 
-  // Items within the selected group, with search + category + negative stock toggle
   const filteredStockItems = useMemo(() => {
     if (!selectedGroup) return [];
+    if (!showMovement) return inventory;
     return selectedGroup.items
       .filter((item) => {
-        if (showNegativeStock && parseFloat(item.quantity || "0") >= 0) return false;
+        if (showNegativeStock && Number.parseFloat(item.quantity || "0") >= 0) return false;
         if (itemCategoryFilter.length > 0) {
-          const itemCatId = item.categoryId == null ? "none" : String(item.categoryId);
-          if (!itemCategoryFilter.includes(itemCatId)) return false;
+          const categoryId = item.categoryId == null ? "none" : String(item.categoryId);
+          if (!itemCategoryFilter.includes(categoryId)) return false;
         }
         if (!itemSearchTerm) return true;
-        const s = itemSearchTerm.toLowerCase();
+        const search = itemSearchTerm.toLowerCase();
         return (
-          (item.stockItemName || "").toLowerCase().includes(s) ||
-          (item.stockItemCode || "").toLowerCase().includes(s)
+          (item.stockItemName || "").toLowerCase().includes(search) ||
+          (item.stockItemCode || "").toLowerCase().includes(search)
         );
       })
       .sort((a, b) => a.stockItemName.localeCompare(b.stockItemName));
-  }, [selectedGroup, itemSearchTerm, itemCategoryFilter, showNegativeStock]);
+  }, [selectedGroup, inventory, itemSearchTerm, itemCategoryFilter, showNegativeStock, showMovement]);
 
-  // All items flat list (for view-all mode)
   const allItemsFiltered = useMemo(() => {
-    return inventory
+    if (!showMovement) return inventory;
+    return historicalInventory
       .filter((item) => {
-        if (showNegativeStock && parseFloat(item.quantity || "0") >= 0) return false;
         if (!itemSearchTerm) return true;
-        const s = itemSearchTerm.toLowerCase();
+        const search = itemSearchTerm.toLowerCase();
         return (
-          (item.stockItemName || "").toLowerCase().includes(s) ||
-          (item.stockItemCode || "").toLowerCase().includes(s)
+          (item.stockItemName || "").toLowerCase().includes(search) ||
+          (item.stockItemCode || "").toLowerCase().includes(search)
         );
       })
       .sort(
@@ -141,17 +166,22 @@ export function useStockGroupSummaries({
           (a.stockGroupName || "").localeCompare(b.stockGroupName || "") ||
           a.stockItemName.localeCompare(b.stockItemName)
       );
-  }, [inventory, itemSearchTerm, showNegativeStock]);
+  }, [historicalInventory, inventory, itemSearchTerm, showMovement]);
 
-  // Totals across all stock groups
-  const totalQty = stockGroups.reduce((s, g) => s + g.totalQuantity, 0);
-  const totalValue = stockGroups.reduce((s, g) => s + g.totalValue, 0);
-  const totalItems = stockGroups.reduce((s, g) => s + g.itemCount, 0);
+  const totalQty = showMovement
+    ? historicalGroups.reduce((sum, group) => sum + group.totalQuantity, 0)
+    : inventorySummary.totals.quantity;
+  const totalValue = showMovement
+    ? historicalGroups.reduce((sum, group) => sum + group.totalValue, 0)
+    : Number(inventorySummary.totals.value ?? 0);
+  const totalItems = showMovement
+    ? historicalGroups.reduce((sum, group) => sum + group.itemCount, 0)
+    : inventorySummary.totals.items;
 
   return {
     openingInventoryMap,
     showMovement,
-    activeInventoryData,
+    activeInventoryData: inventory,
     activeInventoryLoading,
     inventory,
     stockGroups,

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useLocation } from "@/contexts/LocationContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -31,48 +32,83 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const { formatAmount } = useCurrencyContext();
   const { selectedCompany } = useCompany();
   const companyId = selectedCompany?.id;
+  const [inventoryPage, setInventoryPage] = useState(1);
+  const [allStockPage, setAllStockPage] = useState(1);
 
   // ─── State ────────────────────────────────────────────────────────────────
   const {
-    selectedLocationLocal, setSelectedLocationLocal,
-    selectedGroup, setSelectedGroup,
-    selectedRowIndex, setSelectedRowIndex,
-    viewAllItems, setViewAllItems,
-    locationSearchTerm, setLocationSearchTerm,
-    groupSearchTerm, setGroupSearchTerm,
-    itemSearchTerm, setItemSearchTerm,
-    asOfDate, setAsOfDate,
-    fromDate, setFromDate,
-    showNegativeStock, setShowNegativeStock,
-    showZeroStock, setShowZeroStock,
-    negativeSearchTerm, setNegativeSearchTerm,
-    showAllStock, setShowAllStock,
-    allStockGroupFilter, setAllStockGroupFilter,
-    allStockSearchTerm, setAllStockSearchTerm,
-    allStockLocationFilter, setAllStockLocationFilter,
-    allStockCategoryFilter, setAllStockCategoryFilter,
-    itemCategoryFilter, setItemCategoryFilter,
-    groupCategoryFilter, setGroupCategoryFilter,
+    selectedLocationLocal,
+    setSelectedLocationLocal,
+    selectedGroup,
+    setSelectedGroup,
+    selectedRowIndex,
+    setSelectedRowIndex,
+    viewAllItems,
+    setViewAllItems,
+    locationSearchTerm,
+    setLocationSearchTerm,
+    groupSearchTerm,
+    setGroupSearchTerm,
+    itemSearchTerm,
+    setItemSearchTerm,
+    asOfDate,
+    setAsOfDate,
+    fromDate,
+    setFromDate,
+    showNegativeStock,
+    setShowNegativeStock,
+    showZeroStock,
+    setShowZeroStock,
+    negativeSearchTerm,
+    setNegativeSearchTerm,
+    showAllStock,
+    setShowAllStock,
+    allStockGroupFilter,
+    setAllStockGroupFilter,
+    allStockSearchTerm,
+    setAllStockSearchTerm,
+    allStockLocationFilter,
+    setAllStockLocationFilter,
+    allStockCategoryFilter,
+    setAllStockCategoryFilter,
+    itemCategoryFilter,
+    setItemCategoryFilter,
+    groupCategoryFilter,
+    setGroupCategoryFilter,
     allStockSelectedRowIndex,
-    stockMovementOpen, setStockMovementOpen,
-    stockMovementItem, setStockMovementItem,
-    stockMovementPeriod, setStockMovementPeriod,
-    drillMonth, setDrillMonth,
+    stockMovementOpen,
+    setStockMovementOpen,
+    stockMovementItem,
+    setStockMovementItem,
+    stockMovementPeriod,
+    setStockMovementPeriod,
+    drillMonth,
+    setDrillMonth,
     allStockTableRef,
-    deleteDialogOpen, setDeleteDialogOpen,
+    deleteDialogOpen,
+    setDeleteDialogOpen,
     isDeleting,
-    archiveDialogOpen, setArchiveDialogOpen,
+    archiveDialogOpen,
+    setArchiveDialogOpen,
     isArchiving,
-    renameDialogOpen, setRenameDialogOpen,
+    renameDialogOpen,
+    setRenameDialogOpen,
     renamingLocation,
-    renameInput, setRenameInput,
-    renameDeductionInput, setRenameDeductionInput,
-    waGroupDialogOpen, setWaGroupDialogOpen,
+    renameInput,
+    setRenameInput,
+    renameDeductionInput,
+    setRenameDeductionInput,
+    waGroupDialogOpen,
+    setWaGroupDialogOpen,
     waGroupLocation,
-    waGroupSearch, setWaGroupSearch,
-    waGroupSelectedId, setWaGroupSelectedId,
-    createLocationOpen, setCreateLocationOpen,
-    createLocationName, setCreateLocationName,
+    waGroupSearch,
+    setWaGroupSearch,
+    waGroupSelectedId,
+    setWaGroupSelectedId,
+    createLocationOpen,
+    setCreateLocationOpen,
+    createLocationName,
+    setCreateLocationName,
     openRenameDialog,
     openWaGroupDialog,
     handleDeleteLocation,
@@ -97,28 +133,61 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     waChatsLoading,
     locations,
     locationsLoading,
+    inventorySummary,
+    inventorySummaryLoading,
     inventoryData,
     inventoryLoading,
+    inventoryPagination,
     openingInventoryData,
     openingInventoryLoading,
     closingInventoryData,
     closingInventoryLoading,
     allInventoryData,
     allInventoryLoading,
+    allInventoryPagination,
     allNegativeStock,
     negativeStockLoading,
     categoriesList,
+    stockGroupsList,
   } = useLocationInventoryQueries({
     waGroupDialogOpen,
     posUser,
     companyId,
     selectedLocationLocal,
+    selectedGroup,
+    viewAllItems,
     showZeroStock,
     fromDate,
     asOfDate,
     showAllStock,
     showNegativeStock,
+    itemSearchTerm,
+    itemCategoryFilter,
+    inventoryPage,
+    allStockPage,
+    allStockSearchTerm,
+    allStockGroupFilter,
+    allStockLocationFilter,
+    allStockCategoryFilter,
   });
+
+  useEffect(() => {
+    setInventoryPage(1);
+  }, [
+    selectedLocationLocal?.id,
+    selectedGroup ? String(selectedGroup.groupId) : "no-group-selected",
+    viewAllItems,
+    itemSearchTerm,
+    itemCategoryFilter.join(","),
+    showZeroStock,
+    showNegativeStock,
+    fromDate,
+    asOfDate,
+  ]);
+
+  useEffect(() => {
+    setAllStockPage(1);
+  }, [allStockSearchTerm, allStockGroupFilter, allStockLocationFilter, allStockCategoryFilter.join(",")]);
 
   // ─── Export helpers ───────────────────────────────────────────────────────
   const { handlePrintWithOption, handleExportInventory, handlePrintGroup } = useLocationInventoryExports(
@@ -129,10 +198,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   // ─── Combined stock rows (all-stock view) ─────────────────────────────────
   const { allInventoryLocations, allInventoryGroups, filteredCombinedRows } = useCombinedStockRows({
     allInventoryData,
-    allStockGroupFilter,
-    allStockCategoryFilter,
-    allStockLocationFilter,
-    allStockSearchTerm,
+    allLocations: locations,
+    stockGroupsList,
   });
 
   // ─── Stock group summaries (location view) ────────────────────────────────
@@ -149,9 +216,11 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     totalValue,
     totalItems,
   } = useStockGroupSummaries({
+    inventorySummary,
     openingInventoryData,
     inventoryData,
     closingInventoryData,
+    inventorySummaryLoading,
     openingInventoryLoading,
     closingInventoryLoading,
     inventoryLoading,
@@ -216,6 +285,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               formatAmount={formatAmount}
               posUser={posUser}
               allStockTableRef={allStockTableRef}
+              pagination={{
+                ...allInventoryPagination,
+                onPageChange: setAllStockPage,
+              }}
             />
           </div>
         ) : (
@@ -332,6 +405,14 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 setSelectedRowIndex={setSelectedRowIndex}
                 navigate={navigate}
                 inventory={inventory}
+                pagination={
+                  showMovement
+                    ? undefined
+                    : {
+                        ...inventoryPagination,
+                        onPageChange: setInventoryPage,
+                      }
+                }
               />
             )}
 

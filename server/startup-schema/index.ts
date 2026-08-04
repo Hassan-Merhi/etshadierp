@@ -20,6 +20,7 @@ import { schemaCatchupMay2026 } from "./007-schema-catchup-may-2026";
 import { posExportsAndDispatch } from "./008-pos-exports-and-dispatch";
 import { supplierPartnerAndAi } from "./009-supplier-partner-and-ai";
 import { securityNotificationsAndPrecision } from "./010-security-notifications-and-precision";
+import { bandwidthSearchIndexes } from "./011-bandwidth-search-indexes";
 
 export const startupMigrations: string[] = [
   ...coreTablesAndColumns,
@@ -32,4 +33,5 @@ export const startupMigrations: string[] = [
   ...posExportsAndDispatch,
   ...supplierPartnerAndAi,
   ...securityNotificationsAndPrecision,
+  ...bandwidthSearchIndexes,
 ];

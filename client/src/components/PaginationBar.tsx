@@ -9,14 +9,7 @@ interface PaginationBarProps {
   noun?: string;
 }
 
-export function PaginationBar({
-  page,
-  totalPages,
-  total,
-  pageSize,
-  onPageChange,
-  noun = "items",
-}: PaginationBarProps) {
+export function PaginationBar({ page, totalPages, total, pageSize, onPageChange, noun = "items" }: PaginationBarProps) {
   if (total <= pageSize && totalPages <= 1) return null;
   const first = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const last = Math.min(total, page * pageSize);

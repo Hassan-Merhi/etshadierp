@@ -12,10 +12,10 @@ import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 
 /** Statement count of the assembled startup schema. */
-const EXPECTED_STATEMENT_COUNT = 1212;
+const EXPECTED_STATEMENT_COUNT = 1221;
 
 /** sha256 of JSON.stringify(startupMigrations). */
-const EXPECTED_CONTENT_HASH = "64e7042edec495e57cafe352116da2d8e3540ae59db563c196cd69b155536342";
+const EXPECTED_CONTENT_HASH = "6f2a7e6ace03834e78e43ca0f13c36fc24dccc9f85eff307a44aa9349a7a3ca5";
 
 function contentHash(statements: string[]): string {
   return crypto.createHash("sha256").update(JSON.stringify(statements)).digest("hex");

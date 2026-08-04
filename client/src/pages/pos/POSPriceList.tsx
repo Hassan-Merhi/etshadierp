@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { PaginationBar } from "@/components/PaginationBar";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +36,7 @@ import type {
   MasterItem,
   MasterPriceListResponse,
   POSPriceListProps,
+  PaginatedPriceListResponse,
   PriceListItem,
 } from "./pospricelist/types";
 import { ALL_LOCATIONS_ID, formatQty } from "./pospricelist/utils";
@@ -42,6 +45,8 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   const { toast } = useToast();
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 250);
+  const [page, setPage] = useState(1);
   const [groupFilter, setGroupFilter] = useState<string>("all");
   const [editingItem, setEditingItem] = useState<{ stockItemId: number; locationId: number; value: string } | null>(
     null
@@ -88,16 +93,37 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   const isAllMode = selectedLocationId === ALL_LOCATIONS_ID;
 
   // ── Single-location price list ──────────────────────────────────────────────
+  const pricePageSize = posUser ? 30 : 50;
   const {
-    data: priceList = [],
+    data: priceListResponse,
     isLoading: priceListLoading,
     isError: priceListError,
     error: priceListErrorObj,
-  } = useQuery<PriceListItem[]>({
-    queryKey: ["/api/pos/price-list", selectedLocationId],
-    queryFn: async () => {
-      const res = await fetch(`/api/pos/price-list?locationId=${selectedLocationId}`, {
+  } = useQuery<PaginatedPriceListResponse>({
+    queryKey: [
+      "/api/pos/price-list",
+      "paged",
+      selectedLocationId,
+      page,
+      pricePageSize,
+      debouncedSearch,
+      groupFilter,
+      showUnpriced,
+      !!posUser,
+    ],
+    queryFn: async ({ signal }) => {
+      const params = new URLSearchParams({
+        locationId: String(selectedLocationId),
+        page: String(page),
+        pageSize: String(pricePageSize),
+      });
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
+      if (groupFilter !== "all") params.set("group", groupFilter);
+      if (showUnpriced) params.set("unpriced", "true");
+      if (posUser) params.set("availableOnly", "true");
+      const res = await fetch(`/api/pos/price-list?${params.toString()}`, {
         credentials: "include",
+        signal,
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({ message: "Unknown error" }));
@@ -106,7 +132,10 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       return res.json();
     },
     enabled: !!selectedLocationId && !isAllMode,
+    placeholderData: (previous) => previous,
+    staleTime: 30_000,
   });
+  const priceList = priceListResponse?.data ?? [];
 
   // ── All-masters price list ──────────────────────────────────────────────────
   const {
@@ -149,12 +178,13 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   }, [priceList, masterItems, posUser, isAllMode]);
 
   const stockGroups = useMemo(() => {
+    if (!isAllMode && priceListResponse?.groups) return priceListResponse.groups;
     const groups = new Set<string>();
     locationPricedList.forEach((item) => {
       if (item.stockGroupName) groups.add(item.stockGroupName);
     });
     return Array.from(groups).sort();
-  }, [locationPricedList]);
+  }, [locationPricedList, isAllMode, priceListResponse?.groups]);
 
   const isItemUnpriced = (item: any): boolean => {
     if (isAllMode) {
@@ -169,9 +199,13 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   };
 
   const unpricedCount = useMemo(
-    () => locationPricedList.filter(isItemUnpriced).length,
-    [locationPricedList, isAllMode]
+    () => (isAllMode ? locationPricedList.filter(isItemUnpriced).length : (priceListResponse?.counts.unpriced ?? 0)),
+    [locationPricedList, isAllMode, priceListResponse?.counts.unpriced]
   );
+  const totalItemCount = isAllMode ? locationPricedList.length : (priceListResponse?.counts.total ?? priceList.length);
+  const pricedItemCount = isAllMode
+    ? locationPricedList.length - unpricedCount
+    : (priceListResponse?.counts.priced ?? Math.max(0, totalItemCount - unpricedCount));
 
   // Groups that have at least one unpriced item, with their counts — used for the chip picker
   const unpricedByGroup = useMemo<{ name: string; count: number }[]>(() => {
@@ -202,6 +236,10 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       return matchesSearch && matchesGroup && matchesUnpriced;
     });
   }, [locationPricedList, search, groupFilter, showUnpriced, hiddenUnpricedGroups, isAllMode]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [selectedLocationId, debouncedSearch, groupFilter, showUnpriced]);
 
   const selectedLocation = locations.find((l) => l.id === selectedLocationId);
 
@@ -585,6 +623,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
 
   const selectLocation = (id: number) => {
     setSelectedLocationId(id);
+    setPage(1);
     setSearch("");
     setGroupFilter("all");
     setEditingItem(null);
@@ -1002,16 +1041,14 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                     <Tag className="w-4 h-4 text-muted-foreground shrink-0" />
                     <div>
                       <p className="text-xs text-muted-foreground leading-none mb-0.5">Total Items</p>
-                      <p className="text-base font-semibold leading-none">{locationPricedList.length}</p>
+                      <p className="text-base font-semibold leading-none">{totalItemCount}</p>
                     </div>
                   </div>
                   <div className="rounded-lg border bg-muted/40 px-4 py-2 flex items-center gap-3">
                     <Check className="w-4 h-4 text-muted-foreground shrink-0" />
                     <div>
                       <p className="text-xs text-muted-foreground leading-none mb-0.5">Priced</p>
-                      <p className="text-base font-semibold leading-none">
-                        {locationPricedList.length - unpricedCount}
-                      </p>
+                      <p className="text-base font-semibold leading-none">{pricedItemCount}</p>
                     </div>
                   </div>
                   {unpricedCount > 0 && (
@@ -1291,13 +1328,22 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                   </div>
 
                   <p className="text-xs text-muted-foreground text-right mt-2" data-testid="text-item-count">
-                    Showing {filteredItems.length} of {locationPricedList.length} items
+                    Showing {filteredItems.length} of {totalItemCount} items
                     {canEdit && (
                       <span className="ml-1">
                         · Click any price to edit it{isAllMode && masters.length > 0 ? " (cascades to followers)" : ""}
                       </span>
                     )}
                   </p>
+                  {!isAllMode && priceListResponse && (
+                    <PaginationBar
+                      page={priceListResponse.page}
+                      pageSize={priceListResponse.pageSize}
+                      total={priceListResponse.total}
+                      totalPages={priceListResponse.totalPages}
+                      onPageChange={setPage}
+                    />
+                  )}
                 </>
               ) : null}
             </>

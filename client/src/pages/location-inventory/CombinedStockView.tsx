@@ -2,6 +2,7 @@ import { Package, Warehouse, Search, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { PaginationBar } from "@/components/PaginationBar";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -28,15 +29,17 @@ interface CombinedStockViewProps {
   allStockCategoryFilter: string[];
   setAllStockCategoryFilter: (cats: string[] | ((prev: string[]) => string[])) => void;
   allStockSelectedRowIndex: number;
-  openMovement: (
-    locId: number | null,
-    locName: string | null,
-    stockItemId: number,
-    stockItemName: string
-  ) => void;
+  openMovement: (locId: number | null, locName: string | null, stockItemId: number, stockItemName: string) => void;
   formatAmount: (amt: number) => string;
   posUser?: any;
   allStockTableRef: React.RefObject<HTMLDivElement>;
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    onPageChange: (page: number) => void;
+  };
 }
 
 export function CombinedStockView({
@@ -60,15 +63,17 @@ export function CombinedStockView({
   formatAmount,
   posUser,
   allStockTableRef,
+  pagination,
 }: CombinedStockViewProps) {
   // Table columns: locations that actually have stock (derived from inventory data)
   const uniqueLocationNames = Array.from(new Map(allInventoryLocations.map((l) => [l.name, l])).values());
 
   // Dropdown options: full location list so empty locations are still selectable.
   // Falls back to inventory-derived list if allLocations wasn't passed.
-  const dropdownLocations = allLocations && allLocations.length > 0
-    ? [...allLocations].sort((a, b) => (a.name || "").localeCompare(b.name || ""))
-    : uniqueLocationNames;
+  const dropdownLocations =
+    allLocations && allLocations.length > 0
+      ? [...allLocations].sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+      : uniqueLocationNames;
   // Deduplicate categories by id (guard against any API-level duplicates)
   const uniqueCategories = Array.from(new Map(categoriesList.map((c) => [c.id, c])).values());
 
@@ -84,7 +89,7 @@ export function CombinedStockView({
         <div className="flex flex-wrap gap-3 mb-4">
           <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
             <Package className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-semibold">{filteredCombinedRows.length.toLocaleString()}</span>
+            <span className="text-sm font-semibold">{pagination.total.toLocaleString()}</span>
             <span className="text-xs text-muted-foreground">Items</span>
           </div>
           <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
@@ -416,6 +421,13 @@ export function CombinedStockView({
           </div>
         )}
       </Card>
+      <PaginationBar
+        page={pagination.page}
+        pageSize={pagination.pageSize}
+        total={pagination.total}
+        totalPages={pagination.totalPages}
+        onPageChange={pagination.onPageChange}
+      />
     </div>
   );
 }

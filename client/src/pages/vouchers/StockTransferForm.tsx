@@ -9,6 +9,8 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useAppMode, useModePrefix } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { queryClient } from "@/lib/queryClient";
+import { useStockItemSearch } from "@/hooks/useStockItemSearch";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { formatNumber } from "@/lib/formatNumber";
 import { utils, writeFile } from "@/lib/excelHelper";
 import { parseDateLocal } from "@/components/vouchers/PrintTemplate";
@@ -70,12 +72,6 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
   const hydratedVoucherIdRef = useRef<number | null>(null);
   const lastKnownTransferIdRef = useRef<number | null>(null);
 
-  const { data: stockItems = [] } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items/light", selectedCompany?.id],
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  });
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations", selectedCompany?.id],
   });
@@ -162,6 +158,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
     isPOS && posLocationId ? posLocationId : null
   );
   const [transferSearchTerm, setTransferSearchTerm] = useState("");
+  const debouncedTransferSearch = useDebouncedValue(transferSearchTerm, 250);
   const [transferHighlightedIndex, setTransferHighlightedIndex] = useState(0);
   const [transferSourceSearchTerm, setTransferSourceSearchTerm] = useState("");
   const [transferSourceHighlightedIndex, setTransferSourceHighlightedIndex] = useState(0);
@@ -175,6 +172,21 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
   const posSelectedSourceName = isPOS
     ? locations.find((l) => l.id === posSelectedSourceId)?.name || posLocationName
     : "";
+
+  const selectedStockItemIds = Array.from(
+    new Set([
+      ...transferEntries.map((entry) => entry.stockItemId).filter((id) => id > 0),
+      ...((stockTransferToEdit?.items ?? []) as any[]).map((item) => Number(item.stockItemId)).filter((id) => id > 0),
+    ])
+  );
+  const { items: stockItems } = useStockItemSearch<StockItem>({
+    companyId: selectedCompany?.id,
+    search: debouncedTransferSearch,
+    selectedIds: selectedStockItemIds,
+    locationId: transferInventorySource,
+    enabled: !!selectedCompany?.id,
+    pageSize: 100,
+  });
 
   const [transferRevisionDialogOpen, setTransferRevisionDialogOpen] = useState(false);
   const [transferRevisionNote, setTransferRevisionNote] = useState("");
@@ -198,10 +210,24 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
   const importValidItemsCount = importValidItems.length;
   const importTotalItemsCount = importValidationResult?.validatedItems?.length || 0;
 
-  const { data: transferInventory = [] } = useQuery<any[]>({
-    queryKey: transferInventorySource ? [`/api/locations/${transferInventorySource}/inventory`] : [],
+  const { data: transferInventoryPage } = useQuery<{ data: any[] }>({
+    queryKey: transferInventorySource
+      ? ["/api/locations", transferInventorySource, "inventory", "paged", debouncedTransferSearch]
+      : [],
+    queryFn: async ({ signal }) => {
+      const params = new URLSearchParams({ page: "1", pageSize: "100" });
+      if (debouncedTransferSearch.trim()) params.set("search", debouncedTransferSearch.trim());
+      const response = await fetch(`/api/locations/${transferInventorySource}/inventory?${params.toString()}`, {
+        credentials: "include",
+        signal,
+      });
+      if (!response.ok) throw new Error("Failed to load source inventory");
+      return response.json();
+    },
     enabled: !!transferInventorySource && transferInventorySource > 0,
+    placeholderData: (previous) => previous,
   });
+  const transferInventory = transferInventoryPage?.data ?? [];
 
   useEffect(() => {
     if (isPOS && posSelectedSourceId && posSelectedSourceName) {
@@ -217,10 +243,12 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
   useEffect(() => {
     transferEntries.forEach((entry, index) => {
       if (entry.sourceLocationId > 0 && entry.stockItemId > 0 && !entry.rate) {
-        fetch(`/api/locations/${entry.sourceLocationId}/inventory`)
+        fetch(`/api/locations/${entry.sourceLocationId}/inventory-rates?stockItemIds=${entry.stockItemId}`, {
+          credentials: "include",
+        })
           .then((res) => res.json())
           .then((inventory) => {
-            const inv = inventory.find((item: any) => item.stockItemId === entry.stockItemId);
+            const inv = inventory[0];
             if (inv?.averageRate) stockTransferForm.setValue(`entries.${index}.rate`, inv.averageRate);
           })
           .catch(() => {});
@@ -614,22 +642,32 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
     }
     const entriesWithMissingRates = validEntries.filter((e) => !e.rate || e.rate === "" || e.rate === "0");
     if (entriesWithMissingRates.length > 0) {
-      const ratePromises = entriesWithMissingRates.map(async (entry) => {
-        try {
-          const res = await fetch(`/api/locations/${entry.sourceLocationId}/inventory`);
-          if (res.ok) {
-            const inventory = await res.json();
-            const inv = inventory.find((item: any) => item.stockItemId === entry.stockItemId);
-            return {
-              stockItemId: entry.stockItemId,
-              sourceLocationId: entry.sourceLocationId,
-              rate: inv?.averageRate || "0",
-            };
-          }
-        } catch {}
-        return { stockItemId: entry.stockItemId, sourceLocationId: entry.sourceLocationId, rate: "0" };
-      });
-      const fetchedRates = await Promise.all(ratePromises);
+      const itemIdsByLocation = new Map<number, Set<number>>();
+      for (const entry of entriesWithMissingRates) {
+        if (!itemIdsByLocation.has(entry.sourceLocationId)) itemIdsByLocation.set(entry.sourceLocationId, new Set());
+        itemIdsByLocation.get(entry.sourceLocationId)!.add(entry.stockItemId);
+      }
+      const fetchedRates = (
+        await Promise.all(
+          Array.from(itemIdsByLocation.entries()).map(async ([sourceLocationId, itemIds]) => {
+            try {
+              const response = await fetch(
+                `/api/locations/${sourceLocationId}/inventory-rates?stockItemIds=${Array.from(itemIds).join(",")}`,
+                { credentials: "include" }
+              );
+              if (!response.ok) return [];
+              const rows = await response.json();
+              return rows.map((row: any) => ({
+                stockItemId: Number(row.stockItemId),
+                sourceLocationId,
+                rate: row.averageRate || "0",
+              }));
+            } catch {
+              return [];
+            }
+          })
+        )
+      ).flat();
       for (const entry of validEntries) {
         if (!entry.rate || entry.rate === "" || entry.rate === "0") {
           const fetched = fetchedRates.find(

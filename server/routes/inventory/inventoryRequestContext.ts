@@ -8,6 +8,9 @@ export interface InventoryListFilters {
   search?: string;
   locationId?: number;
   stockGroupId?: number;
+  unassignedStockGroup?: boolean;
+  categoryIds?: number[];
+  includeUncategorized?: boolean;
   profile?: string;
 }
 
@@ -33,15 +36,36 @@ export function getActiveInventoryCompanyId(req: Request): number {
 
 export function parseInventoryListFilters(req: Request): InventoryListFilters {
   const page = Math.max(1, Number.parseInt(String(req.query.page || "1"), 10) || 1);
-  const pageSize = Math.min(250, Math.max(1, Number.parseInt(String(req.query.pageSize || "100"), 10) || 100));
-  const search = typeof req.query.search === "string" && req.query.search.trim() ? req.query.search.trim() : undefined;
+  const pageSize = Math.min(100, Math.max(1, Number.parseInt(String(req.query.pageSize || "50"), 10) || 50));
+  const search =
+    typeof req.query.search === "string" && req.query.search.trim() ? req.query.search.trim().slice(0, 100) : undefined;
   const locationId = req.query.locationId ? Number.parseInt(String(req.query.locationId), 10) : undefined;
-  const stockGroupId =
-    req.query.stockGroupId && req.query.stockGroupId !== "all"
-      ? Number.parseInt(String(req.query.stockGroupId), 10)
-      : undefined;
+
+  const stockGroupRaw = String(req.query.stockGroupId ?? "");
+  const unassignedStockGroup = stockGroupRaw === "none" || stockGroupRaw === "null";
+  const stockGroupId = /^\d+$/.test(stockGroupRaw) ? Number.parseInt(stockGroupRaw, 10) : undefined;
+
+  const categoryParts = String(req.query.categoryIds ?? req.query.categoryId ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const includeUncategorized = categoryParts.includes("none") || categoryParts.includes("null");
+  const categoryIds = Array.from(
+    new Set(categoryParts.filter((part) => /^\d+$/.test(part)).map((part) => Number.parseInt(part, 10)))
+  ).slice(0, 50);
+
   const profile = typeof req.query.profile === "string" ? req.query.profile : undefined;
-  return { page, pageSize, search, locationId, stockGroupId, profile };
+  return {
+    page,
+    pageSize,
+    search,
+    locationId,
+    stockGroupId,
+    unassignedStockGroup,
+    categoryIds: categoryIds.length > 0 ? categoryIds : undefined,
+    includeUncategorized,
+    profile,
+  };
 }
 
 export function parseQuickAdjustmentInput(input: unknown): QuickAdjustmentInput {

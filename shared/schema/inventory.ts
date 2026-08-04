@@ -110,6 +110,7 @@ export const stockItems = pgTable(
   (t) => ({
     uniqueCompanyCode: uniqueIndex("stock_items_company_code_unique").on(t.companyId, t.code),
     companyDeletedCodeIdx: index("stock_items_company_deleted_code_idx").on(t.companyId, t.deletedAt, t.code),
+    companyActiveNameIdx: index("stock_items_company_active_name_idx").on(t.companyId, t.active, t.name, t.id),
     companyGroupIdx: index("stock_items_company_group_idx").on(t.companyId, t.stockGroupId),
   })
 );
@@ -143,6 +144,7 @@ export const stockItemCodeAliases = pgTable(
   },
   (t) => ({
     uniqueCompanyAlias: uniqueIndex("stock_item_code_aliases_company_alias_unique").on(t.companyId, t.aliasCode),
+    companyItemIdx: index("stock_item_aliases_company_item_idx").on(t.companyId, t.stockItemId),
   })
 );
 
@@ -183,6 +185,8 @@ export const inventory = pgTable(
     locationIdx: index("inventory_location_idx").on(t.locationId),
     stockItemIdx: index("inventory_stock_item_idx").on(t.stockItemId),
     companyLocationIdx: index("inventory_company_location_idx").on(t.companyId, t.locationId),
+    companyLocationItemIdx: index("inventory_company_location_item_idx").on(t.companyId, t.locationId, t.stockItemId),
+    locationQuantityIdx: index("inventory_location_quantity_idx").on(t.locationId, t.quantity, t.stockItemId),
   })
 );
 
