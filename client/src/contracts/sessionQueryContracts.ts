@@ -35,6 +35,7 @@ export async function fetchAuthenticatedUser(signal?: AbortSignal): Promise<Auth
 export async function fetchUserCompanies(signal?: AbortSignal): Promise<UserCompanyAssignment[]> {
   const response = await fetch(userCompaniesQueryKey[0], {
     credentials: "include",
+    cache: "no-store",
     signal,
   });
   if (!response.ok) throw new Error(`Failed to load user companies (${response.status})`);
@@ -69,10 +70,11 @@ export function userCompaniesQueryOptions() {
     queryKey: userCompaniesQueryKey,
     queryFn: ({ signal }) => fetchUserCompanies(signal),
     select: (cachedValue) => parseUserCompanies(cachedValue),
-    retry: false,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 2_000),
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    refetchOnReconnect: true,
   });
 }
