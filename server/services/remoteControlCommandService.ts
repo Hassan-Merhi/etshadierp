@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { isRemoteSupportEnabled } from "./remoteSupportRuntime";
 import {
   getRemoteControlSession,
+  setRemoteControlMouseCapability,
   type RemoteControlSession,
 } from "./remoteControlSessionService";
 
@@ -97,7 +98,11 @@ function boundedDelta(value: unknown): number | null {
   return Math.max(-1200, Math.min(1200, delta));
 }
 
-function activeSessionForController(sessionId: string, controllerUserId: string): RemoteControlSession {
+function activeSessionForController(
+  sessionId: string,
+  controllerUserId: string,
+  requireMouseCapability = true
+): RemoteControlSession {
   const session = getRemoteControlSession(cleanIdentifier(sessionId));
   if (!session || session.status !== "active") {
     throw new RemoteMouseControlError("SESSION_INACTIVE", 409, "The support session is no longer active.");
@@ -105,7 +110,10 @@ function activeSessionForController(sessionId: string, controllerUserId: string)
   if (session.controllerUserId !== cleanIdentifier(controllerUserId)) {
     throw new RemoteMouseControlError("CONTROLLER_MISMATCH", 403, "This controller does not own the session.");
   }
-  if (!isRemoteSupportEnabled("remoteControl") || !session.capabilities.mouse) {
+  if (!isRemoteSupportEnabled("remoteControl")) {
+    throw new RemoteMouseControlError("MOUSE_CONTROL_DISABLED", 409, "Mouse control is disabled.");
+  }
+  if (requireMouseCapability && !session.capabilities.mouse) {
     throw new RemoteMouseControlError("MOUSE_CONTROL_DISABLED", 409, "Mouse control is disabled.");
   }
   return session;
@@ -114,7 +122,8 @@ function activeSessionForController(sessionId: string, controllerUserId: string)
 function activeSessionForTarget(
   sessionId: string,
   targetUserId: string,
-  targetTabId: string
+  targetTabId: string,
+  requireMouseCapability = true
 ): RemoteControlSession {
   const session = getRemoteControlSession(cleanIdentifier(sessionId));
   if (!session || session.status !== "active") {
@@ -125,6 +134,9 @@ function activeSessionForTarget(
     session.targetTabId !== cleanIdentifier(targetTabId)
   ) {
     throw new RemoteMouseControlError("TARGET_MISMATCH", 403, "This command channel is not bound to this ERP tab.");
+  }
+  if (!isRemoteSupportEnabled("remoteControl") || (requireMouseCapability && !session.capabilities.mouse)) {
+    throw new RemoteMouseControlError("MOUSE_CONTROL_DISABLED", 409, "Mouse control is disabled.");
   }
   return session;
 }
@@ -140,6 +152,18 @@ function notify<T>(listeners: Set<(value: T) => void> | undefined, value: T): nu
     }
   }
   return delivered;
+}
+
+function clearSessionMouseState(sessionId: string, disableCapability: boolean): void {
+  authorizations.delete(sessionId);
+  rateWindows.delete(sessionId);
+  sequenceBySession.delete(sessionId);
+  commandListeners.delete(sessionId);
+  resultListeners.delete(sessionId);
+  for (const [commandId, command] of commandHistory) {
+    if (command.sessionId === sessionId) commandHistory.delete(commandId);
+  }
+  if (disableCapability) setRemoteControlMouseCapability(sessionId, false);
 }
 
 function assertRateLimit(sessionId: string, type: RemoteMouseCommandType, now: number): void {
@@ -165,7 +189,7 @@ function assertMouseAuthorization(sessionId: string, controllerUserId: string, n
     authorization.controllerUserId !== cleanIdentifier(controllerUserId) ||
     now >= authorization.expiresAt
   ) {
-    authorizations.delete(sessionId);
+    clearSessionMouseState(sessionId, true);
     throw new RemoteMouseControlError(
       "MOUSE_AUTHORIZATION_REQUIRED",
       428,
@@ -182,7 +206,7 @@ export function authorizeRemoteMouseControl(input: {
   now?: number;
 }): RemoteMouseAuthorization {
   const now = input.now ?? Date.now();
-  const session = activeSessionForController(input.sessionId, input.controllerUserId);
+  const session = activeSessionForController(input.sessionId, input.controllerUserId, false);
   const confirmedAt = input.passwordConfirmedAt;
   if (
     confirmedAt == null ||
@@ -204,7 +228,19 @@ export function authorizeRemoteMouseControl(input: {
     expiresAt: Math.min(session.expiresAt, confirmedAt + PASSWORD_CONFIRMATION_MAX_AGE_MS),
   };
   authorizations.set(session.id, authorization);
+  if (!setRemoteControlMouseCapability(session.id, true)) {
+    clearSessionMouseState(session.id, false);
+    throw new RemoteMouseControlError("SESSION_INACTIVE", 409, "The support session is no longer active.");
+  }
   return { ...authorization };
+}
+
+export function revokeRemoteMouseControl(input: {
+  sessionId: string;
+  controllerUserId: string;
+}): void {
+  const session = activeSessionForController(input.sessionId, input.controllerUserId, false);
+  clearSessionMouseState(session.id, true);
 }
 
 export function getRemoteMouseAuthorization(
@@ -213,7 +249,7 @@ export function getRemoteMouseAuthorization(
   now = Date.now()
 ): RemoteMouseAuthorization | null {
   try {
-    activeSessionForController(sessionId, controllerUserId);
+    activeSessionForController(sessionId, controllerUserId, false);
     return assertMouseAuthorization(cleanIdentifier(sessionId), controllerUserId, now);
   } catch {
     return null;
@@ -310,7 +346,7 @@ export function publishRemoteMouseCommandResult(input: {
   now?: number;
 }): RemoteMouseCommandResult {
   const now = input.now ?? Date.now();
-  const session = activeSessionForTarget(input.sessionId, input.targetUserId, input.targetTabId);
+  const session = activeSessionForTarget(input.sessionId, input.targetUserId, input.targetTabId, false);
   const commandId = cleanIdentifier(input.commandId);
   const command = commandHistory.get(commandId);
   if (!command || command.sessionId !== session.id) {
@@ -351,14 +387,18 @@ export function subscribeRemoteMouseResults(input: {
 }
 
 export function cleanupRemoteMouseCommandState(now = Date.now()): void {
-  for (const [sessionId, authorization] of authorizations) {
+  const sessionIds = new Set([
+    ...authorizations.keys(),
+    ...commandListeners.keys(),
+    ...resultListeners.keys(),
+    ...sequenceBySession.keys(),
+    ...rateWindows.keys(),
+  ]);
+  for (const sessionId of sessionIds) {
     const session = getRemoteControlSession(sessionId);
-    if (!session || session.status !== "active" || now >= authorization.expiresAt) {
-      authorizations.delete(sessionId);
-      rateWindows.delete(sessionId);
-      sequenceBySession.delete(sessionId);
-      commandListeners.delete(sessionId);
-      resultListeners.delete(sessionId);
+    const authorization = authorizations.get(sessionId);
+    if (!session || session.status !== "active" || !authorization || now >= authorization.expiresAt) {
+      clearSessionMouseState(sessionId, !!session && session.status === "active");
     }
   }
 
