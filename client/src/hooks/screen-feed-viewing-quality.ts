@@ -23,8 +23,10 @@ export function normalizeScreenFeedPoint(
 }
 
 export function getScreenFeedCaptureScale(devicePixelRatio: number): number {
-  if (!Number.isFinite(devicePixelRatio)) return 1;
-  return Math.min(1.25, Math.max(1, devicePixelRatio));
+  if (!Number.isFinite(devicePixelRatio) || devicePixelRatio <= 0) return 1;
+  // Viewport resolution is sufficient for remote support and avoids rendering
+  // 25% more pixels on common Windows display scaling settings.
+  return 1;
 }
 
 export function isSafeScreenFeedAssetUrl(value: string, origin: string): boolean {
