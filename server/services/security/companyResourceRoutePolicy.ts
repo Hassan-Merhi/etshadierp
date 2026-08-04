@@ -10,8 +10,15 @@ export interface CompanyOwnedRouteMatch {
 const ERP_CONTAINER_FACTORY_ALIASES =
   /^\/(?:api\/factory\/)?containers\/\d+\/(documents|freight)(?:\/|$)/;
 
+const ACTIVE_COMPANY_USER_ADMIN_FACTORY_ALIASES =
+  /^\/(?:api\/factory\/)?users(?:\/|$)/;
+
 export function isErpContainerFactoryAlias(path: string): boolean {
   return ERP_CONTAINER_FACTORY_ALIASES.test(path);
+}
+
+export function isFactoryCompanyOptionalRoute(path: string): boolean {
+  return isErpContainerFactoryAlias(path) || ACTIVE_COMPANY_USER_ADMIN_FACTORY_ALIASES.test(path);
 }
 
 const ROUTES: Array<{
