@@ -1,7 +1,7 @@
-export const ACTIVE_CAPTURE_DELAY_MS = 350;
-export const IDLE_CAPTURE_DELAY_MS = 1000;
-export const MAX_IDLE_CAPTURE_DELAY_MS = 2000;
-export const FAILED_CAPTURE_DELAY_MS = 2500;
+export const ACTIVE_CAPTURE_DELAY_MS = 150;
+export const IDLE_CAPTURE_DELAY_MS = 500;
+export const MAX_IDLE_CAPTURE_DELAY_MS = 1000;
+export const FAILED_CAPTURE_DELAY_MS = 2000;
 
 export interface UploadDecisionInput {
   signature: string;
