@@ -37,8 +37,10 @@ describe("bandwidth query policies", () => {
 
   it("never enables live polling in background tabs", () => {
     const policy = liveCountQueryPolicy(60_000);
+    expect(policy.staleTime).toBe(QUERY_STALE_TIMES.liveCount);
     expect(policy.refetchIntervalInBackground).toBe(false);
     expect(policy.refetchOnWindowFocus).toBe(false);
+    expect(policy.refetchOnReconnect).toBe(true);
     expect(policy.refetchInterval).toBeTypeOf("function");
   });
 });
