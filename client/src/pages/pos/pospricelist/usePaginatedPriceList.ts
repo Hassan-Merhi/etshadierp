@@ -11,14 +11,9 @@ interface PosPriceListFilters {
   isAllMode: boolean;
 }
 
-function buildPriceListParams({
-  selectedLocationId,
-  page,
-  search,
-  groupFilter,
-  showUnpriced,
-  posUser,
-}: Omit<PosPriceListFilters, "isAllMode">) {
+type PriceListRequest = Omit<PosPriceListFilters, "isAllMode">;
+
+function buildPriceListParams({ selectedLocationId, page, search, groupFilter, showUnpriced, posUser }: PriceListRequest) {
   const params = new URLSearchParams({
     locationId: String(selectedLocationId),
     page: String(page),
@@ -31,10 +26,7 @@ function buildPriceListParams({
   return params;
 }
 
-async function fetchPriceListPage(
-  filters: Omit<PosPriceListFilters, "isAllMode">,
-  signal?: AbortSignal
-): Promise<PaginatedPriceListResponse> {
+async function fetchPriceListPage(filters: PriceListRequest, signal?: AbortSignal): Promise<PaginatedPriceListResponse> {
   const response = await fetch(`/api/pos/price-list?${buildPriceListParams(filters).toString()}`, {
     credentials: "include",
     signal,
@@ -47,6 +39,14 @@ async function fetchPriceListPage(
 }
 
 export function usePaginatedPriceList(filters: PosPriceListFilters) {
+  const request: PriceListRequest = {
+    selectedLocationId: filters.selectedLocationId,
+    page: filters.page,
+    search: filters.search,
+    groupFilter: filters.groupFilter,
+    showUnpriced: filters.showUnpriced,
+    posUser: filters.posUser,
+  };
   const query = useQuery<PaginatedPriceListResponse>({
     queryKey: [
       "/api/pos/price-list",
@@ -59,7 +59,7 @@ export function usePaginatedPriceList(filters: PosPriceListFilters) {
       filters.showUnpriced,
       !!filters.posUser,
     ],
-    queryFn: ({ signal }) => fetchPriceListPage(filters, signal),
+    queryFn: ({ signal }) => fetchPriceListPage(request, signal),
     enabled: !!filters.selectedLocationId && !filters.isAllMode,
     placeholderData: (previous) => previous,
     staleTime: 30_000,
@@ -67,7 +67,7 @@ export function usePaginatedPriceList(filters: PosPriceListFilters) {
   return { ...query, response: query.data, items: query.data?.data ?? [] };
 }
 
-interface ExportPriceListOptions extends Omit<PosPriceListFilters, "page" | "isAllMode"> {
+interface ExportPriceListOptions extends Omit<PriceListRequest, "page"> {
   hiddenUnpricedGroups: Set<string>;
 }
 
@@ -75,10 +75,10 @@ export async function fetchFilteredPriceListForExport({
   hiddenUnpricedGroups,
   ...filters
 }: ExportPriceListOptions): Promise<PriceListItem[]> {
-  const firstPage = await fetchPriceListPage({ ...filters, page: 1, isAllMode: false });
+  const firstPage = await fetchPriceListPage({ ...filters, page: 1 });
   const pages = [firstPage];
   for (let page = 2; page <= firstPage.totalPages; page += 1) {
-    pages.push(await fetchPriceListPage({ ...filters, page, isAllMode: false }));
+    pages.push(await fetchPriceListPage({ ...filters, page }));
   }
   return pages
     .flatMap((result) => result.data)
