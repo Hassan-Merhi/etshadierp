@@ -181,7 +181,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     setDrawerContainer(c);
     setDrawerOpen(true);
     try {
-      const detail = await loadContainerDetail(c.id);
+      const detail = await loadContainerDetail(c.id, c.companyId);
       setDrawerContainer((current) => (current?.id === c.id ? detail : current));
     } catch (detailError: any) {
       toast({ title: "Failed to load container details", description: detailError.message, variant: "destructive" });

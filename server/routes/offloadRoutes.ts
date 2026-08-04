@@ -183,10 +183,10 @@ export function registerOffloadRoutes(app: Express) {
             eq(vouchers.companyId, offload.companyId),
             or(
               like(vouchers.voucherNumber, `DUTY-${cn}-%`),
-            like(vouchers.voucherNumber, `OFFICE-${cn}-%`),
-            like(vouchers.voucherNumber, `TRANS-${cn}-%`),
-            like(vouchers.voucherNumber, `XFER-${cn}-%`),
-              like(vouchers.voucherNumber, `CHG-${cn}-%`)
+              like(vouchers.voucherNumber, `OFFICE-${cn}-%`),
+              like(vouchers.voucherNumber, `TRANS-${cn}-%`),
+              like(vouchers.voucherNumber, `XFER-${cn}-%`),
+              like(vouchers.voucherNumber, `CHG-${cn}-%`),
             ),
           ),
         )
@@ -305,10 +305,10 @@ export function registerOffloadRoutes(app: Express) {
                 eq(vouchers.companyId, offload.companyId),
                 or(
                   like(vouchers.voucherNumber, `DUTY-${cn}-%`),
-                like(vouchers.voucherNumber, `OFFICE-${cn}-%`),
-                like(vouchers.voucherNumber, `TRANS-${cn}-%`),
-                like(vouchers.voucherNumber, `XFER-${cn}-%`),
-                  like(vouchers.voucherNumber, `CHG-${cn}-%`)
+                  like(vouchers.voucherNumber, `OFFICE-${cn}-%`),
+                  like(vouchers.voucherNumber, `TRANS-${cn}-%`),
+                  like(vouchers.voucherNumber, `XFER-${cn}-%`),
+                  like(vouchers.voucherNumber, `CHG-${cn}-%`),
                 ),
               ),
             )

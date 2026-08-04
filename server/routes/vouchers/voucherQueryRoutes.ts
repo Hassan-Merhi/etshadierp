@@ -128,7 +128,7 @@ export function registerVoucherQueryRoutes(app: Express) {
       const voucherEntries = voucherEntryGroups.flat();
 
       const companyRows = await Promise.all(companyIds.map((allowedCompanyId) => storage.getCompanyById(allowedCompanyId)));
-      const companyMap = new Map(companyRows.filter(Boolean).map((company) => [company!.id, company!]));
+      const companyMap = new Map(companyRows.filter(Boolean).map((company) => [company!.id, company!] as const));
 
       // Combine all transactions with company information
       const transactions: any[] = [];
@@ -258,7 +258,7 @@ export function registerVoucherQueryRoutes(app: Express) {
 
       const companyRows = await Promise.all(companyIds.map((allowedCompanyId) => storage.getCompanyById(allowedCompanyId)));
       const companyNameMap = new Map(
-        companyRows.filter(Boolean).map((company) => [company!.id, company!.name]),
+        companyRows.filter(Boolean).map((company) => [company!.id, company!.name] as const),
       );
       const purchaseOrderGroups = await Promise.all(
         companyIds.map(async (allowedCompanyId) => {

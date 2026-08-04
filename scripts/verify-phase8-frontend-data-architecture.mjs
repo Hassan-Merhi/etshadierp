@@ -48,6 +48,7 @@ for (const required of [
   "canonicalSetValues",
   "paginatedCompanyDataKey",
   "companyIdentity",
+  "loadContainerDetail = async (id: number, companyId: number)",
   "frontendQueryPolicies.operational",
 ]) {
   if (!gitHook.includes(required)) failures.push(`usePaginatedGITContainers missing ${required}`);

@@ -108,8 +108,8 @@ export function usePaginatedGITContainers(filters: PaginatedContainerFilters) {
     placeholderData: (previous) => previous,
   });
 
-  const loadContainerDetail = async (id: number): Promise<EnrichedContainerRow> => {
-    const detailUrl = canonicalApiUrl(`/api/git/containers/${id}`);
+  const loadContainerDetail = async (id: number, companyId: number): Promise<EnrichedContainerRow> => {
+    const detailUrl = canonicalApiUrl(`/api/git/containers/${id}`, { companyId });
     const response = await fetch(detailUrl, { credentials: "include" });
     if (!response.ok) {
       const body = await response.json().catch(() => ({ message: "Failed to load container details" }));
