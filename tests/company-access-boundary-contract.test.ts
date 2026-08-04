@@ -5,8 +5,9 @@ function source(path: string): string {
 }
 
 describe("Phase 7 company access boundary", () => {
-  it("requires explicit company membership even for privileged overrides", () => {
+  it("keeps explicit membership while honoring the existing Developer company scope", () => {
     const boundary = source("server/security/companyAccessBoundary.ts");
+    const companyRoutes = source("server/routes/auth/companyAccessRoutes.ts");
 
     expect(boundary).toContain("resolveAuthorizedCompanyId");
     expect(boundary).toContain("isPrivilegedRole");
@@ -14,6 +15,13 @@ describe("Phase 7 company access boundary", () => {
     expect(boundary).toContain("CROSS_COMPANY_FORBIDDEN");
     expect(boundary).toContain("COMPANY_ACCESS_DENIED");
     expect(boundary).toContain("req.session?.currentRole ?? req.user?.role");
+
+    // Developer company selection is synthetic in the existing selector and
+    // set-company route, so the central boundary must resolve the same scope.
+    expect(companyRoutes).toContain('req.user.role === "Developer"');
+    expect(boundary).toContain('user?.role === "Developer"');
+    expect(boundary).toContain("await storage.getAllCompanies()");
+    expect(boundary).toContain("await storage.getUserCompaniesWithRoles(userId)");
   });
 
   it("routes transfer authorization through the central boundary", () => {
@@ -33,7 +41,7 @@ describe("Phase 7 company access boundary", () => {
     expect(exportRoute).not.toContain("isAdminOrDev && requestedCompanyId");
   });
 
-  it("removes role-only company access from GIT container and agent reports", () => {
+  it("removes route-local role-only company access from GIT container and agent reports", () => {
     const helpers = source("server/lib/gitHelpers.ts");
     const routes = source("server/routes/git/gitReportRoutes.ts");
 
