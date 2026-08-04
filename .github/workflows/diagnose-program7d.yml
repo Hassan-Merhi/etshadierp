@@ -4,16 +4,20 @@ on:
   push:
     branches:
       - agent/fix-core-entry-bandwidth-budget
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
 
 concurrency:
-  group: diagnose-program7d
+  group: diagnose-program7d-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   diagnose:
+    if: github.event_name == 'push' || github.head_ref == 'agent/fix-core-entry-bandwidth-budget'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
