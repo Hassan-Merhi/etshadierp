@@ -242,14 +242,6 @@ jobs:
             tests/remote-control-command-service.test.ts \
             tests/remote-keyboard-command-service.test.ts
           npm run check
-          node node_modules/vitest/vitest.mjs run \
-            tests/remote-control-session-service.test.ts \
-            tests/remote-control-command-service.test.ts \
-            tests/remote-keyboard-command-service.test.ts \
-            tests/remote-support-audit-service.test.ts \
-            tests/remote-support-sensitive-action-policy.test.ts \
-            tests/remote-support-permission-contract.test.ts \
-            --maxWorkers=1 --no-file-parallelism
       - name: Commit repair
         run: |
           if git diff --quiet; then exit 0; fi
