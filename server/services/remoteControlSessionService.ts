@@ -29,8 +29,8 @@ export interface RemoteControlSession {
   stoppedAt: number | null;
   stopReason: string | null;
   capabilities: {
-    mouse: false;
-    keyboard: false;
+    mouse: boolean;
+    keyboard: boolean;
     browserTabOnly: true;
   };
 }
@@ -155,6 +155,17 @@ export function listRemoteControlTabs(userId: string, now = Date.now()): RemoteC
   return freshTabs(cleanIdentifier(userId), now);
 }
 
+export function listActiveRemoteControlSessionsForController(
+  controllerUserId: string
+): RemoteControlSession[] {
+  cleanupRemoteControlState();
+  const normalizedControllerId = cleanIdentifier(controllerUserId);
+  return [...sessions.values()]
+    .filter((session) => session.status === "active" && session.controllerUserId === normalizedControllerId)
+    .sort((left, right) => right.startedAt - left.startedAt)
+    .map((session) => copySession(session) as RemoteControlSession);
+}
+
 export function registerRemoteControlTab(input: {
   userId: string;
   username?: string;
@@ -249,7 +260,7 @@ export function startRemoteControlSession(input: StartRemoteControlSessionInput)
     stoppedAt: null,
     stopReason: null,
     capabilities: {
-      mouse: false,
+      mouse: true,
       keyboard: false,
       browserTabOnly: true,
     },
