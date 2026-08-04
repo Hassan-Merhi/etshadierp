@@ -43,16 +43,27 @@ export async function cancelCompanySessionQueries(
   });
 }
 
-export function removeCompanySessionQueries(client: QueryClient): void {
+interface RemoveCompanySessionQueriesOptions {
+  resetAuthenticatedUser?: boolean;
+}
+
+export function removeCompanySessionQueries(
+  client: QueryClient,
+  options: RemoveCompanySessionQueriesOptions = {},
+): void {
   client.removeQueries({
     predicate: (query) => isCompanySessionQueryKey(query.queryKey),
   });
 
   // /api/auth/me is global because it identifies the logged-in user, but its
-  // role and POS flags belong to the active company session. Resetting it here
-  // prevents a company switch from reusing stale canSellNegativeStock access.
+  // role and POS flags belong to the active company session. Reset it for a
+  // real company switch, but preserve it during initial activation so the
+  // authenticated application is not unmounted and restarted in a loop.
   // Offline company selection keeps the last authenticated snapshot available.
-  if (typeof navigator === "undefined" || navigator.onLine !== false) {
+  if (
+    options.resetAuthenticatedUser !== false &&
+    (typeof navigator === "undefined" || navigator.onLine !== false)
+  ) {
     void client.resetQueries({
       queryKey: ["/api/auth/me"],
       exact: true,
