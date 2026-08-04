@@ -56,12 +56,10 @@ export function RemoteSupportIndicator() {
             </p>
             <p className="truncate text-[11px] text-muted-foreground">
               {session.controllerUsername} · {translateRemoteSupportPhase4Text("ERP tab only", language)} ·{" "}
-              {keyboardActive
-                ? translateRemoteSupportPhase6Text("Mouse and keyboard active", language)
-                : translateRemoteSupportPhase6Text("Keyboard control", language).replace(
-                    translateRemoteSupportPhase6Text("Keyboard control", language),
-                    "Mouse"
-                  )} · {formatRemaining(session.expiresAt, now)}
+              {translateRemoteSupportPhase6Text(
+                keyboardActive ? "Mouse and keyboard active" : "Mouse active",
+                language
+              )} · {formatRemaining(session.expiresAt, now)}
             </p>
           </div>
           <Button
