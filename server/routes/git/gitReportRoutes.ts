@@ -34,12 +34,12 @@ export function registerGitReportRoutes(app: Express) {
    * Returns per-agent FIFO balance allocation for the Agent/Duty report.
    *
    * Access:
-   *   Admin / Developer  → any company, any query mode
+   *   Admin / Owner / Developer → explicitly assigned companies only
    *   Owner              → only companies in user_company_roles
    *   Manager / POS / Normal User → 403
    *
    * Query params:
-   *   companyId=<n>       single company (Admin/Dev: any; Owner: must have access)
+   *   companyId=<n>       single explicitly assigned company
    *   allCompanies=true   all accessible companies, grouped response
    *   (none)              falls back to session company — backward-compatible
    *
@@ -103,7 +103,7 @@ export function registerGitReportRoutes(app: Express) {
   ): Promise<void> {
     try {
       const userId: string = (req.user as any).id;
-      const role: string = (req.user as any).role;
+      const role = String((req.session as any)?.currentRole ?? (req.user as any).role ?? "");
       const sessionCompanyId: number | undefined = (req.session as any)?.currentCompanyId;
 
       const scope = await resolveGitCompanyScope(
@@ -184,7 +184,7 @@ export function registerGitReportRoutes(app: Express) {
    * All active containers (OTW / Sea / At Port / Left Dar / At Border /
    * In Transit / Arrived) with computed fields attached.
    *
-   * Access: Admin / Developer (any company) | Owner (their companies only)
+   * Access: Admin / Owner / Developer, restricted to explicit company memberships
    * Query:  companyId, allCompanies, status, transporter, agent, location,
    *         search/q, docsReady, delayed, overdue
    *
@@ -209,7 +209,7 @@ export function registerGitReportRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid container ID" });
       }
       const userId: string = (req.user as any).id;
-      const role: string = (req.user as any).role;
+      const role = String((req.session as any)?.currentRole ?? (req.user as any).role ?? "");
       const sessionCompanyId: number | undefined = (req.session as any)?.currentCompanyId;
       const scope = await resolveGitCompanyScope(
         userId,
@@ -252,7 +252,7 @@ export function registerGitReportRoutes(app: Express) {
   app.get("/api/git/summary", requireAuth, requireRole("Admin", "Owner"), async (req, res) => {
     try {
       const userId: string = (req.user as any).id;
-      const role: string = (req.user as any).role;
+      const role = String((req.session as any)?.currentRole ?? (req.user as any).role ?? "");
       const sessionCompanyId: number | undefined = (req.session as any)?.currentCompanyId;
 
       const scope = await resolveGitCompanyScope(

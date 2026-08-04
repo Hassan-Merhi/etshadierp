@@ -7,7 +7,6 @@
  * unchanged.
  */
 import type { Express } from "express";
-import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { eq, and, or, desc, inArray, gte, lte, like, sql } from "drizzle-orm";
 import { db } from "../db";
@@ -180,13 +179,16 @@ export function registerOffloadRoutes(app: Express) {
         .select({ voucherNumber: vouchers.voucherNumber, totalAmount: vouchers.totalAmount })
         .from(vouchers)
         .where(
-          or(
-            like(vouchers.voucherNumber, `DUTY-${cn}-%`),
+          and(
+            eq(vouchers.companyId, offload.companyId),
+            or(
+              like(vouchers.voucherNumber, `DUTY-${cn}-%`),
             like(vouchers.voucherNumber, `OFFICE-${cn}-%`),
             like(vouchers.voucherNumber, `TRANS-${cn}-%`),
             like(vouchers.voucherNumber, `XFER-${cn}-%`),
-            like(vouchers.voucherNumber, `CHG-${cn}-%`)
-          )
+              like(vouchers.voucherNumber, `CHG-${cn}-%`)
+            ),
+          ),
         )
         .execute();
 
@@ -299,13 +301,16 @@ export function registerOffloadRoutes(app: Express) {
             .select({ id: vouchers.id })
             .from(vouchers)
             .where(
-              or(
-                like(vouchers.voucherNumber, `DUTY-${cn}-%`),
+              and(
+                eq(vouchers.companyId, offload.companyId),
+                or(
+                  like(vouchers.voucherNumber, `DUTY-${cn}-%`),
                 like(vouchers.voucherNumber, `OFFICE-${cn}-%`),
                 like(vouchers.voucherNumber, `TRANS-${cn}-%`),
                 like(vouchers.voucherNumber, `XFER-${cn}-%`),
-                like(vouchers.voucherNumber, `CHG-${cn}-%`)
-              )
+                  like(vouchers.voucherNumber, `CHG-${cn}-%`)
+                ),
+              ),
             )
             .execute();
 
