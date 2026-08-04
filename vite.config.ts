@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { heavyListPaginationPlugin } from "./build/viteHeavyListPaginationPlugin";
-import { phase1PaginationPlugin } from "./build/vitePhase1PaginationPlugin";
+import { phase1PaginationPlugin } from "./build/vitePhase1PaginationGuardPlugin";
 import { lazyHeavyImportsPlugin } from "./build/viteLazyHeavyImportsPlugin";
 import { labelAssetExtractionPlugin } from "./build/viteLabelAssetExtractionPlugin";
 
