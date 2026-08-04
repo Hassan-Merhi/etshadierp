@@ -26,23 +26,34 @@ describe("company query scope", () => {
     expect(isCompanySessionQueryKey(["account-statement", 1, "ledger", 10])).toBe(true);
   });
 
-  it("removes company data without deleting authentication or company access data", () => {
+  it("removes company data and resets active-company authentication fields", () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
 
-    client.setQueryData(["/api/auth/me"], { id: "user-1" });
-    client.setQueryData(["/api/user/companies"], [{ companyId: 1 }, { companyId: 2 }]);
+    client.setQueryData(["/api/auth/me"], {
+      id: "user-1",
+      canSellNegativeStock: false,
+    });
+    client.setQueryData(["/api/user/companies"], [
+      { companyId: 1 },
+      { companyId: 2 },
+    ]);
     client.setQueryData(["/api/accounts/all", 1], { accounts: [{ id: 1 }] });
     client.setQueryData(["/api/inventory", 1], [{ id: 2 }]);
     client.setQueryData(["account-statement", 1, "ledger", 10], [{ id: 3 }]);
 
     removeCompanySessionQueries(client);
 
-    expect(client.getQueryData(["/api/auth/me"])).toEqual({ id: "user-1" });
-    expect(client.getQueryData(["/api/user/companies"])).toEqual([{ companyId: 1 }, { companyId: 2 }]);
+    expect(client.getQueryData(["/api/auth/me"])).toBeUndefined();
+    expect(client.getQueryData(["/api/user/companies"])).toEqual([
+      { companyId: 1 },
+      { companyId: 2 },
+    ]);
     expect(client.getQueryData(["/api/accounts/all", 1])).toBeUndefined();
     expect(client.getQueryData(["/api/inventory", 1])).toBeUndefined();
-    expect(client.getQueryData(["account-statement", 1, "ledger", 10])).toBeUndefined();
+    expect(
+      client.getQueryData(["account-statement", 1, "ledger", 10]),
+    ).toBeUndefined();
   });
 });
