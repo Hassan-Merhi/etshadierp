@@ -64,7 +64,7 @@ export function registerRemoteSupportRolloutRoutes(app: Express): void {
   app.patch("/api/screen-feed/admin/rollout", requireAuth, (req, res) => {
     if (!requireDeveloper(req, res)) return;
     const stage = req.body?.stage === undefined ? undefined : parseStage(req.body.stage);
-    if (req.body?.stage !== undefined && !stage) {
+    if (req.body?.stage !== undefined && stage === null) {
       return res.status(400).json({ message: "Invalid remote support rollout stage." });
     }
     if (stage !== undefined && stage !== "disabled" && !hasRecentPasswordConfirmation(req)) {
@@ -76,7 +76,7 @@ export function registerRemoteSupportRolloutRoutes(app: Express): void {
 
     const updated = updateRemoteSupportRollout(
       {
-        ...(stage === undefined ? {} : { stage }),
+        ...(stage ? { stage } : {}),
         ...(req.body?.canaryCompanyIds === undefined
           ? {}
           : { canaryCompanyIds: req.body.canaryCompanyIds }),
