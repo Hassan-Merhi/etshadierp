@@ -47,7 +47,6 @@ export function useMobilePerformanceLifecycle(): void {
       window.removeEventListener("offline", updateOnline);
       connection?.removeEventListener?.("change", updateConnectionProfile);
       focusManager.setFocused(undefined);
-      onlineManager.setOnline(undefined);
     };
   }, []);
 }
