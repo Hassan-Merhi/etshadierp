@@ -18,6 +18,11 @@ export type ParsedVoucherListQuery = Omit<VoucherListQuery, "page" | "pageSize">
   paginated: boolean;
 };
 
+type VoucherFilterQuery = Pick<
+  VoucherListQuery,
+  "type" | "search" | "status" | "minAmount" | "maxAmount" | "sort"
+>;
+
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function isStrictDate(value: string): boolean {
@@ -60,7 +65,7 @@ export function parseVoucherListQuery(raw: Record<string, unknown>):
   };
 }
 
-export function filterAndSortVouchers<T extends Record<string, any>>(rows: T[], query: VoucherListQuery): T[] {
+export function filterAndSortVouchers<T extends Record<string, any>>(rows: T[], query: VoucherFilterQuery): T[] {
   const search = query.search?.trim().toLowerCase() ?? "";
   const minimum = query.minAmount ? Number.parseFloat(query.minAmount) : null;
   const maximum = query.maxAmount ? Number.parseFloat(query.maxAmount) : null;
