@@ -75,9 +75,6 @@ interface TranslationMemory {
   applied: string;
 }
 
-// DOM translation is intentionally centralized. Remember the original React-rendered
-// source so switching English ↔ Arabic ↔ French never depends on the currently
-// translated DOM value and never requires a page refresh.
 const textTranslationMemory = new WeakMap<Text, TranslationMemory>();
 const attributeTranslationMemory = new WeakMap<Element, Map<TranslatableAttribute, TranslationMemory>>();
 
@@ -87,6 +84,16 @@ function isProtected(element: Element): boolean {
 
 function isEligibleTextElement(element: Element): boolean {
   return element.matches(ELIGIBLE_TEXT_SELECTOR) || Boolean(element.closest(ELIGIBLE_TEXT_SELECTOR));
+}
+
+function isApprovedNonVisualText(value: string): boolean {
+  return (
+    isPhase3SharedUiText(value) ||
+    isPhase4SupplierPartnerText(value) ||
+    isPhase5PropertiesRentalsText(value) ||
+    isPhase6ReportsExportsText(value) ||
+    isPhase7BackendMessageText(value)
+  );
 }
 
 export function translateApprovedInterfaceText(value: string, language: ApplicationLanguage): string | null {
@@ -138,31 +145,25 @@ function translateTextNode(node: Text, language: ApplicationLanguage) {
 
   const currentValue = node.nodeValue ?? "";
   const memory = getTextMemory(node, currentValue);
-  const translated = translateApprovedInterfaceText(memory.source, language);
 
+  if (!isEligibleTextElement(parent) && !isApprovedNonVisualText(memory.source)) {
+    if (currentValue !== memory.source) {
+      memory.applied = memory.source;
+      node.nodeValue = memory.source;
+    }
+    return;
+  }
+
+  const translated = translateApprovedInterfaceText(memory.source, language);
   if (translated !== null) {
     memory.applied = translated;
     if (translated !== currentValue) node.nodeValue = translated;
     return;
   }
 
-  // If a previously translated node is no longer in the approved dictionary,
-  // restore the original application value instead of leaving stale Arabic/French.
   if (currentValue !== memory.source) {
     memory.applied = memory.source;
     node.nodeValue = memory.source;
-    return;
-  }
-
-  if (
-    !isEligibleTextElement(parent) &&
-    !isPhase3SharedUiText(memory.source) &&
-    !isPhase4SupplierPartnerText(memory.source) &&
-    !isPhase5PropertiesRentalsText(memory.source) &&
-    !isPhase6ReportsExportsText(memory.source) &&
-    !isPhase7BackendMessageText(memory.source)
-  ) {
-    return;
   }
 }
 
