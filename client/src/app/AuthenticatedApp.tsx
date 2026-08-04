@@ -74,12 +74,12 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
     <AppLeaveConfirmDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm} onConfirm={handleConfirmLeave} />
   );
   const languageOnboarding = user.id === undefined ? null : <LanguageOnboardingDialog userId={user.id} />;
-const appOverlays = (
-  <>
-    {appOverlays}
-    <RemoteSupportIndicator />
-  </>
-);
+  const appOverlays = (
+    <>
+      {languageOnboarding}
+      <RemoteSupportIndicator />
+    </>
+  );
 
   if (isPOS) {
     return (
