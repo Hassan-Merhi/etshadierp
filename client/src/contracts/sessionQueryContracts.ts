@@ -55,6 +55,7 @@ export function authenticatedUserQueryOptions() {
   return queryOptions({
     queryKey: authenticatedUserQueryKey,
     queryFn: ({ signal }) => fetchAuthenticatedUser(signal),
+    select: (cachedValue) => parseAuthenticatedUser(cachedValue),
     retry: false,
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
@@ -67,6 +68,7 @@ export function userCompaniesQueryOptions() {
   return queryOptions({
     queryKey: userCompaniesQueryKey,
     queryFn: ({ signal }) => fetchUserCompanies(signal),
+    select: (cachedValue) => parseUserCompanies(cachedValue),
     retry: false,
     staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
