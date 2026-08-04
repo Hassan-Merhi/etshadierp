@@ -50,11 +50,20 @@ type RemoteSupportMetric =
 const HARD_DISABLED = process.env.DISABLE_SCREEN_FEED === "true";
 const startedAt = new Date();
 
+function productionFeatureEnabled(environmentKey: string): boolean {
+  if (HARD_DISABLED || process.env.NODE_ENV !== "production") return false;
+  return process.env[environmentKey]?.trim().toLowerCase() !== "false";
+}
+
+const productionRemoteControlEnabled = productionFeatureEnabled("REMOTE_SUPPORT_REMOTE_CONTROL");
+const productionKeyboardControlEnabled =
+  productionRemoteControlEnabled && productionFeatureEnabled("REMOTE_SUPPORT_KEYBOARD_CONTROL");
+
 const bootFlags: RemoteSupportFlags = {
   screenFeedEnabled: !HARD_DISABLED,
   fastScreenFeed: !HARD_DISABLED,
-  remoteControl: false,
-  keyboardControl: false,
+  remoteControl: productionRemoteControlEnabled,
+  keyboardControl: productionKeyboardControlEnabled,
   sensitiveActionProtection: true,
 };
 
