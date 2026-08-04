@@ -19,7 +19,7 @@ permissions:
 
 concurrency:
   group: remote-support-phase8-finish
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   finish:
