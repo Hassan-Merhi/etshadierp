@@ -1,0 +1,7 @@
+FAILED STEP: formatting
+
+Checking formatting...
+[[33mwarn[39m] server/services/security/companyContextEnforcementAdapter.ts
+[[33mwarn[39m] tests/active-company-permission-context.test.ts
+[[33mwarn[39m] tests/company-context-enforcement.test.ts
+[[33mwarn[39m] Code style issues found in 3 files. Run Prettier with --write to fix.
