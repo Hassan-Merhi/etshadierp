@@ -142,6 +142,15 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
+      // /api/auth/me contains active-company role and POS permissions. It is a
+      // global cache entry, so ordinary company-cache cleanup does not remove it.
+      // Refresh it before rendering the newly selected company; otherwise a POS
+      // user can retain canSellNegativeStock from the previously active company.
+      await queryClient.invalidateQueries({
+        queryKey: ["/api/auth/me"],
+        refetchType: "active",
+      });
+
       removeCompanySessionQueries(queryClient);
       commitCompanySelection(company, { prefetch: true, serverSynced: true });
       return true;
