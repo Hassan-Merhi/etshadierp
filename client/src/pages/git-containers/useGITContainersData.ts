@@ -5,8 +5,6 @@ import { BulkProgress } from "./gitContainerTypes";
 
 interface UseGITContainersDataProps {
   isAllowed: boolean;
-  allCompanies: boolean;
-  queryUrl: string;
   refetch: () => void;
   toast: any;
   setImportResult: (v: any) => void;
@@ -18,8 +16,6 @@ interface UseGITContainersDataProps {
 
 export function useGITContainersData({
   isAllowed,
-  allCompanies,
-  queryUrl,
   refetch,
   toast,
   setImportResult,

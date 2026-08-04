@@ -13,19 +13,16 @@ export function ContainerDrawer({
   container,
   open,
   onClose,
-  queryKey,
   sessionCompanyId,
 }: {
   container: EnrichedContainerRow | null;
   open: boolean;
   onClose: () => void;
-  queryKey: string;
   sessionCompanyId: number | null;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<DrawerForm | null>(null);
-  const [lastId, setLastId] = useState<number | null>(null);
   const [trackEnabled, setTrackEnabled] = useState(true);
   const [trackAutoUpdate, setTrackAutoUpdate] = useState(true);
   const [trackCarrierHint, setTrackCarrierHint] = useState("");
@@ -37,7 +34,6 @@ export function ContainerDrawer({
       setTrackEnabled(container.trackingEnabled ?? false);
       setTrackAutoUpdate(container.trackingAutoUpdate ?? true);
       setTrackCarrierHint(container.trackingCarrierHint ?? "");
-      setLastId(container.id);
     }
   }, [open, container]);
 

@@ -139,8 +139,6 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
 
   const { importMutation, undoImportMutation, bulkEnableMutation, bulkTrackMutation } = useGITContainersData({
     isAllowed,
-    allCompanies,
-    queryUrl,
     refetch,
     toast,
     setImportResult,
@@ -556,7 +554,6 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         container={drawerContainer}
-        queryKey={queryUrl}
         sessionCompanyId={sessionCompanyId}
       />
     </div>
