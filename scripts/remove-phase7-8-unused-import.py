@@ -9,3 +9,9 @@ source = source.replace(
     "// Get unified ledger for a supplier across explicitly accessible companies",
 )
 path.write_text(source)
+
+for temporary_path in [
+    Path("docs/.phase7-8-pr-marker"),
+    Path("docs/.phase7-8-pr-marker-note"),
+]:
+    temporary_path.unlink(missing_ok=True)
