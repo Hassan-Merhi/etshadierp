@@ -120,12 +120,17 @@ let materializationTail: Promise<void> = Promise.resolve();
 /**
  * Materialize at most one complete file-backed attachment at a time. This is
  * required for providers such as Green API that still require a complete
- * multipart Buffer. The reusable export remains on disk between retries.
+ * multipart Buffer. Ordinary in-memory POS and invoice attachments keep their
+ * existing direct delivery path and are not added to the scheduled-export queue.
  */
 export async function withSerializedExportAttachmentBuffer<T>(
   source: ExportAttachmentSource,
   work: (buffer: Buffer) => Promise<T>,
 ): Promise<T> {
+  if (!getFileAttachment(source)) {
+    return work(requireBufferSource(source));
+  }
+
   const previous = materializationTail;
   let release!: () => void;
   materializationTail = new Promise<void>((resolve) => {
