@@ -1,9 +1,9 @@
 name: Temporary main CI prerequisite repair
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/main-ci-prerequisites-20260804
+      - main
 
 permissions:
   contents: write
