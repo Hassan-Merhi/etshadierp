@@ -25,7 +25,6 @@ describe("frontend data architecture", () => {
   it("normalizes set-like filter selections before URL creation", () => {
     expect(canonicalSetValues(["Kolwezi", "Lubumbashi", "Kolwezi", ""])).toEqual([
       "Kolwezi",
-      "Kolwezi",
       "Lubumbashi",
     ]);
   });
