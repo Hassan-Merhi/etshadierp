@@ -1,0 +1,260 @@
+name: Remote support Phase 7 repair
+
+on:
+  push:
+    branches:
+      - agent/remote-support-phase-7-audit-protection
+  pull_request:
+    branches:
+      - agent/remote-support-phase-6-keyboard-control
+
+permissions:
+  contents: write
+
+concurrency:
+  group: remote-support-phase7-repair
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.event_name == 'push' || github.head_ref == 'agent/remote-support-phase-7-audit-protection'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/remote-support-phase-7-audit-protection
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - run: npm ci --no-audit --bin-links=true
+      - name: Apply complete Phase 7 repair
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path("client/src/hooks/remote-keyboard-control-policy.ts")
+          text = p.read_text()
+          text = text.replace(
+              "function elementDescriptor(element: HTMLElement): string {",
+              "function elementDescriptor(element: RemoteEditableElement): string {",
+              1,
+          )
+          text = text.replace(
+              "  if (element.disabled || element.readOnly || isProtectedContainer(element)) return false;",
+              "  const readOnly =\n    (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) &&\n    element.readOnly;\n  if (element.disabled || readOnly || isProtectedContainer(element)) return false;",
+              1,
+          )
+          p.write_text(text)
+
+          p = Path("shared/permissionConfig.ts")
+          text = p.read_text()
+          if 'key: "remote_support_view"' not in text:
+              anchor = '  { key: "act_manage_companies", label: "Manage Companies", group: "Admin Actions", type: "action" },\n'
+              if anchor not in text:
+                  raise SystemExit("Permission anchor missing")
+              entries = '''  { key: "act_manage_companies", label: "Manage Companies", group: "Admin Actions", type: "action" },
+          {
+            key: "remote_support_view",
+            label: "View Remote Support Screens",
+            group: "Remote Support",
+            type: "action",
+            description: "Open live screen viewing and create a bounded support session for users in the active company",
+          },
+          {
+            key: "remote_support_mouse",
+            label: "Use Remote Support Mouse",
+            group: "Remote Support",
+            type: "action",
+            description: "Enable guarded pointer, safe click, and scrolling commands in the exact ERP browser tab",
+          },
+          {
+            key: "remote_support_keyboard",
+            label: "Use Remote Support Keyboard",
+            group: "Remote Support",
+            type: "action",
+            description: "Enable guarded keyboard input only for safe or explicitly approved ERP fields",
+          },
+          {
+            key: "remote_support_audit",
+            label: "View Remote Support Audit",
+            group: "Remote Support",
+            type: "action",
+            description: "View permanent company-scoped remote support session and command metadata",
+          },
+          '''
+              text = text.replace(anchor, entries, 1)
+          p.write_text(text)
+
+          p = Path("server/services/remoteControlSessionService.ts")
+          text = p.read_text()
+          if "type SessionStopListener" not in text:
+              text = text.replace(
+                  "type TargetListener = () => void;\n",
+                  "type TargetListener = () => void;\ntype SessionStopListener = (session: RemoteControlSession) => void;\n",
+                  1,
+              )
+          if "const sessionStopListeners" not in text:
+              text = text.replace(
+                  "const targetListeners = new Map<string, Set<TargetListener>>();\n",
+                  "const targetListeners = new Map<string, Set<TargetListener>>();\nconst sessionStopListeners = new Set<SessionStopListener>();\n",
+                  1,
+              )
+          if "const stoppedSnapshot = copySession(session)" not in text:
+              marker = "  notifyTarget(session.targetUserId);\n  return session;\n"
+              replacement = '''  notifyTarget(session.targetUserId);
+          const stoppedSnapshot = copySession(session) as RemoteControlSession;
+          for (const listener of sessionStopListeners) {
+            try {
+              listener(stoppedSnapshot);
+            } catch {
+              // Stop observers must never prevent a fail-safe stop.
+            }
+          }
+          return session;
+          '''
+              if marker not in text:
+                  raise SystemExit("Stop listener marker missing")
+              text = text.replace(marker, replacement, 1)
+          if "export function subscribeRemoteControlSessionStops" not in text:
+              marker = "export function cleanupRemoteControlState(now = Date.now()): void {\n"
+              replacement = '''export function subscribeRemoteControlSessionStops(listener: SessionStopListener): () => void {
+            sessionStopListeners.add(listener);
+            return () => sessionStopListeners.delete(listener);
+          }
+
+          export function cleanupRemoteControlState(now = Date.now()): void {
+          '''
+              if marker not in text:
+                  raise SystemExit("Cleanup marker missing")
+              text = text.replace(marker, replacement, 1)
+          if "sessionStopListeners.clear();" not in text:
+              text = text.replace(
+                  "  targetListeners.clear();\n}\n\nconst cleanupTimer",
+                  "  targetListeners.clear();\n  sessionStopListeners.clear();\n}\n\nconst cleanupTimer",
+                  1,
+              )
+          p.write_text(text)
+
+          p = Path("server/routes/applicationRoutes.ts")
+          text = p.read_text()
+          keyboard_import = 'import { registerRemoteKeyboardControlRoutes } from "./remoteKeyboardControlRoutes";\n'
+          if 'registerRemoteSupportAuditRoutes' not in text:
+              text = text.replace(
+                  keyboard_import,
+                  keyboard_import + 'import { registerRemoteSupportAuditRoutes } from "./remoteSupportAuditRoutes";\n',
+                  1,
+              )
+          if 'installRemoteSupportSessionStopAudit' not in text:
+              audit_import = 'import { registerRemoteSupportAuditRoutes } from "./remoteSupportAuditRoutes";\n'
+              text = text.replace(
+                  audit_import,
+                  audit_import + 'import { installRemoteSupportSessionStopAudit } from "../services/remoteSupportAuditService";\n',
+                  1,
+              )
+          if "installRemoteSupportSessionStopAudit();" not in text:
+              text = text.replace(
+                  "export async function registerApplicationRoutes(app: Express): Promise<Server> {\n",
+                  "export async function registerApplicationRoutes(app: Express): Promise<Server> {\n  installRemoteSupportSessionStopAudit();\n",
+                  1,
+              )
+          if "registerRemoteSupportAuditRoutes(app);" not in text:
+              text = text.replace(
+                  "  registerRemoteKeyboardControlRoutes(app);\n",
+                  "  registerRemoteKeyboardControlRoutes(app);\n  registerRemoteSupportAuditRoutes(app);\n",
+                  1,
+              )
+          p.write_text(text)
+
+          for test_path in [
+              "tests/remote-control-command-service.test.ts",
+              "tests/remote-keyboard-command-service.test.ts",
+          ]:
+              p = Path(test_path)
+              text = p.read_text()
+              if "companyId: 7" not in text:
+                  text = text.replace(
+                      '    tabId: "erp-tab-1",\n    route: "/dashboard",',
+                      '    tabId: "erp-tab-1",\n    companyId: 7,\n    route: "/dashboard",',
+                      1,
+                  )
+              if "controllerCompanyId: 7" not in text:
+                  text = text.replace(
+                      '    controllerRole: "Developer",\n    durationMs:',
+                      '    controllerRole: "Developer",\n    controllerCompanyId: 7,\n    durationMs:',
+                      1,
+                  )
+              p.write_text(text)
+
+          p = Path("client/src/components/remote-support-indicator-policy.test.ts")
+          text = p.read_text()
+          if "companyId: 7" not in text:
+              text = text.replace('    id: "session-1",\n', '    id: "session-1",\n    companyId: 7,\n', 1)
+          if 'targetRoute: "/dashboard"' not in text:
+              text = text.replace(
+                  '    targetTabId: "tab-1",\n',
+                  '    targetTabId: "tab-1",\n    targetRoute: "/dashboard",\n',
+                  1,
+              )
+          p.write_text(text)
+
+          p = Path("client/src/pages/settings/AuditLogUtils.tsx")
+          text = p.read_text()
+          if 'remote_support_sessions: "Remote Support"' not in text:
+              text = text.replace(
+                  '  security_events: "Security Events",\n',
+                  '  security_events: "Security Events",\n  remote_support_sessions: "Remote Support",\n',
+                  1,
+              )
+          if 'remote_support_session_started: "Support Session Started"' not in text:
+              text = text.replace(
+                  '  settings_change: "Settings Changed",\n',
+                  '''  settings_change: "Settings Changed",
+            remote_support_session_started: "Support Session Started",
+            remote_support_session_stopped: "Support Session Stopped",
+            remote_support_mouse_authorized: "Mouse Control Enabled",
+            remote_support_mouse_revoked: "Mouse Control Disabled",
+            remote_support_keyboard_authorized: "Keyboard Control Enabled",
+            remote_support_keyboard_revoked: "Keyboard Control Disabled",
+            remote_support_mouse_command: "Mouse Command Requested",
+            remote_support_mouse_result: "Mouse Command Result",
+            remote_support_keyboard_command: "Keyboard Command Requested",
+            remote_support_keyboard_result: "Keyboard Command Result",
+            remote_support_command_blocked: "Remote Command Blocked",
+            remote_support_permission_denied: "Remote Support Permission Denied",
+          ''',
+                  1,
+              )
+          p.write_text(text)
+          PY
+      - name: Format and verify type safety
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            client/src/hooks/remote-keyboard-control-policy.ts \
+            client/src/components/remote-support-indicator-policy.test.ts \
+            client/src/pages/settings/AuditLogUtils.tsx \
+            shared/permissionConfig.ts \
+            server/services/remoteControlSessionService.ts \
+            server/services/remoteSupportAuditService.ts \
+            server/routes/applicationRoutes.ts \
+            tests/remote-control-command-service.test.ts \
+            tests/remote-keyboard-command-service.test.ts
+          npm run check
+          node node_modules/vitest/vitest.mjs run \
+            tests/remote-control-session-service.test.ts \
+            tests/remote-control-command-service.test.ts \
+            tests/remote-keyboard-command-service.test.ts \
+            tests/remote-support-audit-service.test.ts \
+            tests/remote-support-sensitive-action-policy.test.ts \
+            tests/remote-support-permission-contract.test.ts \
+            --maxWorkers=1 --no-file-parallelism
+      - name: Commit repair
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client server shared tests
+          git commit -m "fix(remote-support): repair Phase 7 permission and audit wiring"
+          git push --no-verify origin HEAD:agent/remote-support-phase-7-audit-protection
