@@ -40,6 +40,7 @@ interface CombinedInventoryPage {
   pageSize: number;
   total: number;
   totalPages: number;
+  totals: { quantity: number; value: number | null };
 }
 
 interface UseLocationInventoryQueriesParams {
@@ -78,6 +79,7 @@ const EMPTY_COMBINED_PAGE: CombinedInventoryPage = {
   pageSize: 50,
   total: 0,
   totalPages: 1,
+  totals: { quantity: 0, value: null },
 };
 
 export function useLocationInventoryQueries({
@@ -173,7 +175,7 @@ export function useLocationInventoryQueries({
       if (showNegativeStock) params.set("negativeOnly", "true");
       if (debouncedItemSearch.trim()) params.set("search", debouncedItemSearch.trim());
       if (selectedGroup) params.set("groupId", selectedGroup.groupId == null ? "none" : String(selectedGroup.groupId));
-      if (itemCategoryFilter.length === 1) params.set("categoryId", itemCategoryFilter[0]);
+      if (itemCategoryFilter.length > 0) params.set("categoryIds", itemCategoryFilter.join(","));
       const res = await fetch(`/api/locations/${selectedLocationLocal!.id}/inventory?${params.toString()}`, {
         credentials: "include",
         signal,
@@ -308,6 +310,7 @@ export function useLocationInventoryQueries({
       total: allInventoryPage.total,
       totalPages: allInventoryPage.totalPages,
     },
+    allInventoryTotals: allInventoryPage.totals,
     allNegativeStock,
     negativeStockLoading,
     categoriesList,

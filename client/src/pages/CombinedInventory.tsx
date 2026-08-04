@@ -118,7 +118,7 @@ export default function CombinedInventory() {
   const inventoryTotalPages = inventoryPage?.totalPages ?? 1;
 
   const { data: allStockItems = [], isLoading: loadingStockItems } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items/light", selectedCompany?.id],
+    queryKey: ["/api/stock-items/light?all=true", selectedCompany?.id],
     enabled: includeZero,
     staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,

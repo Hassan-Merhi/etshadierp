@@ -98,7 +98,7 @@ export function DataToolsTab() {
 
   // Fetch stock items for silent production picker (developer-only, lightweight)
   const { data: allStockItems = [] } = useQuery<any[]>({
-    queryKey: ["/api/stock-items/light", selectedCompany?.id],
+    queryKey: ["/api/stock-items/light?all=true", selectedCompany?.id],
     enabled: !!selectedCompany && dtCurrentUser?.role === "Developer",
     staleTime: 10 * 60 * 1000,
     refetchOnMount: false,

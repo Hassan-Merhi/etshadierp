@@ -33,7 +33,7 @@ export function useVoucherEditQueries({ id, selectedCompanyId }: UseVoucherEditQ
   // /api/stock-items/light. Reuse the same cache key as voucher creation screens
   // so opening edit/create flows does not download the ~634 KB full list twice.
   const { data: stockItems = [] } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items/light", selectedCompanyId],
+    queryKey: ["/api/stock-items/light?all=true", selectedCompanyId],
     enabled: !!selectedCompanyId,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,

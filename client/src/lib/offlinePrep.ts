@@ -170,7 +170,7 @@ function buildPacks(): PrepPack[] {
           label: "Stock items",
           // Use the lightweight endpoint — only id/code/name/uom/barcode/active needed
           // for offline lookups.  The full 649 KB payload is not required here.
-          endpoint: "/api/stock-items/light",
+          endpoint: "/api/stock-items/light?all=true",
           tableKey: "stockItems",
           extractItems: (data, cid) => extractArray(data).map((s: any) => toEntity(s.id, cid, s)),
         },

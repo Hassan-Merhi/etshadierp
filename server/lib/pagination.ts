@@ -13,12 +13,7 @@ function firstValue(value: unknown): unknown {
   return Array.isArray(value) ? value[0] : value;
 }
 
-export function parseBoundedInteger(
-  value: unknown,
-  fallback: number,
-  minimum: number,
-  maximum: number
-): number {
+export function parseBoundedInteger(value: unknown, fallback: number, minimum: number, maximum: number): number {
   const parsed = Number.parseInt(String(firstValue(value) ?? ""), 10);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(maximum, Math.max(minimum, parsed));

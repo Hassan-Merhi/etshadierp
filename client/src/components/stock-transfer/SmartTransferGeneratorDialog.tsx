@@ -289,9 +289,9 @@ export default function SmartTransferGeneratorDialog({
   });
 
   const { data: stockItems = [] } = useQuery<StockItemLight[]>({
-    queryKey: ["/api/stock-items/light", "smart-transfer-generator"],
+    queryKey: ["/api/stock-items/light?all=true", "smart-transfer-generator"],
     queryFn: async () => {
-      const response = await fetch("/api/stock-items/light", { credentials: "include" });
+      const response = await fetch("/api/stock-items/light?all=true", { credentials: "include" });
       if (!response.ok) throw new Error("Failed to load stock items");
       return response.json();
     },

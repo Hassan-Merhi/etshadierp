@@ -43,6 +43,7 @@ export interface MasterPriceListResponse {
 export interface PaginatedPriceListResponse {
   data: PriceListItem[];
   groups: string[];
+  unpricedByGroup: { name: string; count: number }[];
   counts: { total: number; priced: number; unpriced: number };
   page: number;
   pageSize: number;

@@ -1,5 +1,5 @@
 import { pool } from "../../db";
-import { buildPaginationMeta, parsePagination, parseSearchQuery } from "../../lib/pagination";
+import { buildPaginationMeta, parseIdList, parsePagination, parseSearchQuery } from "../../lib/pagination";
 
 interface InventoryQuery {
   [key: string]: unknown;
@@ -78,29 +78,46 @@ function buildFilters(query: InventoryQuery, values: unknown[]): string[] {
     return `$${values.length}`;
   };
 
+  const identityConditions: string[] = [];
   const search = parseSearchQuery(query.search);
   if (search) {
     const searchParam = addValue(`%${search}%`);
-    conditions.push(`(
+    identityConditions.push(`(
       "stockItemCode" ILIKE ${searchParam}
       OR "stockItemName" ILIKE ${searchParam}
       OR COALESCE("stockGroupName", '') ILIKE ${searchParam}
       OR COALESCE("categoryName", '') ILIKE ${searchParam}
     )`);
   }
+  const selectedIds = parseIdList(query.ids);
+  if (selectedIds.length > 0) {
+    identityConditions.push(`"stockItemId" = ANY(${addValue(selectedIds)}::int[])`);
+  }
+  if (identityConditions.length > 0) {
+    conditions.push(`(${identityConditions.join(" OR ")})`);
+  }
 
   const groupId = String(query.groupId ?? "").trim();
-  if (groupId === "none") {
+  if (groupId === "none" || groupId === "null") {
     conditions.push('"stockGroupId" IS NULL');
   } else if (/^\d+$/.test(groupId)) {
     conditions.push(`"stockGroupId" = ${addValue(Number(groupId))}`);
   }
 
-  const categoryId = String(query.categoryId ?? "").trim();
-  if (categoryId === "none") {
+  const categoryParts = String(query.categoryIds ?? query.categoryId ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const includeUncategorized = categoryParts.includes("none") || categoryParts.includes("null");
+  const categoryIds = Array.from(
+    new Set(categoryParts.filter((part) => /^\d+$/.test(part)).map((part) => Number(part)))
+  ).slice(0, 50);
+  if (categoryIds.length > 0 && includeUncategorized) {
+    conditions.push(`("categoryId" = ANY(${addValue(categoryIds)}::int[]) OR "categoryId" IS NULL)`);
+  } else if (categoryIds.length > 0) {
+    conditions.push(`"categoryId" = ANY(${addValue(categoryIds)}::int[])`);
+  } else if (includeUncategorized) {
     conditions.push('"categoryId" IS NULL');
-  } else if (/^\d+$/.test(categoryId)) {
-    conditions.push(`"categoryId" = ${addValue(Number(categoryId))}`);
   }
 
   if (query.negativeOnly === "true") {
@@ -110,12 +127,7 @@ function buildFilters(query: InventoryQuery, values: unknown[]): string[] {
   return conditions;
 }
 
-export async function getPaginatedLocationInventory({
-  companyId,
-  locationId,
-  query,
-  isPOS,
-}: LocationInventoryArgs) {
+export async function getPaginatedLocationInventory({ companyId, locationId, query, isPOS }: LocationInventoryArgs) {
   const includeZero = query.includeZero === "true";
   const { page, pageSize, offset } = parsePagination(query, { defaultPageSize: 50, maxPageSize: 100 });
   const values: unknown[] = [locationId, companyId];
@@ -185,6 +197,7 @@ export async function getLocationInventorySummary({ companyId, locationId, query
        COALESCE(SUM(quantity::numeric), 0)::text AS "totalQuantity",
        COALESCE(SUM("totalValue"::numeric), 0)::text AS "totalValue",
        COALESCE(BOOL_OR(quantity::numeric < 0), false) AS "hasNegative",
+       COALESCE(BOOL_OR("categoryId" IS NULL), false) AS "hasUncategorized",
        COALESCE(array_remove(array_agg(DISTINCT "categoryId"), NULL), ARRAY[]::int[]) AS "categoryIds"
      FROM filtered
      GROUP BY "stockGroupId"
@@ -204,6 +217,7 @@ export async function getLocationInventorySummary({ companyId, locationId, query
       totalValue,
       averageRate: !isPOS && totalQuantity !== 0 ? totalValue / totalQuantity : 0,
       hasNegative: Boolean(row.hasNegative),
+      hasUncategorized: Boolean(row.hasUncategorized),
       categoryIds: (row.categoryIds ?? []).map(Number),
       items: [],
     };

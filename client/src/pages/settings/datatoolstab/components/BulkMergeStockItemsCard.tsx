@@ -71,7 +71,7 @@ export function BulkMergeStockItemsCard({ embedded }: { embedded?: boolean }) {
       if (!res.ok) throw new Error(data.message || "Bulk merge failed");
       setResults(data.results ?? []);
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light?all=true"] });
       const succeeded = (data.results as BulkMergeResult[]).filter((r) => r.status === "success").length;
       toast({ title: `Bulk merge done — ${succeeded} of ${data.results.length} merged` });
     } catch (err: any) {

@@ -150,7 +150,7 @@ function NewItemsTab() {
       });
       await apiRequest("POST", "/api/stock-items/import", { items: itemsToImport });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light?all=true"] });
       setImportComplete(true);
       toast({ title: "Import Successful", description: `Successfully imported ${itemsToImport.length} stock items` });
     } catch (error: any) {
@@ -663,7 +663,7 @@ function UpdateCategoriesTab() {
       const data = await (res as any).json();
       setResult(data);
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light?all=true"] });
       toast({
         title: "Update Complete",
         description: `${data.updated} items updated${data.notFound ? `, ${data.notFound} item codes not found` : ""}${data.categoryNotFound ? `, ${data.categoryNotFound} category names not found` : ""}`,

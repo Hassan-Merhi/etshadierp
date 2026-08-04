@@ -30,7 +30,7 @@ export function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
   const [isMerging, setIsMerging] = useState(false);
 
   const { data: allStockItems = [] } = useQuery<{ id: number; name: string; code: string }[]>({
-    queryKey: ["/api/stock-items/light", selectedCompany?.id],
+    queryKey: ["/api/stock-items/light?all=true", selectedCompany?.id],
     staleTime: 10 * 60 * 1000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
@@ -71,7 +71,7 @@ export function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
       }
       toast({ title: "Merge complete", description: `"${dupItem.name}" has been merged into "${keptItem.name}".` });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light?all=true"] });
       queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats/net-profit"] });
       setKeptItem(null);

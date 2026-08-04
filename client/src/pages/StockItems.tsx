@@ -191,7 +191,7 @@ export default function StockItems() {
     mutationFn: async (ids: number[]) => apiRequest("POST", "/api/stock-items/bulk-delete", { ids }),
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light?all=true"] });
       setSelectedIds([]);
       toast({ title: "Success", description: data.message || "Stock items deleted successfully" });
     },
@@ -207,7 +207,7 @@ export default function StockItems() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light?all=true"] });
       setAdjustDialogOpen(false);
       setAdjustStockItemId("");
       setAdjustLocationId("");
@@ -226,7 +226,7 @@ export default function StockItems() {
       apiRequest("POST", "/api/stock-items/bulk-assign-category", { ids, categoryId }),
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light?all=true"] });
       setSelectedIds([]);
       setAssignCategoryDialogOpen(false);
       setPendingCategoryId("");
@@ -272,7 +272,7 @@ export default function StockItems() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-grades"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light?all=true"] });
       toast({ title: "Grade deleted" });
     },
     onError: (error: Error) => {
@@ -315,7 +315,7 @@ export default function StockItems() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-categories"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light?all=true"] });
       toast({ title: "Category deleted" });
     },
     onError: (error: Error) => {

@@ -40,8 +40,12 @@ export async function getInventoryPage(companyId: number, filters: InventoryList
   const offset = (filters.page - 1) * filters.pageSize;
 
   if (filters.profile === "combined") {
-    const [{ total }] = await db
-      .select({ total: sql<number>`count(DISTINCT ${inventory.stockItemId})::int` })
+    const [summary] = await db
+      .select({
+        total: sql<number>`count(DISTINCT ${inventory.stockItemId})::int`,
+        totalQuantity: sql<string>`COALESCE(SUM(${inventory.quantity}::numeric), 0)::text`,
+        totalValue: sql<string>`COALESCE(SUM(${inventory.totalValue}::numeric), 0)::text`,
+      })
       .from(inventory)
       .leftJoin(stockItems, eq(inventory.stockItemId, stockItems.id))
       .leftJoin(stockGroups, eq(stockItems.stockGroupId, stockGroups.id))
@@ -89,12 +93,17 @@ export async function getInventoryPage(companyId: number, filters: InventoryList
       .limit(filters.pageSize)
       .offset(offset);
 
+    const total = Number(summary?.total ?? 0);
     return {
       data,
       page: filters.page,
       pageSize: filters.pageSize,
       total,
-      totalPages: Math.ceil(total / filters.pageSize),
+      totalPages: Math.max(1, Math.ceil(total / filters.pageSize)),
+      totals: {
+        quantity: Number(summary?.totalQuantity ?? 0),
+        value: Number(summary?.totalValue ?? 0),
+      },
     };
   }
 
@@ -141,6 +150,6 @@ export async function getInventoryPage(companyId: number, filters: InventoryList
     page: filters.page,
     pageSize: filters.pageSize,
     total,
-    totalPages: Math.ceil(total / filters.pageSize),
+    totalPages: Math.max(1, Math.ceil(total / filters.pageSize)),
   };
 }

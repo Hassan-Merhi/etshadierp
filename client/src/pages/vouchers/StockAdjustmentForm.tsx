@@ -13,6 +13,7 @@ import { formatNumber } from "@/lib/formatNumber";
 import { utils, writeFile } from "@/lib/excelHelper";
 import { parseDateLocal } from "@/components/vouchers/PrintTemplate";
 import { useToast } from "@/hooks/use-toast";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,12 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { X, Plus, FileDown, ChevronDown, Search } from "lucide-react";
 
-import type {
-  Location,
-  StockAdjustmentFormData,
-  StockAdjustmentFormProps,
-  StockItem,
-} from "./stockadjustmentform/types";
+import type { Location, StockAdjustmentFormData, StockAdjustmentFormProps } from "./stockadjustmentform/types";
 import { stockAdjustmentFormSchema } from "./stockadjustmentform/utils";
 export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProps) {
   const { toast } = useToast();
@@ -45,12 +41,6 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
   const [, setLocation] = useLocation();
   const hydratedVoucherIdRef = useRef<number | null>(null);
 
-  const { data: stockItems = [] } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items/light", selectedCompany?.id],
-    staleTime: 5 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  });
   const { data: locations = [] } = useQuery<Location[]>({
     queryKey: ["/api/locations", selectedCompany?.id],
   });
@@ -112,46 +102,58 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
   const displayAdjustmentTotal =
     currentAdjustmentType === "Mixed" ? productionTotal - consumptionTotal : consumptionTotal + productionTotal;
 
-  const { data: locationInventory = [] } = useQuery<any[]>({
-    queryKey: ["/api/adjustment-location-inventory", adjustmentLocationId],
-    enabled: adjustmentLocationId > 0,
-    queryFn: async () => {
-      const response = await fetch(`/api/locations/${adjustmentLocationId}/inventory`);
-      if (!response.ok) throw new Error("Failed to fetch inventory");
-      return response.json();
-    },
-  });
-
   const [adjustmentSearchTerm, setAdjustmentSearchTerm] = useState("");
+  const debouncedAdjustmentSearch = useDebouncedValue(adjustmentSearchTerm, 250);
   const [adjustmentHighlightedIndex, setAdjustmentHighlightedIndex] = useState(0);
   const [activeAdjustmentRow, setActiveAdjustmentRow] = useState<number | null>(null);
   const [showAdjustmentSidebar, setShowAdjustmentSidebar] = useState(false);
   const adjustmentFocusIdRef = useRef(0);
   const adjustmentSidebarRef = useRef<HTMLDivElement>(null);
 
-  const adjustmentItemsWithInventory = useMemo(() => {
-    if (!stockItems.length) return [];
-    return stockItems
-      .map((item) => {
-        const inv = locationInventory.find((i: any) => i.stockItemId === item.id);
-        return {
-          stockItemId: item.id,
-          stockItemCode: item.code,
-          stockItemName: item.name,
-          quantity: inv?.quantity || "0",
-          averageRate: inv?.averageRate || "0",
-        };
-      })
-      .sort((a, b) => a.stockItemName.localeCompare(b.stockItemName));
-  }, [stockItems, locationInventory]);
+  const effectiveAdjustmentLocationId = adjustmentLocationId || Number(stockAdjustmentToEdit?.locationId || 0);
+  const selectedAdjustmentItemIds = Array.from(
+    new Set([
+      ...adjustmentEntries.map((entry) => entry.stockItemId).filter((id) => id > 0),
+      ...((stockAdjustmentToEdit?.items ?? []) as any[]).map((item) => Number(item.stockItemId)).filter((id) => id > 0),
+    ])
+  );
+  const { data: locationInventoryPage } = useQuery<{ data: any[] }>({
+    queryKey: [
+      "/api/locations",
+      effectiveAdjustmentLocationId,
+      "inventory",
+      "adjustment-search",
+      debouncedAdjustmentSearch,
+      selectedAdjustmentItemIds.join(","),
+    ],
+    queryFn: async ({ signal }) => {
+      const params = new URLSearchParams({ page: "1", pageSize: "100", includeZero: "true" });
+      if (debouncedAdjustmentSearch.trim()) params.set("search", debouncedAdjustmentSearch.trim());
+      if (selectedAdjustmentItemIds.length > 0) params.set("ids", selectedAdjustmentItemIds.join(","));
+      const response = await fetch(`/api/locations/${effectiveAdjustmentLocationId}/inventory?${params.toString()}`, {
+        credentials: "include",
+        signal,
+      });
+      if (!response.ok) throw new Error("Failed to fetch inventory");
+      return response.json();
+    },
+    enabled: effectiveAdjustmentLocationId > 0,
+    placeholderData: (previous) => previous,
+  });
+  const locationInventory = locationInventoryPage?.data ?? [];
 
-  const filteredAdjustmentItems = useMemo(() => {
-    if (!adjustmentSearchTerm.trim()) return adjustmentItemsWithInventory;
-    const term = adjustmentSearchTerm.toLowerCase();
-    return adjustmentItemsWithInventory.filter(
-      (item) => item.stockItemName?.toLowerCase().includes(term) || item.stockItemCode?.toLowerCase().includes(term)
-    );
-  }, [adjustmentItemsWithInventory, adjustmentSearchTerm]);
+  const adjustmentItemsWithInventory = useMemo(
+    () =>
+      locationInventory.map((item: any) => ({
+        stockItemId: Number(item.stockItemId),
+        stockItemCode: item.stockItemCode || "",
+        stockItemName: item.stockItemName || "",
+        quantity: item.quantity || "0",
+        averageRate: item.averageRate || "0",
+      })),
+    [locationInventory]
+  );
+  const filteredAdjustmentItems = adjustmentItemsWithInventory;
 
   useEffect(() => {
     if (showAdjustmentSidebar && adjustmentSidebarRef.current) {
@@ -162,18 +164,18 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
   }, [adjustmentHighlightedIndex, showAdjustmentSidebar]);
 
   useEffect(() => {
-    if (stockAdjustmentToEdit && stockAdjustmentToEdit.items && voucherToEdit && stockItems.length > 0) {
+    if (stockAdjustmentToEdit && stockAdjustmentToEdit.items && voucherToEdit && locationInventory.length > 0) {
       if (hydratedVoucherIdRef.current === voucherIdToEdit) return;
       const formEntries = stockAdjustmentToEdit.items.map((item: any) => {
-        const stockItem = stockItems.find((s) => s.id === item.stockItemId);
+        const stockItem = locationInventory.find((s: any) => s.stockItemId === item.stockItemId);
         const quantity = parseFloat(item.quantity || "0");
         const type = quantity < 0 ? "CONSUME" : "PRODUCE";
         const absQuantity = Math.abs(quantity).toString();
         return {
           type,
           stockItemId: item.stockItemId || 0,
-          stockItemCode: stockItem?.code || "",
-          stockItemName: stockItem?.name || "",
+          stockItemCode: stockItem?.stockItemCode || "",
+          stockItemName: stockItem?.stockItemName || "",
           quantity: absQuantity,
           rate: item.rate || "0",
         };
@@ -199,7 +201,7 @@ export function StockAdjustmentForm({ voucherIdToEdit }: StockAdjustmentFormProp
       });
       hydratedVoucherIdRef.current = voucherIdToEdit;
     }
-  }, [stockAdjustmentToEdit, voucherToEdit, stockItems, stockAdjustmentForm]); // eslint-disable-line
+  }, [stockAdjustmentToEdit, voucherToEdit, locationInventory, stockAdjustmentForm]); // eslint-disable-line
 
   const stockAdjustmentMutation = useMutation({
     mutationFn: async (data: StockAdjustmentFormData) => {

@@ -1,19 +1,17 @@
-# Stock items bandwidth: lightweight voucher callers
+# Stock items bandwidth: lightweight callers
 
-## Scope
+## Default behavior
 
-Voucher creation and voucher editing only require stock item identity fields (`id`, `code`, `name`, `uom`). They now use `/api/stock-items/light` instead of downloading the full stock item payload.
+`/api/stock-items/light` is paginated by default, capped at 100 records, and supports server-side search by original item name, code, barcode alias, selected IDs, and location. It returns only selector identity fields. Original stock item and stock group names are never translated or modified.
 
-## Cache behavior
+## Selector flows
 
-Both flows use the same query-key prefix and company id:
+Stock transfer, stock adjustment, and transfer-order workflows use server search or already-loaded location summaries. Selected/edit items are hydrated by ID, so opening a normal voucher screen no longer downloads the full company item list.
 
-```ts
-["/api/stock-items/light", selectedCompanyId]
-```
+## Explicit full-list flows
 
-This lets React Query share the lightweight response across voucher create/edit screens while preserving company-specific cache isolation.
+Management, import, repair, and bulk-edit pages that genuinely require every lightweight identity record opt in with `all=true`. These are explicit on-demand operations rather than ordinary selector navigation.
 
-## Safety
+## Full records
 
-The full `/api/stock-items` endpoint remains unchanged for screens that require prices, costs, aliases, location pricing, tax fields, or other extended stock-item data.
+Full stock item data remains available from `/api/stock-items/:id` only after an item is selected or opened.

@@ -510,13 +510,13 @@ export function keyStartsWith(prefix: string) {
 export function invalidateStockItemLight(companyId?: number | string): void {
   // Exact-key invalidation: only the lightweight endpoint, optionally scoped.
   queryClient.invalidateQueries({
-    queryKey: ["/api/stock-items/light", companyId],
+    queryKey: ["/api/stock-items/light?all=true", companyId],
     refetchType: "active",
   });
   // Also cover callers that stored companyId as undefined (still the same session).
   if (companyId !== undefined) {
     queryClient.invalidateQueries({
-      queryKey: ["/api/stock-items/light", undefined],
+      queryKey: ["/api/stock-items/light?all=true", undefined],
       refetchType: "active",
     });
   }
@@ -529,7 +529,7 @@ export function invalidateStockItemLight(companyId?: number | string): void {
  */
 export function invalidateStockItemPageQueries(): void {
   // Matches ["/api/stock-items", { page, ... }] keys used by the management page.
-  // Does NOT match ["/api/stock-items/light", ...] because the first element differs.
+  // Does NOT match ["/api/stock-items/light?all=true", ...] because the first element differs.
   queryClient.invalidateQueries({
     predicate: (query) => {
       const key = query.queryKey;

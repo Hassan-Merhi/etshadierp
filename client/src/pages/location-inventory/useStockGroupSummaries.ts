@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import type { InventoryItem, StockGroupSummary } from "./locationInventoryTypes";
 
 interface InventorySummary {
-  groups: Array<StockGroupSummary & { hasNegative?: boolean; categoryIds?: number[] }>;
+  groups: Array<StockGroupSummary & { hasNegative?: boolean; hasUncategorized?: boolean; categoryIds?: number[] }>;
   totals: { items: number; quantity: number; value: number | null };
 }
 
@@ -120,7 +120,7 @@ export function useStockGroupSummaries({
         } else {
           const categoryIds = (group.categoryIds ?? []).map(String);
           if (groupCategoryFilter === "none") {
-            if (!categoryIds.includes("null") && categoryIds.length === group.itemCount) return false;
+            if (!group.hasUncategorized) return false;
           } else if (!categoryIds.includes(groupCategoryFilter)) {
             return false;
           }

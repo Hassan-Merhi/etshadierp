@@ -145,6 +145,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     allInventoryData,
     allInventoryLoading,
     allInventoryPagination,
+    allInventoryTotals,
     allNegativeStock,
     negativeStockLoading,
     categoriesList,
@@ -289,6 +290,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 ...allInventoryPagination,
                 onPageChange: setAllStockPage,
               }}
+              totals={allInventoryTotals}
             />
           </div>
         ) : (

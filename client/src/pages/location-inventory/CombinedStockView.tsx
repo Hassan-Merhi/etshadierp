@@ -40,6 +40,7 @@ interface CombinedStockViewProps {
     totalPages: number;
     onPageChange: (page: number) => void;
   };
+  totals: { quantity: number; value: number | null };
 }
 
 export function CombinedStockView({
@@ -64,6 +65,7 @@ export function CombinedStockView({
   posUser,
   allStockTableRef,
   pagination,
+  totals,
 }: CombinedStockViewProps) {
   // Table columns: locations that actually have stock (derived from inventory data)
   const uniqueLocationNames = Array.from(new Map(allInventoryLocations.map((l) => [l.name, l])).values());
@@ -100,7 +102,7 @@ export function CombinedStockView({
           {!posUser && (
             <div className="flex items-center gap-2 bg-primary/10 rounded-lg px-3 py-2">
               <span className="text-sm font-semibold font-mono text-primary">
-                {formatAmount(filteredCombinedRows.reduce((s, r) => s + r.totalValue, 0))}
+                {formatAmount(Number(totals.value ?? 0))}
               </span>
               <span className="text-xs text-muted-foreground">total value</span>
             </div>
@@ -413,7 +415,7 @@ export function CombinedStockView({
                   </td>
                   <td className="px-4 py-2.5 text-right font-mono whitespace-nowrap text-muted-foreground">—</td>
                   <td className="px-4 py-2.5 text-right font-mono whitespace-nowrap">
-                    {formatAmount(filteredCombinedRows.reduce((s, r) => s + r.totalValue, 0))}
+                    {formatAmount(Number(totals.value ?? 0))}
                   </td>
                 </tr>
               </tfoot>

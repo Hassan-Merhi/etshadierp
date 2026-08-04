@@ -210,6 +210,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   // Groups that have at least one unpriced item, with their counts — used for the chip picker
   const unpricedByGroup = useMemo<{ name: string; count: number }[]>(() => {
     if (!showUnpriced) return [];
+    if (!isAllMode) return priceListResponse?.unpricedByGroup ?? [];
     const map = new Map<string, number>();
     for (const item of locationPricedList) {
       if (!isItemUnpriced(item)) continue;
@@ -219,7 +220,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     return Array.from(map.entries())
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [locationPricedList, showUnpriced, isAllMode]);
+  }, [locationPricedList, showUnpriced, isAllMode, priceListResponse?.unpricedByGroup]);
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -267,7 +268,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       if (isAllMode) {
         queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list-by-masters"] });
       } else {
-        queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list", selectedLocationId] });
+        queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list"], refetchType: "active" });
       }
       toast({ title: "Price updated" });
       const current = editingItemRef.current;
@@ -557,7 +558,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       setImportDialogOpen(false);
       setImportPreview([]);
       queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list-by-masters"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list", selectedLocationId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list"], refetchType: "active" });
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message || "Something went wrong.", variant: "destructive" });
     } finally {
@@ -566,12 +567,40 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   };
 
   const exportToExcel = async () => {
-    if (filteredItems.length === 0) return;
+    if (totalItemCount === 0) return;
     setExporting(true);
     try {
       const XLSX = await import("@/lib/excelHelper");
+      let exportItems = filteredItems;
 
-      const rows = filteredItems.map((item: any) => {
+      if (!isAllMode && selectedLocationId) {
+        const fetchPage = async (exportPage: number) => {
+          const params = new URLSearchParams({
+            locationId: String(selectedLocationId),
+            page: String(exportPage),
+            pageSize: "100",
+          });
+          if (search.trim()) params.set("search", search.trim());
+          if (groupFilter !== "all") params.set("group", groupFilter);
+          if (showUnpriced) params.set("unpriced", "true");
+          if (posUser) params.set("availableOnly", "true");
+          const response = await fetch(`/api/pos/price-list?${params.toString()}`, {
+            credentials: "include",
+          });
+          if (!response.ok) throw new Error("Failed to load the complete filtered price list");
+          return (await response.json()) as PaginatedPriceListResponse;
+        };
+        const firstPage = await fetchPage(1);
+        const remainingPages = [];
+        for (let exportPage = 2; exportPage <= firstPage.totalPages; exportPage += 1) {
+          remainingPages.push(await fetchPage(exportPage));
+        }
+        exportItems = [firstPage, ...remainingPages]
+          .flatMap((result) => result.data)
+          .filter((item) => !showUnpriced || !hiddenUnpricedGroups.has(item.stockGroupName || "(No Group)"));
+      }
+
+      const rows = exportItems.map((item: any) => {
         const row: Record<string, any> = {
           Code: item.code || "",
           "Item Name": item.name,

@@ -16,7 +16,7 @@ import { stockItemKeys } from "@/lib/queryKeys";
 describe("stockItemKeys", () => {
   it("light key first element is /api/stock-items/light (not /api/stock-items)", () => {
     const key = stockItemKeys.light(1);
-    expect(key[0]).toBe("/api/stock-items/light");
+    expect(key[0]).toBe("/api/stock-items/light?all=true");
   });
 
   it("light key with companyId encodes companyId as second element", () => {
@@ -26,7 +26,7 @@ describe("stockItemKeys", () => {
 
   it("light key with undefined companyId is still safe", () => {
     const key = stockItemKeys.light(undefined);
-    expect(key[0]).toBe("/api/stock-items/light");
+    expect(key[0]).toBe("/api/stock-items/light?all=true");
     expect(key[1]).toBeUndefined();
   });
 
@@ -38,7 +38,7 @@ describe("stockItemKeys", () => {
   it("light key does NOT share a cache prefix with full key", () => {
     // TanStack Query prefix-matches by array element.
     // The full key is ["/api/stock-items", companyId].
-    // The light key is ["/api/stock-items/light", companyId].
+    // The light key is ["/api/stock-items/light?all=true", companyId].
     // They MUST differ in element[0] so that a broad invalidation of
     // ["/api/stock-items"] does NOT trigger a 649 KB light query refetch.
     const lightKey = stockItemKeys.light(1);
@@ -56,7 +56,7 @@ describe("stockItemKeys", () => {
 describe("stockItemKeys shape regression", () => {
   it("light key does not contain the string 'light' as a trailing discriminator after the URL", () => {
     // Old (broken): ["/api/stock-items", companyId, "light"]
-    // New (correct): ["/api/stock-items/light", companyId]
+    // New (correct): ["/api/stock-items/light?all=true", companyId]
     const key = stockItemKeys.light(1);
     // "light" must be part of the URL, not a trailing element
     expect(key[0]).toContain("light");

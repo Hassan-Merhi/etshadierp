@@ -47,7 +47,7 @@ export function MergeHistoryCard({ embedded }: { embedded?: boolean }) {
       setUnmergeTarget(null);
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items/merge-logs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light?all=true"] });
     } catch (err: any) {
       toast({ title: "Unmerge failed", description: err.message, variant: "destructive" });
     } finally {
@@ -69,7 +69,7 @@ export function MergeHistoryCard({ embedded }: { embedded?: boolean }) {
       setHistoricalRestoreTarget(null);
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items/merge-logs/historical"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light?all=true"] });
     } catch (err: any) {
       toast({ title: "Restore failed", description: err.message, variant: "destructive" });
     } finally {

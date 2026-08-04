@@ -45,14 +45,8 @@ export function registerStockLightRoutes(app: Express) {
         }
       }
 
-      const paginated =
-        req.query.paginated === "true" ||
-        req.query.page != null ||
-        req.query.pageSize != null ||
-        req.query.limit != null ||
-        req.query.search != null ||
-        req.query.locationId != null ||
-        req.query.ids != null;
+      const explicitFullList = req.query.all === "true";
+      const paginated = !explicitFullList;
       const { page, pageSize, offset } = parsePagination(req.query, {
         defaultPageSize: 50,
         maxPageSize: MAX_STOCK_ITEM_PAGE_SIZE,
@@ -126,7 +120,10 @@ export function registerStockLightRoutes(app: Express) {
 
       if (!paginated) {
         res.setHeader("Deprecation", "true");
-        res.setHeader("Warning", '299 - "Unpaginated stock-items/light response is deprecated"');
+        res.setHeader(
+          "Warning",
+          '299 - "Explicit full stock-items/light response; selectors should use paging/search"'
+        );
         const legacyResult = await pool.query(selectSql, filterValues);
         return res.json(legacyResult.rows);
       }

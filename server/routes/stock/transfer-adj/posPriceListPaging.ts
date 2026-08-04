@@ -22,16 +22,21 @@ export async function getPaginatedPosPriceList({
   const unpricedOnly = query.unpriced === "true";
   const availableOnly = isPOS || query.availableOnly === "true";
 
-  const values: unknown[] = [companyId, locationId];
-  const addValue = (value: unknown) => {
-    values.push(value);
-    return `$${values.length}`;
+  const filterValues: unknown[] = [companyId, locationId];
+  const addFilterValue = (value: unknown) => {
+    filterValues.push(value);
+    return `$${filterValues.length}`;
   };
-  const conditions = ["si.company_id = $1", "si.deleted_at IS NULL"];
+  const scopeConditions = ["si.company_id = $1", "si.deleted_at IS NULL"];
+  if (availableOnly) {
+    scopeConditions.push("silp.selling_price IS NOT NULL");
+    scopeConditions.push("COALESCE(inv.quantity, 0)::numeric > 0");
+  }
+  const filterConditions = [...scopeConditions];
 
   if (search) {
-    const searchParam = addValue(`%${search}%`);
-    conditions.push(`(
+    const searchParam = addFilterValue(`%${search}%`);
+    filterConditions.push(`(
       si.code ILIKE ${searchParam}
       OR si.name ILIKE ${searchParam}
       OR COALESCE(sg.name, '') ILIKE ${searchParam}
@@ -43,19 +48,15 @@ export async function getPaginatedPosPriceList({
       )
     )`);
   }
-
   if (group && group !== "all") {
-    conditions.push(`COALESCE(sg.name, '') = ${addValue(group)}`);
+    filterConditions.push(`COALESCE(sg.name, '') = ${addFilterValue(group)}`);
   }
   if (unpricedOnly) {
-    conditions.push("COALESCE(silp.selling_price, si.selling_price, 0)::numeric = 0");
-  }
-  if (availableOnly) {
-    conditions.push("silp.selling_price IS NOT NULL");
-    conditions.push("COALESCE(inv.quantity, 0)::numeric > 0");
+    filterConditions.push("COALESCE(silp.selling_price, si.selling_price, 0)::numeric = 0");
   }
 
-  const whereSql = conditions.join(" AND ");
+  const scopeWhereSql = scopeConditions.join(" AND ");
+  const filterWhereSql = filterConditions.join(" AND ");
   const baseFrom = `
     FROM stock_items si
     LEFT JOIN stock_groups sg ON sg.id = si.stock_group_id
@@ -66,20 +67,20 @@ export async function getPaginatedPosPriceList({
       ON inv.stock_item_id = si.id
      AND inv.location_id = $2`;
 
-  const countValues = [...values];
-  const rowsValues = [...values, pageSize, offset];
-  const limitParam = `$${values.length + 1}`;
-  const offsetParam = `$${values.length + 2}`;
+  const rowsValues = [...filterValues, pageSize, offset];
+  const limitParam = `$${filterValues.length + 1}`;
+  const offsetParam = `$${filterValues.length + 2}`;
 
-  const [countResult, rowsResult, groupResult] = await Promise.all([
+  const [filteredCountResult, scopeCountResult, rowsResult, groupResult] = await Promise.all([
+    pool.query(`SELECT COUNT(*)::int AS total ${baseFrom} WHERE ${filterWhereSql}`, filterValues),
     pool.query(
       `SELECT
          COUNT(*)::int AS total,
          COUNT(*) FILTER (WHERE COALESCE(silp.selling_price, si.selling_price, 0)::numeric > 0)::int AS priced,
          COUNT(*) FILTER (WHERE COALESCE(silp.selling_price, si.selling_price, 0)::numeric = 0)::int AS unpriced
        ${baseFrom}
-       WHERE ${whereSql}`,
-      countValues
+       WHERE ${scopeWhereSql}`,
+      [companyId, locationId]
     ),
     pool.query(
       `SELECT
@@ -92,17 +93,18 @@ export async function getPaginatedPosPriceList({
          COALESCE(silp.selling_price, si.selling_price) AS "sellingPrice",
          COALESCE(inv.quantity, '0')::text AS quantity
        ${baseFrom}
-       WHERE ${whereSql}
+       WHERE ${filterWhereSql}
        ORDER BY si.name, si.id
        LIMIT ${limitParam} OFFSET ${offsetParam}`,
       rowsValues
     ),
     pool.query(
-      `SELECT DISTINCT COALESCE(sg.name, '') AS name
+      `SELECT
+         COALESCE(sg.name, '') AS name,
+         COUNT(*) FILTER (WHERE COALESCE(silp.selling_price, si.selling_price, 0)::numeric = 0)::int AS "unpricedCount"
        ${baseFrom}
-       WHERE si.company_id = $1
-         AND si.deleted_at IS NULL
-         ${availableOnly ? "AND silp.selling_price IS NOT NULL AND COALESCE(inv.quantity, 0)::numeric > 0" : ""}
+       WHERE ${scopeWhereSql}
+       GROUP BY COALESCE(sg.name, '')
        ORDER BY name`,
       [companyId, locationId]
     ),
@@ -138,7 +140,9 @@ export async function getPaginatedPosPriceList({
         [companyId, itemIds]
       ),
     ]);
-    const dubaiMap = new Map(dubaiCostResult.rows.map((row) => [Number(row.stockItemId), String(row.costDubai ?? "0")]));
+    const dubaiMap = new Map(
+      dubaiCostResult.rows.map((row) => [Number(row.stockItemId), String(row.costDubai ?? "0")])
+    );
     const offloadMap = new Map(
       offloadCostResult.rows.map((row) => [Number(row.stockItemId), String(row.offloadingCost ?? "0")])
     );
@@ -149,15 +153,19 @@ export async function getPaginatedPosPriceList({
     }));
   }
 
-  const total = Number(countResult.rows[0]?.total ?? 0);
+  const filteredTotal = Number(filteredCountResult.rows[0]?.total ?? 0);
+  const scopeCounts = scopeCountResult.rows[0] ?? {};
   return {
     data,
     groups: groupResult.rows.map((row) => String(row.name)).filter(Boolean),
+    unpricedByGroup: groupResult.rows
+      .map((row) => ({ name: String(row.name || "(No Group)"), count: Number(row.unpricedCount ?? 0) }))
+      .filter((row) => row.count > 0),
     counts: {
-      total,
-      priced: Number(countResult.rows[0]?.priced ?? 0),
-      unpriced: Number(countResult.rows[0]?.unpriced ?? 0),
+      total: Number(scopeCounts.total ?? 0),
+      priced: Number(scopeCounts.priced ?? 0),
+      unpriced: Number(scopeCounts.unpriced ?? 0),
     },
-    ...buildPaginationMeta(total, page, pageSize),
+    ...buildPaginationMeta(filteredTotal, page, pageSize),
   };
 }
