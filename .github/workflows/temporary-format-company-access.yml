@@ -1,0 +1,36 @@
+name: Temporary format company access
+
+on:
+  push:
+    branches:
+      - agent/fix-developer-company-data-access
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Normalize Replit registry URLs for CI
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Format company access boundary
+        run: node node_modules/prettier/bin/prettier.cjs --write server/security/companyAccessBoundary.ts
+
+      - name: Upload formatted source
+        uses: actions/upload-artifact@v7
+        with:
+          name: formatted-company-access
+          path: server/security/companyAccessBoundary.ts
+          if-no-files-found: error
+          retention-days: 1
