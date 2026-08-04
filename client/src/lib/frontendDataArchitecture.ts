@@ -4,12 +4,16 @@ export type QueryParamValue = string | number | boolean | null | undefined;
 export type QueryParams = Record<string, QueryParamValue | readonly QueryParamValue[]>;
 export type CompanyIdentity = number | string | null | undefined;
 
-/** Sort set-like filter values so selection order cannot create duplicate cache entries. */
+/** Sort and deduplicate set-like filters so selection order cannot create duplicate cache entries. */
 export function canonicalSetValues<T extends QueryParamValue>(values: readonly T[]): T[] {
-  return values
-    .filter((value) => value !== undefined && value !== null && value !== "")
-    .slice()
-    .sort((left, right) => String(left).localeCompare(String(right), undefined, { numeric: true }));
+  const unique = new Map<string, T>();
+  for (const value of values) {
+    if (value === undefined || value === null || value === "") continue;
+    unique.set(`${typeof value}:${String(value)}`, value);
+  }
+  return [...unique.values()].sort((left, right) =>
+    String(left).localeCompare(String(right), undefined, { numeric: true }),
+  );
 }
 
 /** Build a stable URL so equivalent filters share one React Query cache entry. */
