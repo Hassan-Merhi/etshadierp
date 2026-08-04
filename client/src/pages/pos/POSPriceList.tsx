@@ -37,7 +37,6 @@ import type {
   MasterPriceListResponse,
   POSPriceListProps,
   PaginatedPriceListResponse,
-  PriceListItem,
 } from "./pospricelist/types";
 import { ALL_LOCATIONS_ID, formatQty } from "./pospricelist/utils";
 export default function POSPriceList({ posUser }: POSPriceListProps) {
