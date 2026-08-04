@@ -12,6 +12,12 @@ import { PageHeader } from "@/components/PageHeader";
 import { PaginationBar } from "@/components/PaginationBar";
 import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  canonicalApiUrl,
+  companyDataKey,
+  frontendQueryPolicies,
+  invalidateCompanyApiFamily,
+} from "@/lib/frontendDataArchitecture";
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
@@ -444,17 +450,23 @@ export default function Daybook({ user }: { user?: any } = {}) {
     filters.statusFilter,
   ]);
 
+  const offloadsUrl = useMemo(
+    () =>
+      canonicalApiUrl("/api/offloads", {
+        startDate: periodFilter.fromDate,
+        endDate: periodFilter.toDate,
+      }),
+    [periodFilter.fromDate, periodFilter.toDate],
+  );
   const { data: offloads = [], isLoading: offloadsLoading } = useQuery<OffloadListItem[]>({
-    queryKey: ["/api/offloads", selectedCompany?.id, periodFilter.fromDate, periodFilter.toDate],
-    queryFn: async () => {
-      const p = new URLSearchParams();
-      if (periodFilter.fromDate) p.append("startDate", periodFilter.fromDate);
-      if (periodFilter.toDate) p.append("endDate", periodFilter.toDate);
-      const res = await fetch(`/api/offloads${p.toString() ? `?${p.toString()}` : ""}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
+    queryKey: companyDataKey(offloadsUrl, selectedCompany?.id, "daybook-offloads"),
+    queryFn: async ({ signal }) => {
+      const response = await fetch(offloadsUrl, { credentials: "include", signal });
+      if (!response.ok) throw new Error("Failed to load offloads");
+      return response.json();
     },
     enabled: !!selectedCompany,
+    ...frontendQueryPolicies.operational,
   });
 
 
@@ -557,7 +569,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => apiRequest("DELETE", `/api/vouchers/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      void invalidateCompanyApiFamily(queryClient, "/api/vouchers", selectedCompany?.id);
       refreshBalances();
       toast({ title: "Success", description: "Voucher deleted" });
       setDeleteDialogOpen(false);
@@ -568,7 +580,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     mutationFn: async ({ id, updates }: { id: number; updates: EditVoucherForm }) =>
       apiRequest("PATCH", `/api/vouchers/${id}`, updates),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      void invalidateCompanyApiFamily(queryClient, "/api/vouchers", selectedCompany?.id);
       refreshBalances();
       toast({ title: "Success", description: "Voucher updated" });
       setEditDialogOpen(false);

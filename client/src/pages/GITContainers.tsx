@@ -115,6 +115,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
 
   const { data, isLoading, isError, error, refetch, loadContainerDetail } =
     usePaginatedGITContainers({
+      companyIdentity: allCompanies ? `all:${user?.id ?? "unknown"}` : user?.companyId ?? "no-company",
       allCompanies,
       page,
       pageSize: CONTAINER_PAGE_SIZE,
@@ -337,7 +338,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
         <div className="flex flex-wrap gap-2">
           <SummaryCard
             label="Active"
-            value={filteredContainers.length}
+            value={data?.summary?.total ?? data?.total ?? filteredContainers.length}
             icon={<Package className="h-4 w-4 text-primary" />}
             accent="bg-primary/10"
           />

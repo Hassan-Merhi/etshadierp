@@ -6,8 +6,14 @@
  */
 
 import { db } from "../db";
-import { containers, companies, userCompanyRoles, suppliers } from "../../shared/schema";
+import { containers, companies, suppliers } from "../../shared/schema";
 import { and, eq, inArray, sql } from "drizzle-orm";
+import {
+  CompanyAccessError,
+  getAccessibleCompanyIds as getMembershipCompanyIds,
+  isPrivilegedRole,
+  parsePositiveCompanyId,
+} from "../security/companyAccessBoundary";
 
 // ── Status constants ──────────────────────────────────────────────────────────
 
@@ -31,29 +37,6 @@ const DEFAULT_OFFLOAD_DAYS = 14;
 // ── Access control ────────────────────────────────────────────────────────────
 
 /**
- * Returns company IDs the user may access.
- * - Admin / Developer: all companies that have at least one active container.
- * - Owner: companies from user_company_roles only.
- */
-export async function getAccessibleCompanyIds(userId: string, role: string): Promise<number[]> {
-  const isAdminOrDev = role === "Admin" || role === "Developer";
-
-  if (isAdminOrDev) {
-    const rows = await db
-      .selectDistinct({ companyId: containers.companyId })
-      .from(containers)
-      .where(inArray(containers.status, [...ACTIVE_STATUSES]));
-    return rows.map((r) => r.companyId);
-  }
-
-  const rows = await db
-    .select({ companyId: userCompanyRoles.companyId })
-    .from(userCompanyRoles)
-    .where(eq(userCompanyRoles.userId, userId));
-  return rows.map((r) => r.companyId);
-}
-
-/**
  * Resolves company scope from request query params.
  *
  * Returns one of:
@@ -61,42 +44,63 @@ export async function getAccessibleCompanyIds(userId: string, role: string): Pro
  *   { mode: "single", companyId: number }
  *   { error: string,  status: number }       ← caller should return this as HTTP error
  */
+export type GitCompanyScope =
+  | { mode: "all"; companyIds: number[] }
+  | { mode: "single"; companyId: number }
+  | { error: string; status: number; code: string };
+
+function gitScopeError(error: unknown): Extract<GitCompanyScope, { error: string }> {
+  if (error instanceof CompanyAccessError) {
+    return { error: error.message, status: error.status, code: error.code };
+  }
+  return { error: "Unable to resolve company access", status: 500, code: "COMPANY_CONTEXT_FAILED" };
+}
+
 export async function resolveGitCompanyScope(
   userId: string,
   role: string,
   query: Record<string, string | string[] | undefined>,
   sessionCompanyId: number | undefined
-): Promise<
-  { mode: "all"; companyIds: number[] } | { mode: "single"; companyId: number } | { error: string; status: number }
-> {
-  const isAdminOrDev = role === "Admin" || role === "Developer";
-  const wantsAll = query.allCompanies === "true";
-  const rawId = typeof query.companyId === "string" ? query.companyId : undefined;
-  const requestedId = rawId ? parseInt(rawId, 10) : undefined;
+): Promise<GitCompanyScope> {
+  try {
+    const wantsAll = query.allCompanies === "true";
+    const rawId = typeof query.companyId === "string" ? query.companyId.trim() : "";
+    const activeCompanyId = parsePositiveCompanyId(sessionCompanyId, "activeCompanyId");
+    const accessible = await getMembershipCompanyIds(userId);
 
-  if (wantsAll) {
-    const ids = await getAccessibleCompanyIds(userId, role);
-    return { mode: "all", companyIds: ids };
-  }
-
-  if (requestedId !== undefined && !isNaN(requestedId)) {
-    if (!isAdminOrDev) {
-      const access = await db
-        .select({ id: userCompanyRoles.id })
-        .from(userCompanyRoles)
-        .where(and(eq(userCompanyRoles.userId, userId), eq(userCompanyRoles.companyId, requestedId)))
-        .limit(1);
-      if (access.length === 0) {
-        return { error: "Access denied to this company", status: 403 };
+    if (wantsAll) {
+      if (!isPrivilegedRole(role)) {
+        return {
+          error: "Cross-company access requires a privileged role",
+          status: 403,
+          code: "CROSS_COMPANY_FORBIDDEN",
+        };
       }
+      return { mode: "all", companyIds: [...accessible].sort((left, right) => left - right) };
     }
-    return { mode: "single", companyId: requestedId };
-  }
 
-  if (!sessionCompanyId) {
-    return { error: "Company ID required", status: 400 };
+    if (rawId) {
+      const requestedId = parsePositiveCompanyId(rawId, "requestedCompanyId");
+      if (requestedId !== activeCompanyId && !isPrivilegedRole(role)) {
+        return {
+          error: "Cross-company access requires a privileged role",
+          status: 403,
+          code: "CROSS_COMPANY_FORBIDDEN",
+        };
+      }
+      if (!accessible.has(requestedId)) {
+        return { error: "No access to this company", status: 403, code: "COMPANY_ACCESS_DENIED" };
+      }
+      return { mode: "single", companyId: requestedId };
+    }
+
+    if (!accessible.has(activeCompanyId)) {
+      return { error: "No access to this company", status: 403, code: "COMPANY_ACCESS_DENIED" };
+    }
+    return { mode: "single", companyId: activeCompanyId };
+  } catch (error) {
+    return gitScopeError(error);
   }
-  return { mode: "single", companyId: sessionCompanyId };
 }
 
 // ── Calculation helpers ───────────────────────────────────────────────────────

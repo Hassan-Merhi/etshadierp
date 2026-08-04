@@ -6,10 +6,7 @@
  */
 import type { Express, Request, Response } from "express";
 import { logger } from "../../lib/logger";
-import { db } from "../../db";
 import { requireAuth, requireRole } from "../../auth";
-import { containers, companies, userCompanyRoles } from "../../../shared/schema";
-import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import {
   resolveGitCompanyScope,
   fetchActiveContainers,
@@ -54,106 +51,44 @@ export function registerGitReportRoutes(app: Express) {
    */
   app.get("/api/git/agent-duty-summary", requireAuth, requireRole("Admin", "Owner"), async (req, res) => {
     try {
+      const userId = String((req.user as any).id);
+      const role = String((req.session as any)?.currentRole ?? (req.user as any).role ?? "");
       const sessionCompanyId: number | undefined = (req.session as any)?.currentCompanyId;
-      const userId: string = (req.user as any).id;
-      const role: string = (req.user as any).role;
-      const isAdminOrDev = role === "Admin" || role === "Developer";
-
-      const wantsAll = req.query.allCompanies === "true";
-      const requestedId = req.query.companyId ? parseInt(req.query.companyId as string, 10) : undefined;
+      const scope = await resolveGitCompanyScope(
+        userId,
+        role,
+        req.query as Record<string, string | string[] | undefined>,
+        sessionCompanyId,
+      );
+      if ("error" in scope) {
+        return res.status(scope.status).json({ message: scope.error, code: scope.code });
+      }
 
       const asOf = new Date().toISOString();
-
-      // ── All-companies mode ──────────────────────────────────────────────
-      if (wantsAll) {
-        let accessibleIds: number[];
-
-        if (isAdminOrDev) {
-          // Admin/Dev: all companies that actually have containers with duty
-          const rows = await db
-            .selectDistinct({ companyId: containers.companyId })
-            .from(containers)
-            .where(
-              and(
-                isNotNull(containers.agent),
-                isNotNull(containers.dutyFee),
-                sql`${containers.agent} <> ''`,
-                sql`CAST(${containers.dutyFee} AS NUMERIC) > 0`
-              )
-            );
-          accessibleIds = rows.map((r) => r.companyId);
-        } else {
-          // Owner: only their user_company_roles companies
-          const roles = await db
-            .select({ companyId: userCompanyRoles.companyId })
-            .from(userCompanyRoles)
-            .where(eq(userCompanyRoles.userId, userId));
-          accessibleIds = roles.map((r) => r.companyId);
-        }
-
-        if (accessibleIds.length === 0) {
-          return res.json({ asOf, mode: "all", companies: [] });
-        }
-
-        // Load company names in one query
-        const companyRows = await db
-          .select({ id: companies.id, name: companies.name })
-          .from(companies)
-          .where(inArray(companies.id, accessibleIds));
-        const nameMap: Record<number, string> = Object.fromEntries(companyRows.map((c) => [c.id, c.name]));
-
-        // Build each company section in parallel
+      if (scope.mode === "all") {
+        const nameMap = await loadCompanyNames(scope.companyIds);
         const sections = await Promise.all(
-          accessibleIds.map(async (cid) => ({
-            companyId: cid,
-            companyName: nameMap[cid] ?? `Company ${cid}`,
-            agents: await buildAgentsForCompany(cid),
-          }))
+          scope.companyIds.map(async (companyId) => ({
+            companyId,
+            companyName: nameMap[companyId] ?? `Company ${companyId}`,
+            agents: await buildAgentsForCompany(companyId),
+          })),
         );
-
-        // Sort by companyId for stable order
-        sections.sort((a, b) => a.companyId - b.companyId);
-
+        sections.sort((left, right) => left.companyId - right.companyId);
         return res.json({ asOf, mode: "all", companies: sections });
       }
 
-      // ── Single-company mode ────────────────────────────────────────────
-      let companyId: number;
-
-      if (requestedId) {
-        // Owner: validate they have access to this specific company
-        if (!isAdminOrDev) {
-          const access = await db
-            .select({ id: userCompanyRoles.id })
-            .from(userCompanyRoles)
-            .where(and(eq(userCompanyRoles.userId, userId), eq(userCompanyRoles.companyId, requestedId)))
-            .limit(1);
-          if (access.length === 0) {
-            return res.status(403).json({ message: "Access denied to this company" });
-          }
-        }
-        companyId = requestedId;
-      } else {
-        if (!sessionCompanyId) {
-          return res.status(400).json({ message: "Company ID required" });
-        }
-        companyId = sessionCompanyId;
-      }
-
-      // Load company name
-      const companyRow = await db
-        .select({ name: companies.name })
-        .from(companies)
-        .where(eq(companies.id, companyId))
-        .limit(1);
-      const companyName = companyRow[0]?.name ?? `Company ${companyId}`;
-
-      const agents = await buildAgentsForCompany(companyId);
-
-      return res.json({ asOf, mode: "single", companyId, companyName, agents });
+      const nameMap = await loadCompanyNames([scope.companyId]);
+      return res.json({
+        asOf,
+        mode: "single",
+        companyId: scope.companyId,
+        companyName: nameMap[scope.companyId] ?? `Company ${scope.companyId}`,
+        agents: await buildAgentsForCompany(scope.companyId),
+      });
     } catch (err) {
       logger.error("[gitRoutes] agent-duty-summary error:", { error: err });
-      return res.status(500).json({ message: "Internal server error" });
+      return res.status(500).json({ message: "Internal server error", code: "GIT_REPORT_FAILED" });
     }
   });
 
@@ -178,7 +113,7 @@ export function registerGitReportRoutes(app: Express) {
         sessionCompanyId
       );
       if ("error" in scope) {
-        res.status(scope.status).json({ message: scope.error });
+        res.status(scope.status).json({ message: scope.error, code: scope.code });
         return;
       }
 
@@ -282,7 +217,7 @@ export function registerGitReportRoutes(app: Express) {
         req.query as Record<string, string | undefined>,
         sessionCompanyId
       );
-      if ("error" in scope) return res.status(scope.status).json({ message: scope.error });
+      if ("error" in scope) return res.status(scope.status).json({ message: scope.error, code: scope.code });
       const companyIds = scope.mode === "all" ? scope.companyIds : [scope.companyId];
       const [rows, nameMap] = await Promise.all([
         fetchActiveContainers(companyIds, { includeOffloaded: true, containerId }),
@@ -327,7 +262,7 @@ export function registerGitReportRoutes(app: Express) {
         sessionCompanyId
       );
       if ("error" in scope) {
-        return res.status(scope.status).json({ message: scope.error });
+        return res.status(scope.status).json({ message: scope.error, code: scope.code });
       }
 
       const companyIds = scope.mode === "all" ? scope.companyIds : [scope.companyId];

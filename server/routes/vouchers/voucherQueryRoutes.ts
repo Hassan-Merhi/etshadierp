@@ -11,6 +11,7 @@ import { eq, and, inArray, sql, isNull } from "drizzle-orm";
 import { isParentCompanyContext } from "../helpers/supplierBalanceHelpers";
 import { buildVoucherPage, filterAndSortVouchers, parseVoucherListQuery } from "./voucherListPaging";
 import { loadVoucherRelatedData } from "./voucherDetailBatching";
+import { assertActiveCompanyAccess, sendCompanyAccessError } from "../../security/companyAccessBoundary";
 
 /**
  * After saving a journal voucher, if it has a customer entry + a ledger account entry,
@@ -21,9 +22,7 @@ import { loadVoucherRelatedData } from "./voucherDetailBatching";
 export function registerVoucherQueryRoutes(app: Express) {
   app.get("/api/vouchers", requireAuth, async (req, res) => {
     try {
-      if (!req.session.currentCompanyId) {
-        return res.status(400).json({ message: "No company selected" });
-      }
+      const access = await assertActiveCompanyAccess(req);
       const parsedListQuery = parseVoucherListQuery(req.query as Record<string, unknown>);
       if (!parsedListQuery.ok) return res.status(400).json({ message: parsedListQuery.message });
       const listQuery = parsedListQuery.query;
@@ -35,7 +34,7 @@ export function registerVoucherQueryRoutes(app: Express) {
       let vouchers;
       if (startDate && endDate) {
         vouchers = await storage.getVouchersByDateRange(
-          req.session.currentCompanyId,
+          access.activeCompanyId,
           startDate as string,
           endDate as string
         );
@@ -47,7 +46,7 @@ export function registerVoucherQueryRoutes(app: Express) {
         const start = new Date();
         start.setDate(start.getDate() - 90);
         const fmt = (d: Date) => d.toISOString().slice(0, 10);
-        vouchers = await storage.getVouchersByDateRange(req.session.currentCompanyId, fmt(start), fmt(end));
+        vouchers = await storage.getVouchersByDateRange(access.activeCompanyId, fmt(start), fmt(end));
       }
 
       // Strip totalAmount from Stock Transfer vouchers for POS users
@@ -74,7 +73,7 @@ export function registerVoucherQueryRoutes(app: Express) {
           .select({ locationId: userLocations.locationId })
           .from(userLocations)
           .where(
-            and(eq(userLocations.userId, req.user.id), eq(userLocations.companyId, req.session.currentCompanyId!))
+            and(eq(userLocations.userId, req.user.id), eq(userLocations.companyId, access.activeCompanyId))
           );
         const allowedLocIds = assignedLocs.map((l: any) => l.locationId);
         if (allowedLocIds.length > 0) {
@@ -89,7 +88,7 @@ export function registerVoucherQueryRoutes(app: Express) {
       if (!listQuery.paginated) return res.json(filteredVouchers);
       return res.json(buildVoucherPage(filteredVouchers, listQuery.page, listQuery.pageSize));
     } catch (error: unknown) {
-      res.status(500).json({ message: getErrorMessage(error) });
+      return sendCompanyAccessError(res, error);
     }
   });
 
@@ -315,6 +314,7 @@ export function registerVoucherQueryRoutes(app: Express) {
   // Get a specific voucher with all entries and related data
   app.get("/api/vouchers/:id", requireAuth, async (req, res) => {
     try {
+      const access = await assertActiveCompanyAccess(req);
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid voucher ID" });
@@ -326,7 +326,7 @@ export function registerVoucherQueryRoutes(app: Express) {
       }
 
       // Verify voucher belongs to current company
-      if (voucher.companyId !== req.session.currentCompanyId) {
+      if (voucher.companyId !== access.activeCompanyId) {
         return res.status(403).json({
           message: "Access denied: Voucher belongs to a different company",
         });
@@ -374,7 +374,7 @@ export function registerVoucherQueryRoutes(app: Express) {
         customerName,
       });
     } catch (error: unknown) {
-      res.status(500).json({ message: getErrorMessage(error) });
+      return sendCompanyAccessError(res, error);
     }
   });
 

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { invalidateApiFamily } from "@/lib/frontendDataArchitecture";
 import { BulkProgress } from "./gitContainerTypes";
 
 interface UseGITContainersDataProps {
@@ -87,7 +88,7 @@ export function useGITContainersData({
       return res.json() as Promise<{ updated: number; trackingEnabled: boolean }>;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/git/containers"] });
+      void invalidateApiFamily(queryClient, "/api/git/containers");
       toast({
         title: data.trackingEnabled
           ? `Auto-tracking enabled for ${data.updated} containers`
@@ -143,7 +144,7 @@ export function useGITContainersData({
                 clearInterval(intervalId);
                 intervalId = null;
               }
-              queryClient.invalidateQueries({ queryKey: ["/api/git/containers"] });
+              void invalidateApiFamily(queryClient, "/api/git/containers");
             }
           }, 6000);
         }

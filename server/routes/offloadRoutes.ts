@@ -15,6 +15,7 @@ import { storage } from "../storage";
 import { requireAuth, requireRole } from "../auth";
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
 import { getOrCreateLedgerAccount } from "./factory/_helpers";
+import { assertActiveCompanyAccess, sendCompanyAccessError } from "../security/companyAccessBoundary";
 import {
   containerCharges,
   containerOffloadItems,
@@ -32,8 +33,8 @@ export function registerOffloadRoutes(app: Express) {
   // List offloads for daybook view (filtered by date range and company)
   app.get("/api/offloads", requireAuth, async (req, res) => {
     try {
-      const companyId = req.session.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const access = await assertActiveCompanyAccess(req);
+      const companyId = access.activeCompanyId;
 
       const { startDate, endDate } = req.query;
       const conditions: any[] = [eq(containers.companyId, companyId)];
@@ -71,13 +72,14 @@ export function registerOffloadRoutes(app: Express) {
 
       res.json(offloads);
     } catch (error: unknown) {
-      res.status(500).json({ message: getErrorMessage(error) });
+      return sendCompanyAccessError(res, error);
     }
   });
 
   // Get full offload detail with items for daybook view
   app.get("/api/offloads/:id", requireAuth, async (req, res) => {
     try {
+      const access = await assertActiveCompanyAccess(req);
       const offloadId = parseInt(req.params.id);
       if (isNaN(offloadId)) return res.status(400).json({ message: "Invalid offload ID" });
 
@@ -107,6 +109,9 @@ export function registerOffloadRoutes(app: Express) {
         .execute();
 
       if (!offload) return res.status(404).json({ message: "Offload not found" });
+      if (offload.companyId !== access.activeCompanyId) {
+        return res.status(403).json({ message: "No access to this company", code: "COMPANY_ACCESS_DENIED" });
+      }
 
       const items = await db
         .select({
@@ -217,7 +222,7 @@ export function registerOffloadRoutes(app: Express) {
 
       res.json({ ...offload, items, poCharges, additionalCharges, liveCharges });
     } catch (error: unknown) {
-      res.status(500).json({ message: getErrorMessage(error) });
+      return sendCompanyAccessError(res, error);
     }
   });
 
@@ -228,6 +233,7 @@ export function registerOffloadRoutes(app: Express) {
     requireRole("Admin", "Developer", "Owner"),
     async (req, res) => {
       try {
+        const access = await assertActiveCompanyAccess(req);
         const offloadId = parseInt(req.params.id);
         if (isNaN(offloadId)) return res.status(400).json({ message: "Invalid offload ID" });
 
@@ -247,6 +253,9 @@ export function registerOffloadRoutes(app: Express) {
           .execute();
 
         if (!offload) return res.status(404).json({ message: "Offload not found" });
+        if (offload.companyId !== access.activeCompanyId) {
+          return res.status(403).json({ message: "No access to this company", code: "COMPANY_ACCESS_DENIED" });
+        }
 
         const makeOptional = !offload.optional; // toggle
         const cn = offload.containerNumber;
@@ -346,7 +355,7 @@ export function registerOffloadRoutes(app: Express) {
         });
       } catch (error: unknown) {
         logger.error("Error toggling offload optional:", { error: error });
-        res.status(500).json({ message: getErrorMessage(error) });
+        return sendCompanyAccessError(res, error);
       }
     }
   );
@@ -363,10 +372,8 @@ export function registerOffloadRoutes(app: Express) {
           return res.status(400).json({ message: "Invalid container ID" });
         }
 
-        const companyId = req.session.currentCompanyId;
-        if (!companyId) {
-          return res.status(400).json({ message: "No company selected" });
-        }
+        const access = await assertActiveCompanyAccess(req);
+        const companyId = access.activeCompanyId;
 
         // Get container
         const container = await storage.getContainerById(containerId);
@@ -509,7 +516,7 @@ export function registerOffloadRoutes(app: Express) {
         });
       } catch (error: unknown) {
         logger.error("Container offload diagnostics error:", { error: error });
-        res.status(500).json({ message: getErrorMessage(error) });
+        return sendCompanyAccessError(res, error);
       }
     }
   );
@@ -536,7 +543,7 @@ export function registerOffloadRoutes(app: Express) {
       res.json(allContainers);
     } catch (error: unknown) {
       logger.error("Get containers for diagnostics error:", { error: error });
-      res.status(500).json({ message: getErrorMessage(error) });
+      return sendCompanyAccessError(res, error);
     }
   });
 
@@ -682,7 +689,7 @@ export function registerOffloadRoutes(app: Express) {
         res.json({ scanned, created, skippedExisting, errors, errorDetails });
       } catch (error: unknown) {
         logger.error("Backfill post-offload vouchers error:", { error: error });
-        res.status(500).json({ message: getErrorMessage(error) });
+        return sendCompanyAccessError(res, error);
       }
     }
   );
