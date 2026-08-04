@@ -162,9 +162,9 @@ jobs:
           requireText(policies, "refetchIntervalInBackground: false", "live polling must pause in background tabs");
           requireText(policies, "stableReferenceQueryPolicy", "stable reference-data cache policy missing");
           requireText(appData, "stableSettingsQueryPolicy", "authenticated bootstrap settings policy missing");
-          requireText(appData, "companyQueryKey(\"/api/chat/unread-count\"", "bootstrap chat key is not company scoped");
-          requireText(sidebar, "companyQueryKey(\"/api/chat/unread-count\"", "sidebar chat key is not company scoped");
-          requireText(sidebar, "companyQueryKey(\"/api/company-settings\"", "sidebar settings key is not shared/company scoped");
+          requireText(appData, 'companyQueryKey("/api/chat/unread-count"', "bootstrap chat key is not company scoped");
+          requireText(sidebar, 'companyQueryKey("/api/chat/unread-count"', "sidebar chat key is not company scoped");
+          requireText(sidebar, 'companyQueryKey("/api/company-settings"', "sidebar settings key is not shared/company scoped");
           requireText(sidebar, "liveCountQueryPolicy(60_000)", "sidebar live-count policy missing");
           requireText(sidebar, "stableSettingsQueryPolicy", "sidebar settings cache policy missing");
           forbidText(sidebar, 'queryKey: ["/api/chat/unread-count"]', "unscoped duplicate chat query remains");
