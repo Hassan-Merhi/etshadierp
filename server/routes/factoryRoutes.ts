@@ -40,14 +40,14 @@ import {
   getActiveCompanyPermissionContext,
 } from "../services/security/activeCompanyPermissionContext";
 import { chooseAuthorizedFactoryCompany } from "../services/security/factoryCompanyScopePolicy";
-import { isErpContainerFactoryAlias } from "../services/security/companyResourceRoutePolicy";
+import { isFactoryCompanyOptionalRoute } from "../services/security/companyResourceRoutePolicy";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   app.use("/api/factory", async (req: any, res: any, next: any) => {
     try {
       const session = req.session as any;
       if (!session?.userId) return next();
-      if (isErpContainerFactoryAlias(req.path)) return next();
+      if (isFactoryCompanyOptionalRoute(req.path)) return next();
 
       const assignedFactories = await db
         .select({ id: companies.id, companyType: companies.companyType, active: companies.active })
