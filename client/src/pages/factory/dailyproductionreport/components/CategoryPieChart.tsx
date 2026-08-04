@@ -5,11 +5,7 @@
  */
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
-import {
-  ResponsiveChartPanel,
-  ResponsiveChartViewport,
-  ResponsiveLegendList,
-} from "@/components/ui/responsive-report";
+import { ResponsiveChartPanel, ResponsiveChartViewport, ResponsiveLegendList } from "@/components/ui/responsive-report";
 
 import { GROUP_ORDER, PIE_COLORS, classifyCategory } from "../utils";
 

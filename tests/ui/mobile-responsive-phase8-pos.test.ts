@@ -41,7 +41,7 @@ describe("Mobile responsiveness Phase 8 POS", () => {
     for (const token of [
       'role="combobox"',
       'aria-autocomplete="list"',
-      'aria-controls={resultsId}',
+      "aria-controls={resultsId}",
       'role="listbox"',
       'aria-label="Matching stock items"',
       "max-h-[min(22rem,48dvh)]",
@@ -56,12 +56,12 @@ describe("Mobile responsiveness Phase 8 POS", () => {
     const mobile = source("client/src/pages/pos/pos-components/PosMobileLayout.tsx");
 
     for (const token of [
-      'data-testid={`input-mobile-qty-${actualIndex}`}',
-      'data-testid={`input-mobile-rate-${actualIndex}`}',
+      "data-testid={`input-mobile-qty-${actualIndex}`}",
+      "data-testid={`input-mobile-rate-${actualIndex}`}",
       "Decrease quantity for",
       "Increase quantity for",
-      "updateRow(actualIndex, \"quantity\"",
-      "updateRow(actualIndex, \"rate\"",
+      'updateRow(actualIndex, "quantity"',
+      'updateRow(actualIndex, "rate"',
       "onClick={handleSaveSale}",
       "disabled={saveMutation?.isPending || !hasValidItems}",
     ]) {
@@ -83,13 +83,13 @@ describe("Mobile responsiveness Phase 8 POS", () => {
       "sm:grid-cols-2",
       "min-h-11 w-full",
       "grid grid-cols-2 gap-2",
-      'data-testid={`button-view-${transfer.voucherId}`}',
-      'data-testid={`button-edit-${transfer.voucherId}`}',
+      "data-testid={`button-view-${transfer.voucherId}`}",
+      "data-testid={`button-edit-${transfer.voucherId}`}",
     ]) {
       expect(transfers).toContain(token);
     }
 
-    expect(transfers).toContain('fetch(`/api/stock-transfers/list?${params}`');
+    expect(transfers).toContain("fetch(`/api/stock-transfers/list?${params}`");
     expect(transfers).toContain("setEditVoucherId(transfer.voucherId)");
   });
 
@@ -106,9 +106,9 @@ describe("Mobile responsiveness Phase 8 POS", () => {
         "adjustInventory",
         "costPrice =",
         "ledgerAccountId:",
-        "POST\", \"/api",
-        "PUT\", \"/api",
-        "DELETE\", \"/api",
+        'POST", "/api',
+        'PUT", "/api',
+        'DELETE", "/api',
       ]) {
         expect(contents).not.toContain(forbidden);
       }

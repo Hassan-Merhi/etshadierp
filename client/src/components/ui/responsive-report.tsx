@@ -34,10 +34,7 @@ const ResponsiveReportGrid = React.forwardRef<HTMLDivElement, React.HTMLAttribut
     <div
       ref={ref}
       data-responsive-report-grid="true"
-      className={cn(
-        "grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-2 [&>*]:min-w-0 [&>*]:max-w-full",
-        className
-      )}
+      className={cn("grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-2 [&>*]:min-w-0 [&>*]:max-w-full", className)}
       {...props}
     />
   )
