@@ -6,10 +6,12 @@ import {
   publishRemoteMouseCommand,
   publishRemoteMouseCommandResult,
   resetRemoteMouseCommandStateForTests,
+  revokeRemoteMouseControl,
   subscribeRemoteMouseCommands,
   subscribeRemoteMouseResults,
 } from "../server/services/remoteControlCommandService";
 import {
+  getRemoteControlSession,
   registerRemoteControlTab,
   resetRemoteControlSessionStateForTests,
   startRemoteControlSession,
@@ -57,6 +59,12 @@ describe("remote mouse command safety", () => {
     restoreRemoteSupportBootDefaults("phase-5-test-cleanup");
   });
 
+  it("keeps passive viewing read-only before mouse authorization", () => {
+    const session = buildSession();
+    expect(session.capabilities.mouse).toBe(false);
+    expect(getRemoteControlSession(session.id)?.capabilities.mouse).toBe(false);
+  });
+
   it("requires a recent password confirmation before mouse authorization", () => {
     const session = buildSession();
     expect(() =>
@@ -68,6 +76,7 @@ describe("remote mouse command safety", () => {
     ).toThrowError(
       expect.objectContaining({ code: "PASSWORD_CONFIRMATION_REQUIRED", statusCode: 428 })
     );
+    expect(getRemoteControlSession(session.id)?.capabilities.mouse).toBe(false);
   });
 
   it("authorizes the owning controller for at most five minutes", () => {
@@ -81,8 +90,37 @@ describe("remote mouse command safety", () => {
     });
 
     expect(authorization.expiresAt).toBe(now + 5 * 60 * 1000);
+    expect(getRemoteControlSession(session.id)?.capabilities.mouse).toBe(true);
     expect(getRemoteMouseAuthorization(session.id, "1", now + 1000)?.sessionId).toBe(session.id);
     expect(getRemoteMouseAuthorization(session.id, "1", authorization.expiresAt + 1)).toBeNull();
+    expect(getRemoteControlSession(session.id)?.capabilities.mouse).toBe(false);
+  });
+
+  it("revokes mouse capability without ending passive viewing", () => {
+    const session = buildSession();
+    const now = Date.now();
+    authorizeRemoteMouseControl({
+      sessionId: session.id,
+      controllerUserId: "1",
+      passwordConfirmedAt: now,
+      now,
+    });
+
+    revokeRemoteMouseControl({ sessionId: session.id, controllerUserId: "1" });
+
+    expect(getRemoteMouseAuthorization(session.id, "1", now + 1)).toBeNull();
+    expect(getRemoteControlSession(session.id)?.status).toBe("active");
+    expect(getRemoteControlSession(session.id)?.capabilities.mouse).toBe(false);
+    expect(() =>
+      publishRemoteMouseCommand({
+        sessionId: session.id,
+        controllerUserId: "1",
+        type: "click",
+        x: 0.5,
+        y: 0.5,
+        now: now + 1,
+      })
+    ).toThrowError(expect.objectContaining({ code: "MOUSE_CONTROL_DISABLED", statusCode: 409 }));
   });
 
   it("rejects a controller that does not own the session", () => {
@@ -198,6 +236,14 @@ describe("remote mouse command safety", () => {
 
   it("rejects command subscriptions from a different user or browser tab", () => {
     const session = buildSession();
+    const now = Date.now();
+    authorizeRemoteMouseControl({
+      sessionId: session.id,
+      controllerUserId: "1",
+      passwordConfirmedAt: now,
+      now,
+    });
+
     expect(() =>
       subscribeRemoteMouseCommands({
         sessionId: session.id,
