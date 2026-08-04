@@ -18,18 +18,19 @@ export function RemoteSupportIndicator() {
   const { language } = useApplicationLanguage();
   const { session, stopping, stop, tabId } = useRemoteControlSession();
   const [now, setNow] = useState(Date.now());
+  const mouseActive = !!session?.capabilities.mouse;
 
   useEffect(() => {
-    if (!session) return;
+    if (!mouseActive) return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
-  }, [session]);
+  }, [mouseActive]);
 
   return (
     <>
       <RemoteMouseControllerOverlay />
       <RemoteMouseControlTarget session={session} tabId={tabId} />
-      {session && (
+      {session && mouseActive && (
         <div
           className="fixed bottom-4 right-4 z-[100] flex max-w-[min(92vw,360px)] items-center gap-2 rounded-lg border bg-background/95 px-3 py-2 shadow-lg backdrop-blur"
           role="status"
