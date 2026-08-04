@@ -46,6 +46,11 @@ export class RemoteSupportRolloutError extends Error {
 }
 
 const STAGES = new Set<RemoteSupportRolloutStage>(["disabled", "internal", "canary", "general"]);
+const SAFE_BOOT_STATE = {
+  stage: "disabled" as const,
+  canaryCompanyIds: [] as number[],
+  internalControllerUserIds: [] as string[],
+};
 
 function parsePositiveIds(value: unknown): number[] {
   const values = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : [];
@@ -64,13 +69,7 @@ function normalizeStage(value: unknown): RemoteSupportRolloutStage {
   return STAGES.has(stage as RemoteSupportRolloutStage) ? (stage as RemoteSupportRolloutStage) : "disabled";
 }
 
-const bootState = {
-  stage: normalizeStage(process.env.REMOTE_SUPPORT_ROLLOUT_STAGE),
-  canaryCompanyIds: parsePositiveIds(process.env.REMOTE_SUPPORT_CANARY_COMPANY_IDS),
-  internalControllerUserIds: parseUserIds(process.env.REMOTE_SUPPORT_INTERNAL_CONTROLLER_IDS),
-};
-
-let state = { ...bootState };
+let state = { ...SAFE_BOOT_STATE };
 let revision = 1;
 let updatedAt = new Date();
 let updatedBy = "system";
@@ -207,7 +206,7 @@ export function assertRemoteSupportRolloutEligible(input: RemoteSupportRolloutEl
 }
 
 export function resetRemoteSupportRolloutForTests(): void {
-  state = { stage: "disabled", canaryCompanyIds: [], internalControllerUserIds: [] };
+  state = { ...SAFE_BOOT_STATE };
   revision = 1;
   updatedAt = new Date(0);
   updatedBy = "test";
