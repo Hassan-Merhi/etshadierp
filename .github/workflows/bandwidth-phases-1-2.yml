@@ -11,7 +11,7 @@ on:
       - "client/src/app/useAuthenticatedAppData.ts"
       - "client/src/components/AppSidebar.tsx"
       - "client/src/lib/queryPolicies.ts"
-      - "client/src/lib/queryPolicies.test.ts"
+      - "tests/ui/queryPolicies.test.ts"
       - "scripts/verify-bandwidth-phases-1-2.mjs"
       - ".github/workflows/bandwidth-phases-1-2.yml"
 
@@ -37,6 +37,7 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci --ignore-scripts
+
       - name: Consolidate persistent shell queries
         run: |
           python - <<'PY'
@@ -45,59 +46,62 @@ jobs:
           path = Path("client/src/components/AppSidebar.tsx")
           text = path.read_text()
 
-          policy_import = 'import { accessQueryPolicy, liveCountQueryPolicy, stableSettingsQueryPolicy } from "@/lib/queryPolicies";\n'
+          toast_import = 'import { useToast } from "@/hooks/use-toast";\n'
           scope_import = 'import { companyQueryKey } from "@/lib/companyQueryScope";\n'
-          anchor = 'import { useToast } from "@/hooks/use-toast";\n'
+          policy_import = (
+              'import { accessQueryPolicy, liveCountQueryPolicy, stableSettingsQueryPolicy } '
+              'from "@/lib/queryPolicies";\n'
+          )
           if scope_import not in text:
-              text = text.replace(anchor, anchor + scope_import, 1)
+              text = text.replace(toast_import, toast_import + scope_import, 1)
           if policy_import not in text:
               text = text.replace(scope_import, scope_import + policy_import, 1)
 
-          text = text.replace(
-              '''  const { data: myErpPages } = useQuery<{ pageKeys: string[]; fullAccess: boolean }>({
-            queryKey: ["/api/my-erp-pages"],
-            enabled: !!user,
-          });''',
+          def replace_block(source: str, start_marker: str, end_marker: str, replacement: str) -> str:
+              start = source.index(start_marker)
+              end = source.index(end_marker, start)
+              return source[:start] + replacement + source[end:]
+
+          text = replace_block(
+              text,
+              '  const { data: myErpPages } = useQuery<{ pageKeys: string[]; fullAccess: boolean }>({',
+              '\n\n  const { data: companySettings }',
               '''  const { data: myErpPages } = useQuery<{ pageKeys: string[]; fullAccess: boolean }>({
             queryKey: companyQueryKey("/api/my-erp-pages", selectedCompany?.id),
             ...accessQueryPolicy,
             enabled: !!user && !!selectedCompany?.id,
           });''',
-              1,
           )
 
-          old_settings = '''  const { data: companySettings } = useQuery<any>({
-            queryKey: ["/api/company-settings", selectedCompany?.id],
-            enabled: !!selectedCompany?.id,
-            queryFn: async () => {
-              const res = await fetch(`/api/company-settings?companyId=${selectedCompany?.id}`, { credentials: "include" });
-              return res.ok ? res.json() : null;
-            },
-          });'''
-          new_settings = '''  const { data: companySettings } = useQuery<any>({
+          text = replace_block(
+              text,
+              '  const { data: companySettings } = useQuery<any>({',
+              '\n\n  const allowedPages',
+              '''  const { data: companySettings } = useQuery<any>({
             queryKey: companyQueryKey("/api/company-settings", selectedCompany?.id),
             ...stableSettingsQueryPolicy,
             enabled: !!selectedCompany?.id,
-          });'''
-          text = text.replace(old_settings, new_settings, 1)
-
-          text = text.replace(
-              '''  const { data: chatUnread } = useQuery<{ count: number }>({
-            queryKey: ["/api/chat/unread-count"],
-            refetchInterval: 60000,
-            enabled: !!user,
           });''',
+          )
+
+          text = replace_block(
+              text,
+              '  const { data: chatUnread } = useQuery<{ count: number }>({',
+              '\n\n  useEffect(() => {',
               '''  const { data: chatUnread } = useQuery<{ count: number }>({
             queryKey: companyQueryKey("/api/chat/unread-count", selectedCompany?.id),
             ...liveCountQueryPolicy(60_000),
             enabled: !!user && !!selectedCompany?.id,
           });''',
-              1,
           )
-          path.write_text(text)
 
-          test = Path("client/src/lib/queryPolicies.test.ts")
-          test.write_text('''// @vitest-environment jsdom
+          path.write_text(text)
+          PY
+
+      - name: Add focused query-policy coverage
+        run: |
+          cat > tests/ui/queryPolicies.test.ts <<'EOF'
+          // @vitest-environment jsdom
           import { describe, expect, it } from "vitest";
           import {
             QUERY_GC_TIMES,
@@ -107,7 +111,7 @@ jobs:
             stableReferenceQueryPolicy,
             stableSettingsQueryPolicy,
             visibleTabInterval,
-          } from "./queryPolicies";
+          } from "../../client/src/lib/queryPolicies";
 
           describe("bandwidth query policies", () => {
             it("keeps stable settings and reference data cached without passive refetches", () => {
@@ -119,7 +123,7 @@ jobs:
               expect(stableReferenceQueryPolicy.refetchOnReconnect).toBe(false);
             });
 
-            it("caches access metadata while preserving explicit mutation invalidation", () => {
+            it("caches access metadata while preserving explicit invalidation", () => {
               expect(accessQueryPolicy.staleTime).toBe(5 * 60_000);
               expect(accessQueryPolicy.refetchOnMount).toBe(false);
               expect(accessQueryPolicy.refetchOnWindowFocus).toBe(false);
@@ -134,17 +138,19 @@ jobs:
               if (descriptor) Object.defineProperty(document, "visibilityState", descriptor);
             });
 
-            it("never enables live polling in the background", () => {
+            it("never enables live polling in background tabs", () => {
               const policy = liveCountQueryPolicy(60_000);
               expect(policy.refetchIntervalInBackground).toBe(false);
               expect(policy.refetchOnWindowFocus).toBe(false);
               expect(policy.refetchInterval).toBeTypeOf("function");
             });
           });
-          ''')
+          EOF
 
-          verifier = Path("scripts/verify-bandwidth-phases-1-2.mjs")
-          verifier.write_text('''#!/usr/bin/env node
+      - name: Add Phase 1-2 bandwidth contract
+        run: |
+          cat > scripts/verify-bandwidth-phases-1-2.mjs <<'EOF'
+          #!/usr/bin/env node
           import fs from "node:fs";
 
           const appData = fs.readFileSync("client/src/app/useAuthenticatedAppData.ts", "utf8");
@@ -165,10 +171,13 @@ jobs:
           requireText(appData, 'companyQueryKey("/api/chat/unread-count"', "bootstrap chat key is not company scoped");
           requireText(sidebar, 'companyQueryKey("/api/chat/unread-count"', "sidebar chat key is not company scoped");
           requireText(sidebar, 'companyQueryKey("/api/company-settings"', "sidebar settings key is not shared/company scoped");
+          requireText(sidebar, 'companyQueryKey("/api/my-erp-pages"', "sidebar access key is not company scoped");
           requireText(sidebar, "liveCountQueryPolicy(60_000)", "sidebar live-count policy missing");
           requireText(sidebar, "stableSettingsQueryPolicy", "sidebar settings cache policy missing");
+          requireText(sidebar, "accessQueryPolicy", "sidebar access cache policy missing");
           forbidText(sidebar, 'queryKey: ["/api/chat/unread-count"]', "unscoped duplicate chat query remains");
           forbidText(sidebar, "refetchInterval: 60000", "raw sidebar polling interval remains");
+          forbidText(sidebar, "company-settings?companyId=", "duplicate raw company-settings fetch remains");
 
           if (failures.length) {
             console.error("Bandwidth phases 1-2 contract failed:");
@@ -176,26 +185,28 @@ jobs:
             process.exit(1);
           }
           console.log(JSON.stringify({ phases: [1, 2], status: "complete", sqlRequired: false }, null, 2));
-          ''')
-          PY
+          EOF
+
       - name: Format changed files
         run: |
           node node_modules/prettier/bin/prettier.cjs --write \
             client/src/app/useAuthenticatedAppData.ts \
             client/src/components/AppSidebar.tsx \
             client/src/lib/queryPolicies.ts \
-            client/src/lib/queryPolicies.test.ts \
+            tests/ui/queryPolicies.test.ts \
             scripts/verify-bandwidth-phases-1-2.mjs
+
       - name: Verify Phase 1-2 contracts
         run: node scripts/verify-bandwidth-phases-1-2.mjs
       - name: Focused policy tests
-        run: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts client/src/lib/queryPolicies.test.ts --maxWorkers=1 --no-file-parallelism
+        run: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts tests/ui/queryPolicies.test.ts --maxWorkers=1 --no-file-parallelism
       - name: Type-check
         run: npm run check
       - name: Existing bandwidth ratchet
         run: npm run verify:bandwidth
       - name: Production build
         run: npm run build
+
       - name: Commit completed Phase 1-2 implementation
         if: github.event_name == 'push'
         run: |
@@ -208,7 +219,7 @@ jobs:
           git add client/src/app/useAuthenticatedAppData.ts \
             client/src/components/AppSidebar.tsx \
             client/src/lib/queryPolicies.ts \
-            client/src/lib/queryPolicies.test.ts \
+            tests/ui/queryPolicies.test.ts \
             scripts/verify-bandwidth-phases-1-2.mjs
           git commit -m "Complete bandwidth polling and shared cache phases"
           git push origin HEAD:bandwidth-phases-1-2
