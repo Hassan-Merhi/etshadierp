@@ -36,6 +36,7 @@ const compatibilityTranslationFiles = [
   "client/src/i18n/backendMessagesPhase7Translations.part6.ts",
   "client/src/i18n/backendMessagesPhase7Translations.part7.ts",
   "client/src/i18n/backendMessagesPhase7Translations.part8.ts",
+  "client/src/pages/pos/postransferorders/copy.ts",
 ];
 
 const reviewedTechnicalValues = new Set([
@@ -74,6 +75,13 @@ function loadCompatibilityCoveredValues() {
     for (const match of source.matchAll(/\ben\s*:\s*(["'`])((?:\\.|(?!\1).)*)\1/g)) {
       values.add(match[2].replace(/\\(["'`])/g, "$1").trim());
     }
+    // Also support the POS transfer dictionary shape: en: { key: "value" }.
+    const englishBlock = source.match(/\ben\s*:\s*\{([\s\S]*?)\n\s*\},\s*\n\s*(?:ar|fr)\s*:/)?.[1];
+    if (englishBlock) {
+      for (const match of englishBlock.matchAll(/:\s*(["'`])((?:\\.|(?!\1).)*)\1/g)) {
+        values.add(match[2].replace(/\\(["'`])/g, "$1").trim());
+      }
+    }
   }
   return values;
 }
@@ -90,25 +98,13 @@ function refineFinding(finding, compatibilityCoveredValues) {
   if (finding.kind === "jsx-text") {
     if (value.includes("\n")) return null;
     if (!/^[A-Za-z][A-Za-z0-9\s,.'!?&/():%+\-–—…*#@]+$/.test(value)) return null;
-    if (/\b(?:return|const|let|var|useState|useRef|Promise|forwardRef|interface|type|extends)\b/.test(value)) {
-      return null;
-    }
+    if (/\b(?:return|const|let|var|useState|useRef|Promise|forwardRef|interface|type|extends)\b/.test(value)) return null;
   }
-  if (reviewedTechnicalValues.has(value)) {
-    return { ...finding, status: "excluded", category: "technical-identifier" };
-  }
-  if (compatibilityCoveredValues.has(value)) {
-    return { ...finding, status: "excluded", category: "compatibility-covered" };
-  }
-  if (looksLikeCssClassList(value)) {
-    return { ...finding, status: "excluded", category: "style-token" };
-  }
-  if (finding.kind === "jsx-expression-text" && /(?:\\t|\\n|\t|\n)/.test(value)) {
-    return { ...finding, status: "excluded", category: "sample-data" };
-  }
-  if (finding.kind === "error-constructor" && /^[a-z][a-z0-9_-]{1,50}$/.test(value)) {
-    return { ...finding, status: "excluded", category: "technical-identifier" };
-  }
+  if (reviewedTechnicalValues.has(value)) return { ...finding, status: "excluded", category: "technical-identifier" };
+  if (compatibilityCoveredValues.has(value)) return { ...finding, status: "excluded", category: "compatibility-covered" };
+  if (looksLikeCssClassList(value)) return { ...finding, status: "excluded", category: "style-token" };
+  if (finding.kind === "jsx-expression-text" && /(?:\\t|\\n|\t|\n)/.test(value)) return { ...finding, status: "excluded", category: "sample-data" };
+  if (finding.kind === "error-constructor" && /^[a-z][a-z0-9_-]{1,50}$/.test(value)) return { ...finding, status: "excluded", category: "technical-identifier" };
   return finding;
 }
 
@@ -121,30 +117,17 @@ function rebuildReport(report, compatibilityCoveredValues) {
     modules[finding.module] ??= { candidates: 0, actionable: 0, excluded: 0 };
     modules[finding.module].candidates += 1;
     modules[finding.module][finding.status] += 1;
-    if (finding.status === "excluded") {
-      excludedCategories[finding.category] = (excludedCategories[finding.category] ?? 0) + 1;
-    } else {
-      filesByActionableCount[finding.file] = (filesByActionableCount[finding.file] ?? 0) + 1;
-    }
+    if (finding.status === "excluded") excludedCategories[finding.category] = (excludedCategories[finding.category] ?? 0) + 1;
+    else filesByActionableCount[finding.file] = (filesByActionableCount[finding.file] ?? 0) + 1;
   }
   const actionable = findings.filter((finding) => finding.status === "actionable").length;
   return {
     ...report,
     detectorVersion: DETECTOR_VERSION,
-    totals: {
-      candidates: findings.length,
-      actionable,
-      excluded: findings.length - actionable,
-      unclassified: 0,
-    },
+    totals: { candidates: findings.length, actionable, excluded: findings.length - actionable, unclassified: 0 },
     modules: Object.fromEntries(Object.entries(modules).sort(([left], [right]) => left.localeCompare(right))),
-    excludedCategories: Object.fromEntries(
-      Object.entries(excludedCategories).sort(([, left], [, right]) => right - left),
-    ),
-    topActionableFiles: Object.entries(filesByActionableCount)
-      .sort(([, left], [, right]) => right - left)
-      .slice(0, 50)
-      .map(([file, count]) => ({ file, count })),
+    excludedCategories: Object.fromEntries(Object.entries(excludedCategories).sort(([, left], [, right]) => right - left)),
+    topActionableFiles: Object.entries(filesByActionableCount).sort(([, left], [, right]) => right - left).slice(0, 50).map(([file, count]) => ({ file, count })),
     findings,
   };
 }
@@ -163,16 +146,10 @@ const report = rebuildReport(buildReport(policy), compatibilityCoveredValues);
 
 writeOutput(jsonOutput, `${JSON.stringify(report, null, 2)}\n`);
 writeOutput(markdownOutput, renderMarkdown(report, baseline));
-if (suggestedBaselineOutput) {
-  writeOutput(suggestedBaselineOutput, `${JSON.stringify(createSuggestedBaseline(report), null, 2)}\n`);
-}
+if (suggestedBaselineOutput) writeOutput(suggestedBaselineOutput, `${JSON.stringify(createSuggestedBaseline(report), null, 2)}\n`);
 
-console.log(
-  `I18n audit: ${report.totals.actionable} actionable, ${report.totals.excluded} reviewed exclusions, ${report.totals.candidates} total candidates.`,
-);
-for (const [module, counts] of Object.entries(report.modules)) {
-  console.log(`${module}: ${counts.actionable} actionable / ${counts.excluded} excluded`);
-}
+console.log(`I18n audit: ${report.totals.actionable} actionable, ${report.totals.excluded} reviewed exclusions, ${report.totals.candidates} total candidates.`);
+for (const [module, counts] of Object.entries(report.modules)) console.log(`${module}: ${counts.actionable} actionable / ${counts.excluded} excluded`);
 
 if (!noEnforce) {
   if (!baseline) {

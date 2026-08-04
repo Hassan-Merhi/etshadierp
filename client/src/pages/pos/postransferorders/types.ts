@@ -1,7 +1,5 @@
 /**
  * Types for the PosTransferOrders page.
- *
- * Extracted from PosTransferOrders.tsx during the Phase 4 god-file split.
  */
 
 export interface PosUser {
@@ -43,19 +41,25 @@ export interface TransferDetailItem {
 export interface RevisionItem {
   stockItemId: number;
   stockItemName: string;
+  sourceLocationId?: number | null;
   sourceLocationName?: string | null;
   originalQuantity: string;
   delta: string;
   newQuantity: string;
 }
 
+export type RevisionStatus = "pending" | "approved" | "rejected" | "superseded";
+
 export interface Revision {
   id: number;
   revisionNumber: number;
-  note?: string;
+  note?: string | null;
   optional: boolean;
-  createdBy?: number | null;
-  createdAt: string;
+  status?: RevisionStatus;
+  statusReason?: string | null;
+  createdBy?: string | null;
+  revisionDate: string;
+  createdAt?: string;
   items: RevisionItem[];
 }
 
@@ -89,8 +93,7 @@ export interface ExtraItem {
   qtyDraft: string;
 }
 
-export // ─── Create Transfer Dialog (multi-location POS users) ───────────────────────
-interface NewTransferItem {
+export interface NewTransferItem {
   stockItemId: number;
   stockItemName: string;
   quantity: string;
