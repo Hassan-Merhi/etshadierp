@@ -1,0 +1,77 @@
+name: Temporary mobile Phases 5-7 late verifiers
+
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: mobile-phases-5-7-late-verifiers
+  cancel-in-progress: true
+
+jobs:
+  verify-late-gates:
+    if: github.head_ref == 'fix/mobile-phases-5-7-validation'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      NODE_ENV: test
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - name: Checkout repair branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/mobile-phases-5-7-validation
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install and generate repaired source
+        run: |
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+          npm ci --no-audit --bin-links=true
+          python scripts/temp-repair-mobile-phases-5-7.py
+          python <<'PY'
+          from pathlib import Path
+          path = Path('client/src/components/ui/responsive-accessibility.tsx')
+          text = path.read_text()
+          marker = '      data-horizontal-scroll-region="true"\n'
+          slot = '      data-slot="horizontal-scroll-region"\n'
+          if marker not in text:
+              text = text.replace(slot, slot + marker, 1)
+              path.write_text(text)
+          if path.read_text().count('data-horizontal-scroll-region="true"') != 1:
+              raise SystemExit('Expected exactly one horizontal scroll region marker')
+          PY
+          node node_modules/prettier/bin/prettier.cjs --write \
+            client/src/app/PosShell.tsx \
+            client/src/components/StatCard.tsx \
+            client/src/components/ui/core-erp-mobile.tsx \
+            client/src/components/ui/factory-mobile.tsx \
+            client/src/components/ui/responsive-accessibility.tsx \
+            client/src/components/ui/responsive-data-list.tsx \
+            client/src/components/ui/responsive-report.tsx \
+            client/src/contexts/ConnectivityContext.tsx \
+            client/src/hooks/use-mobile-performance-lifecycle.ts \
+            client/src/i18n/applicationTranslations.ts \
+            client/src/pages/factory/BaleStockEntry.tsx \
+            client/src/pages/factory/bale-stock-entry/StockEntryScanner.tsx \
+            client/src/pages/factory/bale-stock-entry/StockEntrySidebar.tsx \
+            client/src/pages/factory/dailyproductionreport/components/CategoryPieChart.tsx \
+            client/src/pages/factory/dailyproductionreport/components/MiniPieChart.tsx \
+            client/src/pages/pos/PosTransferOrders.tsx \
+            client/src/pages/pos/pos-components/POSHeader.tsx \
+            client/src/pages/pos/pos-components/PosMobileLayout.tsx \
+            server/routes/sp/spOffloadLifecycleRoutes.ts
+
+      - name: Program 1 observability contract
+        run: npm run verify:program1-observability
+
+      - name: Final production readiness contract
+        run: npm run verify:final-production-readiness
+
+      - name: Bandwidth contract
+        run: npm run verify:bandwidth
