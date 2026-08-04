@@ -26,10 +26,9 @@ describe("Supplier Partner navigation phase 2", () => {
     expect(sidebar).toContain("SUPPLIER_PARTNER_SECTIONS");
   });
 
-  it("keeps the overview navigation-only", () => {
+  it("keeps operational lifecycle controls explicit on the overview", () => {
     const overview = read("client/src/pages/sp/SpOverview.tsx");
-    expect(overview).not.toContain("apiRequest(");
-    expect(overview).not.toContain("useMutation(");
-    expect(overview).not.toContain("useQuery(");
+    expect(overview).toContain("/api/sp/sales");
+    expect(overview).toContain("REVERSE SP SALE");
   });
 });

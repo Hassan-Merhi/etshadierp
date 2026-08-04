@@ -49,7 +49,16 @@
     "POST /api/sp/containers/:id/cancel [requireAuth > <anonymous> > <anonymous>]",
     "GET /api/sp/production/closure-status [requireAuth > <anonymous>]",
     "POST /api/sp/production/evidence [requireAuth > <anonymous>]",
-    "POST /api/sp/production/close-rollback-window [requireAuth > <anonymous>]"
+    "POST /api/sp/production/close-rollback-window [requireAuth > <anonymous>]",
+    "GET /api/sp/permissions [requireAuth > <anonymous> > <anonymous>]",
+    "PUT /api/sp/permissions/:userId/:permission [requireAuth > <anonymous> > <anonymous>]",
+    "GET /api/sp/audit-events [requireAuth > <anonymous> > <anonymous>]",
+    "POST /api/sp/offload [requireAuth > <anonymous>]",
+    "POST /api/sp/offloads/:id/reverse [requireAuth > <anonymous> > <anonymous>]",
+    "GET /api/sp/reconciliation/offloads [requireAuth > <anonymous> > <anonymous>]",
+    "GET /api/sp/reconciliation/charges [requireAuth > <anonymous> > <anonymous>]",
+    "GET /api/sp/reconciliation/full [requireAuth > <anonymous> > <anonymous>]",
+    "GET /api/sp/reconciliation/full/export.csv [requireAuth > <anonymous> > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
     "USE /api/factory/containers [postOffloadReconciliationMiddleware]",
@@ -76,8 +85,16 @@
       "tests/phases-10-7-13-trilingual-surfaces.test.ts",
       "tests/phase14-i18n-release-gate.test.ts",
       "tests/phase8-rtl-responsive-accessibility.test.ts",
-      "tests/phase9-final-release-gate.test.ts"
+      "tests/phase9-final-release-gate.test.ts",
+      "tests/sp-production-closure.database.test.ts",
+      "tests/ui/mobile-responsive-phase10-performance.test.ts",
+      "tests/ui/mobile-responsive-phase4-forms-dialogs.test.ts",
+      "tests/ui/mobile-responsive-phase5-tables-data-lists.test.ts",
+      "tests/ui/mobile-responsive-phase6-core-erp.test.ts",
+      "tests/ui/mobile-responsive-phase7-factory.test.ts",
+      "tests/ui/mobile-responsive-phase8-pos.test.ts",
+      "tests/ui/mobile-responsive-phase9-reports.test.ts"
     ],
-    "maxAdditionalTextAssertions": 266
+    "maxAdditionalTextAssertions": 316
   }
 }

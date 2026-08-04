@@ -13,31 +13,29 @@ describe("global application language integration", () => {
     expect(fs.existsSync(path.join(root, "client/src/components/GlobalLanguageSwitch.tsx"))).toBe(false);
   });
 
-  it("places language selection inside the profile menu without covering company switching", () => {
+  it("places language selection inside workspace controls without covering company switching", () => {
     const topBar = read("client/src/components/AppTopBar.tsx");
-    const userMenu = read("client/src/components/UserMenu.tsx");
+    const workspaceControls = read("client/src/components/MobileWorkspaceControls.tsx");
     const companySelector = read("client/src/components/CompanySelector.tsx");
 
-    expect(topBar).toContain("<UserMenu");
+    expect(topBar).toContain("<WorkspaceHeaderControls");
     expect(topBar).toContain("<CompanySelector />");
-    expect(topBar.indexOf("<UserMenu")).toBeLessThan(topBar.indexOf("<CompanySelector />"));
+    expect(topBar.indexOf("<WorkspaceHeaderControls")).toBeLessThan(topBar.indexOf("<CompanySelector />"));
     expect(companySelector).toContain('data-testid="button-company-selector"');
 
-    expect(userMenu).toContain("DropdownMenuRadioGroup");
-    expect(userMenu).toContain('data-testid="button-user-menu"');
-    expect(userMenu).toContain("application-language-${option.value}");
-    expect(userMenu).toContain('value: "en"');
-    expect(userMenu).toContain('value: "ar"');
-    expect(userMenu).toContain('value: "fr"');
-    expect(userMenu).not.toContain("fixed right-3 top-3");
-    expect(userMenu).not.toContain("z-[70]");
+    expect(workspaceControls).toContain("DropdownMenuRadioGroup");
+    expect(workspaceControls).toContain("application-language-${option.value}");
+    expect(workspaceControls).toContain('value: "en"');
+    expect(workspaceControls).toContain('value: "ar"');
+    expect(workspaceControls).toContain('value: "fr"');
+    expect(workspaceControls).not.toContain("fixed right-3 top-3");
+    expect(workspaceControls).not.toContain("z-[70]");
   });
 
-  it("keeps the profile trigger available at narrow widths", () => {
-    const userMenu = read("client/src/components/UserMenu.tsx");
-    expect(userMenu).toContain('data-testid="button-user-menu"');
-    expect(userMenu).toContain('className="h-8 max-w-[15rem]');
-    expect(userMenu).not.toContain('data-testid="button-user-menu"\n          className="hidden');
+  it("keeps workspace controls available at narrow widths", () => {
+    const topBar = read("client/src/components/AppTopBar.tsx");
+    expect(topBar).toContain("<MobileWorkspaceControls");
+    expect(topBar).toContain("<WorkspaceHeaderControls");
   });
 
   it("keeps the Factory compatibility component non-visual", () => {

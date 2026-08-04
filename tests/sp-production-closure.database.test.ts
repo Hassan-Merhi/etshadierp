@@ -78,7 +78,7 @@ databaseDescribe("Supplier Partner production closure database", () => {
         INSERT INTO sp_completion_records(company_id, cutover_id, completion_snapshot, reason)
         VALUES (${companyId}, ${cutoverId}, '{}'::jsonb, 'duplicate closure')
       `),
-    ).rejects.toMatchObject({ code: "23505" });
+    ).rejects.toMatchObject({ cause: { code: "23505" } });
 
     await db.execute(sql`DELETE FROM sp_completion_records WHERE company_id = ${companyId}`);
     await db.execute(sql`DELETE FROM sp_production_evidence WHERE company_id = ${companyId}`);
