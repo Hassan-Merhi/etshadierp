@@ -20,6 +20,7 @@ import {
   startRemoteControlSession,
 } from "../server/services/remoteControlSessionService";
 import { restoreRemoteSupportBootDefaults, updateRemoteSupportFlags } from "../server/services/remoteSupportRuntime";
+import { resetRemoteSupportRolloutForTests, updateRemoteSupportRollout } from "../server/services/remoteSupportRollout";
 
 function buildSession() {
   const now = Date.now();
@@ -53,6 +54,7 @@ function authorizeMouse(sessionId: string, now: number) {
 
 describe("remote keyboard command safety", () => {
   beforeEach(() => {
+    resetRemoteSupportRolloutForTests();
     resetRemoteKeyboardCommandStateForTests();
     resetRemoteMouseCommandStateForTests();
     resetRemoteControlSessionStateForTests();
@@ -66,12 +68,14 @@ describe("remote keyboard command safety", () => {
       },
       "phase-6-test"
     );
+    updateRemoteSupportRollout({ stage: "general" }, "remote-support-test");
   });
 
   afterEach(() => {
     resetRemoteKeyboardCommandStateForTests();
     resetRemoteMouseCommandStateForTests();
     resetRemoteControlSessionStateForTests();
+    resetRemoteSupportRolloutForTests();
     restoreRemoteSupportBootDefaults("phase-6-test-cleanup");
   });
 

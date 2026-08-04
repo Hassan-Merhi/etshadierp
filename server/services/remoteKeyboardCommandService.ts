@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { isRemoteSupportEnabled } from "./remoteSupportRuntime";
+import { evaluateRemoteSupportRollout } from "./remoteSupportRollout";
 import {
   getRemoteControlSession,
   setRemoteControlKeyboardCapability,
@@ -127,6 +128,18 @@ function activeSessionForController(
   }
   if (!isRemoteSupportEnabled("remoteControl") || !isRemoteSupportEnabled("keyboardControl")) {
     throw new RemoteKeyboardControlError("KEYBOARD_CONTROL_DISABLED", 409, "Keyboard control is disabled.");
+  }
+  const rollout = evaluateRemoteSupportRollout({
+    companyId: session.companyId,
+    controllerUserId: session.controllerUserId,
+    controllerRole: session.controllerRole,
+  });
+  if (!rollout.allowed) {
+    throw new RemoteKeyboardControlError(
+      rollout.code ?? "REMOTE_SUPPORT_ROLLOUT_BLOCKED",
+      409,
+      rollout.message ?? "Remote support control is blocked by rollout policy."
+    );
   }
   if (!session.capabilities.mouse) {
     throw new RemoteKeyboardControlError(

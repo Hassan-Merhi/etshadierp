@@ -17,6 +17,7 @@ import {
   startRemoteControlSession,
 } from "../server/services/remoteControlSessionService";
 import { restoreRemoteSupportBootDefaults, updateRemoteSupportFlags } from "../server/services/remoteSupportRuntime";
+import { resetRemoteSupportRolloutForTests, updateRemoteSupportRollout } from "../server/services/remoteSupportRollout";
 
 function buildSession() {
   const now = Date.now();
@@ -41,6 +42,7 @@ function buildSession() {
 
 describe("remote mouse command safety", () => {
   beforeEach(() => {
+    resetRemoteSupportRolloutForTests();
     resetRemoteMouseCommandStateForTests();
     resetRemoteControlSessionStateForTests();
     updateRemoteSupportFlags(
@@ -53,11 +55,13 @@ describe("remote mouse command safety", () => {
       },
       "phase-5-test"
     );
+    updateRemoteSupportRollout({ stage: "general" }, "remote-support-test");
   });
 
   afterEach(() => {
     resetRemoteMouseCommandStateForTests();
     resetRemoteControlSessionStateForTests();
+    resetRemoteSupportRolloutForTests();
     restoreRemoteSupportBootDefaults("phase-5-test-cleanup");
   });
 

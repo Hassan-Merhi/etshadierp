@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { isRemoteSupportEnabled } from "./remoteSupportRuntime";
+import { evaluateRemoteSupportRollout } from "./remoteSupportRollout";
 import {
   getRemoteControlSession,
   setRemoteControlMouseCapability,
@@ -112,6 +113,18 @@ function activeSessionForController(
   }
   if (!isRemoteSupportEnabled("remoteControl")) {
     throw new RemoteMouseControlError("MOUSE_CONTROL_DISABLED", 409, "Mouse control is disabled.");
+  }
+  const rollout = evaluateRemoteSupportRollout({
+    companyId: session.companyId,
+    controllerUserId: session.controllerUserId,
+    controllerRole: session.controllerRole,
+  });
+  if (!rollout.allowed) {
+    throw new RemoteMouseControlError(
+      rollout.code ?? "REMOTE_SUPPORT_ROLLOUT_BLOCKED",
+      409,
+      rollout.message ?? "Remote support control is blocked by rollout policy."
+    );
   }
   if (requireMouseCapability && !session.capabilities.mouse) {
     throw new RemoteMouseControlError("MOUSE_CONTROL_DISABLED", 409, "Mouse control is disabled.");

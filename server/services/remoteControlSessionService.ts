@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { isRemoteSupportEnabled } from "./remoteSupportRuntime";
+import { evaluateRemoteSupportRollout } from "./remoteSupportRollout";
 
 export type RemoteControlSessionStatus = "active" | "stopped" | "expired";
 
@@ -240,6 +241,18 @@ export function startRemoteControlSession(input: StartRemoteControlSessionInput)
   }
   if (!isRemoteControlControllerRole(input.controllerRole)) {
     throw new RemoteControlSessionError("CONTROLLER_NOT_AUTHORIZED", 403, "This role cannot start support control.");
+  }
+  const rollout = evaluateRemoteSupportRollout({
+    companyId: input.controllerCompanyId,
+    controllerUserId: input.controllerUserId,
+    controllerRole: input.controllerRole,
+  });
+  if (!rollout.allowed) {
+    throw new RemoteControlSessionError(
+      rollout.code ?? "REMOTE_SUPPORT_ROLLOUT_BLOCKED",
+      409,
+      rollout.message ?? "Remote support control is blocked by rollout policy."
+    );
   }
 
   const targetUserId = cleanIdentifier(input.targetUserId);

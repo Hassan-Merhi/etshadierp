@@ -8,14 +8,8 @@ import {
   resetRemoteControlSessionStateForTests,
   startRemoteControlSession,
 } from "../server/services/remoteControlSessionService";
-import {
-  resetRemoteSupportRolloutForTests,
-  updateRemoteSupportRollout,
-} from "../server/services/remoteSupportRollout";
-import {
-  restoreRemoteSupportBootDefaults,
-  updateRemoteSupportFlags,
-} from "../server/services/remoteSupportRuntime";
+import { resetRemoteSupportRolloutForTests, updateRemoteSupportRollout } from "../server/services/remoteSupportRollout";
+import { restoreRemoteSupportBootDefaults, updateRemoteSupportFlags } from "../server/services/remoteSupportRuntime";
 
 function registerTargetTab() {
   registerRemoteControlTab({

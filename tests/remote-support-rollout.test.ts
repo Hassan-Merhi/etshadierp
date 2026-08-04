@@ -7,10 +7,7 @@ import {
   rollbackRemoteSupportRollout,
   updateRemoteSupportRollout,
 } from "../server/services/remoteSupportRollout";
-import {
-  restoreRemoteSupportBootDefaults,
-  updateRemoteSupportFlags,
-} from "../server/services/remoteSupportRuntime";
+import { restoreRemoteSupportBootDefaults, updateRemoteSupportFlags } from "../server/services/remoteSupportRuntime";
 
 describe("remote support controlled rollout", () => {
   beforeEach(() => {
@@ -40,10 +37,7 @@ describe("remote support controlled rollout", () => {
   });
 
   it("limits internal rollout to developers or explicit controllers", () => {
-    updateRemoteSupportRollout(
-      { stage: "internal", internalControllerUserIds: ["controller-2"] },
-      "developer"
-    );
+    updateRemoteSupportRollout({ stage: "internal", internalControllerUserIds: ["controller-2"] }, "developer");
 
     expect(
       evaluateRemoteSupportRollout({

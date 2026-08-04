@@ -13,6 +13,7 @@ import {
   stopRemoteControlSession,
 } from "../server/services/remoteControlSessionService";
 import { restoreRemoteSupportBootDefaults, updateRemoteSupportFlags } from "../server/services/remoteSupportRuntime";
+import { resetRemoteSupportRolloutForTests, updateRemoteSupportRollout } from "../server/services/remoteSupportRollout";
 
 const now = Date.now();
 const companyId = 7;
@@ -42,6 +43,7 @@ function startSession(controllerUserId = "1", targetUserId = "22", selectedCompa
 
 describe("remote control session safety", () => {
   beforeEach(() => {
+    resetRemoteSupportRolloutForTests();
     resetRemoteControlSessionStateForTests();
     updateRemoteSupportFlags(
       {
@@ -53,10 +55,12 @@ describe("remote control session safety", () => {
       },
       "phase-7-test"
     );
+    updateRemoteSupportRollout({ stage: "general" }, "remote-support-test");
   });
 
   afterEach(() => {
     resetRemoteControlSessionStateForTests();
+    resetRemoteSupportRolloutForTests();
     restoreRemoteSupportBootDefaults("phase-7-test-cleanup");
   });
 

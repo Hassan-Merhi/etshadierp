@@ -8,18 +8,10 @@ import {
   updateRemoteSupportRollout,
   type RemoteSupportRolloutStage,
 } from "../services/remoteSupportRollout";
-import {
-  getRemoteSupportRuntimeSnapshot,
-  updateRemoteSupportFlags,
-} from "../services/remoteSupportRuntime";
+import { getRemoteSupportRuntimeSnapshot, updateRemoteSupportFlags } from "../services/remoteSupportRuntime";
 
 const PASSWORD_CONFIRMATION_MAX_AGE_MS = 5 * 60 * 1000;
-const ROLLOUT_STAGES = new Set<RemoteSupportRolloutStage>([
-  "disabled",
-  "internal",
-  "canary",
-  "general",
-]);
+const ROLLOUT_STAGES = new Set<RemoteSupportRolloutStage>(["disabled", "internal", "canary", "general"]);
 
 function actor(req: Request): string {
   const username = getSessionUsername(req);
@@ -77,9 +69,7 @@ export function registerRemoteSupportRolloutRoutes(app: Express): void {
     const updated = updateRemoteSupportRollout(
       {
         ...(stage ? { stage } : {}),
-        ...(req.body?.canaryCompanyIds === undefined
-          ? {}
-          : { canaryCompanyIds: req.body.canaryCompanyIds }),
+        ...(req.body?.canaryCompanyIds === undefined ? {} : { canaryCompanyIds: req.body.canaryCompanyIds }),
         ...(req.body?.internalControllerUserIds === undefined
           ? {}
           : { internalControllerUserIds: req.body.internalControllerUserIds }),
@@ -99,10 +89,7 @@ export function registerRemoteSupportRolloutRoutes(app: Express): void {
     if (!requireDeveloper(req, res)) return;
     const updatedBy = actor(req);
     const rollout = rollbackRemoteSupportRollout(updatedBy);
-    const runtime = updateRemoteSupportFlags(
-      { remoteControl: false, keyboardControl: false },
-      updatedBy
-    );
+    const runtime = updateRemoteSupportFlags({ remoteControl: false, keyboardControl: false }, updatedBy);
     const stoppedSessions = stopAllRemoteControlSessions("rollout-emergency-rollback");
     res.setHeader("Cache-Control", "no-store");
     res.json({ rollout, runtime, stoppedSessions });

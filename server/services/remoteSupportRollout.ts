@@ -48,30 +48,20 @@ export class RemoteSupportRolloutError extends Error {
 const STAGES = new Set<RemoteSupportRolloutStage>(["disabled", "internal", "canary", "general"]);
 
 function parsePositiveIds(value: unknown): number[] {
-  const values = Array.isArray(value)
-    ? value
-    : typeof value === "string"
-      ? value.split(",")
-      : [];
+  const values = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : [];
   return [...new Set(values.map(Number).filter((id) => Number.isInteger(id) && id > 0))].sort(
     (left, right) => left - right
   );
 }
 
 function parseUserIds(value: unknown): string[] {
-  const values = Array.isArray(value)
-    ? value
-    : typeof value === "string"
-      ? value.split(",")
-      : [];
+  const values = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : [];
   return [...new Set(values.map((item) => String(item).trim()).filter(Boolean))].sort();
 }
 
 function normalizeStage(value: unknown): RemoteSupportRolloutStage {
   const stage = typeof value === "string" ? value.trim().toLowerCase() : "disabled";
-  return STAGES.has(stage as RemoteSupportRolloutStage)
-    ? (stage as RemoteSupportRolloutStage)
-    : "disabled";
+  return STAGES.has(stage as RemoteSupportRolloutStage) ? (stage as RemoteSupportRolloutStage) : "disabled";
 }
 
 const bootState = {
