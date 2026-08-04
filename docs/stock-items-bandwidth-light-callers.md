@@ -15,3 +15,7 @@ Management, import, repair, and bulk-edit pages that genuinely require every lig
 ## Full records
 
 Full stock item data remains available from `/api/stock-items/:id` only after an item is selected or opened.
+
+## Verification
+
+The Phase 3–4 bandwidth contract verifies default pagination, the 100-record cap, original-name preservation, alias/location search, selected-ID hydration, and the absence of full-company item downloads from ordinary voucher selector flows.
