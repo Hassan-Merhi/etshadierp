@@ -2,6 +2,10 @@ import type { NextFunction, Request, Response } from "express";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { persistSecurityEvent } from "./securityAuditRuntime";
+import {
+  isPinnedCompanyRoute,
+  resolvePermissionCompanyId,
+} from "./activeCompanyPermissionPolicy";
 
 export type CompanyAssertionSource = "body" | "query" | "params";
 
@@ -62,6 +66,47 @@ export function decideExplicitCompanyContext(
   return { allowed: true, companyId, code: "COMPANY_CONTEXT_OK" };
 }
 
+/**
+ * Route-aware company enforcement for middleware consumers.
+ *
+ * Factory and Properties routes validate against factoryCompanyId when one is
+ * pinned. Ordinary ERP routes validate against currentCompanyId and ignore a
+ * stale factoryCompanyId left by another browser tab. Request-supplied company
+ * assertions must always match the company selected by the route policy.
+ */
+export function decideRouteCompanyContext(
+  session: any,
+  path: string,
+  requestAssertions: number[] = [],
+  includeLegacyFactorySessionAssertion = true
+): CompanyContextDecision {
+  const companyId = resolvePermissionCompanyId({
+    path,
+    currentCompanyId: session?.currentCompanyId,
+    factoryCompanyId: session?.factoryCompanyId,
+  });
+  if (!companyId) return { allowed: false, companyId: null, code: "COMPANY_CONTEXT_REQUIRED" };
+
+  const assertions = [...requestAssertions];
+  if (
+    includeLegacyFactorySessionAssertion &&
+    isPinnedCompanyRoute(path) &&
+    session?.factoryCompanyId !== undefined &&
+    session?.factoryCompanyId !== null
+  ) {
+    const pinnedFactoryCompanyId = positiveInteger(session.factoryCompanyId);
+    if (pinnedFactoryCompanyId === null) {
+      return { allowed: false, companyId, code: "COMPANY_CONTEXT_MISMATCH" };
+    }
+    assertions.push(pinnedFactoryCompanyId);
+  }
+
+  if (assertions.some((assertion) => assertion !== companyId)) {
+    return { allowed: false, companyId, code: "COMPANY_CONTEXT_MISMATCH" };
+  }
+  return { allowed: true, companyId, code: "COMPANY_CONTEXT_OK" };
+}
+
 async function auditCompanyDecision(req: Request, decision: CompanyContextDecision): Promise<void> {
   await persistSecurityEvent(
     db,
@@ -86,8 +131,10 @@ export function requireExplicitCompanyContext(options: CompanyContextOptions = {
   const fields = options.assertionFields ?? ["companyId", "factoryCompanyId"];
   return async (req: Request, res: Response, next: NextFunction) => {
     const assertions = assertionValues(req, fields);
-    const decision = decideExplicitCompanyContext(
+    const requestPath = req.originalUrl?.split("?", 1)[0] || req.path || "/";
+    const decision = decideRouteCompanyContext(
       req.session as any,
+      requestPath,
       assertions,
       options.includeLegacyFactorySessionAssertion !== false
     );
@@ -105,9 +152,9 @@ export function requireExplicitCompanyContext(options: CompanyContextOptions = {
       return res.status(status).json({ message, code: decision.code });
     }
 
-    // Normalize legacy factory consumers to the authenticated company. This is not
-    // fallback resolution: any pre-existing legacy value was already required to match.
-    (req.session as any).factoryCompanyId = decision.companyId;
+    if (isPinnedCompanyRoute(requestPath)) {
+      (req.session as any).factoryCompanyId = decision.companyId;
+    }
     (req as any).securityCompanyId = decision.companyId;
     next();
   };
