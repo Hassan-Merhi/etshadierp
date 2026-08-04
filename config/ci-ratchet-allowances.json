@@ -50,9 +50,15 @@
     "GET /api/screen-feed/control/tabs/:userId [requireAuth > <anonymous>]",
     "POST /api/screen-feed/control/tab-heartbeat [requireLogin > <anonymous>]",
     "GET /api/screen-feed/control/status [requireLogin > <anonymous>]",
+    "GET /api/screen-feed/control/sessions/controller-active [requireAuth > <anonymous>]",
     "GET /api/screen-feed/control/sessions/active/:userId [requireAuth > <anonymous>]",
     "POST /api/screen-feed/control/sessions [requireAuth > <anonymous>]",
     "POST /api/screen-feed/control/sessions/:sessionId/heartbeat [requireAuth > <anonymous>]",
+    "POST /api/screen-feed/control/sessions/:sessionId/mouse-authorization [requireAuth > <anonymous>]",
+    "GET /api/screen-feed/control/commands [requireLogin > <anonymous>]",
+    "POST /api/screen-feed/control/sessions/:sessionId/commands [requireAuth > <anonymous>]",
+    "GET /api/screen-feed/control/sessions/:sessionId/results [requireAuth > <anonymous>]",
+    "POST /api/screen-feed/control/sessions/:sessionId/commands/:commandId/result [requireLogin > <anonymous>]",
     "POST /api/screen-feed/control/sessions/:sessionId/stop [requireLogin > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
