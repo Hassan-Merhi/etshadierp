@@ -48,7 +48,7 @@ export class RemoteSupportRolloutError extends Error {
 type MutableRolloutState = Pick<RemoteSupportRolloutState, "stage" | "canaryCompanyIds" | "internalControllerUserIds">;
 
 const STAGES = new Set<RemoteSupportRolloutStage>(["disabled", "internal", "canary", "general"]);
-const SAFE_BOOT_STATE: MutableRolloutState = {
+const TEST_SAFE_STATE: MutableRolloutState = {
   stage: "disabled",
   canaryCompanyIds: [],
   internalControllerUserIds: [],
@@ -71,7 +71,21 @@ function normalizeStage(value: unknown): RemoteSupportRolloutStage {
   return STAGES.has(stage as RemoteSupportRolloutStage) ? (stage as RemoteSupportRolloutStage) : "disabled";
 }
 
-let state: MutableRolloutState = { ...SAFE_BOOT_STATE };
+function productionBootState(): MutableRolloutState {
+  if (process.env.NODE_ENV !== "production") return { ...TEST_SAFE_STATE };
+  return {
+    stage: normalizeStage(process.env.REMOTE_SUPPORT_ROLLOUT_STAGE ?? "general"),
+    canaryCompanyIds: parsePositiveIds(process.env.REMOTE_SUPPORT_CANARY_COMPANY_IDS),
+    internalControllerUserIds: parseUserIds(process.env.REMOTE_SUPPORT_INTERNAL_CONTROLLER_USER_IDS),
+  };
+}
+
+const bootState = productionBootState();
+let state: MutableRolloutState = {
+  stage: bootState.stage,
+  canaryCompanyIds: [...bootState.canaryCompanyIds],
+  internalControllerUserIds: [...bootState.internalControllerUserIds],
+};
 let revision = 1;
 let updatedAt = new Date();
 let updatedBy = "system";
@@ -208,7 +222,7 @@ export function assertRemoteSupportRolloutEligible(input: RemoteSupportRolloutEl
 }
 
 export function resetRemoteSupportRolloutForTests(): void {
-  state = { ...SAFE_BOOT_STATE };
+  state = { ...TEST_SAFE_STATE };
   revision = 1;
   updatedAt = new Date(0);
   updatedBy = "test";
