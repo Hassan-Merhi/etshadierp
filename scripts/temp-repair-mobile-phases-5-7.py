@@ -4,11 +4,12 @@ from pathlib import Path
 def replace_once(path: str, old: str, new: str) -> None:
     file_path = Path(path)
     text = file_path.read_text()
+    if old in text:
+        file_path.write_text(text.replace(old, new, 1))
+        return
     if new in text:
         return
-    if old not in text:
-        raise SystemExit(f"Expected source text not found in {path}: {old[:100]!r}")
-    file_path.write_text(text.replace(old, new, 1))
+    raise SystemExit(f"Expected source text not found in {path}: {old[:100]!r}")
 
 
 replace_once(
