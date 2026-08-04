@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - fix/phase4-post-merge-formatting
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -46,5 +49,3 @@ jobs:
           git add client/src/app/PosShell.tsx client/src/components/ui/dialog.tsx client/src/i18n/applicationTranslations.ts client/src/styles/rtl-hardening.css .github/workflows/temp-phase4-format.yml
           git commit -m "Fix Phase 4 post-merge formatting"
           git push origin HEAD:fix/phase4-post-merge-formatting
-
-# Retriggered after opening PR #466.
