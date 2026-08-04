@@ -33,6 +33,13 @@ function getFileAttachment(source: ExportAttachmentSource): { filePath: string; 
   return undefined;
 }
 
+function requireBufferSource(source: ExportAttachmentSource): Buffer {
+  if (!Buffer.isBuffer(source)) {
+    throw new Error("Expected an in-memory export attachment");
+  }
+  return source;
+}
+
 export function armExportAttachmentCleanup(
   source: ExportAttachmentSource,
   delayMs = DEFAULT_CLEANUP_DELAY_MS,
@@ -70,7 +77,7 @@ export function isFileExportAttachment(
 
 export function getExportAttachmentSize(source: ExportAttachmentSource): number {
   const file = getFileAttachment(source);
-  return file ? file.sizeBytes : source.length;
+  return file ? file.sizeBytes : requireBufferSource(source).length;
 }
 
 export function toNodemailerAttachment(
@@ -84,12 +91,12 @@ export function toNodemailerAttachment(
     return { filename, contentType, path: file.filePath };
   }
 
-  return { filename, contentType, content: source };
+  return { filename, contentType, content: requireBufferSource(source) };
 }
 
 export async function readExportAttachmentBuffer(source: ExportAttachmentSource): Promise<Buffer> {
   const file = getFileAttachment(source);
-  if (!file) return source;
+  if (!file) return requireBufferSource(source);
   armExportAttachmentCleanup(source);
   return fs.promises.readFile(file.filePath);
 }
@@ -97,7 +104,7 @@ export async function readExportAttachmentBuffer(source: ExportAttachmentSource)
 export async function assertExportAttachmentAvailable(source: ExportAttachmentSource): Promise<void> {
   const file = getFileAttachment(source);
   if (!file) {
-    if (source.length <= 0) throw new Error("Export attachment is empty");
+    if (requireBufferSource(source).length <= 0) throw new Error("Export attachment is empty");
     return;
   }
 
