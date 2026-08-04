@@ -57,6 +57,34 @@ jobs:
           cache: npm
       - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
       - run: npm ci --no-audit --bin-links=true
+      - name: Lock controller roles to the reviewed policy
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('server/services/remoteControlSessionService.ts')
+          text = path.read_text()
+          old = '''export function isRemoteControlControllerRole(role: unknown): boolean {
+            const allowedRoles = new Set(
+              (process.env.REMOTE_SUPPORT_CONTROLLER_ROLES ?? "Developer,Admin,Owner,Manager")
+                .split(",")
+                .map((value) => value.trim())
+                .filter(Boolean)
+            );
+            return typeof role === "string" && allowedRoles.has(role);
+          }
+          '''
+          new = '''const REMOTE_CONTROL_CONTROLLER_ROLES = new Set(["Developer", "Admin", "Owner", "Manager"]);
+
+          export function isRemoteControlControllerRole(role: unknown): boolean {
+            return typeof role === "string" && REMOTE_CONTROL_CONTROLLER_ROLES.has(role);
+          }
+          '''
+          if new not in text:
+              if old not in text:
+                  raise SystemExit('controller role policy anchor missing')
+              path.write_text(text.replace(old, new, 1))
+          PY
       - name: Format affected source
         run: |
           node node_modules/prettier/bin/prettier.cjs --write \
@@ -64,6 +92,7 @@ jobs:
             server/routes/remoteKeyboardControlRoutes.ts \
             server/routes/remoteSupportAuditRoutes.ts \
             server/routes/screenFeedRoutes.ts \
+            server/services/remoteControlSessionService.ts \
             server/services/remoteSupportRollout.ts
       - name: Verify Phase 8 contracts
         run: |
