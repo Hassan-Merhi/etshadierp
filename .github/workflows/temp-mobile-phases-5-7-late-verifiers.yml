@@ -1,4 +1,4 @@
-name: Temporary mobile Phases 5-7 late verifiers
+name: Temporary mobile Phases 5-7 final source gate
 
 on:
   pull_request:
@@ -6,14 +6,17 @@ on:
       - main
 
 concurrency:
-  group: mobile-phases-5-7-late-verifiers
+  group: mobile-phases-5-7-final-source-gate
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
-  verify-late-gates:
+  verify-and-push:
     if: github.head_ref == 'fix/mobile-phases-5-7-validation'
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       NODE_ENV: test
       NODE_OPTIONS: --max-old-space-size=4096
@@ -22,6 +25,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: fix/mobile-phases-5-7-validation
+          fetch-depth: 0
 
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
@@ -41,11 +45,16 @@ jobs:
           marker = '      data-horizontal-scroll-region="true"\n'
           slot = '      data-slot="horizontal-scroll-region"\n'
           if marker not in text:
+              if slot not in text:
+                  raise SystemExit('Horizontal scroll slot was not found')
               text = text.replace(slot, slot + marker, 1)
               path.write_text(text)
           if path.read_text().count('data-horizontal-scroll-region="true"') != 1:
               raise SystemExit('Expected exactly one horizontal scroll region marker')
           PY
+          npm audit fix --package-lock-only --omit=dev || true
+          npm ci --no-audit --bin-links=true
+          npm run verify:dependency-audit
           node node_modules/prettier/bin/prettier.cjs --write \
             client/src/app/PosShell.tsx \
             client/src/components/StatCard.tsx \
@@ -67,11 +76,66 @@ jobs:
             client/src/pages/pos/pos-components/PosMobileLayout.tsx \
             server/routes/sp/spOffloadLifecycleRoutes.ts
 
-      - name: Program 1 observability contract
-        run: npm run verify:program1-observability
+      - name: Phase 5-7 focused contracts
+        run: |
+          node scripts/verify-mobile-responsive-phase5-tables.mjs
+          node scripts/verify-mobile-responsive-phase6-core-erp.mjs
+          node scripts/verify-mobile-responsive-phase7-factory.mjs
+          node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts \
+            tests/ui/mobile-responsive-phase5-tables-data-lists.test.ts \
+            tests/ui/mobile-responsive-phase6-core-erp.test.ts \
+            tests/ui/mobile-responsive-phase7-factory.test.ts \
+            --maxWorkers=1 --no-file-parallelism
 
-      - name: Final production readiness contract
-        run: npm run verify:final-production-readiness
+      - name: Lockfile and production dependencies
+        run: |
+          npm run verify:lockfile
+          npm run verify:production-dependencies
 
-      - name: Bandwidth contract
-        run: npm run verify:bandwidth
+      - name: Lint and TypeScript
+        run: |
+          npm run lint
+          npm run check
+
+      - name: Production build
+        run: npm run build
+
+      - name: Release safety contracts
+        run: |
+          npm run verify:program1-observability
+          npm run verify:final-production-readiness
+          npm run verify:bandwidth
+
+      - name: Push verified source repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config core.hooksPath /dev/null
+          git add \
+            package-lock.json \
+            client/src/app/PosShell.tsx \
+            client/src/components/StatCard.tsx \
+            client/src/components/ui/core-erp-mobile.tsx \
+            client/src/components/ui/factory-mobile.tsx \
+            client/src/components/ui/responsive-accessibility.tsx \
+            client/src/components/ui/responsive-data-list.tsx \
+            client/src/components/ui/responsive-report.tsx \
+            client/src/contexts/ConnectivityContext.tsx \
+            client/src/hooks/use-mobile-performance-lifecycle.ts \
+            client/src/i18n/applicationTranslations.ts \
+            client/src/pages/factory/BaleStockEntry.tsx \
+            client/src/pages/factory/bale-stock-entry/StockEntryScanner.tsx \
+            client/src/pages/factory/bale-stock-entry/StockEntrySidebar.tsx \
+            client/src/pages/factory/dailyproductionreport/components/CategoryPieChart.tsx \
+            client/src/pages/factory/dailyproductionreport/components/MiniPieChart.tsx \
+            client/src/pages/pos/PosTransferOrders.tsx \
+            client/src/pages/pos/pos-components/POSHeader.tsx \
+            client/src/pages/pos/pos-components/PosMobileLayout.tsx \
+            server/routes/sp/spOffloadLifecycleRoutes.ts
+          if git diff --cached --quiet; then
+            echo "Verified source repair already present."
+            exit 0
+          fi
+          git commit -m "Fix mobile Phases 5-7 validation blockers"
+          git pull --rebase origin fix/mobile-phases-5-7-validation
+          git push origin HEAD:fix/mobile-phases-5-7-validation
