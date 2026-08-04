@@ -12,6 +12,12 @@ import { PageHeader } from "@/components/PageHeader";
 import { PaginationBar } from "@/components/PaginationBar";
 import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  canonicalApiUrl,
+  companyDataKey,
+  frontendQueryPolicies,
+  invalidateCompanyApiFamily,
+} from "@/lib/frontendDataArchitecture";
 import { useToast } from "@/hooks/use-toast";
 import {
   DropdownMenu,
@@ -169,22 +175,40 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const [expandedCondensedGroups, setExpandedCondensedGroups] = useState<Set<string>>(new Set());
 
   const { data: ledgerAccounts = [] } = useQuery<LedgerAccount[]>({
-    queryKey: ["/api/ledger-accounts", selectedCompany?.id],
+    queryKey: companyDataKey("/api/ledger-accounts", selectedCompany?.id),
     enabled: !!selectedCompany,
+    ...frontendQueryPolicies.reference,
   });
   const { data: bankAccounts = [] } = useQuery<BankAccount[]>({
-    queryKey: ["/api/bank-accounts", selectedCompany?.id],
+    queryKey: companyDataKey("/api/bank-accounts", selectedCompany?.id),
     enabled: !!selectedCompany,
+    ...frontendQueryPolicies.reference,
   });
-  const { data: suppliers = [] } = useQuery<Supplier[]>({ queryKey: ["/api/suppliers"], enabled: !!selectedCompany });
-  const { data: employees = [] } = useQuery<Employee[]>({
-    queryKey: ["/api/employees", selectedCompany?.id],
+  const { data: suppliers = [] } = useQuery<Supplier[]>({
+    queryKey: companyDataKey("/api/suppliers", selectedCompany?.id),
     enabled: !!selectedCompany,
+    ...frontendQueryPolicies.reference,
+  });
+  const { data: employees = [] } = useQuery<Employee[]>({
+    queryKey: companyDataKey("/api/employees", selectedCompany?.id),
+    enabled: !!selectedCompany,
+    ...frontendQueryPolicies.reference,
   });
   const { data: fixedAssets = [] } = useQuery<FixedAsset[]>({
-    queryKey: ["/api/fixed-assets", selectedCompany?.id],
+    queryKey: companyDataKey("/api/fixed-assets", selectedCompany?.id),
     enabled: !!selectedCompany,
+    ...frontendQueryPolicies.reference,
   });
+
+
+  useEffect(() => {
+    setSelectedVoucher(null);
+    setVoucherToEdit(null);
+    setExpandedVoucherId(null);
+    setViewDialogOpen(false);
+    setEditDialogOpen(false);
+    setVoucherPage(1);
+  }, [selectedCompany?.id]);
 
   const [purchaseOrderData, setPurchaseOrderData] = useState<any>(null);
   const [poSupplierBalance, setPoSupplierBalance] = useState<string | null>(null);
@@ -203,10 +227,13 @@ export default function Daybook({ user }: { user?: any } = {}) {
       .catch(() => setPoSupplierBalance(null));
   }, [purchaseOrderData?.supplierId, balanceRefreshKey]);
 
+  const viewEntriesUrl = selectedVoucher ? `/api/vouchers/${selectedVoucher.id}/view-entries` : "";
   const { data: viewVoucherEntriesRaw, isLoading: viewEntriesLoading } = useQuery<any>({
-    queryKey: selectedVoucher ? [`/api/vouchers/${selectedVoucher.id}/view-entries`] : [],
+    queryKey: selectedVoucher
+      ? companyDataKey(viewEntriesUrl, selectedCompany?.id, "daybook-view-entries")
+      : [],
     enabled: !!selectedVoucher && viewDialogOpen,
-    staleTime: 0,
+    ...frontendQueryPolicies.live,
   });
 
   const viewVoucherEntries: ViewVoucherEntry[] = useMemo(() => {
@@ -214,10 +241,13 @@ export default function Daybook({ user }: { user?: any } = {}) {
     return Array.isArray(viewVoucherEntriesRaw) ? viewVoucherEntriesRaw : viewVoucherEntriesRaw.entries || [];
   }, [viewVoucherEntriesRaw]);
 
+  const expandedEntriesUrl = expandedVoucherId ? `/api/vouchers/${expandedVoucherId}/view-entries` : "";
   const { data: expandedEntriesRaw, isLoading: expandedLoading } = useQuery<any>({
-    queryKey: expandedVoucherId ? [`/api/vouchers/${expandedVoucherId}/view-entries`] : [],
+    queryKey: expandedVoucherId
+      ? companyDataKey(expandedEntriesUrl, selectedCompany?.id, "daybook-expanded-entries")
+      : [],
     enabled: !!expandedVoucherId,
-    staleTime: 0,
+    ...frontendQueryPolicies.live,
   });
   const expandedEntries: ViewVoucherEntry[] = useMemo(() => {
     if (!expandedEntriesRaw) return [];
@@ -231,7 +261,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const { data: voucherRevisions = [], isLoading: revisionsLoading } = useQuery<any[]>({
     queryKey:
       selectedVoucher && isStockTransferVoucher && viewDialogOpen
-        ? [`/api/stock-transfers/by-voucher/${selectedVoucher.id}/revisions`]
+        ? companyDataKey(
+            `/api/stock-transfers/by-voucher/${selectedVoucher.id}/revisions`,
+            selectedCompany?.id,
+            "daybook-transfer-revisions",
+          )
         : [],
     enabled: !!selectedVoucher && isStockTransferVoucher && viewDialogOpen,
   });
@@ -379,8 +413,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
   }, [viewDialogOpen, selectedVoucher, viewVoucherEntries, navigate, selectedDialogRow]);
 
   const { data: voucherEntries = [], isLoading: entriesLoading } = useQuery<VoucherEntry[]>({
-    queryKey: voucherToEdit ? [`/api/vouchers/${voucherToEdit.id}/entries`] : [],
+    queryKey: voucherToEdit
+      ? companyDataKey(`/api/vouchers/${voucherToEdit.id}/entries`, selectedCompany?.id, "daybook-edit-entries")
+      : [],
     enabled: !!voucherToEdit && editDialogOpen,
+    ...frontendQueryPolicies.operational,
   });
 
   const editForm = useForm<EditVoucherForm>({
@@ -444,17 +481,23 @@ export default function Daybook({ user }: { user?: any } = {}) {
     filters.statusFilter,
   ]);
 
+  const offloadsUrl = useMemo(
+    () =>
+      canonicalApiUrl("/api/offloads", {
+        startDate: periodFilter.fromDate,
+        endDate: periodFilter.toDate,
+      }),
+    [periodFilter.fromDate, periodFilter.toDate],
+  );
   const { data: offloads = [], isLoading: offloadsLoading } = useQuery<OffloadListItem[]>({
-    queryKey: ["/api/offloads", selectedCompany?.id, periodFilter.fromDate, periodFilter.toDate],
-    queryFn: async () => {
-      const p = new URLSearchParams();
-      if (periodFilter.fromDate) p.append("startDate", periodFilter.fromDate);
-      if (periodFilter.toDate) p.append("endDate", periodFilter.toDate);
-      const res = await fetch(`/api/offloads${p.toString() ? `?${p.toString()}` : ""}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
+    queryKey: companyDataKey(offloadsUrl, selectedCompany?.id, "daybook-offloads"),
+    queryFn: async ({ signal }) => {
+      const response = await fetch(offloadsUrl, { credentials: "include", signal });
+      if (!response.ok) throw new Error("Failed to load offloads");
+      return response.json();
     },
     enabled: !!selectedCompany,
+    ...frontendQueryPolicies.operational,
   });
 
 
@@ -557,7 +600,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => apiRequest("DELETE", `/api/vouchers/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      void invalidateCompanyApiFamily(queryClient, "/api/vouchers", selectedCompany?.id);
       refreshBalances();
       toast({ title: "Success", description: "Voucher deleted" });
       setDeleteDialogOpen(false);
@@ -568,7 +611,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
     mutationFn: async ({ id, updates }: { id: number; updates: EditVoucherForm }) =>
       apiRequest("PATCH", `/api/vouchers/${id}`, updates),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      void invalidateCompanyApiFamily(queryClient, "/api/vouchers", selectedCompany?.id);
       refreshBalances();
       toast({ title: "Success", description: "Voucher updated" });
       setEditDialogOpen(false);

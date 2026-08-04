@@ -1,5 +1,4 @@
 import type { Express } from "express";
-import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -11,6 +10,13 @@ import { eq, and, inArray, sql, isNull } from "drizzle-orm";
 import { isParentCompanyContext } from "../helpers/supplierBalanceHelpers";
 import { buildVoucherPage, filterAndSortVouchers, parseVoucherListQuery } from "./voucherListPaging";
 import { loadVoucherRelatedData } from "./voucherDetailBatching";
+import {
+  assertActiveCompanyAccess,
+  getAccessibleCompanyIds,
+  isPrivilegedRole,
+  resolveAuthorizedCompanyId,
+  sendCompanyAccessError,
+} from "../../security/companyAccessBoundary";
 
 /**
  * After saving a journal voucher, if it has a customer entry + a ledger account entry,
@@ -21,9 +27,7 @@ import { loadVoucherRelatedData } from "./voucherDetailBatching";
 export function registerVoucherQueryRoutes(app: Express) {
   app.get("/api/vouchers", requireAuth, async (req, res) => {
     try {
-      if (!req.session.currentCompanyId) {
-        return res.status(400).json({ message: "No company selected" });
-      }
+      const access = await assertActiveCompanyAccess(req);
       const parsedListQuery = parseVoucherListQuery(req.query as Record<string, unknown>);
       if (!parsedListQuery.ok) return res.status(400).json({ message: parsedListQuery.message });
       const listQuery = parsedListQuery.query;
@@ -35,7 +39,7 @@ export function registerVoucherQueryRoutes(app: Express) {
       let vouchers;
       if (startDate && endDate) {
         vouchers = await storage.getVouchersByDateRange(
-          req.session.currentCompanyId,
+          access.activeCompanyId,
           startDate as string,
           endDate as string
         );
@@ -47,7 +51,7 @@ export function registerVoucherQueryRoutes(app: Express) {
         const start = new Date();
         start.setDate(start.getDate() - 90);
         const fmt = (d: Date) => d.toISOString().slice(0, 10);
-        vouchers = await storage.getVouchersByDateRange(req.session.currentCompanyId, fmt(start), fmt(end));
+        vouchers = await storage.getVouchersByDateRange(access.activeCompanyId, fmt(start), fmt(end));
       }
 
       // Strip totalAmount from Stock Transfer vouchers for POS users
@@ -74,7 +78,7 @@ export function registerVoucherQueryRoutes(app: Express) {
           .select({ locationId: userLocations.locationId })
           .from(userLocations)
           .where(
-            and(eq(userLocations.userId, req.user.id), eq(userLocations.companyId, req.session.currentCompanyId!))
+            and(eq(userLocations.userId, req.user.id), eq(userLocations.companyId, access.activeCompanyId))
           );
         const allowedLocIds = assignedLocs.map((l: any) => l.locationId);
         if (allowedLocIds.length > 0) {
@@ -89,13 +93,14 @@ export function registerVoucherQueryRoutes(app: Express) {
       if (!listQuery.paginated) return res.json(filteredVouchers);
       return res.json(buildVoucherPage(filteredVouchers, listQuery.page, listQuery.pageSize));
     } catch (error: unknown) {
-      res.status(500).json({ message: getErrorMessage(error) });
+      return sendCompanyAccessError(res, error);
     }
   });
 
-  // Get unified ledger for a supplier across all companies
+  // Get unified ledger for a supplier across explicitly accessible companies
   app.get("/api/suppliers/:supplierId/unified-ledger", requireAuth, async (req, res) => {
     try {
+      const access = await assertActiveCompanyAccess(req);
       const supplierId = parseInt(req.params.supplierId);
 
       if (isNaN(supplierId)) {
@@ -103,19 +108,26 @@ export function registerVoucherQueryRoutes(app: Express) {
       }
 
       const { companyId, startDate, endDate } = req.query;
-      const filterCompanyId = companyId ? parseInt(companyId as string) : undefined;
+      const companyIds = companyId
+        ? [await resolveAuthorizedCompanyId(req, companyId)]
+        : isPrivilegedRole(access.role)
+          ? [...(await getAccessibleCompanyIds(access.userId))].sort((left, right) => left - right)
+          : [access.activeCompanyId];
 
-      // Get voucher entries (filtered by company if specified)
-      const voucherEntries = await storage.getVoucherEntriesBySupplier(
-        supplierId,
-        filterCompanyId,
-        startDate as string | undefined,
-        endDate as string | undefined
+      const voucherEntryGroups = await Promise.all(
+        companyIds.map((allowedCompanyId) =>
+          storage.getVoucherEntriesBySupplier(
+            supplierId,
+            allowedCompanyId,
+            startDate as string | undefined,
+            endDate as string | undefined,
+          ),
+        ),
       );
+      const voucherEntries = voucherEntryGroups.flat();
 
-      // Get all companies to map IDs to names
-      const companies = await storage.getAllCompanies();
-      const companyMap = new Map(companies.map((c) => [c.id, c]));
+      const companyRows = await Promise.all(companyIds.map((allowedCompanyId) => storage.getCompanyById(allowedCompanyId)));
+      const companyMap = new Map(companyRows.filter(Boolean).map((company) => [company!.id, company!] as const));
 
       // Combine all transactions with company information
       const transactions: any[] = [];
@@ -153,8 +165,7 @@ export function registerVoucherQueryRoutes(app: Express) {
       // configured parent company — never guessed via "lowest company ID".
       // Use filterCompanyId if set, otherwise fall back to the session company so that
       // viewing "All Companies" from a sub-company session also hides the opening balance.
-      const sessionCompanyId = (req.session as any).currentCompanyId;
-      const effectiveCompanyId = filterCompanyId ?? sessionCompanyId ?? null;
+      const effectiveCompanyId = companyIds.length === 1 ? companyIds[0] : access.activeCompanyId;
       const isParentContext = await isParentCompanyContext(effectiveCompanyId);
       const openingBalance = isParentContext ? globalOpeningBalance : 0;
 
@@ -200,7 +211,12 @@ export function registerVoucherQueryRoutes(app: Express) {
         const containerRows = await db
           .select({ id: containers.id, containerNumber: containers.containerNumber })
           .from(containers)
-          .where(inArray(containers.containerNumber, Array.from(containerNumberSet)));
+          .where(
+            and(
+              inArray(containers.companyId, companyIds),
+              inArray(containers.containerNumber, Array.from(containerNumberSet)),
+            ),
+          );
         for (const c of containerRows) {
           containerIdMap.set(c.containerNumber, c.id);
         }
@@ -218,13 +234,14 @@ export function registerVoucherQueryRoutes(app: Express) {
 
       res.json(result); // Already in chronological order
     } catch (error: unknown) {
-      res.status(500).json({ message: getErrorMessage(error) });
+      return sendCompanyAccessError(res, error);
     }
   });
 
   // Get purchase orders for a specific supplier filtered by company
   app.get("/api/suppliers/:supplierId/purchase-orders", requireAuth, async (req, res) => {
     try {
+      const access = await assertActiveCompanyAccess(req);
       const supplierId = parseInt(req.params.supplierId);
 
       if (isNaN(supplierId)) {
@@ -232,31 +249,29 @@ export function registerVoucherQueryRoutes(app: Express) {
       }
 
       const { companyId } = req.query;
-      const filterCompanyId = companyId ? parseInt(companyId as string) : undefined;
+      const companyIds = companyId
+        ? [await resolveAuthorizedCompanyId(req, companyId)]
+        : isPrivilegedRole(access.role)
+          ? [...(await getAccessibleCompanyIds(access.userId))].sort((left, right) => left - right)
+          : [access.activeCompanyId];
 
-      if (!filterCompanyId) {
-        // If no company filter, get POs from all companies
-        const companies = await storage.getAllCompanies();
-        const allPOs: any[] = [];
+      const companyRows = await Promise.all(companyIds.map((allowedCompanyId) => storage.getCompanyById(allowedCompanyId)));
+      const companyNameMap = new Map(
+        companyRows.filter(Boolean).map((company) => [company!.id, company!.name] as const),
+      );
+      const purchaseOrderGroups = await Promise.all(
+        companyIds.map(async (allowedCompanyId) => {
+          const purchaseOrders = await storage.getPurchaseOrdersBySupplier(supplierId, allowedCompanyId);
+          return purchaseOrders.map((purchaseOrder) => ({
+            ...purchaseOrder,
+            companyName: companyNameMap.get(allowedCompanyId) ?? `Company ${allowedCompanyId}`,
+          }));
+        }),
+      );
 
-        for (const company of companies) {
-          const pos = await storage.getPurchaseOrdersBySupplier(supplierId, company.id);
-          allPOs.push(...pos.map((po) => ({ ...po, companyName: company.name })));
-        }
-
-        return res.json(allPOs);
-      }
-
-      const purchaseOrders = await storage.getPurchaseOrdersBySupplier(supplierId, filterCompanyId);
-      const company = await storage.getCompanyById(filterCompanyId);
-      const posWithCompanyName = purchaseOrders.map((po) => ({
-        ...po,
-        companyName: company?.name,
-      }));
-
-      res.json(posWithCompanyName);
+      return res.json(purchaseOrderGroups.flat());
     } catch (error: unknown) {
-      res.status(500).json({ message: getErrorMessage(error) });
+      return sendCompanyAccessError(res, error);
     }
   });
 
@@ -264,8 +279,8 @@ export function registerVoucherQueryRoutes(app: Express) {
 
   app.get("/api/vouchers/optional", requireAuth, requireNonPOS, async (req, res) => {
     try {
-      const companyId = req.session.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const access = await assertActiveCompanyAccess(req);
+      const companyId = access.activeCompanyId;
 
       const { type, locationId, startDate, endDate, search } = req.query;
 
@@ -307,14 +322,15 @@ export function registerVoucherQueryRoutes(app: Express) {
 
       res.json(filtered);
     } catch (error: unknown) {
-      logger.error("Optional vouchers error:", { error: error });
-      res.status(500).json({ message: getErrorMessage(error) });
+      logger.error("Optional vouchers error:", { error });
+      return sendCompanyAccessError(res, error);
     }
   });
 
   // Get a specific voucher with all entries and related data
   app.get("/api/vouchers/:id", requireAuth, async (req, res) => {
     try {
+      const access = await assertActiveCompanyAccess(req);
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid voucher ID" });
@@ -326,7 +342,7 @@ export function registerVoucherQueryRoutes(app: Express) {
       }
 
       // Verify voucher belongs to current company
-      if (voucher.companyId !== req.session.currentCompanyId) {
+      if (voucher.companyId !== access.activeCompanyId) {
         return res.status(403).json({
           message: "Access denied: Voucher belongs to a different company",
         });
@@ -374,7 +390,7 @@ export function registerVoucherQueryRoutes(app: Express) {
         customerName,
       });
     } catch (error: unknown) {
-      res.status(500).json({ message: getErrorMessage(error) });
+      return sendCompanyAccessError(res, error);
     }
   });
 

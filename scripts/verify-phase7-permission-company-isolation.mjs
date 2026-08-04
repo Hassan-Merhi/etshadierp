@@ -11,6 +11,8 @@ for (const required of [
   "assertCompanyAccess",
   "assertCompaniesAccess",
   "resolveAuthorizedCompanyId",
+  "parsePositiveCompanyId",
+  "req.session?.currentRole ?? req.user?.role",
   "CROSS_COMPANY_FORBIDDEN",
   "COMPANY_ACCESS_DENIED",
   "await assertCompanyAccess(context.userId, targetCompanyId)",
@@ -38,15 +40,63 @@ if (exportRoute.includes("isAdminOrDev && requestedCompanyId")) {
   failures.push("net-position export still permits role-only cross-company override");
 }
 
+const gitHelpers = read("server/lib/gitHelpers.ts");
+for (const required of [
+  "getAccessibleCompanyIds as getMembershipCompanyIds",
+  "isPrivilegedRole",
+  "COMPANY_ACCESS_DENIED",
+  "CROSS_COMPANY_FORBIDDEN",
+]) {
+  if (!gitHelpers.includes(required)) failures.push(`gitHelpers missing ${required}`);
+}
+for (const forbidden of ["userCompanyRoles", "Admin / Developer: all companies"]) {
+  if (gitHelpers.includes(forbidden)) failures.push(`gitHelpers still contains role-only access marker ${forbidden}`);
+}
+
+const gitRoutes = read("server/routes/git/gitReportRoutes.ts");
+for (const required of [
+  "resolveGitCompanyScope",
+  "code: scope.code",
+  "session as any)?.currentRole",
+  "buildAgentsForCompany(scope.companyId)",
+]) {
+  if (!gitRoutes.includes(required)) failures.push(`gitReportRoutes missing ${required}`);
+}
+
+const voucherRoutes = read("server/routes/vouchers/voucherQueryRoutes.ts");
+for (const required of [
+  "assertActiveCompanyAccess(req)",
+  "resolveAuthorizedCompanyId(req, companyId)",
+  "getAccessibleCompanyIds(access.userId)",
+  "inArray(containers.companyId, companyIds)",
+  "sendCompanyAccessError(res, error)",
+]) {
+  if (!voucherRoutes.includes(required)) failures.push(`voucherQueryRoutes missing ${required}`);
+}
+if (voucherRoutes.includes("const companies = await storage.getAllCompanies()")) {
+  failures.push("voucherQueryRoutes still loads every company for supplier cross-company reads");
+}
+
+const offloadRoutes = read("server/routes/offloadRoutes.ts");
+for (const required of [
+  "assertActiveCompanyAccess(req)",
+  "offload.companyId !== access.activeCompanyId",
+  "eq(vouchers.companyId, offload.companyId)",
+  "COMPANY_ACCESS_DENIED",
+]) {
+  if (!offloadRoutes.includes(required)) failures.push(`offloadRoutes missing ${required}`);
+}
+
 const docs = read("docs/engineering/phase7-permission-company-isolation-completion.md").toLowerCase();
 for (const phrase of [
   "explicit company membership",
   "privileged cross-company access",
-  "active company",
-  "transfer boundary",
-  "financial exports",
-  "verification boundary",
-  "merge boundary",
+  "git containers and reports",
+  "voucher and daybook boundary",
+  "offload boundary",
+  "database changes",
+  "deferred verification",
+  "merge order",
 ]) {
   if (!docs.includes(phrase)) failures.push(`Phase 7 documentation missing ${phrase}`);
 }

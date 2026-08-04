@@ -1,6 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import {
+  companyDataKey,
+  frontendQueryPolicies,
+  invalidateApiFamily,
+} from "@/lib/frontendDataArchitecture";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
@@ -65,7 +70,7 @@ export function ContainerDrawer({
     mutationFn: (data: Record<string, unknown>) =>
       apiRequest("PATCH", `/api/containers/${container!.id}/tracking`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/git/containers"] });
+      void invalidateApiFamily(queryClient, "/api/git/containers");
       toast({ title: "Saved", description: `\${container?.containerNumber} updated.` });
       onClose();
     },
@@ -82,7 +87,7 @@ export function ContainerDrawer({
     mutationFn: (data: Record<string, unknown>) =>
       apiRequest("PATCH", `/api/container-tracking/${container!.id}/settings`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/git/containers"] });
+      void invalidateApiFamily(queryClient, "/api/git/containers");
       toast({ title: "Tracking settings saved" });
     },
     onError: (err: any) => {
@@ -185,10 +190,13 @@ export function ContainerDrawer({
   }, [trackNowMutation.isPending, container?.id]);
 
   const eventsQueryKey = container?.id ? `/api/container-tracking/${container.id}/events` : null;
+  const trackingCompanyIdentity = sessionCompanyId ?? container?.companyId ?? "no-company";
   const { data: events, isLoading: eventsLoading } = useQuery<any[]>({
-    queryKey: [eventsQueryKey],
+    queryKey: eventsQueryKey
+      ? companyDataKey(eventsQueryKey, trackingCompanyIdentity, "container-tracking-events")
+      : [],
     enabled: showEvents && !!eventsQueryKey,
-    staleTime: 30_000,
+    ...frontendQueryPolicies.operational,
   });
 
   const { data: trackingStatus } = useQuery<any>({

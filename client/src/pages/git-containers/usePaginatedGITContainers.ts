@@ -1,9 +1,18 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import {
+  canonicalApiUrl,
+  canonicalSetValues,
+  frontendQueryPolicies,
+  paginatedCompanyDataKey,
+  type CompanyIdentity,
+  type QueryParams,
+} from "@/lib/frontendDataArchitecture";
 import type { EnrichedContainerRow, EtaFilterValue, GitContainersResponse } from "./gitContainerTypes";
 
 interface PaginatedContainerFilters {
+  companyIdentity: CompanyIdentity;
   allCompanies: boolean;
   page: number;
   pageSize: number;
@@ -24,37 +33,38 @@ interface PaginatedContainerFilters {
   enabled: boolean;
 }
 
-const appendList = (params: URLSearchParams, key: string, values: string[]) => {
-  if (values.length > 0) params.set(key, values.join(","));
+const compactSet = (values: readonly string[]): string | undefined => {
+  const normalized = canonicalSetValues(values);
+  return normalized.length > 0 ? normalized.join(",") : undefined;
 };
 
 export function usePaginatedGITContainers(filters: PaginatedContainerFilters) {
   const debouncedSearch = useDebouncedValue(filters.search, 300);
   const queryUrl = useMemo(() => {
-    const params = new URLSearchParams({
-      page: String(filters.page),
-      pageSize: String(filters.pageSize),
+    const etaDates = filters.etaFilter === "ALL" ? undefined : compactSet(filters.etaFilter.selectedDates);
+    const params: QueryParams = {
+      page: filters.page,
+      pageSize: filters.pageSize,
       profile: "compact",
-    });
-    if (filters.allCompanies) params.set("allCompanies", "true");
-    if (filters.companyFilter !== "ALL") params.set("company", filters.companyFilter);
-    appendList(params, "containers", filters.containerFilters);
-    appendList(params, "suppliers", filters.supplierFilters);
-    appendList(params, "transporters", filters.transporterFilters);
-    appendList(params, "agents", filters.agentFilters);
-    appendList(params, "trucks", filters.truckFilters);
-    appendList(params, "locations", filters.locationFilters);
-    if (filters.docsFilter !== "ALL") params.set("docs", filters.docsFilter);
-    if (filters.delayedFilter !== "ALL") params.set("delayedState", filters.delayedFilter);
-    if (filters.freightFilter !== "ALL") params.set("freight", filters.freightFilter);
-    if (filters.notesFilter !== "ALL") params.set("notes", filters.notesFilter);
-    if (filters.sortOrder !== "DEFAULT") params.set("sort", filters.sortOrder);
-    if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
-    if (filters.etaFilter !== "ALL") {
-      appendList(params, "etaDates", filters.etaFilter.selectedDates);
-      if (filters.etaFilter.includeNoEta) params.set("includeNoEta", "true");
-    }
-    return `/api/git/containers?${params.toString()}`;
+      allCompanies: filters.allCompanies ? true : undefined,
+      company: filters.companyFilter !== "ALL" ? filters.companyFilter : undefined,
+      containers: compactSet(filters.containerFilters),
+      suppliers: compactSet(filters.supplierFilters),
+      transporters: compactSet(filters.transporterFilters),
+      agents: compactSet(filters.agentFilters),
+      trucks: compactSet(filters.truckFilters),
+      locations: compactSet(filters.locationFilters),
+      docs: filters.docsFilter !== "ALL" ? filters.docsFilter : undefined,
+      delayedState: filters.delayedFilter !== "ALL" ? filters.delayedFilter : undefined,
+      freight: filters.freightFilter !== "ALL" ? filters.freightFilter : undefined,
+      notes: filters.notesFilter !== "ALL" ? filters.notesFilter : undefined,
+      sort: filters.sortOrder !== "DEFAULT" ? filters.sortOrder : undefined,
+      search: debouncedSearch.trim() || undefined,
+      etaDates,
+      includeNoEta:
+        filters.etaFilter !== "ALL" && filters.etaFilter.includeNoEta ? true : undefined,
+    };
+    return canonicalApiUrl("/api/git/containers", params);
   }, [
     filters.allCompanies,
     filters.page,
@@ -76,7 +86,14 @@ export function usePaginatedGITContainers(filters: PaginatedContainerFilters) {
   ]);
 
   const query = useQuery<GitContainersResponse>({
-    queryKey: ["/api/git/containers", queryUrl],
+    queryKey: paginatedCompanyDataKey(
+      queryUrl,
+      filters.companyIdentity,
+      filters.page,
+      filters.pageSize,
+      "git-containers",
+      filters.allCompanies ? "all-accessible" : "active-company",
+    ),
     queryFn: async ({ signal }) => {
       const response = await fetch(queryUrl, { credentials: "include", signal });
       if (!response.ok) {
@@ -86,15 +103,18 @@ export function usePaginatedGITContainers(filters: PaginatedContainerFilters) {
       return response.json();
     },
     enabled: filters.enabled,
+    ...frontendQueryPolicies.operational,
     staleTime: 45_000,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
     placeholderData: (previous) => previous,
   });
 
-  const loadContainerDetail = async (id: number): Promise<EnrichedContainerRow> => {
-    const response = await fetch(`/api/git/containers/${id}`, { credentials: "include" });
-    if (!response.ok) throw new Error("Failed to load container details");
+  const loadContainerDetail = async (id: number, companyId: number): Promise<EnrichedContainerRow> => {
+    const detailUrl = canonicalApiUrl(`/api/git/containers/${id}`, { companyId });
+    const response = await fetch(detailUrl, { credentials: "include" });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ message: "Failed to load container details" }));
+      throw new Error(body.message || "Failed to load container details");
+    }
     return response.json();
   };
 

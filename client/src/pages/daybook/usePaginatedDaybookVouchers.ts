@@ -1,6 +1,12 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import {
+  canonicalApiUrl,
+  frontendQueryPolicies,
+  paginatedCompanyDataKey,
+  type QueryParams,
+} from "@/lib/frontendDataArchitecture";
 import type { Voucher } from "./types";
 
 interface DaybookFilterState {
@@ -38,36 +44,43 @@ export interface PaginatedVoucherResponse {
 
 export function usePaginatedDaybookVouchers(options: UsePaginatedDaybookVouchersOptions) {
   const debouncedSearch = useDebouncedValue(options.filters.searchQuery, 250);
-  const queryUrl = useMemo(() => {
-    const params = new URLSearchParams({
+  const queryParams = useMemo<QueryParams>(
+    () => ({
       profile: "page",
-      page: String(options.page),
-      pageSize: String(options.pageSize),
+      page: options.page,
+      pageSize: options.pageSize,
       startDate: options.fromDate,
       endDate: options.toDate,
       sort: options.filters.sortOrder,
-    });
-    if (options.filters.voucherType !== "all") params.set("type", options.filters.voucherType);
-    if (options.filters.statusFilter !== "all") params.set("status", options.filters.statusFilter);
-    if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
-    if (options.filters.minAmount) params.set("minAmount", options.filters.minAmount);
-    if (options.filters.maxAmount) params.set("maxAmount", options.filters.maxAmount);
-    return `/api/vouchers?${params.toString()}`;
-  }, [
-    options.page,
-    options.pageSize,
-    options.fromDate,
-    options.toDate,
-    options.filters.voucherType,
-    options.filters.statusFilter,
-    options.filters.sortOrder,
-    options.filters.minAmount,
-    options.filters.maxAmount,
-    debouncedSearch,
-  ]);
+      type: options.filters.voucherType !== "all" ? options.filters.voucherType : undefined,
+      status: options.filters.statusFilter !== "all" ? options.filters.statusFilter : undefined,
+      search: debouncedSearch.trim() || undefined,
+      minAmount: options.filters.minAmount || undefined,
+      maxAmount: options.filters.maxAmount || undefined,
+    }),
+    [
+      options.page,
+      options.pageSize,
+      options.fromDate,
+      options.toDate,
+      options.filters.voucherType,
+      options.filters.statusFilter,
+      options.filters.sortOrder,
+      options.filters.minAmount,
+      options.filters.maxAmount,
+      debouncedSearch,
+    ],
+  );
+  const queryUrl = useMemo(() => canonicalApiUrl("/api/vouchers", queryParams), [queryParams]);
 
   const query = useQuery<PaginatedVoucherResponse>({
-    queryKey: ["/api/vouchers", "daybook-page", options.companyId, queryUrl],
+    queryKey: paginatedCompanyDataKey(
+      queryUrl,
+      options.companyId,
+      options.page,
+      options.pageSize,
+      "daybook-vouchers",
+    ),
     queryFn: async ({ signal }) => {
       const response = await fetch(queryUrl, { credentials: "include", signal });
       if (!response.ok) {
@@ -77,19 +90,22 @@ export function usePaginatedDaybookVouchers(options: UsePaginatedDaybookVouchers
       return response.json();
     },
     enabled: !!options.companyId,
-    staleTime: 30_000,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    ...frontendQueryPolicies.operational,
     placeholderData: (previous) => previous,
   });
 
   const loadAllVouchers = async (): Promise<Voucher[]> => {
-    const url = new URL(queryUrl, window.location.origin);
-    url.searchParams.delete("profile");
-    url.searchParams.delete("page");
-    url.searchParams.delete("pageSize");
-    const response = await fetch(`${url.pathname}?${url.searchParams.toString()}`, { credentials: "include" });
-    if (!response.ok) throw new Error("Failed to load complete Daybook export");
+    const exportUrl = canonicalApiUrl("/api/vouchers", {
+      ...queryParams,
+      profile: undefined,
+      page: undefined,
+      pageSize: undefined,
+    });
+    const response = await fetch(exportUrl, { credentials: "include" });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ message: "Failed to load complete Daybook export" }));
+      throw new Error(body.message || "Failed to load complete Daybook export");
+    }
     return response.json();
   };
 

@@ -8,11 +8,17 @@ const failures = [];
 const architecture = read("client/src/lib/frontendDataArchitecture.ts");
 for (const required of [
   "canonicalApiUrl",
+  "canonicalSetValues",
   "companyDataKey",
+  "paginatedCompanyDataKey",
   "queryMatchesApiFamily",
+  "queryMatchesCompanyApiFamily",
   "invalidateApiFamily",
+  "invalidateCompanyApiFamily",
   "removeApiFamily",
+  "removeCompanyApiFamily",
   "unwrapList",
+  "unwrapPage",
   "frontendQueryPolicies",
   'refetchType ?? "active"',
 ]) {
@@ -36,6 +42,50 @@ for (const required of [
   if (!keys.includes(required)) failures.push(`queryKeys.ts missing ${required}`);
 }
 
+const gitHook = read("client/src/pages/git-containers/usePaginatedGITContainers.ts");
+for (const required of [
+  "canonicalApiUrl",
+  "canonicalSetValues",
+  "paginatedCompanyDataKey",
+  "companyIdentity",
+  "loadContainerDetail = async (id: number, companyId: number)",
+  "frontendQueryPolicies.operational",
+]) {
+  if (!gitHook.includes(required)) failures.push(`usePaginatedGITContainers missing ${required}`);
+}
+
+const daybookHook = read("client/src/pages/daybook/usePaginatedDaybookVouchers.ts");
+for (const required of [
+  "canonicalApiUrl",
+  "paginatedCompanyDataKey",
+  "frontendQueryPolicies.operational",
+  "loadAllVouchers",
+]) {
+  if (!daybookHook.includes(required)) failures.push(`usePaginatedDaybookVouchers missing ${required}`);
+}
+
+const daybook = read("client/src/pages/Daybook.tsx");
+for (const required of [
+  "companyDataKey(offloadsUrl",
+  "invalidateCompanyApiFamily",
+  "daybook-view-entries",
+  "daybook-expanded-entries",
+  "daybook-transfer-revisions",
+  "daybook-edit-entries",
+  "frontendQueryPolicies.reference",
+]) {
+  if (!daybook.includes(required)) failures.push(`Daybook integration missing ${required}`);
+}
+
+const drawer = read("client/src/pages/git-containers/ContainerDrawer.tsx");
+for (const required of [
+  "companyDataKey(eventsQueryKey",
+  "container-tracking-events",
+  "invalidateApiFamily",
+]) {
+  if (!drawer.includes(required)) failures.push(`ContainerDrawer integration missing ${required}`);
+}
+
 for (const test of [
   "tests/ui/frontend-data-architecture.test.ts",
   "tests/ui/queryKeys.test.ts",
@@ -47,10 +97,13 @@ const docs = read("docs/engineering/phase8-frontend-data-architecture.md").toLow
 for (const phrase of [
   "canonical request urls",
   "company-scoped cache identity",
+  "paginated screen integration",
   "exact endpoint-family invalidation",
-  "active-only refetch",
   "response-shape normalization",
-  "merge boundary",
+  "query policies",
+  "export compatibility",
+  "deferred verification",
+  "merge order",
 ]) {
   if (!docs.includes(phrase)) failures.push(`phase8 documentation missing ${phrase}`);
 }
