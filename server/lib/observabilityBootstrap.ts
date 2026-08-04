@@ -37,7 +37,19 @@ function installExternalFetchTracing(): void {
       const configured = Number(process.env.EXTERNAL_DEPENDENCY_SLOW_MS);
       const thresholdMs = Number.isFinite(configured) ? Math.max(0, configured) : 1_500;
       const slow = durationMs >= thresholdMs;
-      if (failed || slow) logger[failed ? "error" : "warn"]("External dependency operation", { module: "dependency", action: failed ? "request_failed" : "slow_request", dependency, durationMs: Math.round(durationMs), status: response.status, requestId: trace?.requestId, source: trace?.source });
+      if (failed || slow) {
+        const isServerFailure = response.status >= 500;
+        const level = isServerFailure ? "error" : "warn";
+        logger[level]("External dependency operation", {
+          module: "dependency",
+          action: failed ? "request_failed" : "slow_request",
+          dependency,
+          durationMs: Math.round(durationMs),
+          status: response.status,
+          requestId: trace?.requestId,
+          source: trace?.source,
+        });
+      }
       return response;
     } catch (error) {
       const durationMs = performance.now() - startedAt;
