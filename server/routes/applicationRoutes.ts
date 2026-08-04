@@ -48,6 +48,7 @@ import { registerPasskeyRoutes } from "./passkeyRoutes";
 import { registerPosRoutes } from "./posRoutes";
 import { registerPropertiesRentalRoutes } from "./propertiesRentalRoutes";
 import { registerRemoteControlSessionRoutes } from "./remoteControlSessionRoutes";
+import { registerRemoteKeyboardControlRoutes } from "./remoteKeyboardControlRoutes";
 import { registerReportsRoutes } from "./reportsRoutes";
 import { registerScreenFeedRoutes } from "./screenFeedRoutes";
 import { registerSpRoutes } from "./sp";
@@ -129,6 +130,7 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerPasskeyRoutes(app);
   registerScreenFeedRoutes(app);
   registerRemoteControlSessionRoutes(app);
+  registerRemoteKeyboardControlRoutes(app);
   registerLocationRoutes(app);
   registerInventoryRoutes(app);
   registerLedgerRoutes(app);
