@@ -62,12 +62,10 @@ jobs:
           apply_phase phase-4 \
             10028e5e6e8acd0a99177257c431de8ed7060676 \
             fb9ed5cc4c53962512125a3ca323c7e211d15039 \
-            client/src/app/AuthenticatedApp.tsx \
             client/src/app/PosShell.tsx \
             client/src/components/RemoteSupportIndicator.tsx \
             client/src/hooks/use-remote-control-session.ts \
             client/src/i18n/remoteSupportPhase4Translations.ts \
-            config/ci-ratchet-allowances.json \
             docs/remote-support-phase-4.md \
             scripts/audit-i18n-phase14.mjs \
             server/routes/applicationRoutes.ts \
@@ -88,7 +86,6 @@ jobs:
             client/src/hooks/remote-mouse-control-policy.ts \
             client/src/hooks/use-remote-control-session.ts \
             client/src/i18n/remoteSupportPhase5Translations.ts \
-            config/ci-ratchet-allowances.json \
             docs/remote-support-phase-5.md \
             scripts/audit-i18n-phase14.mjs \
             server/routes/remoteControlSessionRoutes.ts \
@@ -111,7 +108,6 @@ jobs:
             client/src/hooks/remote-mouse-control-policy.ts \
             client/src/i18n/remoteSupportPhase6Translations.ts \
             client/src/pages/settings/WatchUserDialog.tsx \
-            config/ci-ratchet-allowances.json \
             docs/remote-support-phase-6.md \
             scripts/audit-i18n-phase14.mjs \
             server/routes/applicationRoutes.ts \
@@ -145,4 +141,53 @@ jobs:
             tests/remote-support-permission-contract.test.ts \
             tests/remote-support-sensitive-action-policy.test.ts
 
+          python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+
+          app_path = Path("client/src/app/AuthenticatedApp.tsx")
+          app = app_path.read_text()
+          import_line = 'import { LanguageOnboardingDialog } from "@/components/LanguageOnboardingDialog";\n'
+          indicator_import = 'import { RemoteSupportIndicator } from "@/components/RemoteSupportIndicator";\n'
+          if indicator_import not in app:
+              app = app.replace(import_line, import_line + indicator_import, 1)
+          language_line = '  const languageOnboarding = user.id === undefined ? null : <LanguageOnboardingDialog userId={user.id} />;\n'
+          overlay = '''  const languageOnboarding = user.id === undefined ? null : <LanguageOnboardingDialog userId={user.id} />;
+          const appOverlays = (
+            <>
+              {languageOnboarding}
+              <RemoteSupportIndicator />
+            </>
+          );
+          '''
+          if "const appOverlays" not in app:
+              if language_line not in app:
+                  raise SystemExit("AuthenticatedApp language overlay anchor missing")
+              app = app.replace(language_line, overlay, 1)
+          app = app.replace("{languageOnboarding}", "{appOverlays}")
+          # Restore the nested language node inside the overlay after the global replacement.
+          app = app.replace("const appOverlays = (\n    <>\n      {appOverlays}", "const appOverlays = (\n    <>\n      {languageOnboarding}", 1)
+          app_path.write_text(app)
+
+          config_path = Path("config/ci-ratchet-allowances.json")
+          current = json.loads(config_path.read_text())
+          phase7 = json.loads(
+              subprocess.check_output(
+                  ["git", "show", "origin/agent/remote-support-phase-7-audit-protection:config/ci-ratchet-allowances.json"],
+                  text=True,
+              )
+          )
+          additions = current.setdefault("routeManifestAdditions", [])
+          for entry in phase7.get("routeManifestAdditions", []):
+              if "/api/screen-feed/control/" in entry and entry not in additions:
+                  additions.append(entry)
+          audit_entry = "GET /api/screen-feed/control/audit [requireAuth > <anonymous> > <anonymous>]"
+          if audit_entry not in additions:
+              additions.append(audit_entry)
+          config_path.write_text(json.dumps(current, indent=2, ensure_ascii=False) + "\n")
+          PY
+
+          git add client/src/app/AuthenticatedApp.tsx config/ci-ratchet-allowances.json
+          git commit -m "fix(remote-support): reconcile current app shell and CI route ratchet"
           git push --no-verify origin HEAD:agent/remote-support-phase-8-current-main
