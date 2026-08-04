@@ -1,0 +1,173 @@
+name: Temporary company access audit fix
+
+on:
+  push:
+    branches:
+      - agent/fix-route-aware-company-context-rebased
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    if: github.actor != 'github-actions[bot]' || contains(github.event.head_commit.message, 'Trigger company access audit fix')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/fix-route-aware-company-context-rebased
+          fetch-depth: 0
+
+      - name: Apply guarded company-access replacements
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          def read(path: str) -> str:
+              return Path(path).read_text(encoding="utf-8")
+
+          def write(path: str, text: str) -> None:
+              Path(path).write_text(text, encoding="utf-8")
+
+          def insert_after(text: str, anchor: str, insertion: str, path: str) -> str:
+              if insertion.strip() in text:
+                  return text
+              if anchor not in text:
+                  raise SystemExit(f"Missing import anchor in {path}: {anchor!r}")
+              return text.replace(anchor, anchor + insertion, 1)
+
+          def replace_once(text: str, old: str, new: str, path: str) -> str:
+              if new in text:
+                  return text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"Expected exactly one replacement in {path}, found {count}")
+              return text.replace(old, new, 1)
+
+          path = "server/routes/erp-payroll/runs.ts"
+          text = read(path)
+          text = insert_after(
+              text,
+              'import { storage } from "../../storage";\n',
+              'import { getAccessibleCompanyIds } from "../../security/companyAccessBoundary";\n',
+              path,
+          )
+          text = replace_once(
+              text,
+              '''        const userRoles = await storage.getUserCompaniesWithRoles(req.session.userId);\n        const hasAccess = userRoles.some((r: any) => r.companyId === paramCompanyId);\n        if (!hasAccess) return res.status(403).json({ message: "Access denied to this company" });''',
+              '''        const accessibleCompanyIds = await getAccessibleCompanyIds(req.session.userId!);\n        if (!accessibleCompanyIds.has(paramCompanyId)) {\n          return res.status(403).json({ message: "Access denied to this company" });\n        }''',
+              path,
+          )
+          write(path, text)
+
+          path = "server/routes/stats/statsDataRoutes.ts"
+          text = read(path)
+          text = insert_after(
+              text,
+              'import { storage } from "../../storage";\n',
+              'import { getAccessibleCompanyIds } from "../../security/companyAccessBoundary";\n',
+              path,
+          )
+          text = replace_once(
+              text,
+              '''      const userCompanyRoles = await storage.getUserCompaniesWithRoles(userId);\n      const companyIds = userCompanyRoles.map((r) => r.companyId);''',
+              '''      const companyIds = Array.from(await getAccessibleCompanyIds(userId));''',
+              path,
+          )
+          write(path, text)
+
+          path = "server/routes/helpers/supplierBalanceHelpers.ts"
+          text = read(path)
+          text = insert_after(
+              text,
+              'import { storage } from "../../storage";\n',
+              'import { getAccessibleCompanyIds } from "../../security/companyAccessBoundary";\n',
+              path,
+          )
+          text = replace_once(
+              text,
+              '''  const roles = await storage.getUserCompaniesWithRoles(userId);\n  const hasAccess = roles.some((r: any) => r.companyId === requestedCompanyId);\n  return hasAccess ? requestedCompanyId : null;''',
+              '''  const accessibleCompanyIds = await getAccessibleCompanyIds(userId);\n  return accessibleCompanyIds.has(requestedCompanyId) ? requestedCompanyId : null;''',
+              path,
+          )
+          write(path, text)
+
+          path = "server/routes/reportsContainerTrackingRoutes.ts"
+          text = read(path)
+          text = insert_after(
+              text,
+              'import { storage } from "../storage";\n',
+              'import { getAccessibleCompanyIds } from "../security/companyAccessBoundary";\n',
+              path,
+          )
+          text = replace_once(
+              text,
+              '''      const userCompanyRoles = await storage.getUserCompaniesWithRoles(userId);\n      const companyIds = userCompanyRoles.map((role) => role.companyId);''',
+              '''      const companyIds = Array.from(await getAccessibleCompanyIds(userId));''',
+              path,
+          )
+          write(path, text)
+
+          path = "server/routes/reportsClosingStockRoutes.ts"
+          text = read(path)
+          text = insert_after(
+              text,
+              'import { storage } from "../storage";\n',
+              'import { getAccessibleCompanyIds } from "../security/companyAccessBoundary";\n',
+              path,
+          )
+          text = replace_once(
+              text,
+              '''      const userCompanies = await storage.getUserCompaniesWithRoles(req.user!.id);\n      const hasAccessToTarget = userCompanies.some((uc) => uc.companyId === targetCompanyId);\n      if (!hasAccessToTarget) {''',
+              '''      const accessibleCompanyIds = await getAccessibleCompanyIds(req.user!.id);\n      if (!accessibleCompanyIds.has(targetCompanyId)) {''',
+              path,
+          )
+          write(path, text)
+
+          path = "server/routes/containers/containerFreightReadRoutes.ts"
+          text = read(path)
+          text = insert_after(
+              text,
+              'import { storage } from "../../storage";\n',
+              'import { getAccessibleCompanyIds } from "../../security/companyAccessBoundary";\n',
+              path,
+          )
+          text = replace_once(
+              text,
+              '''      const userCompanyRoles = await storage.getUserCompaniesWithRoles(userId);\n      const hasAccess = userCompanyRoles.some((r) => r.companyId === container.companyId);\n      if (!hasAccess) {''',
+              '''      const accessibleCompanyIds = await getAccessibleCompanyIds(userId);\n      if (!accessibleCompanyIds.has(container.companyId)) {''',
+              path,
+          )
+          write(path, text)
+
+          path = "tests/company-access-boundary-contract.test.ts"
+          text = read(path)
+          test_block = '''\n\n  it("routes remaining cross-company page scopes through the central boundary", () => {\n    const routeFiles = [\n      "server/routes/erp-payroll/runs.ts",\n      "server/routes/stats/statsDataRoutes.ts",\n      "server/routes/helpers/supplierBalanceHelpers.ts",\n      "server/routes/reportsContainerTrackingRoutes.ts",\n      "server/routes/reportsClosingStockRoutes.ts",\n      "server/routes/containers/containerFreightReadRoutes.ts",\n    ];\n\n    for (const routeFile of routeFiles) {\n      const route = source(routeFile);\n      expect(route).toContain("getAccessibleCompanyIds");\n      expect(route).not.toContain("getUserCompaniesWithRoles");\n    }\n  });'''
+          if 'routes remaining cross-company page scopes through the central boundary' not in text:
+              marker = "\n});"
+              index = text.rfind(marker)
+              if index < 0:
+                  raise SystemExit(f"Missing describe terminator in {path}")
+              text = text[:index] + test_block + text[index:]
+          write(path, text)
+          PY
+
+      - name: Install formatter
+        run: npm ci --ignore-scripts
+
+      - name: Format changed files
+        run: npx prettier --write server/routes/erp-payroll/runs.ts server/routes/stats/statsDataRoutes.ts server/routes/helpers/supplierBalanceHelpers.ts server/routes/reportsContainerTrackingRoutes.ts server/routes/reportsClosingStockRoutes.ts server/routes/containers/containerFreightReadRoutes.ts tests/company-access-boundary-contract.test.ts
+
+      - name: Commit audited fixes
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/routes/erp-payroll/runs.ts server/routes/stats/statsDataRoutes.ts server/routes/helpers/supplierBalanceHelpers.ts server/routes/reportsContainerTrackingRoutes.ts server/routes/reportsClosingStockRoutes.ts server/routes/containers/containerFreightReadRoutes.ts tests/company-access-boundary-contract.test.ts
+          git commit -m "Centralize remaining cross-company page access"
+          git push origin HEAD:agent/fix-route-aware-company-context-rebased
