@@ -55,8 +55,8 @@ export function isPrivilegedRole(role: string | null | undefined): role is Privi
  * to explicit user_company_roles assignments.
  */
 export async function getAccessibleCompanyIds(userId: string): Promise<Set<number>> {
-  const user = await storage.getUser(userId);
-  if (user?.role === "Developer") {
+  const roles = await storage.getUserCompaniesWithRoles(userId);
+  if (roles.some((entry: any) => entry.role === "Developer")) {
     const companies = await storage.getAllCompanies();
     return new Set(
       companies
@@ -65,7 +65,6 @@ export async function getAccessibleCompanyIds(userId: string): Promise<Set<numbe
     );
   }
 
-  const roles = await storage.getUserCompaniesWithRoles(userId);
   return new Set(
     roles
       .map((entry: any) => Number(entry.companyId))
