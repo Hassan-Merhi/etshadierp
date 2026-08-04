@@ -883,7 +883,7 @@
     "GET /api/screen-feed/being-watched [requireLogin > <anonymous>]",
     "GET /api/screen-feed/trace/:event [requireLogin > <anonymous>]",
     "POST /api/screen-feed [requireLogin > <anonymous>]",
-    "GET /api/screen-feed/:userId [requireAuth > <anonymous>]",
+    "GET /api/screen-feed/:userId [requireAuth > <anonymous> > <anonymous>]",
     "GET /api/stock-items [requireAuth > <anonymous>]",
     "GET /api/inventory [requireAuth > <anonymous>]",
     "GET /api/locations [requireAuth > <anonymous>]",
