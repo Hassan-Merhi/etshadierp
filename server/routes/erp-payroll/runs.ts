@@ -10,6 +10,7 @@ import { logger } from "../../lib/logger";
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "../../db";
 import { storage } from "../../storage";
+import { getAccessibleCompanyIds } from "../../security/companyAccessBoundary";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { triggerAccountWhatsAppStatement } from "../factoryWhatsappRoutes";
 import {
@@ -65,9 +66,10 @@ export function registerPayrollRunRoutes(app: Express) {
 
       // Validate that the requesting user has access to this company
       if (paramCompanyId && paramCompanyId !== sessionCompanyId) {
-        const userRoles = await storage.getUserCompaniesWithRoles(req.session.userId);
-        const hasAccess = userRoles.some((r: any) => r.companyId === paramCompanyId);
-        if (!hasAccess) return res.status(403).json({ message: "Access denied to this company" });
+        const accessibleCompanyIds = await getAccessibleCompanyIds(req.session.userId!);
+        if (!accessibleCompanyIds.has(paramCompanyId)) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
       }
 
       const runs = await db

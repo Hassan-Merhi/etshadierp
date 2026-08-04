@@ -11,6 +11,7 @@ import { logger } from "../lib/logger";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
+import { getAccessibleCompanyIds } from "../security/companyAccessBoundary";
 import { requireAuth, requireRole } from "../auth";
 import { adjustInventory } from "../inventoryHelper";
 import {
@@ -148,9 +149,8 @@ export function registerReportsClosingStockRoutes(app: Express) {
       }
 
       // Verify user has access to target company
-      const userCompanies = await storage.getUserCompaniesWithRoles(req.user!.id);
-      const hasAccessToTarget = userCompanies.some((uc) => uc.companyId === targetCompanyId);
-      if (!hasAccessToTarget) {
+      const accessibleCompanyIds = await getAccessibleCompanyIds(req.user!.id);
+      if (!accessibleCompanyIds.has(targetCompanyId)) {
         return res.status(403).json({ message: "You don't have access to the target company" });
       }
 
