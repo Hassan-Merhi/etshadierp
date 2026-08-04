@@ -8,6 +8,12 @@ import { storage } from "../../storage";
 import { companies } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
+function disableSessionResponseCaching(res: { setHeader: (name: string, value: string) => void }) {
+  res.setHeader("Cache-Control", "private, no-store, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Vary", "Cookie");
+}
+
 export function registerCompanyAccessRoutes(app: Express) {
   app.get("/api/companies", requireAuth, async (_req, res) => {
     try {
@@ -18,6 +24,7 @@ export function registerCompanyAccessRoutes(app: Express) {
   });
 
   app.get("/api/user/companies", requireAuth, async (req, res) => {
+    disableSessionResponseCaching(res);
     try {
       if (!req.user) return res.status(401).json({ message: "Unauthorized" });
       if (req.user.role === "Developer") {
@@ -92,7 +99,7 @@ export function registerCompanyAccessRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/companies/:id", requireAuth, requireRole("Admin"), async (req, res) => {
+  app.patch("/api/companies/:id", requireAuth, async (req, res) => {
     try {
       res.json(await storage.updateCompany(parseInt(req.params.id), req.body));
     } catch (error: unknown) {
@@ -110,6 +117,7 @@ export function registerCompanyAccessRoutes(app: Express) {
   });
 
   app.get("/api/auth/session-company", requireAuth, (req, res) => {
+    disableSessionResponseCaching(res);
     res.json({ companyId: req.session.currentCompanyId ?? null });
   });
 
