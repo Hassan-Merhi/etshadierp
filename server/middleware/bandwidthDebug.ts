@@ -6,8 +6,11 @@ import {
 } from "../lib/requestPerformanceContext";
 
 const DEFAULT_THRESHOLD_BYTES = 500 * 1024;
+const DEFAULT_STATIC_THRESHOLD_BYTES = 2 * 1024 * 1024;
+const DEFAULT_DOCUMENT_THRESHOLD_BYTES = 10 * 1024 * 1024;
 const DEFAULT_REPORT_INTERVAL_MS = 5 * 60 * 1000;
-const DEFAULT_TOP_N = 20;
+const DEFAULT_LOG_TOP_N = 3;
+const MAX_LOG_TOP_N = 5;
 const DEFAULT_API_WINDOW_BUDGET_MB = 50;
 const DEFAULT_STATIC_WINDOW_BUDGET_MB = 20;
 const DEFAULT_ENDPOINT_WINDOW_BUDGET_MB = 20;
@@ -27,6 +30,20 @@ type EndpointAggregate = {
   dbDurationMs: number;
 };
 
+type EndpointDiagnosticRow = {
+  method: string;
+  path: string;
+  requests: number;
+  errors: number;
+  totalResponseBytes: number;
+  averageResponseBytes: number;
+  maxResponseBytes: number;
+  averageDurationMs: number;
+  maxDurationMs: number;
+  dbQueryCount: number;
+  averageDbDurationMs: number;
+};
+
 type BandwidthBudgetConfig = {
   apiWindowBytes: number;
   staticWindowBytes: number;
@@ -42,8 +59,39 @@ type BandwidthBudgetViolation = {
   path?: string;
 };
 
+type BandwidthDiagnosticSnapshot = {
+  generatedAt: string | null;
+  windowMs: number;
+  endpointCount: number;
+  apiEndpointCount: number;
+  staticAssetCount: number;
+  totalApiResponseBytes: number;
+  totalStaticAssetResponseBytes: number;
+  budgets: BandwidthBudgetConfig;
+  violations: BandwidthBudgetViolation[];
+  ranked: EndpointDiagnosticRow[];
+  staticAssets: EndpointDiagnosticRow[];
+};
+
 const aggregates = new Map<string, EndpointAggregate>();
 let reportTimer: NodeJS.Timeout | undefined;
+let latestDiagnosticSnapshot: BandwidthDiagnosticSnapshot = {
+  generatedAt: null,
+  windowMs: DEFAULT_REPORT_INTERVAL_MS,
+  endpointCount: 0,
+  apiEndpointCount: 0,
+  staticAssetCount: 0,
+  totalApiResponseBytes: 0,
+  totalStaticAssetResponseBytes: 0,
+  budgets: {
+    apiWindowBytes: DEFAULT_API_WINDOW_BUDGET_MB * 1024 * 1024,
+    staticWindowBytes: DEFAULT_STATIC_WINDOW_BUDGET_MB * 1024 * 1024,
+    endpointWindowBytes: DEFAULT_ENDPOINT_WINDOW_BUDGET_MB * 1024 * 1024,
+  },
+  violations: [],
+  ranked: [],
+  staticAssets: [],
+};
 
 function positiveNumber(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
@@ -54,8 +102,8 @@ function megabytesToBytes(value: string | undefined, fallbackMb: number): number
   return Math.round(positiveNumber(value, fallbackMb) * 1024 * 1024);
 }
 
-function getThresholdBytes(): number {
-  return Math.round(positiveNumber(process.env.BANDWIDTH_DEBUG_THRESHOLD_KB, 500) * 1024);
+function kilobytesToBytes(value: string | undefined, fallbackBytes: number): number {
+  return Math.round(positiveNumber(value, fallbackBytes / 1024) * 1024);
 }
 
 function getBandwidthBudgetConfig(): BandwidthBudgetConfig {
@@ -102,7 +150,30 @@ function isStaticAsset(path: string): boolean {
   return /^\/assets\/[^/]+-[A-Za-z0-9_-]{6,}\.(js|css|woff2?|ttf|png|jpe?g|webp|gif|svg|ico)$/i.test(path);
 }
 
-function formatRow(aggregate: EndpointAggregate) {
+function isDocumentOrExportPath(path: string): boolean {
+  return /(?:whatsapp|green-api|pdf|receipt|print|export|download|excel|xlsx|csv|send-invoice-pdf-backend|send-stock-pdf-backend)/i.test(path);
+}
+
+function getLargeResponseThresholdBytes(path: string): number {
+  if (isStaticAsset(path)) {
+    return kilobytesToBytes(
+      process.env.BANDWIDTH_DEBUG_STATIC_THRESHOLD_KB,
+      DEFAULT_STATIC_THRESHOLD_BYTES,
+    );
+  }
+  if (isDocumentOrExportPath(path)) {
+    return kilobytesToBytes(
+      process.env.BANDWIDTH_DEBUG_DOCUMENT_THRESHOLD_KB,
+      DEFAULT_DOCUMENT_THRESHOLD_BYTES,
+    );
+  }
+  return kilobytesToBytes(
+    process.env.BANDWIDTH_DEBUG_THRESHOLD_KB,
+    DEFAULT_THRESHOLD_BYTES,
+  );
+}
+
+function formatRow(aggregate: EndpointAggregate): EndpointDiagnosticRow {
   const count = Math.max(aggregate.requestCount, 1);
   return {
     method: aggregate.method,
@@ -117,6 +188,16 @@ function formatRow(aggregate: EndpointAggregate) {
     dbQueryCount: aggregate.dbQueryCount,
     averageDbDurationMs: Math.round(aggregate.dbDurationMs / count),
   };
+}
+
+function sortRows(rows: EndpointAggregate[]): EndpointDiagnosticRow[] {
+  return rows
+    .map(formatRow)
+    .sort((left, right) =>
+      right.totalResponseBytes !== left.totalResponseBytes
+        ? right.totalResponseBytes - left.totalResponseBytes
+        : right.requests - left.requests,
+    );
 }
 
 function sumResponseBytes(rows: EndpointAggregate[]): number {
@@ -202,26 +283,38 @@ function evaluateBandwidthBudgets(
 function emitRanking(): void {
   if (aggregates.size === 0) return;
 
-  const topN = Math.round(positiveNumber(process.env.BANDWIDTH_DEBUG_TOP_N, DEFAULT_TOP_N));
+  const logTopN = Math.min(
+    MAX_LOG_TOP_N,
+    Math.round(positiveNumber(process.env.BANDWIDTH_DEBUG_LOG_TOP_N, DEFAULT_LOG_TOP_N)),
+  );
   const windowMs = positiveNumber(process.env.BANDWIDTH_DEBUG_REPORT_INTERVAL_MS, DEFAULT_REPORT_INTERVAL_MS);
   const all = [...aggregates.values()];
   const apiAggregates = all.filter((aggregate) => isApiPath(aggregate.path));
   const staticAggregates = all.filter((aggregate) => isStaticAsset(aggregate.path));
+
+  if (apiAggregates.length === 0 && staticAggregates.length === 0) {
+    aggregates.clear();
+    return;
+  }
+
   const budgetSnapshot = evaluateBandwidthBudgets(apiAggregates, staticAggregates);
+  const fullApiRows = sortRows(apiAggregates);
+  const fullStaticRows = sortRows(staticAggregates);
+  const generatedAt = new Date().toISOString();
 
-  const apiRows = apiAggregates
-    .map(formatRow)
-    .sort((left, right) =>
-      right.totalResponseBytes !== left.totalResponseBytes
-        ? right.totalResponseBytes - left.totalResponseBytes
-        : right.requests - left.requests,
-    )
-    .slice(0, topN);
-
-  const staticRows = staticAggregates
-    .map(formatRow)
-    .sort((left, right) => right.totalResponseBytes - left.totalResponseBytes)
-    .slice(0, 10);
+  latestDiagnosticSnapshot = {
+    generatedAt,
+    windowMs,
+    endpointCount: all.length,
+    apiEndpointCount: apiAggregates.length,
+    staticAssetCount: staticAggregates.length,
+    totalApiResponseBytes: budgetSnapshot.totalApiResponseBytes,
+    totalStaticAssetResponseBytes: budgetSnapshot.totalStaticAssetResponseBytes,
+    budgets: { ...budgetSnapshot.config },
+    violations: budgetSnapshot.violations.map((violation) => ({ ...violation })),
+    ranked: fullApiRows.map((row) => ({ ...row })),
+    staticAssets: fullStaticRows.map((row) => ({ ...row })),
+  };
 
   recordOperationalEvent({
     category: "bandwidth",
@@ -237,8 +330,8 @@ function emitRanking(): void {
     apiWindowBudgetBytes: budgetSnapshot.config.apiWindowBytes,
     staticWindowBudgetBytes: budgetSnapshot.config.staticWindowBytes,
     endpointWindowBudgetBytes: budgetSnapshot.config.endpointWindowBytes,
-    ranked: apiRows,
-    staticAssets: staticRows,
+    ranked: fullApiRows.slice(0, logTopN),
+    staticAssets: fullStaticRows.slice(0, logTopN),
   });
 
   for (const violation of budgetSnapshot.violations) {
@@ -268,6 +361,16 @@ function ensureReportTimer(): void {
   reportTimer.unref();
 }
 
+export function getBandwidthDiagnosticSnapshot(): BandwidthDiagnosticSnapshot {
+  return {
+    ...latestDiagnosticSnapshot,
+    budgets: { ...latestDiagnosticSnapshot.budgets },
+    violations: latestDiagnosticSnapshot.violations.map((violation) => ({ ...violation })),
+    ranked: latestDiagnosticSnapshot.ranked.map((row) => ({ ...row })),
+    staticAssets: latestDiagnosticSnapshot.staticAssets.map((row) => ({ ...row })),
+  };
+}
+
 export function bandwidthDebugMiddleware(req: Request, res: Response, next: NextFunction): void {
   if (process.env.BANDWIDTH_DEBUG !== "true") return next();
 
@@ -275,7 +378,6 @@ export function bandwidthDebugMiddleware(req: Request, res: Response, next: Next
   runWithRequestPerformanceContext(() => {
     const start = Date.now();
     const startHeapBytes = process.memoryUsage().heapUsed;
-    const thresholdBytes = getThresholdBytes();
     let totalBytes = 0;
     let finalized = false;
 
@@ -326,7 +428,8 @@ export function bandwidthDebugMiddleware(req: Request, res: Response, next: Next
         aggregate.dbDurationMs += databaseMetrics.dbDurationMs;
         aggregates.set(key, aggregate);
 
-        if (totalBytes >= thresholdBytes) {
+        const responseThresholdBytes = getLargeResponseThresholdBytes(path);
+        if (totalBytes >= responseThresholdBytes) {
           recordOperationalEvent({
             category: "bandwidth",
             code: "large_http_response",
@@ -336,6 +439,7 @@ export function bandwidthDebugMiddleware(req: Request, res: Response, next: Next
             path,
             status: res.statusCode,
             responseBytes: totalBytes,
+            budgetBytes: responseThresholdBytes,
             durationMs,
             heapDeltaBytes,
             dbQueryCount: databaseMetrics.dbQueryCount,
@@ -355,10 +459,30 @@ export const __bandwidthDebugTesting = {
   normalizePath,
   isApiPath,
   isStaticAsset,
+  isDocumentOrExportPath,
+  getLargeResponseThresholdBytes,
   calculateRankScore,
   evaluateBandwidthBudgets,
   getBandwidthBudgetConfig,
+  getBandwidthDiagnosticSnapshot,
   clear(): void {
     aggregates.clear();
+    latestDiagnosticSnapshot = {
+      generatedAt: null,
+      windowMs: DEFAULT_REPORT_INTERVAL_MS,
+      endpointCount: 0,
+      apiEndpointCount: 0,
+      staticAssetCount: 0,
+      totalApiResponseBytes: 0,
+      totalStaticAssetResponseBytes: 0,
+      budgets: {
+        apiWindowBytes: DEFAULT_API_WINDOW_BUDGET_MB * 1024 * 1024,
+        staticWindowBytes: DEFAULT_STATIC_WINDOW_BUDGET_MB * 1024 * 1024,
+        endpointWindowBytes: DEFAULT_ENDPOINT_WINDOW_BUDGET_MB * 1024 * 1024,
+      },
+      violations: [],
+      ranked: [],
+      staticAssets: [],
+    };
   },
 };
