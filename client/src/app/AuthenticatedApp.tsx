@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { useDialogScrollFix } from "@/hooks/use-dialog-scroll-fix";
 import { useMobilePerformanceLifecycle } from "@/hooks/use-mobile-performance-lifecycle";
 import { useLocation, Redirect } from "wouter";
@@ -7,7 +7,6 @@ import { usePresence } from "@/hooks/use-presence";
 import { useScreenFeed } from "@/hooks/use-screen-feed";
 import { useWsInvalidation } from "@/hooks/use-ws-invalidation";
 import { LanguageOnboardingDialog } from "@/components/LanguageOnboardingDialog";
-import { RemoteSupportIndicator } from "@/components/RemoteSupportIndicator";
 import type { AuthenticatedUser } from "@/contracts/sessionContracts";
 import { useAppNavigation } from "./useAppNavigation";
 import { useAuthenticatedAppData } from "./useAuthenticatedAppData";
@@ -18,6 +17,12 @@ import { PosShell } from "./PosShell";
 import { PropertiesShell } from "./PropertiesShell";
 import { FactoryShell } from "./FactoryShell";
 import { ErpShell } from "./ErpShell";
+
+const RemoteSupportIndicator = lazy(() =>
+  import("@/components/RemoteSupportIndicator").then((module) => ({
+    default: module.RemoteSupportIndicator,
+  }))
+);
 
 interface AuthenticatedAppProps {
   user: AuthenticatedUser;
@@ -77,7 +82,9 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
   const appOverlays = (
     <>
       {languageOnboarding}
-      <RemoteSupportIndicator />
+      <Suspense fallback={null}>
+        <RemoteSupportIndicator />
+      </Suspense>
     </>
   );
 
