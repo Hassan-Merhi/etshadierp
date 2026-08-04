@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 
 import { requireAuth, requireRole } from "../../auth";
 import { db, pool } from "../../db";
@@ -14,7 +14,7 @@ function disableSessionResponseCaching(res: { setHeader: (name: string, value: s
   res.setHeader("Vary", "Cookie");
 }
 
-function saveSession(req: Express.Request): Promise<void> {
+function saveSession(req: Request): Promise<void> {
   return new Promise((resolve, reject) => {
     req.session.save((error) => {
       if (error) reject(error);
