@@ -9,14 +9,22 @@ on:
       - main
     paths:
       - "client/src/components/PaginationBar.tsx"
+      - "client/src/components/stock-transfer/SmartTransferGeneratorDialog.tsx"
       - "client/src/hooks/useDebouncedValue.ts"
       - "client/src/hooks/useStockItemSearch.ts"
+      - "client/src/lib/queryKeys.ts"
+      - "client/src/pages/CombinedInventory.tsx"
       - "client/src/pages/LocationInventory.tsx"
+      - "client/src/pages/StockItemDetail.tsx"
       - "client/src/pages/StockTransferOrder.tsx"
       - "client/src/pages/Vouchers.tsx"
       - "client/src/pages/location-inventory/**"
       - "client/src/pages/pos/POSPriceList.tsx"
       - "client/src/pages/pos/pospricelist/types.ts"
+      - "client/src/pages/settings/DataToolsTab.tsx"
+      - "client/src/pages/settings/datatoolstab/components/BulkMergeStockItemsCard.tsx"
+      - "client/src/pages/settings/datatoolstab/components/MergeHistoryCard.tsx"
+      - "client/src/pages/settings/datatoolstab/components/MergeStockItemsCard.tsx"
       - "client/src/pages/vouchers/StockAdjustmentForm.tsx"
       - "client/src/pages/vouchers/StockTransferForm.tsx"
       - "client/src/pages/vouchers/useVoucherQueries.ts"
@@ -116,6 +124,17 @@ jobs:
             python scripts/harden-bandwidth-phases-3-4.py
           fi
 
+      - name: Fix Phase 3-4 lint regression
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("client/src/pages/pos/POSPriceList.tsx")
+          source = path.read_text()
+          source = source.replace("  PriceListItem,\n", "")
+          path.write_text(source)
+          PY
+
       - name: Update startup schema integrity pin
         run: node node_modules/tsx/dist/cli.mjs scripts/update-startup-schema-integrity.mts
 
@@ -123,9 +142,13 @@ jobs:
         run: |
           node node_modules/prettier/bin/prettier.cjs --write \
             client/src/components/PaginationBar.tsx \
+            client/src/components/stock-transfer/SmartTransferGeneratorDialog.tsx \
             client/src/hooks/useDebouncedValue.ts \
             client/src/hooks/useStockItemSearch.ts \
+            client/src/lib/queryKeys.ts \
+            client/src/pages/CombinedInventory.tsx \
             client/src/pages/LocationInventory.tsx \
+            client/src/pages/StockItemDetail.tsx \
             client/src/pages/StockTransferOrder.tsx \
             client/src/pages/Vouchers.tsx \
             client/src/pages/location-inventory/AllItemsView.tsx \
@@ -136,6 +159,10 @@ jobs:
             client/src/pages/location-inventory/useStockGroupSummaries.ts \
             client/src/pages/pos/POSPriceList.tsx \
             client/src/pages/pos/pospricelist/types.ts \
+            client/src/pages/settings/DataToolsTab.tsx \
+            client/src/pages/settings/datatoolstab/components/BulkMergeStockItemsCard.tsx \
+            client/src/pages/settings/datatoolstab/components/MergeHistoryCard.tsx \
+            client/src/pages/settings/datatoolstab/components/MergeStockItemsCard.tsx \
             client/src/pages/vouchers/StockAdjustmentForm.tsx \
             client/src/pages/vouchers/StockTransferForm.tsx \
             client/src/pages/vouchers/useVoucherQueries.ts \
@@ -162,6 +189,17 @@ jobs:
       - name: Focused regression tests
         run: node node_modules/tsx/dist/cli.mjs scripts/test-bandwidth-phases-3-4.mts
 
+      - name: Lint changed regression surface
+        run: |
+          node node_modules/eslint/bin/eslint.js \
+            client/src/pages/pos/POSPriceList.tsx \
+            client/src/pages/vouchers/StockAdjustmentForm.tsx \
+            client/src/pages/vouchers/StockTransferForm.tsx \
+            client/src/pages/StockTransferOrder.tsx \
+            server/routes/stock/stockLightRoutes.ts \
+            server/routes/location/locationInventoryPaging.ts \
+            server/routes/stock/transfer-adj/posPriceListPaging.ts
+
       - name: Type-check
         run: npm run check
 
@@ -178,5 +216,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Complete bandwidth stock inventory and POS phases"
+          git commit -m "Fix Phase 3-4 lint and formatting"
           git push origin HEAD:bandwidth-phases-1-2
