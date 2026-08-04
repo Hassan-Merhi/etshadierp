@@ -126,7 +126,11 @@ beforeAll(async () => {
     throw new Error(`SP company switch failed: ${companySwitch.status} ${JSON.stringify(companySwitch.body)}`);
   }
 
-  const setup = await spAgent.post("/api/sp/setup").send({});
+  const setup = await spAgent.post("/api/sp/setup").send({
+    confirmation: "CHANGE SP SETUP",
+    reason: "Initialize Supplier Partner lifecycle test setup",
+    idempotencyKey: `sp-setup-initial-${RUN_ID}`,
+  });
   if (setup.status !== 200) {
     throw new Error(`SP setup failed: ${setup.status} ${JSON.stringify(setup.body)}`);
   }
@@ -174,7 +178,11 @@ describe("SP lifecycle setup", () => {
   });
 
   it("is idempotent when setup runs again", async () => {
-    const response = await spAgent.post("/api/sp/setup").send({});
+    const response = await spAgent.post("/api/sp/setup").send({
+      confirmation: "CHANGE SP SETUP",
+      reason: "Verify Supplier Partner setup remains idempotent",
+      idempotencyKey: `sp-setup-repeat-${RUN_ID}`,
+    });
     expect(response.status).toBe(200);
     const created: string[] = response.body?.created ?? [];
     expect(created.filter((entry) => !entry.toLowerCase().includes("location"))).toHaveLength(0);
