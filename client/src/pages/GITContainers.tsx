@@ -26,11 +26,12 @@ import { PageHeader } from "@/components/PageHeader";
 import { PaginationBar } from "@/components/PaginationBar";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useCompany } from "@/contexts/CompanyContext";
+import { authenticatedUserQueryOptions } from "@/contracts/sessionQueryContracts";
 
 // Sub-component imports
 import {
   EnrichedContainerRow,
-  AuthUser,
   OTW_COLS,
   OtwColId,
   DEFAULT_OTW_COL_VIS,
@@ -50,7 +51,8 @@ import { useGITContainersData } from "./git-containers/useGITContainersData";
 import { usePaginatedGITContainers } from "./git-containers/usePaginatedGITContainers";
 
 export default function GITContainers({ embedded = false }: { embedded?: boolean } = {}) {
-  const { data: user, isLoading: userLoading } = useQuery<AuthUser>({ queryKey: ["/api/auth/me"] });
+  const { data: user, isLoading: userLoading } = useQuery(authenticatedUserQueryOptions());
+  const { selectedCompany } = useCompany();
   const { toast } = useToast();
 
   const [allCompanies, setAllCompanies] = useState(false);
@@ -115,7 +117,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
 
   const { data, isLoading, isError, error, refetch, loadContainerDetail } =
     usePaginatedGITContainers({
-      companyIdentity: allCompanies ? `all:${user?.id ?? "unknown"}` : user?.companyId ?? "no-company",
+      companyIdentity: allCompanies ? `all:${user?.id ?? "unknown"}` : selectedCompany?.id ?? "no-company",
       allCompanies,
       page,
       pageSize: CONTAINER_PAGE_SIZE,
@@ -133,7 +135,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
       notesFilter,
       sortOrder,
       search,
-      enabled: !!isAllowed,
+      enabled: !!isAllowed && !!selectedCompany,
     });
 
   const allContainers = data?.containers ?? [];
@@ -240,8 +242,12 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
       // avoiding the 2 MB Express JSON body limit that a base64 screenshot would exceed.
       await apiRequest("POST", "/api/git/send-containers-whatsapp", {});
       toast({ title: "Sent", description: "Container report sent to WhatsApp group." });
-    } catch (err: any) {
-      toast({ title: "Failed to send", description: err.message, variant: "destructive" });
+    } catch (error: unknown) {
+      toast({
+        title: "Failed to send",
+        description: error instanceof Error ? error.message : "Unable to send the container report.",
+        variant: "destructive",
+      });
     } finally {
       setWaSending(false);
     }
@@ -278,7 +284,9 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
           <div className="text-center space-y-2">
             <AlertTriangle className="h-8 w-8 text-red-500 mx-auto" />
             <p className="text-sm font-medium">Failed to load containers</p>
-            <p className="text-xs text-muted-foreground">{(error as any)?.message ?? "Unknown error"}</p>
+            <p className="text-xs text-muted-foreground">
+              {error instanceof Error ? error.message : "Unknown error"}
+            </p>
           </div>
         </div>
       </div>

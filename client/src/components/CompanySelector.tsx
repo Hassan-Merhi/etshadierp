@@ -1,6 +1,6 @@
 import { useCompany, type Company } from "@/contexts/CompanyContext";
 import type { CompanyType } from "@/contracts/sessionContracts";
-import { ChevronDown, Layers, WifiOff } from "lucide-react";
+import { AlertTriangle, ChevronDown, Layers, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -51,7 +51,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 export function CompanySelector() {
-  const { selectedCompany, companies, isLoading, selectCompany } = useCompany();
+  const { selectedCompany, companies, isLoading, error: companyError, selectCompany } = useCompany();
   const { isOnline } = useConnectivity();
   const { t } = useApplicationLanguage();
   const { toast } = useToast();
@@ -93,6 +93,23 @@ export function CompanySelector() {
       });
     }
   };
+
+  if (companyError) {
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        disabled
+        data-testid="button-company-selector-error"
+        aria-label="Company data unavailable"
+        title={companyError.message}
+        className="h-10 gap-1.5 px-2 text-destructive sm:h-8"
+      >
+        <AlertTriangle className="h-4 w-4 shrink-0" />
+        <span className="hidden sm:inline">Company unavailable</span>
+      </Button>
+    );
+  }
 
   if (isLoading || !selectedCompany) {
     return (

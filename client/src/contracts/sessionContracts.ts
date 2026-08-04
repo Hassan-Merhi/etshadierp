@@ -39,6 +39,9 @@ export const authenticatedUserSchema = z
     username: z.string().min(1),
     role: z.string().min(1).nullable().optional(),
     currentRole: z.string().min(1).nullable().optional(),
+    currentCompanyId: optionalPositiveInteger,
+    currentLocationId: optionalPositiveInteger,
+    currentPOSStation: optionalPositiveInteger,
     active: z.boolean().optional(),
     assignedLocationId: optionalPositiveInteger,
     posStation: z

@@ -84,13 +84,6 @@ export interface GitContainersResponse {
   };
 }
 
-export interface AuthUser {
-  id: number;
-  username: string;
-  role?: string;
-  currentRole?: string | null;
-  companyId?: number;
-}
 
 export const OTW_COLS = [
   { id: "supplier", label: "Supplier" },

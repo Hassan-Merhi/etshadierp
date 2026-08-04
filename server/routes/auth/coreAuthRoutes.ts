@@ -185,7 +185,22 @@ export function registerCoreAuthRoutes(app: Express) {
       }
     }
     const { password: _password, ...userWithoutPassword } = req.user as any;
-    res.json({ ...userWithoutPassword, username, currentRole: req.session.currentRole ?? null });
+    res.json({
+      ...userWithoutPassword,
+      username,
+      currentRole: req.session.currentRole ?? null,
+      currentCompanyId: req.session.currentCompanyId ?? null,
+      currentLocationId: req.session.currentLocationId ?? null,
+      currentPOSStation: req.session.currentPOSStation ?? null,
+      assignedLocationId: req.session.currentLocationId ?? req.user.assignedLocationId ?? null,
+      posStation: req.session.currentPOSStation ?? req.user.posStation ?? null,
+      cashAccountId: req.session.cashAccountId ?? req.user.cashAccountId ?? null,
+      canSellNegativeStock: req.session.canSellNegativeStock ?? req.user.canSellNegativeStock ?? false,
+      posViewOnly: Boolean((req.session as any).posViewOnly ?? false),
+      daybookEditDays: req.session.daybookEditDays ?? req.user.daybookEditDays ?? null,
+      canAccessCustomers: req.session.canAccessCustomers ?? req.user.canAccessCustomers ?? false,
+      canDeleteRecords: req.session.canDeleteRecords ?? false,
+    });
   });
 
   app.patch("/api/me/password", requireLogin, async (req: any, res: any) => {
