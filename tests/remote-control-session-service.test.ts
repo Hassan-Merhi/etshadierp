@@ -15,24 +15,27 @@ import {
 import { restoreRemoteSupportBootDefaults, updateRemoteSupportFlags } from "../server/services/remoteSupportRuntime";
 
 const now = Date.now();
+const companyId = 7;
 
-function registerTab(userId = "22", tabId = "erp-tab-1") {
+function registerTab(userId = "22", tabId = "erp-tab-1", selectedCompanyId = companyId) {
   return registerRemoteControlTab({
     userId,
     username: `user-${userId}`,
     tabId,
+    companyId: selectedCompanyId,
     route: "/dashboard",
     now,
   });
 }
 
-function startSession(controllerUserId = "1", targetUserId = "22") {
+function startSession(controllerUserId = "1", targetUserId = "22", selectedCompanyId = companyId) {
   return startRemoteControlSession({
     targetUserId,
     targetUsername: `user-${targetUserId}`,
     controllerUserId,
     controllerUsername: `developer-${controllerUserId}`,
     controllerRole: "Developer",
+    controllerCompanyId: selectedCompanyId,
     durationMs: 5 * 60 * 1000,
   });
 }
@@ -48,57 +51,77 @@ describe("remote control session safety", () => {
         keyboardControl: true,
         sensitiveActionProtection: true,
       },
-      "phase-6-test"
+      "phase-7-test"
     );
   });
 
   afterEach(() => {
     resetRemoteControlSessionStateForTests();
-    restoreRemoteSupportBootDefaults("phase-6-test-cleanup");
+    restoreRemoteSupportBootDefaults("phase-7-test-cleanup");
   });
 
-  it("allows only configured controller roles", () => {
+  it("allows configured support roles while permission middleware remains the final gate", () => {
     expect(isRemoteControlControllerRole("Developer")).toBe(true);
-    expect(isRemoteControlControllerRole("Admin")).toBe(false);
-    expect(() =>
-      startRemoteControlSession({
-        targetUserId: "22",
-        controllerUserId: "3",
-        controllerUsername: "admin",
-        controllerRole: "Admin",
-      })
-    ).toThrow(RemoteControlSessionError);
+    expect(isRemoteControlControllerRole("Admin")).toBe(true);
+    expect(isRemoteControlControllerRole("Owner")).toBe(true);
+    expect(isRemoteControlControllerRole("User")).toBe(false);
   });
 
-  it("binds a passive session to one active ERP browser tab", () => {
+  it("binds a passive session to one company and exact ERP browser tab", () => {
     registerTab("22", "erp-tab-1");
     registerRemoteControlTab({
       userId: "22",
       username: "user-22",
       tabId: "erp-tab-2",
-      route: "/dashboard",
+      companyId,
+      route: "/reports",
       now: now + 1,
     });
     const session = startSession();
 
+    expect(session.companyId).toBe(companyId);
     expect(session.scope).toBe("erp-browser-tab");
     expect(session.targetTabId).toBe("erp-tab-2");
+    expect(session.targetRoute).toBe("/reports");
     expect(session.capabilities).toEqual({ mouse: false, keyboard: false, browserTabOnly: true });
     expect(getActiveRemoteControlSession("22", "erp-tab-2")?.id).toBe(session.id);
     expect(getActiveRemoteControlSession("22", "erp-tab-1")).toBeNull();
   });
 
+  it("refuses to bind a controller to a tab in another company", () => {
+    registerTab("22", "erp-tab-1", 8);
+    expect(() => startSession("1", "22", 7)).toThrowError(
+      expect.objectContaining({ code: "TARGET_TAB_UNAVAILABLE", statusCode: 409 })
+    );
+  });
+
+  it("stops support immediately if the target tab changes company", () => {
+    registerTab();
+    const session = startSession();
+    registerRemoteControlTab({
+      userId: "22",
+      username: "user-22",
+      tabId: "erp-tab-1",
+      companyId: 8,
+      route: "/dashboard",
+      now: now + 1000,
+    });
+
+    expect(getActiveRemoteControlSession("22")).toBeNull();
+    expect(stopRemoteControlSession(session.id, "again")?.stopReason).toBe("target-company-changed");
+  });
+
   it("enforces mouse before keyboard and disables keyboard with mouse", () => {
     registerTab();
     const session = startSession();
-
     expect(setRemoteControlKeyboardCapability(session.id, true)).toBeNull();
     expect(setRemoteControlMouseCapability(session.id, true)?.capabilities.mouse).toBe(true);
     expect(setRemoteControlKeyboardCapability(session.id, true)?.capabilities.keyboard).toBe(true);
     expect(getActiveRemoteControlSession("22")?.capabilities).toMatchObject({ mouse: true, keyboard: true });
-
-    const mouseStopped = setRemoteControlMouseCapability(session.id, false);
-    expect(mouseStopped?.capabilities).toMatchObject({ mouse: false, keyboard: false });
+    expect(setRemoteControlMouseCapability(session.id, false)?.capabilities).toMatchObject({
+      mouse: false,
+      keyboard: false,
+    });
   });
 
   it("disables active keyboard capability when the runtime flag is turned off", () => {
@@ -106,10 +129,8 @@ describe("remote control session safety", () => {
     const session = startSession();
     setRemoteControlMouseCapability(session.id, true);
     setRemoteControlKeyboardCapability(session.id, true);
-
     updateRemoteSupportFlags({ keyboardControl: false }, "test-disable-keyboard");
     cleanupRemoteControlState(now + 1000);
-
     expect(getActiveRemoteControlSession("22")?.capabilities).toMatchObject({ mouse: true, keyboard: false });
   });
 
@@ -121,14 +142,14 @@ describe("remote control session safety", () => {
     );
   });
 
-  it("keeps reconnects by the same controller idempotent", () => {
+  it("keeps reconnects by the same controller and company idempotent", () => {
     registerTab();
     const first = startSession("1");
     const second = startSession("1");
     expect(second.id).toBe(first.id);
   });
 
-  it("supports controller heartbeat, target stop, and automatic expiration", () => {
+  it("supports heartbeat, target stop, and automatic expiration", () => {
     registerTab();
     const session = startSession();
     setRemoteControlMouseCapability(session.id, true);

@@ -7,6 +7,7 @@ export interface RemoteControlTabPresence {
   userId: string;
   username: string;
   tabId: string;
+  companyId: number;
   route: string;
   firstSeenAt: number;
   lastSeenAt: number;
@@ -14,9 +15,11 @@ export interface RemoteControlTabPresence {
 
 export interface RemoteControlSession {
   id: string;
+  companyId: number;
   targetUserId: string;
   targetUsername: string;
   targetTabId: string;
+  targetRoute: string;
   controllerUserId: string;
   controllerUsername: string;
   controllerRole: string;
@@ -53,10 +56,12 @@ interface StartRemoteControlSessionInput {
   controllerUserId: string;
   controllerUsername: string;
   controllerRole: string;
+  controllerCompanyId: number;
   durationMs?: number;
 }
 
 type TargetListener = () => void;
+type SessionStopListener = (session: RemoteControlSession) => void;
 
 const DEFAULT_SESSION_MS = 10 * 60 * 1000;
 const MAX_SESSION_MS = 15 * 60 * 1000;
@@ -70,6 +75,7 @@ const sessions = new Map<string, RemoteControlSession>();
 const activeByTargetUser = new Map<string, string>();
 const tabsByUser = new Map<string, Map<string, RemoteControlTabPresence>>();
 const targetListeners = new Map<string, Set<TargetListener>>();
+const sessionStopListeners = new Set<SessionStopListener>();
 
 function cleanIdentifier(value: unknown, maxLength = 128): string {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
@@ -78,6 +84,11 @@ function cleanIdentifier(value: unknown, maxLength = 128): string {
 function cleanRoute(value: unknown): string {
   const route = cleanIdentifier(value, 500);
   return route.startsWith("/") ? route : "/";
+}
+
+function positiveCompanyId(value: unknown): number | null {
+  const companyId = Number(value);
+  return Number.isInteger(companyId) && companyId > 0 ? companyId : null;
 }
 
 function copySession(session: RemoteControlSession | null | undefined): RemoteControlSession | null {
@@ -125,6 +136,14 @@ function stopSessionInternal(
     activeByTargetUser.delete(session.targetUserId);
   }
   notifyTarget(session.targetUserId);
+  const stoppedSnapshot = copySession(session) as RemoteControlSession;
+  for (const listener of sessionStopListeners) {
+    try {
+      listener(stoppedSnapshot);
+    } catch {
+      // Stop observers must never prevent a fail-safe stop.
+    }
+  }
   return session;
 }
 
@@ -145,7 +164,7 @@ function freshTabs(userId: string, now = Date.now()): RemoteControlTabPresence[]
 
 export function isRemoteControlControllerRole(role: unknown): boolean {
   const allowedRoles = new Set(
-    (process.env.REMOTE_SUPPORT_CONTROLLER_ROLES ?? "Developer")
+    (process.env.REMOTE_SUPPORT_CONTROLLER_ROLES ?? "Developer,Admin,Owner,Manager")
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean)
@@ -170,16 +189,19 @@ export function registerRemoteControlTab(input: {
   userId: string;
   username?: string;
   tabId: string;
+  companyId: unknown;
   route?: string;
   now?: number;
 }): RemoteControlSession | null {
   const userId = cleanIdentifier(input.userId);
   const tabId = cleanIdentifier(input.tabId);
-  if (!userId || !tabId) {
-    throw new RemoteControlSessionError("INVALID_TAB", 400, "A valid ERP browser tab is required.");
+  const companyId = positiveCompanyId(input.companyId);
+  if (!userId || !tabId || !companyId) {
+    throw new RemoteControlSessionError("INVALID_TAB", 400, "A valid company ERP browser tab is required.");
   }
 
   const now = input.now ?? Date.now();
+  const route = cleanRoute(input.route);
   let userTabs = tabsByUser.get(userId);
   if (!userTabs) {
     userTabs = new Map();
@@ -191,13 +213,19 @@ export function registerRemoteControlTab(input: {
     userId,
     username: cleanIdentifier(input.username, 160) || existing?.username || userId,
     tabId,
-    route: cleanRoute(input.route),
+    companyId,
+    route,
     firstSeenAt: existing?.firstSeenAt ?? now,
     lastSeenAt: now,
   });
 
   const session = activeSessionRecord(userId);
   if (session?.targetTabId === tabId) {
+    if (session.companyId !== companyId) {
+      stopSessionInternal(session, "target-company-changed", "stopped", now);
+      return null;
+    }
+    session.targetRoute = route;
     session.lastTargetHeartbeatAt = now;
     return copySession(session);
   }
@@ -216,13 +244,16 @@ export function startRemoteControlSession(input: StartRemoteControlSessionInput)
 
   const targetUserId = cleanIdentifier(input.targetUserId);
   const controllerUserId = cleanIdentifier(input.controllerUserId);
-  if (!targetUserId || !controllerUserId) {
-    throw new RemoteControlSessionError("INVALID_SESSION_PARTICIPANT", 400, "Valid users are required.");
+  const controllerCompanyId = positiveCompanyId(input.controllerCompanyId);
+  if (!targetUserId || !controllerUserId || !controllerCompanyId) {
+    throw new RemoteControlSessionError("INVALID_SESSION_PARTICIPANT", 400, "Valid users and company are required.");
   }
 
   const existing = activeSessionRecord(targetUserId);
   if (existing) {
-    if (existing.controllerUserId === controllerUserId) return copySession(existing) as RemoteControlSession;
+    if (existing.controllerUserId === controllerUserId && existing.companyId === controllerCompanyId) {
+      return copySession(existing) as RemoteControlSession;
+    }
     throw new RemoteControlSessionError(
       "TARGET_ALREADY_CONTROLLED",
       409,
@@ -230,14 +261,14 @@ export function startRemoteControlSession(input: StartRemoteControlSessionInput)
     );
   }
 
-  const tabs = freshTabs(targetUserId);
+  const tabs = freshTabs(targetUserId).filter((tab) => tab.companyId === controllerCompanyId);
   const requestedTabId = cleanIdentifier(input.requestedTabId);
   const selectedTab = requestedTabId ? tabs.find((tab) => tab.tabId === requestedTabId) : tabs[0];
   if (!selectedTab) {
     throw new RemoteControlSessionError(
       "TARGET_TAB_UNAVAILABLE",
       409,
-      "No active ERP browser tab is available for this user."
+      "No active ERP browser tab is available for this user in the selected company."
     );
   }
 
@@ -245,9 +276,11 @@ export function startRemoteControlSession(input: StartRemoteControlSessionInput)
   const durationMs = Math.min(MAX_SESSION_MS, Math.max(MIN_SESSION_MS, input.durationMs ?? DEFAULT_SESSION_MS));
   const session: RemoteControlSession = {
     id: randomUUID(),
+    companyId: controllerCompanyId,
     targetUserId,
     targetUsername: cleanIdentifier(input.targetUsername, 160) || selectedTab.username || targetUserId,
     targetTabId: selectedTab.tabId,
+    targetRoute: selectedTab.route,
     controllerUserId,
     controllerUsername: cleanIdentifier(input.controllerUsername, 160) || controllerUserId,
     controllerRole: cleanIdentifier(input.controllerRole, 80),
@@ -290,9 +323,7 @@ export function setRemoteControlKeyboardCapability(sessionId: string, enabled: b
   cleanupRemoteControlState();
   const session = sessions.get(cleanIdentifier(sessionId));
   if (!session || session.status !== "active") return null;
-  if (enabled && (!session.capabilities.mouse || !isRemoteSupportEnabled("keyboardControl"))) {
-    return null;
-  }
+  if (enabled && (!session.capabilities.mouse || !isRemoteSupportEnabled("keyboardControl"))) return null;
   if (session.capabilities.keyboard === enabled) return copySession(session);
   session.capabilities.keyboard = enabled;
   notifyTarget(session.targetUserId);
@@ -360,6 +391,11 @@ export function subscribeRemoteControlTarget(userId: string, listener: TargetLis
   };
 }
 
+export function subscribeRemoteControlSessionStops(listener: SessionStopListener): () => void {
+  sessionStopListeners.add(listener);
+  return () => sessionStopListeners.delete(listener);
+}
+
 export function cleanupRemoteControlState(now = Date.now()): void {
   for (const session of sessions.values()) {
     if (session.status === "active") {
@@ -388,6 +424,7 @@ export function resetRemoteControlSessionStateForTests(): void {
   activeByTargetUser.clear();
   tabsByUser.clear();
   targetListeners.clear();
+  sessionStopListeners.clear();
 }
 
 const cleanupTimer = setInterval(() => cleanupRemoteControlState(), 3000);

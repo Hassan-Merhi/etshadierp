@@ -1,6 +1,12 @@
 import type { Express, Request, Response } from "express";
 import { requireAuth, requireLogin } from "../auth";
-import { getSessionRole, getSessionUserId, getSessionUsername } from "../lib/requestContext";
+import { requireActionAccess } from "../lib/permissionMiddleware";
+import {
+  getSessionCompanyId,
+  getSessionRole,
+  getSessionUserId,
+  getSessionUsername,
+} from "../lib/requestContext";
 import {
   RemoteMouseControlError,
   authorizeRemoteMouseControl,
@@ -28,10 +34,17 @@ import {
   subscribeRemoteControlTarget,
   type RemoteControlSession,
 } from "../services/remoteControlSessionService";
+import {
+  remoteSupportCommandAuditDetails,
+  writeRemoteSupportAudit,
+} from "../services/remoteSupportAuditService";
+import { isRemoteMouseCommandAllowedOnRoute } from "../services/remoteSupportSensitiveActionPolicy";
 import { isRemoteSupportEnabled } from "../services/remoteSupportRuntime";
 
 const STATUS_REFRESH_MS = 5000;
 const COMMAND_HEARTBEAT_MS = 5000;
+const viewPermission = requireActionAccess("remote_support_view");
+const mousePermission = requireActionAccess("remote_support_mouse");
 
 type FlushableResponse = Response & { flush?: () => void };
 
@@ -126,8 +139,21 @@ function handleSessionError(error: unknown, res: Response): void {
   res.status(500).json({ message: "Unable to manage the support session." });
 }
 
+async function writeAuditOrUnavailable(input: Parameters<typeof writeRemoteSupportAudit>[0], res: Response) {
+  try {
+    await writeRemoteSupportAudit(input);
+    return true;
+  } catch {
+    res.status(503).json({
+      code: "REMOTE_SUPPORT_AUDIT_UNAVAILABLE",
+      message: "Remote support auditing is temporarily unavailable. Control remains blocked.",
+    });
+    return false;
+  }
+}
+
 export function registerRemoteControlSessionRoutes(app: Express): void {
-  app.get("/api/screen-feed/control/tabs/:userId", requireAuth, (req, res) => {
+  app.get("/api/screen-feed/control/tabs/:userId", requireAuth, viewPermission, (req, res) => {
     if (!requireController(req, res)) return;
     res.setHeader("Cache-Control", "no-store");
     res.json({ tabs: listRemoteControlTabs(req.params.userId) });
@@ -139,13 +165,11 @@ export function registerRemoteControlSessionRoutes(app: Express): void {
         userId: sessionUserId(req),
         username: sessionUsername(req),
         tabId: req.body?.tabId,
+        companyId: getSessionCompanyId(req),
         route: req.body?.route,
       });
       res.setHeader("Cache-Control", "no-store");
-      res.json({
-        enabled: isRemoteSupportEnabled("remoteControl"),
-        session: serializeSession(session),
-      });
+      res.json({ enabled: isRemoteSupportEnabled("remoteControl"), session: serializeSession(session) });
     } catch (error) {
       handleSessionError(error, res);
     }
@@ -161,6 +185,7 @@ export function registerRemoteControlSessionRoutes(app: Express): void {
         userId,
         username: sessionUsername(req),
         tabId,
+        companyId: getSessionCompanyId(req),
         route: typeof req.query.route === "string" ? req.query.route : "/",
       });
     } catch (error) {
@@ -169,14 +194,12 @@ export function registerRemoteControlSessionRoutes(app: Express): void {
 
     openEventStream(res);
     let closed = false;
-
     const sendStatus = () => {
       writeEvent(res, "control", {
         enabled: isRemoteSupportEnabled("remoteControl"),
         session: serializeSession(getActiveRemoteControlSession(userId, tabId)),
       });
     };
-
     const unsubscribe = subscribeRemoteControlTarget(userId, sendStatus);
     const refreshId = setInterval(sendStatus, STATUS_REFRESH_MS);
     const cleanup = () => {
@@ -186,30 +209,46 @@ export function registerRemoteControlSessionRoutes(app: Express): void {
       unsubscribe();
       if (!res.writableEnded) res.end();
     };
-
     req.once("close", cleanup);
     res.once("close", cleanup);
     sendStatus();
   });
 
-  app.get("/api/screen-feed/control/sessions/controller-active", requireAuth, (req, res) => {
-    if (!requireController(req, res)) return;
-    const controllerUserId = sessionUserId(req);
-    const sessions = listActiveRemoteControlSessionsForController(controllerUserId).map((session) => ({
-      ...serializeSession(session)!,
-      mouseAuthorization: serializeMouseAuthorization(getRemoteMouseAuthorization(session.id, controllerUserId)),
-    }));
-    res.setHeader("Cache-Control", "no-store");
-    res.json({ sessions });
-  });
+  app.get(
+    "/api/screen-feed/control/sessions/controller-active",
+    requireAuth,
+    viewPermission,
+    (req, res) => {
+      if (!requireController(req, res)) return;
+      const controllerUserId = sessionUserId(req);
+      const sessions = listActiveRemoteControlSessionsForController(controllerUserId)
+        .filter((session) => session.companyId === getSessionCompanyId(req))
+        .map((session) => ({
+          ...serializeSession(session)!,
+          mouseAuthorization: serializeMouseAuthorization(
+            getRemoteMouseAuthorization(session.id, controllerUserId)
+          ),
+        }));
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ sessions });
+    }
+  );
 
-  app.get("/api/screen-feed/control/sessions/active/:userId", requireAuth, (req, res) => {
-    if (!requireController(req, res)) return;
-    res.setHeader("Cache-Control", "no-store");
-    res.json({ session: serializeSession(getActiveRemoteControlSession(req.params.userId)) });
-  });
+  app.get(
+    "/api/screen-feed/control/sessions/active/:userId",
+    requireAuth,
+    viewPermission,
+    (req, res) => {
+      if (!requireController(req, res)) return;
+      const session = getActiveRemoteControlSession(req.params.userId);
+      res.setHeader("Cache-Control", "no-store");
+      res.json({
+        session: session?.companyId === getSessionCompanyId(req) ? serializeSession(session) : null,
+      });
+    }
+  );
 
-  app.post("/api/screen-feed/control/sessions", requireAuth, (req, res) => {
+  app.post("/api/screen-feed/control/sessions", requireAuth, viewPermission, async (req, res) => {
     if (!requireController(req, res)) return;
     try {
       const durationMinutes = Number(req.body?.durationMinutes);
@@ -220,53 +259,109 @@ export function registerRemoteControlSessionRoutes(app: Express): void {
         controllerUserId: sessionUserId(req),
         controllerUsername: sessionUsername(req),
         controllerRole: sessionRole(req),
+        controllerCompanyId: getSessionCompanyId(req),
         durationMs: Number.isFinite(durationMinutes) ? durationMinutes * 60 * 1000 : undefined,
       });
+      const audited = await writeAuditOrUnavailable(
+        {
+          event: "session_started",
+          session,
+          actorUserId: sessionUserId(req),
+          actorUsername: sessionUsername(req),
+          details: { capability: "view", status: "requested", route: session.targetRoute },
+        },
+        res
+      );
+      if (!audited) {
+        stopRemoteControlSession(session.id, "audit-unavailable");
+        return;
+      }
       res.status(201).json({ session: serializeSession(session) });
     } catch (error) {
       handleSessionError(error, res);
     }
   });
 
-  app.post("/api/screen-feed/control/sessions/:sessionId/heartbeat", requireAuth, (req, res) => {
-    if (!requireController(req, res)) return;
-    const session = heartbeatRemoteControlController(req.params.sessionId, sessionUserId(req));
-    if (!session) return res.status(404).json({ message: "The support session is no longer active." });
-    res.setHeader("Cache-Control", "no-store");
-    res.json({ session: serializeSession(session) });
-  });
-
-  app.post("/api/screen-feed/control/sessions/:sessionId/mouse-authorization", requireAuth, (req, res) => {
-    if (!requireController(req, res)) return;
-    try {
-      const authorization = authorizeRemoteMouseControl({
-        sessionId: req.params.sessionId,
-        controllerUserId: sessionUserId(req),
-        passwordConfirmedAt: passwordConfirmedAt(req),
-      });
+  app.post(
+    "/api/screen-feed/control/sessions/:sessionId/heartbeat",
+    requireAuth,
+    viewPermission,
+    (req, res) => {
+      if (!requireController(req, res)) return;
+      const session = heartbeatRemoteControlController(req.params.sessionId, sessionUserId(req));
+      if (!session || session.companyId !== getSessionCompanyId(req)) {
+        return res.status(404).json({ message: "The support session is no longer active." });
+      }
       res.setHeader("Cache-Control", "no-store");
-      res.json({ authorization: serializeMouseAuthorization(authorization) });
-    } catch (error) {
-      handleSessionError(error, res);
+      res.json({ session: serializeSession(session) });
     }
-  });
+  );
 
-  app.post("/api/screen-feed/control/sessions/:sessionId/mouse-authorization/revoke", requireAuth, (req, res) => {
-    if (!requireController(req, res)) return;
-    try {
-      revokeRemoteMouseControl({
-        sessionId: req.params.sessionId,
-        controllerUserId: sessionUserId(req),
-      });
-      res.setHeader("Cache-Control", "no-store");
-      res.json({
-        authorization: null,
-        session: serializeSession(getRemoteControlSession(req.params.sessionId)),
-      });
-    } catch (error) {
-      handleSessionError(error, res);
+  app.post(
+    "/api/screen-feed/control/sessions/:sessionId/mouse-authorization",
+    requireAuth,
+    mousePermission,
+    async (req, res) => {
+      if (!requireController(req, res)) return;
+      try {
+        const authorization = authorizeRemoteMouseControl({
+          sessionId: req.params.sessionId,
+          controllerUserId: sessionUserId(req),
+          passwordConfirmedAt: passwordConfirmedAt(req),
+        });
+        const session = getRemoteControlSession(req.params.sessionId);
+        if (!session || session.companyId !== getSessionCompanyId(req)) {
+          revokeRemoteMouseControl({ sessionId: req.params.sessionId, controllerUserId: sessionUserId(req) });
+          return res.status(404).json({ message: "Support session not found." });
+        }
+        const audited = await writeAuditOrUnavailable(
+          {
+            event: "mouse_authorized",
+            session,
+            actorUserId: sessionUserId(req),
+            actorUsername: sessionUsername(req),
+            details: { capability: "mouse", status: "requested", route: session.targetRoute },
+          },
+          res
+        );
+        if (!audited) {
+          revokeRemoteMouseControl({ sessionId: session.id, controllerUserId: sessionUserId(req) });
+          return;
+        }
+        res.setHeader("Cache-Control", "no-store");
+        res.json({ authorization: serializeMouseAuthorization(authorization) });
+      } catch (error) {
+        handleSessionError(error, res);
+      }
     }
-  });
+  );
+
+  app.post(
+    "/api/screen-feed/control/sessions/:sessionId/mouse-authorization/revoke",
+    requireAuth,
+    mousePermission,
+    async (req, res) => {
+      if (!requireController(req, res)) return;
+      try {
+        const session = getRemoteControlSession(req.params.sessionId);
+        if (!session || session.companyId !== getSessionCompanyId(req)) {
+          return res.status(404).json({ message: "Support session not found." });
+        }
+        revokeRemoteMouseControl({ sessionId: session.id, controllerUserId: sessionUserId(req) });
+        await writeRemoteSupportAudit({
+          event: "mouse_revoked",
+          session: getRemoteControlSession(session.id) ?? session,
+          actorUserId: sessionUserId(req),
+          actorUsername: sessionUsername(req),
+          details: { capability: "mouse", status: "requested", route: session.targetRoute },
+        });
+        res.setHeader("Cache-Control", "no-store");
+        res.json({ authorization: null, session: serializeSession(getRemoteControlSession(session.id)) });
+      } catch (error) {
+        handleSessionError(error, res);
+      }
+    }
+  );
 
   app.get("/api/screen-feed/control/commands", requireLogin, (req, res) => {
     const sessionId = typeof req.query.sessionId === "string" ? req.query.sessionId : "";
@@ -274,7 +369,6 @@ export function registerRemoteControlSessionRoutes(app: Express): void {
     if (!sessionId || !tabId) {
       return res.status(400).json({ message: "A support session and browser tab are required." });
     }
-
     let unsubscribe = () => {};
     try {
       unsubscribe = subscribeRemoteMouseCommands({
@@ -286,7 +380,6 @@ export function registerRemoteControlSessionRoutes(app: Express): void {
     } catch (error) {
       return handleSessionError(error, res);
     }
-
     openEventStream(res);
     let closed = false;
     const heartbeatId = setInterval(() => writeHeartbeat(res), COMMAND_HEARTBEAT_MS);
@@ -297,81 +390,147 @@ export function registerRemoteControlSessionRoutes(app: Express): void {
       unsubscribe();
       if (!res.writableEnded) res.end();
     };
-
     req.once("close", cleanup);
     res.once("close", cleanup);
     writeEvent(res, "ready", { sessionId, tabId });
   });
 
-  app.post("/api/screen-feed/control/sessions/:sessionId/commands", requireAuth, (req, res) => {
-    if (!requireController(req, res)) return;
-    try {
-      const command = publishRemoteMouseCommand({
-        sessionId: req.params.sessionId,
-        controllerUserId: sessionUserId(req),
-        type: req.body?.type,
-        x: req.body?.x,
-        y: req.body?.y,
-        deltaX: req.body?.deltaX,
-        deltaY: req.body?.deltaY,
-      });
-      res.status(202).json({ command: serializeMouseCommand(command) });
-    } catch (error) {
-      handleSessionError(error, res);
+  app.post(
+    "/api/screen-feed/control/sessions/:sessionId/commands",
+    requireAuth,
+    mousePermission,
+    async (req, res) => {
+      if (!requireController(req, res)) return;
+      try {
+        const session = getRemoteControlSession(req.params.sessionId);
+        if (!session || session.companyId !== getSessionCompanyId(req)) {
+          return res.status(404).json({ message: "Support session not found." });
+        }
+        const type = req.body?.type;
+        if (
+          (type !== "pointer-move" && type !== "click" && type !== "scroll") ||
+          !isRemoteMouseCommandAllowedOnRoute(session.targetRoute, type)
+        ) {
+          await writeRemoteSupportAudit({
+            event: "command_blocked",
+            session,
+            actorUserId: sessionUserId(req),
+            actorUsername: sessionUsername(req),
+            details: {
+              capability: "mouse",
+              commandType: typeof type === "string" ? type : "invalid",
+              status: "denied",
+              reason: "sensitive-route",
+              route: session.targetRoute,
+            },
+          });
+          return res.status(403).json({
+            code: "SENSITIVE_REMOTE_ACTION_BLOCKED",
+            message: "Mouse clicks are blocked on this sensitive ERP route.",
+          });
+        }
+        const audited = await writeAuditOrUnavailable(
+          {
+            event: "mouse_command",
+            session,
+            actorUserId: sessionUserId(req),
+            actorUsername: sessionUsername(req),
+            details: remoteSupportCommandAuditDetails({
+              capability: "mouse",
+              commandType: type,
+              route: session.targetRoute,
+            }),
+          },
+          res
+        );
+        if (!audited) return;
+        const command = publishRemoteMouseCommand({
+          sessionId: session.id,
+          controllerUserId: sessionUserId(req),
+          type,
+          x: req.body?.x,
+          y: req.body?.y,
+          deltaX: req.body?.deltaX,
+          deltaY: req.body?.deltaY,
+        });
+        res.status(202).json({ command: serializeMouseCommand(command) });
+      } catch (error) {
+        handleSessionError(error, res);
+      }
     }
-  });
+  );
 
-  app.get("/api/screen-feed/control/sessions/:sessionId/results", requireAuth, (req, res) => {
-    if (!requireController(req, res)) return;
-
-    let unsubscribe = () => {};
-    try {
-      unsubscribe = subscribeRemoteMouseResults({
-        sessionId: req.params.sessionId,
-        controllerUserId: sessionUserId(req),
-        listener: (result) => writeEvent(res, "result", serializeMouseCommandResult(result)),
-      });
-    } catch (error) {
-      return handleSessionError(error, res);
+  app.get(
+    "/api/screen-feed/control/sessions/:sessionId/results",
+    requireAuth,
+    mousePermission,
+    (req, res) => {
+      if (!requireController(req, res)) return;
+      let unsubscribe = () => {};
+      try {
+        unsubscribe = subscribeRemoteMouseResults({
+          sessionId: req.params.sessionId,
+          controllerUserId: sessionUserId(req),
+          listener: (result) => writeEvent(res, "result", serializeMouseCommandResult(result)),
+        });
+      } catch (error) {
+        return handleSessionError(error, res);
+      }
+      openEventStream(res);
+      let closed = false;
+      const heartbeatId = setInterval(() => writeHeartbeat(res), COMMAND_HEARTBEAT_MS);
+      const cleanup = () => {
+        if (closed) return;
+        closed = true;
+        clearInterval(heartbeatId);
+        unsubscribe();
+        if (!res.writableEnded) res.end();
+      };
+      req.once("close", cleanup);
+      res.once("close", cleanup);
+      writeEvent(res, "ready", { sessionId: req.params.sessionId });
     }
+  );
 
-    openEventStream(res);
-    let closed = false;
-    const heartbeatId = setInterval(() => writeHeartbeat(res), COMMAND_HEARTBEAT_MS);
-    const cleanup = () => {
-      if (closed) return;
-      closed = true;
-      clearInterval(heartbeatId);
-      unsubscribe();
-      if (!res.writableEnded) res.end();
-    };
-
-    req.once("close", cleanup);
-    res.once("close", cleanup);
-    writeEvent(res, "ready", { sessionId: req.params.sessionId });
-  });
-
-  app.post("/api/screen-feed/control/sessions/:sessionId/commands/:commandId/result", requireLogin, (req, res) => {
-    try {
-      const result = publishRemoteMouseCommandResult({
-        sessionId: req.params.sessionId,
-        commandId: req.params.commandId,
-        targetUserId: sessionUserId(req),
-        targetTabId: req.body?.tabId,
-        status: req.body?.status,
-        reason: req.body?.reason,
-      });
-      res.setHeader("Cache-Control", "no-store");
-      res.json({ result: serializeMouseCommandResult(result) });
-    } catch (error) {
-      handleSessionError(error, res);
+  app.post(
+    "/api/screen-feed/control/sessions/:sessionId/commands/:commandId/result",
+    requireLogin,
+    async (req, res) => {
+      try {
+        const result = publishRemoteMouseCommandResult({
+          sessionId: req.params.sessionId,
+          commandId: req.params.commandId,
+          targetUserId: sessionUserId(req),
+          targetTabId: req.body?.tabId,
+          status: req.body?.status,
+          reason: req.body?.reason,
+        });
+        const session = getRemoteControlSession(req.params.sessionId);
+        if (session) {
+          await writeRemoteSupportAudit({
+            event: result.status === "blocked" ? "command_blocked" : "mouse_result",
+            session,
+            actorUserId: sessionUserId(req),
+            actorUsername: sessionUsername(req),
+            details: {
+              capability: "mouse",
+              status: result.status,
+              reason: result.reason,
+              route: session.targetRoute,
+            },
+          });
+        }
+        res.setHeader("Cache-Control", "no-store");
+        res.json({ result: serializeMouseCommandResult(result) });
+      } catch (error) {
+        handleSessionError(error, res);
+      }
     }
-  });
+  );
 
-  app.post("/api/screen-feed/control/sessions/:sessionId/stop", requireLogin, (req, res) => {
+  app.post("/api/screen-feed/control/sessions/:sessionId/stop", requireLogin, async (req, res) => {
     const session = getRemoteControlSession(req.params.sessionId);
     if (!session) return res.status(404).json({ message: "Support session not found." });
-
     const actorUserId = sessionUserId(req);
     const actorIsTarget = session.targetUserId === actorUserId;
     const actorIsController = session.controllerUserId === actorUserId;
@@ -379,7 +538,6 @@ export function registerRemoteControlSessionRoutes(app: Express): void {
     if (!actorIsTarget && !actorIsController && !actorIsAuthorizedController) {
       return res.status(403).json({ message: "Access denied." });
     }
-
     const reason =
       typeof req.body?.reason === "string" && req.body.reason.trim()
         ? req.body.reason.trim().slice(0, 160)
@@ -387,6 +545,19 @@ export function registerRemoteControlSessionRoutes(app: Express): void {
           ? "target-emergency-stop"
           : "controller-stopped";
     const stopped = stopRemoteControlSession(session.id, reason);
+    if (stopped) {
+      try {
+        await writeRemoteSupportAudit({
+          event: "session_stopped",
+          session: stopped,
+          actorUserId,
+          actorUsername: sessionUsername(req),
+          details: { capability: "view", stopReason: reason, route: stopped.targetRoute },
+        });
+      } catch {
+        // Stopping remains fail-safe even when the audit database is unavailable.
+      }
+    }
     res.setHeader("Cache-Control", "no-store");
     res.json({ session: serializeSession(stopped) });
   });

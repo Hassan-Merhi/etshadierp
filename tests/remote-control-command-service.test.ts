@@ -24,6 +24,7 @@ function buildSession() {
     userId: "22",
     username: "employee",
     tabId: "erp-tab-1",
+    companyId: 7,
     route: "/dashboard",
     now,
   });
@@ -33,6 +34,7 @@ function buildSession() {
     controllerUserId: "1",
     controllerUsername: "developer",
     controllerRole: "Developer",
+    controllerCompanyId: 7,
     durationMs: 10 * 60 * 1000,
   });
 }

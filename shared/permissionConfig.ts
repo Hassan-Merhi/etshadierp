@@ -183,6 +183,34 @@ const ACTION_PERMISSIONS: PermissionEntry[] = [
     description: "Add, edit, or remove users and their role assignments",
   },
   { key: "act_manage_companies", label: "Manage Companies", group: "Admin Actions", type: "action" },
+  {
+    key: "remote_support_view",
+    label: "View Remote Support Screens",
+    group: "Remote Support",
+    type: "action",
+    description: "Open live screen viewing and create a bounded support session for users in the active company",
+  },
+  {
+    key: "remote_support_mouse",
+    label: "Use Remote Support Mouse",
+    group: "Remote Support",
+    type: "action",
+    description: "Enable guarded pointer, safe click, and scrolling commands in the exact ERP browser tab",
+  },
+  {
+    key: "remote_support_keyboard",
+    label: "Use Remote Support Keyboard",
+    group: "Remote Support",
+    type: "action",
+    description: "Enable guarded keyboard input only for safe or explicitly approved ERP fields",
+  },
+  {
+    key: "remote_support_audit",
+    label: "View Remote Support Audit",
+    group: "Remote Support",
+    type: "action",
+    description: "View permanent company-scoped remote support session and command metadata",
+  },
 ];
 
 // ─── Sensitive Field Restrictions ─────────────────────────────────────────────
