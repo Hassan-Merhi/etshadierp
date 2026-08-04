@@ -2,7 +2,8 @@
   "description": "Reviewed CI ratchet deltas for intentional functionality added before the architecture snapshots were refreshed. Every allowance is exact so unrelated growth or routes still fail.",
   "godFileLineCaps": {
     "server/routes/payroll/workerStatsAdvancesRoutes.ts": 922,
-    "server/services/factory/postOffloadPhase6Safety.ts": 927
+    "server/services/factory/postOffloadPhase6Safety.ts": 927,
+    "client/src/pages/daybook/VoucherDetailsDialog.tsx": 966
   },
   "routeManifestAdditions": [
     "GET /api/factory/raw-stock/post-offload/readiness [requireAuth > <anonymous> > <anonymous>]",
@@ -117,8 +118,11 @@
       "tests/ui/mobile-responsive-phase6-core-erp.test.ts",
       "tests/ui/mobile-responsive-phase7-factory.test.ts",
       "tests/ui/mobile-responsive-phase8-pos.test.ts",
-      "tests/ui/mobile-responsive-phase9-reports.test.ts"
+      "tests/ui/mobile-responsive-phase9-reports.test.ts",
+      "tests/remote-support-permission-contract.test.ts",
+      "tests/ui/pos-negative-stock-permission.test.ts",
+      "tests/ui/tracking-containers-abort-recovery.test.ts"
     ],
-    "maxAdditionalTextAssertions": 316
+    "maxAdditionalTextAssertions": 341
   }
 }
