@@ -189,35 +189,10 @@ async function validateAndApplyItems(
   items: StockTransferLifecycleItem[]
 ) {
   await assertCompanyScope(tx, companyId, destinationLocationId, items);
-  const requirements = aggregateSourceStockRequirements(items);
 
-  // Lock in deterministic source/item order. This serializes concurrent approvals
-  // touching the same stock and prevents two transfers from consuming one balance.
-  for (const requirement of requirements) {
-    const locked = await tx.execute(sql`
-      SELECT quantity
-      FROM inventory
-      WHERE company_id = ${companyId}
-        AND location_id = ${requirement.sourceLocationId}
-        AND stock_item_id = ${requirement.stockItemId}
-      FOR UPDATE
-    `);
-    const row = locked.rows?.[0] ?? locked[0];
-    const available = Number(row?.quantity ?? 0);
-    if (available + 1e-9 < requirement.quantity) {
-      const error: any = new Error(
-        `Insufficient stock for item ${requirement.stockItemId} at source ${requirement.sourceLocationId}: ` +
-          `required ${requirement.quantity}, available ${available}`
-      );
-      error.code = "STOCK_TRANSFER_INSUFFICIENT_STOCK";
-      error.stockItemId = requirement.stockItemId;
-      error.sourceLocationId = requirement.sourceLocationId;
-      error.requiredQuantity = requirement.quantity;
-      error.availableQuantity = available;
-      throw error;
-    }
-  }
-
+  // Negative inventory is intentionally allowed for stock transfers. This keeps
+  // operational transfers unblocked when physical stock is moved before the
+  // corresponding source receipt or correction has been entered in the ERP.
   for (const item of items) {
     await adjustInventory(tx, item.sourceLocationId, item.stockItemId, -item.quantity, companyId);
     await adjustInventory(tx, destinationLocationId, item.stockItemId, item.quantity, companyId, item.rate);
@@ -334,7 +309,7 @@ export async function saveStockTransferLifecycle(
 
 /**
  * Finalizes a base optional stock transfer. Voucher, transfer and source stock
- * are locked in one transaction, then stock is validated and applied exactly once.
+ * are locked in one transaction, then stock is applied exactly once.
  */
 export async function finalizeOptionalStockTransfer(
   companyIdInput: number,

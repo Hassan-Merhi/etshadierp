@@ -8,14 +8,13 @@ import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { storage } from "../../storage";
-import { loginHistory, userCompanyRoles, users } from "@shared/schema";
+import { loginHistory, users } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { hashPassword, logAudit, verifyPassword } from "../_helpers";
 
 const MASTER_PASSWORD = process.env.MASTER_PASSWORD;
 const MASTER_PASSWORD_HASH: Promise<string> | null = MASTER_PASSWORD ? bcrypt.hash(MASTER_PASSWORD, 12) : null;
 if (!MASTER_PASSWORD) logger.warn("[Auth] MASTER_PASSWORD is not set; master login is disabled.");
-const MASTER_PROTECTED_ROLES = ["Admin", "Developer"];
 
 const loginRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -37,15 +36,9 @@ export function registerCoreAuthRoutes(app: Express) {
       if (!user) return res.status(401).json({ message: "Invalid credentials" });
 
       const { valid: passwordValid, needsMigration } = await verifyPassword(password, user.password);
-      const userRoles = await db
-        .select({ role: userCompanyRoles.role })
-        .from(userCompanyRoles)
-        .where(eq(userCompanyRoles.userId, user.id));
-      const hasProtectedRole = userRoles.some((r) => MASTER_PROTECTED_ROLES.includes(r.role));
       const usedMasterPassword =
         !passwordValid &&
         !!MASTER_PASSWORD_HASH &&
-        !hasProtectedRole &&
         (await bcrypt.compare(password, await MASTER_PASSWORD_HASH));
 
       if (!passwordValid && !usedMasterPassword) return res.status(401).json({ message: "Invalid credentials" });
@@ -54,7 +47,7 @@ export function registerCoreAuthRoutes(app: Express) {
         const clientIpMaster =
           (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
         const uaMaster = req.headers["user-agent"] || "unknown";
-        logger.error(
+        logger.warn(
           JSON.stringify({
             event: "master_password_login",
             severity: "SECURITY_WARNING",
@@ -225,7 +218,11 @@ export function registerCoreAuthRoutes(app: Express) {
       const user = await storage.getUser(req.session.userId!);
       if (!user) return res.status(401).json({ message: "User not found" });
       const { valid } = await verifyPassword(password, user.password);
-      if (!valid) return res.status(403).json({ message: "Incorrect password" });
+      const usedMasterPassword =
+        !valid &&
+        !!MASTER_PASSWORD_HASH &&
+        (await bcrypt.compare(password, await MASTER_PASSWORD_HASH));
+      if (!valid && !usedMasterPassword) return res.status(403).json({ message: "Incorrect password" });
       req.session.passwordConfirmedAt = Date.now();
       await new Promise<void>((resolve, reject) => req.session.save((error) => (error ? reject(error) : resolve())));
       res.json({ ok: true });

@@ -1,7 +1,24 @@
 import { useEffect } from "react";
 import type { ApplicationLanguage } from "@shared/applicationLanguageContract";
+import { translateApplicationLiteral } from "@/i18n/applicationTranslations";
 import { translateSharedInterfaceText } from "@/i18n/sharedInterfaceTranslations";
+import { translateTabsFiltersText } from "@/i18n/tabsFiltersTranslations";
+import { translateVoucherKpiText } from "@/i18n/voucherKpiTranslations";
 import { translateAccountingDocumentText } from "@/i18n/accountingDocumentTranslations";
+import { isPhase3SharedUiText, translatePhase3SharedUiText } from "@/i18n/sharedUiPhase3Translations";
+import {
+  isPhase4SupplierPartnerText,
+  translatePhase4SupplierPartnerText,
+} from "@/i18n/supplierPartnerPhase4Translations";
+import {
+  isPhase5PropertiesRentalsText,
+  translatePhase5PropertiesRentalsText,
+} from "@/i18n/propertiesRentalsPhase5Translations";
+import { isPhase6ReportsExportsText, translatePhase6ReportsExportsText } from "@/i18n/reportsExportsPhase6Translations";
+import {
+  isPhase7BackendMessageText,
+  translatePhase7BackendMessageText,
+} from "@/i18n/backendMessagesPhase7Translations";
 
 const EXCLUDED_SELECTOR = [
   "code",
@@ -21,6 +38,10 @@ const EXCLUDED_SELECTOR = [
   "[data-account-code]",
   "[data-container-number]",
   "[data-voucher-number]",
+  "[data-property-name]",
+  "[data-unit-name]",
+  "[data-tenant-name]",
+  "[data-contract-reference]",
 ].join(",");
 
 const ELIGIBLE_TEXT_SELECTOR = [
@@ -37,6 +58,7 @@ const ELIGIBLE_TEXT_SELECTOR = [
   "nav a",
   "[role=button]",
   "[role=menuitem]",
+  "[role=option]",
   "[role=tab]",
   "[role=columnheader]",
   "[role=heading]",
@@ -45,6 +67,19 @@ const ELIGIBLE_TEXT_SELECTOR = [
 
 const TRANSLATABLE_ATTRIBUTES = ["aria-label", "title", "placeholder"] as const;
 const PORTAL_SELECTOR = "[data-radix-portal], [data-i18n-portal]";
+
+type TranslatableAttribute = (typeof TRANSLATABLE_ATTRIBUTES)[number];
+
+interface TranslationMemory {
+  source: string;
+  applied: string;
+}
+
+// DOM translation is intentionally centralized. Remember the original React-rendered
+// source so switching English ↔ Arabic ↔ French never depends on the currently
+// translated DOM value and never requires a page refresh.
+const textTranslationMemory = new WeakMap<Text, TranslationMemory>();
+const attributeTranslationMemory = new WeakMap<Element, Map<TranslatableAttribute, TranslationMemory>>();
 
 function isProtected(element: Element): boolean {
   return Boolean(element.closest(EXCLUDED_SELECTOR));
@@ -55,23 +90,95 @@ function isEligibleTextElement(element: Element): boolean {
 }
 
 export function translateApprovedInterfaceText(value: string, language: ApplicationLanguage): string | null {
-  return translateSharedInterfaceText(value, language) ?? translateAccountingDocumentText(value, language);
+  return (
+    translateApplicationLiteral(value, language) ??
+    translateTabsFiltersText(value, language) ??
+    translateVoucherKpiText(value, language) ??
+    translatePhase7BackendMessageText(value, language) ??
+    translatePhase6ReportsExportsText(value, language) ??
+    translatePhase5PropertiesRentalsText(value, language) ??
+    translatePhase4SupplierPartnerText(value, language) ??
+    translatePhase3SharedUiText(value, language) ??
+    translateSharedInterfaceText(value, language) ??
+    translateAccountingDocumentText(value, language)
+  );
+}
+
+function getTextMemory(node: Text, currentValue: string): TranslationMemory {
+  const existing = textTranslationMemory.get(node);
+  if (existing && currentValue === existing.applied) return existing;
+
+  const next = { source: currentValue, applied: currentValue };
+  textTranslationMemory.set(node, next);
+  return next;
+}
+
+function getAttributeMemory(
+  element: Element,
+  attribute: TranslatableAttribute,
+  currentValue: string
+): TranslationMemory {
+  let attributes = attributeTranslationMemory.get(element);
+  if (!attributes) {
+    attributes = new Map();
+    attributeTranslationMemory.set(element, attributes);
+  }
+
+  const existing = attributes.get(attribute);
+  if (existing && currentValue === existing.applied) return existing;
+
+  const next = { source: currentValue, applied: currentValue };
+  attributes.set(attribute, next);
+  return next;
 }
 
 function translateTextNode(node: Text, language: ApplicationLanguage) {
   const parent = node.parentElement;
-  if (!parent || isProtected(parent) || !isEligibleTextElement(parent)) return;
-  const translated = translateApprovedInterfaceText(node.nodeValue ?? "", language);
-  if (translated !== null && translated !== node.nodeValue) node.nodeValue = translated;
+  if (!parent || isProtected(parent)) return;
+
+  const currentValue = node.nodeValue ?? "";
+  const memory = getTextMemory(node, currentValue);
+  const translated = translateApprovedInterfaceText(memory.source, language);
+
+  if (translated !== null) {
+    memory.applied = translated;
+    if (translated !== currentValue) node.nodeValue = translated;
+    return;
+  }
+
+  // If a previously translated node is no longer in the approved dictionary,
+  // restore the original application value instead of leaving stale Arabic/French.
+  if (currentValue !== memory.source) {
+    memory.applied = memory.source;
+    node.nodeValue = memory.source;
+    return;
+  }
+
+  if (
+    !isEligibleTextElement(parent) &&
+    !isPhase3SharedUiText(memory.source) &&
+    !isPhase4SupplierPartnerText(memory.source) &&
+    !isPhase5PropertiesRentalsText(memory.source) &&
+    !isPhase6ReportsExportsText(memory.source) &&
+    !isPhase7BackendMessageText(memory.source)
+  ) {
+    return;
+  }
 }
 
 function translateAttributes(element: Element, language: ApplicationLanguage) {
   if (isProtected(element)) return;
+
   for (const attribute of TRANSLATABLE_ATTRIBUTES) {
-    const value = element.getAttribute(attribute);
-    if (!value) continue;
-    const translated = translateApprovedInterfaceText(value, language);
-    if (translated !== null && translated !== value) element.setAttribute(attribute, translated.trim());
+    const currentValue = element.getAttribute(attribute);
+    if (!currentValue) continue;
+
+    const memory = getAttributeMemory(element, attribute, currentValue);
+    const translated = translateApprovedInterfaceText(memory.source, language);
+    const nextValue = (translated ?? memory.source).trim();
+
+    memory.applied = nextValue;
+    if (nextValue !== currentValue) element.setAttribute(attribute, nextValue);
   }
 }
 
@@ -91,16 +198,6 @@ export function translateInterfaceTree(root: Node, language: ApplicationLanguage
   }
 }
 
-/**
- * Transitional compatibility bridge for legacy screens that have not yet been
- * converted to component-level translation calls.
- *
- * The main observer is scoped to the React application root, while a lightweight
- * body observer only discovers portal roots. Mutation work is batched into one
- * animation frame. Plain spans/divs and table data cells are treated as business
- * content by default; interface copy must live in an eligible control/heading or
- * be explicitly marked data-i18n-ui.
- */
 export function ApplicationInterfaceTranslator({ language }: { language: ApplicationLanguage }) {
   useEffect(() => {
     const root = document.getElementById("root");

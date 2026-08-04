@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useMainContentFocus } from "@/hooks/use-main-content-focus";
 import { useWorkspaceWheelScroll } from "@/hooks/use-workspace-wheel-scroll";
+import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import { AppModeProvider } from "@/contexts/AppModeContext";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { PropertiesSidebar } from "@/components/PropertiesSidebar";
@@ -21,6 +22,7 @@ interface PropertiesShellProps {
 
 export function PropertiesShell({ user, currentLocation, handleLogout, leaveConfirmDialog }: PropertiesShellProps) {
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const { t } = useApplicationLanguage();
   const style = { "--sidebar-width": "16rem", "--sidebar-width-icon": "3rem" };
   const propertiesContainerRef = useRef<HTMLDivElement>(null);
   useMainContentFocus(currentLocation);
@@ -29,7 +31,7 @@ export function PropertiesShell({ user, currentLocation, handleLogout, leaveConf
 
   return (
     <AppModeProvider mode="properties">
-      <SkipLink />
+      <SkipLink>{t("accessibility.skipToMainContent")}</SkipLink>
       <SidebarProvider style={style as React.CSSProperties}>
         <div ref={propertiesContainerRef} className="flex h-full w-full min-w-0 overflow-hidden">
           <PropertiesSidebar user={user} />

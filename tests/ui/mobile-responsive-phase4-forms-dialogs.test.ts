@@ -30,9 +30,10 @@ describe("Mobile responsiveness Phase 4 forms and dialogs", () => {
 
     expect(sheet).toContain("h-[var(--app-viewport-height)]");
     expect(sheet).toContain("w-[calc(100vw-0.75rem)]");
-    expect(sheet).toContain('aria-label="Close sheet"');
+    expect(sheet).toContain('aria-label="Close panel"');
     expect(sheet).toContain("min-h-11 min-w-11");
     expect(sheet).toContain("[&>*]:min-h-11");
+    expect(sheet).toContain('data-slot="sheet-content"');
   });
 
   it("provides responsive form layouts and touch-sized select controls", () => {

@@ -1,12 +1,14 @@
-import type { ScreenFrame } from "../screenFeedStore";
+import type { ScreenFeedCursor, ScreenFrame } from "../screenFeedStore";
 
 type StatusListener = () => void;
 type FrameListener = (frame: ScreenFrame) => void;
+type CursorListener = (cursor: ScreenFeedCursor) => void;
 type DisconnectListener = () => void;
 
 export class ScreenFeedLiveHub {
   private readonly statusListeners = new Map<string, Set<StatusListener>>();
   private readonly frameListeners = new Map<string, Set<FrameListener>>();
+  private readonly cursorListeners = new Map<string, Set<CursorListener>>();
   private readonly disconnectListeners = new Set<DisconnectListener>();
 
   subscribeStatus(userId: string, listener: StatusListener): () => void {
@@ -33,6 +35,17 @@ export class ScreenFeedLiveHub {
     };
   }
 
+  subscribeCursors(userId: string, listener: CursorListener): () => void {
+    const listeners = this.cursorListeners.get(userId) ?? new Set<CursorListener>();
+    listeners.add(listener);
+    this.cursorListeners.set(userId, listeners);
+
+    return () => {
+      listeners.delete(listener);
+      if (listeners.size === 0) this.cursorListeners.delete(userId);
+    };
+  }
+
   subscribeDisconnect(listener: DisconnectListener): () => void {
     this.disconnectListeners.add(listener);
     return () => this.disconnectListeners.delete(listener);
@@ -50,6 +63,22 @@ export class ScreenFeedLiveHub {
     for (const listener of listeners) {
       try {
         listener(frame);
+        delivered += 1;
+      } catch {
+        // A broken stream is cleaned up by its request close handler.
+      }
+    }
+    return delivered;
+  }
+
+  publishCursor(userId: string, cursor: ScreenFeedCursor): number {
+    const listeners = this.cursorListeners.get(userId);
+    if (!listeners?.size) return 0;
+
+    let delivered = 0;
+    for (const listener of listeners) {
+      try {
+        listener(cursor);
         delivered += 1;
       } catch {
         // A broken stream is cleaned up by its request close handler.
@@ -84,6 +113,7 @@ export class ScreenFeedLiveHub {
   clear(): void {
     this.disconnectAll();
     this.frameListeners.clear();
+    this.cursorListeners.clear();
     this.statusListeners.clear();
     this.disconnectListeners.clear();
   }

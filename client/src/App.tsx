@@ -1,4 +1,5 @@
 import "@/styles/rtl-hardening.css";
+import "@/styles/pos-revision-history.css";
 import { useEffect, useRef } from "react";
 import { Redirect, Switch, Route } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -14,7 +15,6 @@ import { DateFormatProvider } from "@/contexts/DateFormatContext";
 import { CurrencyProvider } from "@/contexts/CurrencyContext";
 import { CursorNavProvider } from "@/contexts/CursorNavContext";
 import { ApplicationLanguageProvider } from "@/contexts/ApplicationLanguageContext";
-import { GlobalLanguageSwitch } from "@/components/GlobalLanguageSwitch";
 import { DateJumpDialog } from "@/components/DateJumpDialog";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { UserNotesPanel } from "@/components/UserNotesPanel";
@@ -128,7 +128,6 @@ function AuthenticatedRoot() {
             <CurrencyProvider>
               <CursorNavProvider>
                 <ServerRestartWatcher />
-                <GlobalLanguageSwitch />
                 <AuthenticatedApp user={user} handleLogout={handleLogout} />
                 <AuthenticatedChatWidget />
                 <DateJumpDialog />

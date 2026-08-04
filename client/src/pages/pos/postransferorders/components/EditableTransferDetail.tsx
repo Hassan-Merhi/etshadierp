@@ -233,9 +233,6 @@ function EditableTransferDetail({
         </Button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold font-mono text-sm" data-testid="text-voucher-number">
-              {detail.voucherNumber}
-            </span>
             <span className="text-xs text-muted-foreground">{formatDate(detail.voucherDate)}</span>
             {detail.inventoryApplied && (
               <Badge

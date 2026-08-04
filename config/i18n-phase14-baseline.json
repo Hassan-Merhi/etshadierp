@@ -1,4 +1,61 @@
 {
-  "description": "One-way ceiling for candidate untranslated UI literals. This equals the measured PR #377 count from the I18n Audit workflow and may only be lowered as literals are migrated.",
-  "maxFindings": 9110
+  "schemaVersion": 2,
+  "detectorVersion": 9,
+  "policyDigest": "c26178dd9bc7d71d34976e5bb87aa946cc5d59e6db54b7415f9e363514809f8f",
+  "reviewedAt": "2026-08-03",
+  "reviewedHead": "0165e11ef7c738abc12eaadd5cea674dbe157ca7",
+  "description": "Reviewed untranslated-text ratchet after Phase 8 RTL, responsive-layout and accessibility hardening. Actionable counts may only decrease unless the detector or policy is explicitly re-reviewed. Application-level accessibility labels are included as reviewed compatibility coverage, while protected business values remain untranslated.",
+  "reviewedTotals": {
+    "candidates": 22430,
+    "actionable": 12545,
+    "excluded": 9885,
+    "compatibilityCovered": 8825,
+    "unclassified": 0
+  },
+  "maxActionable": 12545,
+  "modules": {
+    "accounting": {
+      "maxActionable": 1441
+    },
+    "administration": {
+      "maxActionable": 1165
+    },
+    "backend-messages": {
+      "maxActionable": 0
+    },
+    "container-purchasing": {
+      "maxActionable": 870
+    },
+    "factory": {
+      "maxActionable": 5497
+    },
+    "inventory-logistics": {
+      "maxActionable": 1381
+    },
+    "other-client": {
+      "maxActionable": 856
+    },
+    "payroll": {
+      "maxActionable": 555
+    },
+    "properties-rentals": {
+      "maxActionable": 0
+    },
+    "reports-exports": {
+      "maxActionable": 0
+    },
+    "sales-pos": {
+      "maxActionable": 776
+    },
+    "shared-contracts": {
+      "maxActionable": 4
+    },
+    "shared-ui": {
+      "maxActionable": 0
+    },
+    "supplier-partner": {
+      "maxActionable": 0
+    }
+  },
+  "maxUnclassified": 0
 }

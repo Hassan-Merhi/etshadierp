@@ -4,6 +4,7 @@ import { useMainContentFocus } from "@/hooks/use-main-content-focus";
 import { useWorkspaceWheelScroll } from "@/hooks/use-workspace-wheel-scroll";
 import { useButtonClickFeedback } from "@/hooks/use-button-click-feedback";
 import { useCompany } from "@/contexts/CompanyContext";
+import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import { AppModeProvider } from "@/contexts/AppModeContext";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { DailyRateModal } from "@/components/DailyRateModal";
@@ -20,6 +21,7 @@ import { MODULE_ACCENT } from "@/components/sidebar/sidebarPrimitives";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { CommandPalette } from "@/components/CommandPalette";
 import { LoadingState } from "@/components/ui/page-state";
+import { SkipLink } from "@/components/ui/responsive-accessibility";
 import type { MyAccess } from "./factoryAccessGuard";
 import { canUseAdminSearch, type ShellUser } from "./shellUser";
 
@@ -67,6 +69,7 @@ export function FactoryShell({
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [currentLocation] = useLocation();
   const { selectedCompany } = useCompany();
+  const { t } = useApplicationLanguage();
   const factoryContainerRef = useRef<HTMLDivElement>(null);
   useButtonClickFeedback(factoryContainerRef);
 
@@ -81,6 +84,7 @@ export function FactoryShell({
 
   return (
     <AppModeProvider mode="factory">
+      <SkipLink>{t("accessibility.skipToMainContent")}</SkipLink>
       <SidebarProvider style={style as React.CSSProperties}>
         <div ref={factoryContainerRef} className="flex h-full w-full min-w-0 overflow-hidden">
           {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}

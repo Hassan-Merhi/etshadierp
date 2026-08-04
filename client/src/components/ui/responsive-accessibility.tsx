@@ -12,6 +12,7 @@ export function SkipLink({
   return (
     <a
       href={href}
+      data-slot="skip-link"
       className={cn(
         "sr-only z-50 rounded-md bg-background px-4 py-2 text-sm font-medium text-foreground shadow-lg transition focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 motion-reduce:transition-none",
         className
@@ -26,7 +27,7 @@ export function SkipLink({
 type VisuallyHiddenProps = React.HTMLAttributes<HTMLSpanElement>;
 
 export function VisuallyHidden({ className, ...props }: VisuallyHiddenProps) {
-  return <span className={cn("sr-only", className)} {...props} />;
+  return <span data-slot="visually-hidden" className={cn("sr-only", className)} {...props} />;
 }
 
 type LiveRegionProps = React.HTMLAttributes<HTMLDivElement> & {
@@ -37,6 +38,7 @@ type LiveRegionProps = React.HTMLAttributes<HTMLDivElement> & {
 export function LiveRegion({ className, politeness = "polite", atomic = true, ...props }: LiveRegionProps) {
   return (
     <div
+      data-slot="live-region"
       role={politeness === "assertive" ? "alert" : "status"}
       aria-live={politeness}
       aria-atomic={atomic}
@@ -53,6 +55,7 @@ type ResponsiveActionsProps = React.HTMLAttributes<HTMLDivElement> & {
 export function ResponsiveActions({ className, label = "Page actions", ...props }: ResponsiveActionsProps) {
   return (
     <div
+      data-slot="responsive-actions"
       role="group"
       aria-label={label}
       className={cn(
@@ -71,6 +74,7 @@ type ResponsiveToolbarProps = React.HTMLAttributes<HTMLDivElement> & {
 export function ResponsiveToolbar({ className, label = "Page filters and tools", ...props }: ResponsiveToolbarProps) {
   return (
     <div
+      data-slot="responsive-toolbar"
       role="search"
       aria-label={label}
       className={cn(
@@ -89,6 +93,7 @@ type ResponsiveGridProps = React.HTMLAttributes<HTMLDivElement> & {
 export function ResponsiveGrid({ className, minColumnWidth = "16rem", style, ...props }: ResponsiveGridProps) {
   return (
     <div
+      data-slot="responsive-grid"
       className={cn("grid min-w-0 gap-4", className)}
       style={{ gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${minColumnWidth}), 1fr))`, ...style }}
       {...props}
@@ -102,7 +107,7 @@ type AccessibleRegionProps = React.HTMLAttributes<HTMLElement> & {
 };
 
 export function AccessibleRegion({ label, as: Comp = "section", className, ...props }: AccessibleRegionProps) {
-  return <Comp aria-label={label} className={className} {...props} />;
+  return <Comp data-slot="accessible-region" aria-label={label} className={className} {...props} />;
 }
 
 type HorizontalScrollRegionProps = React.HTMLAttributes<HTMLDivElement> & {
@@ -122,6 +127,8 @@ export function HorizontalScrollRegion({
 
   return (
     <div
+      data-slot="horizontal-scroll-region"
+      data-horizontal-scroll-region="true"
       role="region"
       aria-label={label}
       aria-describedby={descriptionId}

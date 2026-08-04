@@ -22,6 +22,12 @@ function pathnameOf(req) {
   catch { return req.url || "/"; }
 }
 
+function isExpectedLongLivedRequest(req, path) {
+  if (path === "/api/screen-feed/live/status") return true;
+  const accept = String(req.headers?.accept || "").toLowerCase();
+  return accept.includes("text/event-stream");
+}
+
 function snapshot() {
   const memory = process.memoryUsage();
   return {
@@ -67,6 +73,7 @@ Server.prototype.emit = function observableEmit(event, ...args) {
   }
 
   const started = Date.now();
+  const expectedLongLived = isExpectedLongLivedRequest(req, path);
   metrics.totalRequests += 1;
   metrics.activeRequests += 1;
   metrics.maxActiveRequests = Math.max(metrics.maxActiveRequests, metrics.activeRequests);
@@ -81,7 +88,7 @@ Server.prototype.emit = function observableEmit(event, ...args) {
       metrics.total5xx += 1;
       metrics.last5xxAt = new Date().toISOString();
       log("ERROR", "http-5xx", { method: req.method, path, statusCode: res.statusCode, durationMs });
-    } else if (durationMs >= slowRequestMs) {
+    } else if (!expectedLongLived && durationMs >= slowRequestMs) {
       metrics.slowRequests += 1;
       log("WARN", "slow-request", { method: req.method, path, statusCode: res.statusCode, durationMs });
     }

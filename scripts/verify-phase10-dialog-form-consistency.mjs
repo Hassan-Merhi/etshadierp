@@ -81,7 +81,7 @@ for (const token of [
 for (const token of [
   "h-[var(--app-viewport-height)]",
   "w-[calc(100vw-0.75rem)]",
-  'aria-label="Close sheet"',
+  'aria-label="Close panel"',
   "min-h-11 min-w-11",
   "[&>*]:min-h-11",
   "motion-reduce:animate-none",

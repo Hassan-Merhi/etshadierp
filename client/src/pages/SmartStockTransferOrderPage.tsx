@@ -102,11 +102,13 @@ export default function SmartStockTransferOrderPage() {
         <>
           <Button
             type="button"
-            className="fixed bottom-6 right-6 z-40 h-12 rounded-full px-5 shadow-lg"
+            variant="outline"
+            size="sm"
+            className="fixed bottom-5 right-5 z-40 h-9 rounded-lg border-border/70 bg-background/90 px-3 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur transition-colors hover:bg-accent hover:text-foreground"
             onClick={() => setGeneratorOpen(true)}
             data-testid="button-open-smart-transfer-generator"
           >
-            <Sparkles className="mr-2 h-4 w-4" />
+            <Sparkles className="mr-1.5 h-3.5 w-3.5" />
             Smart Generate
           </Button>
           <SmartTransferGeneratorDialog

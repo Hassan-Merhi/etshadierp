@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "detectorVersion": 9,
+  "approvedAt": "2026-08-03",
+  "description": "Exact approved untranslated-text release baseline after Phases 1 through 8. Phase 9 requires these counts to remain exact, requires zero unclassified findings and forbids release-time baseline drift.",
+  "totals": {
+    "candidates": 22430,
+    "actionable": 12545,
+    "excluded": 9885,
+    "unclassified": 0
+  },
+  "modules": {
+    "accounting": 1441,
+    "administration": 1165,
+    "backend-messages": 0,
+    "container-purchasing": 870,
+    "factory": 5497,
+    "inventory-logistics": 1381,
+    "other-client": 856,
+    "payroll": 555,
+    "properties-rentals": 0,
+    "reports-exports": 0,
+    "sales-pos": 776,
+    "shared-contracts": 4,
+    "shared-ui": 0,
+    "supplier-partner": 0
+  }
+}

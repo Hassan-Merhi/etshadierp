@@ -1,11 +1,23 @@
-import { ReactNode, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { LogOut, MoreHorizontal, Search, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CurrencyToggle } from "@/components/CurrencyToggle";
 import { NotificationsCenter } from "@/components/NotificationsCenter";
 import { PendingSyncIndicator } from "@/components/PendingSyncIndicator";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { UserMenu } from "@/components/UserMenu";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  useApplicationDirection,
+  useApplicationLanguage,
+} from "@/contexts/ApplicationLanguageContext";
 
 interface WorkspaceUser {
   username: string;
@@ -41,27 +53,9 @@ export function WorkspaceHeaderControls({ accentColor, user, onLogout }: Workspa
 
       <div className="mx-1 hidden h-5 w-px bg-border/60 sm:block" />
 
-      <div className="hidden shrink-0 items-center gap-2 rounded-full border border-border/40 bg-muted/30 px-2.5 py-1 md:flex">
-        <span
-          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white"
-          style={{ backgroundColor: accentColor }}
-        >
-          {getInitials(user.username)}
-        </span>
-        <span className="text-sm font-medium leading-none">{user.username}</span>
-        <span className="border-l border-border/50 pl-1.5 text-xs leading-none text-muted-foreground">{user.role}</span>
+      <div className="hidden sm:block">
+        <UserMenu accentColor={accentColor} user={user} onLogout={onLogout} />
       </div>
-
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={onLogout}
-        data-testid="button-logout"
-        aria-label="Log out"
-        className="hidden sm:inline-flex"
-      >
-        <LogOut className="h-4 w-4" />
-      </Button>
 
       <div className="mx-1 hidden h-5 w-px bg-border/60 sm:block" />
 
@@ -81,6 +75,8 @@ export default function MobileWorkspaceControls({
   extraActions,
 }: MobileWorkspaceControlsProps) {
   const [open, setOpen] = useState(false);
+  const direction = useApplicationDirection();
+  const { t } = useApplicationLanguage();
 
   const openSearch = () => {
     setOpen(false);
@@ -98,17 +94,20 @@ export default function MobileWorkspaceControls({
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Open account and display controls"
+          aria-label={t("accessibility.openWorkspaceControls")}
           data-testid="button-mobile-controls"
           className="h-10 w-10 shrink-0 sm:hidden"
         >
-          <MoreHorizontal className="h-5 w-5" />
+          <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="flex w-[calc(100vw_-_0.5rem)] max-w-sm flex-col gap-0 p-0">
-        <SheetHeader className="border-b px-4 pb-3 pt-[max(1rem,var(--safe-area-top))] text-left">
-          <SheetTitle>Workspace controls</SheetTitle>
-          <SheetDescription>Account, display, synchronization, and search controls.</SheetDescription>
+      <SheetContent
+        side={direction === "rtl" ? "left" : "right"}
+        className="flex w-[calc(100vw_-_0.5rem)] max-w-sm flex-col gap-0 p-0"
+      >
+        <SheetHeader className="border-b px-4 pb-3 pt-[max(1rem,var(--safe-area-top))] text-start">
+          <SheetTitle>{t("workspace.controls")}</SheetTitle>
+          <SheetDescription>{t("workspace.controlsDescription")}</SheetDescription>
         </SheetHeader>
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4">
@@ -116,14 +115,26 @@ export default function MobileWorkspaceControls({
             <span
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
               style={{ backgroundColor: accentColor }}
+              aria-hidden="true"
             >
               {getInitials(user.username)}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold">{user.username}</p>
-              <p className="truncate text-xs text-muted-foreground">{user.role}</p>
+              <p className="truncate text-sm font-semibold" data-business-value="true">
+                {user.username}
+              </p>
+              <p className="truncate text-xs text-muted-foreground" data-business-value="true">
+                {user.role}
+              </p>
             </div>
-            <UserRound className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <UserRound className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          </div>
+
+          <div className="rounded-lg border p-3">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {t("workspace.accountLanguage")}
+            </p>
+            <UserMenu accentColor={accentColor} user={user} onLogout={logout} />
           </div>
 
           {extraActions && <div className="grid gap-2 [&>*]:w-full">{extraActions}</div>}
@@ -135,17 +146,17 @@ export default function MobileWorkspaceControls({
               data-testid="button-mobile-controls-search"
               className="w-full justify-start gap-2"
             >
-              <Search className="h-4 w-4" />
-              Search the workspace
+              <Search className="h-4 w-4" aria-hidden="true" />
+              {t("workspace.search")}
             </Button>
           )}
 
           <div className="rounded-lg border p-3">
             <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Status and display
+              {t("workspace.statusDisplay")}
             </p>
             <div className="flex items-center justify-between gap-3 border-b pb-3">
-              <span className="text-sm">Pending synchronization</span>
+              <span className="text-sm">{t("workspace.pendingSync")}</span>
               <PendingSyncIndicator />
             </div>
             <div className="grid grid-cols-2 gap-2 pt-3">
@@ -153,7 +164,7 @@ export default function MobileWorkspaceControls({
                 <CurrencyToggle />
               </div>
               <div className="flex min-h-10 items-center justify-between rounded-md border px-3">
-                <span className="text-sm">Theme</span>
+                <span className="text-sm">{t("workspace.theme")}</span>
                 <ThemeToggle />
               </div>
             </div>
@@ -165,8 +176,8 @@ export default function MobileWorkspaceControls({
             data-testid="button-mobile-logout"
             className="mt-auto w-full gap-2"
           >
-            <LogOut className="h-4 w-4" />
-            Log out
+            <LogOut className="h-4 w-4" aria-hidden="true" />
+            {t("common.logout")}
           </Button>
         </div>
       </SheetContent>

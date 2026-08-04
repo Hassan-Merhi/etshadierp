@@ -1,0 +1,232 @@
+name: Temporary SP Phases 3-4 Full Verification
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  full-ci:
+    name: Full CI and coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
+      NODE_ENV: test
+      SESSION_SECRET: sp-phases-3-4-full-ci-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+      PORT: "5000"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/sp-finalization-phases-3-4-lifecycle
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Normalize package registry URLs
+        run: |
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+          sed -i 's#https://registry.replit.com/#https://registry.npmjs.org/#g' package-lock.json
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+      - name: Verify environment documentation
+        run: npm run verify:env-docs
+      - name: Check formatting for complete stacked diff
+        run: |
+          git fetch --no-tags --prune origin +refs/heads/agent/sp-finalization-phases-1-2-atomicity:refs/remotes/origin/agent/sp-finalization-phases-1-2-atomicity
+          mapfile -d '' changed_files < <(
+            git diff --name-only --diff-filter=ACMR -z origin/agent/sp-finalization-phases-1-2-atomicity HEAD -- client/src server shared tests scripts |
+              grep -zE '\.(ts|tsx|css|mjs)$' || true
+          )
+          if [ "${#changed_files[@]}" -gt 0 ]; then
+            node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
+          fi
+      - name: TypeScript
+        run: npm run check
+      - name: Production build
+        run: npm run build
+      - name: Lint
+        run: npm run lint
+      - name: Route manifest and guard ratchets
+        run: node node_modules/vitest/vitest.mjs run tests/route-manifest.test.ts --maxWorkers=1 --no-file-parallelism
+      - name: I18n audit
+        run: node scripts/audit-i18n-phase14.mjs
+      - name: Prepare disposable database schema
+        run: node node_modules/drizzle-kit/bin.cjs push --force
+      - name: Run production startup migrations
+        run: |
+          node dist/index.js > sp-phases-3-4-full-startup.log 2>&1 &
+          app_pid=$!
+          cleanup() {
+            kill "$app_pid" 2>/dev/null || true
+            wait "$app_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          for attempt in $(seq 1 180); do
+            if curl --fail --silent --show-error http://127.0.0.1:${PORT}/api/health/db > sp-phases-3-4-full-health.json; then
+              cat sp-phases-3-4-full-health.json
+              exit 0
+            fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              cat sp-phases-3-4-full-startup.log
+              exit 1
+            fi
+            sleep 1
+          done
+          cat sp-phases-3-4-full-startup.log
+          exit 1
+      - name: Backend tests
+        run: npm run test:backend
+      - name: API smoke sweep
+        run: npm run test:smoke-sweep
+      - name: Backend coverage thresholds
+        run: npm run test:backend:coverage
+      - name: Frontend tests
+        run: npm run test:frontend
+      - name: Frontend coverage thresholds
+        run: npm run test:frontend:coverage
+      - name: Coverage ratchet audit
+        run: npm run audit:coverage-ratchet
+
+  node22-static:
+    name: Node 22 static and release contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/sp-finalization-phases-3-4-lifecycle
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22.14"
+          cache: npm
+      - name: Normalize package registry URLs
+        run: |
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+          sed -i 's#https://registry.replit.com/#https://registry.npmjs.org/#g' package-lock.json
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+      - name: Verify lockfile and production dependencies
+        run: |
+          npm run verify:lockfile
+          npm run verify:production-dependencies
+      - name: Lint
+        run: npm run lint
+      - name: TypeScript
+        run: npm run check
+      - name: Production build
+        run: npm run build
+      - name: Verify server bundle
+        run: npm run verify:server-bundle
+      - name: Repository release safety contracts
+        run: |
+          npm run verify:program1-observability
+          npm run verify:final-production-readiness
+          npm run verify:bandwidth
+
+  postgres-regression:
+    name: Node 22 PostgreSQL serial regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
+      NODE_ENV: test
+      SESSION_SECRET: sp-phases-3-4-postgres-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+      PORT: "5000"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/sp-finalization-phases-3-4-lifecycle
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22.14"
+          cache: npm
+      - name: Normalize package registry URLs
+        run: |
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+          sed -i 's#https://registry.replit.com/#https://registry.npmjs.org/#g' package-lock.json
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+      - name: Verify migration registry
+        run: node scripts/verify-migration-registry.mjs --json
+      - name: Prepare disposable database schema
+        run: node node_modules/drizzle-kit/bin.cjs push --force
+      - name: Verify disposable database schema
+        run: node scripts/verify-ci-disposable-schema.mjs
+      - name: Backend serial regression
+        run: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
+      - name: Frontend serial regression
+        run: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
+
+  dependency-audit:
+    name: Production dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/sp-finalization-phases-3-4-lifecycle
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Normalize package registry URLs
+        run: |
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+          sed -i 's#https://registry.replit.com/#https://registry.npmjs.org/#g' package-lock.json
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+      - name: Block unreviewed production vulnerabilities
+        run: npm run verify:dependency-audit
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/sp-finalization-phases-3-4-lifecycle
+          fetch-depth: 0
+      - uses: trufflesecurity/trufflehog@v3.90.4
+        with:
+          extra_args: --results=verified,unknown
