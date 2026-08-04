@@ -3,6 +3,7 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
+import { getAccessibleCompanyIds } from "../../security/companyAccessBoundary";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { stockItems, stockGroups, vouchers, salesItems, locations, stockItemLocationPrices } from "@shared/schema";
 import { eq, and, sql, isNull } from "drizzle-orm";
@@ -173,8 +174,7 @@ export function registerStatsDataRoutes(app: Express) {
       }
 
       // Get all companies the user has access to
-      const userCompanyRoles = await storage.getUserCompaniesWithRoles(userId);
-      const companyIds = userCompanyRoles.map((r) => r.companyId);
+      const companyIds = Array.from(await getAccessibleCompanyIds(userId));
 
       if (companyIds.length === 0) {
         return res.json([]);

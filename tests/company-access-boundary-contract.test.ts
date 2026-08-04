@@ -65,4 +65,21 @@ describe("Phase 7 company access boundary", () => {
     expect(offloads).toContain("eq(vouchers.companyId, offload.companyId)");
     expect(offloads).toContain("COMPANY_ACCESS_DENIED");
   });
+
+  it("routes remaining cross-company page scopes through the central boundary", () => {
+    const routeFiles = [
+      "server/routes/erp-payroll/runs.ts",
+      "server/routes/stats/statsDataRoutes.ts",
+      "server/routes/helpers/supplierBalanceHelpers.ts",
+      "server/routes/reportsContainerTrackingRoutes.ts",
+      "server/routes/reportsClosingStockRoutes.ts",
+      "server/routes/containers/containerFreightReadRoutes.ts",
+    ];
+
+    for (const routeFile of routeFiles) {
+      const route = source(routeFile);
+      expect(route).toContain("getAccessibleCompanyIds");
+      expect(route).not.toContain("getUserCompaniesWithRoles");
+    }
+  });
 });

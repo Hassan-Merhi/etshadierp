@@ -5,6 +5,7 @@ import { db } from "../db";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import { storage } from "../storage";
+import { getAccessibleCompanyIds } from "../security/companyAccessBoundary";
 import { poLineItems, purchaseOrders, voucherEntries, vouchers } from "@shared/schema";
 
 /**
@@ -21,8 +22,7 @@ export function registerReportsContainerTrackingRoutes(app: Express) {
         return res.status(401).json({ message: "Not authenticated" });
       }
 
-      const userCompanyRoles = await storage.getUserCompaniesWithRoles(userId);
-      const companyIds = userCompanyRoles.map((role) => role.companyId);
+      const companyIds = Array.from(await getAccessibleCompanyIds(userId));
 
       if (companyIds.length === 0) {
         return res.json({
@@ -35,10 +35,7 @@ export function registerReportsContainerTrackingRoutes(app: Express) {
         });
       }
 
-      const [allCompanies, allSuppliers] = await Promise.all([
-        storage.getAllCompanies(),
-        storage.getAllSuppliers(),
-      ]);
+      const [allCompanies, allSuppliers] = await Promise.all([storage.getAllCompanies(), storage.getAllSuppliers()]);
       const companyMap = new Map(allCompanies.map((company) => [company.id, company]));
       const supplierMap = new Map(allSuppliers.map((supplier) => [supplier.id, supplier]));
 
@@ -194,10 +191,8 @@ export function registerReportsContainerTrackingRoutes(app: Express) {
         totalAmount += amount;
       }
 
-      const byTransporter: Record<
-        string,
-        { otw: any[]; offloaded: any[]; otwTotal: number; offloadedTotal: number }
-      > = {};
+      const byTransporter: Record<string, { otw: any[]; offloaded: any[]; otwTotal: number; offloadedTotal: number }> =
+        {};
 
       for (const container of otwContainers) {
         const transporter = container.transporter || "Unassigned";

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { resolveActiveCompanyId } from "../server/routes/helpers/resolveActiveCompanyId";
 import {
   chooseActiveCompanyRole,
   resolvePermissionCompanyId,
@@ -15,15 +16,14 @@ describe("active company permission context", () => {
   });
 
   it("does not reuse an Admin role from another company", () => {
-    expect(
-      chooseActiveCompanyRole(20, [{ companyId: 10, role: "Admin" }])
-    ).toBeNull();
+    expect(chooseActiveCompanyRole(20, [{ companyId: 10, role: "Admin" }])).toBeNull();
   });
 
   it("preserves the explicit Developer all-company bypass", () => {
-    expect(
-      chooseActiveCompanyRole(99, [{ companyId: 10, role: "Developer" }])
-    ).toEqual({ role: "Developer", developerBypass: true });
+    expect(chooseActiveCompanyRole(99, [{ companyId: 10, role: "Developer" }])).toEqual({
+      role: "Developer",
+      developerBypass: true,
+    });
   });
 
   it("prefers the active company's concrete role over a Developer role elsewhere", () => {
@@ -84,5 +84,25 @@ describe("active company permission context", () => {
         factoryCompanyId: 20,
       })
     ).toBe(10);
+  });
+
+  it("applies the route policy through the shared request helper", () => {
+    const session = { currentCompanyId: 10, factoryCompanyId: 20 };
+
+    expect(
+      resolveActiveCompanyId({
+        originalUrl: "/api/admin/users?companyId=10",
+        path: "/api/admin/users",
+        session,
+      } as any)
+    ).toBe(10);
+
+    expect(
+      resolveActiveCompanyId({
+        originalUrl: "/api/factory/raw-stock",
+        path: "/api/factory/raw-stock",
+        session,
+      } as any)
+    ).toBe(20);
   });
 });

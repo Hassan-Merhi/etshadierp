@@ -7,6 +7,7 @@
 
 import Decimal from "decimal.js";
 import { storage } from "../../storage";
+import { getAccessibleCompanyIds } from "../../security/companyAccessBoundary";
 import { getVoucherEntriesBySupplierBatched } from "../performance/supplierVoucherEntryBatcher";
 
 let parentCompanyResolution: Promise<number> | null = null;
@@ -165,7 +166,6 @@ export async function authorizeCompanyIdParam(
 
   const userId = req.session.userId;
   if (!userId) return null;
-  const roles = await storage.getUserCompaniesWithRoles(userId);
-  const hasAccess = roles.some((r: any) => r.companyId === requestedCompanyId);
-  return hasAccess ? requestedCompanyId : null;
+  const accessibleCompanyIds = await getAccessibleCompanyIds(userId);
+  return accessibleCompanyIds.has(requestedCompanyId) ? requestedCompanyId : null;
 }

@@ -4,6 +4,7 @@ import { logger } from "../../lib/logger";
 import type { Express } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
+import { getAccessibleCompanyIds } from "../../security/companyAccessBoundary";
 import { requireAuth, requireNonPOS } from "../../auth";
 import {
   stockItems,
@@ -335,9 +336,8 @@ export function registerContainerFreightReadRoutes(app: Express) {
       }
 
       // Verify user has access to this container's company
-      const userCompanyRoles = await storage.getUserCompaniesWithRoles(userId);
-      const hasAccess = userCompanyRoles.some((r) => r.companyId === container.companyId);
-      if (!hasAccess) {
+      const accessibleCompanyIds = await getAccessibleCompanyIds(userId);
+      if (!accessibleCompanyIds.has(container.companyId)) {
         return res.status(403).json({ message: "Access denied" });
       }
 
