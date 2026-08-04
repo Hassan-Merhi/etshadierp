@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { apiRequest, getQueryFn, queryClient } from "@/lib/queryClient";
-import { parseAuthenticatedUser, type AuthenticatedUser } from "@/contracts/sessionContracts";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { authenticatedUserQueryOptions } from "@/contracts/sessionQueryContracts";
 
 /**
  * Manages the authenticated user session:
@@ -11,23 +11,14 @@ import { parseAuthenticatedUser, type AuthenticatedUser } from "@/contracts/sess
  *   - handleLogout — clears cache, clears biometric credentials, redirects
  */
 export function useAuthenticatedUser() {
-  const {
-    data: user,
-    isLoading,
-    error,
-  } = useQuery<AuthenticatedUser | null>({
-    queryKey: ["/api/auth/me"],
-    queryFn: async (context) => {
-      const value = await getQueryFn({ on401: "returnNull" })(context);
-      return parseAuthenticatedUser(value);
-    },
-    retry: false,
-    staleTime: 30 * 60 * 1000,
-  });
+  const { data: user, isLoading, error } = useQuery(authenticatedUserQueryOptions());
 
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
   useEffect(() => {
-    if (!isLoading) return;
+    if (!isLoading) {
+      setLoadingTimedOut(false);
+      return;
+    }
     const timer = window.setTimeout(() => setLoadingTimedOut(true), 12000);
     return () => window.clearTimeout(timer);
   }, [isLoading]);
