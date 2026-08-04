@@ -1,0 +1,48 @@
+name: Mobile integration conflict report
+
+on:
+  push:
+    branches:
+      - agent/mobile-responsive-phases-5-10-integration
+
+permissions:
+  contents: write
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out integration branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/mobile-responsive-phases-5-10-integration
+          fetch-depth: 0
+
+      - name: Generate exact conflict report
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --no-tags origin main
+          set +e
+          git merge --no-commit --no-ff origin/main
+          merge_status=$?
+          set -e
+          mkdir -p /tmp/mobile-conflicts
+          git diff --name-only --diff-filter=U | tee /tmp/mobile-conflicts/files.txt
+          while IFS= read -r file; do
+            [ -n "$file" ] || continue
+            safe_name="${file//\//__}"
+            cp "$file" "/tmp/mobile-conflicts/${safe_name}.txt"
+          done < /tmp/mobile-conflicts/files.txt
+          printf 'merge_status=%s\n' "$merge_status" > /tmp/mobile-conflicts/status.txt
+          git merge --abort || true
+          git checkout -B agent/mobile-integration-conflict-report origin/main
+          rm -rf .mobile-integration-conflicts
+          mkdir -p .mobile-integration-conflicts
+          cp -R /tmp/mobile-conflicts/. .mobile-integration-conflicts/
+          git add .mobile-integration-conflicts
+          git commit -m "Report mobile integration conflicts"
+          git push --force origin HEAD:agent/mobile-integration-conflict-report
