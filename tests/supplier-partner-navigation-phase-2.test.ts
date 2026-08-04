@@ -29,6 +29,7 @@ describe("Supplier Partner navigation phase 2", () => {
   it("keeps operational lifecycle controls explicit on the overview", () => {
     const overview = read("client/src/pages/sp/SpOverview.tsx");
     expect(overview).toContain("/api/sp/sales");
-    expect(overview).toContain("REVERSE SP SALE");
+    expect(overview).toContain('data-testid="confirm-reverse-sp-sale"');
+    expect(overview).toContain("reverseSale.mutate()");
   });
 });
