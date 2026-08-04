@@ -22,7 +22,7 @@ export type ExportAttachmentSource =
 
 function getMarkerPayload(source: ExportAttachmentSource): ExportFileMarkerPayload | undefined {
   if (!Buffer.isBuffer(source)) return undefined;
-  const payload = (source as Buffer & { [EXPORT_MARKER_KEY]?: ExportFileMarkerPayload })[EXPORT_MARKER_KEY];
+  const payload = Reflect.get(source, EXPORT_MARKER_KEY) as ExportFileMarkerPayload | undefined;
   return payload?.kind === "file" && payload.path ? payload : undefined;
 }
 
