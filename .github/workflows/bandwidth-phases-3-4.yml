@@ -12,10 +12,15 @@ on:
       - "client/src/hooks/useDebouncedValue.ts"
       - "client/src/hooks/useStockItemSearch.ts"
       - "client/src/pages/LocationInventory.tsx"
+      - "client/src/pages/StockTransferOrder.tsx"
+      - "client/src/pages/Vouchers.tsx"
       - "client/src/pages/location-inventory/**"
       - "client/src/pages/pos/POSPriceList.tsx"
       - "client/src/pages/pos/pospricelist/types.ts"
+      - "client/src/pages/vouchers/StockAdjustmentForm.tsx"
       - "client/src/pages/vouchers/StockTransferForm.tsx"
+      - "client/src/pages/vouchers/useVoucherQueries.ts"
+      - "docs/stock-items-bandwidth-light-callers.md"
       - "server/lib/pagination.ts"
       - "server/routes/inventory/**"
       - "server/routes/location/locationInventoryRoutes.ts"
@@ -27,6 +32,7 @@ on:
       - "shared/schema/inventory.ts"
       - "scripts/enforce-bandwidth-phases-3-4-backend.py"
       - "scripts/enforce-bandwidth-phases-3-4-frontend.py"
+      - "scripts/harden-bandwidth-phases-3-4.py"
       - "scripts/test-bandwidth-phases-3-4.mts"
       - "scripts/update-startup-schema-integrity.mts"
       - "scripts/verify-bandwidth-phases-3-4.mjs"
@@ -80,10 +86,35 @@ jobs:
       - run: npm ci --ignore-scripts
 
       - name: Apply Phase 3-4 backend implementation
-        run: python scripts/enforce-bandwidth-phases-3-4-backend.py
+        run: |
+          if grep -q 'getPaginatedLocationInventory' server/routes/location/locationInventoryRoutes.ts \
+            && grep -q 'filters.profile === "combined"' server/routes/inventory/inventoryQueryService.ts; then
+            echo "Phase 3-4 backend base is already applied."
+          else
+            python scripts/enforce-bandwidth-phases-3-4-backend.py
+          fi
 
       - name: Apply Phase 3-4 frontend implementation
-        run: python scripts/enforce-bandwidth-phases-3-4-frontend.py
+        run: |
+          if grep -q 'PaginatedPriceListResponse' client/src/pages/pos/POSPriceList.tsx \
+            && grep -q 'profile: "combined"' client/src/pages/location-inventory/useLocationInventoryQueries.ts \
+            && grep -q 'useStockItemSearch' client/src/pages/vouchers/StockTransferForm.tsx; then
+            echo "Phase 3-4 frontend base is already applied."
+          else
+            python scripts/enforce-bandwidth-phases-3-4-frontend.py
+          fi
+
+      - name: Apply Phase 3-4 hardening
+        run: |
+          if grep -q 'explicitFullList' server/routes/stock/stockLightRoutes.ts \
+            && grep -q 'unpricedByGroup' server/routes/stock/transfer-adj/posPriceListPaging.ts \
+            && grep -q 'effectiveAdjustmentLocationId' client/src/pages/vouchers/StockAdjustmentForm.tsx \
+            && grep -q 'editStockItems' client/src/pages/StockTransferOrder.tsx \
+            && grep -q 'allInventoryTotals' client/src/pages/LocationInventory.tsx; then
+            echo "Phase 3-4 hardening is already applied."
+          else
+            python scripts/harden-bandwidth-phases-3-4.py
+          fi
 
       - name: Update startup schema integrity pin
         run: node node_modules/tsx/dist/cli.mjs scripts/update-startup-schema-integrity.mts
@@ -95,6 +126,8 @@ jobs:
             client/src/hooks/useDebouncedValue.ts \
             client/src/hooks/useStockItemSearch.ts \
             client/src/pages/LocationInventory.tsx \
+            client/src/pages/StockTransferOrder.tsx \
+            client/src/pages/Vouchers.tsx \
             client/src/pages/location-inventory/AllItemsView.tsx \
             client/src/pages/location-inventory/CombinedStockView.tsx \
             client/src/pages/location-inventory/StockGroupItemsView.tsx \
@@ -103,7 +136,10 @@ jobs:
             client/src/pages/location-inventory/useStockGroupSummaries.ts \
             client/src/pages/pos/POSPriceList.tsx \
             client/src/pages/pos/pospricelist/types.ts \
+            client/src/pages/vouchers/StockAdjustmentForm.tsx \
             client/src/pages/vouchers/StockTransferForm.tsx \
+            client/src/pages/vouchers/useVoucherQueries.ts \
+            docs/stock-items-bandwidth-light-callers.md \
             server/lib/pagination.ts \
             server/routes/inventory/inventoryQueryService.ts \
             server/routes/inventory/inventoryRequestContext.ts \
@@ -116,9 +152,9 @@ jobs:
             server/startup-schema/index.ts \
             shared/schema/inventory.ts \
             scripts/test-bandwidth-phases-3-4.mts \
+            scripts/verify-bandwidth-phases-3-4.mjs \
             tests/bandwidth-phases-3-4.test.ts \
-            tests/startup-schema-integrity.test.ts \
-            scripts/verify-bandwidth-phases-3-4.mjs
+            tests/startup-schema-integrity.test.ts
 
       - name: Verify Phase 3-4 contracts
         run: node scripts/verify-bandwidth-phases-3-4.mjs
@@ -141,26 +177,6 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            client/src/components/PaginationBar.tsx \
-            client/src/hooks/useDebouncedValue.ts \
-            client/src/hooks/useStockItemSearch.ts \
-            client/src/pages/LocationInventory.tsx \
-            client/src/pages/location-inventory/AllItemsView.tsx \
-            client/src/pages/location-inventory/CombinedStockView.tsx \
-            client/src/pages/location-inventory/StockGroupItemsView.tsx \
-            client/src/pages/location-inventory/useCombinedStockRows.ts \
-            client/src/pages/location-inventory/useLocationInventoryQueries.ts \
-            client/src/pages/location-inventory/useStockGroupSummaries.ts \
-            client/src/pages/pos/POSPriceList.tsx \
-            client/src/pages/pos/pospricelist/types.ts \
-            client/src/pages/vouchers/StockTransferForm.tsx \
-            server/routes/inventory/inventoryQueryService.ts \
-            server/routes/inventory/inventoryRequestContext.ts \
-            server/routes/location/locationInventoryRoutes.ts \
-            server/routes/stock/transfer-adj/price-list.ts \
-            server/startup-schema/index.ts \
-            shared/schema/inventory.ts \
-            tests/startup-schema-integrity.test.ts
+          git add -A
           git commit -m "Complete bandwidth stock inventory and POS phases"
           git push origin HEAD:bandwidth-phases-1-2
