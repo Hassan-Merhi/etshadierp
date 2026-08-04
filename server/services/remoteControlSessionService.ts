@@ -61,6 +61,7 @@ interface StartRemoteControlSessionInput {
 }
 
 type TargetListener = () => void;
+type SessionStopListener = (session: RemoteControlSession) => void;
 
 const DEFAULT_SESSION_MS = 10 * 60 * 1000;
 const MAX_SESSION_MS = 15 * 60 * 1000;
@@ -74,6 +75,7 @@ const sessions = new Map<string, RemoteControlSession>();
 const activeByTargetUser = new Map<string, string>();
 const tabsByUser = new Map<string, Map<string, RemoteControlTabPresence>>();
 const targetListeners = new Map<string, Set<TargetListener>>();
+const sessionStopListeners = new Set<SessionStopListener>();
 
 function cleanIdentifier(value: unknown, maxLength = 128): string {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
@@ -134,6 +136,14 @@ function stopSessionInternal(
     activeByTargetUser.delete(session.targetUserId);
   }
   notifyTarget(session.targetUserId);
+  const stoppedSnapshot = copySession(session) as RemoteControlSession;
+  for (const listener of sessionStopListeners) {
+    try {
+      listener(stoppedSnapshot);
+    } catch {
+      // Stop observers must never prevent a fail-safe stop.
+    }
+  }
   return session;
 }
 
@@ -309,10 +319,7 @@ export function setRemoteControlMouseCapability(sessionId: string, enabled: bool
   return copySession(session);
 }
 
-export function setRemoteControlKeyboardCapability(
-  sessionId: string,
-  enabled: boolean
-): RemoteControlSession | null {
+export function setRemoteControlKeyboardCapability(sessionId: string, enabled: boolean): RemoteControlSession | null {
   cleanupRemoteControlState();
   const session = sessions.get(cleanIdentifier(sessionId));
   if (!session || session.status !== "active") return null;
@@ -384,6 +391,11 @@ export function subscribeRemoteControlTarget(userId: string, listener: TargetLis
   };
 }
 
+export function subscribeRemoteControlSessionStops(listener: SessionStopListener): () => void {
+  sessionStopListeners.add(listener);
+  return () => sessionStopListeners.delete(listener);
+}
+
 export function cleanupRemoteControlState(now = Date.now()): void {
   for (const session of sessions.values()) {
     if (session.status === "active") {
@@ -412,6 +424,7 @@ export function resetRemoteControlSessionStateForTests(): void {
   activeByTargetUser.clear();
   tabsByUser.clear();
   targetListeners.clear();
+  sessionStopListeners.clear();
 }
 
 const cleanupTimer = setInterval(() => cleanupRemoteControlState(), 3000);

@@ -149,8 +149,12 @@ const SAFE_FILTER_DESCRIPTOR = new RegExp(
 let remoteFocusedElement: RemoteEditableElement | null = null;
 let lastTrustedLocalInteractionAt = 0;
 
-function elementDescriptor(element: HTMLElement): string {
-  const labelText = element.labels ? Array.from(element.labels).map((label) => label.textContent ?? "").join(" ") : "";
+function elementDescriptor(element: RemoteEditableElement): string {
+  const labelText = element.labels
+    ? Array.from(element.labels)
+        .map((label) => label.textContent ?? "")
+        .join(" ")
+    : "";
   return [
     element.id,
     element.getAttribute("name"),
@@ -177,10 +181,17 @@ function isProtectedContainer(element: HTMLElement): boolean {
 }
 
 export function isSafeRemoteEditableElement(element: Element | null): element is RemoteEditableElement {
-  if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement)) {
+  if (
+    !(
+      element instanceof HTMLInputElement ||
+      element instanceof HTMLTextAreaElement ||
+      element instanceof HTMLSelectElement
+    )
+  ) {
     return false;
   }
-  if (element.disabled || element.readOnly || isProtectedContainer(element)) return false;
+  const readOnly = (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) && element.readOnly;
+  if (element.disabled || readOnly || isProtectedContainer(element)) return false;
 
   const descriptor = elementDescriptor(element);
   if (SENSITIVE_DESCRIPTOR.test(descriptor)) return false;
@@ -256,7 +267,11 @@ function dispatchValueEvents(
   element.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
-function replaceSelection(element: HTMLInputElement | HTMLTextAreaElement, replacement: string, inputType: string): boolean {
+function replaceSelection(
+  element: HTMLInputElement | HTMLTextAreaElement,
+  replacement: string,
+  inputType: string
+): boolean {
   const start = element.selectionStart ?? element.value.length;
   const end = element.selectionEnd ?? start;
   const next = `${element.value.slice(0, start)}${replacement}${element.value.slice(end)}`;
@@ -278,13 +293,12 @@ function dispatchKey(element: HTMLElement, key: string, shiftKey: boolean): void
 }
 
 function focusAdjacentEditable(current: RemoteEditableElement, reverse: boolean, documentRef: Document): boolean {
-  const candidates = Array.from(documentRef.querySelectorAll("input,textarea,select"))
-    .filter(isSafeRemoteEditableElement);
+  const candidates = Array.from(documentRef.querySelectorAll("input,textarea,select")).filter(
+    isSafeRemoteEditableElement
+  );
   if (candidates.length === 0) return false;
   const index = Math.max(0, candidates.indexOf(current));
-  const nextIndex = reverse
-    ? (index - 1 + candidates.length) % candidates.length
-    : (index + 1) % candidates.length;
+  const nextIndex = reverse ? (index - 1 + candidates.length) % candidates.length : (index + 1) % candidates.length;
   remoteFocusedElement = candidates[nextIndex];
   remoteFocusedElement.focus({ preventScroll: true });
   return true;
@@ -294,7 +308,10 @@ function applySelectKey(element: HTMLSelectElement, key: RemoteKeyboardKey): boo
   if (key !== "ArrowUp" && key !== "ArrowDown" && key !== "Home" && key !== "End") return false;
   const enabledOptions = Array.from(element.options).filter((option) => !option.disabled);
   if (enabledOptions.length === 0) return false;
-  const current = Math.max(0, enabledOptions.findIndex((option) => option === element.selectedOptions[0]));
+  const current = Math.max(
+    0,
+    enabledOptions.findIndex((option) => option === element.selectedOptions[0])
+  );
   const next =
     key === "Home"
       ? 0
@@ -336,13 +353,14 @@ export function applyRemoteKeyboardCommand(
     if (typeof command.text !== "string" || command.text.length === 0 || /[\u0000-\u001f\u007f]/u.test(command.text)) {
       return { status: "ignored", reason: "invalid-text" };
     }
-    if (element instanceof HTMLSelectElement || (element instanceof HTMLInputElement && ["checkbox", "radio"].includes(element.type))) {
+    if (
+      element instanceof HTMLSelectElement ||
+      (element instanceof HTMLInputElement && ["checkbox", "radio"].includes(element.type))
+    ) {
       return { status: "blocked", reason: "text-not-supported" };
     }
     const applied = replaceSelection(element, command.text, "insertText");
-    return applied
-      ? { status: "executed", reason: null }
-      : { status: "blocked", reason: "field-length-limit" };
+    return applied ? { status: "executed", reason: null } : { status: "blocked", reason: "field-length-limit" };
   }
 
   const key = command.key;

@@ -5,9 +5,11 @@ import { shouldShowRemoteSupportIndicator } from "./remote-support-indicator-pol
 function session(mouse: boolean, status: RemoteControlSessionView["status"] = "active") {
   return {
     id: "session-1",
+    companyId: 7,
     targetUserId: "22",
     targetUsername: "employee",
     targetTabId: "tab-1",
+    targetRoute: "/dashboard",
     controllerUserId: "1",
     controllerUsername: "developer",
     controllerRole: "Developer",

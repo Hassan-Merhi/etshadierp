@@ -1,10 +1,7 @@
 import { auditLog } from "@shared/schema";
 import { db } from "../db";
 import { logger } from "../lib/logger";
-import {
-  subscribeRemoteControlSessionStops,
-  type RemoteControlSession,
-} from "./remoteControlSessionService";
+import { subscribeRemoteControlSessionStops, type RemoteControlSession } from "./remoteControlSessionService";
 
 export type RemoteSupportAuditEvent =
   | "session_started"
