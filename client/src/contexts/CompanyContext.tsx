@@ -7,15 +7,10 @@ import {
   removeCompanySessionQueries,
 } from "@/lib/companyQueryScope";
 import { createCompanySwitchQueue, type CompanySwitchQueue } from "@/lib/companySwitchQueue";
-import { companyDataKey, frontendQueryPolicies } from "@/lib/frontendDataArchitecture";
-import {
-  fetchSessionCompany,
-  userCompaniesQueryOptions,
-} from "@/contracts/sessionQueryContracts";
-import type {
-  CompanyType,
-  UserCompanyAssignment,
-} from "@/contracts/sessionContracts";
+import { companyDataKey } from "@/lib/frontendDataArchitecture";
+import { stableReferenceQueryPolicy } from "@/lib/queryPolicies";
+import { fetchSessionCompany, userCompaniesQueryOptions } from "@/contracts/sessionQueryContracts";
+import type { CompanyType, UserCompanyAssignment } from "@/contracts/sessionContracts";
 
 const PREFETCH_KEYS = [
   "/api/suppliers",
@@ -25,6 +20,9 @@ const PREFETCH_KEYS = [
   "/api/locations",
   "/api/employees",
   "/api/fixed-assets",
+  "/api/stock-groups",
+  "/api/stock-categories",
+  "/api/stock-grades",
 ] as const;
 
 function prefetchReferenceData(companyId: number, role?: string) {
@@ -32,7 +30,7 @@ function prefetchReferenceData(companyId: number, role?: string) {
   for (const url of PREFETCH_KEYS) {
     void queryClient.prefetchQuery({
       queryKey: companyDataKey(url, companyId),
-      ...frontendQueryPolicies.reference,
+      ...stableReferenceQueryPolicy,
     });
   }
 }
@@ -132,8 +130,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const companies: Company[] = userCompanyAssignments
     .map(mapCompanyAssignment)
     .filter(
-      (company, index, allCompanies) =>
-        index === allCompanies.findIndex((candidate) => candidate.id === company.id),
+      (company, index, allCompanies) => index === allCompanies.findIndex((candidate) => candidate.id === company.id)
     );
 
   const commitCompanySelection = useCallback((company: Company, options: CompanyCommitOptions) => {
@@ -186,13 +183,13 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
       return true;
     },
-    [commitCompanySelection],
+    [commitCompanySelection]
   );
 
   const selectCompany = useCallback(
     (company: Company, options: CompanySelectionOptions = {}) =>
       switchQueueRef.current!.enqueue(() => performCompanySelection(company, options)),
-    [performCompanySelection],
+    [performCompanySelection]
   );
 
   const scheduleInitialSyncRetry = useCallback(() => {
@@ -208,16 +205,14 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     () => () => {
       if (initialRetryTimer.current !== null) window.clearTimeout(initialRetryTimer.current);
     },
-    [],
+    []
   );
 
   useEffect(() => {
     if (companies.length === 0 || selectedCompany || initialSyncStarted.current) return;
 
     const savedCompanyId = parseSavedCompanyId(localStorage.getItem("selectedCompanyId"));
-    const savedCompany = savedCompanyId
-      ? companies.find((company) => company.id === savedCompanyId)
-      : undefined;
+    const savedCompany = savedCompanyId ? companies.find((company) => company.id === savedCompanyId) : undefined;
     const target = savedCompany ?? companies[0];
     if (!target) return;
 
@@ -267,14 +262,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         console.error("[Company] Initial company synchronization failed; retrying.", error);
         scheduleInitialSyncRetry();
       });
-  }, [
-    commitCompanySelection,
-    companies,
-    initialSyncAttempt,
-    scheduleInitialSyncRetry,
-    selectCompany,
-    selectedCompany,
-  ]);
+  }, [commitCompanySelection, companies, initialSyncAttempt, scheduleInitialSyncRetry, selectCompany, selectedCompany]);
 
   return (
     <CompanyContext.Provider

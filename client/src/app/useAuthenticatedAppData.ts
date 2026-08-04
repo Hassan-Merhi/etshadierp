@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { companyQueryKey } from "@/lib/companyQueryScope";
 import { setAppTimezone } from "@/lib/queryClient";
+import { accessQueryPolicy, liveCountQueryPolicy, stableSettingsQueryPolicy } from "@/lib/queryPolicies";
 import { useToast } from "@/hooks/use-toast";
 
 export interface FactoryAccess {
@@ -26,7 +27,7 @@ export function useAuthenticatedAppData({ selectedCompanyId, userPresent, isPOS 
 
   const { data: chatUnread } = useQuery<{ count: number }>({
     queryKey: companyQueryKey("/api/chat/unread-count", selectedCompanyId),
-    refetchInterval: 60000,
+    ...liveCountQueryPolicy(60_000),
     enabled: isPOS && userPresent && !!selectedCompanyId,
   });
 
@@ -45,6 +46,7 @@ export function useAuthenticatedAppData({ selectedCompanyId, userPresent, isPOS 
 
   const { data: companySettings } = useQuery<any>({
     queryKey: companyQueryKey("/api/company-settings", selectedCompanyId),
+    ...stableSettingsQueryPolicy,
     enabled: userPresent && !!selectedCompanyId,
   });
 
@@ -58,8 +60,8 @@ export function useAuthenticatedAppData({ selectedCompanyId, userPresent, isPOS 
     isError: myAccessError,
   } = useQuery<FactoryAccess>({
     queryKey: companyQueryKey("/api/factory/my-access", selectedCompanyId),
+    ...accessQueryPolicy,
     enabled: userPresent && !isPOS && !!selectedCompanyId,
-    staleTime: 30000,
     retry: 2,
   });
 
@@ -69,8 +71,8 @@ export function useAuthenticatedAppData({ selectedCompanyId, userPresent, isPOS 
       const response = await fetch("/api/factory/settings");
       return response.ok ? response.json() : {};
     },
+    ...stableSettingsQueryPolicy,
     enabled: userPresent && !isPOS && !!selectedCompanyId,
-    staleTime: 60000,
   });
 
   return {
