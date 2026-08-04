@@ -1,7 +1,10 @@
+import { auditLog } from "@shared/schema";
 import { db } from "../db";
 import { logger } from "../lib/logger";
-import { auditLog } from "@shared/schema";
-import type { RemoteControlSession } from "./remoteControlSessionService";
+import {
+  subscribeRemoteControlSessionStops,
+  type RemoteControlSession,
+} from "./remoteControlSessionService";
 
 export type RemoteSupportAuditEvent =
   | "session_started"
@@ -40,6 +43,8 @@ const ALLOWED_DETAIL_KEYS = new Set<keyof RemoteSupportAuditDetails>([
   "route",
   "stopReason",
 ]);
+const auditedStoppedSessionIds = new Set<string>();
+let stopAuditInstalled = false;
 
 function boundedText(value: unknown, maxLength: number): string | null {
   return typeof value === "string" && value.trim() ? value.trim().slice(0, maxLength) : null;
@@ -52,7 +57,9 @@ function safeDetails(details: RemoteSupportAuditDetails): Record<string, { new: 
     if (!ALLOWED_DETAIL_KEYS.has(key) || rawValue === undefined) continue;
     if (key === "textLength" || key === "sequence") {
       const numberValue = Number(rawValue);
-      if (Number.isFinite(numberValue) && numberValue >= 0) safe[key] = { new: Math.floor(numberValue) };
+      if (Number.isFinite(numberValue) && numberValue >= 0) {
+        safe[key] = { new: Math.floor(numberValue) };
+      }
       continue;
     }
     if (key === "route") {
@@ -96,6 +103,8 @@ export async function writeRemoteSupportAudit(input: {
   actorUsername?: string;
   details?: RemoteSupportAuditDetails;
 }): Promise<void> {
+  if (input.event === "session_stopped" && auditedStoppedSessionIds.has(input.session.id)) return;
+
   const actorUserId = boundedText(input.actorUserId, 128) ?? input.session.controllerUserId;
   const actorUsername = boundedText(input.actorUsername, 160) ?? input.session.controllerUsername;
   try {
@@ -109,6 +118,7 @@ export async function writeRemoteSupportAudit(input: {
       recordIdentifier: input.session.id,
       changes: buildRemoteSupportAuditChanges(input),
     });
+    if (input.event === "session_stopped") auditedStoppedSessionIds.add(input.session.id);
   } catch (error) {
     logger.error("[RemoteSupport] permanent audit write failed", {
       error,
@@ -118,6 +128,24 @@ export async function writeRemoteSupportAudit(input: {
     });
     throw error;
   }
+}
+
+export function installRemoteSupportSessionStopAudit(): void {
+  if (stopAuditInstalled) return;
+  stopAuditInstalled = true;
+  subscribeRemoteControlSessionStops((session) => {
+    void writeRemoteSupportAudit({
+      event: "session_stopped",
+      session,
+      actorUserId: session.controllerUserId,
+      actorUsername: session.controllerUsername,
+      details: {
+        capability: "view",
+        stopReason: session.stopReason,
+        route: session.targetRoute,
+      },
+    }).catch(() => undefined);
+  });
 }
 
 export function remoteSupportCommandAuditDetails(input: {
@@ -137,4 +165,9 @@ export function remoteSupportCommandAuditDetails(input: {
     route: input.route,
     status: "requested",
   };
+}
+
+export function resetRemoteSupportAuditStateForTests(): void {
+  auditedStoppedSessionIds.clear();
+  stopAuditInstalled = false;
 }
