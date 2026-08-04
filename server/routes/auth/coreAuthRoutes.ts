@@ -102,7 +102,7 @@ export function registerCoreAuthRoutes(app: Express) {
         req.session.currentPOSStation = firstCompany.posStation;
         req.session.cashAccountId = firstCompany.cashAccountId;
         req.session.canSellNegativeStock = firstCompany.canSellNegativeStock;
-        (req.session as any).posViewOnly = firstCompany.posViewOnly ?? false;
+        req.session.posViewOnly = firstCompany.posViewOnly ?? false;
         req.session.daybookEditDays = firstCompany.daybookEditDays;
         req.session.canAccessCustomers = firstCompany.canAccessCustomers;
         req.session.canDeleteRecords = firstCompany.canDeleteRecords;
@@ -196,7 +196,7 @@ export function registerCoreAuthRoutes(app: Express) {
       posStation: req.session.currentPOSStation ?? req.user.posStation ?? null,
       cashAccountId: req.session.cashAccountId ?? req.user.cashAccountId ?? null,
       canSellNegativeStock: req.session.canSellNegativeStock ?? req.user.canSellNegativeStock ?? false,
-      posViewOnly: Boolean((req.session as any).posViewOnly ?? false),
+      posViewOnly: Boolean(req.session.posViewOnly ?? false),
       daybookEditDays: req.session.daybookEditDays ?? req.user.daybookEditDays ?? null,
       canAccessCustomers: req.session.canAccessCustomers ?? req.user.canAccessCustomers ?? false,
       canDeleteRecords: req.session.canDeleteRecords ?? false,
