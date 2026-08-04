@@ -89,6 +89,7 @@ export function PosShell({
     currentLocation === "/pos/" ||
     currentLocation.startsWith("/pos/edit/");
   const hasAdminSearch = canUseAdminSearch(user);
+  const userMenuUser = { username: user.username, role: user.role ?? "POS" };
   const posContainerRef = useRef<HTMLDivElement>(null);
   useMainContentFocus(currentLocation, isFullHeightRoute);
   useWorkspaceWheelScroll(posContainerRef);
@@ -229,7 +230,7 @@ export function PosShell({
                     </kbd>
                   </Button>
                 )}
-                <UserMenu accentColor="#2563eb" user={user} onLogout={handleLogout} />
+                <UserMenu accentColor="#2563eb" user={userMenuUser} onLogout={handleLogout} />
               </div>
             </header>
             <OfflineBanner />
