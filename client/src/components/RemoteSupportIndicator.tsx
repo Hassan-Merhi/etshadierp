@@ -3,6 +3,7 @@ import { ShieldCheck, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RemoteMouseControllerOverlay } from "@/components/RemoteMouseControllerOverlay";
 import { RemoteMouseControlTarget } from "@/components/RemoteMouseControlTarget";
+import { shouldShowRemoteSupportIndicator } from "@/components/remote-support-indicator-policy";
 import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import { useRemoteControlSession } from "@/hooks/use-remote-control-session";
 import { translateRemoteSupportPhase4Text } from "@/i18n/remoteSupportPhase4Translations";
@@ -18,7 +19,7 @@ export function RemoteSupportIndicator() {
   const { language } = useApplicationLanguage();
   const { session, stopping, stop, tabId } = useRemoteControlSession();
   const [now, setNow] = useState(Date.now());
-  const mouseActive = !!session?.capabilities.mouse;
+  const mouseActive = shouldShowRemoteSupportIndicator(session);
 
   useEffect(() => {
     if (!mouseActive) return;
