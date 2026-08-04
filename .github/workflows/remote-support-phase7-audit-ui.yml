@@ -19,7 +19,7 @@ jobs:
   wire:
     if: github.event_name == 'push' || github.head_ref == 'agent/remote-support-phase-7-audit-protection'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -38,15 +38,21 @@ jobs:
           p = Path("client/src/pages/settings/AuditLog.tsx")
           text = p.read_text()
           if '{ label: "Remote Support", value: "remote_support" }' not in text:
+              anchor = '  { label: "Settings / Permissions", value: "settings_change,permission_change" },\n'
+              if anchor not in text:
+                  raise SystemExit("Audit action option anchor missing")
               text = text.replace(
-                  '  { label: "Settings / Permissions", value: "settings_change,permission_change" },\n',
-                  '  { label: "Settings / Permissions", value: "settings_change,permission_change" },\n  { label: "Remote Support", value: "remote_support" },\n',
+                  anchor,
+                  anchor + '  { label: "Remote Support", value: "remote_support" },\n',
                   1,
               )
-          if "const remoteSupportAudit = filterAction === \"remote_support\";" not in text:
+          if 'const remoteSupportAudit = filterAction === "remote_support";' not in text:
+              anchor = "  const { data, isLoading, error, refetch, isFetching } = useQuery({\n"
+              if anchor not in text:
+                  raise SystemExit("Audit useQuery anchor missing")
               text = text.replace(
-                  "  const { data, isLoading, error, refetch, isFetching } = useQuery({\n",
-                  '  const remoteSupportAudit = filterAction === "remote_support";\n\n  const { data, isLoading, error, refetch, isFetching } = useQuery({\n',
+                  anchor,
+                  '  const remoteSupportAudit = filterAction === "remote_support";\n\n' + anchor,
                   1,
               )
           text = text.replace(
@@ -55,46 +61,49 @@ jobs:
               1,
           )
           old = '''      const params = new URLSearchParams({
-                action: filterAction === "all" ? "all" : filterAction,
-                module: filterModule,
-                search: debouncedSearch,
-                from: filterDateFrom,
-                to: filterDateTo,
-                page: page.toString(),
-                limit: "50",
-              });
-              const res = await apiRequest("GET", `/api/audit-log?${params.toString()}`);
+              action: filterAction === "all" ? "all" : filterAction,
+              module: filterModule,
+              search: debouncedSearch,
+              from: filterDateFrom,
+              to: filterDateTo,
+              page: page.toString(),
+              limit: "50",
+            });
+            const res = await apiRequest("GET", `/api/audit-log?${params.toString()}`);
           '''
           new = '''      const params = new URLSearchParams({
-                ...(remoteSupportAudit
-                  ? {}
-                  : {
-                      action: filterAction === "all" ? "all" : filterAction,
-                      module: filterModule,
-                    }),
-                search: debouncedSearch,
-                from: filterDateFrom,
-                to: filterDateTo,
-                page: page.toString(),
-                limit: "50",
-              });
-              const endpoint = remoteSupportAudit
-                ? "/api/screen-feed/control/audit"
-                : "/api/audit-log";
-              const res = await apiRequest("GET", `${endpoint}?${params.toString()}`);
+              ...(remoteSupportAudit
+                ? {}
+                : {
+                    action: filterAction === "all" ? "all" : filterAction,
+                    module: filterModule,
+                  }),
+              search: debouncedSearch,
+              from: filterDateFrom,
+              to: filterDateTo,
+              page: page.toString(),
+              limit: "50",
+            });
+            const endpoint = remoteSupportAudit
+              ? "/api/screen-feed/control/audit"
+              : "/api/audit-log";
+            const res = await apiRequest("GET", `${endpoint}?${params.toString()}`);
           '''
-          if old in text:
+          if 'const endpoint = remoteSupportAudit' not in text:
+              if old not in text:
+                  raise SystemExit("Audit query block missing")
               text = text.replace(old, new, 1)
-          elif 'const endpoint = remoteSupportAudit' not in text:
-              raise SystemExit("AuditLog query block not found")
           p.write_text(text)
 
           p = Path("client/src/pages/settings/WatchUserDialog.tsx")
           text = p.read_text()
           if 'data-watched-user-id={String(userId)}' not in text:
+              anchor = '        data-testid="dialog-watch-user"\n'
+              if anchor not in text:
+                  raise SystemExit("Watch dialog anchor missing")
               text = text.replace(
-                  '        data-testid="dialog-watch-user"\n',
-                  '        data-testid="dialog-watch-user"\n        data-watched-user-id={String(userId)}\n',
+                  anchor,
+                  anchor + '        data-watched-user-id={String(userId)}\n',
                   1,
               )
           p.write_text(text)
@@ -105,52 +114,28 @@ jobs:
           ]:
               p = Path(path)
               text = p.read_text()
-              old = '''function matchingSession(sessions: ControllerSessionView[]): ControllerSessionView | null {
-                const dialogText = findWatchDialog()?.textContent ?? "";
+              if "dataset.watchedUserId" in text:
+                  continue
+              start = text.index("function matchingSession(")
+              end = text.index("\n}\n", start) + 3
+              block = text[start:end]
+              return_type = "ControllerSessionView" if "ControllerSessionView" in block else "RemoteControlSessionView"
+              replacement = f'''function matchingSession(sessions: {return_type}[]): {return_type} | null {{
+                const dialog = findWatchDialog();
+                const watchedUserId = dialog?.dataset.watchedUserId;
+                const dialogText = dialog?.textContent ?? "";
                 return (
-                  sessions.find((session) => dialogText.includes(`Watching: ${session.targetUsername}`)) ?? sessions[0] ?? null
+                  sessions.find((session) => watchedUserId && session.targetUserId === watchedUserId) ??
+                  sessions.find((session) => dialogText.includes(session.targetUsername)) ??
+                  sessions[0] ??
+                  null
                 );
-              }
+              }}
           '''
-              old_keyboard = '''function matchingSession(sessions: RemoteControlSessionView[]): RemoteControlSessionView | null {
-                const dialogText = findWatchDialog()?.textContent ?? "";
-                return sessions.find((session) => dialogText.includes(`Watching: ${session.targetUsername}`)) ?? sessions[0] ?? null;
-              }
-          '''
-              if "dataset.watchedUserId" not in text:
-                  if "ControllerSessionView" in text and old in text:
-                      new = '''function matchingSession(sessions: ControllerSessionView[]): ControllerSessionView | null {
-                        const dialog = findWatchDialog();
-                        const watchedUserId = dialog?.dataset.watchedUserId;
-                        const dialogText = dialog?.textContent ?? "";
-                        return (
-                          sessions.find((session) => watchedUserId && session.targetUserId === watchedUserId) ??
-                          sessions.find((session) => dialogText.includes(session.targetUsername)) ??
-                          sessions[0] ??
-                          null
-                        );
-                      }
-          '''
-                      text = text.replace(old, new, 1)
-                  elif old_keyboard in text:
-                      new = '''function matchingSession(sessions: RemoteControlSessionView[]): RemoteControlSessionView | null {
-                        const dialog = findWatchDialog();
-                        const watchedUserId = dialog?.dataset.watchedUserId;
-                        const dialogText = dialog?.textContent ?? "";
-                        return (
-                          sessions.find((session) => watchedUserId && session.targetUserId === watchedUserId) ??
-                          sessions.find((session) => dialogText.includes(session.targetUsername)) ??
-                          sessions[0] ??
-                          null
-                        );
-                      }
-          '''
-                      text = text.replace(old_keyboard, new, 1)
-                  else:
-                      raise SystemExit(f"matchingSession block not found in {path}")
+              text = text[:start] + replacement + text[end:]
               p.write_text(text)
           PY
-      - name: Format
+      - name: Format and type-check
         run: |
           node node_modules/prettier/bin/prettier.cjs --write \
             client/src/pages/settings/AuditLog.tsx \
@@ -158,6 +143,7 @@ jobs:
             client/src/components/RemoteMouseControllerOverlay.tsx \
             client/src/components/RemoteKeyboardControllerOverlay.tsx \
             server/routes/remoteSupportAuditRoutes.ts
+          npm run check
       - name: Commit
         run: |
           if git diff --quiet; then exit 0; fi
