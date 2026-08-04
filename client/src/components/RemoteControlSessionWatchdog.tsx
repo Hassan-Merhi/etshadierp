@@ -52,21 +52,15 @@ export function RemoteControlSessionWatchdog() {
   const [target, setTarget] = useState<WatchTarget | null>(() => currentWatchTarget());
   const [state, setState] = useState<WatchdogState>("idle");
   const [message, setMessage] = useState<string | null>(null);
-  const sessionIdRef = useRef<string | null>(null);
   const runningRef = useRef(false);
   const lastHeartbeatRef = useRef(0);
 
   useEffect(() => {
     const refresh = () => {
       const next = currentWatchTarget();
-      setTarget((current) => {
-        if (current?.userId === next?.userId && current?.username === next?.username) return current;
-        sessionIdRef.current = null;
-        lastHeartbeatRef.current = 0;
-        setState(next ? "waiting" : "idle");
-        setMessage(null);
-        return next;
-      });
+      setTarget((current) =>
+        current?.userId === next?.userId && current?.username === next?.username ? current : next,
+      );
     };
 
     refresh();
@@ -74,6 +68,12 @@ export function RemoteControlSessionWatchdog() {
     observer.observe(document.body, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    lastHeartbeatRef.current = 0;
+    setState(target ? "waiting" : "idle");
+    setMessage(null);
+  }, [target?.userId, target?.username]);
 
   useEffect(() => {
     if (!target) return;
@@ -90,7 +90,6 @@ export function RemoteControlSessionWatchdog() {
 
         const activeSession = active.response.ok ? active.payload.session : null;
         if (activeSession?.id && activeSession.status === "active") {
-          sessionIdRef.current = activeSession.id;
           setState("ready");
           setMessage(null);
 
@@ -101,7 +100,6 @@ export function RemoteControlSessionWatchdog() {
               { method: "POST", body: JSON.stringify({}) },
             );
             if (!heartbeat.response.ok) {
-              sessionIdRef.current = null;
               setState("waiting");
               setMessage(heartbeat.payload.message || "Reconnecting the support session.");
             }
@@ -121,7 +119,6 @@ export function RemoteControlSessionWatchdog() {
         if (cancelled) return;
 
         if (started.response.ok && started.payload.session?.id) {
-          sessionIdRef.current = started.payload.session.id;
           lastHeartbeatRef.current = Date.now();
           setState("ready");
           setMessage(null);
