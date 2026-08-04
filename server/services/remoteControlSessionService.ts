@@ -163,14 +163,10 @@ function freshTabs(userId: string, now = Date.now()): RemoteControlTabPresence[]
     .map((tab) => ({ ...tab }));
 }
 
+const REMOTE_CONTROL_CONTROLLER_ROLES = new Set(["Developer", "Admin", "Owner", "Manager"]);
+
 export function isRemoteControlControllerRole(role: unknown): boolean {
-  const allowedRoles = new Set(
-    (process.env.REMOTE_SUPPORT_CONTROLLER_ROLES ?? "Developer,Admin,Owner,Manager")
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean)
-  );
-  return typeof role === "string" && allowedRoles.has(role);
+  return typeof role === "string" && REMOTE_CONTROL_CONTROLLER_ROLES.has(role);
 }
 
 export function listRemoteControlTabs(userId: string, now = Date.now()): RemoteControlTabPresence[] {

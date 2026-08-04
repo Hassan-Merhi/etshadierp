@@ -2,12 +2,7 @@ import type { Express, Request, Response } from "express";
 import { requireAuth, requireLogin } from "../auth";
 import { logger } from "../lib/logger";
 import { requireActionAccess } from "../lib/permissionMiddleware";
-import {
-  getSessionCompanyId,
-  getSessionRole,
-  getSessionUserId,
-  getSessionUsername,
-} from "../lib/requestContext";
+import { getSessionCompanyId, getSessionRole, getSessionUserId, getSessionUsername } from "../lib/requestContext";
 import {
   screenFeedCursorStore,
   screenFeedStore,

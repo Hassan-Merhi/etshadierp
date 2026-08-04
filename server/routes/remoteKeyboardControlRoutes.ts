@@ -1,12 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { requireAuth, requireLogin } from "../auth";
 import { requireActionAccess } from "../lib/permissionMiddleware";
-import {
-  getSessionCompanyId,
-  getSessionRole,
-  getSessionUserId,
-  getSessionUsername,
-} from "../lib/requestContext";
+import { getSessionCompanyId, getSessionRole, getSessionUserId, getSessionUsername } from "../lib/requestContext";
 import {
   RemoteKeyboardControlError,
   authorizeRemoteKeyboardControl,
@@ -19,14 +14,8 @@ import {
   type RemoteKeyboardCommand,
   type RemoteKeyboardCommandResult,
 } from "../services/remoteKeyboardCommandService";
-import {
-  getRemoteControlSession,
-  isRemoteControlControllerRole,
-} from "../services/remoteControlSessionService";
-import {
-  remoteSupportCommandAuditDetails,
-  writeRemoteSupportAudit,
-} from "../services/remoteSupportAuditService";
+import { getRemoteControlSession, isRemoteControlControllerRole } from "../services/remoteControlSessionService";
+import { remoteSupportCommandAuditDetails, writeRemoteSupportAudit } from "../services/remoteSupportAuditService";
 import { isRemoteKeyboardAllowedOnRoute } from "../services/remoteSupportSensitiveActionPolicy";
 
 const STREAM_HEARTBEAT_MS = 5000;
@@ -101,10 +90,7 @@ function handleError(error: unknown, res: Response): void {
   res.status(500).json({ message: "Unable to manage keyboard control." });
 }
 
-async function auditOrBlock(
-  input: Parameters<typeof writeRemoteSupportAudit>[0],
-  res: Response
-): Promise<boolean> {
+async function auditOrBlock(input: Parameters<typeof writeRemoteSupportAudit>[0], res: Response): Promise<boolean> {
   try {
     await writeRemoteSupportAudit(input);
     return true;

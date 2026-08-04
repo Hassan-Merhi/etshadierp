@@ -24,10 +24,7 @@ export function registerRemoteSupportAuditRoutes(app: Express): void {
     try {
       const companyId = getSessionCompanyId(req);
       const requestedLimit = Number.parseInt(String(req.query.limit ?? "50"), 10);
-      const pageSize = Math.min(
-        MAX_PAGE_SIZE,
-        Math.max(1, Number.isFinite(requestedLimit) ? requestedLimit : 50)
-      );
+      const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Number.isFinite(requestedLimit) ? requestedLimit : 50));
       const requestedPage = Number.parseInt(String(req.query.page ?? "1"), 10);
       const page = Math.max(1, Number.isFinite(requestedPage) ? requestedPage : 1);
       const from = safeDate(req.query.from);

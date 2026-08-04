@@ -45,10 +45,7 @@ export class RemoteSupportRolloutError extends Error {
   }
 }
 
-type MutableRolloutState = Pick<
-  RemoteSupportRolloutState,
-  "stage" | "canaryCompanyIds" | "internalControllerUserIds"
->;
+type MutableRolloutState = Pick<RemoteSupportRolloutState, "stage" | "canaryCompanyIds" | "internalControllerUserIds">;
 
 const STAGES = new Set<RemoteSupportRolloutStage>(["disabled", "internal", "canary", "general"]);
 const SAFE_BOOT_STATE: MutableRolloutState = {
