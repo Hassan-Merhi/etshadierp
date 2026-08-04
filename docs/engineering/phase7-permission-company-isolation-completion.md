@@ -1,57 +1,70 @@
 # Phase 7 — Permission and Company-Isolation Completion
 
-Phase 7 establishes one reusable backend boundary for resolving the authenticated user, active company, privileged cross-company access, and explicit company membership. It preserves existing business behavior while removing role-only cross-tenant assumptions from sensitive routes.
+Phase 7 establishes one reusable backend boundary for resolving the authenticated user, active company, privileged cross-company access, and explicit company membership. Existing business behavior and response shapes are preserved while role-only cross-tenant assumptions are removed from the routes touched by the bandwidth program.
 
 ## Explicit company membership
 
-Every company-scoped request must resolve an authenticated user and a positive active company from the session. A user may access a company only when `getUserCompaniesWithRoles` contains an explicit role for that company. Admin, Owner, and Developer status does not by itself grant access to every company in the database.
+Every protected company-scoped request resolves an authenticated user and a positive active company from the session. The active role is read from `session.currentRole` with the authenticated user role as fallback. A user may access a company only when `getUserCompaniesWithRoles` contains an explicit role for that company.
+
+Admin, Owner, and Developer status does not by itself grant access to every company in the database.
 
 ## Privileged cross-company access
 
-A requested company override is accepted only for Admin, Owner, or Developer roles. The override is then checked against the user’s explicit company memberships. Non-privileged users remain bound to the active company. Invalid identifiers return a controlled 400 response; missing authentication returns 401; denied membership or cross-company access returns 403.
+A requested company override or all-accessible-companies view is accepted only for Admin, Owner, or Developer roles. The result is then restricted to the user’s explicit company memberships. Non-privileged users remain bound to the active company.
 
-## Active company
+Invalid identifiers return a controlled `400`; missing authentication returns `401`; denied membership and forbidden cross-company access return `403`. Responses include stable codes such as:
 
-The active company is resolved centrally from `req.session.currentCompanyId`. Routes no longer duplicate parsing rules or silently continue with an undefined company. The central context returns the authenticated user ID, active company ID, and current role as one consistent authorization input.
+- `INVALID_COMPANY_ID`
+- `AUTH_REQUIRED`
+- `CROSS_COMPANY_FORBIDDEN`
+- `COMPANY_ACCESS_DENIED`
 
-## Transfer boundary
+## GIT containers and reports
 
-Company-transfer authorization now delegates to the central company-access boundary. Source and destination company checks share the same membership rules as other protected routes. The compatibility `TransferRouteError` mapping remains so existing transfer API response behavior is preserved.
+GIT container lists, container details, summary reports, at-port reports, truck-location reports, and agent/duty summaries now use the central membership set.
 
-## Financial exports
+The previous behavior that allowed Admin or Developer users to read every company with an active container was removed. All-company mode now means all companies explicitly assigned to that user, not all companies in the database.
 
-The monthly net-position Excel export now requires non-POS access and resolves an optional company override through the central boundary. Previously, an Admin or Developer could provide an arbitrary company ID and the route trusted the role alone. The route now requires both a privileged role and explicit access to the requested company.
+## Voucher and Daybook boundary
 
-The export still uses the same workbook generator, date handling, company naming, headers, and output format.
+The voucher list and voucher-detail routes now assert access to the active company before reading data. Optional voucher history uses the same boundary.
+
+Supplier unified-ledger and supplier purchase-order routes no longer trust an arbitrary `companyId` or load every company. They resolve an authorized override or query only the user’s accessible companies. Container links extracted from supplier narrations are also restricted to those allowed companies.
+
+## Offload boundary
+
+Offload list, detail, optional-status toggle, and diagnostics routes assert active-company membership. Detail and mutation routes verify that the target offload belongs to the active company before loading items or changing inventory.
+
+Voucher lookups based on container-number prefixes now include the offload company in the database condition, preventing a matching container number in another company from being read or modified.
+
+## Existing protected boundaries retained
+
+- Company-transfer authorization continues to delegate to the shared boundary.
+- The monthly net-position Excel export continues to require non-POS access and explicit membership for an override.
+- Existing company-role storage remains authoritative.
+- Existing public route shapes, workbook calculations, filenames, costing behavior, and inventory calculations remain unchanged.
+- No automatic role grants or company-role backfills are performed.
 
 ## Reusable boundary
 
 `server/security/companyAccessBoundary.ts` provides:
 
-- authenticated company context resolution;
+- authenticated active-company context resolution;
+- positive company-ID parsing;
 - privileged-role classification;
 - accessible-company set resolution;
 - one-company and multi-company membership assertions;
 - authorized active/override company resolution;
-- consistent authorization error codes and HTTP responses.
+- consistent authorization errors and HTTP responses.
 
-This boundary is intended for remaining company-scoped routes, exports, background jobs, repair tools, and cross-company workflows so authorization behavior does not drift between modules.
+## Database changes
 
-## Compatibility retained
+No schema change, migration, SQL script, or data repair is required for Phase 7.
 
-- Existing company-role storage remains authoritative.
-- Existing transfer routes and services retain their public API shape.
-- Existing workbook data calculations and filenames remain unchanged.
-- POS users remain excluded from general financial exports.
-- No schema or production migration is introduced.
-- No automatic role grants or company-role backfills are performed.
+## Deferred verification
 
-## Verification boundary
+The source contract and verifier were expanded to cover GIT reports, voucher and supplier routes, offload routes, stable error codes, and removal of role-only company lookups. Per owner request, TypeScript, lint, unit, integration, PostgreSQL, build, browser, deployment, and CI checks were not run in this phase and remain part of the final all-phase verification.
 
-The Phase 7 verifier rejects duplicate transfer-owned role lookup logic, role-only company overrides in the monthly net-position export, missing explicit membership enforcement, and missing controlled authorization codes. A focused source contract covers the central boundary, transfer integration, and financial export protection.
+## Merge order
 
-The verifier and contract test were added but not executed because the owner requested no CI checks. No TypeScript, lint, unit, integration, database, build, browser, or deployment result is claimed.
-
-## Merge boundary
-
-Keep this phase as a draft and do not merge without explicit owner authorization. Earlier draft phases remain unmerged and may require ordered reconciliation before final integration.
+This phase is stacked on the Phase 5–6 branch. Phase 5–6 must be integrated before Phase 7–8, and neither branch should be merged without explicit owner authorization.
