@@ -99,7 +99,7 @@ export function registerCompanyAccessRoutes(app: Express) {
     }
   });
 
-  app.patch("/api/companies/:id", requireAuth, async (req, res) => {
+  app.patch("/api/companies/:id", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
       res.json(await storage.updateCompany(parseInt(req.params.id), req.body));
     } catch (error: unknown) {
