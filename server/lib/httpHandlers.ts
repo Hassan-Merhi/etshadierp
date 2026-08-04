@@ -32,6 +32,10 @@ export function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unexpected server error";
 }
 
+// Legacy route registrars still call this helper as a global. Keep one shared
+// implementation while those registrars are migrated to explicit imports.
+(globalThis as typeof globalThis & { getErrorMessage?: typeof getErrorMessage }).getErrorMessage = getErrorMessage;
+
 export function getErrorStack(error: unknown): string | undefined {
   return error instanceof Error ? error.stack : undefined;
 }
