@@ -118,6 +118,7 @@ function stopSessionInternal(
   if (session.status !== "active") return session;
   session.status = status;
   session.capabilities.mouse = false;
+  session.capabilities.keyboard = false;
   session.stoppedAt = now;
   session.stopReason = cleanIdentifier(reason, 160) || "stopped";
   if (activeByTargetUser.get(session.targetUserId) === session.id) {
@@ -275,8 +276,25 @@ export function setRemoteControlMouseCapability(sessionId: string, enabled: bool
   cleanupRemoteControlState();
   const session = sessions.get(cleanIdentifier(sessionId));
   if (!session || session.status !== "active") return null;
-  if (session.capabilities.mouse === enabled) return copySession(session);
+  const nextKeyboard = enabled ? session.capabilities.keyboard : false;
+  if (session.capabilities.mouse === enabled && session.capabilities.keyboard === nextKeyboard) {
+    return copySession(session);
+  }
   session.capabilities.mouse = enabled;
+  if (!enabled) session.capabilities.keyboard = false;
+  notifyTarget(session.targetUserId);
+  return copySession(session);
+}
+
+export function setRemoteControlKeyboardCapability(sessionId: string, enabled: boolean): RemoteControlSession | null {
+  cleanupRemoteControlState();
+  const session = sessions.get(cleanIdentifier(sessionId));
+  if (!session || session.status !== "active") return null;
+  if (enabled && (!session.capabilities.mouse || !isRemoteSupportEnabled("keyboardControl"))) {
+    return null;
+  }
+  if (session.capabilities.keyboard === enabled) return copySession(session);
+  session.capabilities.keyboard = enabled;
   notifyTarget(session.targetUserId);
   return copySession(session);
 }
@@ -347,6 +365,9 @@ export function cleanupRemoteControlState(now = Date.now()): void {
     if (session.status === "active") {
       if (!isRemoteSupportEnabled("remoteControl")) {
         stopSessionInternal(session, "runtime-disabled", "stopped", now);
+      } else if (!isRemoteSupportEnabled("keyboardControl") && session.capabilities.keyboard) {
+        session.capabilities.keyboard = false;
+        notifyTarget(session.targetUserId);
       } else if (now >= session.expiresAt) {
         stopSessionInternal(session, "session-expired", "expired", now);
       } else if (now - session.lastControllerHeartbeatAt > CONTROLLER_HEARTBEAT_TTL_MS) {

@@ -297,6 +297,7 @@ export function WatchUserDialog({
       <DialogContent
         className="!fixed !inset-0 !left-0 !top-0 !translate-x-0 !translate-y-0 !max-w-none !w-screen !h-screen !rounded-none p-0 overflow-hidden flex flex-col"
         data-testid="dialog-watch-user"
+        data-watched-user-id={String(userId)}
         data-screenfeed-ignore="true"
       >
         <div className="flex items-center gap-3 px-4 py-2.5 border-b shrink-0 flex-wrap gap-y-1">

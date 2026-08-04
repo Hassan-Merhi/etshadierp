@@ -1,3 +1,5 @@
+import { clearRemoteEditableFocus, focusRemoteEditableElement } from "./remote-keyboard-control-policy";
+
 export type RemoteMouseCommandType = "pointer-move" | "click" | "scroll";
 export type RemoteMouseExecutionStatus = "executed" | "blocked" | "ignored";
 
@@ -18,6 +20,10 @@ export interface RemoteMouseExecutionResult {
   reason: string | null;
   clientX: number;
   clientY: number;
+}
+
+export interface RemoteMouseExecutionOptions {
+  keyboardEnabled?: boolean;
 }
 
 const BLOCKED_SELECTOR = [
@@ -210,7 +216,8 @@ function nearestScrollableElement(element: Element | null, view: Window): HTMLEl
 export function applyRemoteMouseCommand(
   command: RemoteMouseCommandView,
   documentRef: Document = document,
-  view: Window = window
+  view: Window = window,
+  options: RemoteMouseExecutionOptions = {}
 ): RemoteMouseExecutionResult {
   if (!finiteCoordinate(command.x) || !finiteCoordinate(command.y)) {
     return { status: "ignored", reason: "invalid-coordinates", clientX: 0, clientY: 0 };
@@ -243,6 +250,11 @@ export function applyRemoteMouseCommand(
     }
     return { status: "executed", reason: null, clientX, clientY };
   }
+
+  if (options.keyboardEnabled && focusRemoteEditableElement(target)) {
+    return { status: "executed", reason: null, clientX, clientY };
+  }
+  clearRemoteEditableFocus();
 
   if (isRemoteMouseBlockedElement(target)) {
     return { status: "blocked", reason: "protected-element", clientX, clientY };

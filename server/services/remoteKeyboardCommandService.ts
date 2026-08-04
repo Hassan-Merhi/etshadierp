@@ -1,0 +1,444 @@
+import { randomUUID } from "crypto";
+import { isRemoteSupportEnabled } from "./remoteSupportRuntime";
+import {
+  getRemoteControlSession,
+  setRemoteControlKeyboardCapability,
+  type RemoteControlSession,
+} from "./remoteControlSessionService";
+
+export type RemoteKeyboardCommandType = "insert-text" | "key";
+export type RemoteKeyboardCommandResultStatus = "executed" | "blocked" | "ignored";
+export type RemoteKeyboardKey =
+  | "Backspace"
+  | "Delete"
+  | "Tab"
+  | "Escape"
+  | "Enter"
+  | "ArrowUp"
+  | "ArrowDown"
+  | "ArrowLeft"
+  | "ArrowRight"
+  | "Home"
+  | "End"
+  | "Space";
+
+export interface RemoteKeyboardCommand {
+  id: string;
+  sessionId: string;
+  targetUserId: string;
+  targetTabId: string;
+  type: RemoteKeyboardCommandType;
+  sequence: number;
+  text?: string;
+  key?: RemoteKeyboardKey;
+  shiftKey: boolean;
+  createdAt: number;
+}
+
+export interface RemoteKeyboardCommandResult {
+  commandId: string;
+  sessionId: string;
+  status: RemoteKeyboardCommandResultStatus;
+  reason: string | null;
+  completedAt: number;
+}
+
+export interface RemoteKeyboardAuthorization {
+  sessionId: string;
+  controllerUserId: string;
+  authorizedAt: number;
+  expiresAt: number;
+}
+
+export class RemoteKeyboardControlError extends Error {
+  constructor(
+    readonly code: string,
+    readonly statusCode: number,
+    message: string
+  ) {
+    super(message);
+    this.name = "RemoteKeyboardControlError";
+  }
+}
+
+type CommandListener = (command: RemoteKeyboardCommand) => void;
+type ResultListener = (result: RemoteKeyboardCommandResult) => void;
+
+interface RateWindow {
+  startedAt: number;
+  count: number;
+}
+
+const PASSWORD_CONFIRMATION_MAX_AGE_MS = 5 * 60 * 1000;
+const COMMAND_RETENTION_MS = 2 * 60 * 1000;
+const RATE_WINDOW_MS = 1000;
+const RATE_LIMIT = 30;
+const MAX_TEXT_CODE_POINTS = 64;
+const ALLOWED_KEYS = new Set<RemoteKeyboardKey>([
+  "Backspace",
+  "Delete",
+  "Tab",
+  "Escape",
+  "Enter",
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "Home",
+  "End",
+  "Space",
+]);
+
+const commandListeners = new Map<string, Set<CommandListener>>();
+const resultListeners = new Map<string, Set<ResultListener>>();
+const authorizations = new Map<string, RemoteKeyboardAuthorization>();
+const commandHistory = new Map<string, RemoteKeyboardCommand>();
+const sequenceBySession = new Map<string, number>();
+const rateWindows = new Map<string, RateWindow>();
+
+function cleanIdentifier(value: unknown, maxLength = 160): string {
+  return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+function cleanReason(value: unknown): string | null {
+  const reason = cleanIdentifier(value, 160);
+  return reason || null;
+}
+
+function cleanInsertText(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const codePoints = Array.from(value);
+  if (codePoints.length === 0 || codePoints.length > MAX_TEXT_CODE_POINTS) return null;
+  if (/[\u0000-\u001f\u007f]/u.test(value)) return null;
+  return value;
+}
+
+function activeSessionForController(
+  sessionId: string,
+  controllerUserId: string,
+  requireKeyboardCapability = true
+): RemoteControlSession {
+  const session = getRemoteControlSession(cleanIdentifier(sessionId));
+  if (!session || session.status !== "active") {
+    throw new RemoteKeyboardControlError("SESSION_INACTIVE", 409, "The support session is no longer active.");
+  }
+  if (session.controllerUserId !== cleanIdentifier(controllerUserId)) {
+    throw new RemoteKeyboardControlError("CONTROLLER_MISMATCH", 403, "This controller does not own the session.");
+  }
+  if (!isRemoteSupportEnabled("remoteControl") || !isRemoteSupportEnabled("keyboardControl")) {
+    throw new RemoteKeyboardControlError("KEYBOARD_CONTROL_DISABLED", 409, "Keyboard control is disabled.");
+  }
+  if (!session.capabilities.mouse) {
+    throw new RemoteKeyboardControlError(
+      "MOUSE_CONTROL_REQUIRED",
+      409,
+      "Enable mouse control before keyboard control."
+    );
+  }
+  if (requireKeyboardCapability && !session.capabilities.keyboard) {
+    throw new RemoteKeyboardControlError("KEYBOARD_CONTROL_DISABLED", 409, "Keyboard control is disabled.");
+  }
+  return session;
+}
+
+function activeSessionForTarget(
+  sessionId: string,
+  targetUserId: string,
+  targetTabId: string,
+  requireKeyboardCapability = true
+): RemoteControlSession {
+  const session = getRemoteControlSession(cleanIdentifier(sessionId));
+  if (!session || session.status !== "active") {
+    throw new RemoteKeyboardControlError("SESSION_INACTIVE", 409, "The support session is no longer active.");
+  }
+  if (session.targetUserId !== cleanIdentifier(targetUserId) || session.targetTabId !== cleanIdentifier(targetTabId)) {
+    throw new RemoteKeyboardControlError("TARGET_MISMATCH", 403, "This keyboard channel is not bound to this ERP tab.");
+  }
+  if (
+    !isRemoteSupportEnabled("remoteControl") ||
+    !isRemoteSupportEnabled("keyboardControl") ||
+    (requireKeyboardCapability && !session.capabilities.keyboard)
+  ) {
+    throw new RemoteKeyboardControlError("KEYBOARD_CONTROL_DISABLED", 409, "Keyboard control is disabled.");
+  }
+  return session;
+}
+
+function notify<T>(listeners: Set<(value: T) => void> | undefined, value: T): number {
+  let delivered = 0;
+  for (const listener of listeners ?? []) {
+    try {
+      listener(value);
+      delivered += 1;
+    } catch {
+      // A disconnected stream must not affect other listeners or session state.
+    }
+  }
+  return delivered;
+}
+
+function clearSessionKeyboardState(sessionId: string, disableCapability: boolean): void {
+  authorizations.delete(sessionId);
+  rateWindows.delete(sessionId);
+  sequenceBySession.delete(sessionId);
+  commandListeners.delete(sessionId);
+  resultListeners.delete(sessionId);
+  for (const [commandId, command] of commandHistory) {
+    if (command.sessionId === sessionId) commandHistory.delete(commandId);
+  }
+  if (disableCapability) setRemoteControlKeyboardCapability(sessionId, false);
+}
+
+function assertRateLimit(sessionId: string, now: number): void {
+  let window = rateWindows.get(sessionId);
+  if (!window || now - window.startedAt >= RATE_WINDOW_MS) {
+    window = { startedAt: now, count: 0 };
+    rateWindows.set(sessionId, window);
+  }
+  window.count += 1;
+  if (window.count > RATE_LIMIT) {
+    throw new RemoteKeyboardControlError("KEYBOARD_RATE_LIMITED", 429, "Keyboard commands are being sent too quickly.");
+  }
+}
+
+function assertKeyboardAuthorization(
+  sessionId: string,
+  controllerUserId: string,
+  now: number
+): RemoteKeyboardAuthorization {
+  const authorization = authorizations.get(sessionId);
+  if (
+    !authorization ||
+    authorization.controllerUserId !== cleanIdentifier(controllerUserId) ||
+    now >= authorization.expiresAt
+  ) {
+    clearSessionKeyboardState(sessionId, true);
+    throw new RemoteKeyboardControlError(
+      "KEYBOARD_AUTHORIZATION_REQUIRED",
+      428,
+      "Confirm your password before enabling keyboard control."
+    );
+  }
+  return { ...authorization };
+}
+
+export function authorizeRemoteKeyboardControl(input: {
+  sessionId: string;
+  controllerUserId: string;
+  passwordConfirmedAt: number | null | undefined;
+  now?: number;
+}): RemoteKeyboardAuthorization {
+  const now = input.now ?? Date.now();
+  const session = activeSessionForController(input.sessionId, input.controllerUserId, false);
+  const confirmedAt = input.passwordConfirmedAt;
+  if (
+    confirmedAt == null ||
+    !Number.isFinite(confirmedAt) ||
+    confirmedAt > now ||
+    now - confirmedAt > PASSWORD_CONFIRMATION_MAX_AGE_MS
+  ) {
+    throw new RemoteKeyboardControlError(
+      "PASSWORD_CONFIRMATION_REQUIRED",
+      428,
+      "Confirm your password before enabling keyboard control."
+    );
+  }
+
+  const authorization: RemoteKeyboardAuthorization = {
+    sessionId: session.id,
+    controllerUserId: session.controllerUserId,
+    authorizedAt: now,
+    expiresAt: Math.min(session.expiresAt, confirmedAt + PASSWORD_CONFIRMATION_MAX_AGE_MS),
+  };
+  authorizations.set(session.id, authorization);
+  if (!setRemoteControlKeyboardCapability(session.id, true)) {
+    clearSessionKeyboardState(session.id, false);
+    throw new RemoteKeyboardControlError("KEYBOARD_CONTROL_DISABLED", 409, "Keyboard control is disabled.");
+  }
+  return { ...authorization };
+}
+
+export function revokeRemoteKeyboardControl(input: { sessionId: string; controllerUserId: string }): void {
+  const session = activeSessionForController(input.sessionId, input.controllerUserId, false);
+  clearSessionKeyboardState(session.id, true);
+}
+
+export function getRemoteKeyboardAuthorization(
+  sessionId: string,
+  controllerUserId: string,
+  now = Date.now()
+): RemoteKeyboardAuthorization | null {
+  try {
+    activeSessionForController(sessionId, controllerUserId, false);
+    return assertKeyboardAuthorization(cleanIdentifier(sessionId), controllerUserId, now);
+  } catch {
+    return null;
+  }
+}
+
+export function publishRemoteKeyboardCommand(input: {
+  sessionId: string;
+  controllerUserId: string;
+  type: unknown;
+  text?: unknown;
+  key?: unknown;
+  shiftKey?: unknown;
+  now?: number;
+}): RemoteKeyboardCommand {
+  const now = input.now ?? Date.now();
+  const session = activeSessionForController(input.sessionId, input.controllerUserId);
+  assertKeyboardAuthorization(session.id, input.controllerUserId, now);
+  assertRateLimit(session.id, now);
+
+  if (input.type !== "insert-text" && input.type !== "key") {
+    throw new RemoteKeyboardControlError("INVALID_KEYBOARD_COMMAND", 400, "Unsupported keyboard command.");
+  }
+
+  const text = input.type === "insert-text" ? cleanInsertText(input.text) : undefined;
+  const key =
+    input.type === "key" && ALLOWED_KEYS.has(input.key as RemoteKeyboardKey)
+      ? (input.key as RemoteKeyboardKey)
+      : undefined;
+  if (input.type === "insert-text" && !text) {
+    throw new RemoteKeyboardControlError("INVALID_KEYBOARD_TEXT", 400, "Keyboard text is invalid or too long.");
+  }
+  if (input.type === "key" && !key) {
+    throw new RemoteKeyboardControlError("INVALID_KEY", 400, "This keyboard key is not allowed.");
+  }
+
+  const nextSequence = (sequenceBySession.get(session.id) ?? 0) + 1;
+  sequenceBySession.set(session.id, nextSequence);
+  const command: RemoteKeyboardCommand = {
+    id: randomUUID(),
+    sessionId: session.id,
+    targetUserId: session.targetUserId,
+    targetTabId: session.targetTabId,
+    type: input.type,
+    sequence: nextSequence,
+    ...(text ? { text } : {}),
+    ...(key ? { key } : {}),
+    shiftKey: input.shiftKey === true,
+    createdAt: now,
+  };
+
+  commandHistory.set(command.id, command);
+  const delivered = notify(commandListeners.get(session.id), command);
+  if (delivered === 0) {
+    commandHistory.delete(command.id);
+    throw new RemoteKeyboardControlError(
+      "TARGET_KEYBOARD_CHANNEL_UNAVAILABLE",
+      409,
+      "The employee ERP tab is not ready to receive keyboard commands."
+    );
+  }
+  return { ...command };
+}
+
+export function subscribeRemoteKeyboardCommands(input: {
+  sessionId: string;
+  targetUserId: string;
+  targetTabId: string;
+  listener: CommandListener;
+}): () => void {
+  const session = activeSessionForTarget(input.sessionId, input.targetUserId, input.targetTabId);
+  let listeners = commandListeners.get(session.id);
+  if (!listeners) {
+    listeners = new Set();
+    commandListeners.set(session.id, listeners);
+  }
+  listeners.add(input.listener);
+  return () => {
+    listeners?.delete(input.listener);
+    if (listeners?.size === 0) commandListeners.delete(session.id);
+  };
+}
+
+export function publishRemoteKeyboardCommandResult(input: {
+  sessionId: string;
+  commandId: string;
+  targetUserId: string;
+  targetTabId: string;
+  status: unknown;
+  reason?: unknown;
+  now?: number;
+}): RemoteKeyboardCommandResult {
+  const now = input.now ?? Date.now();
+  const session = activeSessionForTarget(input.sessionId, input.targetUserId, input.targetTabId, false);
+  const commandId = cleanIdentifier(input.commandId);
+  const command = commandHistory.get(commandId);
+  if (!command || command.sessionId !== session.id) {
+    throw new RemoteKeyboardControlError("KEYBOARD_COMMAND_NOT_FOUND", 404, "Keyboard command not found.");
+  }
+  if (input.status !== "executed" && input.status !== "blocked" && input.status !== "ignored") {
+    throw new RemoteKeyboardControlError("INVALID_KEYBOARD_RESULT", 400, "Unsupported keyboard command result.");
+  }
+
+  const result: RemoteKeyboardCommandResult = {
+    commandId,
+    sessionId: session.id,
+    status: input.status,
+    reason: cleanReason(input.reason),
+    completedAt: now,
+  };
+  commandHistory.delete(commandId);
+  notify(resultListeners.get(session.id), result);
+  return { ...result };
+}
+
+export function subscribeRemoteKeyboardResults(input: {
+  sessionId: string;
+  controllerUserId: string;
+  listener: ResultListener;
+}): () => void {
+  const session = activeSessionForController(input.sessionId, input.controllerUserId);
+  let listeners = resultListeners.get(session.id);
+  if (!listeners) {
+    listeners = new Set();
+    resultListeners.set(session.id, listeners);
+  }
+  listeners.add(input.listener);
+  return () => {
+    listeners?.delete(input.listener);
+    if (listeners?.size === 0) resultListeners.delete(session.id);
+  };
+}
+
+export function cleanupRemoteKeyboardCommandState(now = Date.now()): void {
+  const sessionIds = new Set([
+    ...authorizations.keys(),
+    ...commandListeners.keys(),
+    ...resultListeners.keys(),
+    ...sequenceBySession.keys(),
+    ...rateWindows.keys(),
+  ]);
+  for (const sessionId of sessionIds) {
+    const session = getRemoteControlSession(sessionId);
+    const authorization = authorizations.get(sessionId);
+    if (
+      !session ||
+      session.status !== "active" ||
+      !session.capabilities.mouse ||
+      !authorization ||
+      now >= authorization.expiresAt ||
+      !isRemoteSupportEnabled("keyboardControl")
+    ) {
+      clearSessionKeyboardState(sessionId, !!session && session.status === "active");
+    }
+  }
+
+  for (const [commandId, command] of commandHistory) {
+    if (now - command.createdAt > COMMAND_RETENTION_MS) commandHistory.delete(commandId);
+  }
+}
+
+export function resetRemoteKeyboardCommandStateForTests(): void {
+  commandListeners.clear();
+  resultListeners.clear();
+  authorizations.clear();
+  commandHistory.clear();
+  sequenceBySession.clear();
+  rateWindows.clear();
+}
+
+const cleanupTimer = setInterval(() => cleanupRemoteKeyboardCommandState(), 3000);
+(cleanupTimer as unknown as { unref?: () => void }).unref?.();
