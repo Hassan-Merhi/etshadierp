@@ -6,6 +6,11 @@ on:
       - agent/remote-support-phase-8-current-main
     paths:
       - .github/workflows/remote-support-phase8-env-docs.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/remote-support-phase8-env-docs.yml
 
 permissions:
   contents: write
@@ -16,6 +21,7 @@ concurrency:
 
 jobs:
   document:
+    if: github.event_name == 'push' || github.head_ref == 'agent/remote-support-phase-8-current-main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
