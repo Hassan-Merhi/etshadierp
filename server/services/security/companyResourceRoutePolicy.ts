@@ -7,11 +7,9 @@ export interface CompanyOwnedRouteMatch {
   domain: AuthorizationDomain;
 }
 
-const ERP_CONTAINER_FACTORY_ALIASES =
-  /^\/(?:api\/factory\/)?containers\/\d+\/(documents|freight)(?:\/|$)/;
+const ERP_CONTAINER_FACTORY_ALIASES = /^\/(?:api\/factory\/)?containers\/\d+\/(documents|freight)(?:\/|$)/;
 
-const ACTIVE_COMPANY_USER_ADMIN_FACTORY_ALIASES =
-  /^\/(?:api\/factory\/)?users(?:\/|$)/;
+const ACTIVE_COMPANY_USER_ADMIN_FACTORY_ALIASES = /^\/(?:api\/factory\/)?users(?:\/|$)/;
 
 export function isErpContainerFactoryAlias(path: string): boolean {
   return ERP_CONTAINER_FACTORY_ALIASES.test(path);
