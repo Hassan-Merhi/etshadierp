@@ -1,0 +1,168 @@
+name: Remote support Phase 7 audit UI wiring
+
+on:
+  push:
+    branches:
+      - agent/remote-support-phase-7-audit-protection
+  pull_request:
+    branches:
+      - agent/remote-support-phase-6-keyboard-control
+
+permissions:
+  contents: write
+
+concurrency:
+  group: remote-support-phase7-audit-ui
+  cancel-in-progress: false
+
+jobs:
+  wire:
+    if: github.event_name == 'push' || github.head_ref == 'agent/remote-support-phase-7-audit-protection'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/remote-support-phase-7-audit-protection
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - run: npm ci --no-audit --bin-links=true
+      - name: Wire audit filter and stable watched-user identity
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path("client/src/pages/settings/AuditLog.tsx")
+          text = p.read_text()
+          if '{ label: "Remote Support", value: "remote_support" }' not in text:
+              text = text.replace(
+                  '  { label: "Settings / Permissions", value: "settings_change,permission_change" },\n',
+                  '  { label: "Settings / Permissions", value: "settings_change,permission_change" },\n  { label: "Remote Support", value: "remote_support" },\n',
+                  1,
+              )
+          if "const remoteSupportAudit = filterAction === \"remote_support\";" not in text:
+              text = text.replace(
+                  "  const { data, isLoading, error, refetch, isFetching } = useQuery({\n",
+                  '  const remoteSupportAudit = filterAction === "remote_support";\n\n  const { data, isLoading, error, refetch, isFetching } = useQuery({\n',
+                  1,
+              )
+          text = text.replace(
+              '      "/api/audit-log",\n      activeCompanyId,',
+              '      remoteSupportAudit ? "/api/screen-feed/control/audit" : "/api/audit-log",\n      activeCompanyId,',
+              1,
+          )
+          old = '''      const params = new URLSearchParams({
+                action: filterAction === "all" ? "all" : filterAction,
+                module: filterModule,
+                search: debouncedSearch,
+                from: filterDateFrom,
+                to: filterDateTo,
+                page: page.toString(),
+                limit: "50",
+              });
+              const res = await apiRequest("GET", `/api/audit-log?${params.toString()}`);
+          '''
+          new = '''      const params = new URLSearchParams({
+                ...(remoteSupportAudit
+                  ? {}
+                  : {
+                      action: filterAction === "all" ? "all" : filterAction,
+                      module: filterModule,
+                    }),
+                search: debouncedSearch,
+                from: filterDateFrom,
+                to: filterDateTo,
+                page: page.toString(),
+                limit: "50",
+              });
+              const endpoint = remoteSupportAudit
+                ? "/api/screen-feed/control/audit"
+                : "/api/audit-log";
+              const res = await apiRequest("GET", `${endpoint}?${params.toString()}`);
+          '''
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif 'const endpoint = remoteSupportAudit' not in text:
+              raise SystemExit("AuditLog query block not found")
+          p.write_text(text)
+
+          p = Path("client/src/pages/settings/WatchUserDialog.tsx")
+          text = p.read_text()
+          if 'data-watched-user-id={String(userId)}' not in text:
+              text = text.replace(
+                  '        data-testid="dialog-watch-user"\n',
+                  '        data-testid="dialog-watch-user"\n        data-watched-user-id={String(userId)}\n',
+                  1,
+              )
+          p.write_text(text)
+
+          for path in [
+              "client/src/components/RemoteMouseControllerOverlay.tsx",
+              "client/src/components/RemoteKeyboardControllerOverlay.tsx",
+          ]:
+              p = Path(path)
+              text = p.read_text()
+              old = '''function matchingSession(sessions: ControllerSessionView[]): ControllerSessionView | null {
+                const dialogText = findWatchDialog()?.textContent ?? "";
+                return (
+                  sessions.find((session) => dialogText.includes(`Watching: ${session.targetUsername}`)) ?? sessions[0] ?? null
+                );
+              }
+          '''
+              old_keyboard = '''function matchingSession(sessions: RemoteControlSessionView[]): RemoteControlSessionView | null {
+                const dialogText = findWatchDialog()?.textContent ?? "";
+                return sessions.find((session) => dialogText.includes(`Watching: ${session.targetUsername}`)) ?? sessions[0] ?? null;
+              }
+          '''
+              if "dataset.watchedUserId" not in text:
+                  if "ControllerSessionView" in text and old in text:
+                      new = '''function matchingSession(sessions: ControllerSessionView[]): ControllerSessionView | null {
+                        const dialog = findWatchDialog();
+                        const watchedUserId = dialog?.dataset.watchedUserId;
+                        const dialogText = dialog?.textContent ?? "";
+                        return (
+                          sessions.find((session) => watchedUserId && session.targetUserId === watchedUserId) ??
+                          sessions.find((session) => dialogText.includes(session.targetUsername)) ??
+                          sessions[0] ??
+                          null
+                        );
+                      }
+          '''
+                      text = text.replace(old, new, 1)
+                  elif old_keyboard in text:
+                      new = '''function matchingSession(sessions: RemoteControlSessionView[]): RemoteControlSessionView | null {
+                        const dialog = findWatchDialog();
+                        const watchedUserId = dialog?.dataset.watchedUserId;
+                        const dialogText = dialog?.textContent ?? "";
+                        return (
+                          sessions.find((session) => watchedUserId && session.targetUserId === watchedUserId) ??
+                          sessions.find((session) => dialogText.includes(session.targetUsername)) ??
+                          sessions[0] ??
+                          null
+                        );
+                      }
+          '''
+                      text = text.replace(old_keyboard, new, 1)
+                  else:
+                      raise SystemExit(f"matchingSession block not found in {path}")
+              p.write_text(text)
+          PY
+      - name: Format
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            client/src/pages/settings/AuditLog.tsx \
+            client/src/pages/settings/WatchUserDialog.tsx \
+            client/src/components/RemoteMouseControllerOverlay.tsx \
+            client/src/components/RemoteKeyboardControllerOverlay.tsx \
+            server/routes/remoteSupportAuditRoutes.ts
+      - name: Commit
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client server
+          git commit -m "feat(remote-support): expose company-scoped support audit history"
+          git push --no-verify origin HEAD:agent/remote-support-phase-7-audit-protection
