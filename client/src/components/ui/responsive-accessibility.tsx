@@ -134,7 +134,6 @@ export function HorizontalScrollRegion({
       aria-describedby={descriptionId}
       tabIndex={tabIndex}
       data-horizontal-scroll="true"
-      data-horizontal-scroll-region="true"
       className={cn(
         "max-w-full touch-pan-x overflow-x-auto overscroll-x-contain rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         className
