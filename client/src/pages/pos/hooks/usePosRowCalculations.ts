@@ -57,9 +57,7 @@ export function usePosRowCalculations({
     );
     const emptyIdx = rows.findIndex((r) => !r.itemName);
     let targetRow =
-      targetRowOverride ??
-      activeRow ??
-      (draftIdx !== -1 ? draftIdx : emptyIdx);
+      targetRowOverride ?? activeRow ?? (draftIdx !== -1 ? draftIdx : emptyIdx);
     const newRows = [...rows];
     // If no suitable row found, append one
     if (targetRow === -1 || targetRow == null) {
