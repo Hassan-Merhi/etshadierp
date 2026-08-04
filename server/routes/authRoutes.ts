@@ -1,5 +1,6 @@
 import type { Express } from "express";
 
+import { registerActivityOverviewRoutes } from "./auth/activityOverviewRoutes";
 import { registerAuthAuditLogRoutes } from "./auth/auditLogRoutes";
 import { registerCompanyAccessRoutes } from "./auth/companyAccessRoutes";
 import { registerCoreAuthRoutes } from "./auth/coreAuthRoutes";
@@ -14,6 +15,7 @@ export function registerAuthRoutes(app: Express) {
   registerCoreAuthRoutes(app);
   registerSessionRoutes(app);
   registerAuthAuditLogRoutes(app);
+  registerActivityOverviewRoutes(app);
   registerUserAdministrationRoutes(app);
   registerUserAccessRoutes(app);
   registerLanguagePreferenceRoutes(app);
