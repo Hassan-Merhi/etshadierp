@@ -127,7 +127,6 @@ jobs:
             docs/remote-support-phase-7.md \
             server/routes/applicationRoutes.ts \
             server/routes/remoteControlSessionRoutes.ts \
-            server/routes/remoteKeyboardControlRoutes.ts \
             server/routes/remoteSupportAuditRoutes.ts \
             server/routes/screenFeedRoutes.ts \
             server/services/remoteControlSessionService.ts \
@@ -140,6 +139,9 @@ jobs:
             tests/remote-support-audit-service.test.ts \
             tests/remote-support-permission-contract.test.ts \
             tests/remote-support-sensitive-action-policy.test.ts
+
+          git show origin/agent/remote-support-phase-7-audit-protection:server/routes/remoteKeyboardControlRoutes.ts \
+            > server/routes/remoteKeyboardControlRoutes.ts
 
           python - <<'PY'
           import json
@@ -166,7 +168,6 @@ jobs:
                   raise SystemExit("AuthenticatedApp language overlay anchor missing")
               app = app.replace(language_line, overlay, 1)
           app = app.replace("{languageOnboarding}", "{appOverlays}")
-          # Restore the nested language node inside the overlay after the global replacement.
           app = app.replace("const appOverlays = (\n    <>\n      {appOverlays}", "const appOverlays = (\n    <>\n      {languageOnboarding}", 1)
           app_path.write_text(app)
 
@@ -188,6 +189,9 @@ jobs:
           config_path.write_text(json.dumps(current, indent=2, ensure_ascii=False) + "\n")
           PY
 
-          git add client/src/app/AuthenticatedApp.tsx config/ci-ratchet-allowances.json
-          git commit -m "fix(remote-support): reconcile current app shell and CI route ratchet"
+          git add \
+            client/src/app/AuthenticatedApp.tsx \
+            config/ci-ratchet-allowances.json \
+            server/routes/remoteKeyboardControlRoutes.ts
+          git commit -m "fix(remote-support): reconcile current app shell, keyboard audit, and CI ratchet"
           git push --no-verify origin HEAD:agent/remote-support-phase-8-current-main
