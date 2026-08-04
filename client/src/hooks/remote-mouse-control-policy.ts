@@ -186,7 +186,7 @@ export function isAllowedRemoteClickElement(
   if (!(clickable instanceof HTMLElement)) return false;
 
   if (clickable.getAttribute("data-remote-control-safe") === "true") return true;
-  if (clickable.getAttribute("role") === "tab" || clickable instanceof HTMLSummaryElement) return true;
+  if (clickable.getAttribute("role") === "tab" || clickable.tagName === "SUMMARY") return true;
   if (clickable instanceof HTMLAnchorElement) {
     return isSameOriginNavigation(clickable, location) && !DANGEROUS_TEXT.test(elementDescriptor(clickable));
   }
