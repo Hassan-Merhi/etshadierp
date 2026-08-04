@@ -11,6 +11,11 @@ import { pool } from "../db";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
 import FormDataLib from "form-data";
+import {
+  getExportAttachmentSize,
+  withSerializedExportAttachmentBuffer,
+  type ExportAttachmentSource,
+} from "../helpers/exportAttachmentSource";
 
 export interface WaSettings {
   instanceId: string;
@@ -165,38 +170,51 @@ async function sendGreenApiFileUpload({
 }: {
   settings: WaSettings;
   chatId: string;
-  buffer: Buffer;
+  buffer: ExportAttachmentSource;
   fileName: string;
   caption: string;
   mimeType: string;
 }): Promise<{ success: boolean; error?: string }> {
   const url = baseUrl(settings.instanceId, settings.apiToken, "sendFileByUpload");
+  const sizeBytes = getExportAttachmentSize(buffer);
 
-  // Use the `form-data` npm package — its getBuffer()+getHeaders() pattern
-  // produces a well-formed multipart body with correct Content-Disposition
-  // (including filename=) and a matching Content-Type boundary that Green API
-  // requires. Native Web FormData in Node 20 does not propagate the boundary
-  // correctly through native fetch, causing Green API to reject the upload.
-  const form = new FormDataLib();
-  form.append("chatId", chatId);
-  if (caption) form.append("caption", caption);
-  form.append("file", buffer, { filename: fileName, contentType: mimeType });
+  return withSerializedExportAttachmentBuffer(buffer, async (materializedBuffer) => {
+    // Green API still requires form-data#getBuffer(). Only the active upload
+    // materializes the file-backed export; queued retries keep the reusable
+    // source on disk and cannot create several multipart bodies concurrently.
+    const form = new FormDataLib();
+    form.append("chatId", chatId);
+    if (caption) form.append("caption", caption);
+    form.append("file", materializedBuffer, { filename: fileName, contentType: mimeType });
 
-  const response = await fetch(url, {
-    method: "POST",
-    body: form.getBuffer(),
-    headers: form.getHeaders(),
+    const multipartBody = form.getBuffer();
+    const response = await fetch(url, {
+      method: "POST",
+      body: multipartBody,
+      headers: form.getHeaders(),
+    });
+
+    if (!response.ok) {
+      const body = await response.text();
+      logger.error("[WA upload] Green API error", {
+        status: response.status,
+        body,
+        chatId,
+        fileName,
+        size: sizeBytes,
+      });
+      return { success: false, error: `Green API ${response.status}: ${body}` };
+    }
+
+    const json = (await response.json().catch(() => ({}))) as unknown;
+    logger.info("[WA upload] Green API response", {
+      response: json,
+      chatId,
+      fileName,
+      size: sizeBytes,
+    });
+    return { success: true };
   });
-
-  if (!response.ok) {
-    const body = await response.text();
-    logger.error("[WA upload] Green API error", { status: response.status, body, chatId, fileName, size: buffer.length });
-    return { success: false, error: `Green API ${response.status}: ${body}` };
-  }
-
-  const json = (await response.json().catch(() => ({}))) as any;
-  logger.info("[WA upload] Green API response", { response: json, chatId, fileName, size: buffer.length });
-  return { success: true };
 }
 
 // ─── Send file ────────────────────────────────────────────────────────────────
@@ -393,7 +411,7 @@ export async function sendWhatsAppFileToChatIdPos(
  */
 export async function sendWhatsAppFileToChatId(
   chatId: string,
-  buffer: Buffer,
+  buffer: ExportAttachmentSource,
   fileName: string,
   caption: string,
   mimeType = "application/octet-stream"
