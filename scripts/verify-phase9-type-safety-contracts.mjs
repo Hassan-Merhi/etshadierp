@@ -49,6 +49,8 @@ for (const invariant of [
   "parseSessionCompany",
   "authenticatedUserQueryOptions",
   "userCompaniesQueryOptions",
+  "select: (cachedValue) => parseAuthenticatedUser(cachedValue)",
+  "select: (cachedValue) => parseUserCompanies(cachedValue)",
   "response.status === 401",
 ]) {
   if (!queries.includes(invariant)) failures.push(`sessionQueryContracts.ts: missing ${invariant}`);
