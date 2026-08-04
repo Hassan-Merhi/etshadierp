@@ -60,7 +60,13 @@
     "POST /api/screen-feed/control/sessions/:sessionId/commands [requireAuth > <anonymous>]",
     "GET /api/screen-feed/control/sessions/:sessionId/results [requireAuth > <anonymous>]",
     "POST /api/screen-feed/control/sessions/:sessionId/commands/:commandId/result [requireLogin > <anonymous>]",
-    "POST /api/screen-feed/control/sessions/:sessionId/stop [requireLogin > <anonymous>]"
+    "POST /api/screen-feed/control/sessions/:sessionId/stop [requireLogin > <anonymous>]",
+    "POST /api/screen-feed/control/sessions/:sessionId/keyboard-authorization [requireAuth > <anonymous>]",
+    "POST /api/screen-feed/control/sessions/:sessionId/keyboard-authorization/revoke [requireAuth > <anonymous>]",
+    "GET /api/screen-feed/control/keyboard-commands [requireLogin > <anonymous>]",
+    "POST /api/screen-feed/control/sessions/:sessionId/keyboard-commands [requireAuth > <anonymous>]",
+    "GET /api/screen-feed/control/sessions/:sessionId/keyboard-results [requireAuth > <anonymous>]",
+    "POST /api/screen-feed/control/sessions/:sessionId/keyboard-commands/:commandId/result [requireLogin > <anonymous>]"
   ],
   "routeManifestMountAdditions": [
     "USE /api/factory/containers [postOffloadReconciliationMiddleware]",
