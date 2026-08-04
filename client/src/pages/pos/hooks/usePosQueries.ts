@@ -128,7 +128,7 @@ export function usePosQueries({
 
   const { data: posCustomers = [] } = useQuery<any[]>({
     queryKey: ["/api/pos/customers"],
-    enabled: isCreditSale,
+    enabled: isCreditSale && authUser?.canAccessCustomers === true,
   });
 
   const { data: editVoucher, isLoading: editVoucherLoading } = useQuery<any>({
