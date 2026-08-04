@@ -45,11 +45,16 @@ export class RemoteSupportRolloutError extends Error {
   }
 }
 
+type MutableRolloutState = Pick<
+  RemoteSupportRolloutState,
+  "stage" | "canaryCompanyIds" | "internalControllerUserIds"
+>;
+
 const STAGES = new Set<RemoteSupportRolloutStage>(["disabled", "internal", "canary", "general"]);
-const SAFE_BOOT_STATE = {
-  stage: "disabled" as const,
-  canaryCompanyIds: [] as number[],
-  internalControllerUserIds: [] as string[],
+const SAFE_BOOT_STATE: MutableRolloutState = {
+  stage: "disabled",
+  canaryCompanyIds: [],
+  internalControllerUserIds: [],
 };
 
 function parsePositiveIds(value: unknown): number[] {
@@ -69,7 +74,7 @@ function normalizeStage(value: unknown): RemoteSupportRolloutStage {
   return STAGES.has(stage as RemoteSupportRolloutStage) ? (stage as RemoteSupportRolloutStage) : "disabled";
 }
 
-let state = { ...SAFE_BOOT_STATE };
+let state: MutableRolloutState = { ...SAFE_BOOT_STATE };
 let revision = 1;
 let updatedAt = new Date();
 let updatedBy = "system";
