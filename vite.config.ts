@@ -46,6 +46,9 @@ export default defineConfig({
           if (normalizedId.endsWith("/client/src/lib/labelHtml.ts")) {
             return "label-printing";
           }
+          if (normalizedId.includes("/client/src/i18n/")) {
+            return "application-translations";
+          }
           if (
             id.includes("node_modules/react/") ||
             id.includes("node_modules/react-dom/") ||
