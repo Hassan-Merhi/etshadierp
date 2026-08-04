@@ -1,4 +1,4 @@
-import type { Request } from "express";
+import type { Request, Response } from "express";
 
 import { storage } from "../storage";
 
@@ -21,7 +21,7 @@ export interface CompanyAccessContext {
   role: string;
 }
 
-function parsePositiveCompanyId(value: unknown, label = "companyId"): number {
+export function parsePositiveCompanyId(value: unknown, label = "companyId"): number {
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw new CompanyAccessError(400, `${label} must be a positive integer`, "INVALID_COMPANY_ID");
@@ -30,13 +30,13 @@ function parsePositiveCompanyId(value: unknown, label = "companyId"): number {
 }
 
 export function getCompanyAccessContext(req: Request): CompanyAccessContext {
-  const userId = req.session?.userId;
+  const userId = String(req.session?.userId ?? req.user?.id ?? "").trim();
   if (!userId) {
     throw new CompanyAccessError(401, "Authentication required", "AUTH_REQUIRED");
   }
 
   const activeCompanyId = parsePositiveCompanyId(req.session?.currentCompanyId, "activeCompanyId");
-  const role = String(req.user?.role ?? "");
+  const role = String(req.session?.currentRole ?? req.user?.role ?? "");
   return { userId, activeCompanyId, role };
 }
 
@@ -100,9 +100,12 @@ export async function assertActiveCompanyAccess(req: Request): Promise<CompanyAc
   return context;
 }
 
-export function sendCompanyAccessError(res: any, error: unknown, fallbackStatus = 500) {
+export function sendCompanyAccessError(res: Response, error: unknown, fallbackStatus = 500) {
   if (error instanceof CompanyAccessError) {
     return res.status(error.status).json({ message: error.message, code: error.code });
   }
-  return res.status(fallbackStatus).json({ message: error instanceof Error ? error.message : "Request failed" });
+  return res.status(fallbackStatus).json({
+    message: error instanceof Error ? error.message : "Request failed",
+    code: "COMPANY_CONTEXT_FAILED",
+  });
 }
