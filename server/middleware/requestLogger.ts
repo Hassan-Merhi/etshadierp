@@ -10,6 +10,11 @@ import { logger } from "../lib/logger";
 import { getOperationalEventSnapshot, recordOperationalEvent } from "../lib/operationalEvents";
 import { handlePerformanceDashboard, recordPerformanceSample } from "../lib/performanceDashboard";
 import {
+  classifyRequestTiming,
+  getSlowRequestThresholdConfig,
+  getSlowRequestThresholdMs,
+} from "../lib/requestLoggingPolicy";
+import {
   getRequestPerformanceMetrics,
   runWithRequestPerformanceContext,
 } from "../lib/requestPerformanceContext";
@@ -19,11 +24,20 @@ import {
   updateTraceContext,
 } from "../lib/traceContext";
 import { writeSuccessfulActivityAudit } from "./activityAudit";
+import { getBandwidthDiagnosticSnapshot } from "./bandwidthDebug";
 import { handleClientObservability } from "./clientObservability";
 
-const SLOW_REQUEST_MS = Number(process.env.SLOW_REQUEST_MS || 500);
 const SUCCESS_SAMPLE_RATE = Math.min(1, Math.max(0, Number(process.env.REQUEST_LOG_SAMPLE_RATE || 0)));
-const SKIPPED_PATHS = new Set(["/api/health", "/api/health/db", "/api/health/metrics", "/api/health/performance", "/api/health/performance.json", "/api/boot", "/api/csrf-token"]);
+const SKIPPED_PATHS = new Set([
+  "/api/auth/me",
+  "/api/health",
+  "/api/health/db",
+  "/api/health/metrics",
+  "/api/health/performance",
+  "/api/health/performance.json",
+  "/api/boot",
+  "/api/csrf-token",
+]);
 const startedAt = Date.now();
 
 type DurationBucket = "under100" | "under500" | "under1000" | "under5000" | "over5000";
@@ -89,6 +103,7 @@ export function getRequestMetricsSnapshot() {
   const poolIdle = Number((pool as any).idleCount || 0);
   const poolWaiting = Number((pool as any).waitingCount || 0);
   const completed = metrics.success + metrics.clientError + metrics.serverError;
+  const slowRequestThresholdsMs = getSlowRequestThresholdConfig();
 
   return {
     status: poolWaiting > 0 ? "degraded" : "ok",
@@ -115,7 +130,8 @@ export function getRequestMetricsSnapshot() {
       maxDurationMs: metrics.durationMaxMs,
       slowPercent: percentage(metrics.slow, completed),
       serverErrorPercent: percentage(metrics.serverError, completed),
-      slowRequestThresholdMs: SLOW_REQUEST_MS,
+      slowRequestThresholdMs: slowRequestThresholdsMs.default,
+      slowRequestThresholdsMs,
       durationBuckets: { ...metrics.durationBuckets },
       database: {
         queryCount: metrics.dbQueryCount,
@@ -132,6 +148,7 @@ export function getRequestMetricsSnapshot() {
       waiting: poolWaiting,
       utilizationPercent: poolMax > 0 ? Math.round(((poolTotal - poolIdle) / poolMax) * 100) : null,
     },
+    bandwidth: getBandwidthDiagnosticSnapshot(),
     operationalEvents: getOperationalEventSnapshot(),
   };
 }
@@ -216,6 +233,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
         const companyId = Number(currentSession?.currentCompanyId) || undefined;
         const factoryCompanyId = Number(currentSession?.factoryCompanyId) || undefined;
         const locationId = Number(currentSession?.currentLocationId) || undefined;
+        const timingClass = classifyRequestTiming(routeTemplate);
+        const slowRequestThresholdMs = getSlowRequestThresholdMs(routeTemplate);
 
         updateTraceContext({ routeTemplate, userId, companyId, factoryCompanyId, locationId });
         recordDuration(durationMs);
@@ -228,7 +247,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
         else if (statusCode >= 400) metrics.clientError += 1;
         else metrics.success += 1;
 
-        const isSlow = durationMs >= SLOW_REQUEST_MS;
+        const isSlow = durationMs >= slowRequestThresholdMs;
         if (isSlow) metrics.slow += 1;
 
         if (statusCode >= 500) {
@@ -272,6 +291,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
           dbQueryCount: databaseMetrics.dbQueryCount,
           dbDurationMs: Math.round(databaseMetrics.dbDurationMs),
           slow: isSlow,
+          thresholdMs: slowRequestThresholdMs,
+          thresholdClass: timingClass,
         });
       });
 
