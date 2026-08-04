@@ -9,6 +9,11 @@ import { hydrateActiveCredentialVersion } from "./services/security/credentialVe
 import { CompanyIsolationError, assertRequestCompanyMatchesSession } from "./services/security/companyIsolationPolicy";
 import { decideExplicitCompanyScope } from "./services/security/companyRequestScopePolicy";
 
+const EXPECTED_ANONYMOUS_SESSION_REASONS = new Set([
+  "SESSION_REQUIRED",
+  "SESSION_USER_REQUIRED",
+]);
+
 function logDenied(params: {
   userId?: string | null;
   username?: string | null;
@@ -18,19 +23,27 @@ function logDenied(params: {
   path: string;
   reason: string;
 }) {
-  logger.error(
-    JSON.stringify({
-      event: "access_denied",
-      ts: new Date().toISOString(),
-      userId: params.userId ?? null,
-      username: params.username ?? null,
-      role: params.role ?? null,
-      companyId: params.companyId ?? null,
-      method: params.method,
-      path: params.path,
-      reason: params.reason,
-    })
-  );
+  const payload = JSON.stringify({
+    event: "access_denied",
+    ts: new Date().toISOString(),
+    userId: params.userId ?? null,
+    username: params.username ?? null,
+    role: params.role ?? null,
+    companyId: params.companyId ?? null,
+    method: params.method,
+    path: params.path,
+    reason: params.reason,
+  });
+
+  const isExpectedAnonymousRequest =
+    !params.userId && EXPECTED_ANONYMOUS_SESSION_REASONS.has(params.reason);
+
+  if (isExpectedAnonymousRequest) {
+    logger.info(payload);
+    return;
+  }
+
+  logger.error(payload);
 }
 
 function rejectInvalidSession(
@@ -91,9 +104,6 @@ function authorizeExplicitCompanyScope(req: Request, res: Response): boolean {
     return false;
   }
 
-  // This endpoint intentionally transitions the server-owned active company.
-  // The target ID is still parsed above and the route handler verifies the user
-  // has access before changing or saving any session fields.
   if (req.method === "POST" && req.path === "/api/auth/set-company") {
     return true;
   }
@@ -101,21 +111,10 @@ function authorizeExplicitCompanyScope(req: Request, res: Response): boolean {
   const userId = req.session.userId;
   const role = req.session.currentRole;
 
-  // Developers may access any company's data explicitly — skip the cross-company
-  // guard entirely for them. This lets Developer accounts query settings / ledgers
-  // for companies other than the one currently active in their session.
   if (role === "Developer") return true;
 
-  // Admin/Owner/Manager performing a GET (read-only) request may read data from
-  // other companies.  This is required for the Settings → Users page, which fetches
-  // locations from child companies to assign POS roles across the org.  GET carries
-  // no mutation risk, and these roles are already trusted to manage the system.
   if (req.method === "GET" && ["Admin", "Owner", "Manager"].includes(role ?? "")) return true;
 
-  // Use req.session.currentCompanyId (the ERP company), NOT resolveActiveCompanyId.
-  // resolveActiveCompanyId returns factoryCompanyId || currentCompanyId; when an admin
-  // has visited the factory module the factory company leaks into ERP route checks and
-  // causes spurious CROSS_COMPANY_ACCESS_DENIED 403s on routes like GET /api/locations.
   const companyId = (req.session as any).currentCompanyId ?? null;
 
   try {
@@ -141,8 +140,6 @@ function authorizeExplicitCompanyScope(req: Request, res: Response): boolean {
   }
 }
 
-// Light authentication middleware — only requires a valid user session.
-// Does NOT require a company to be selected. Use for personal-account actions.
 export async function requireLogin(req: Request, res: Response, next: NextFunction) {
   try {
     const result = await enforceCredentialAwareSession(req, {
@@ -157,7 +154,6 @@ export async function requireLogin(req: Request, res: Response, next: NextFuncti
   }
 }
 
-// Authentication middleware for company-scoped routes.
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   try {
     const sessionResult = await enforceCredentialAwareSession(req, {
