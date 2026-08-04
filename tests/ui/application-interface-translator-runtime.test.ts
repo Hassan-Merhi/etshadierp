@@ -19,7 +19,7 @@ describe("application interface translator runtime behavior", () => {
     expect(surface.textContent).toContain("Encaisser");
     expect(surface.textContent).toContain("Imprimer le reçu");
     expect(surface.querySelector("button")?.getAttribute("title")).toBe("Imprimer le reçu");
-    expect(surface.querySelector("input")?.getAttribute("placeholder")).toBe("Rechercher des clients");
+    expect(surface.querySelector("input")?.getAttribute("placeholder")).toBe("Rechercher clients");
 
     translateInterfaceTree(surface, "ar");
     expect(surface.textContent).toContain("إتمام البيع");
