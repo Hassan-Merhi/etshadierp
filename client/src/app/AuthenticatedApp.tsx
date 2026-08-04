@@ -70,7 +70,8 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
   const leaveConfirmDialog = (
     <AppLeaveConfirmDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm} onConfirm={handleConfirmLeave} />
   );
-  const languageOnboarding = <LanguageOnboardingDialog userId={user.id} />;
+  const languageOnboarding =
+    user.id === undefined ? null : <LanguageOnboardingDialog userId={user.id} />;
 
   if (isPOS) {
     return (
