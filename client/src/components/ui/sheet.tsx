@@ -68,7 +68,7 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
         <SheetPrimitive.Close
           data-slot="sheet-close"
           aria-label="Close panel"
-          className="absolute right-2 top-2 flex min-h-11 min-w-11 items-center justify-center rounded-md opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary motion-reduce:transition-none sm:right-4 sm:top-4"
+          className="absolute right-2 top-2 flex min-h-10 min-w-10 items-center justify-center rounded-md opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary motion-reduce:transition-none sm:right-4 sm:top-4"
         >
           <X className="h-4 w-4" aria-hidden="true" />
           <span className="sr-only">Close panel</span>
