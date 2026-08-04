@@ -1,0 +1,85 @@
+name: Group A Phase 2 polling and cache
+
+on:
+  push:
+    branches:
+      - agent/group-a-phase-2-polling-cache
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: group-a-phase-2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  implement-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/group-a-phase-2-polling-cache
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Normalize public npm registry
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Apply current-main Phase 2 migration
+        run: python scripts/apply-group-a-phase-2.py
+
+      - name: Format Phase 2 files
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            client/src/app/useAuthenticatedAppData.ts \
+            client/src/components/AppSidebar.tsx \
+            client/src/components/FactorySidebar.tsx \
+            client/src/components/NotificationsCenter.tsx \
+            client/src/contexts/CompanyContext.tsx \
+            client/src/lib/queryClient.ts \
+            client/src/lib/queryPolicies.ts \
+            tests/ui/group-a-phase-2-query-policies.test.ts \
+            scripts/verify-group-a-phase-2.mjs
+
+      - name: Verify Phase 2 source contracts
+        run: node scripts/verify-group-a-phase-2.mjs
+
+      - name: Run focused policy tests
+        run: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts tests/ui/group-a-phase-2-query-policies.test.ts --maxWorkers=1 --no-file-parallelism
+
+      - name: Type-check
+        run: npm run check
+
+      - name: Production build
+        run: npm run build
+
+      - name: Verify bandwidth budget
+        run: npm run verify:bandwidth
+
+      - name: Commit completed Phase 2 implementation
+        run: |
+          if git diff --quiet; then
+            echo "Group A Phase 2 is already applied."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            client/src/app/useAuthenticatedAppData.ts \
+            client/src/components/AppSidebar.tsx \
+            client/src/components/FactorySidebar.tsx \
+            client/src/components/NotificationsCenter.tsx \
+            client/src/contexts/CompanyContext.tsx \
+            client/src/lib/queryClient.ts \
+            client/src/lib/queryPolicies.ts
+          git commit -m "Complete Group A Phase 2 polling and shared cache"
+          git push origin HEAD:agent/group-a-phase-2-polling-cache
