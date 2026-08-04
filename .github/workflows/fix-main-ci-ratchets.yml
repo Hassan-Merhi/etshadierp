@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/fix-core-entry-bandwidth-budget
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -14,6 +17,7 @@ concurrency:
 
 jobs:
   reconcile:
+    if: github.event_name == 'push' || github.head_ref == 'agent/fix-core-entry-bandwidth-budget'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
