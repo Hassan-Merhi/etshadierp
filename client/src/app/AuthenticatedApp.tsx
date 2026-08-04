@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { useDialogScrollFix } from "@/hooks/use-dialog-scroll-fix";
 import { useMobilePerformanceLifecycle } from "@/hooks/use-mobile-performance-lifecycle";
 import { useLocation, Redirect } from "wouter";
@@ -14,10 +14,15 @@ import { useAuthenticatedAppData } from "./useAuthenticatedAppData";
 import { resolveAuthenticatedAppRoute } from "./authenticatedAppRouteGuard";
 import { AppLeaveConfirmDialog } from "./AppLeaveConfirmDialog";
 import { AppLoadingState } from "./AppLoadingState";
-import { PosShell } from "./PosShell";
-import { PropertiesShell } from "./PropertiesShell";
-import { FactoryShell } from "./FactoryShell";
-import { ErpShell } from "./ErpShell";
+
+const PosShell = lazy(() => import("./PosShell").then((module) => ({ default: module.PosShell })));
+const PropertiesShell = lazy(() =>
+  import("./PropertiesShell").then((module) => ({ default: module.PropertiesShell })),
+);
+const FactoryShell = lazy(() =>
+  import("./FactoryShell").then((module) => ({ default: module.FactoryShell })),
+);
+const ErpShell = lazy(() => import("./ErpShell").then((module) => ({ default: module.ErpShell })));
 
 interface AuthenticatedAppProps {
   user: AuthenticatedUser;
@@ -84,14 +89,16 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
   if (isPOS) {
     return (
       <>
-        <PosShell
-          user={user}
-          posImportEnabled={posImportEnabled}
-          chatUnread={chatUnread}
-          handleGoBack={handleGoBack}
-          handleLogout={handleLogout}
-          leaveConfirmDialog={leaveConfirmDialog}
-        />
+        <Suspense fallback={<AppLoadingState />}>
+          <PosShell
+            user={user}
+            posImportEnabled={posImportEnabled}
+            chatUnread={chatUnread}
+            handleGoBack={handleGoBack}
+            handleLogout={handleLogout}
+            leaveConfirmDialog={leaveConfirmDialog}
+          />
+        </Suspense>
         {appOverlays}
       </>
     );
@@ -100,12 +107,14 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
   if (routeState.isPropertiesCompany && routeState.isPropertiesRoute) {
     return (
       <>
-        <PropertiesShell
-          user={user}
-          currentLocation={currentLocation}
-          handleLogout={handleLogout}
-          leaveConfirmDialog={leaveConfirmDialog}
-        />
+        <Suspense fallback={<AppLoadingState />}>
+          <PropertiesShell
+            user={user}
+            currentLocation={currentLocation}
+            handleLogout={handleLogout}
+            leaveConfirmDialog={leaveConfirmDialog}
+          />
+        </Suspense>
         {appOverlays}
       </>
     );
@@ -114,13 +123,15 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
   if (routeState.isFactoryRoute || routeState.isFactoryCompany) {
     return (
       <>
-        <FactoryShell
-          user={user}
-          myAccess={myAccess}
-          factoryDefaultPage={routeState.factoryDefaultPage}
-          handleLogout={handleLogout}
-          leaveConfirmDialog={leaveConfirmDialog}
-        />
+        <Suspense fallback={<AppLoadingState />}>
+          <FactoryShell
+            user={user}
+            myAccess={myAccess}
+            factoryDefaultPage={routeState.factoryDefaultPage}
+            handleLogout={handleLogout}
+            leaveConfirmDialog={leaveConfirmDialog}
+          />
+        </Suspense>
         {appOverlays}
       </>
     );
@@ -128,12 +139,14 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
 
   return (
     <>
-      <ErpShell
-        user={user}
-        hasErpAccess={routeState.hasErpAccess}
-        handleLogout={handleLogout}
-        leaveConfirmDialog={leaveConfirmDialog}
-      />
+      <Suspense fallback={<AppLoadingState />}>
+        <ErpShell
+          user={user}
+          hasErpAccess={routeState.hasErpAccess}
+          handleLogout={handleLogout}
+          leaveConfirmDialog={leaveConfirmDialog}
+        />
+      </Suspense>
       {appOverlays}
     </>
   );
