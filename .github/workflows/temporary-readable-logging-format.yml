@@ -1,0 +1,54 @@
+name: Temporary readable logging formatter
+
+on:
+  push:
+    branches:
+      - chore/readable-production-logs-phases-1-3
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Normalize registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Format readable logging files
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            server/lib/logger.test.ts \
+            server/lib/logger.ts \
+            server/lib/requestLoggingPolicy.test.ts \
+            server/lib/requestLoggingPolicy.ts \
+            server/middleware/bandwidthDebug.test.ts \
+            server/middleware/bandwidthDebug.ts \
+            server/middleware/requestLogger.ts
+
+      - name: Upload formatted files
+        uses: actions/upload-artifact@v4
+        with:
+          name: readable-logging-formatted-files
+          if-no-files-found: error
+          retention-days: 1
+          path: |
+            server/lib/logger.test.ts
+            server/lib/logger.ts
+            server/lib/requestLoggingPolicy.test.ts
+            server/lib/requestLoggingPolicy.ts
+            server/middleware/bandwidthDebug.test.ts
+            server/middleware/bandwidthDebug.ts
+            server/middleware/requestLogger.ts
