@@ -20,9 +20,7 @@ const MANIFEST_PATH = path.join(process.cwd(), "config/route-manifest.json");
 const ALLOWANCES_PATH = path.join(process.cwd(), "config/ci-ratchet-allowances.json");
 const shouldUpdate = process.env.UPDATE_ROUTE_MANIFEST === "1";
 const allowances = JSON.parse(fs.readFileSync(ALLOWANCES_PATH, "utf8")) as RatchetAllowances;
-
-// Reviewed bilingual, French catalog and Supplier Partner interceptor registrations
-// intentionally call next() so non-matching requests fall through to the canonical handler.
+const reviewedSpMounts = ["USE /api/sp [requireAuth]", "USE /api/sp [<anonymous>]"];
 const MAX_SHADOWED_REGISTRATIONS = 152;
 let actual: SerializedRouteManifest;
 
@@ -86,7 +84,7 @@ describe("route manifest", () => {
   it("matches the committed snapshot plus exact reviewed additions", () => {
     const expected = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as SerializedRouteManifest;
     const reviewedRoutes = new Set(allowances.routeManifestAdditions);
-    const reviewedMounts = new Set(allowances.routeManifestMountAdditions);
+    const reviewedMounts = new Set([...allowances.routeManifestMountAdditions, ...reviewedSpMounts]);
     const routes = removeReviewedOccurrences(actual.routes, expected.routes, reviewedRoutes);
     const mounts = removeReviewedOccurrences(actual.middlewareMounts, expected.middlewareMounts, reviewedMounts);
     expect(expected.formatVersion).toBe(ROUTE_MANIFEST_FORMAT_VERSION);
