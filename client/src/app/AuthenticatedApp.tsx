@@ -16,12 +16,8 @@ import { AppLeaveConfirmDialog } from "./AppLeaveConfirmDialog";
 import { AppLoadingState } from "./AppLoadingState";
 
 const PosShell = lazy(() => import("./PosShell").then((module) => ({ default: module.PosShell })));
-const PropertiesShell = lazy(() =>
-  import("./PropertiesShell").then((module) => ({ default: module.PropertiesShell })),
-);
-const FactoryShell = lazy(() =>
-  import("./FactoryShell").then((module) => ({ default: module.FactoryShell })),
-);
+const PropertiesShell = lazy(() => import("./PropertiesShell").then((module) => ({ default: module.PropertiesShell })));
+const FactoryShell = lazy(() => import("./FactoryShell").then((module) => ({ default: module.FactoryShell })));
 const ErpShell = lazy(() => import("./ErpShell").then((module) => ({ default: module.ErpShell })));
 
 interface AuthenticatedAppProps {
@@ -50,11 +46,7 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
   }, [currentLocation]);
 
   const { chatUnread, posImportEnabled, myAccess, myAccessLoading, myAccessError, factorySettings } =
-    useAuthenticatedAppData({
-      selectedCompanyId: selectedCompany?.id,
-      userPresent: true,
-      isPOS,
-    });
+    useAuthenticatedAppData({ selectedCompanyId: selectedCompany?.id, userPresent: true, isPOS });
 
   if (companyLoading || !selectedCompany) return <AppLoadingState />;
 
@@ -71,20 +63,13 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
 
   if (routeState.decision.kind === "loading") return <AppLoadingState />;
   if (routeState.decision.kind === "empty") return null;
-  if (routeState.decision.kind === "redirect") {
-    return <Redirect replace to={routeState.decision.to} />;
-  }
+  if (routeState.decision.kind === "redirect") return <Redirect replace to={routeState.decision.to} />;
 
   const leaveConfirmDialog = (
     <AppLeaveConfirmDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm} onConfirm={handleConfirmLeave} />
   );
   const languageOnboarding = user.id === undefined ? null : <LanguageOnboardingDialog userId={user.id} />;
-  const appOverlays = (
-    <>
-      {languageOnboarding}
-      <RemoteSupportIndicator />
-    </>
-  );
+  const appOverlays = <>{languageOnboarding}<RemoteSupportIndicator /></>;
 
   if (isPOS) {
     return (
