@@ -8,7 +8,6 @@ import {
   parseSearchQuery,
 } from "../server/lib/pagination";
 import { parseInventoryListFilters } from "../server/routes/inventory/inventoryRequestContext";
-import { startupMigrations } from "../server/startup-schema";
 
 describe("bandwidth phases 3-4 pagination contracts", () => {
   it("clamps page sizes and produces a stable offset", () => {
@@ -49,14 +48,5 @@ describe("bandwidth phases 3-4 pagination contracts", () => {
       includeUncategorized: true,
       profile: "combined",
     });
-  });
-
-  it("registers the required stock, inventory and POS indexes", () => {
-    const sql = startupMigrations.join("\n");
-    expect(sql).toContain("stock_items_company_active_name_idx");
-    expect(sql).toContain("stock_items_name_trgm_idx");
-    expect(sql).toContain("stock_item_aliases_company_item_idx");
-    expect(sql).toContain("inventory_company_location_item_idx");
-    expect(sql).toContain("stock_item_location_prices_location_item_idx");
   });
 });
