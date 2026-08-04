@@ -102,7 +102,9 @@ export function RemoteMouseControlTarget({
           return;
         }
 
-        const result = applyRemoteMouseCommand(command);
+        const result = applyRemoteMouseCommand(command, document, window, {
+          keyboardEnabled: session.capabilities.keyboard,
+        });
         setPointer((current) => ({
           x: result.clientX,
           y: result.clientY,
