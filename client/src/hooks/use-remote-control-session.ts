@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 
 export interface RemoteControlSessionView {
@@ -25,7 +26,7 @@ export interface RemoteControlSessionView {
 }
 
 const TAB_KEY = "remote-support-browser-tab-id";
-const HEARTBEAT_MS = 8000;
+const HEARTBEAT_MS = 4000;
 
 function createTabId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -64,6 +65,7 @@ function normalizeSession(value: unknown): RemoteControlSessionView | null {
 
 export function useRemoteControlSession() {
   const tabId = useMemo(() => getRemoteSupportTabId(), []);
+  const [currentLocation] = useLocation();
   const [session, setSession] = useState<RemoteControlSessionView | null>(null);
   const [stopping, setStopping] = useState(false);
 
@@ -71,14 +73,14 @@ export function useRemoteControlSession() {
     try {
       const response = await apiRequest("POST", "/api/screen-feed/control/tab-heartbeat", {
         tabId,
-        route: window.location.pathname,
+        route: currentLocation || window.location.pathname,
       });
       const payload = await response.json();
       setSession(normalizeSession(payload?.session));
     } catch {
       // The event stream or next heartbeat will restore state.
     }
-  }, [tabId]);
+  }, [currentLocation, tabId]);
 
   useEffect(() => {
     void heartbeat();
@@ -96,7 +98,10 @@ export function useRemoteControlSession() {
   useEffect(() => {
     let eventSource: EventSource | null = null;
     try {
-      const params = new URLSearchParams({ tabId, route: window.location.pathname });
+      const params = new URLSearchParams({
+        tabId,
+        route: currentLocation || window.location.pathname,
+      });
       eventSource = new EventSource(`/api/screen-feed/control/status?${params.toString()}`, {
         withCredentials: true,
       });
@@ -112,7 +117,7 @@ export function useRemoteControlSession() {
       eventSource = null;
     }
     return () => eventSource?.close();
-  }, [tabId]);
+  }, [currentLocation, tabId]);
 
   const stop = useCallback(async () => {
     if (!session || stopping) return;
