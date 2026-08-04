@@ -1,3 +1,4 @@
+import { dispatchOperationalAlert } from "./logAlertDispatcher";
 import { logger } from "./logger";
 
 export type OperationalEventCategory = "error" | "bandwidth" | "integrity";
@@ -17,7 +18,6 @@ export interface OperationalEventInput {
   budgetBytes?: number;
   companyId?: number;
   userId?: number;
-  // Optional diagnostic metrics attached by bandwidth/performance events.
   endpointCount?: number;
   apiEndpointCount?: number;
   staticAssetCount?: number;
@@ -48,24 +48,13 @@ interface OperationalEventCodeSummary {
 }
 
 const MAX_RECENT_EVENTS = 50;
-const counts: Record<OperationalEventCategory, number> = {
-  error: 0,
-  bandwidth: 0,
-  integrity: 0,
-};
-const severityCounts: Record<OperationalEventSeverity, number> = {
-  info: 0,
-  warning: 0,
-  critical: 0,
-};
+const counts: Record<OperationalEventCategory, number> = { error: 0, bandwidth: 0, integrity: 0 };
+const severityCounts: Record<OperationalEventSeverity, number> = { info: 0, warning: 0, critical: 0 };
 const codeSummaries = new Map<string, OperationalEventCodeSummary>();
 const recentEvents: OperationalEventRecord[] = [];
 
 function normalizeCode(code: string): string {
-  const normalized = code
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_.-]+/g, "_");
+  const normalized = code.trim().toLowerCase().replace(/[^a-z0-9_.-]+/g, "_");
   return normalized.slice(0, 80) || "unknown_event";
 }
 
@@ -134,21 +123,32 @@ export function recordOperationalEvent(input: OperationalEventInput): void {
   if (event.severity === "critical") logger.error(event.message, context);
   else if (event.severity === "warning") logger.warn(event.message, context);
   else logger.info(event.message, context);
+
+  if (event.severity !== "info") {
+    void dispatchOperationalAlert({
+      severity: event.severity,
+      category: event.category,
+      code: event.code,
+      message: event.message,
+      timestamp: event.timestamp,
+      requestId: event.requestId,
+      method: event.method,
+      path: event.path,
+      status: event.status,
+      durationMs: event.durationMs,
+      responseBytes: event.responseBytes,
+      budgetBytes: event.budgetBytes,
+      companyId: event.companyId,
+    });
+  }
 }
 
 export function recordIntegrityEvent(
   code: string,
   message: string,
-  context: Omit<OperationalEventInput, "category" | "code" | "message"> = {
-    severity: "warning",
-  }
+  context: Omit<OperationalEventInput, "category" | "code" | "message"> = { severity: "warning" },
 ): void {
-  recordOperationalEvent({
-    category: "integrity",
-    code,
-    message,
-    ...context,
-  });
+  recordOperationalEvent({ category: "integrity", code, message, ...context });
 }
 
 export function getOperationalEventSnapshot() {

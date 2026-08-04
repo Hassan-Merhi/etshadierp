@@ -3,6 +3,7 @@ import { Server } from "node:http";
 
 const startedAt = Date.now();
 const slowRequestMs = Number.parseInt(process.env.SLOW_REQUEST_MS || "1000", 10);
+const emitRequestLogs = process.env.RUNTIME_OBSERVABILITY_REQUEST_LOGS === "true";
 const histogram = monitorEventLoopDelay({ resolution: 20 });
 histogram.enable();
 
@@ -48,14 +49,40 @@ function snapshot() {
   };
 }
 
+function readableMessage(action, details) {
+  if (action === "startup") {
+    return `Runtime observability started with a ${details.slowRequestMs} ms slow-request threshold.`;
+  }
+  if (action === "http-5xx") {
+    return `${details.method || "HTTP"} ${details.path || "request"} failed with status ${details.statusCode} in ${details.durationMs} ms.`;
+  }
+  if (action === "slow-request") {
+    return `${details.method || "HTTP"} ${details.path || "request"} was slow and completed in ${details.durationMs} ms.`;
+  }
+  if (action === "runtime-pressure") {
+    return `Runtime pressure detected: RSS memory is ${details.memory?.rssMb ?? "unknown"} MB and event-loop p99 is ${details.eventLoop?.p99Ms ?? "unknown"} ms.`;
+  }
+  return "Runtime observability event recorded.";
+}
+
 function log(level, action, details) {
-  console[level === "ERROR" ? "error" : level === "WARN" ? "warn" : "log"](JSON.stringify({
-    timestamp: new Date().toISOString(),
-    level,
-    module: "runtime-observability",
-    action,
-    ...details,
-  }));
+  const message = readableMessage(action, details);
+  const sharedLogger = globalThis.__erpLogger;
+  const method = level === "ERROR" ? "error" : level === "WARN" ? "warn" : "info";
+  if (sharedLogger && typeof sharedLogger[method] === "function") {
+    sharedLogger[method](message, {
+      event: `runtime.${action}`,
+      module: "runtime-observability",
+      action,
+      ...details,
+    });
+    return;
+  }
+
+  const line = `[${level}] ${message}`;
+  if (level === "ERROR") console.error(line);
+  else if (level === "WARN") console.warn(line);
+  else console.log(line);
 }
 
 const originalEmit = Server.prototype.emit;
@@ -87,10 +114,14 @@ Server.prototype.emit = function observableEmit(event, ...args) {
     if (res.statusCode >= 500) {
       metrics.total5xx += 1;
       metrics.last5xxAt = new Date().toISOString();
-      log("ERROR", "http-5xx", { method: req.method, path, statusCode: res.statusCode, durationMs });
+      if (emitRequestLogs) {
+        log("ERROR", "http-5xx", { method: req.method, path, statusCode: res.statusCode, durationMs });
+      }
     } else if (!expectedLongLived && durationMs >= slowRequestMs) {
       metrics.slowRequests += 1;
-      log("WARN", "slow-request", { method: req.method, path, statusCode: res.statusCode, durationMs });
+      if (emitRequestLogs) {
+        log("WARN", "slow-request", { method: req.method, path, statusCode: res.statusCode, durationMs });
+      }
     }
   };
 
@@ -108,4 +139,4 @@ const periodic = setInterval(() => {
 }, 60_000);
 periodic.unref();
 
-log("INFO", "startup", { slowRequestMs });
+log("INFO", "startup", { slowRequestMs, requestLogsEnabled: emitRequestLogs });

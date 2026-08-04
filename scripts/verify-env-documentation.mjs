@@ -2,12 +2,13 @@
 /**
  * verify-env-documentation.mjs
  *
- * Fails when the server reads an environment variable that .env.example does
- * not mention, or when .env.example documents one nothing reads.
+ * Fails when the server reads an environment variable that the deployment
+ * examples do not mention, or when an example documents one nothing reads.
  *
- * Without this the file drifts silently: it described 4 variables while the
- * server read 94, so every operator had to grep the source to configure a
- * deployment. A guard is the only thing that keeps that from happening again.
+ * The root .env.example remains the main deployment reference. Bounded
+ * subsystems may add a module-specific `*.env.example` beside their operator
+ * documentation when keeping every tuning option in the root file would make
+ * it harder to use.
  *
  * Usage:  node scripts/verify-env-documentation.mjs
  */
@@ -16,13 +17,16 @@ import { join, resolve } from "path";
 
 const ROOT = resolve(process.cwd());
 const SERVER_DIR = join(ROOT, "server");
-const ENV_EXAMPLE = join(ROOT, ".env.example");
+const ENV_EXAMPLES = [
+  join(ROOT, ".env.example"),
+  join(ROOT, "docs", "observability", "render-logging.env.example"),
+];
 
 /**
  * Variables the platform injects or that belong to tooling rather than to
- * configuring a deployment. Documented in .env.example's closing section as
- * context, but never something an operator sets, so they are exempt from the
- * "must be documented" rule in both directions.
+ * configuring a deployment. Documented in the root example's closing section
+ * as context, but never something an operator sets, so they are exempt from
+ * the "must be documented" rule in both directions.
  */
 const IGNORED = new Set([
   "NODE_ENV",
@@ -65,7 +69,7 @@ for (const file of collectSourceFiles(SERVER_DIR)) {
   }
 }
 
-const exampleText = readFileSync(ENV_EXAMPLE, "utf8");
+const exampleText = ENV_EXAMPLES.map((file) => readFileSync(file, "utf8")).join("\n");
 const documented = new Set(
   [...exampleText.matchAll(/^#?\s*([A-Z][A-Z_0-9]{2,})=/gm)].map((match) => match[1])
 );
@@ -78,20 +82,22 @@ const undocumented = [...used.keys()].filter((name) => !documented.has(name)).so
 const stale = [...documented].filter((name) => !used.has(name) && !IGNORED.has(name)).sort();
 
 if (undocumented.length === 0 && stale.length === 0) {
-  console.log(`✅  Environment documentation check passed — ${used.size} variables, all documented in .env.example.`);
+  console.log(
+    `✅  Environment documentation check passed — ${used.size} variables, all documented across ${ENV_EXAMPLES.length} deployment examples.`,
+  );
   process.exit(0);
 }
 
 console.error("\n❌  ENVIRONMENT DOCUMENTATION CHECK FAILED");
 
 if (undocumented.length > 0) {
-  console.error(`\n   ${undocumented.length} variable(s) read by the server but missing from .env.example:\n`);
+  console.error(`\n   ${undocumented.length} variable(s) read by the server but missing from the deployment examples:\n`);
   for (const name of undocumented) console.error(`   • ${name}  (first seen in ${used.get(name)})`);
-  console.error("\n   Add each to .env.example with its default and what it does.");
+  console.error("\n   Add each to .env.example or the owning module's *.env.example with its default and purpose.");
 }
 
 if (stale.length > 0) {
-  console.error(`\n   ${stale.length} variable(s) documented in .env.example but read nowhere:\n`);
+  console.error(`\n   ${stale.length} variable(s) documented in deployment examples but read nowhere:\n`);
   for (const name of stale) console.error(`   • ${name}`);
   console.error("\n   Remove these, or confirm they are still wired up.");
 }

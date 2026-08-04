@@ -10,20 +10,27 @@ import { logger } from "../lib/logger";
 import { getOperationalEventSnapshot, recordOperationalEvent } from "../lib/operationalEvents";
 import { handlePerformanceDashboard, recordPerformanceSample } from "../lib/performanceDashboard";
 import {
-  getRequestPerformanceMetrics,
-  runWithRequestPerformanceContext,
-} from "../lib/requestPerformanceContext";
-import {
-  normaliseRouteTemplate,
-  runWithTraceContext,
-  updateTraceContext,
-} from "../lib/traceContext";
+  classifyRequestTiming,
+  getSlowRequestThresholdConfig,
+  getSlowRequestThresholdMs,
+} from "../lib/requestLoggingPolicy";
+import { getRequestPerformanceMetrics, runWithRequestPerformanceContext } from "../lib/requestPerformanceContext";
+import { normaliseRouteTemplate, runWithTraceContext, updateTraceContext } from "../lib/traceContext";
 import { writeSuccessfulActivityAudit } from "./activityAudit";
+import { getBandwidthDiagnosticSnapshot } from "./bandwidthDebug";
 import { handleClientObservability } from "./clientObservability";
 
-const SLOW_REQUEST_MS = Number(process.env.SLOW_REQUEST_MS || 500);
 const SUCCESS_SAMPLE_RATE = Math.min(1, Math.max(0, Number(process.env.REQUEST_LOG_SAMPLE_RATE || 0)));
-const SKIPPED_PATHS = new Set(["/api/health", "/api/health/db", "/api/health/metrics", "/api/health/performance", "/api/health/performance.json", "/api/boot", "/api/csrf-token"]);
+const SKIPPED_PATHS = new Set([
+  "/api/auth/me",
+  "/api/health",
+  "/api/health/db",
+  "/api/health/metrics",
+  "/api/health/performance",
+  "/api/health/performance.json",
+  "/api/boot",
+  "/api/csrf-token",
+]);
 const startedAt = Date.now();
 
 type DurationBucket = "under100" | "under500" | "under1000" | "under5000" | "over5000";
@@ -89,6 +96,7 @@ export function getRequestMetricsSnapshot() {
   const poolIdle = Number((pool as any).idleCount || 0);
   const poolWaiting = Number((pool as any).waitingCount || 0);
   const completed = metrics.success + metrics.clientError + metrics.serverError;
+  const slowRequestThresholdsMs = getSlowRequestThresholdConfig();
 
   return {
     status: poolWaiting > 0 ? "degraded" : "ok",
@@ -115,7 +123,8 @@ export function getRequestMetricsSnapshot() {
       maxDurationMs: metrics.durationMaxMs,
       slowPercent: percentage(metrics.slow, completed),
       serverErrorPercent: percentage(metrics.serverError, completed),
-      slowRequestThresholdMs: SLOW_REQUEST_MS,
+      slowRequestThresholdMs: slowRequestThresholdsMs.default,
+      slowRequestThresholdsMs,
       durationBuckets: { ...metrics.durationBuckets },
       database: {
         queryCount: metrics.dbQueryCount,
@@ -132,6 +141,7 @@ export function getRequestMetricsSnapshot() {
       waiting: poolWaiting,
       utilizationPercent: poolMax > 0 ? Math.round(((poolTotal - poolIdle) / poolMax) * 100) : null,
     },
+    bandwidth: getBandwidthDiagnosticSnapshot(),
     operationalEvents: getOperationalEventSnapshot(),
   };
 }
@@ -157,7 +167,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
   };
   const originalEnd = res.end.bind(res);
   (res as typeof res & { end: typeof res.end }).end = function (chunk?: any, ...args: any[]): Response {
-    if (chunk != null && typeof chunk !== "function") responseBytes += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk));
+    if (chunk != null && typeof chunk !== "function")
+      responseBytes += Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk));
     return originalEnd(chunk, ...args);
   };
 
@@ -171,111 +182,128 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
       buildVersion,
       source: "http",
     },
-    () => runWithRequestPerformanceContext(() => {
-      if (handleClientObservability(req, res, requestId)) return;
-      if (handlePerformanceDashboard(req, res)) return;
+    () =>
+      runWithRequestPerformanceContext(() => {
+        if (handleClientObservability(req, res, requestId)) return;
+        if (handlePerformanceDashboard(req, res)) return;
 
-      if (req.method === "GET" && req.path === "/api/health") {
-        res.status(200).json({ status: "ok", timestamp: new Date().toISOString(), uptimeSeconds: Math.floor(process.uptime()) });
-        return;
-      }
-
-      if (req.method === "GET" && req.path === "/api/health/metrics") {
-        if (!isMonitoringRole(req)) {
-          res.status(403).json({ message: "Admin or Developer access required." });
+        if (req.method === "GET" && req.path === "/api/health") {
+          res
+            .status(200)
+            .json({ status: "ok", timestamp: new Date().toISOString(), uptimeSeconds: Math.floor(process.uptime()) });
           return;
         }
-        res.status(200).json(getRequestMetricsSnapshot());
-        return;
-      }
 
-      if (req.method === "GET" && req.path === "/api/audit-log") {
-        const companyId = Number((req as any).session?.currentCompanyId);
-        if (!Number.isSafeInteger(companyId) || companyId <= 0) {
-          res.status(409).json({ message: "Select a company before viewing activity history.", code: "AUDIT_COMPANY_REQUIRED" });
+        if (req.method === "GET" && req.path === "/api/health/metrics") {
+          if (!isMonitoringRole(req)) {
+            res.status(403).json({ message: "Admin or Developer access required." });
+            return;
+          }
+          res.status(200).json(getRequestMetricsSnapshot());
           return;
         }
-      }
 
-      if (req.path.startsWith("/api/")) {
-        metrics.total += 1;
-        metrics.active += 1;
-      }
+        if (req.method === "GET" && req.path === "/api/audit-log") {
+          const companyId = Number((req as any).session?.currentCompanyId);
+          if (!Number.isSafeInteger(companyId) || companyId <= 0) {
+            res
+              .status(409)
+              .json({ message: "Select a company before viewing activity history.", code: "AUDIT_COMPANY_REQUIRED" });
+            return;
+          }
+        }
 
-      res.on("finish", () => {
-        const { method, path } = req;
-        if (!path.startsWith("/api/")) return;
+        if (req.path.startsWith("/api/")) {
+          metrics.total += 1;
+          metrics.active += 1;
+        }
 
-        metrics.active = Math.max(0, metrics.active - 1);
-        const statusCode = res.statusCode;
-        const durationMs = Date.now() - start;
-        const routeTemplate = normaliseRouteTemplate(path, req.route?.path, req.baseUrl || "");
-        const databaseMetrics = getRequestPerformanceMetrics();
-        const currentSession = (req as any).session;
-        const userId = currentSession?.userId || (req as any).user?.id;
-        const companyId = Number(currentSession?.currentCompanyId) || undefined;
-        const factoryCompanyId = Number(currentSession?.factoryCompanyId) || undefined;
-        const locationId = Number(currentSession?.currentLocationId) || undefined;
+        res.on("finish", () => {
+          const { method, path } = req;
+          if (!path.startsWith("/api/")) return;
 
-        updateTraceContext({ routeTemplate, userId, companyId, factoryCompanyId, locationId });
-        recordDuration(durationMs);
-        metrics.dbQueryCount += databaseMetrics.dbQueryCount;
-        metrics.dbDurationMs += databaseMetrics.dbDurationMs;
-        recordPerformanceSample({ method, routeTemplate, status: statusCode, durationMs, responseBytes, dbQueryCount: databaseMetrics.dbQueryCount, dbDurationMs: databaseMetrics.dbDurationMs });
-        writeSuccessfulActivityAudit(req, statusCode);
+          metrics.active = Math.max(0, metrics.active - 1);
+          const statusCode = res.statusCode;
+          const durationMs = Date.now() - start;
+          const routeTemplate = normaliseRouteTemplate(path, req.route?.path, req.baseUrl || "");
+          const databaseMetrics = getRequestPerformanceMetrics();
+          const currentSession = (req as any).session;
+          const userId = currentSession?.userId || (req as any).user?.id;
+          const companyId = Number(currentSession?.currentCompanyId) || undefined;
+          const factoryCompanyId = Number(currentSession?.factoryCompanyId) || undefined;
+          const locationId = Number(currentSession?.currentLocationId) || undefined;
+          const timingClass = classifyRequestTiming(routeTemplate);
+          const slowRequestThresholdMs = getSlowRequestThresholdMs(routeTemplate);
 
-        if (statusCode >= 500) metrics.serverError += 1;
-        else if (statusCode >= 400) metrics.clientError += 1;
-        else metrics.success += 1;
-
-        const isSlow = durationMs >= SLOW_REQUEST_MS;
-        if (isSlow) metrics.slow += 1;
-
-        if (statusCode >= 500) {
-          recordOperationalEvent({
-            category: "error",
-            code: "http_server_error",
-            severity: "critical",
-            message: "HTTP server error detected",
-            requestId,
+          updateTraceContext({ routeTemplate, userId, companyId, factoryCompanyId, locationId });
+          recordDuration(durationMs);
+          metrics.dbQueryCount += databaseMetrics.dbQueryCount;
+          metrics.dbDurationMs += databaseMetrics.dbDurationMs;
+          recordPerformanceSample({
             method,
-            path: routeTemplate,
+            routeTemplate,
             status: statusCode,
             durationMs,
             responseBytes,
             dbQueryCount: databaseMetrics.dbQueryCount,
             dbDurationMs: databaseMetrics.dbDurationMs,
-            ...(userId != null ? { userId: Number(userId) } : {}),
-            ...(companyId != null ? { companyId } : {}),
           });
-          return;
-        }
+          writeSuccessfulActivityAudit(req, statusCode);
 
-        if (SKIPPED_PATHS.has(path)) return;
-        const isFailure = statusCode >= 400;
-        const sampledSuccess = !isFailure && SUCCESS_SAMPLE_RATE > 0 && Math.random() < SUCCESS_SAMPLE_RATE;
-        if (!isFailure && !isSlow && !sampledSuccess) return;
+          if (statusCode >= 500) metrics.serverError += 1;
+          else if (statusCode >= 400) metrics.clientError += 1;
+          else metrics.success += 1;
 
-        const level = statusCode >= 400 || isSlow ? "warn" : "info";
-        logger[level](`${method} ${routeTemplate} ${statusCode}`, {
-          module: "http",
-          action: isSlow ? "slow_request" : "request",
-          requestId,
-          routeTemplate,
-          ...(userId != null ? { userId } : {}),
-          ...(companyId != null ? { companyId } : {}),
-          ...(factoryCompanyId != null ? { factoryCompanyId } : {}),
-          ...(locationId != null ? { locationId } : {}),
-          status: statusCode,
-          durationMs,
-          responseBytes,
-          dbQueryCount: databaseMetrics.dbQueryCount,
-          dbDurationMs: Math.round(databaseMetrics.dbDurationMs),
-          slow: isSlow,
+          const isSlow = durationMs >= slowRequestThresholdMs;
+          if (isSlow) metrics.slow += 1;
+
+          if (statusCode >= 500) {
+            recordOperationalEvent({
+              category: "error",
+              code: "http_server_error",
+              severity: "critical",
+              message: "HTTP server error detected",
+              requestId,
+              method,
+              path: routeTemplate,
+              status: statusCode,
+              durationMs,
+              responseBytes,
+              dbQueryCount: databaseMetrics.dbQueryCount,
+              dbDurationMs: databaseMetrics.dbDurationMs,
+              ...(userId != null ? { userId: Number(userId) } : {}),
+              ...(companyId != null ? { companyId } : {}),
+            });
+            return;
+          }
+
+          if (SKIPPED_PATHS.has(path)) return;
+          const isFailure = statusCode >= 400;
+          const sampledSuccess = !isFailure && SUCCESS_SAMPLE_RATE > 0 && Math.random() < SUCCESS_SAMPLE_RATE;
+          if (!isFailure && !isSlow && !sampledSuccess) return;
+
+          const level = statusCode >= 400 || isSlow ? "warn" : "info";
+          logger[level](`${method} ${routeTemplate} ${statusCode}`, {
+            module: "http",
+            action: isSlow ? "slow_request" : "request",
+            requestId,
+            routeTemplate,
+            ...(userId != null ? { userId } : {}),
+            ...(companyId != null ? { companyId } : {}),
+            ...(factoryCompanyId != null ? { factoryCompanyId } : {}),
+            ...(locationId != null ? { locationId } : {}),
+            status: statusCode,
+            durationMs,
+            responseBytes,
+            dbQueryCount: databaseMetrics.dbQueryCount,
+            dbDurationMs: Math.round(databaseMetrics.dbDurationMs),
+            slow: isSlow,
+            thresholdMs: slowRequestThresholdMs,
+            thresholdClass: timingClass,
+          });
         });
-      });
 
-      next();
-    }),
+        next();
+      })
   );
 }
