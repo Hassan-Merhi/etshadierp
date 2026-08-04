@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/remote-support-phase-7-audit-protection
+  pull_request:
+    branches:
+      - agent/remote-support-phase-6-keyboard-control
 
 permissions:
   contents: write
@@ -14,6 +17,7 @@ concurrency:
 
 jobs:
   finish:
+    if: github.event_name == 'push' || github.head_ref == 'agent/remote-support-phase-7-audit-protection'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
