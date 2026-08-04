@@ -1,0 +1,71 @@
+name: Temporary mobile Phase 5 port
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  port:
+    if: github.head_ref == 'agent/mobile-responsive-phase-5-current-main-v2'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout Phase 5 branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/mobile-responsive-phase-5-current-main-v2
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config core.hooksPath /dev/null
+
+      - name: Port exact Phase 5 commits
+        run: |
+          set +e
+          git cherry-pick d8e85014afe75da3a3c7f0e446aafc31e311e67e..fd622843620aa3c8d0f7c6241fcea0235d61ca33
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "Phase 5 cherry-pick conflict"
+            git status --short
+            git diff --name-only --diff-filter=U
+            exit "$status"
+          fi
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+          npm ci --no-audit --bin-links=true
+
+      - name: Format and verify Phase 5
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            client/src/components/ui/pagination.tsx \
+            client/src/components/ui/responsive-accessibility.tsx \
+            client/src/components/ui/responsive-data-list.tsx \
+            client/src/components/ui/table.tsx \
+            docs/mobile-responsive-phase-status.md \
+            scripts/verify-mobile-responsive-phase5-tables.mjs \
+            tests/ui/mobile-responsive-phase5-tables-data-lists.test.ts
+          node scripts/verify-mobile-responsive-phase5-tables.mjs
+          npx vitest run tests/ui/mobile-responsive-phase5-tables-data-lists.test.ts
+          npm run check
+          npm run build
+
+      - name: Remove temporary workflow and push
+        run: |
+          rm .github/workflows/temp-mobile-phase5-port.yml
+          git add -A
+          git commit -m "Port mobile responsiveness Phase 5 onto current main"
+          git push origin HEAD:agent/mobile-responsive-phase-5-current-main-v2
