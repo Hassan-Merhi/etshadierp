@@ -34,8 +34,13 @@ export function usePosRowCalculations({
   focusCell,
 }: PosRowCalculationsParams) {
   const selectItem = (item: any, targetRowOverride?: number) => {
-    const canSellZeroStock = posUser?.canSellNegativeStock || authUser?.canSellNegativeStock;
-    if (item.stock === 0 && !canSellZeroStock) {
+    // authUser is the active-company session response and must win over the
+    // route prop if the company was switched after the app first authenticated.
+    // The server still performs the authoritative stock check during checkout.
+    const canSellNegativeStock =
+      authUser?.canSellNegativeStock ?? posUser?.canSellNegativeStock ?? false;
+    const availableStock = Number(item.stock);
+    if (Number.isFinite(availableStock) && availableStock <= 0 && !canSellNegativeStock) {
       setZeroStockItem(item.name);
       setZeroStockAlert(true);
       return;
