@@ -7,6 +7,7 @@ import {
   getRemoteMouseAuthorization,
   publishRemoteMouseCommand,
   publishRemoteMouseCommandResult,
+  revokeRemoteMouseControl,
   subscribeRemoteMouseCommands,
   subscribeRemoteMouseResults,
   type RemoteMouseAuthorization,
@@ -195,7 +196,7 @@ export function registerRemoteControlSessionRoutes(app: Express): void {
     if (!requireController(req, res)) return;
     const controllerUserId = sessionUserId(req);
     const sessions = listActiveRemoteControlSessionsForController(controllerUserId).map((session) => ({
-      ...serializeSession(session),
+      ...serializeSession(session)!,
       mouseAuthorization: serializeMouseAuthorization(
         getRemoteMouseAuthorization(session.id, controllerUserId)
       ),
@@ -250,6 +251,27 @@ export function registerRemoteControlSessionRoutes(app: Express): void {
         });
         res.setHeader("Cache-Control", "no-store");
         res.json({ authorization: serializeMouseAuthorization(authorization) });
+      } catch (error) {
+        handleSessionError(error, res);
+      }
+    }
+  );
+
+  app.post(
+    "/api/screen-feed/control/sessions/:sessionId/mouse-authorization/revoke",
+    requireAuth,
+    (req, res) => {
+      if (!requireController(req, res)) return;
+      try {
+        revokeRemoteMouseControl({
+          sessionId: req.params.sessionId,
+          controllerUserId: sessionUserId(req),
+        });
+        res.setHeader("Cache-Control", "no-store");
+        res.json({
+          authorization: null,
+          session: serializeSession(getRemoteControlSession(req.params.sessionId)),
+        });
       } catch (error) {
         handleSessionError(error, res);
       }
