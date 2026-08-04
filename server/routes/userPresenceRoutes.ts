@@ -11,7 +11,7 @@ import { logger } from "../lib/logger";
 import { eq, and, desc, lt, gt, ne, sql } from "drizzle-orm";
 import { db } from "../db";
 import { requireAuth } from "../auth";
-import { userActivityLog, userPresence, updatePresenceSchema } from "@shared/schema";
+import { companies, userActivityLog, userPresence, updatePresenceSchema } from "@shared/schema";
 
 export function registerUserPresenceRoutes(app: Express) {
   // User Presence tracking endpoints
@@ -47,7 +47,7 @@ export function registerUserPresenceRoutes(app: Express) {
   });
 
   // PATCH: Update user presence (heartbeat / route change)
-  // Returns 204 silently on DB failure — presence is non-critical.
+  // Returns 204 immediately; the presence write remains best-effort.
   app.patch("/api/user-presence", requireAuth, async (req, res) => {
     const parseResult = updatePresenceSchema.safeParse(req.body);
     if (!parseResult.success) {
@@ -59,61 +59,78 @@ export function registerUserPresenceRoutes(app: Express) {
     const userId = req.user!.id;
     const username = req.user!.username;
     const companyId = req.session.currentCompanyId || null;
-    const companyName = (req.session as any).currentCompanyName || null;
+    const sessionCompanyName = (req.session as any).currentCompanyName || null;
     const role = req.session.currentRole || null;
 
-    // Respond immediately — presence writes are best-effort.
     res.status(204).end();
 
-    // Upsert current presence row.
-    db.insert(userPresence)
-      .values({
-        sessionId,
-        userId,
-        username,
-        currentRoute: route,
-        companyId,
-        companyName,
-        role,
-        lastSeen: sql`now()`,
-      })
-      .onConflictDoUpdate({
-        target: userPresence.sessionId,
-        set: {
+    void (async () => {
+      let companyName = sessionCompanyName as string | null;
+      if (!companyName && companyId) {
+        const [companyRow] = await db
+          .select({ name: companies.name })
+          .from(companies)
+          .where(eq(companies.id, companyId))
+          .limit(1);
+        companyName = companyRow?.name ?? null;
+
+        if (companyName) {
+          (req.session as any).currentCompanyName = companyName;
+          req.session.save((error) => {
+            if (error) {
+              logger.warn("[Presence] Could not persist repaired company name in session.", {
+                error: getErrorMessage(error),
+                userId,
+                companyId,
+              });
+            }
+          });
+        }
+      }
+
+      await db
+        .insert(userPresence)
+        .values({
+          sessionId,
+          userId,
+          username,
           currentRoute: route,
           companyId,
           companyName,
           role,
           lastSeen: sql`now()`,
-        },
-      })
-      .catch((err: unknown) => {
-        logger.error("[Presence] Heartbeat upsert error:", { error: getErrorMessage(err) });
-      });
+        })
+        .onConflictDoUpdate({
+          target: userPresence.sessionId,
+          set: {
+            currentRoute: route,
+            companyId,
+            companyName,
+            role,
+            lastSeen: sql`now()`,
+          },
+        });
 
-    // Log route changes to activity log so admins can watch navigation history.
-    if (type === "route_change") {
-      db.insert(userActivityLog)
-        .values({
+      if (type === "route_change") {
+        await db.insert(userActivityLog).values({
           userId,
           username,
           companyId,
           companyName,
           route,
-        })
-        .catch((err: unknown) => {
-          logger.error("[ActivityLog] Insert error:", { error: getErrorMessage(err) });
         });
 
-      // Prune: keep only last 200 entries per user (fire-and-forget).
-      db.execute(
-        sql`DELETE FROM user_activity_log WHERE user_id = ${userId}
-              AND id NOT IN (
-                SELECT id FROM user_activity_log WHERE user_id = ${userId}
-                ORDER BY occurred_at DESC LIMIT 200
-              )`
-      ).catch(() => {});
-    }
+        db.execute(
+          sql`DELETE FROM user_activity_log WHERE user_id = ${userId}
+                AND id NOT IN (
+                  SELECT id FROM user_activity_log WHERE user_id = ${userId}
+                  ORDER BY occurred_at DESC LIMIT 200
+                )`
+        ).catch(() => {});
+      }
+    })().catch((error: unknown) => {
+      logger.error("[Presence] Heartbeat processing error:", { error: getErrorMessage(error) });
+    });
   });
 
   // GET: Fetch a single user's current presence (for Watch panel polling).
