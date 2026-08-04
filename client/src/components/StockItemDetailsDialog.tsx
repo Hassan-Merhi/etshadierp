@@ -94,7 +94,7 @@ export function StockItemDetailsDialog({
   // Only needs id/name/code/uom — use the light endpoint.
   // companyId is resolved server-side from session; no need to pass it in the URL or key.
   const { data: allStockItems = [] } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items/light"],
+    queryKey: ["/api/stock-items/light?all=true"],
     enabled: open && editingTransaction !== null,
     staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -135,7 +135,7 @@ export function StockItemDetailsDialog({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/stock-items/${stockItemId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light?all=true"] });
       setIsEditingDetails(false);
       toast({
         title: "Stock Item Updated",

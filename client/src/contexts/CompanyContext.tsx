@@ -3,10 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest, getQueryFn, queryClient, setAppTimezone } from "@/lib/queryClient";
 import {
   cancelCompanySessionQueries,
-  companyQueryKey,
   isCompanySessionQueryKey,
   removeCompanySessionQueries,
 } from "@/lib/companyQueryScope";
+import { stableReferenceQueryPolicy } from "@/lib/queryPolicies";
 import { createCompanySwitchQueue, type CompanySwitchQueue } from "@/lib/companySwitchQueue";
 import {
   parseSessionCompany,
@@ -23,12 +23,15 @@ const PREFETCH_KEYS = [
   "/api/locations",
   "/api/employees",
   "/api/fixed-assets",
+  "/api/stock-groups",
+  "/api/stock-categories",
+  "/api/stock-grades",
 ] as const;
 
-function prefetchReferenceData(companyId: number, role?: string) {
+function prefetchReferenceData(_companyId: number, role?: string) {
   if (role === "POS") return;
   for (const url of PREFETCH_KEYS) {
-    queryClient.prefetchQuery({ queryKey: companyQueryKey(url, companyId) });
+    queryClient.prefetchQuery({ queryKey: [url], ...stableReferenceQueryPolicy });
   }
 }
 
@@ -106,8 +109,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const companies: Company[] = userCompanyAssignments
     .map(mapCompanyAssignment)
     .filter(
-      (company, index, allCompanies) =>
-        index === allCompanies.findIndex((candidate) => candidate.id === company.id),
+      (company, index, allCompanies) => index === allCompanies.findIndex((candidate) => candidate.id === company.id)
     );
 
   const commitCompanySelection = useCallback((company: Company, options: CompanyCommitOptions) => {
@@ -146,13 +148,13 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       commitCompanySelection(company, { prefetch: true, serverSynced: true });
       return true;
     },
-    [commitCompanySelection],
+    [commitCompanySelection]
   );
 
   const selectCompany = useCallback(
     (company: Company, options: CompanySelectionOptions = {}) =>
       switchQueueRef.current!.enqueue(() => performCompanySelection(company, options)),
-    [performCompanySelection],
+    [performCompanySelection]
   );
 
   const scheduleInitialSyncRetry = useCallback(() => {
@@ -168,7 +170,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     () => () => {
       if (initialRetryTimer.current !== null) window.clearTimeout(initialRetryTimer.current);
     },
-    [],
+    []
   );
 
   useEffect(() => {
@@ -228,14 +230,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         console.error("[Company] Initial company synchronization failed; retrying.", error);
         scheduleInitialSyncRetry();
       });
-  }, [
-    commitCompanySelection,
-    companies,
-    initialSyncAttempt,
-    scheduleInitialSyncRetry,
-    selectCompany,
-    selectedCompany,
-  ]);
+  }, [commitCompanySelection, companies, initialSyncAttempt, scheduleInitialSyncRetry, selectCompany, selectedCompany]);
 
   return (
     <CompanyContext.Provider

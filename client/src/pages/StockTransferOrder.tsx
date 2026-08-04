@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment, useRef, useCallback } from "react";
+import { useState, useEffect, Fragment, useRef, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
@@ -50,6 +50,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
+import { useStockItemSearch } from "@/hooks/useStockItemSearch";
 
 import type {
   ImportPreviewRow,
@@ -232,12 +233,19 @@ export default function StockTransferOrder() {
     enabled: !!editVoucherId,
   });
 
-  const { data: stockItems = [] } = useQuery<Array<{ id: number; name: string; code: string; uom: string }>>({
-    queryKey: ["/api/stock-items/light", selectedCompany?.id],
-    staleTime: 10 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
+  const editStockItemIds = Array.from(
+    new Set(((existingTransfer?.items ?? []) as any[]).map((item) => Number(item.stockItemId)).filter((id) => id > 0))
+  );
+  const { items: editStockItems } = useStockItemSearch<{
+    id: number;
+    name: string;
+    code: string;
+    uom: string;
+  }>({
+    companyId: selectedCompany?.id,
+    selectedIds: editStockItemIds,
+    enabled: !!editVoucherId && editStockItemIds.length > 0,
+    pageSize: 100,
   });
 
   const { data: revisions = [] } = useQuery<any[]>({
@@ -265,6 +273,17 @@ export default function StockTransferOrder() {
     },
     enabled: selectedLocationIds.length > 0,
   });
+
+  const stockItems = useMemo<StockItemData[]>(() => {
+    const byId = new Map<number, StockItemData>();
+    for (const group of summaryData?.stockGroups ?? []) {
+      for (const item of group.items) byId.set(item.id, item);
+    }
+    for (const item of editStockItems) {
+      if (!byId.has(item.id)) byId.set(item.id, { ...item, locationData: {} });
+    }
+    return Array.from(byId.values());
+  }, [summaryData, editStockItems]);
 
   useEffect(() => {
     if (!editVoucherId) {

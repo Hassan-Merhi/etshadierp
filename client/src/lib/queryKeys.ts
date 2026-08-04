@@ -16,7 +16,7 @@ import { canonicalApiUrl, companyDataKey } from "./frontendDataArchitecture";
  */
 
 export function normalizeFilters(
-  filters: Record<string, unknown> | null | undefined,
+  filters: Record<string, unknown> | null | undefined
 ): Record<string, unknown> | undefined {
   if (!filters) return undefined;
   const clean: Record<string, unknown> = {};
@@ -34,17 +34,16 @@ export const companyKeys = {
   url: (requestUrl: string, companyId: number | string | null | undefined, ...identity: readonly unknown[]) =>
     companyDataKey(requestUrl, companyId, ...identity),
 
-  reference: (url: string, companyId: number | string | null | undefined) =>
-    companyDataKey(url, companyId),
+  reference: (url: string, companyId: number | string | null | undefined) => companyDataKey(url, companyId),
 
   accounts: (
     companyId: number | string | null | undefined,
-    params?: Record<string, string | number | boolean | null | undefined>,
+    params?: Record<string, string | number | boolean | null | undefined>
   ) => companyDataKey(canonicalApiUrl("/api/accounts/all", params), companyId),
 
   vouchers: (
     companyId: number | string | null | undefined,
-    params?: Record<string, string | number | boolean | null | undefined>,
+    params?: Record<string, string | number | boolean | null | undefined>
   ) => companyDataKey(canonicalApiUrl("/api/vouchers", params), companyId),
 
   dashboardCash: (companyId: number | string | null | undefined) =>
@@ -58,13 +57,11 @@ export const companyKeys = {
 
   companyAccounts: (
     activeCompanyId: number | string | null | undefined,
-    targetCompanyId: number | string | null | undefined,
+    targetCompanyId: number | string | null | undefined
   ) => companyDataKey(`/api/company-accounts/${targetCompanyId ?? "no-company"}`, activeCompanyId, targetCompanyId),
 
-  autoTransferConfig: (
-    companyId: number | string | null | undefined,
-    modulePrefix: string,
-  ) => companyDataKey(`${modulePrefix}/auto-transfer-config`, companyId),
+  autoTransferConfig: (companyId: number | string | null | undefined, modulePrefix: string) =>
+    companyDataKey(`${modulePrefix}/auto-transfer-config`, companyId),
 
   voucherSearch: (companyId: number | string | null | undefined, search: string) =>
     companyDataKey("/api/vouchers/search", companyId, search),
@@ -88,10 +85,11 @@ export const inventoryKeys = {
 
 export const stockItemKeys = {
   light: (companyId: number | string | undefined) => ["/api/stock-items/light", companyId] as const,
+  allLight: (companyId: number | string | undefined) => ["/api/stock-items/light?all=true", companyId] as const,
   full: (companyId: number | string | undefined) => ["/api/stock-items", companyId] as const,
   page: (
     companyId: number | string | undefined,
-    params: Record<string, string | number | boolean | null | undefined>,
+    params: Record<string, string | number | boolean | null | undefined>
   ) => companyDataKey(canonicalApiUrl("/api/stock-items", params), companyId),
 };
 

@@ -3,17 +3,17 @@
  *
  * Extracted from DataToolsTab.tsx during the Phase 4 god-file split.
  */
-import {useState, useRef} from "react";
-import {Card, CardHeader, CardTitle, CardContent, CardDescription} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {Alert, AlertDescription} from "@/components/ui/alert";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Badge} from "@/components/ui/badge";
-import {useToast} from "@/hooks/use-toast";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {Loader2, AlertTriangle, Upload, Check, X, FileSpreadsheet, FileDown} from "lucide-react";
-import {utils, writeFile, readFile} from "@/lib/excelHelper";
-import type {BulkMergePairRow, BulkMergeResult} from "../types";
+import { useState, useRef } from "react";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Loader2, AlertTriangle, Upload, Check, X, FileSpreadsheet, FileDown } from "lucide-react";
+import { utils, writeFile, readFile } from "@/lib/excelHelper";
+import type { BulkMergePairRow, BulkMergeResult } from "../types";
 
 export function BulkMergeStockItemsCard({ embedded }: { embedded?: boolean }) {
   const { toast } = useToast();
@@ -71,7 +71,7 @@ export function BulkMergeStockItemsCard({ embedded }: { embedded?: boolean }) {
       if (!res.ok) throw new Error(data.message || "Bulk merge failed");
       setResults(data.results ?? []);
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light?all=true"] });
       const succeeded = (data.results as BulkMergeResult[]).filter((r) => r.status === "success").length;
       toast({ title: `Bulk merge done — ${succeeded} of ${data.results.length} merged` });
     } catch (err: any) {

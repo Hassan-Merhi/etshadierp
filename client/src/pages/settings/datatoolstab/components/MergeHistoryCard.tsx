@@ -3,19 +3,28 @@
  *
  * Extracted from DataToolsTab.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {Card, CardHeader, CardTitle, CardContent, CardDescription} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {Alert, AlertDescription} from "@/components/ui/alert";
-import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle} from "@/components/ui/alert-dialog";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {Badge} from "@/components/ui/badge";
-import {Skeleton} from "@/components/ui/skeleton";
-import {useToast} from "@/hooks/use-toast";
-import {useQuery} from "@tanstack/react-query";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {Loader2, AlertTriangle, RotateCcw} from "lucide-react";
-import type {MergeLogEntry} from "../types";
+import { useState } from "react";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Loader2, AlertTriangle, RotateCcw } from "lucide-react";
+import type { MergeLogEntry } from "../types";
 
 export function MergeHistoryCard({ embedded }: { embedded?: boolean }) {
   const { toast } = useToast();
@@ -47,7 +56,7 @@ export function MergeHistoryCard({ embedded }: { embedded?: boolean }) {
       setUnmergeTarget(null);
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items/merge-logs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light?all=true"] });
     } catch (err: any) {
       toast({ title: "Unmerge failed", description: err.message, variant: "destructive" });
     } finally {
@@ -69,7 +78,7 @@ export function MergeHistoryCard({ embedded }: { embedded?: boolean }) {
       setHistoricalRestoreTarget(null);
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items/merge-logs/historical"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light?all=true"] });
     } catch (err: any) {
       toast({ title: "Restore failed", description: err.message, variant: "destructive" });
     } finally {

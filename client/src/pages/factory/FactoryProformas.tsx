@@ -124,7 +124,7 @@ export default function FactoryProformas() {
   });
 
   const { data: allStockItems = [] } = useQuery<any[]>({
-    queryKey: ["/api/stock-items/light", selectedCompany?.id],
+    queryKey: ["/api/stock-items/light?all=true", selectedCompany?.id],
     enabled: isAddLineOpen || expandedProformaIds.size > 0,
     staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,

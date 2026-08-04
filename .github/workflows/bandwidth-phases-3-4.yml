@@ -1,0 +1,242 @@
+name: Bandwidth phases 3-4
+
+on:
+  push:
+    branches:
+      - bandwidth-phases-1-2
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "client/src/components/PaginationBar.tsx"
+      - "client/src/components/stock-transfer/SmartTransferGeneratorDialog.tsx"
+      - "client/src/hooks/useDebouncedValue.ts"
+      - "client/src/hooks/useStockItemSearch.ts"
+      - "client/src/lib/queryKeys.ts"
+      - "client/src/pages/CombinedInventory.tsx"
+      - "client/src/pages/LocationInventory.tsx"
+      - "client/src/pages/StockItemDetail.tsx"
+      - "client/src/pages/StockTransferOrder.tsx"
+      - "client/src/pages/Vouchers.tsx"
+      - "client/src/pages/location-inventory/**"
+      - "client/src/pages/pos/POSPriceList.tsx"
+      - "client/src/pages/pos/pospricelist/**"
+      - "client/src/pages/settings/DataToolsTab.tsx"
+      - "client/src/pages/settings/datatoolstab/components/BulkMergeStockItemsCard.tsx"
+      - "client/src/pages/settings/datatoolstab/components/MergeHistoryCard.tsx"
+      - "client/src/pages/settings/datatoolstab/components/MergeStockItemsCard.tsx"
+      - "client/src/pages/stocktransferorder/**"
+      - "client/src/pages/vouchers/StockAdjustmentForm.tsx"
+      - "client/src/pages/vouchers/StockTransferForm.tsx"
+      - "client/src/pages/vouchers/stocktransferform/**"
+      - "client/src/pages/vouchers/useVoucherQueries.ts"
+      - "docs/stock-items-bandwidth-light-callers.md"
+      - "server/lib/pagination.ts"
+      - "server/routes/inventory/**"
+      - "server/routes/location/locationInventoryRoutes.ts"
+      - "server/routes/location/locationInventoryPaging.ts"
+      - "server/routes/stock/stockLightRoutes.ts"
+      - "server/routes/stock/transfer-adj/price-list.ts"
+      - "server/routes/stock/transfer-adj/posPriceListPaging.ts"
+      - "server/startup-schema/011-bandwidth-search-indexes.ts"
+      - "shared/schema/inventory.ts"
+      - "scripts/enforce-bandwidth-phases-3-4-backend.py"
+      - "scripts/enforce-bandwidth-phases-3-4-frontend.py"
+      - "scripts/fix-bandwidth-phases-3-4-ci.py"
+      - "scripts/harden-bandwidth-phases-3-4.py"
+      - "scripts/test-bandwidth-phases-3-4.mts"
+      - "scripts/update-startup-schema-integrity.mts"
+      - "scripts/verify-bandwidth-phases-3-4.mjs"
+      - "tests/bandwidth-phases-3-4.test.ts"
+      - "tests/program-6c-stock-light-route.test.ts"
+      - "tests/startup-schema-integrity.test.ts"
+      - ".github/workflows/bandwidth-phases-3-4.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bandwidth-phases-3-4-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  complete-and-verify:
+    if: github.event_name == 'push' || github.head_ref == 'bandwidth-phases-1-2'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
+      NODE_ENV: test
+      SESSION_SECRET: bandwidth-phase-3-4-ci
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: bandwidth-phases-1-2
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+
+      - name: Apply Phase 3-4 backend implementation
+        run: |
+          if grep -q 'getPaginatedLocationInventory' server/routes/location/locationInventoryRoutes.ts \
+            && grep -q 'filters.profile === "combined"' server/routes/inventory/inventoryQueryService.ts; then
+            echo "Phase 3-4 backend base is already applied."
+          else
+            python scripts/enforce-bandwidth-phases-3-4-backend.py
+          fi
+
+      - name: Apply Phase 3-4 frontend implementation
+        run: |
+          if grep -q 'usePaginatedPriceList' client/src/pages/pos/POSPriceList.tsx \
+            && grep -q 'profile: "combined"' client/src/pages/location-inventory/useLocationInventoryQueries.ts \
+            && grep -q 'useStockItemSearch' client/src/pages/vouchers/StockTransferForm.tsx; then
+            echo "Phase 3-4 frontend base is already applied."
+          else
+            python scripts/enforce-bandwidth-phases-3-4-frontend.py
+          fi
+
+      - name: Apply Phase 3-4 hardening
+        run: |
+          if grep -q 'explicitFullList' server/routes/stock/stockLightRoutes.ts \
+            && grep -q 'unpricedByGroup' server/routes/stock/transfer-adj/posPriceListPaging.ts \
+            && grep -q 'effectiveAdjustmentLocationId' client/src/pages/vouchers/StockAdjustmentForm.tsx \
+            && grep -q 'useStockTransferOrderItems' client/src/pages/StockTransferOrder.tsx \
+            && grep -q 'allInventoryTotals' client/src/pages/LocationInventory.tsx; then
+            echo "Phase 3-4 hardening is already applied."
+          else
+            python scripts/harden-bandwidth-phases-3-4.py
+          fi
+
+      - name: Apply Phase 3-4 CI and architecture repairs
+        run: |
+          if grep -q 'useStockTransferOrderItems' client/src/pages/StockTransferOrder.tsx \
+            && grep -q 'fetchFilteredPriceListForExport' client/src/pages/pos/POSPriceList.tsx \
+            && grep -q 'fetchMissingTransferRates' client/src/pages/vouchers/StockTransferForm.tsx \
+            && grep -q 'si.company_id = \$1' tests/program-6c-stock-light-route.test.ts; then
+            echo "Phase 3-4 CI repairs are already applied."
+          else
+            python scripts/fix-bandwidth-phases-3-4-ci.py
+          fi
+
+      - name: Fix Phase 3-4 lint regression
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("client/src/pages/pos/POSPriceList.tsx")
+          source = path.read_text().replace("  PriceListItem,\n", "")
+          path.write_text(source)
+          PY
+
+      - name: Update startup schema integrity pin
+        run: node node_modules/tsx/dist/cli.mjs scripts/update-startup-schema-integrity.mts
+
+      - name: Format changed files
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            client/src/components/PaginationBar.tsx \
+            client/src/components/stock-transfer/SmartTransferGeneratorDialog.tsx \
+            client/src/hooks/useDebouncedValue.ts \
+            client/src/hooks/useStockItemSearch.ts \
+            client/src/lib/queryKeys.ts \
+            client/src/pages/CombinedInventory.tsx \
+            client/src/pages/LocationInventory.tsx \
+            client/src/pages/StockItemDetail.tsx \
+            client/src/pages/StockTransferOrder.tsx \
+            client/src/pages/Vouchers.tsx \
+            client/src/pages/location-inventory/AllItemsView.tsx \
+            client/src/pages/location-inventory/CombinedStockView.tsx \
+            client/src/pages/location-inventory/StockGroupItemsView.tsx \
+            client/src/pages/location-inventory/useCombinedStockRows.ts \
+            client/src/pages/location-inventory/useLocationInventoryQueries.ts \
+            client/src/pages/location-inventory/useStockGroupSummaries.ts \
+            client/src/pages/pos/POSPriceList.tsx \
+            client/src/pages/pos/pospricelist/types.ts \
+            client/src/pages/pos/pospricelist/usePaginatedPriceList.ts \
+            client/src/pages/settings/DataToolsTab.tsx \
+            client/src/pages/settings/datatoolstab/components/BulkMergeStockItemsCard.tsx \
+            client/src/pages/settings/datatoolstab/components/MergeHistoryCard.tsx \
+            client/src/pages/settings/datatoolstab/components/MergeStockItemsCard.tsx \
+            client/src/pages/stocktransferorder/useStockTransferOrderItems.ts \
+            client/src/pages/vouchers/StockAdjustmentForm.tsx \
+            client/src/pages/vouchers/StockTransferForm.tsx \
+            client/src/pages/vouchers/stocktransferform/bandwidth.ts \
+            client/src/pages/vouchers/useVoucherQueries.ts \
+            docs/stock-items-bandwidth-light-callers.md \
+            server/lib/pagination.ts \
+            server/routes/inventory/inventoryQueryService.ts \
+            server/routes/inventory/inventoryRequestContext.ts \
+            server/routes/location/locationInventoryPaging.ts \
+            server/routes/location/locationInventoryRoutes.ts \
+            server/routes/stock/stockLightRoutes.ts \
+            server/routes/stock/transfer-adj/posPriceListPaging.ts \
+            server/routes/stock/transfer-adj/price-list.ts \
+            server/startup-schema/011-bandwidth-search-indexes.ts \
+            server/startup-schema/index.ts \
+            shared/schema/inventory.ts \
+            scripts/test-bandwidth-phases-3-4.mts \
+            scripts/verify-bandwidth-phases-3-4.mjs \
+            tests/bandwidth-phases-3-4.test.ts \
+            tests/program-6c-stock-light-route.test.ts \
+            tests/startup-schema-integrity.test.ts
+
+      - name: Verify Phase 3-4 contracts
+        run: node scripts/verify-bandwidth-phases-3-4.mjs
+
+      - name: Focused regression tests
+        run: node node_modules/tsx/dist/cli.mjs scripts/test-bandwidth-phases-3-4.mts
+
+      - name: Lint changed regression surface
+        run: |
+          node node_modules/eslint/bin/eslint.js \
+            client/src/components/PaginationBar.tsx \
+            client/src/pages/pos/POSPriceList.tsx \
+            client/src/pages/pos/pospricelist/usePaginatedPriceList.ts \
+            client/src/pages/vouchers/StockAdjustmentForm.tsx \
+            client/src/pages/vouchers/StockTransferForm.tsx \
+            client/src/pages/vouchers/stocktransferform/bandwidth.ts \
+            client/src/pages/StockTransferOrder.tsx \
+            client/src/pages/stocktransferorder/useStockTransferOrderItems.ts \
+            server/routes/stock/stockLightRoutes.ts \
+            server/routes/location/locationInventoryPaging.ts \
+            server/routes/stock/transfer-adj/posPriceListPaging.ts
+
+      - name: Type-check
+        run: npm run check
+
+      - name: Production build
+        run: npm run build
+
+      - name: Commit completed Phase 3-4 implementation
+        if: github.event_name == 'push'
+        run: |
+          if git diff --quiet; then
+            echo "Phase 3-4 branch already contains the completed implementation."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Split and verify Phase 3-4 bandwidth logic"
+          git push origin HEAD:bandwidth-phases-1-2

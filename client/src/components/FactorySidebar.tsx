@@ -36,6 +36,8 @@ import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { companyQueryKey } from "@/lib/companyQueryScope";
+import { accessQueryPolicy, liveCountQueryPolicy, stableSettingsQueryPolicy } from "@/lib/queryPolicies";
 import { useConnectivity } from "@/contexts/ConnectivityContext";
 import { useRef, useEffect, useMemo } from "react";
 import { useRecentNav } from "@/hooks/use-recent-nav";
@@ -179,23 +181,28 @@ export function useFactoryVisibleSections(user?: any): {
   isDeveloper: boolean;
   isPrivileged: boolean;
 } {
+  const { selectedCompany } = useCompany();
   const isDeveloper = user?.role === "Developer";
   const isAdmin = user?.role === "Admin" || user?.role === "Owner" || isDeveloper;
 
   const { data: settings } = useQuery<any>({
-    queryKey: ["/api/factory/settings"],
+    queryKey: companyQueryKey("/api/factory/settings", selectedCompany?.id),
     queryFn: async () => {
       const r = await fetch("/api/factory/settings");
       return r.ok ? r.json() : {};
     },
-    staleTime: 60000,
-    enabled: !!user,
+    ...stableSettingsQueryPolicy,
+    enabled: !!user && !!selectedCompany?.id,
   });
 
-  const { data: myAccess } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hiddenCostFields: string[] }>({
-    queryKey: ["/api/factory/my-access"],
-    staleTime: 30000,
-    enabled: !!user,
+  const { data: myAccess } = useQuery<{
+    fullAccess: boolean;
+    pageKeys: string[];
+    hiddenCostFields: string[];
+  }>({
+    queryKey: companyQueryKey("/api/factory/my-access", selectedCompany?.id),
+    ...accessQueryPolicy,
+    enabled: !!user && !!selectedCompany?.id,
   });
 
   const isPinnedVisible = (item: NavItem): boolean => {
@@ -258,6 +265,7 @@ export function useFactoryVisibleSections(user?: any): {
 export function FactorySidebar({ user }: { user?: any }) {
   const { toast } = useToast();
   const { conflictCount } = useConnectivity();
+  const { selectedCompany } = useCompany();
   const prevUnreadRef = useRef<number>(-1);
 
   const { items: pinnedItems, reorder: reorderPinned } = usePinnedOrder(
@@ -266,9 +274,9 @@ export function FactorySidebar({ user }: { user?: any }) {
   );
 
   const { data: chatUnread } = useQuery<{ count: number }>({
-    queryKey: ["/api/chat/unread-count"],
-    refetchInterval: 60000,
-    enabled: !!user,
+    queryKey: companyQueryKey("/api/chat/unread-count", selectedCompany?.id),
+    ...liveCountQueryPolicy(60_000),
+    enabled: !!user && !!selectedCompany?.id,
   });
 
   useEffect(() => {
@@ -293,7 +301,6 @@ export function FactorySidebar({ user }: { user?: any }) {
   const { openSections, toggleSection } = useOpenSections(visibleSections);
 
   const allNavItems = useMemo(() => [...FACTORY_PINNED_DEFAULTS, ...FACTORY_NAV_SECTIONS.flatMap((s) => s.items)], []);
-  const { selectedCompany } = useCompany();
   const recentItems = useRecentNav(allNavItems, selectedCompany?.id);
 
   const testIdFor = (i: NavItem) => `link-factory-${i.url.split("/").pop()}`;

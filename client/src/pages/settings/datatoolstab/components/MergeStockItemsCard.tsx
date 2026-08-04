@@ -3,21 +3,21 @@
  *
  * Extracted from DataToolsTab.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {Card, CardHeader, CardTitle, CardContent, CardDescription} from "@/components/ui/card";
-import {Button} from "@/components/ui/button";
-import {Input} from "@/components/ui/input";
-import {Label} from "@/components/ui/label";
-import {Alert, AlertDescription} from "@/components/ui/alert";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {useToast} from "@/hooks/use-toast";
-import {StockItemAutocomplete} from "@/components/StockItemAutocomplete";
-import {useQuery} from "@tanstack/react-query";
-import {queryClient, apiRequest} from "@/lib/queryClient";
-import {Loader2, AlertTriangle, Eye, ArrowLeftRight} from "lucide-react";
-import {formatNumber} from "@/lib/formatNumber";
+import { useState } from "react";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { StockItemAutocomplete } from "@/components/StockItemAutocomplete";
+import { useQuery } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Loader2, AlertTriangle, Eye, ArrowLeftRight } from "lucide-react";
+import { formatNumber } from "@/lib/formatNumber";
 
-import type {MergePreviewResult} from "../types";
+import type { MergePreviewResult } from "../types";
 
 export function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
   const { toast } = useToast();
@@ -30,7 +30,7 @@ export function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
   const [isMerging, setIsMerging] = useState(false);
 
   const { data: allStockItems = [] } = useQuery<{ id: number; name: string; code: string }[]>({
-    queryKey: ["/api/stock-items/light", selectedCompany?.id],
+    queryKey: ["/api/stock-items/light?all=true", selectedCompany?.id],
     staleTime: 10 * 60 * 1000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
@@ -71,7 +71,7 @@ export function MergeStockItemsCard({ embedded }: { embedded?: boolean } = {}) {
       }
       toast({ title: "Merge complete", description: `"${dupItem.name}" has been merged into "${keptItem.name}".` });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-items/light?all=true"] });
       queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats/net-profit"] });
       setKeptItem(null);

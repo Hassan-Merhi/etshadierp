@@ -123,7 +123,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
   });
 
   const { data: allStockItems = [] } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items/light"],
+    queryKey: ["/api/stock-items/light?all=true"],
     staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,

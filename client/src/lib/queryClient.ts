@@ -2,6 +2,7 @@ import { QueryClient, QueryFunction, MutationCache, QueryCache } from "@tanstack
 import { isSafeToQueue, enqueueRequest, getDescriptionForRequest } from "./offlineQueue";
 import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
 import { toast } from "@/hooks/use-toast";
+import { accessQueryPolicy, stableReferenceQueryPolicy, stableSettingsQueryPolicy } from "./queryPolicies";
 
 /* ── Timezone-aware date utility ───────────────────────────────────────────── */
 // Stores the configured timezone for the current company.
@@ -509,13 +510,13 @@ export function keyStartsWith(prefix: string) {
 export function invalidateStockItemLight(companyId?: number | string): void {
   // Exact-key invalidation: only the lightweight endpoint, optionally scoped.
   queryClient.invalidateQueries({
-    queryKey: ["/api/stock-items/light", companyId],
+    queryKey: ["/api/stock-items/light?all=true", companyId],
     refetchType: "active",
   });
   // Also cover callers that stored companyId as undefined (still the same session).
   if (companyId !== undefined) {
     queryClient.invalidateQueries({
-      queryKey: ["/api/stock-items/light", undefined],
+      queryKey: ["/api/stock-items/light?all=true", undefined],
       refetchType: "active",
     });
   }
@@ -528,7 +529,7 @@ export function invalidateStockItemLight(companyId?: number | string): void {
  */
 export function invalidateStockItemPageQueries(): void {
   // Matches ["/api/stock-items", { page, ... }] keys used by the management page.
-  // Does NOT match ["/api/stock-items/light", ...] because the first element differs.
+  // Does NOT match ["/api/stock-items/light?all=true", ...] because the first element differs.
   queryClient.invalidateQueries({
     predicate: (query) => {
       const key = query.queryKey;
@@ -587,3 +588,34 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+export const STABLE_REFERENCE_QUERY_PREFIXES = [
+  "/api/ledger-accounts",
+  "/api/locations",
+  "/api/suppliers",
+  "/api/customers",
+  "/api/employees",
+  "/api/bank-accounts",
+  "/api/fixed-assets",
+  "/api/stock-groups",
+  "/api/stock-categories",
+  "/api/stock-grades",
+] as const;
+
+export const STABLE_SETTINGS_QUERY_PREFIXES = [
+  "/api/company-settings",
+  "/api/factory/settings",
+  "/api/user/preferences",
+] as const;
+
+export const ACCESS_QUERY_PREFIXES = ["/api/my-erp-pages", "/api/factory/my-access"] as const;
+
+for (const prefix of STABLE_REFERENCE_QUERY_PREFIXES) {
+  queryClient.setQueryDefaults([prefix], stableReferenceQueryPolicy);
+}
+for (const prefix of STABLE_SETTINGS_QUERY_PREFIXES) {
+  queryClient.setQueryDefaults([prefix], stableSettingsQueryPolicy);
+}
+for (const prefix of ACCESS_QUERY_PREFIXES) {
+  queryClient.setQueryDefaults([prefix], accessQueryPolicy);
+}

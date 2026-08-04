@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { InventoryTable } from "./InventoryTable";
+import { PaginationBar } from "@/components/PaginationBar";
 import type { InventoryItem, StockGroupSummary } from "./locationInventoryTypes";
 
 interface StockGroupItemsViewProps {
@@ -22,6 +23,13 @@ interface StockGroupItemsViewProps {
   setSelectedRowIndex: (v: number) => void;
   navigate: (path: string) => void;
   inventory: InventoryItem[];
+  pagination?: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    onPageChange: (page: number) => void;
+  };
 }
 
 export function StockGroupItemsView({
@@ -41,6 +49,7 @@ export function StockGroupItemsView({
   setSelectedRowIndex,
   navigate,
   inventory,
+  pagination,
 }: StockGroupItemsViewProps) {
   return (
     <>
@@ -63,10 +72,8 @@ export function StockGroupItemsView({
             </span>
             {!posUser && (
               <span>
-                <span className="font-semibold text-foreground">
-                  {formatAmount(selectedGroup.totalValue)}
-                </span>{" "}
-                total value
+                <span className="font-semibold text-foreground">{formatAmount(selectedGroup.totalValue)}</span> total
+                value
               </span>
             )}
           </div>
@@ -128,6 +135,15 @@ export function StockGroupItemsView({
         inventory={inventory}
         selectedGroup={selectedGroup}
       />
+      {pagination && (
+        <PaginationBar
+          page={pagination.page}
+          pageSize={pagination.pageSize}
+          total={pagination.total}
+          totalPages={pagination.totalPages}
+          onPageChange={pagination.onPageChange}
+        />
+      )}
     </>
   );
 }

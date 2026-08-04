@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import type { InventoryLocation as Location } from "./locationInventoryTypes";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import type { InventoryLocation as Location, StockGroupSummary } from "./locationInventoryTypes";
 
 interface InventoryItem {
   inventoryId: number | null;
@@ -19,29 +20,93 @@ interface InventoryItem {
   categoryName?: string | null;
 }
 
+interface InventoryPage {
+  data: InventoryItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  totals?: { quantity: number; value: number | null };
+}
+
+interface InventorySummary {
+  groups: StockGroupSummary[];
+  totals: { items: number; quantity: number; value: number | null };
+}
+
+interface CombinedInventoryPage {
+  data: any[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  totals: { quantity: number; value: number | null };
+}
+
 interface UseLocationInventoryQueriesParams {
   waGroupDialogOpen: boolean;
   posUser?: any;
   companyId: number | undefined;
   selectedLocationLocal: Location | null;
+  selectedGroup: StockGroupSummary | null;
+  viewAllItems: boolean;
   showZeroStock: boolean;
   fromDate: string;
   asOfDate: string;
   showAllStock: boolean;
   showNegativeStock: boolean;
+  itemSearchTerm: string;
+  itemCategoryFilter: string[];
+  inventoryPage: number;
+  allStockPage: number;
+  allStockSearchTerm: string;
+  allStockGroupFilter: string;
+  allStockLocationFilter: string;
+  allStockCategoryFilter: string[];
 }
+
+const EMPTY_INVENTORY_PAGE: InventoryPage = {
+  data: [],
+  page: 1,
+  pageSize: 50,
+  total: 0,
+  totalPages: 1,
+};
+
+const EMPTY_COMBINED_PAGE: CombinedInventoryPage = {
+  data: [],
+  page: 1,
+  pageSize: 50,
+  total: 0,
+  totalPages: 1,
+  totals: { quantity: 0, value: null },
+};
 
 export function useLocationInventoryQueries({
   waGroupDialogOpen,
   posUser,
   companyId,
   selectedLocationLocal,
+  selectedGroup,
+  viewAllItems,
   showZeroStock,
   fromDate,
   asOfDate,
   showAllStock,
   showNegativeStock,
+  itemSearchTerm,
+  itemCategoryFilter,
+  inventoryPage,
+  allStockPage,
+  allStockSearchTerm,
+  allStockGroupFilter,
+  allStockLocationFilter,
+  allStockCategoryFilter,
 }: UseLocationInventoryQueriesParams) {
+  const debouncedItemSearch = useDebouncedValue(itemSearchTerm, 250);
+  const debouncedAllStockSearch = useDebouncedValue(allStockSearchTerm, 250);
+  const showMovement = Boolean(fromDate && asOfDate);
+
   const { data: waChats = [], isLoading: waChatsLoading } = useQuery<{ id: string; name: string; type: string }[]>({
     queryKey: ["/api/whatsapp/chats/pos"],
     enabled: waGroupDialogOpen,
@@ -49,20 +114,13 @@ export function useLocationInventoryQueries({
   });
 
   const { data: allLocations = [], isLoading: allLocationsLoading } = useQuery<Location[]>({
-    // Keep companyId as a second array element for cache scoping (different companies
-    // get separate cache entries), but do NOT embed it in the URL.
-    // The server reads the company from the session (req.session.currentCompanyId).
-    // Putting ?companyId=X in the URL triggers requireAuth's cross-company guard,
-    // which compares it against resolveActiveCompanyId(req) — that returns
-    // factoryCompanyId first, causing 403s for admin users who have been in factory mode.
     queryKey: companyId ? ["/api/locations", companyId] : [],
-    queryFn: async () => {
-      const res = await fetch("/api/locations", { credentials: "include" });
+    queryFn: async ({ signal }) => {
+      const res = await fetch("/api/locations", { credentials: "include", signal });
       if (!res.ok) throw new Error(`Failed to fetch locations: ${res.status}`);
       return res.json();
     },
     enabled: !posUser && !!companyId,
-    staleTime: 5 * 60 * 1000,
   });
 
   const { data: posAssignedLocations = [], isLoading: posLocationsLoading } = useQuery<Location[]>({
@@ -73,111 +131,156 @@ export function useLocationInventoryQueries({
   const locations = posUser ? posAssignedLocations : allLocations;
   const locationsLoading = posUser ? posLocationsLoading : allLocationsLoading;
 
-  const { data: inventoryData = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
+  const {
+    data: inventorySummary = { groups: [], totals: { items: 0, quantity: 0, value: null } },
+    isLoading: inventorySummaryLoading,
+  } = useQuery<InventorySummary>({
     queryKey:
       selectedLocationLocal && companyId
-        ? [`/api/locations/${selectedLocationLocal.id}/inventory${showZeroStock ? "?includeZero=true" : ""}`, companyId]
+        ? ["/api/locations", selectedLocationLocal.id, "inventory-summary", companyId, showZeroStock]
         : [],
-    queryFn: async () => {
-      const url = `/api/locations/${selectedLocationLocal!.id}/inventory${showZeroStock ? "?includeZero=true" : ""}`;
-      const res = await fetch(url, { credentials: "include" });
+    queryFn: async ({ signal }) => {
+      const params = new URLSearchParams({ summary: "true" });
+      if (showZeroStock) params.set("includeZero", "true");
+      const res = await fetch(`/api/locations/${selectedLocationLocal!.id}/inventory?${params.toString()}`, {
+        credentials: "include",
+        signal,
+      });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
-    enabled: !!selectedLocationLocal && !!companyId,
+    enabled: !!selectedLocationLocal && !!companyId && !showMovement,
+    staleTime: 30_000,
+  });
+
+  const { data: inventoryPageData = EMPTY_INVENTORY_PAGE, isLoading: inventoryLoading } = useQuery<InventoryPage>({
+    queryKey:
+      selectedLocationLocal && companyId
+        ? [
+            "/api/locations",
+            selectedLocationLocal.id,
+            "inventory-page",
+            companyId,
+            inventoryPage,
+            debouncedItemSearch,
+            selectedGroup?.groupId ?? "all",
+            itemCategoryFilter.join(","),
+            showZeroStock,
+            showNegativeStock,
+          ]
+        : [],
+    queryFn: async ({ signal }) => {
+      const params = new URLSearchParams({ page: String(inventoryPage), pageSize: "50" });
+      if (showZeroStock) params.set("includeZero", "true");
+      if (showNegativeStock) params.set("negativeOnly", "true");
+      if (debouncedItemSearch.trim()) params.set("search", debouncedItemSearch.trim());
+      if (selectedGroup) params.set("groupId", selectedGroup.groupId == null ? "none" : String(selectedGroup.groupId));
+      if (itemCategoryFilter.length > 0) params.set("categoryIds", itemCategoryFilter.join(","));
+      const res = await fetch(`/api/locations/${selectedLocationLocal!.id}/inventory?${params.toString()}`, {
+        credentials: "include",
+        signal,
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    enabled: !!selectedLocationLocal && !!companyId && !showMovement && (viewAllItems || selectedGroup !== null),
+    placeholderData: (previous) => previous,
   });
 
   const { data: openingInventoryData = [], isLoading: openingInventoryLoading } = useQuery<InventoryItem[]>({
     queryKey:
-      selectedLocationLocal && fromDate && companyId
+      selectedLocationLocal && showMovement && companyId
         ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${fromDate}`, companyId]
         : [],
-    queryFn: async () => {
-      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${fromDate}`;
-      const res = await fetch(url, { credentials: "include" });
+    queryFn: async ({ signal }) => {
+      const res = await fetch(`/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${fromDate}`, {
+        credentials: "include",
+        signal,
+      });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
-    enabled: !!selectedLocationLocal && !!fromDate && !!companyId,
+    enabled: !!selectedLocationLocal && showMovement && !!companyId,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
 
   const { data: closingInventoryData = [], isLoading: closingInventoryLoading } = useQuery<InventoryItem[]>({
     queryKey:
-      selectedLocationLocal && asOfDate && companyId
+      selectedLocationLocal && showMovement && companyId
         ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${asOfDate}`, companyId]
         : [],
-    queryFn: async () => {
-      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${asOfDate}`;
-      const res = await fetch(url, { credentials: "include" });
+    queryFn: async ({ signal }) => {
+      const res = await fetch(`/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${asOfDate}`, {
+        credentials: "include",
+        signal,
+      });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
-    enabled: !!selectedLocationLocal && !!asOfDate && !!companyId,
+    enabled: !!selectedLocationLocal && showMovement && !!companyId,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
 
-  const { data: allInventoryRaw, isLoading: allInventoryLoading } = useQuery<any>({
-    queryKey: companyId ? ["/api/inventory", companyId] : [],
-    queryFn: async () => {
-      // Fetch the first page at the maximum allowed page size.
-      const PAGE_SIZE = 5000;
-      const res = await fetch(`/api/inventory?page=1&pageSize=${PAGE_SIZE}`, { credentials: "include" });
-      if (!res.ok) throw new Error(await res.text());
-      const first = await res.json();
+  const selectedAllStockLocationId = allStockLocationFilter
+    ? locations.find((location) => location.name === allStockLocationFilter)?.id
+    : undefined;
 
-      // Legacy non-paginated response — return as-is.
-      if (Array.isArray(first)) return first;
-
-      const { data, totalPages } = first;
-      if (!totalPages || totalPages <= 1) return data;
-
-      // Fetch any remaining pages in parallel so large inventories are not truncated.
-      const remaining = await Promise.all(
-        Array.from({ length: totalPages - 1 }, (_, i) => i + 2).map(async (page) => {
-          const r = await fetch(`/api/inventory?page=${page}&pageSize=${PAGE_SIZE}`, { credentials: "include" });
-          if (!r.ok) throw new Error(await r.text());
-          const d = await r.json();
-          return Array.isArray(d) ? d : (d.data ?? []);
-        })
-      );
-      return [...data, ...remaining.flat()];
-    },
-    enabled: showAllStock && !!companyId,
-    // Extended stale time: the full inventory list is expensive; avoid re-downloading
-    // it on every mutation or focus event. Users can navigate away and back to refresh.
-    staleTime: 10 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-    refetchOnMount: false,
-    retry: false,
-  });
-  // queryFn always resolves to a flat array of inventory rows.
-  const allInventoryData: any[] = Array.isArray(allInventoryRaw) ? allInventoryRaw : [];
+  const { data: allInventoryPage = EMPTY_COMBINED_PAGE, isLoading: allInventoryLoading } =
+    useQuery<CombinedInventoryPage>({
+      queryKey: companyId
+        ? [
+            "/api/inventory",
+            "combined-page",
+            companyId,
+            allStockPage,
+            debouncedAllStockSearch,
+            allStockGroupFilter,
+            selectedAllStockLocationId ?? null,
+            allStockCategoryFilter.join(","),
+          ]
+        : [],
+      queryFn: async ({ signal }) => {
+        const params = new URLSearchParams({
+          profile: "combined",
+          page: String(allStockPage),
+          pageSize: "50",
+        });
+        if (debouncedAllStockSearch.trim()) params.set("search", debouncedAllStockSearch.trim());
+        if (allStockGroupFilter) params.set("stockGroupId", allStockGroupFilter);
+        if (selectedAllStockLocationId) params.set("locationId", String(selectedAllStockLocationId));
+        if (allStockCategoryFilter.length > 0) params.set("categoryIds", allStockCategoryFilter.join(","));
+        const res = await fetch(`/api/inventory?${params.toString()}`, { credentials: "include", signal });
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+      },
+      enabled: showAllStock && !!companyId,
+      staleTime: 60_000,
+      gcTime: 15 * 60_000,
+      refetchOnWindowFocus: false,
+      placeholderData: (previous) => previous,
+    });
 
   const { data: allNegativeStock = [], isLoading: negativeStockLoading } = useQuery<any[]>({
     queryKey: companyId ? ["/api/inventory/negative", companyId] : [],
-    queryFn: async () => {
-      const res = await fetch("/api/inventory/negative", { credentials: "include" });
+    queryFn: async ({ signal }) => {
+      const res = await fetch("/api/inventory/negative", { credentials: "include", signal });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
     enabled: !posUser && !!companyId && showNegativeStock && !selectedLocationLocal,
-    staleTime: 30000,
+    staleTime: 30_000,
   });
 
   const { data: categoriesList = [] } = useQuery<{ id: number; name: string; active: boolean }[]>({
     queryKey: companyId ? ["/api/stock-categories", companyId] : [],
-    queryFn: async () => {
-      const res = await fetch("/api/stock-categories", { credentials: "include" });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
     enabled: !!companyId,
-    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: stockGroupsList = [] } = useQuery<{ id: number; name: string; code?: string }[]>({
+    queryKey: companyId ? ["/api/stock-groups", companyId] : [],
+    enabled: !!companyId,
   });
 
   return {
@@ -185,16 +288,32 @@ export function useLocationInventoryQueries({
     waChatsLoading,
     locations,
     locationsLoading,
-    inventoryData,
+    inventorySummary,
+    inventorySummaryLoading,
+    inventoryData: inventoryPageData.data,
     inventoryLoading,
+    inventoryPagination: {
+      page: inventoryPageData.page,
+      pageSize: inventoryPageData.pageSize,
+      total: inventoryPageData.total,
+      totalPages: inventoryPageData.totalPages,
+    },
     openingInventoryData,
     openingInventoryLoading,
     closingInventoryData,
     closingInventoryLoading,
-    allInventoryData,
+    allInventoryData: allInventoryPage.data,
     allInventoryLoading,
+    allInventoryPagination: {
+      page: allInventoryPage.page,
+      pageSize: allInventoryPage.pageSize,
+      total: allInventoryPage.total,
+      totalPages: allInventoryPage.totalPages,
+    },
+    allInventoryTotals: allInventoryPage.totals,
     allNegativeStock,
     negativeStockLoading,
     categoriesList,
+    stockGroupsList,
   };
 }

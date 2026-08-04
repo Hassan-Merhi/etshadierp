@@ -40,10 +40,9 @@ import { useRecentNav } from "@/hooks/use-recent-nav";
 import { Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import {
-  SUPPLIER_PARTNER_RECENT_ITEMS,
-  SUPPLIER_PARTNER_SECTIONS,
-} from "@/lib/supplier-partner-navigation";
+import { companyQueryKey } from "@/lib/companyQueryScope";
+import { accessQueryPolicy, liveCountQueryPolicy, stableSettingsQueryPolicy } from "@/lib/queryPolicies";
+import { SUPPLIER_PARTNER_RECENT_ITEMS, SUPPLIER_PARTNER_SECTIONS } from "@/lib/supplier-partner-navigation";
 import {
   ModuleHeader,
   ModuleFooter,
@@ -143,17 +142,15 @@ export function useErpVisibleSections(user?: any): {
   const { selectedCompany } = useCompany();
 
   const { data: myErpPages } = useQuery<{ pageKeys: string[]; fullAccess: boolean }>({
-    queryKey: ["/api/my-erp-pages"],
-    enabled: !!user,
+    queryKey: companyQueryKey("/api/my-erp-pages", selectedCompany?.id),
+    ...accessQueryPolicy,
+    enabled: !!user && !!selectedCompany?.id,
   });
 
   const { data: companySettings } = useQuery<any>({
-    queryKey: ["/api/company-settings", selectedCompany?.id],
+    queryKey: companyQueryKey("/api/company-settings", selectedCompany?.id),
+    ...stableSettingsQueryPolicy,
     enabled: !!selectedCompany?.id,
-    queryFn: async () => {
-      const res = await fetch(`/api/company-settings?companyId=${selectedCompany?.id}`, { credentials: "include" });
-      return res.ok ? res.json() : null;
-    },
   });
 
   const allowedPages = new Set<string>(myErpPages?.pageKeys || []);
@@ -221,9 +218,9 @@ export function AppSidebar({ user }: { user?: any }) {
   const { items: pinnedItems, reorder: reorderPinned } = usePinnedOrder("erp-pinned-order", defaultPinnedItems);
 
   const { data: chatUnread } = useQuery<{ count: number }>({
-    queryKey: ["/api/chat/unread-count"],
-    refetchInterval: 60000,
-    enabled: !!user,
+    queryKey: companyQueryKey("/api/chat/unread-count", selectedCompany?.id),
+    ...liveCountQueryPolicy(60_000),
+    enabled: !!user && !!selectedCompany?.id,
   });
 
   useEffect(() => {

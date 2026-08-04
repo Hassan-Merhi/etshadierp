@@ -118,7 +118,7 @@ export default function CombinedInventory() {
   const inventoryTotalPages = inventoryPage?.totalPages ?? 1;
 
   const { data: allStockItems = [], isLoading: loadingStockItems } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items/light", selectedCompany?.id],
+    queryKey: ["/api/stock-items/light?all=true", selectedCompany?.id],
     enabled: includeZero,
     staleTime: 10 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -502,8 +502,8 @@ export default function CombinedInventory() {
       {/* Partial-load notice — only shown when total rows exceed the first page */}
       {inventoryTotalPages > 1 && (
         <p className="text-xs text-muted-foreground -mt-2">
-          Showing first {inventoryRows.length.toLocaleString()} of {inventoryTotal.toLocaleString()} inventory rows.
-          Use search to narrow results, or click Refresh to reload.
+          Showing first {inventoryRows.length.toLocaleString()} of {inventoryTotal.toLocaleString()} inventory rows. Use
+          search to narrow results, or click Refresh to reload.
         </p>
       )}
 

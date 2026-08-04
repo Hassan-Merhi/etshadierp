@@ -10,6 +10,7 @@ import { getClientDate } from "../../lib/dateUtils";
 import { generateStockPdf } from "../../helpers/generateStockPdf";
 import { inventory, stockItems, companies, stockGroups } from "@shared/schema";
 import { eq, and, inArray } from "drizzle-orm";
+import { getLocationInventorySummary, getPaginatedLocationInventory } from "./locationInventoryPaging";
 
 const MAX_INVENTORY_RATE_STOCK_ITEM_IDS = 250;
 
@@ -119,6 +120,36 @@ export function registerLocationInventoryRoutes(app: Express) {
 
       const includeZero = req.query.includeZero === "true";
 
+      if (!asOfDate && req.query.summary === "true") {
+        const summary = await getLocationInventorySummary({
+          companyId: location.companyId,
+          locationId,
+          query: req.query as Record<string, unknown>,
+          isPOS: req.user?.role === "POS",
+        });
+        res.setHeader("Cache-Control", "private, max-age=15, stale-while-revalidate=30");
+        return res.json(summary);
+      }
+
+      const wantsPagedInventory =
+        !asOfDate &&
+        (req.query.page != null ||
+          req.query.pageSize != null ||
+          req.query.search != null ||
+          req.query.groupId != null ||
+          req.query.categoryId != null ||
+          req.query.negativeOnly != null);
+      if (wantsPagedInventory) {
+        const page = await getPaginatedLocationInventory({
+          companyId: location.companyId,
+          locationId,
+          query: req.query as Record<string, unknown>,
+          isPOS: req.user?.role === "POS",
+        });
+        res.setHeader("Cache-Control", "private, max-age=15, stale-while-revalidate=30");
+        return res.json(page);
+      }
+
       // Use the location's own companyId as source of truth (not session, which
       // may lag or differ in multi-company contexts). Access check above already
       // confirmed location.companyId === session.currentCompanyId.
@@ -144,7 +175,9 @@ export function registerLocationInventoryRoutes(app: Express) {
         res.json(inventory);
       }
     } catch (error: unknown) {
-      logger.error(`[inventory] ERROR locationId=${req.params.locationId}:`, { error: getErrorMessage(error) ?? error });
+      logger.error(`[inventory] ERROR locationId=${req.params.locationId}:`, {
+        error: getErrorMessage(error) ?? error,
+      });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
