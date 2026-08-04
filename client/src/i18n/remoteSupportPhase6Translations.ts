@@ -97,6 +97,7 @@ export const remoteSupportPhase6Translations: readonly Phase7BackendMessagesEntr
     ar: "نتيجة أمر لوحة المفاتيح غير مدعومة.",
     fr: "Résultat de commande clavier non pris en charge.",
   },
+  { en: "Mouse active", ar: "الماوس نشط", fr: "Souris active" },
   { en: "Keyboard active", ar: "لوحة المفاتيح نشطة", fr: "Clavier actif" },
   { en: "Mouse and keyboard active", ar: "الماوس ولوحة المفاتيح نشطان", fr: "Souris et clavier actifs" },
 ];
