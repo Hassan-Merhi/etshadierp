@@ -1,13 +1,25 @@
 import type { Express, Request, Response } from "express";
 import { requireAuth, requireLogin } from "../auth";
 import { getSessionRole, getSessionUserId, getSessionUsername } from "../lib/requestContext";
-import { isRemoteSupportEnabled } from "../services/remoteSupportRuntime";
+import {
+  RemoteMouseControlError,
+  authorizeRemoteMouseControl,
+  getRemoteMouseAuthorization,
+  publishRemoteMouseCommand,
+  publishRemoteMouseCommandResult,
+  subscribeRemoteMouseCommands,
+  subscribeRemoteMouseResults,
+  type RemoteMouseAuthorization,
+  type RemoteMouseCommand,
+  type RemoteMouseCommandResult,
+} from "../services/remoteControlCommandService";
 import {
   RemoteControlSessionError,
   getActiveRemoteControlSession,
   getRemoteControlSession,
   heartbeatRemoteControlController,
   isRemoteControlControllerRole,
+  listActiveRemoteControlSessionsForController,
   listRemoteControlTabs,
   registerRemoteControlTab,
   startRemoteControlSession,
@@ -15,8 +27,10 @@ import {
   subscribeRemoteControlTarget,
   type RemoteControlSession,
 } from "../services/remoteControlSessionService";
+import { isRemoteSupportEnabled } from "../services/remoteSupportRuntime";
 
 const STATUS_REFRESH_MS = 5000;
+const COMMAND_HEARTBEAT_MS = 5000;
 
 type FlushableResponse = Response & { flush?: () => void };
 
@@ -31,6 +45,11 @@ function sessionUsername(req: Request): string {
 
 function sessionRole(req: Request): string {
   return getSessionRole(req) || "";
+}
+
+function passwordConfirmedAt(req: Request): number | null {
+  const value = (req.session as { passwordConfirmedAt?: unknown }).passwordConfirmedAt;
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
 function requireController(req: Request, res: Response): boolean {
@@ -53,6 +72,29 @@ function serializeSession(session: RemoteControlSession | null) {
   };
 }
 
+function serializeMouseAuthorization(authorization: RemoteMouseAuthorization | null) {
+  if (!authorization) return null;
+  return {
+    ...authorization,
+    authorizedAt: new Date(authorization.authorizedAt).toISOString(),
+    expiresAt: new Date(authorization.expiresAt).toISOString(),
+  };
+}
+
+function serializeMouseCommand(command: RemoteMouseCommand) {
+  return {
+    ...command,
+    createdAt: new Date(command.createdAt).toISOString(),
+  };
+}
+
+function serializeMouseCommandResult(result: RemoteMouseCommandResult) {
+  return {
+    ...result,
+    completedAt: new Date(result.completedAt).toISOString(),
+  };
+}
+
 function openEventStream(res: Response): void {
   res.status(200);
   res.setHeader("Content-Type", "text/event-stream");
@@ -69,8 +111,14 @@ function writeEvent(res: Response, event: string, payload: unknown): void {
   (res as FlushableResponse).flush?.();
 }
 
+function writeHeartbeat(res: Response): void {
+  if (res.writableEnded || res.destroyed) return;
+  res.write(`: heartbeat ${Date.now()}\n\n`);
+  (res as FlushableResponse).flush?.();
+}
+
 function handleSessionError(error: unknown, res: Response): void {
-  if (error instanceof RemoteControlSessionError) {
+  if (error instanceof RemoteControlSessionError || error instanceof RemoteMouseControlError) {
     res.status(error.statusCode).json({ code: error.code, message: error.message });
     return;
   }
@@ -143,6 +191,19 @@ export function registerRemoteControlSessionRoutes(app: Express): void {
     sendStatus();
   });
 
+  app.get("/api/screen-feed/control/sessions/controller-active", requireAuth, (req, res) => {
+    if (!requireController(req, res)) return;
+    const controllerUserId = sessionUserId(req);
+    const sessions = listActiveRemoteControlSessionsForController(controllerUserId).map((session) => ({
+      ...serializeSession(session),
+      mouseAuthorization: serializeMouseAuthorization(
+        getRemoteMouseAuthorization(session.id, controllerUserId)
+      ),
+    }));
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ sessions });
+  });
+
   app.get("/api/screen-feed/control/sessions/active/:userId", requireAuth, (req, res) => {
     if (!requireController(req, res)) return;
     res.setHeader("Cache-Control", "no-store");
@@ -175,6 +236,129 @@ export function registerRemoteControlSessionRoutes(app: Express): void {
     res.setHeader("Cache-Control", "no-store");
     res.json({ session: serializeSession(session) });
   });
+
+  app.post(
+    "/api/screen-feed/control/sessions/:sessionId/mouse-authorization",
+    requireAuth,
+    (req, res) => {
+      if (!requireController(req, res)) return;
+      try {
+        const authorization = authorizeRemoteMouseControl({
+          sessionId: req.params.sessionId,
+          controllerUserId: sessionUserId(req),
+          passwordConfirmedAt: passwordConfirmedAt(req),
+        });
+        res.setHeader("Cache-Control", "no-store");
+        res.json({ authorization: serializeMouseAuthorization(authorization) });
+      } catch (error) {
+        handleSessionError(error, res);
+      }
+    }
+  );
+
+  app.get("/api/screen-feed/control/commands", requireLogin, (req, res) => {
+    const sessionId = typeof req.query.sessionId === "string" ? req.query.sessionId : "";
+    const tabId = typeof req.query.tabId === "string" ? req.query.tabId : "";
+    if (!sessionId || !tabId) {
+      return res.status(400).json({ message: "A support session and browser tab are required." });
+    }
+
+    let unsubscribe = () => {};
+    try {
+      unsubscribe = subscribeRemoteMouseCommands({
+        sessionId,
+        targetUserId: sessionUserId(req),
+        targetTabId: tabId,
+        listener: (command) => writeEvent(res, "command", serializeMouseCommand(command)),
+      });
+    } catch (error) {
+      return handleSessionError(error, res);
+    }
+
+    openEventStream(res);
+    let closed = false;
+    const heartbeatId = setInterval(() => writeHeartbeat(res), COMMAND_HEARTBEAT_MS);
+    const cleanup = () => {
+      if (closed) return;
+      closed = true;
+      clearInterval(heartbeatId);
+      unsubscribe();
+      if (!res.writableEnded) res.end();
+    };
+
+    req.once("close", cleanup);
+    res.once("close", cleanup);
+    writeEvent(res, "ready", { sessionId, tabId });
+  });
+
+  app.post("/api/screen-feed/control/sessions/:sessionId/commands", requireAuth, (req, res) => {
+    if (!requireController(req, res)) return;
+    try {
+      const command = publishRemoteMouseCommand({
+        sessionId: req.params.sessionId,
+        controllerUserId: sessionUserId(req),
+        type: req.body?.type,
+        x: req.body?.x,
+        y: req.body?.y,
+        deltaX: req.body?.deltaX,
+        deltaY: req.body?.deltaY,
+      });
+      res.status(202).json({ command: serializeMouseCommand(command) });
+    } catch (error) {
+      handleSessionError(error, res);
+    }
+  });
+
+  app.get("/api/screen-feed/control/sessions/:sessionId/results", requireAuth, (req, res) => {
+    if (!requireController(req, res)) return;
+
+    let unsubscribe = () => {};
+    try {
+      unsubscribe = subscribeRemoteMouseResults({
+        sessionId: req.params.sessionId,
+        controllerUserId: sessionUserId(req),
+        listener: (result) => writeEvent(res, "result", serializeMouseCommandResult(result)),
+      });
+    } catch (error) {
+      return handleSessionError(error, res);
+    }
+
+    openEventStream(res);
+    let closed = false;
+    const heartbeatId = setInterval(() => writeHeartbeat(res), COMMAND_HEARTBEAT_MS);
+    const cleanup = () => {
+      if (closed) return;
+      closed = true;
+      clearInterval(heartbeatId);
+      unsubscribe();
+      if (!res.writableEnded) res.end();
+    };
+
+    req.once("close", cleanup);
+    res.once("close", cleanup);
+    writeEvent(res, "ready", { sessionId: req.params.sessionId });
+  });
+
+  app.post(
+    "/api/screen-feed/control/sessions/:sessionId/commands/:commandId/result",
+    requireLogin,
+    (req, res) => {
+      try {
+        const result = publishRemoteMouseCommandResult({
+          sessionId: req.params.sessionId,
+          commandId: req.params.commandId,
+          targetUserId: sessionUserId(req),
+          targetTabId: req.body?.tabId,
+          status: req.body?.status,
+          reason: req.body?.reason,
+        });
+        res.setHeader("Cache-Control", "no-store");
+        res.json({ result: serializeMouseCommandResult(result) });
+      } catch (error) {
+        handleSessionError(error, res);
+      }
+    }
+  );
 
   app.post("/api/screen-feed/control/sessions/:sessionId/stop", requireLogin, (req, res) => {
     const session = getRemoteControlSession(req.params.sessionId);
