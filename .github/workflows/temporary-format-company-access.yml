@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/fix-developer-company-data-access
+  pull_request:
+    branches:
+      - main
 
 jobs:
   format:
