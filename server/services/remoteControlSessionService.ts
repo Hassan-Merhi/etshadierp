@@ -156,9 +156,7 @@ export function listRemoteControlTabs(userId: string, now = Date.now()): RemoteC
   return freshTabs(cleanIdentifier(userId), now);
 }
 
-export function listActiveRemoteControlSessionsForController(
-  controllerUserId: string
-): RemoteControlSession[] {
+export function listActiveRemoteControlSessionsForController(controllerUserId: string): RemoteControlSession[] {
   cleanupRemoteControlState();
   const normalizedControllerId = cleanIdentifier(controllerUserId);
   return [...sessions.values()]
@@ -273,10 +271,7 @@ export function startRemoteControlSession(input: StartRemoteControlSessionInput)
   return copySession(session) as RemoteControlSession;
 }
 
-export function setRemoteControlMouseCapability(
-  sessionId: string,
-  enabled: boolean
-): RemoteControlSession | null {
+export function setRemoteControlMouseCapability(sessionId: string, enabled: boolean): RemoteControlSession | null {
   cleanupRemoteControlState();
   const session = sessions.get(cleanIdentifier(sessionId));
   if (!session || session.status !== "active") return null;

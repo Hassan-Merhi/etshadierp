@@ -164,18 +164,20 @@ describe("remote mouse execution policy", () => {
     container.scrollBy = scrollBy;
     document.elementFromPoint = vi.fn(() => child);
 
-    expect(
-      applyRemoteMouseCommand(command("scroll", { deltaX: 0, deltaY: 240 }))
-    ).toMatchObject({ status: "executed", reason: null });
+    expect(applyRemoteMouseCommand(command("scroll", { deltaX: 0, deltaY: 240 }))).toMatchObject({
+      status: "executed",
+      reason: null,
+    });
     expect(scrollBy).toHaveBeenCalledWith({ left: 0, top: 240, behavior: "auto" });
 
     const plainTarget = document.createElement("div");
     document.body.appendChild(plainTarget);
     document.elementFromPoint = vi.fn(() => plainTarget);
     const windowScrollBy = vi.spyOn(window, "scrollBy").mockImplementation(() => {});
-    expect(
-      applyRemoteMouseCommand(command("scroll", { deltaX: 10, deltaY: 40 }))
-    ).toMatchObject({ status: "executed", reason: null });
+    expect(applyRemoteMouseCommand(command("scroll", { deltaX: 10, deltaY: 40 }))).toMatchObject({
+      status: "executed",
+      reason: null,
+    });
     expect(windowScrollBy).toHaveBeenCalledWith({ left: 10, top: 40, behavior: "auto" });
   });
 

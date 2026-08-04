@@ -129,10 +129,7 @@ function activeSessionForTarget(
   if (!session || session.status !== "active") {
     throw new RemoteMouseControlError("SESSION_INACTIVE", 409, "The support session is no longer active.");
   }
-  if (
-    session.targetUserId !== cleanIdentifier(targetUserId) ||
-    session.targetTabId !== cleanIdentifier(targetTabId)
-  ) {
+  if (session.targetUserId !== cleanIdentifier(targetUserId) || session.targetTabId !== cleanIdentifier(targetTabId)) {
     throw new RemoteMouseControlError("TARGET_MISMATCH", 403, "This command channel is not bound to this ERP tab.");
   }
   if (!isRemoteSupportEnabled("remoteControl") || (requireMouseCapability && !session.capabilities.mouse)) {
@@ -235,10 +232,7 @@ export function authorizeRemoteMouseControl(input: {
   return { ...authorization };
 }
 
-export function revokeRemoteMouseControl(input: {
-  sessionId: string;
-  controllerUserId: string;
-}): void {
+export function revokeRemoteMouseControl(input: { sessionId: string; controllerUserId: string }): void {
   const session = activeSessionForController(input.sessionId, input.controllerUserId, false);
   clearSessionMouseState(session.id, true);
 }

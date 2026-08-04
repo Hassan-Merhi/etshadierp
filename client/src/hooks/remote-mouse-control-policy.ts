@@ -127,7 +127,7 @@ function finiteCoordinate(value: unknown): value is number {
 
 function elementDescriptor(element: Element): string {
   const htmlElement = element as HTMLElement;
-  const href = element instanceof HTMLAnchorElement ? element.getAttribute("href") ?? "" : "";
+  const href = element instanceof HTMLAnchorElement ? (element.getAttribute("href") ?? "") : "";
   return [
     htmlElement.innerText,
     htmlElement.textContent,

@@ -197,9 +197,7 @@ export function registerRemoteControlSessionRoutes(app: Express): void {
     const controllerUserId = sessionUserId(req);
     const sessions = listActiveRemoteControlSessionsForController(controllerUserId).map((session) => ({
       ...serializeSession(session)!,
-      mouseAuthorization: serializeMouseAuthorization(
-        getRemoteMouseAuthorization(session.id, controllerUserId)
-      ),
+      mouseAuthorization: serializeMouseAuthorization(getRemoteMouseAuthorization(session.id, controllerUserId)),
     }));
     res.setHeader("Cache-Control", "no-store");
     res.json({ sessions });
@@ -238,45 +236,37 @@ export function registerRemoteControlSessionRoutes(app: Express): void {
     res.json({ session: serializeSession(session) });
   });
 
-  app.post(
-    "/api/screen-feed/control/sessions/:sessionId/mouse-authorization",
-    requireAuth,
-    (req, res) => {
-      if (!requireController(req, res)) return;
-      try {
-        const authorization = authorizeRemoteMouseControl({
-          sessionId: req.params.sessionId,
-          controllerUserId: sessionUserId(req),
-          passwordConfirmedAt: passwordConfirmedAt(req),
-        });
-        res.setHeader("Cache-Control", "no-store");
-        res.json({ authorization: serializeMouseAuthorization(authorization) });
-      } catch (error) {
-        handleSessionError(error, res);
-      }
+  app.post("/api/screen-feed/control/sessions/:sessionId/mouse-authorization", requireAuth, (req, res) => {
+    if (!requireController(req, res)) return;
+    try {
+      const authorization = authorizeRemoteMouseControl({
+        sessionId: req.params.sessionId,
+        controllerUserId: sessionUserId(req),
+        passwordConfirmedAt: passwordConfirmedAt(req),
+      });
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ authorization: serializeMouseAuthorization(authorization) });
+    } catch (error) {
+      handleSessionError(error, res);
     }
-  );
+  });
 
-  app.post(
-    "/api/screen-feed/control/sessions/:sessionId/mouse-authorization/revoke",
-    requireAuth,
-    (req, res) => {
-      if (!requireController(req, res)) return;
-      try {
-        revokeRemoteMouseControl({
-          sessionId: req.params.sessionId,
-          controllerUserId: sessionUserId(req),
-        });
-        res.setHeader("Cache-Control", "no-store");
-        res.json({
-          authorization: null,
-          session: serializeSession(getRemoteControlSession(req.params.sessionId)),
-        });
-      } catch (error) {
-        handleSessionError(error, res);
-      }
+  app.post("/api/screen-feed/control/sessions/:sessionId/mouse-authorization/revoke", requireAuth, (req, res) => {
+    if (!requireController(req, res)) return;
+    try {
+      revokeRemoteMouseControl({
+        sessionId: req.params.sessionId,
+        controllerUserId: sessionUserId(req),
+      });
+      res.setHeader("Cache-Control", "no-store");
+      res.json({
+        authorization: null,
+        session: serializeSession(getRemoteControlSession(req.params.sessionId)),
+      });
+    } catch (error) {
+      handleSessionError(error, res);
     }
-  );
+  });
 
   app.get("/api/screen-feed/control/commands", requireLogin, (req, res) => {
     const sessionId = typeof req.query.sessionId === "string" ? req.query.sessionId : "";
@@ -361,26 +351,22 @@ export function registerRemoteControlSessionRoutes(app: Express): void {
     writeEvent(res, "ready", { sessionId: req.params.sessionId });
   });
 
-  app.post(
-    "/api/screen-feed/control/sessions/:sessionId/commands/:commandId/result",
-    requireLogin,
-    (req, res) => {
-      try {
-        const result = publishRemoteMouseCommandResult({
-          sessionId: req.params.sessionId,
-          commandId: req.params.commandId,
-          targetUserId: sessionUserId(req),
-          targetTabId: req.body?.tabId,
-          status: req.body?.status,
-          reason: req.body?.reason,
-        });
-        res.setHeader("Cache-Control", "no-store");
-        res.json({ result: serializeMouseCommandResult(result) });
-      } catch (error) {
-        handleSessionError(error, res);
-      }
+  app.post("/api/screen-feed/control/sessions/:sessionId/commands/:commandId/result", requireLogin, (req, res) => {
+    try {
+      const result = publishRemoteMouseCommandResult({
+        sessionId: req.params.sessionId,
+        commandId: req.params.commandId,
+        targetUserId: sessionUserId(req),
+        targetTabId: req.body?.tabId,
+        status: req.body?.status,
+        reason: req.body?.reason,
+      });
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ result: serializeMouseCommandResult(result) });
+    } catch (error) {
+      handleSessionError(error, res);
     }
-  );
+  });
 
   app.post("/api/screen-feed/control/sessions/:sessionId/stop", requireLogin, (req, res) => {
     const session = getRemoteControlSession(req.params.sessionId);

@@ -68,9 +68,7 @@ function findWatchDialog(): HTMLElement | null {
 
 function matchingSession(sessions: ControllerSessionView[]): ControllerSessionView | null {
   const dialogText = findWatchDialog()?.textContent ?? "";
-  return (
-    sessions.find((session) => dialogText.includes(`Watching: ${session.targetUsername}`)) ?? sessions[0] ?? null
-  );
+  return sessions.find((session) => dialogText.includes(`Watching: ${session.targetUsername}`)) ?? sessions[0] ?? null;
 }
 
 function authorizationIsFresh(authorization: MouseAuthorizationView | null): boolean {
@@ -90,10 +88,7 @@ export function RemoteMouseControllerOverlay() {
   const [lastResult, setLastResult] = useState<CommandResultView | null>(null);
   const pointerSentAtRef = useRef(0);
   const wheelSentAtRef = useRef(0);
-  const t = useCallback(
-    (value: string) => translateRemoteSupportPhase5Text(value, language),
-    [language]
-  );
+  const t = useCallback((value: string) => translateRemoteSupportPhase5Text(value, language), [language]);
 
   useEffect(() => {
     const update = () => setWatchDialogOpen(!!findWatchDialog());
@@ -116,15 +111,11 @@ export function RemoteMouseControllerOverlay() {
     [sessionsQuery.data?.sessions]
   );
   const authorized = authorizationIsFresh(session?.mouseAuthorization ?? null);
-  const controlEnabled =
-    !!session && session.capabilities.mouse && authorized && armedSessionId === session.id;
+  const controlEnabled = !!session && session.capabilities.mouse && authorized && armedSessionId === session.id;
 
   useEffect(() => {
     if (!session || !session.capabilities.mouse || !authorized || armedSessionId !== session.id) {
-      if (
-        armedSessionId &&
-        (!session || armedSessionId !== session.id || !session.capabilities.mouse || !authorized)
-      ) {
+      if (armedSessionId && (!session || armedSessionId !== session.id || !session.capabilities.mouse || !authorized)) {
         setArmedSessionId(null);
       }
     }
@@ -139,10 +130,10 @@ export function RemoteMouseControllerOverlay() {
 
   const requestMouseAuthorization = useCallback(async () => {
     if (!session) return;
-    await requestJson(
-      `/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/mouse-authorization`,
-      { method: "POST", body: JSON.stringify({}) }
-    );
+    await requestJson(`/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/mouse-authorization`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
     await sessionsQuery.refetch();
     setArmedSessionId(session.id);
     setPasswordOpen(false);
@@ -162,9 +153,7 @@ export function RemoteMouseControllerOverlay() {
       ) {
         setPasswordOpen(true);
       } else {
-        setError(
-          requestError instanceof Error ? t(requestError.message) : t("Unable to enable mouse control.")
-        );
+        setError(requestError instanceof Error ? t(requestError.message) : t("Unable to enable mouse control."));
       }
     } finally {
       setBusy(false);
@@ -293,10 +282,9 @@ export function RemoteMouseControllerOverlay() {
 
   useEffect(() => {
     if (!controlEnabled || !session) return;
-    const eventSource = new EventSource(
-      `/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/results`,
-      { withCredentials: true }
-    );
+    const eventSource = new EventSource(`/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/results`, {
+      withCredentials: true,
+    });
     eventSource.addEventListener("result", (event) => {
       try {
         const result = JSON.parse((event as MessageEvent<string>).data) as CommandResultView;

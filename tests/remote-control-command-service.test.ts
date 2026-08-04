@@ -73,9 +73,7 @@ describe("remote mouse command safety", () => {
         controllerUserId: "1",
         passwordConfirmedAt: null,
       })
-    ).toThrowError(
-      expect.objectContaining({ code: "PASSWORD_CONFIRMATION_REQUIRED", statusCode: 428 })
-    );
+    ).toThrowError(expect.objectContaining({ code: "PASSWORD_CONFIRMATION_REQUIRED", statusCode: 428 }));
     expect(getRemoteControlSession(session.id)?.capabilities.mouse).toBe(false);
   });
 
@@ -229,9 +227,7 @@ describe("remote mouse command safety", () => {
         y: 0.5,
         now: now + 3,
       })
-    ).toThrowError(
-      expect.objectContaining({ code: "TARGET_COMMAND_CHANNEL_UNAVAILABLE", statusCode: 409 })
-    );
+    ).toThrowError(expect.objectContaining({ code: "TARGET_COMMAND_CHANNEL_UNAVAILABLE", statusCode: 409 }));
   });
 
   it("rejects command subscriptions from a different user or browser tab", () => {
