@@ -1,0 +1,69 @@
+name: Readable logging phase 10 release
+
+on:
+  pull_request:
+    branches:
+      - chore/readable-production-logs-phases-8-9
+    paths:
+      - "server/lib/logger.ts"
+      - "server/lib/logAlerts.ts"
+      - "server/lib/operationalEvents.ts"
+      - "server/routes/auth/auditLogRoutes.ts"
+      - "server/middleware/requestLogger.ts"
+      - "server/middleware/bandwidthDebug.ts"
+      - "docs/render-readable-logging.md"
+      - "docs/logging-phases-8-9.md"
+      - "docs/logging-phase-10-release.md"
+      - "scripts/verify-readable-logging-*.mjs"
+      - ".github/workflows/readable-logging-phase-10.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Normalize registry URLs
+        run: |
+          sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+          sed -i 's#https://registry.replit.com/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Phase 10 release contracts
+        run: |
+          node scripts/verify-readable-logging-phases-1-7.mjs
+          node scripts/verify-readable-logging-phases-8-9.mjs
+          node scripts/verify-readable-logging-phase-10.mjs
+
+      - name: Focused logging tests
+        run: |
+          node node_modules/vitest/vitest.mjs run server/lib/logger.test.ts server/lib/logAlerts.test.ts server/lib/operationalEvents.test.ts server/middleware/bandwidthDebug.test.ts server/lib/requestLoggingPolicy.test.ts
+
+      - name: TypeScript
+        run: npm run check
+
+      - name: Lint logging files
+        run: node node_modules/eslint/bin/eslint.js server/lib/logger.ts server/lib/logAlerts.ts server/lib/operationalEvents.ts server/routes/auth/auditLogRoutes.ts server/middleware/requestLogger.ts server/middleware/bandwidthDebug.ts
+
+      - name: Production build
+        run: npm run build
+
+      - name: Final production readiness
+        run: npm run verify:final-production-readiness
+
+      - name: Dependency audit
+        run: npm run verify:dependency-audit
