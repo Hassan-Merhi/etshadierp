@@ -38,6 +38,8 @@
     "GET /api/factory/categories [requireAuth > <anonymous>]",
     "GET /api/factory/bale-products [requireAuth > <anonymous>]",
     "GET /api/factory/bale-products/:id [requireAuth > <anonymous>]",
+    "GET /api/audit-log/overview [requireAuth > <anonymous> > <anonymous>]",
+    "GET /api/git/containers/:id [requireAuth > <anonymous> > <anonymous>]",
     "GET /api/screen-feed/admin/runtime [requireAuth > <anonymous>]",
     "PATCH /api/screen-feed/admin/runtime [requireAuth > <anonymous>]",
     "POST /api/screen-feed/admin/runtime/emergency-stop [requireAuth > <anonymous>]",
@@ -80,7 +82,7 @@
     "POST /api/screen-feed/control/sessions/:sessionId/keyboard-commands [requireAuth > <anonymous>]",
     "GET /api/screen-feed/control/sessions/:sessionId/keyboard-results [requireAuth > <anonymous>]",
     "POST /api/screen-feed/control/sessions/:sessionId/keyboard-commands/:commandId/result [requireLogin > <anonymous>]",
-    "GET /api/screen-feed/control/audit [requireAuth > <anonymous> > <anonymous>]",
+    "GET /api/screen-feed/control/audit [requireAuth > <anonymous>]",
     "GET /api/screen-feed/admin/rollout [requireAuth > <anonymous>]",
     "PATCH /api/screen-feed/admin/rollout [requireAuth > <anonymous>]",
     "POST /api/screen-feed/admin/rollout/rollback [requireAuth > <anonymous>]"
@@ -121,8 +123,9 @@
       "tests/ui/mobile-responsive-phase9-reports.test.ts",
       "tests/remote-support-permission-contract.test.ts",
       "tests/ui/pos-negative-stock-permission.test.ts",
-      "tests/ui/tracking-containers-abort-recovery.test.ts"
+      "tests/ui/tracking-containers-abort-recovery.test.ts",
+      "tests/phase10-scheduled-export-lifecycle-contract.test.ts"
     ],
-    "maxAdditionalTextAssertions": 341
+    "maxAdditionalTextAssertions": 396
   }
 }
