@@ -20,13 +20,15 @@ on:
       - "client/src/pages/Vouchers.tsx"
       - "client/src/pages/location-inventory/**"
       - "client/src/pages/pos/POSPriceList.tsx"
-      - "client/src/pages/pos/pospricelist/types.ts"
+      - "client/src/pages/pos/pospricelist/**"
       - "client/src/pages/settings/DataToolsTab.tsx"
       - "client/src/pages/settings/datatoolstab/components/BulkMergeStockItemsCard.tsx"
       - "client/src/pages/settings/datatoolstab/components/MergeHistoryCard.tsx"
       - "client/src/pages/settings/datatoolstab/components/MergeStockItemsCard.tsx"
+      - "client/src/pages/stocktransferorder/**"
       - "client/src/pages/vouchers/StockAdjustmentForm.tsx"
       - "client/src/pages/vouchers/StockTransferForm.tsx"
+      - "client/src/pages/vouchers/stocktransferform/**"
       - "client/src/pages/vouchers/useVoucherQueries.ts"
       - "docs/stock-items-bandwidth-light-callers.md"
       - "server/lib/pagination.ts"
@@ -40,11 +42,13 @@ on:
       - "shared/schema/inventory.ts"
       - "scripts/enforce-bandwidth-phases-3-4-backend.py"
       - "scripts/enforce-bandwidth-phases-3-4-frontend.py"
+      - "scripts/fix-bandwidth-phases-3-4-ci.py"
       - "scripts/harden-bandwidth-phases-3-4.py"
       - "scripts/test-bandwidth-phases-3-4.mts"
       - "scripts/update-startup-schema-integrity.mts"
       - "scripts/verify-bandwidth-phases-3-4.mjs"
       - "tests/bandwidth-phases-3-4.test.ts"
+      - "tests/program-6c-stock-light-route.test.ts"
       - "tests/startup-schema-integrity.test.ts"
       - ".github/workflows/bandwidth-phases-3-4.yml"
 
@@ -104,7 +108,7 @@ jobs:
 
       - name: Apply Phase 3-4 frontend implementation
         run: |
-          if grep -q 'PaginatedPriceListResponse' client/src/pages/pos/POSPriceList.tsx \
+          if grep -q 'usePaginatedPriceList' client/src/pages/pos/POSPriceList.tsx \
             && grep -q 'profile: "combined"' client/src/pages/location-inventory/useLocationInventoryQueries.ts \
             && grep -q 'useStockItemSearch' client/src/pages/vouchers/StockTransferForm.tsx; then
             echo "Phase 3-4 frontend base is already applied."
@@ -117,11 +121,22 @@ jobs:
           if grep -q 'explicitFullList' server/routes/stock/stockLightRoutes.ts \
             && grep -q 'unpricedByGroup' server/routes/stock/transfer-adj/posPriceListPaging.ts \
             && grep -q 'effectiveAdjustmentLocationId' client/src/pages/vouchers/StockAdjustmentForm.tsx \
-            && grep -q 'editStockItems' client/src/pages/StockTransferOrder.tsx \
+            && grep -q 'useStockTransferOrderItems' client/src/pages/StockTransferOrder.tsx \
             && grep -q 'allInventoryTotals' client/src/pages/LocationInventory.tsx; then
             echo "Phase 3-4 hardening is already applied."
           else
             python scripts/harden-bandwidth-phases-3-4.py
+          fi
+
+      - name: Apply Phase 3-4 CI and architecture repairs
+        run: |
+          if grep -q 'useStockTransferOrderItems' client/src/pages/StockTransferOrder.tsx \
+            && grep -q 'fetchFilteredPriceListForExport' client/src/pages/pos/POSPriceList.tsx \
+            && grep -q 'fetchMissingTransferRates' client/src/pages/vouchers/StockTransferForm.tsx \
+            && grep -q 'si.company_id = \$1' tests/program-6c-stock-light-route.test.ts; then
+            echo "Phase 3-4 CI repairs are already applied."
+          else
+            python scripts/fix-bandwidth-phases-3-4-ci.py
           fi
 
       - name: Fix Phase 3-4 lint regression
@@ -130,8 +145,7 @@ jobs:
           from pathlib import Path
 
           path = Path("client/src/pages/pos/POSPriceList.tsx")
-          source = path.read_text()
-          source = source.replace("  PriceListItem,\n", "")
+          source = path.read_text().replace("  PriceListItem,\n", "")
           path.write_text(source)
           PY
 
@@ -159,12 +173,15 @@ jobs:
             client/src/pages/location-inventory/useStockGroupSummaries.ts \
             client/src/pages/pos/POSPriceList.tsx \
             client/src/pages/pos/pospricelist/types.ts \
+            client/src/pages/pos/pospricelist/usePaginatedPriceList.ts \
             client/src/pages/settings/DataToolsTab.tsx \
             client/src/pages/settings/datatoolstab/components/BulkMergeStockItemsCard.tsx \
             client/src/pages/settings/datatoolstab/components/MergeHistoryCard.tsx \
             client/src/pages/settings/datatoolstab/components/MergeStockItemsCard.tsx \
+            client/src/pages/stocktransferorder/useStockTransferOrderItems.ts \
             client/src/pages/vouchers/StockAdjustmentForm.tsx \
             client/src/pages/vouchers/StockTransferForm.tsx \
+            client/src/pages/vouchers/stocktransferform/bandwidth.ts \
             client/src/pages/vouchers/useVoucherQueries.ts \
             docs/stock-items-bandwidth-light-callers.md \
             server/lib/pagination.ts \
@@ -181,6 +198,7 @@ jobs:
             scripts/test-bandwidth-phases-3-4.mts \
             scripts/verify-bandwidth-phases-3-4.mjs \
             tests/bandwidth-phases-3-4.test.ts \
+            tests/program-6c-stock-light-route.test.ts \
             tests/startup-schema-integrity.test.ts
 
       - name: Verify Phase 3-4 contracts
@@ -192,10 +210,14 @@ jobs:
       - name: Lint changed regression surface
         run: |
           node node_modules/eslint/bin/eslint.js \
+            client/src/components/PaginationBar.tsx \
             client/src/pages/pos/POSPriceList.tsx \
+            client/src/pages/pos/pospricelist/usePaginatedPriceList.ts \
             client/src/pages/vouchers/StockAdjustmentForm.tsx \
             client/src/pages/vouchers/StockTransferForm.tsx \
+            client/src/pages/vouchers/stocktransferform/bandwidth.ts \
             client/src/pages/StockTransferOrder.tsx \
+            client/src/pages/stocktransferorder/useStockTransferOrderItems.ts \
             server/routes/stock/stockLightRoutes.ts \
             server/routes/location/locationInventoryPaging.ts \
             server/routes/stock/transfer-adj/posPriceListPaging.ts
@@ -216,5 +238,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Fix Phase 3-4 lint and formatting"
+          git commit -m "Split and verify Phase 3-4 bandwidth logic"
           git push origin HEAD:bandwidth-phases-1-2
