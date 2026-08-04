@@ -19,13 +19,7 @@ The rollout stage is independent from the lower-level runtime flags. Runtime har
 
 ## Configuration
 
-Optional boot-time environment variables:
-
-- `REMOTE_SUPPORT_ROLLOUT_STAGE`
-- `REMOTE_SUPPORT_CANARY_COMPANY_IDS` — comma-separated positive company IDs
-- `REMOTE_SUPPORT_INTERNAL_CONTROLLER_IDS` — comma-separated user IDs
-
-The safe default is `disabled`.
+Rollout state is deliberately runtime-only and returns to `disabled` after every application restart. A Developer must explicitly enable each rollout stage through the guarded administrative API after confirming their password. This prevents a deployment, restart, or stale configuration value from silently re-enabling interactive control.
 
 Developer-only runtime endpoints:
 
@@ -60,4 +54,4 @@ The integrated Phase 4–8 branch passes TypeScript validation and the focused r
 
 ## Storage
 
-Rollout configuration is runtime state and can be supplied by environment variables at boot. Phase 8 adds no SQL table and no database migration. Permanent session and command metadata continues to use the existing `audit_log` table without storing screenshots, field values, passwords, clipboard contents, or typed text.
+Rollout configuration is transient runtime state and is intentionally not persisted. Phase 8 adds no SQL table and no database migration. Permanent session and command metadata continues to use the existing `audit_log` table without storing screenshots, field values, passwords, clipboard contents, or typed text.
