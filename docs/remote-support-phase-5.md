@@ -6,11 +6,13 @@ Phase 5 adds mouse movement, safe clicks, and scrolling inside the exact authent
 
 ## Controller activation
 
-- Opening the Watch view still creates only the bounded Phase 4 support session.
-- Mouse control remains read-only until the controller explicitly selects **Enable**.
+- Opening the Watch view creates only the bounded Phase 4 support session. Passive screen viewing remains silent and read-only.
+- The employee control indicator is not shown for passive viewing.
+- Mouse capability remains disabled until the controller explicitly selects **Enable**.
 - The controller must confirm their own password. The existing authenticated password-confirmation timestamp is accepted for no more than five minutes.
 - Authorization is bound to the controller, support session, target user, and exact target browser-tab identifier.
-- Closing the Watch view, stopping the support session, session expiry, tab disconnect, runtime disable, restore-defaults, or the global emergency stop ends the usable command path.
+- Enabling mouse control activates the visible **Admin support active** indicator in the employee ERP tab.
+- Selecting **Stop mouse**, authorization expiry, closing the Watch view, stopping the support session, session expiry, tab disconnect, runtime disable, restore-defaults, or the global emergency stop disables mouse capability and removes the active-control indicator.
 
 ## Allowed commands
 
@@ -28,7 +30,7 @@ The target tab evaluates every click locally and fails closed. Phase 5 blocks:
 - External links, downloads, new-window links, and JavaScript links.
 - Every keyboard, typing, clipboard, file, desktop, and operating-system command.
 
-The employee can still stop the complete support session immediately from the persistent **Admin support active** indicator.
+During mouse control, the employee can stop the complete support session immediately from the persistent **Admin support active** indicator.
 
 ## Transport and validation
 
@@ -38,6 +40,7 @@ The employee can still stop the complete support session immediately from the pe
 - Commands are sequenced, rate-limited by type, expire quickly, and are rejected when the target command stream is unavailable.
 - Target results report `executed`, `blocked`, or `ignored` without transmitting field values or sensitive page content.
 - Broken streams are isolated so one disconnected listener cannot affect another session.
+- Mouse authorization and active capability are revoked together; passive viewing cannot retain an active command channel.
 
 ## Rollout and storage
 
@@ -48,6 +51,6 @@ The employee can still stop the complete support session immediately from the pe
 
 ## Verification
 
-- Session tests now require mouse capability while keyboard capability remains disabled.
-- Backend tests cover password freshness, controller ownership, exact target-tab binding, normalized commands, bounded scrolling, command sequencing, rate limits, missing streams, result ownership, and broken-listener isolation.
+- Session tests require passive sessions to start with mouse and keyboard capability disabled.
+- Backend tests cover password freshness, activation and revocation of mouse capability, controller ownership, exact target-tab binding, normalized commands, bounded scrolling, command sequencing, rate limits, missing streams, result ownership, and broken-listener isolation.
 - Frontend tests cover image coordinate mapping, protected elements, safe navigation, explicit allowlisting, blocked mutation controls, pointer movement, and nearest-container scrolling.
