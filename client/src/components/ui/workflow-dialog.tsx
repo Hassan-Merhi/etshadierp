@@ -4,6 +4,7 @@ import { AlertTriangle, Loader2, type LucideIcon } from "lucide-react";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -60,7 +61,10 @@ export function WorkflowDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className={cn("max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] overflow-hidden p-0 sm:max-w-lg", contentClassName)}
+        className={cn(
+          "max-h-[calc(var(--app-viewport-height)-1rem)] w-[calc(100vw-1rem)] overflow-hidden p-0 sm:max-w-lg",
+          contentClassName
+        )}
         data-testid={testId}
       >
         <div className="flex min-h-0 flex-col">
@@ -71,12 +75,14 @@ export function WorkflowDialog({
               </div>
               <div className="min-w-0">
                 <DialogTitle className="break-words">{title}</DialogTitle>
-                {description ? <DialogDescription className="mt-1 break-words leading-5">{description}</DialogDescription> : null}
+                {description ? (
+                  <DialogDescription className="mt-1 break-words leading-5">{description}</DialogDescription>
+                ) : null}
               </div>
             </div>
           </DialogHeader>
 
-          {children ? <div className="min-h-0 overflow-y-auto px-4 py-4 sm:px-6">{children}</div> : null}
+          {children ? <DialogBody className="px-4 py-4 sm:px-6">{children}</DialogBody> : null}
 
           <DialogFooter className="border-t bg-muted/20 px-4 py-3 sm:px-6">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
@@ -89,7 +95,9 @@ export function WorkflowDialog({
               disabled={disableConfirm || isPending}
               aria-busy={isPending ? "true" : undefined}
             >
-              {isPending ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
+              {isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+              ) : null}
               {confirmLabel}
             </Button>
           </DialogFooter>
