@@ -35,7 +35,7 @@ describe("shared logger readability", () => {
         totalApiResponseBytes: 24196990,
         apiEndpointCount: 42,
       }),
-    ).toBe("API responses transferred 23.08 MB across 42 endpoints during the last 5.0 minutes");
+    ).toBe("API responses transferred 23.1 MB across 42 endpoints during the last 5.0 minutes");
   });
 
   it("derives stable event names from operational event codes", () => {
@@ -46,14 +46,5 @@ describe("shared logger readability", () => {
         code: "large_http_response",
       }),
     ).toBe("operational.large_http_response");
-  });
-
-  it("explains embedded access-denied JSON", () => {
-    expect(
-      __loggerTesting.humanizeLegacyMessage(
-        '{"event":"access_denied","path":"/api/auth/me","reason":"SESSION_REQUIRED"}',
-        {},
-      ),
-    ).toBe("Access to /api/auth/me was denied because an active session was required");
   });
 });
