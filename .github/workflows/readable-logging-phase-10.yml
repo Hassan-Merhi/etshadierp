@@ -43,9 +43,12 @@ jobs:
           --health-retries 10
     env:
       NODE_ENV: test
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/etshadi_test?sslmode=disable
-      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/etshadi_test?sslmode=disable
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/etshadi_test
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/etshadi_test
+      PGSSLMODE: disable
       SESSION_SECRET: phase-10-ci-session-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -69,6 +72,9 @@ jobs:
           node scripts/verify-readable-logging-phases-1-7.mjs
           node scripts/verify-readable-logging-phases-8-9.mjs
           node scripts/verify-readable-logging-phase-10.mjs
+
+      - name: Prepare disposable PostgreSQL schema
+        run: node node_modules/drizzle-kit/bin.cjs push --force
 
       - name: Focused logging tests
         run: |
