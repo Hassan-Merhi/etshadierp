@@ -141,6 +141,8 @@ describe("Supplier Partner Phase 3 — full sale reversal", () => {
 
     const reverseResponse = await agent.post(`/api/sp/sales/${sale.id}/reverse`).send({
       reason: "Customer sale was entered twice",
+      confirmation: "REVERSE SP SALE",
+      idempotencyKey: `reverse-sale-${sale.id}`,
       reversalDate: "2026-08-03",
     });
 
@@ -175,6 +177,8 @@ describe("Supplier Partner Phase 3 — full sale reversal", () => {
 
     const duplicateResponse = await agent.post(`/api/sp/sales/${sale.id}/reverse`).send({
       reason: "Attempt to reverse the same sale again",
+      confirmation: "REVERSE SP SALE",
+      idempotencyKey: `reverse-sale-duplicate-${sale.id}`,
     });
     expect(duplicateResponse.status).toBe(409);
     expect(duplicateResponse.body.code).toBe("SP_SALE_NOT_REVERSIBLE");
@@ -223,6 +227,8 @@ describe("Supplier Partner Phase 4 — open-container cancellation", () => {
 
     const cancellationResponse = await agent.post(`/api/sp/containers/${containerId}/cancel`).send({
       reason: "Supplier cancelled the shipment before dispatch",
+      confirmation: "CANCEL SP CONTAINER",
+      idempotencyKey: `cancel-container-${containerId}`,
       cancellationDate: "2026-08-03",
     });
 
@@ -259,6 +265,8 @@ describe("Supplier Partner Phase 4 — open-container cancellation", () => {
 
     const duplicateResponse = await agent.post(`/api/sp/containers/${containerId}/cancel`).send({
       reason: "Attempt to cancel the same container again",
+      confirmation: "CANCEL SP CONTAINER",
+      idempotencyKey: `cancel-container-duplicate-${containerId}`,
     });
     expect(duplicateResponse.status).toBe(409);
     expect(duplicateResponse.body.code).toBe("SP_CONTAINER_NOT_CANCELLABLE");
