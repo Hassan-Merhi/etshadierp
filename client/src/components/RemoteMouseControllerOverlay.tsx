@@ -116,11 +116,17 @@ export function RemoteMouseControllerOverlay() {
     [sessionsQuery.data?.sessions]
   );
   const authorized = authorizationIsFresh(session?.mouseAuthorization ?? null);
-  const controlEnabled = !!session && authorized && armedSessionId === session.id;
+  const controlEnabled =
+    !!session && session.capabilities.mouse && authorized && armedSessionId === session.id;
 
   useEffect(() => {
-    if (!session || !authorized || armedSessionId !== session.id) {
-      if (armedSessionId && (!session || armedSessionId !== session.id || !authorized)) setArmedSessionId(null);
+    if (!session || !session.capabilities.mouse || !authorized || armedSessionId !== session.id) {
+      if (
+        armedSessionId &&
+        (!session || armedSessionId !== session.id || !session.capabilities.mouse || !authorized)
+      ) {
+        setArmedSessionId(null);
+      }
     }
   }, [armedSessionId, authorized, session]);
 
@@ -156,7 +162,9 @@ export function RemoteMouseControllerOverlay() {
       ) {
         setPasswordOpen(true);
       } else {
-        setError(requestError instanceof Error ? requestError.message : t("Unable to enable mouse control."));
+        setError(
+          requestError instanceof Error ? t(requestError.message) : t("Unable to enable mouse control.")
+        );
       }
     } finally {
       setBusy(false);
@@ -174,11 +182,30 @@ export function RemoteMouseControllerOverlay() {
       });
       await requestMouseAuthorization();
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : t("Password confirmation failed."));
+      setError(requestError instanceof Error ? t(requestError.message) : t("Password confirmation failed."));
     } finally {
       setBusy(false);
     }
   }, [busy, password, requestMouseAuthorization, session, t]);
+
+  const stopMouse = useCallback(async () => {
+    if (!session || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await requestJson(
+        `/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/mouse-authorization/revoke`,
+        { method: "POST", body: JSON.stringify({}) }
+      );
+      setArmedSessionId(null);
+      setLastResult(null);
+      await sessionsQuery.refetch();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? t(requestError.message) : t("Mouse command failed."));
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, session, sessionsQuery, t]);
 
   const sendCommand = useCallback(
     async (
@@ -200,7 +227,7 @@ export function RemoteMouseControllerOverlay() {
           setArmedSessionId(null);
           setPasswordOpen(true);
         }
-        setError(requestError instanceof Error ? requestError.message : t("Mouse command failed."));
+        setError(requestError instanceof Error ? t(requestError.message) : t("Mouse command failed."));
       }
     },
     [controlEnabled, session, t]
@@ -286,7 +313,7 @@ export function RemoteMouseControllerOverlay() {
     return () => eventSource.close();
   }, [controlEnabled, session, t]);
 
-  if (!watchDialogOpen || !session?.capabilities.mouse) return null;
+  if (!watchDialogOpen || !session) return null;
 
   const statusLabel = lastResult
     ? t(lastResult.status === "executed" ? "Executed" : lastResult.status === "blocked" ? "Blocked" : "Ignored")
@@ -316,10 +343,12 @@ export function RemoteMouseControllerOverlay() {
             size="sm"
             variant="outline"
             className="h-8 shrink-0 px-2"
-            onClick={() => setArmedSessionId(null)}
+            onClick={() => void stopMouse()}
+            disabled={busy}
             data-testid="button-disable-remote-mouse"
           >
-            <Square className="mr-1 h-3 w-3" /> {t("Stop mouse")}
+            {busy ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Square className="mr-1 h-3 w-3" />}
+            {t("Stop mouse")}
           </Button>
         ) : (
           <Button
