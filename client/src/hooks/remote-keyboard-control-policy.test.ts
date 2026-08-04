@@ -99,9 +99,9 @@ describe("remote keyboard editing policy", () => {
     ).toMatchObject({ status: "executed" });
     expect(input.selectionStart).toBe(input.value.length);
 
-    expect(
-      applyRemoteKeyboardCommand(command({ type: "key", key: "Enter", text: undefined }), document, 5002)
-    ).toEqual({ status: "blocked", reason: "form-submit-blocked" });
+    expect(applyRemoteKeyboardCommand(command({ type: "key", key: "Enter", text: undefined }), document, 5002)).toEqual(
+      { status: "blocked", reason: "form-submit-blocked" }
+    );
   });
 
   it("supports textarea line breaks and safe Tab navigation", () => {

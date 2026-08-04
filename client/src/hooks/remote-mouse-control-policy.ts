@@ -1,7 +1,4 @@
-import {
-  clearRemoteEditableFocus,
-  focusRemoteEditableElement,
-} from "./remote-keyboard-control-policy";
+import { clearRemoteEditableFocus, focusRemoteEditableElement } from "./remote-keyboard-control-policy";
 
 export type RemoteMouseCommandType = "pointer-move" | "click" | "scroll";
 export type RemoteMouseExecutionStatus = "executed" | "blocked" | "ignored";

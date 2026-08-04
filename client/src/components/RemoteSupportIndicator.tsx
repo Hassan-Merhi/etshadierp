@@ -59,7 +59,8 @@ export function RemoteSupportIndicator() {
               {translateRemoteSupportPhase6Text(
                 keyboardActive ? "Mouse and keyboard active" : "Mouse active",
                 language
-              )} · {formatRemaining(session.expiresAt, now)}
+              )}{" "}
+              · {formatRemaining(session.expiresAt, now)}
             </p>
           </div>
           <Button

@@ -151,15 +151,8 @@ function activeSessionForTarget(
   if (!session || session.status !== "active") {
     throw new RemoteKeyboardControlError("SESSION_INACTIVE", 409, "The support session is no longer active.");
   }
-  if (
-    session.targetUserId !== cleanIdentifier(targetUserId) ||
-    session.targetTabId !== cleanIdentifier(targetTabId)
-  ) {
-    throw new RemoteKeyboardControlError(
-      "TARGET_MISMATCH",
-      403,
-      "This keyboard channel is not bound to this ERP tab."
-    );
+  if (session.targetUserId !== cleanIdentifier(targetUserId) || session.targetTabId !== cleanIdentifier(targetTabId)) {
+    throw new RemoteKeyboardControlError("TARGET_MISMATCH", 403, "This keyboard channel is not bound to this ERP tab.");
   }
   if (
     !isRemoteSupportEnabled("remoteControl") ||
@@ -204,11 +197,7 @@ function assertRateLimit(sessionId: string, now: number): void {
   }
   window.count += 1;
   if (window.count > RATE_LIMIT) {
-    throw new RemoteKeyboardControlError(
-      "KEYBOARD_RATE_LIMITED",
-      429,
-      "Keyboard commands are being sent too quickly."
-    );
+    throw new RemoteKeyboardControlError("KEYBOARD_RATE_LIMITED", 429, "Keyboard commands are being sent too quickly.");
   }
 }
 
@@ -264,19 +253,12 @@ export function authorizeRemoteKeyboardControl(input: {
   authorizations.set(session.id, authorization);
   if (!setRemoteControlKeyboardCapability(session.id, true)) {
     clearSessionKeyboardState(session.id, false);
-    throw new RemoteKeyboardControlError(
-      "KEYBOARD_CONTROL_DISABLED",
-      409,
-      "Keyboard control is disabled."
-    );
+    throw new RemoteKeyboardControlError("KEYBOARD_CONTROL_DISABLED", 409, "Keyboard control is disabled.");
   }
   return { ...authorization };
 }
 
-export function revokeRemoteKeyboardControl(input: {
-  sessionId: string;
-  controllerUserId: string;
-}): void {
+export function revokeRemoteKeyboardControl(input: { sessionId: string; controllerUserId: string }): void {
   const session = activeSessionForController(input.sessionId, input.controllerUserId, false);
   clearSessionKeyboardState(session.id, true);
 }
@@ -313,9 +295,10 @@ export function publishRemoteKeyboardCommand(input: {
   }
 
   const text = input.type === "insert-text" ? cleanInsertText(input.text) : undefined;
-  const key = input.type === "key" && ALLOWED_KEYS.has(input.key as RemoteKeyboardKey)
-    ? (input.key as RemoteKeyboardKey)
-    : undefined;
+  const key =
+    input.type === "key" && ALLOWED_KEYS.has(input.key as RemoteKeyboardKey)
+      ? (input.key as RemoteKeyboardKey)
+      : undefined;
   if (input.type === "insert-text" && !text) {
     throw new RemoteKeyboardControlError("INVALID_KEYBOARD_TEXT", 400, "Keyboard text is invalid or too long.");
   }
@@ -387,11 +370,7 @@ export function publishRemoteKeyboardCommandResult(input: {
     throw new RemoteKeyboardControlError("KEYBOARD_COMMAND_NOT_FOUND", 404, "Keyboard command not found.");
   }
   if (input.status !== "executed" && input.status !== "blocked" && input.status !== "ignored") {
-    throw new RemoteKeyboardControlError(
-      "INVALID_KEYBOARD_RESULT",
-      400,
-      "Unsupported keyboard command result."
-    );
+    throw new RemoteKeyboardControlError("INVALID_KEYBOARD_RESULT", 400, "Unsupported keyboard command result.");
   }
 
   const result: RemoteKeyboardCommandResult = {

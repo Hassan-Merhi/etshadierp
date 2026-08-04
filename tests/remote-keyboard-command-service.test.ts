@@ -19,10 +19,7 @@ import {
   resetRemoteControlSessionStateForTests,
   startRemoteControlSession,
 } from "../server/services/remoteControlSessionService";
-import {
-  restoreRemoteSupportBootDefaults,
-  updateRemoteSupportFlags,
-} from "../server/services/remoteSupportRuntime";
+import { restoreRemoteSupportBootDefaults, updateRemoteSupportFlags } from "../server/services/remoteSupportRuntime";
 
 function buildSession() {
   const now = Date.now();
@@ -99,9 +96,7 @@ describe("remote keyboard command safety", () => {
         passwordConfirmedAt: now - 6 * 60 * 1000,
         now,
       })
-    ).toThrowError(
-      expect.objectContaining({ code: "PASSWORD_CONFIRMATION_REQUIRED", statusCode: 428 })
-    );
+    ).toThrowError(expect.objectContaining({ code: "PASSWORD_CONFIRMATION_REQUIRED", statusCode: 428 }));
 
     const authorization = authorizeRemoteKeyboardControl({
       sessionId: session.id,
@@ -265,9 +260,7 @@ describe("remote keyboard command safety", () => {
         key: "Tab",
         now,
       })
-    ).toThrowError(
-      expect.objectContaining({ code: "TARGET_KEYBOARD_CHANNEL_UNAVAILABLE", statusCode: 409 })
-    );
+    ).toThrowError(expect.objectContaining({ code: "TARGET_KEYBOARD_CHANNEL_UNAVAILABLE", statusCode: 409 }));
 
     subscribeRemoteKeyboardCommands({
       sessionId: session.id,

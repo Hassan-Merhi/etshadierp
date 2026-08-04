@@ -286,10 +286,7 @@ export function setRemoteControlMouseCapability(sessionId: string, enabled: bool
   return copySession(session);
 }
 
-export function setRemoteControlKeyboardCapability(
-  sessionId: string,
-  enabled: boolean
-): RemoteControlSession | null {
+export function setRemoteControlKeyboardCapability(sessionId: string, enabled: boolean): RemoteControlSession | null {
   cleanupRemoteControlState();
   const session = sessions.get(cleanIdentifier(sessionId));
   if (!session || session.status !== "active") return null;

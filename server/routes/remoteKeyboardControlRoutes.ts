@@ -89,42 +89,34 @@ function handleError(error: unknown, res: Response): void {
 }
 
 export function registerRemoteKeyboardControlRoutes(app: Express): void {
-  app.post(
-    "/api/screen-feed/control/sessions/:sessionId/keyboard-authorization",
-    requireAuth,
-    (req, res) => {
-      if (!requireController(req, res)) return;
-      try {
-        const authorization = authorizeRemoteKeyboardControl({
-          sessionId: req.params.sessionId,
-          controllerUserId: sessionUserId(req),
-          passwordConfirmedAt: passwordConfirmedAt(req),
-        });
-        res.setHeader("Cache-Control", "no-store");
-        res.json({ authorization: serializeAuthorization(authorization) });
-      } catch (error) {
-        handleError(error, res);
-      }
+  app.post("/api/screen-feed/control/sessions/:sessionId/keyboard-authorization", requireAuth, (req, res) => {
+    if (!requireController(req, res)) return;
+    try {
+      const authorization = authorizeRemoteKeyboardControl({
+        sessionId: req.params.sessionId,
+        controllerUserId: sessionUserId(req),
+        passwordConfirmedAt: passwordConfirmedAt(req),
+      });
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ authorization: serializeAuthorization(authorization) });
+    } catch (error) {
+      handleError(error, res);
     }
-  );
+  });
 
-  app.post(
-    "/api/screen-feed/control/sessions/:sessionId/keyboard-authorization/revoke",
-    requireAuth,
-    (req, res) => {
-      if (!requireController(req, res)) return;
-      try {
-        revokeRemoteKeyboardControl({
-          sessionId: req.params.sessionId,
-          controllerUserId: sessionUserId(req),
-        });
-        res.setHeader("Cache-Control", "no-store");
-        res.json({ authorization: null });
-      } catch (error) {
-        handleError(error, res);
-      }
+  app.post("/api/screen-feed/control/sessions/:sessionId/keyboard-authorization/revoke", requireAuth, (req, res) => {
+    if (!requireController(req, res)) return;
+    try {
+      revokeRemoteKeyboardControl({
+        sessionId: req.params.sessionId,
+        controllerUserId: sessionUserId(req),
+      });
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ authorization: null });
+    } catch (error) {
+      handleError(error, res);
     }
-  );
+  });
 
   app.get("/api/screen-feed/control/keyboard-commands", requireLogin, (req, res) => {
     const sessionId = typeof req.query.sessionId === "string" ? req.query.sessionId : "";
@@ -160,59 +152,51 @@ export function registerRemoteKeyboardControlRoutes(app: Express): void {
     writeEvent(res, "ready", { sessionId, tabId });
   });
 
-  app.post(
-    "/api/screen-feed/control/sessions/:sessionId/keyboard-commands",
-    requireAuth,
-    (req, res) => {
-      if (!requireController(req, res)) return;
-      try {
-        const command = publishRemoteKeyboardCommand({
-          sessionId: req.params.sessionId,
-          controllerUserId: sessionUserId(req),
-          type: req.body?.type,
-          text: req.body?.text,
-          key: req.body?.key,
-          shiftKey: req.body?.shiftKey,
-        });
-        res.status(202).json({ command: serializeCommand(command) });
-      } catch (error) {
-        handleError(error, res);
-      }
+  app.post("/api/screen-feed/control/sessions/:sessionId/keyboard-commands", requireAuth, (req, res) => {
+    if (!requireController(req, res)) return;
+    try {
+      const command = publishRemoteKeyboardCommand({
+        sessionId: req.params.sessionId,
+        controllerUserId: sessionUserId(req),
+        type: req.body?.type,
+        text: req.body?.text,
+        key: req.body?.key,
+        shiftKey: req.body?.shiftKey,
+      });
+      res.status(202).json({ command: serializeCommand(command) });
+    } catch (error) {
+      handleError(error, res);
     }
-  );
+  });
 
-  app.get(
-    "/api/screen-feed/control/sessions/:sessionId/keyboard-results",
-    requireAuth,
-    (req, res) => {
-      if (!requireController(req, res)) return;
+  app.get("/api/screen-feed/control/sessions/:sessionId/keyboard-results", requireAuth, (req, res) => {
+    if (!requireController(req, res)) return;
 
-      let unsubscribe = () => {};
-      try {
-        unsubscribe = subscribeRemoteKeyboardResults({
-          sessionId: req.params.sessionId,
-          controllerUserId: sessionUserId(req),
-          listener: (result) => writeEvent(res, "result", serializeResult(result)),
-        });
-      } catch (error) {
-        return handleError(error, res);
-      }
-
-      openEventStream(res);
-      let closed = false;
-      const heartbeatId = setInterval(() => writeHeartbeat(res), STREAM_HEARTBEAT_MS);
-      const cleanup = () => {
-        if (closed) return;
-        closed = true;
-        clearInterval(heartbeatId);
-        unsubscribe();
-        if (!res.writableEnded) res.end();
-      };
-      req.once("close", cleanup);
-      res.once("close", cleanup);
-      writeEvent(res, "ready", { sessionId: req.params.sessionId });
+    let unsubscribe = () => {};
+    try {
+      unsubscribe = subscribeRemoteKeyboardResults({
+        sessionId: req.params.sessionId,
+        controllerUserId: sessionUserId(req),
+        listener: (result) => writeEvent(res, "result", serializeResult(result)),
+      });
+    } catch (error) {
+      return handleError(error, res);
     }
-  );
+
+    openEventStream(res);
+    let closed = false;
+    const heartbeatId = setInterval(() => writeHeartbeat(res), STREAM_HEARTBEAT_MS);
+    const cleanup = () => {
+      if (closed) return;
+      closed = true;
+      clearInterval(heartbeatId);
+      unsubscribe();
+      if (!res.writableEnded) res.end();
+    };
+    req.once("close", cleanup);
+    res.once("close", cleanup);
+    writeEvent(res, "ready", { sessionId: req.params.sessionId });
+  });
 
   app.post(
     "/api/screen-feed/control/sessions/:sessionId/keyboard-commands/:commandId/result",
