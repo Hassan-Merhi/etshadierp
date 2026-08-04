@@ -1,0 +1,51 @@
+name: Remote support Phase 6 autofix
+
+on:
+  push:
+    branches:
+      - agent/remote-support-phase-6-keyboard-control
+
+permissions:
+  contents: write
+
+concurrency:
+  group: remote-support-phase6-autofix
+  cancel-in-progress: false
+
+jobs:
+  autofix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/remote-support-phase-6-keyboard-control
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - run: npm ci --no-audit --bin-links=true
+      - name: Format every Phase 6 changed source file
+        run: |
+          git fetch origin agent/remote-support-phase-5-mouse-control --depth=1
+          mapfile -d '' changed_files < <(
+            git diff --name-only --diff-filter=ACMR -z origin/agent/remote-support-phase-5-mouse-control...HEAD -- client/src server shared tests scripts |
+              grep -zE '\.(ts|tsx|css|mjs)$' || true
+          )
+          if [ "${#changed_files[@]}" -gt 0 ]; then
+            printf 'Formatting %s files\n' "${#changed_files[@]}"
+            node node_modules/prettier/bin/prettier.cjs --write "${changed_files[@]}"
+          fi
+      - name: Commit formatter output
+        run: |
+          if git diff --quiet; then
+            echo "All Phase 6 changed source is formatted."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/src server shared tests scripts
+          git commit -m "style(remote-support): format all Phase 6 changed source"
+          git push --no-verify origin HEAD:agent/remote-support-phase-6-keyboard-control
