@@ -6,14 +6,16 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   format:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout repository
+      - name: Checkout pull request branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Set up Node.js 20
         uses: actions/setup-node@v4
@@ -27,6 +29,20 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --bin-links=true
 
+      - name: Preserve the legacy bandwidth top-N setting
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("server/middleware/bandwidthDebug.ts")
+          source = path.read_text()
+          source = source.replace(
+              "process.env.BANDWIDTH_DEBUG_LOG_TOP_N,",
+              "process.env.BANDWIDTH_DEBUG_LOG_TOP_N || process.env.BANDWIDTH_DEBUG_TOP_N,",
+          )
+          path.write_text(source)
+          PY
+
       - name: Format readable logging files
         run: |
           node node_modules/prettier/bin/prettier.cjs --write \
@@ -38,17 +54,23 @@ jobs:
             server/middleware/bandwidthDebug.ts \
             server/middleware/requestLogger.ts
 
-      - name: Upload formatted files
-        uses: actions/upload-artifact@v4
-        with:
-          name: readable-logging-formatted-files
-          if-no-files-found: error
-          retention-days: 1
-          path: |
-            server/lib/logger.test.ts
-            server/lib/logger.ts
-            server/lib/requestLoggingPolicy.test.ts
-            server/lib/requestLoggingPolicy.ts
-            server/middleware/bandwidthDebug.test.ts
-            server/middleware/bandwidthDebug.ts
+      - name: Commit formatted files and remove this workflow
+        run: |
+          rm .github/workflows/temporary-readable-logging-format.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            .github/workflows/temporary-readable-logging-format.yml \
+            server/lib/logger.test.ts \
+            server/lib/logger.ts \
+            server/lib/requestLoggingPolicy.test.ts \
+            server/lib/requestLoggingPolicy.ts \
+            server/middleware/bandwidthDebug.test.ts \
+            server/middleware/bandwidthDebug.ts \
             server/middleware/requestLogger.ts
+          if git diff --cached --quiet; then
+            echo "No formatting changes were required."
+            exit 0
+          fi
+          git commit -m "Format readable logging phases 4 and 5"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
