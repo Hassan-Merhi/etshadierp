@@ -83,3 +83,5 @@ jobs:
             client/src/lib/queryPolicies.ts
           git commit -m "Complete Group A Phase 2 polling and shared cache"
           git push origin HEAD:agent/group-a-phase-2-polling-cache
+
+# This comment intentionally retriggers the branch workflow after the workflow file exists.
