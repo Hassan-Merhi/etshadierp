@@ -5,7 +5,6 @@ import { requireAuth, requireRole } from "../auth";
 import { logger } from "../lib/logger";
 import { fetchAllCompanies } from "../services/export-data";
 import { sendExportEmail } from "../services/emailService";
-import { buildFullExportZip } from "../helpers/buildFullExportZip";
 import {
   createJob,
   getJob,
@@ -16,6 +15,7 @@ import {
   releaseJobArchive,
 } from "../services/exportJobManager";
 import { createTemporaryExportArchive, streamTemporaryExportArchive } from "../helpers/temporaryExportArchive";
+import { createScheduledExportArtifact } from "../helpers/scheduledExportArtifact";
 import { retryAsync, isEmailConfigError } from "../helpers/retryAsync";
 import { createExportRun, updateExportRun, finishExportRun } from "../helpers/exportRunTracker";
 
@@ -210,80 +210,88 @@ export function registerExportRoutes(app: Express) {
           return;
         }
 
-        // Email providers require complete attachment bytes, so this compatibility
-        // path remains buffered. It is still protected by the heavy-export coordinator.
-        const {
-          zip: zipBuf,
-          names,
-          skipped,
-        } = await buildFullExportZip(companies, fromDate, toDate, (msg, level) => addStep(job, msg, level ?? "info"));
+        const artifact = await createScheduledExportArtifact(
+          `manual-email-${job.id}`,
+          companies,
+          fromDate,
+          toDate,
+          (message, level) => addStep(job, message, level ?? "info"),
+        );
 
-        if (names.length === 0) {
-          const msg = "ZIP is empty — no companies exported successfully. Nothing will be sent.";
-          failJob(job, msg);
-          await finishExportRun(runId, { status: "failed", skippedReason: msg, companiesCount: companies.length });
-          return;
-        }
+        try {
+          const { attachment, names, skipped, sizeBytes } = artifact;
+          if (names.length === 0 || sizeBytes <= 0) {
+            const message = "ZIP is empty — no companies exported successfully. Nothing will be sent.";
+            failJob(job, message);
+            await finishExportRun(runId, {
+              status: "failed",
+              skippedReason: message,
+              companiesCount: companies.length,
+            });
+            return;
+          }
 
-        if (skipped.length > 0) {
-          addStep(job, `Skipped ${skipped.length} companies: ${skipped.join(", ")}`, "warning");
-        }
+          if (skipped.length > 0) {
+            addStep(job, `Skipped ${skipped.length} companies: ${skipped.join(", ")}`, "warning");
+          }
 
-        const sizeMB = (zipBuf.length / 1024 / 1024).toFixed(1);
-        const zipSizeBytes = zipBuf.length;
-        addStep(job, `ZIP archive ready — ${sizeMB} MB, ${names.length} companies`, "success");
+          const sizeMB = (sizeBytes / 1024 / 1024).toFixed(1);
+          addStep(job, `ZIP archive ready — ${sizeMB} MB, ${names.length} companies`, "success");
 
-        await updateExportRun(runId, {
-          companiesCount: companies.length,
-          companyFilesCount: names.length,
-          zipSizeBytes,
-          skippedCompanies: skipped.join(", ") || null,
-        });
-
-        await updateExportRun(runId, { emailAttempted: true });
-        addStep(job, "Sending email (up to 3 attempts, 30 s between retries)...", "info");
-
-        const emailRes = await retryAsync({
-          label: "ManualEmail",
-          attempts: 3,
-          delayMs: 30 * 1000,
-          fn: () => sendExportEmail(zipBuf, dateLabel, names),
-          isSuccess: (r) => r.success,
-          shouldRetry: (r) => !r.error || !isEmailConfigError(r.error),
-          onAttempt: (n) => {
-            if (n > 1) addStep(job, `Retry attempt ${n}/3...`, "info");
-          },
-        });
-
-        if (emailRes.result.success) {
-          addStep(job, `Email sent successfully to all recipients (attempt ${emailRes.attempts})`, "success");
-          finishJob(job);
-          logger.info("Export job completed", {
-            module: "export",
-            action: "start",
-            status: "success",
-            durationMs: Date.now() - _t,
+          await updateExportRun(runId, {
+            companiesCount: companies.length,
+            companyFilesCount: names.length,
+            zipSizeBytes: sizeBytes,
+            skippedCompanies: skipped.join(", ") || null,
           });
-          await finishExportRun(runId, {
-            status: "success",
-            emailSuccess: true,
-            emailAttempts: emailRes.attempts,
+
+          await updateExportRun(runId, { emailAttempted: true });
+          addStep(job, "Sending email (up to 3 attempts, 30 s between retries)...", "info");
+
+          const emailRes = await retryAsync({
+            label: "ManualEmail",
+            attempts: 3,
+            delayMs: 30 * 1000,
+            fn: () => sendExportEmail(attachment, dateLabel, names),
+            isSuccess: (result) => result.success,
+            shouldRetry: (result) => !result.error || !isEmailConfigError(result.error),
+            onAttempt: (attempt) => {
+              if (attempt > 1) addStep(job, `Retry attempt ${attempt}/3...`, "info");
+            },
           });
-        } else {
-          const errMsg = emailRes.result.error || "Email send failed";
-          failJob(job, errMsg);
-          logger.warn("Export job email failed", {
-            module: "export",
-            action: "start",
-            status: "emailFailed",
-            durationMs: Date.now() - _t,
-          });
-          await finishExportRun(runId, {
-            status: "failed",
-            emailSuccess: false,
-            emailError: errMsg,
-            emailAttempts: emailRes.attempts,
-          });
+
+          if (emailRes.result.success) {
+            addStep(job, `Email sent successfully to all recipients (attempt ${emailRes.attempts})`, "success");
+            finishJob(job);
+            logger.info("Export job completed", {
+              module: "export",
+              action: "start",
+              status: "success",
+              durationMs: Date.now() - _t,
+            });
+            await finishExportRun(runId, {
+              status: "success",
+              emailSuccess: true,
+              emailAttempts: emailRes.attempts,
+            });
+          } else {
+            const errorMessage = emailRes.result.error || "Email send failed";
+            failJob(job, errorMessage);
+            logger.warn("Export job email failed", {
+              module: "export",
+              action: "start",
+              status: "emailFailed",
+              durationMs: Date.now() - _t,
+            });
+            await finishExportRun(runId, {
+              status: "failed",
+              emailSuccess: false,
+              emailError: errorMessage,
+              emailAttempts: emailRes.attempts,
+            });
+          }
+        } finally {
+          await artifact.dispose();
         }
       } catch (err: unknown) {
         logger.error("Export job failed", {

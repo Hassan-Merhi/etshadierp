@@ -1,110 +1,102 @@
-# Phase 10 — Scheduled and Email Export Memory Optimization
+# Phase 10 — Scheduled Export Memory Lifecycle
 
-Status: **implementation complete** on `agent/memory-phase-1-stabilization`.
+Phase 10 makes file-backed export artifacts the primary path for scheduled daily exports and manual email exports. Large ZIP, workbook, and PDF attachments remain reusable across delivery retries without remaining as long-lived complete Buffers in application memory.
 
-This phase reduces how long scheduled email and WhatsApp jobs retain complete XLSX, PDF, ZIP, and multipart request Buffers. It does not change report contents, schedules, recipients, permissions, retry counts, success rules, or business calculations.
+## Explicit daily export lifecycle
 
-## Attachment source support
+The scheduled daily export now calls `createScheduledExportArtifact` once. The export is streamed into a temporary ZIP file and represented as:
 
-`server/helpers/exportAttachmentSource.ts` supports:
+```ts
+{ filePath, sizeBytes }
+```
 
-- ordinary in-memory Buffers;
-- explicit temporary-file attachment sources;
-- Buffer-compatible managed file markers produced by the scheduled attachment bridge.
+The same file-backed source is reused for:
 
-The helper validates attachment availability and size, passes file paths directly to Nodemailer, materializes bytes only when a provider requires them, refreshes managed cleanup timers during active use, and provides explicit release support.
+- sequential email delivery;
+- WhatsApp delivery;
+- email retries;
+- WhatsApp retries;
+- export-run size and company metadata.
 
-## Sequential export email delivery
+The daily scheduler no longer calls the buffered full-export ZIP builder for its main export. Existing schedule enablement, three-year date range, company selection, retry counts, retry delays, success/partial-failure rules, run tracking, and recipient settings remain unchanged.
 
-`server/services/emailService.ts` now:
+## Manual email export lifecycle
 
-- accepts Buffer-backed or file-backed ZIP attachments;
-- rejects oversized attachments before opening SMTP;
-- sends to recipients sequentially instead of creating several large MIME/base64 bodies concurrently;
-- reuses one attachment descriptor across recipients and retries;
-- closes the Nodemailer transporter after success or failure;
-- preserves the existing partial-delivery success behavior.
+Manual email exports from `/api/export/start` now use the same explicit temporary artifact lifecycle. The HTTP request still returns the background job immediately, progress messages remain available, and the email is retried according to the existing policy.
 
-A file-backed attachment is streamed by Nodemailer and does not need to be loaded into a complete application Buffer.
+Manual download exports continue to stream a temporary ZIP to the browser and preserve the existing single-use download cleanup behavior.
 
-## Explicit artifact lifecycle helpers
+## Sequential email delivery
 
-`server/helpers/temporaryExportArchive.ts` exports `releaseTemporaryExportArchive()` for deterministic cleanup.
+Nodemailer receives a file path for file-backed exports. It streams the attachment for each recipient rather than creating several full MIME encodings concurrently.
 
-`server/helpers/scheduledExportArtifact.ts` can build one ZIP into a temporary file and return:
+Recipients remain sequential. SMTP verification, Gmail size checks, subject/body text, filenames, recipient selection, partial-delivery logging, and transporter shutdown remain unchanged.
 
-- the file-backed attachment source;
-- size and company metadata;
-- an idempotent `dispose()` function.
+## Serialized WhatsApp materialization
 
-`withScheduledExportArtifact()` guarantees archive deletion after its delivery callback finishes.
+Green API requires the `form-data` package and a complete multipart body. Phase 10 therefore keeps the reusable export on disk and materializes it only while one active scheduled-export upload owns the global materialization slot.
 
-## Scheduled compatibility bridge
+`withSerializedExportAttachmentBuffer` provides this boundary:
 
-`server/scheduledAttachmentBridge.mjs` is preloaded in development and production after the Phase 9 export bridge.
+1. wait for the previous file-backed upload;
+2. verify the source file and expected size;
+3. read one complete attachment Buffer;
+4. build the required Green API multipart body;
+5. await the upload response;
+6. release the slot in `finally`.
 
-It protects existing scheduler and manual-email callers without rewriting the large scheduler route file:
+Ordinary in-memory POS, invoice, image, and small PDF sends keep their existing direct path and are not forced through the scheduled-export queue.
 
-- final application-owned ZIP and PDF `Buffer.concat()` results are written to managed temporary files;
-- background ExcelJS `writeBuffer()` results are written to managed temporary XLSX files;
-- returned markers remain `Buffer.isBuffer(...) === true` and expose the real byte length, preserving existing size checks and route behavior;
-- email receives the managed file path directly;
-- WhatsApp retains only a small marker during retry delays;
-- file bytes are read only while the active multipart upload is being created;
-- orphaned managed files have a bounded cleanup timer.
+## Deterministic cleanup
 
-This covers:
+Explicit scheduled and manual artifacts use `try/finally` disposal. Their temporary ZIP files are removed after all configured delivery attempts finish, regardless of success, partial failure, configuration failure, or thrown errors.
 
-1. daily scheduled full exports;
-2. manual email exports;
-3. scheduled all-company net-position ZIPs;
-4. scheduled stock PDFs;
-5. scheduled net-position workbooks.
+Scheduled stock-report PDF and net-position workbook markers are released after their individual WhatsApp attempts. Scheduled all-company net-position ZIP markers are released after WhatsApp and email delivery finish.
 
-## WhatsApp multipart serialization
+Startup stale-file cleanup remains available for process crashes and hard restarts. Timer cleanup remains a fallback for compatibility-created managed markers, not the primary ownership mechanism for the new daily/manual paths.
 
-Green API requires the existing `form-data` and `form.getBuffer()` upload format. The bridge therefore defers multipart construction until the patched `fetch` call begins.
+## Attachment source contract
 
-A global upload queue allows only one managed large WhatsApp multipart body to be materialized at a time. Multi-recipient sends may still perform their network requests through the existing service flow, but they cannot hold several complete multipart attachment bodies in memory simultaneously.
+`ExportAttachmentSource` supports:
 
-After an upload attempt completes, the multipart Buffer becomes unreachable while the reusable export remains on disk for any later retry or delivery channel.
+- ordinary in-memory `Buffer` attachments;
+- explicit `{ filePath, sizeBytes }` sources;
+- compatibility Buffer markers backed by temporary files.
 
-## Cleanup policy
+Shared helpers provide size validation, Nodemailer file-path conversion, managed-marker release, and serialized file-backed materialization.
 
-- Active email or WhatsApp use refreshes the managed-file cleanup timer.
-- Default active cleanup delay: 15 minutes.
-- Default orphan cleanup delay: 60 minutes.
-- Phase 9 startup cleanup also removes stale files from the shared export temporary directory.
-- Explicit lifecycle helpers remain preferred for new scheduled workflows that can use `finally` cleanup directly.
+## Compatibility bridge
 
-Configuration:
+`server/scheduledAttachmentBridge.mjs` remains loaded in development and production as a compatibility boundary for older background exporters that still call `Buffer.concat` or `workbook.xlsx.writeBuffer()`.
 
-- `SCHEDULED_ATTACHMENT_MIN_BYTES` — default `131072`;
-- `SCHEDULED_ATTACHMENT_CLEANUP_DELAY_MS` — default `900000`;
-- `SCHEDULED_ATTACHMENT_ORPHAN_CLEANUP_DELAY_MS` — default `3600000`;
-- `SCHEDULED_ATTACHMENT_FORCE=1` — verifier-only override;
-- `EXPORT_BRIDGE_TEMP_DIR` — shared temporary directory override.
+Phase 10 no longer depends on that bridge for the primary daily full-export and manual email paths. Removing the bridge entirely remains a later migration only after every remaining scheduled PDF/workbook producer has an explicit streaming or file-backed API.
 
-## Verification
+## Behavior retained
 
-A focused smoke verifier is available at:
+- No report rows, accounting values, inventory values, costing values, or workbook formulas change.
+- Existing schedules, time zones, recipients, captions, names, MIME types, attachment limits, and retry policies remain unchanged.
+- Email and WhatsApp can still succeed independently and produce a partial-failure run status.
+- Manual export job status and progress reporting remain unchanged.
+- No new background polling or database queries are introduced.
 
-`node scripts/verify-phase10-scheduled-attachments.mjs`
+## Database changes
 
-It checks:
+No SQL, schema migration, settings backfill, or production data repair is required for Phase 10.
 
-- file-backed ZIP markers;
-- real marker length compatibility;
-- managed files written with valid ZIP signatures;
-- deferred WhatsApp multipart construction;
-- one-at-a-time multipart uploads;
-- file-backed background Excel workbooks.
+## Deferred verification
 
-The verifier and CI were intentionally not executed while editing this isolated branch.
+Source contracts now cover the explicit daily lifecycle, manual email lifecycle, serialized file-backed WhatsApp materialization, ordinary Buffer compatibility, sequential email delivery, and deterministic cleanup.
 
-## Safety constraints preserved
+The existing attachment smoke verifier remains available for file-marker and multipart behavior, and the new source verifier covers the production wiring:
 
-- The same export is not regenerated for each recipient or retry.
-- Email and WhatsApp retries remain independent.
-- Existing run tracking and partial-failure behavior remain unchanged.
-- Export calculations, workbook layout, selected date ranges, and recipient configuration are unchanged.
+```bash
+node scripts/verify-phase10-scheduled-export-lifecycle.mjs
+node scripts/verify-phase10-scheduled-attachments.mjs
+node node_modules/vitest/vitest.mjs run tests/phase10-scheduled-export-lifecycle-contract.test.ts
+```
+
+These commands, TypeScript compilation, lint, integration tests, production build, memory profiling, provider delivery tests, deployment checks, and CI were not run during this phase. They remain deferred to the final all-phase verification pass.
+
+## Merge order
+
+Phase 10 is stacked with Phase 9 after the Phase 5–6 and Phase 7–8 pull requests. Merge the earlier stacked pull requests first, then integrate the Phase 9–10 pull request only after explicit owner authorization.

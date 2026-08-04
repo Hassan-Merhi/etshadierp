@@ -5,6 +5,7 @@ import { pool } from "../../db";
 import { getWaSettings, sendWhatsAppFileToChatId } from "../whatsappService";
 import { generateNetPositionExcel } from "../../helpers/generateNetPositionExcel";
 import { generateStockPdf } from "../../helpers/generateStockPdf";
+import { releaseManagedExportAttachment } from "../../helpers/exportAttachmentSource";
 import { storage } from "../../storage";
 import { buildNetPositionZip, getTodayLabel } from "./daily-export";
 import { shouldSendStockReport } from "./whatsapp-send";
@@ -14,7 +15,7 @@ export async function checkAndRunStockReport(): Promise<void> {
     const r = await pool.query(
       `SELECT company_id, recipient_id, auto_send, enabled,
               frequency, send_hour, send_day_of_week, last_sent_at
-       FROM whatsapp_stock_settings WHERE id = 1`
+       FROM whatsapp_stock_settings WHERE id = 1`,
     );
     if (!r.rows.length) return;
     const row = r.rows[0];
@@ -31,7 +32,6 @@ export async function checkAndRunStockReport(): Promise<void> {
 
     if (!shouldSendStockReport(cfg)) return;
 
-    // Fetch recipient chatId
     const rq = await pool.query("SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true", [
       row.recipient_id,
     ]);
@@ -42,7 +42,7 @@ export async function checkAndRunStockReport(): Promise<void> {
     const chatId = rq.rows[0].chat_id as string;
 
     const allCompanies = await storage.getAllCompanies();
-    const company = (allCompanies as any[]).find((c) => c.id === row.company_id);
+    const company = allCompanies.find((candidate) => candidate.id === row.company_id);
     if (!company) {
       logger.info(`[StockReport] Company ${row.company_id} not found.`);
       return;
@@ -53,58 +53,58 @@ export async function checkAndRunStockReport(): Promise<void> {
 
     logger.info(`[StockReport] Sending to ${company.name} → ${chatId} (${cfg.frequency})…`);
 
-    // 1. Stock PDF
     const {
       buffer: pdfBuf,
       pageCount: pdfPageCount,
       rowCount: pdfRowCount,
     } = await generateStockPdf(row.company_id, company.name, undefined, undefined, true);
 
-    // Safety guard: if PDF is absurdly over-paginated, skip send rather than
-    // delivering a broken 100+ page file. Root cause: PDFKit ≥0.17 exposes
-    // page.maxY as a function; ensureSpace must call it, not compare to it.
-    const maxAllowedPages = Math.ceil(pdfRowCount / 20) + 5;
-    if (pdfPageCount > maxAllowedPages) {
-      logger.error(
-        `[StockReport] SAFETY GUARD: PDF has ${pdfPageCount} pages for ${pdfRowCount} rows ` +
-          `(max allowed: ${maxAllowedPages}). company="${company.name}". Skipping WhatsApp send.`
+    try {
+      const maxAllowedPages = Math.ceil(pdfRowCount / 20) + 5;
+      if (pdfPageCount > maxAllowedPages) {
+        logger.error(
+          `[StockReport] SAFETY GUARD: PDF has ${pdfPageCount} pages for ${pdfRowCount} rows ` +
+            `(max allowed: ${maxAllowedPages}). company="${company.name}". Skipping WhatsApp send.`,
+        );
+        return;
+      }
+
+      const pdfName = `Stock_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.pdf`;
+      logger.info(
+        `[StockReport] Uploading stock PDF — chatId=${chatId} file=${pdfName} ` +
+          `size=${pdfBuf.length} pageCount=${pdfPageCount} rowCount=${pdfRowCount}`,
       );
-      return;
+      const pdfRes = await sendWhatsAppFileToChatId(chatId, pdfBuf, pdfName, "", "application/pdf");
+      if (pdfRes.success) {
+        logger.info(`[StockReport] PDF sent — chatId=${chatId} file=${pdfName}`);
+      } else {
+        logger.error(
+          `[StockReport] PDF upload failed — chatId=${chatId} file=${pdfName} ` +
+            `size=${pdfBuf.length} pageCount=${pdfPageCount} rowCount=${pdfRowCount} ` +
+            `greenApiError="${pdfRes.error}"`,
+        );
+      }
+    } finally {
+      await releaseManagedExportAttachment(pdfBuf);
     }
 
-    const pdfName = `Stock_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.pdf`;
-    const pdfCap = "";
-    logger.info(
-      `[StockReport] Uploading stock PDF — chatId=${chatId} file=${pdfName} ` +
-        `size=${pdfBuf.length} pageCount=${pdfPageCount} rowCount=${pdfRowCount}`
-    );
-    const pdfRes = await sendWhatsAppFileToChatId(chatId, pdfBuf, pdfName, pdfCap, "application/pdf");
-    if (pdfRes.success) {
-      logger.info(`[StockReport] PDF sent — chatId=${chatId} file=${pdfName}`);
-    } else {
-      logger.error(
-        `[StockReport] PDF upload failed — chatId=${chatId} file=${pdfName} ` +
-          `size=${pdfBuf.length} pageCount=${pdfPageCount} rowCount=${pdfRowCount} ` +
-          `greenApiError="${pdfRes.error}"`
-      );
-    }
-
-    // 2. Net Position Excel (Jan 1 → today)
     const xlsBuf = await generateNetPositionExcel(row.company_id, company.name, yearStart, today);
-    const xlsName = `NetPosition_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.xlsx`;
-    const xlsCap = "";
-    const xlsRes = await sendWhatsAppFileToChatId(
-      chatId,
-      xlsBuf,
-      xlsName,
-      xlsCap,
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-    logger.info(`[StockReport] Net Position Excel: ${xlsRes.success ? "sent" : xlsRes.error}`);
+    try {
+      const xlsName = `NetPosition_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.xlsx`;
+      const xlsRes = await sendWhatsAppFileToChatId(
+        chatId,
+        xlsBuf,
+        xlsName,
+        "",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      logger.info(`[StockReport] Net Position Excel: ${xlsRes.success ? "sent" : xlsRes.error}`);
+    } finally {
+      await releaseManagedExportAttachment(xlsBuf);
+    }
 
-    // Mark as sent
     await pool.query(`UPDATE whatsapp_stock_settings SET last_sent_at = now() WHERE id = 1`);
-    logger.info(`[StockReport] Done — last_sent_at updated.`);
+    logger.info("[StockReport] Done — last_sent_at updated.");
   } catch (err: unknown) {
     logger.error("[StockReport] Error:", { error: getErrorMessage(err) || err });
   }
@@ -117,7 +117,7 @@ export async function checkAndRunNetPositionExport(): Promise<void> {
     const r = await pool.query(
       `SELECT recipient_id, frequency, send_hour, send_day_of_week,
               enabled, auto_send, last_sent_at
-       FROM net_position_export_settings WHERE id = 1`
+       FROM net_position_export_settings WHERE id = 1`,
     );
     if (!r.rows.length) return;
     const row = r.rows[0];
@@ -133,7 +133,7 @@ export async function checkAndRunNetPositionExport(): Promise<void> {
 
     if (!shouldSendStockReport(cfg)) return;
 
-    const companies = (await storage.getAllCompanies()) as any[];
+    const companies = await storage.getAllCompanies();
     if (!companies.length) {
       logger.info("[NetPositionExport] No companies found — skipping.");
       return;
@@ -145,47 +145,49 @@ export async function checkAndRunNetPositionExport(): Promise<void> {
     const npEnd = today;
 
     logger.info(
-      `[NetPositionExport] Building net position ZIP for ${companies.length} companies (${npStart}→${npEnd})…`
+      `[NetPositionExport] Building net position ZIP for ${companies.length} companies (${npStart}→${npEnd})…`,
     );
     const zipBuf = await buildNetPositionZip(companies, npStart, npEnd);
-    logger.info(`[NetPositionExport] ZIP ready (${(zipBuf.length / 1024).toFixed(0)} KB)`);
 
-    // Send to WhatsApp group
-    if (row.recipient_id) {
-      const rq = await pool.query("SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true", [
-        row.recipient_id,
-      ]);
-      if (rq.rows.length) {
-        const chatId = rq.rows[0].chat_id as string;
-        const waSettings = await getWaSettings();
-        if (waSettings?.enabled) {
-          const waRes = await sendWhatsAppFileToChatId(
-            chatId,
-            zipBuf,
-            `NetPosition_AllCompanies_${today}.zip`,
-            "",
-            "application/zip"
-          );
-          logger.info(`[NetPositionExport] WhatsApp: ${waRes.success ? "sent" : waRes.error}`);
+    try {
+      logger.info(`[NetPositionExport] ZIP ready (${(zipBuf.length / 1024).toFixed(0)} KB)`);
+
+      if (row.recipient_id) {
+        const rq = await pool.query("SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true", [
+          row.recipient_id,
+        ]);
+        if (rq.rows.length) {
+          const chatId = rq.rows[0].chat_id as string;
+          const waSettings = await getWaSettings();
+          if (waSettings?.enabled) {
+            const waRes = await sendWhatsAppFileToChatId(
+              chatId,
+              zipBuf,
+              `NetPosition_AllCompanies_${today}.zip`,
+              "",
+              "application/zip",
+            );
+            logger.info(`[NetPositionExport] WhatsApp: ${waRes.success ? "sent" : waRes.error}`);
+          } else {
+            logger.info("[NetPositionExport] WhatsApp not enabled — skipping WhatsApp send.");
+          }
         } else {
-          logger.info("[NetPositionExport] WhatsApp not enabled — skipping WhatsApp send.");
+          logger.info(`[NetPositionExport] Recipient id=${row.recipient_id} inactive — skipping WhatsApp.`);
         }
-      } else {
-        logger.info(`[NetPositionExport] Recipient id=${row.recipient_id} inactive — skipping WhatsApp.`);
       }
+
+      const emailResult = await sendExportEmail(
+        zipBuf,
+        today,
+        companies.map((company) => company.name),
+      );
+      logger.info(`[NetPositionExport] Email: ${emailResult.success ? "sent" : emailResult.error}`);
+
+      await pool.query(`UPDATE net_position_export_settings SET last_sent_at = now() WHERE id = 1`);
+      logger.info("[NetPositionExport] Done — last_sent_at updated.");
+    } finally {
+      await releaseManagedExportAttachment(zipBuf);
     }
-
-    // Send via email (uses existing export_recipients + export_settings for credentials)
-    const emailResult = await sendExportEmail(
-      zipBuf,
-      today,
-      companies.map((c) => c.name)
-    );
-    logger.info(`[NetPositionExport] Email: ${emailResult.success ? "sent" : emailResult.error}`);
-
-    // Mark as sent
-    await pool.query(`UPDATE net_position_export_settings SET last_sent_at = now() WHERE id = 1`);
-    logger.info(`[NetPositionExport] Done — last_sent_at updated.`);
   } catch (err: unknown) {
     logger.error("[NetPositionExport] Error:", { error: getErrorMessage(err) || err });
   }

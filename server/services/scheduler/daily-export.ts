@@ -7,9 +7,9 @@ import { sendExportEmail } from "../emailService";
 import { pool } from "../../db";
 import { getWaSettings } from "../whatsappService";
 import { generateNetPositionExcel } from "../../helpers/generateNetPositionExcel";
-import { buildFullExportZip } from "../../helpers/buildFullExportZip";
 import { retryAsync, isEmailConfigError, isWaConfigError } from "../../helpers/retryAsync";
 import { createExportRun, updateExportRun, finishExportRun } from "../../helpers/exportRunTracker";
+import { createScheduledExportArtifact } from "../../helpers/scheduledExportArtifact";
 
 import { isScheduleEnabled } from "./net-position";
 import { runDailyWhatsAppSend } from "./whatsapp-send";
@@ -134,7 +134,6 @@ export async function runDailyExport(): Promise<boolean> {
   const cronFiredAt = new Date().toISOString();
   logger.info(`[DailyExport] Scheduled run triggered at ${cronFiredAt}`);
 
-  // ── Check what's enabled BEFORE any expensive work ──────────────────────
   const emailEnabled = await isScheduleEnabled();
   const waSettings = await getWaSettings();
   const whatsappReady = !!(waSettings?.enabled && waSettings?.dailyAutoSend && waSettings?.dailyRecipientId);
@@ -163,145 +162,150 @@ export async function runDailyExport(): Promise<boolean> {
     }
 
     const today = getTodayLabel();
-
-    // Limit the scheduled daily export to the last 3 years so the ZIP stays
-    // a manageable size. Older data is available via the manual "Export Now"
-    // flow where the user can pick an explicit date range.
     const threeYearsAgo = new Date();
     threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);
     const exportFromDate = threeYearsAgo.toISOString().substring(0, 10);
 
     logger.info(
-      `[DailyExport] Building export for ${companies.length} company/companies (label: ${today}, from: ${exportFromDate})`
+      `[DailyExport] Building export for ${companies.length} company/companies (label: ${today}, from: ${exportFromDate})`,
     );
 
-    const { zip, names, skipped } = await buildFullExportZip(companies, exportFromDate, undefined);
+    const artifact = await createScheduledExportArtifact(
+      `daily-${runId}`,
+      companies,
+      exportFromDate,
+      undefined,
+    );
 
-    if (!names.length || !zip.length) {
-      logger.error("[DailyExport] ZIP is empty — no companies exported successfully. Nothing will be sent.");
-      await finishExportRun(runId, {
-        status: "failed",
+    try {
+      const { attachment, names, skipped, sizeBytes } = artifact;
+      if (!names.length || sizeBytes <= 0) {
+        logger.error("[DailyExport] ZIP is empty — no companies exported successfully. Nothing will be sent.");
+        await finishExportRun(runId, {
+          status: "failed",
+          companiesCount: companies.length,
+          skippedReason: "Export ZIP is empty — no companies exported successfully.",
+        });
+        return false;
+      }
+
+      const zipSizeMb = (sizeBytes / 1024 / 1024).toFixed(1);
+      logger.info(
+        `[DailyExport] Run ${runId} — ZIP ready: ${zipSizeMb} MB, ${names.length} companies${
+          skipped.length ? `, ${skipped.length} skipped: ${skipped.join(", ")}` : ""
+        }`,
+      );
+
+      await updateExportRun(runId, {
         companiesCount: companies.length,
-        skippedReason: "Export ZIP is empty — no companies exported successfully.",
-      });
-      return false;
-    }
-
-    const zipSizeBytes = zip.length;
-    const zipSizeMb = (zipSizeBytes / 1024 / 1024).toFixed(1);
-    logger.info(
-      `[DailyExport] Run ${runId} — ZIP ready: ${zipSizeMb} MB, ${names.length} companies${skipped.length ? `, ${skipped.length} skipped: ${skipped.join(", ")}` : ""}`
-    );
-
-    await updateExportRun(runId, {
-      companiesCount: companies.length,
-      companyFilesCount: names.length,
-      zipSizeBytes,
-      skippedCompanies: skipped.join(", ") || null,
-    });
-
-    // ── Email (retried up to 3×, 2 min between attempts) ───────────────────
-    let emailSuccess = false;
-    let emailError: string | undefined;
-    let emailAttempts = 0;
-
-    if (emailEnabled) {
-      await updateExportRun(runId, { emailAttempted: true });
-      logger.info("[DailyExport] Sending email (up to 3 attempts, 2 min delay)...");
-
-      const emailRes = await retryAsync({
-        label: "DailyExport/Email",
-        attempts: 3,
-        delayMs: 2 * 60 * 1000,
-        fn: () => sendExportEmail(zip, today, names),
-        isSuccess: (r) => r.success,
-        shouldRetry: (r) => !r.error || !isEmailConfigError(r.error),
-        onAttempt: (n) => {
-          emailAttempts = n;
-          logger.info(`[DailyExport] Email attempt ${n}/3...`);
-        },
+        companyFilesCount: names.length,
+        zipSizeBytes: sizeBytes,
+        skippedCompanies: skipped.join(", ") || null,
       });
 
-      emailSuccess = emailRes.result.success;
-      emailAttempts = emailRes.attempts;
-      emailError = emailRes.result.error;
+      let emailSuccess = false;
+      let emailError: string | undefined;
+      let emailAttempts = 0;
 
-      if (emailSuccess) {
-        logger.info(`[DailyExport] Email sent successfully (attempt ${emailAttempts}).`);
-        await pool.query(`UPDATE export_settings SET last_run_at = now() WHERE id = 1`).catch(() => {});
+      if (emailEnabled) {
+        await updateExportRun(runId, { emailAttempted: true });
+        logger.info("[DailyExport] Sending email (up to 3 attempts, 2 min delay)...");
+
+        const emailRes = await retryAsync({
+          label: "DailyExport/Email",
+          attempts: 3,
+          delayMs: 2 * 60 * 1000,
+          fn: () => sendExportEmail(attachment, today, names),
+          isSuccess: (result) => result.success,
+          shouldRetry: (result) => !result.error || !isEmailConfigError(result.error),
+          onAttempt: (attempt) => {
+            emailAttempts = attempt;
+            logger.info(`[DailyExport] Email attempt ${attempt}/3...`);
+          },
+        });
+
+        emailSuccess = emailRes.result.success;
+        emailAttempts = emailRes.attempts;
+        emailError = emailRes.result.error;
+
+        if (emailSuccess) {
+          logger.info(`[DailyExport] Email sent successfully (attempt ${emailAttempts}).`);
+          await pool.query(`UPDATE export_settings SET last_run_at = now() WHERE id = 1`).catch(() => {});
+        } else {
+          logger.error(`[DailyExport] Email failed after ${emailAttempts} attempt(s): ${emailError}`);
+        }
       } else {
-        logger.error(`[DailyExport] Email failed after ${emailAttempts} attempt(s): ${emailError}`);
+        logger.info("[DailyExport] Email schedule is disabled — skipping email.");
       }
-    } else {
-      logger.info("[DailyExport] Email schedule is disabled — skipping email.");
-    }
 
-    // ── WhatsApp (retried up to 3×, 2 min between attempts) ────────────────
-    let waSuccess = false;
-    let waError: string | undefined;
-    let waAttempts = 0;
+      let waSuccess = false;
+      let waError: string | undefined;
+      let waAttempts = 0;
 
-    if (whatsappReady) {
-      await updateExportRun(runId, { whatsappAttempted: true });
-      logger.info("[DailyExport] Sending via WhatsApp (up to 3 attempts, 2 min delay)...");
+      if (whatsappReady) {
+        await updateExportRun(runId, { whatsappAttempted: true });
+        logger.info("[DailyExport] Sending via WhatsApp (up to 3 attempts, 2 min delay)...");
 
-      const waRes = await retryAsync({
-        label: "DailyExport/WhatsApp",
-        attempts: 3,
-        delayMs: 2 * 60 * 1000,
-        fn: () => runDailyWhatsAppSend(zip, today, companies),
-        isSuccess: (r) => r.sent,
-        shouldRetry: (r) => !r.skipped && (!r.error || !isWaConfigError(r.error)),
-        onAttempt: (n) => {
-          waAttempts = n;
-          logger.info(`[DailyExport] WhatsApp attempt ${n}/3...`);
-        },
+        const waRes = await retryAsync({
+          label: "DailyExport/WhatsApp",
+          attempts: 3,
+          delayMs: 2 * 60 * 1000,
+          fn: () => runDailyWhatsAppSend(attachment, today, companies),
+          isSuccess: (result) => result.sent,
+          shouldRetry: (result) => !result.skipped && (!result.error || !isWaConfigError(result.error)),
+          onAttempt: (attempt) => {
+            waAttempts = attempt;
+            logger.info(`[DailyExport] WhatsApp attempt ${attempt}/3...`);
+          },
+        });
+
+        waSuccess = waRes.result.sent;
+        waAttempts = waRes.attempts;
+        waError = waRes.result.error || waRes.result.skipReason;
+
+        if (waSuccess) {
+          logger.info(`[DailyExport] WhatsApp sent successfully (attempt ${waAttempts}).`);
+        } else if (waRes.result.skipped) {
+          logger.info(`[DailyExport] WhatsApp skipped: ${waError}.`);
+        } else {
+          logger.error(`[DailyExport] WhatsApp failed after ${waAttempts} attempt(s): ${waError}`);
+        }
+      } else {
+        logger.info("[DailyExport] WhatsApp not ready — skipping WhatsApp send.");
+      }
+
+      const bothSucceeded = (!emailEnabled || emailSuccess) && (!whatsappReady || waSuccess);
+      const atLeastOne = (emailEnabled && emailSuccess) || (whatsappReady && waSuccess);
+      const finalStatus = bothSucceeded ? "success" : atLeastOne ? "partial_failed" : "failed";
+
+      logger.info(
+        `[DailyExport] Run ${runId} finished — status: ${finalStatus}` +
+          ` | email: ${emailEnabled ? (emailSuccess ? "ok" : "failed") : "n/a"}` +
+          ` | wa: ${whatsappReady ? (waSuccess ? "ok" : "failed") : "n/a"}`,
+      );
+
+      await finishExportRun(runId, {
+        status: finalStatus,
+        emailSuccess,
+        emailError: emailError ?? null,
+        emailAttempts,
+        whatsappSuccess: waSuccess,
+        whatsappError: waError ?? null,
+        whatsappAttempts: waAttempts,
       });
 
-      waSuccess = waRes.result.sent;
-      waAttempts = waRes.attempts;
-      waError = waRes.result.error || waRes.result.skipReason;
-
-      if (waSuccess) {
-        logger.info(`[DailyExport] WhatsApp sent successfully (attempt ${waAttempts}).`);
-      } else if (waRes.result.skipped) {
-        logger.info(`[DailyExport] WhatsApp skipped: ${waError}.`);
-      } else {
-        logger.error(`[DailyExport] WhatsApp failed after ${waAttempts} attempt(s): ${waError}`);
-      }
-    } else {
-      logger.info("[DailyExport] WhatsApp not ready — skipping WhatsApp send.");
+      return finalStatus !== "failed";
+    } finally {
+      await artifact.dispose();
     }
-
-    // ── Determine final run status ──────────────────────────────────────────
-    const bothSucceeded = (!emailEnabled || emailSuccess) && (!whatsappReady || waSuccess);
-    const atLeastOne = (emailEnabled && emailSuccess) || (whatsappReady && waSuccess);
-    const finalStatus = bothSucceeded ? "success" : atLeastOne ? "partial_failed" : "failed";
-
-    logger.info(
-      `[DailyExport] Run ${runId} finished — status: ${finalStatus}` +
-        ` | email: ${emailEnabled ? (emailSuccess ? "ok" : "failed") : "n/a"}` +
-        ` | wa: ${whatsappReady ? (waSuccess ? "ok" : "failed") : "n/a"}`
-    );
-
-    await finishExportRun(runId, {
-      status: finalStatus,
-      emailSuccess,
-      emailError: emailError ?? null,
-      emailAttempts,
-      whatsappSuccess: waSuccess,
-      whatsappError: waError ?? null,
-      whatsappAttempts: waAttempts,
-    });
-
-    return finalStatus !== "failed";
   } catch (err: unknown) {
     logger.error(`[DailyExport] Unexpected error in run ${runId}:`, {
       error: getErrorStack(err) || getErrorMessage(err) || err,
     });
-    await finishExportRun(runId, { status: "failed", skippedReason: getErrorMessage(err) || "Unexpected error" }).catch(
-      () => {}
-    );
+    await finishExportRun(runId, {
+      status: "failed",
+      skippedReason: getErrorMessage(err) || "Unexpected error",
+    }).catch(() => {});
     return false;
   }
 }

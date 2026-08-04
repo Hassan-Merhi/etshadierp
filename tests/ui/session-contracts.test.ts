@@ -1,4 +1,5 @@
 import {
+  SessionContractError,
   authenticatedUserSchema,
   companyTypeSchema,
   parseAuthenticatedUser,
@@ -28,21 +29,75 @@ describe("session API contracts", () => {
     expect(assignment.companyType).toBe("erp");
   });
 
-  it("rejects malformed company assignments instead of leaking any into the UI", () => {
-    expect(() => parseUserCompanies([{ companyId: "bad", companyName: "" }])).toThrow(
-      "Invalid user-companies response",
-    );
+  it("normalizes typed company permissions without losing extra fields", () => {
+    const [assignment] = parseUserCompanies([
+      {
+        companyId: "7",
+        companyName: "GC Lshi",
+        companyType: "erp",
+        assignedLocationId: "11",
+        posStation: "3",
+        cashAccountId: "44",
+        canSellNegativeStock: true,
+        posViewOnly: false,
+        daybookEditDays: "5",
+        canAccessCustomers: true,
+        canDeleteRecords: false,
+        customSetting: "preserved",
+      },
+    ]);
+
+    expect(assignment).toMatchObject({
+      companyId: 7,
+      assignedLocationId: 11,
+      posStation: 3,
+      cashAccountId: 44,
+      canSellNegativeStock: true,
+      posViewOnly: false,
+      daybookEditDays: 5,
+      canAccessCustomers: true,
+      canDeleteRecords: false,
+      customSetting: "preserved",
+    });
   });
 
-  it("parses authenticated users and preserves additional server fields", () => {
+  it("rejects malformed company assignments with structured contract issues", () => {
+    try {
+      parseUserCompanies([{ companyId: "bad", companyName: "" }]);
+      throw new Error("Expected contract parsing to fail");
+    } catch (error) {
+      expect(error).toBeInstanceOf(SessionContractError);
+      expect(error).toMatchObject({ contract: "user-companies" });
+      expect((error as SessionContractError).issues.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("parses the complete authenticated session and preserves additional server fields", () => {
     const user = parseAuthenticatedUser({
       id: 12,
       username: "hassan",
       role: "Admin",
+      currentRole: "Owner",
+      currentCompanyId: "7",
+      currentLocationId: "11",
+      currentPOSStation: "3",
+      canSellNegativeStock: true,
+      daybookEditDays: "5",
       customPermission: true,
     });
 
-    expect(user).toMatchObject({ id: 12, username: "hassan", role: "Admin", customPermission: true });
+    expect(user).toMatchObject({
+      id: 12,
+      username: "hassan",
+      role: "Admin",
+      currentRole: "Owner",
+      currentCompanyId: 7,
+      currentLocationId: 11,
+      currentPOSStation: 3,
+      canSellNegativeStock: true,
+      daybookEditDays: 5,
+      customPermission: true,
+    });
     expect(authenticatedUserSchema.safeParse(user).success).toBe(true);
   });
 

@@ -1,18 +1,20 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { apiRequest, getQueryFn, queryClient, setAppTimezone } from "@/lib/queryClient";
+import { apiRequest, queryClient, setAppTimezone } from "@/lib/queryClient";
 import {
   cancelCompanySessionQueries,
-  companyQueryKey,
   isCompanySessionQueryKey,
   removeCompanySessionQueries,
 } from "@/lib/companyQueryScope";
 import { createCompanySwitchQueue, type CompanySwitchQueue } from "@/lib/companySwitchQueue";
+import { companyDataKey, frontendQueryPolicies } from "@/lib/frontendDataArchitecture";
 import {
-  parseSessionCompany,
-  parseUserCompanies,
-  type CompanyType,
-  type UserCompanyAssignment,
+  fetchSessionCompany,
+  userCompaniesQueryOptions,
+} from "@/contracts/sessionQueryContracts";
+import type {
+  CompanyType,
+  UserCompanyAssignment,
 } from "@/contracts/sessionContracts";
 
 const PREFETCH_KEYS = [
@@ -28,7 +30,10 @@ const PREFETCH_KEYS = [
 function prefetchReferenceData(companyId: number, role?: string) {
   if (role === "POS") return;
   for (const url of PREFETCH_KEYS) {
-    queryClient.prefetchQuery({ queryKey: companyQueryKey(url, companyId) });
+    void queryClient.prefetchQuery({
+      queryKey: companyDataKey(url, companyId),
+      ...frontendQueryPolicies.reference,
+    });
   }
 }
 
@@ -40,6 +45,14 @@ export interface Company {
   role?: string;
   companyType: CompanyType;
   displayCurrency?: string | null;
+  assignedLocationId?: number | null;
+  posStation?: number | null;
+  cashAccountId?: number | null;
+  canSellNegativeStock?: boolean | null;
+  posViewOnly?: boolean | null;
+  daybookEditDays?: number | null;
+  canAccessCustomers?: boolean | null;
+  canDeleteRecords?: boolean | null;
 }
 
 export interface CompanySelectionOptions {
@@ -50,6 +63,7 @@ interface CompanyContextType {
   selectedCompany: Company | null;
   companies: Company[];
   isLoading: boolean;
+  error: Error | null;
   selectCompany: (company: Company, options?: CompanySelectionOptions) => Promise<boolean>;
 }
 
@@ -69,7 +83,21 @@ function mapCompanyAssignment(assignment: UserCompanyAssignment): Company {
     role: assignment.role,
     companyType: assignment.companyType,
     displayCurrency: assignment.displayCurrency,
+    assignedLocationId: assignment.assignedLocationId,
+    posStation: assignment.posStation,
+    cashAccountId: assignment.cashAccountId,
+    canSellNegativeStock: assignment.canSellNegativeStock,
+    posViewOnly: assignment.posViewOnly,
+    daybookEditDays: assignment.daybookEditDays,
+    canAccessCustomers: assignment.canAccessCustomers,
+    canDeleteRecords: assignment.canDeleteRecords,
   };
+}
+
+function parseSavedCompanyId(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
 async function switchCompanyOnServer(companyId: number): Promise<boolean> {
@@ -95,13 +123,11 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     switchQueueRef.current = createCompanySwitchQueue(setIsSyncingCompany);
   }
 
-  const { data: userCompanyAssignments = [], isLoading } = useQuery<UserCompanyAssignment[]>({
-    queryKey: ["/api/user/companies"],
-    queryFn: async (context) => {
-      const value = await getQueryFn({ on401: "throw" })(context);
-      return parseUserCompanies(value);
-    },
-  });
+  const {
+    data: userCompanyAssignments = [],
+    isLoading,
+    error: companyAssignmentsError,
+  } = useQuery(userCompaniesQueryOptions());
 
   const companies: Company[] = userCompanyAssignments
     .map(mapCompanyAssignment)
@@ -135,7 +161,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
       const ok = await switchCompanyOnServer(company.id);
       if (!ok) {
-        queryClient.invalidateQueries({
+        void queryClient.invalidateQueries({
           predicate: (query) => isCompanySessionQueryKey(query.queryKey),
           refetchType: "active",
         });
@@ -174,9 +200,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (companies.length === 0 || selectedCompany || initialSyncStarted.current) return;
 
-    const savedCompanyId = localStorage.getItem("selectedCompanyId");
+    const savedCompanyId = parseSavedCompanyId(localStorage.getItem("selectedCompanyId"));
     const savedCompany = savedCompanyId
-      ? companies.find((company) => company.id === Number.parseInt(savedCompanyId, 10))
+      ? companies.find((company) => company.id === savedCompanyId)
       : undefined;
     const target = savedCompany ?? companies[0];
     if (!target) return;
@@ -191,12 +217,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    void fetch("/api/auth/session-company", { credentials: "include", cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) return { companyId: null };
-        const value: unknown = await response.json();
-        return parseSessionCompany(value);
-      })
+    void fetchSessionCompany()
       .catch(() => ({ companyId: null }))
       .then(async ({ companyId: sessionCompanyId }) => {
         if (sessionCompanyId === target.id) {
@@ -243,6 +264,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         selectedCompany,
         companies,
         isLoading: isLoading || isSyncingCompany || (companies.length > 0 && !selectedCompany),
+        error: companyAssignmentsError instanceof Error ? companyAssignmentsError : null,
         selectCompany,
       }}
     >

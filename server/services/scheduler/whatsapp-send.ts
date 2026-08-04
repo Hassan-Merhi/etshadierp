@@ -2,6 +2,10 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { pool } from "../../db";
 import { getWaSettings, sendWhatsAppFileToChatId } from "../whatsappService";
+import {
+  getExportAttachmentSize,
+  type ExportAttachmentSource,
+} from "../../helpers/exportAttachmentSource";
 import { WHATSAPP_ATTACHMENT_LIMIT_MB } from "./daily-export";
 
 interface DailyWaSendResult {
@@ -12,10 +16,10 @@ interface DailyWaSendResult {
 }
 
 export async function runDailyWhatsAppSend(
-  dailyZip: Buffer,
+  dailyZip: ExportAttachmentSource,
   dateLabel: string,
   companies: { id: number; name: string }[],
-  opts: { bypassAutoSendCheck?: boolean } = {}
+  opts: { bypassAutoSendCheck?: boolean } = {},
 ): Promise<DailyWaSendResult> {
   const skip = (skipReason: string): DailyWaSendResult => {
     logger.info(`[WhatsApp] ${skipReason} — skipping daily ZIP send.`);
@@ -45,8 +49,8 @@ export async function runDailyWhatsAppSend(
     return skip(`Daily export recipient id=${recipientId} not found or inactive`);
   }
 
-  // ZIP size check — WhatsApp has a lower attachment limit than email
-  const zipSizeMb = dailyZip.length / 1024 / 1024;
+  // ZIP size check — WhatsApp has a lower attachment limit than email.
+  const zipSizeMb = getExportAttachmentSize(dailyZip) / 1024 / 1024;
   if (zipSizeMb > WHATSAPP_ATTACHMENT_LIMIT_MB) {
     const msg = `ZIP is too large for WhatsApp. Size: ${zipSizeMb.toFixed(1)} MB (limit: ${WHATSAPP_ATTACHMENT_LIMIT_MB} MB).`;
     logger.error(`[WhatsApp] ${msg}`);

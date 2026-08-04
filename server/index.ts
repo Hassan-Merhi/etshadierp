@@ -106,6 +106,7 @@ declare module "express-session" {
     currentPOSStation?: number | null;
     cashAccountId?: number | null;
     canSellNegativeStock?: boolean;
+    posViewOnly?: boolean;
     daybookEditDays?: number;
     canAccessCustomers?: boolean;
     canDeleteRecords?: boolean;

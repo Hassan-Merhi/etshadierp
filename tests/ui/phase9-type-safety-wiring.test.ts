@@ -6,35 +6,72 @@ function source(path: string): string {
 }
 
 describe("Phase 9 type-safety wiring", () => {
-  it("validates the authenticated user response from unknown", () => {
-    const hook = source("client/src/app/useAuthenticatedUser.ts");
+  it("centralizes typed authenticated-user and company-session queries", () => {
+    const queries = source("client/src/contracts/sessionQueryContracts.ts");
+    const authHook = source("client/src/app/useAuthenticatedUser.ts");
+    const companyContext = source("client/src/contexts/CompanyContext.tsx");
 
-    expect(hook).toContain("useQuery<AuthenticatedUser | null>");
-    expect(hook).toContain("parseAuthenticatedUser(value)");
-    expect(hook).not.toContain("useQuery<any>");
-    expect(hook).toContain("logoutError: unknown");
+    expect(queries).toContain("fetchAuthenticatedUser");
+    expect(queries).toContain("fetchUserCompanies");
+    expect(queries).toContain("fetchSessionCompany");
+    expect(queries).toContain("parseAuthenticatedUser");
+    expect(queries).toContain("parseUserCompanies");
+    expect(queries).toContain("parseSessionCompany");
+    expect(queries).toContain("authenticatedUserQueryOptions");
+    expect(queries).toContain("userCompaniesQueryOptions");
+
+    expect(authHook).toContain("useQuery(authenticatedUserQueryOptions())");
+    expect(authHook).not.toContain("useQuery<any>");
+    expect(authHook).toContain("logoutError: unknown");
+
+    expect(companyContext).toContain("useQuery(userCompaniesQueryOptions())");
+    expect(companyContext).toContain("fetchSessionCompany()");
+    expect(companyContext).not.toContain("useQuery<any[]>");
+    expect(companyContext).toContain("export interface Company");
+    expect(companyContext).toContain("createCompanySwitchQueue");
+    expect(companyContext).toContain("companyDataKey(url, companyId)");
   });
 
-  it("validates company assignments and session-company responses", () => {
-    const context = source("client/src/contexts/CompanyContext.tsx");
-
-    expect(context).toContain("useQuery<UserCompanyAssignment[]>");
-    expect(context).toContain("parseUserCompanies(value)");
-    expect(context).toContain("parseSessionCompany(value)");
-    expect(context).not.toContain("useQuery<any[]>");
-    expect(context).toContain("export interface Company");
-    expect(context).toContain("createCompanySwitchQueue");
-  });
-
-  it("removes unsafe company selector casts without bypassing context switching", () => {
+  it("renders an explicit company-contract failure without bypassing context switching", () => {
     const selector = source("client/src/components/CompanySelector.tsx");
 
     expect(selector).toContain("company: Company");
-    expect(selector).toContain("error: unknown");
+    expect(selector).toContain("error: companyError");
+    expect(selector).toContain("button-company-selector-error");
     expect(selector).toContain("await selectCompany(company");
     expect(selector).not.toContain("company: any");
     expect(selector).not.toContain("as any");
     expect(selector).not.toContain("error: any");
     expect(selector).not.toContain("window.location.reload");
+  });
+
+  it("uses the shared auth contract and selected company in GIT containers", () => {
+    const page = source("client/src/pages/GITContainers.tsx");
+    const localTypes = source("client/src/pages/git-containers/gitContainerTypes.ts");
+
+    expect(page).toContain("useQuery(authenticatedUserQueryOptions())");
+    expect(page).toContain("const { selectedCompany } = useCompany()");
+    expect(page).toContain("selectedCompany?.id ?? \"no-company\"");
+    expect(page).not.toContain("useQuery<AuthUser>");
+    expect(page).not.toContain("catch (err: any)");
+    expect(localTypes).not.toContain("export interface AuthUser");
+  });
+
+  it("returns the current session permissions from auth/me", () => {
+    const route = source("server/routes/auth/coreAuthRoutes.ts");
+
+    for (const field of [
+      "currentRole",
+      "currentCompanyId",
+      "currentLocationId",
+      "currentPOSStation",
+      "canSellNegativeStock",
+      "posViewOnly",
+      "daybookEditDays",
+      "canAccessCustomers",
+      "canDeleteRecords",
+    ]) {
+      expect(route).toContain(field);
+    }
   });
 });
