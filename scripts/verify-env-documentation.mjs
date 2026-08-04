@@ -20,6 +20,7 @@ const SERVER_DIR = join(ROOT, "server");
 const ENV_EXAMPLES = [
   join(ROOT, ".env.example"),
   join(ROOT, "docs", "observability", "render-logging.env.example"),
+  join(ROOT, "docs", "remote-support.env.example"),
 ];
 
 /**
@@ -71,7 +72,7 @@ for (const file of collectSourceFiles(SERVER_DIR)) {
 
 const exampleText = ENV_EXAMPLES.map((file) => readFileSync(file, "utf8")).join("\n");
 const documented = new Set(
-  [...exampleText.matchAll(/^#?\s*([A-Z][A-Z_0-9]{2,})=/gm)].map((match) => match[1])
+  [...exampleText.matchAll(/^#?\s*([A-Z][A-Z_0-9]{2,})=/gm)].map((match) => match[1]),
 );
 // Platform-injected vars are described in prose, not as assignments.
 for (const match of exampleText.matchAll(/^#\s{3}([A-Z][A-Z_0-9]{2,})\s{2,}/gm)) {

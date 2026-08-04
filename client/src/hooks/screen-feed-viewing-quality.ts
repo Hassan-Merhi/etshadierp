@@ -12,7 +12,7 @@ export function normalizeScreenFeedPoint(
   clientX: number,
   clientY: number,
   viewportWidth: number,
-  viewportHeight: number
+  viewportHeight: number,
 ): NormalizedScreenFeedPoint {
   const safeWidth = Math.max(1, viewportWidth);
   const safeHeight = Math.max(1, viewportHeight);
@@ -24,9 +24,9 @@ export function normalizeScreenFeedPoint(
 
 export function getScreenFeedCaptureScale(devicePixelRatio: number): number {
   if (!Number.isFinite(devicePixelRatio) || devicePixelRatio <= 0) return 1;
-  // Viewport resolution is sufficient for remote support and avoids rendering
-  // 25% more pixels on common Windows display scaling settings.
-  return 1;
+  // Preserve extra detail on high-DPI displays while keeping capture work
+  // bounded to 1.25x the viewport pixel count.
+  return Math.min(1.25, Math.max(1, devicePixelRatio));
 }
 
 export function isSafeScreenFeedAssetUrl(value: string, origin: string): boolean {
