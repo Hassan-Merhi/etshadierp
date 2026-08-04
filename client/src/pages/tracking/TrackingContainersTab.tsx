@@ -66,9 +66,9 @@ export default function TrackingContainersTab() {
       recovering.add(query.queryHash);
       queueMicrotask(() => {
         if (disposed) return;
-        void queryClient
-          .resetQueries({ queryKey: query.queryKey, exact: true })
-          .finally(() => recovering.delete(query.queryHash));
+        void queryClient.resetQueries({ queryKey: query.queryKey, exact: true }).finally(() =>
+          recovering.delete(query.queryHash),
+        );
       });
     });
 
