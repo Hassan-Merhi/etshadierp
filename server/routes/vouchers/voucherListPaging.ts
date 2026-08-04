@@ -12,6 +12,12 @@ export interface VoucherListQuery {
   pageSize?: string;
 }
 
+export type ParsedVoucherListQuery = Omit<VoucherListQuery, "page" | "pageSize"> & {
+  page: number;
+  pageSize: number;
+  paginated: boolean;
+};
+
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function isStrictDate(value: string): boolean {
@@ -21,7 +27,7 @@ function isStrictDate(value: string): boolean {
 }
 
 export function parseVoucherListQuery(raw: Record<string, unknown>):
-  | { ok: true; query: VoucherListQuery & { page: number; pageSize: number; paginated: boolean } }
+  | { ok: true; query: ParsedVoucherListQuery }
   | { ok: false; message: string } {
   const startDate = raw.startDate == null ? undefined : String(raw.startDate);
   const endDate = raw.endDate == null ? undefined : String(raw.endDate);
