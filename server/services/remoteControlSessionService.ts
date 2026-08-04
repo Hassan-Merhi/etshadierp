@@ -117,6 +117,7 @@ function stopSessionInternal(
 ): RemoteControlSession {
   if (session.status !== "active") return session;
   session.status = status;
+  session.capabilities.mouse = false;
   session.stoppedAt = now;
   session.stopReason = cleanIdentifier(reason, 160) || "stopped";
   if (activeByTargetUser.get(session.targetUserId) === session.id) {
@@ -260,7 +261,7 @@ export function startRemoteControlSession(input: StartRemoteControlSessionInput)
     stoppedAt: null,
     stopReason: null,
     capabilities: {
-      mouse: true,
+      mouse: false,
       keyboard: false,
       browserTabOnly: true,
     },
@@ -270,6 +271,19 @@ export function startRemoteControlSession(input: StartRemoteControlSessionInput)
   activeByTargetUser.set(targetUserId, session.id);
   notifyTarget(targetUserId);
   return copySession(session) as RemoteControlSession;
+}
+
+export function setRemoteControlMouseCapability(
+  sessionId: string,
+  enabled: boolean
+): RemoteControlSession | null {
+  cleanupRemoteControlState();
+  const session = sessions.get(cleanIdentifier(sessionId));
+  if (!session || session.status !== "active") return null;
+  if (session.capabilities.mouse === enabled) return copySession(session);
+  session.capabilities.mouse = enabled;
+  notifyTarget(session.targetUserId);
+  return copySession(session);
 }
 
 export function heartbeatRemoteControlController(
