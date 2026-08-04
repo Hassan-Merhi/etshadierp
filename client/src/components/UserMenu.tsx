@@ -30,12 +30,13 @@ function getInitials(username: string) {
 
 interface UserMenuProps {
   accentColor: string;
-  user: { username: string; role: string };
+  user: { username: string; role?: string | null };
   onLogout: () => void;
 }
 
 export function UserMenu({ accentColor, user, onLogout }: UserMenuProps) {
   const { language, setLanguage, isSaving, t } = useApplicationLanguage();
+  const roleLabel = user.role ?? "";
 
   return (
     <DropdownMenu dir="ltr">
@@ -58,12 +59,14 @@ export function UserMenu({ accentColor, user, onLogout }: UserMenuProps) {
             <span className="max-w-[8rem] truncate text-sm font-medium leading-none" data-business-value="true">
               {user.username}
             </span>
-            <span
-              className="hidden border-l border-border/50 pl-2 text-xs leading-none text-muted-foreground lg:inline"
-              data-business-value="true"
-            >
-              {user.role}
-            </span>
+            {roleLabel ? (
+              <span
+                className="hidden border-l border-border/50 pl-2 text-xs leading-none text-muted-foreground lg:inline"
+                data-business-value="true"
+              >
+                {roleLabel}
+              </span>
+            ) : null}
           </span>
           <ChevronDown className="hidden h-3 w-3 shrink-0 text-muted-foreground sm:block" aria-hidden="true" />
         </Button>
@@ -75,9 +78,11 @@ export function UserMenu({ accentColor, user, onLogout }: UserMenuProps) {
             <span className="truncate text-sm font-medium" data-business-value="true">
               {user.username}
             </span>
-            <span className="truncate text-xs text-muted-foreground" data-business-value="true">
-              {user.role}
-            </span>
+            {roleLabel ? (
+              <span className="truncate text-xs text-muted-foreground" data-business-value="true">
+                {roleLabel}
+              </span>
+            ) : null}
           </div>
         </DropdownMenuLabel>
 
