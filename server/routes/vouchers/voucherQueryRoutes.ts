@@ -1,5 +1,4 @@
 import type { Express } from "express";
-import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -98,7 +97,7 @@ export function registerVoucherQueryRoutes(app: Express) {
     }
   });
 
-  // Get unified ledger for a supplier across all companies
+  // Get unified ledger for a supplier across explicitly accessible companies
   app.get("/api/suppliers/:supplierId/unified-ledger", requireAuth, async (req, res) => {
     try {
       const access = await assertActiveCompanyAccess(req);
