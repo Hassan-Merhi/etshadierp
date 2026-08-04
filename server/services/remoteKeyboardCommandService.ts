@@ -288,6 +288,13 @@ export function publishRemoteKeyboardCommand(input: {
   const now = input.now ?? Date.now();
   const session = activeSessionForController(input.sessionId, input.controllerUserId);
   assertKeyboardAuthorization(session.id, input.controllerUserId, now);
+  if ((commandListeners.get(session.id)?.size ?? 0) === 0) {
+    throw new RemoteKeyboardControlError(
+      "TARGET_KEYBOARD_CHANNEL_UNAVAILABLE",
+      409,
+      "The employee ERP tab is not ready to receive keyboard commands."
+    );
+  }
   assertRateLimit(session.id, now);
 
   if (input.type !== "insert-text" && input.type !== "key") {
