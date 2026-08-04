@@ -1,16 +1,13 @@
 name: Temporary mobile Phases 8-10 validation
 
 on:
-  push:
-    branches:
-      - agent/mobile-phases-8-10-validation-current-main
   pull_request:
     branches:
       - main
   workflow_dispatch:
 
 concurrency:
-  group: mobile-phases-8-10-validation-current-main
+  group: mobile-phases-8-10-validation-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
