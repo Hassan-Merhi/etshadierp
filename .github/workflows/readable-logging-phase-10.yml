@@ -27,6 +27,25 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: etshadi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d etshadi_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/etshadi_test
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/etshadi_test
+      SESSION_SECRET: phase-10-ci-session-secret
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
