@@ -73,7 +73,7 @@ for (const [name, source] of [
 }
 
 for (const token of [
-  "100dvh",
+  "var(--app-viewport-height)",
   "overflow-y-auto",
   "overscroll-contain",
   "min-h-10",
@@ -93,8 +93,8 @@ for (const token of [
   'data-slot="sheet-content"',
   'data-slot="sheet-close"',
   'data-sheet-side={side}',
-  "min-h-10",
-  "min-w-10",
+  "min-h-11",
+  "min-w-11",
   "motion-reduce:animate-none",
 ]) {
   if (!sources.sheet.includes(token)) failures.push(`Accessible sheet contract missing: ${token}`);
