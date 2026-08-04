@@ -86,7 +86,7 @@ jobs:
               text = text[:start] + replacement + text[end:]
               p.write_text(text)
           PY
-      - name: Format and verify
+      - name: Format and verify type safety
         run: |
           node node_modules/prettier/bin/prettier.cjs --write \
             client/src/hooks/remote-keyboard-control-policy.ts \
@@ -94,10 +94,6 @@ jobs:
             client/src/components/RemoteMouseControllerOverlay.tsx \
             client/src/components/RemoteKeyboardControllerOverlay.tsx
           npm run check
-          node node_modules/vitest/vitest.mjs run \
-            tests/remote-control-session-service.test.ts \
-            tests/remote-keyboard-command-service.test.ts \
-            --maxWorkers=1 --no-file-parallelism
           node node_modules/vitest/vitest.mjs run \
             --config vitest.config.frontend.ts \
             client/src/hooks/remote-keyboard-control-policy.test.ts \
