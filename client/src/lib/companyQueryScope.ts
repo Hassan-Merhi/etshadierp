@@ -35,7 +35,9 @@ export function isCompanySessionQueryKey(queryKey: QueryKey): boolean {
   return !isGlobalQueryKey(queryKey);
 }
 
-export async function cancelCompanySessionQueries(client: QueryClient): Promise<void> {
+export async function cancelCompanySessionQueries(
+  client: QueryClient,
+): Promise<void> {
   await client.cancelQueries({
     predicate: (query) => isCompanySessionQueryKey(query.queryKey),
   });
