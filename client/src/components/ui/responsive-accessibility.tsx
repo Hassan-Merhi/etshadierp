@@ -128,7 +128,6 @@ export function HorizontalScrollRegion({
   return (
     <div
       data-slot="horizontal-scroll-region"
-      data-horizontal-scroll-region="true"
       role="region"
       aria-label={label}
       aria-describedby={descriptionId}
