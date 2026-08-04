@@ -14,6 +14,15 @@ function disableSessionResponseCaching(res: { setHeader: (name: string, value: s
   res.setHeader("Vary", "Cookie");
 }
 
+function saveSession(req: Express.Request): Promise<void> {
+  return new Promise((resolve, reject) => {
+    req.session.save((error) => {
+      if (error) reject(error);
+      else resolve();
+    });
+  });
+}
+
 export function registerCompanyAccessRoutes(app: Express) {
   app.get("/api/companies", requireAuth, async (_req, res) => {
     try {
@@ -150,6 +159,12 @@ export function registerCompanyAccessRoutes(app: Express) {
         }
       }
 
+      const [companyRow] = await db
+        .select({ name: companies.name })
+        .from(companies)
+        .where(eq(companies.id, companyId))
+        .limit(1);
+
       req.session.currentCompanyId = companyId;
       delete (req.session as any).factoryCompanyId;
       req.session.currentRole = userRole.role;
@@ -161,23 +176,16 @@ export function registerCompanyAccessRoutes(app: Express) {
       req.session.daybookEditDays = userRole.daybookEditDays;
       req.session.canAccessCustomers = userRole.canAccessCustomers;
       req.session.canDeleteRecords = userRole.canDeleteRecords;
+      (req.session as any).currentCompanyName = companyRow?.name ?? null;
 
-      db.select({ name: companies.name })
-        .from(companies)
-        .where(eq(companies.id, companyId))
-        .limit(1)
-        .then((rows) => {
-          (req.session as any).currentCompanyName = rows[0]?.name || null;
-        })
-        .catch(() => {});
+      try {
+        await saveSession(req);
+      } catch (error: unknown) {
+        logger.error("Error saving session:", { error });
+        return res.status(500).json({ message: "Failed to save session" });
+      }
 
-      req.session.save((error) => {
-        if (error) {
-          logger.error("Error saving session:", { error });
-          return res.status(500).json({ message: "Failed to save session" });
-        }
-        res.json({ message: "Company set successfully", companyId });
-      });
+      res.json({ message: "Company set successfully", companyId });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
