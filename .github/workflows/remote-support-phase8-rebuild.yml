@@ -1,0 +1,148 @@
+name: Remote support Phase 8 rebuild
+
+on:
+  push:
+    branches:
+      - agent/remote-support-phase-8-current-main
+    paths:
+      - .github/workflows/remote-support-phase8-rebuild.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/remote-support-phase8-rebuild.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: remote-support-phase8-rebuild
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    if: github.event_name == 'push' || github.head_ref == 'agent/remote-support-phase-8-current-main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/remote-support-phase-8-current-main
+          fetch-depth: 0
+      - name: Apply reviewed stacked phase patches onto current main
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main \
+            agent/remote-support-phase-4-current-main \
+            agent/remote-support-phase-5-mouse-control \
+            agent/remote-support-phase-6-keyboard-control \
+            agent/remote-support-phase-7-audit-protection
+
+          apply_phase() {
+            local label="$1"
+            local base="$2"
+            local head="$3"
+            shift 3
+            local patch="/tmp/${label}.patch"
+            git diff --binary "$base" "$head" -- "$@" > "$patch"
+            if [ ! -s "$patch" ]; then
+              echo "No patch content for ${label}" >&2
+              exit 1
+            fi
+            if ! git apply --3way --index "$patch"; then
+              echo "Failed to apply ${label}; unresolved paths:" >&2
+              git diff --name-only --diff-filter=U >&2 || true
+              exit 1
+            fi
+            git commit -m "feat(remote-support): apply ${label} on current main"
+          }
+
+          apply_phase phase-4 \
+            10028e5e6e8acd0a99177257c431de8ed7060676 \
+            fb9ed5cc4c53962512125a3ca323c7e211d15039 \
+            client/src/app/AuthenticatedApp.tsx \
+            client/src/app/PosShell.tsx \
+            client/src/components/RemoteSupportIndicator.tsx \
+            client/src/hooks/use-remote-control-session.ts \
+            client/src/i18n/remoteSupportPhase4Translations.ts \
+            config/ci-ratchet-allowances.json \
+            docs/remote-support-phase-4.md \
+            scripts/audit-i18n-phase14.mjs \
+            server/routes/applicationRoutes.ts \
+            server/routes/remoteControlSessionRoutes.ts \
+            server/routes/screenFeedRoutes.ts \
+            server/services/remoteControlSessionService.ts \
+            tests/remote-control-session-service.test.ts
+
+          apply_phase phase-5 \
+            fb9ed5cc4c53962512125a3ca323c7e211d15039 \
+            8ac9147b8f3042c31107834c1e48592db3d155fc \
+            client/src/components/RemoteMouseControlTarget.tsx \
+            client/src/components/RemoteMouseControllerOverlay.tsx \
+            client/src/components/RemoteSupportIndicator.tsx \
+            client/src/components/remote-support-indicator-policy.test.ts \
+            client/src/components/remote-support-indicator-policy.ts \
+            client/src/hooks/remote-mouse-control-policy.test.ts \
+            client/src/hooks/remote-mouse-control-policy.ts \
+            client/src/hooks/use-remote-control-session.ts \
+            client/src/i18n/remoteSupportPhase5Translations.ts \
+            config/ci-ratchet-allowances.json \
+            docs/remote-support-phase-5.md \
+            scripts/audit-i18n-phase14.mjs \
+            server/routes/remoteControlSessionRoutes.ts \
+            server/services/remoteControlCommandService.ts \
+            server/services/remoteControlSessionService.ts \
+            tests/remote-control-command-service.test.ts \
+            tests/remote-control-session-service.test.ts
+
+          apply_phase phase-6 \
+            8ac9147b8f3042c31107834c1e48592db3d155fc \
+            a5331e4d782aa00f5212fc2841933731c9d9d22e \
+            client/src/components/RemoteKeyboardControlTarget.tsx \
+            client/src/components/RemoteKeyboardControllerOverlay.tsx \
+            client/src/components/RemoteMouseControlTarget.tsx \
+            client/src/components/RemoteMouseControllerOverlay.tsx \
+            client/src/components/RemoteSupportIndicator.tsx \
+            client/src/components/remote-support-indicator-policy.ts \
+            client/src/hooks/remote-keyboard-control-policy.test.ts \
+            client/src/hooks/remote-keyboard-control-policy.ts \
+            client/src/hooks/remote-mouse-control-policy.ts \
+            client/src/i18n/remoteSupportPhase6Translations.ts \
+            client/src/pages/settings/WatchUserDialog.tsx \
+            config/ci-ratchet-allowances.json \
+            docs/remote-support-phase-6.md \
+            scripts/audit-i18n-phase14.mjs \
+            server/routes/applicationRoutes.ts \
+            server/routes/remoteKeyboardControlRoutes.ts \
+            server/services/remoteControlSessionService.ts \
+            server/services/remoteKeyboardCommandService.ts \
+            tests/remote-control-session-service.test.ts \
+            tests/remote-keyboard-command-service.test.ts
+
+          apply_phase phase-7 \
+            47a749d72e72ee25648b79583a5b21ebb29f84eb \
+            origin/agent/remote-support-phase-7-audit-protection \
+            client/src/components/remote-support-indicator-policy.test.ts \
+            client/src/hooks/remote-keyboard-control-policy.ts \
+            client/src/hooks/use-remote-control-session.ts \
+            client/src/pages/settings/AuditLogUtils.tsx \
+            docs/remote-support-phase-7.md \
+            server/routes/applicationRoutes.ts \
+            server/routes/remoteControlSessionRoutes.ts \
+            server/routes/remoteKeyboardControlRoutes.ts \
+            server/routes/remoteSupportAuditRoutes.ts \
+            server/routes/screenFeedRoutes.ts \
+            server/services/remoteControlSessionService.ts \
+            server/services/remoteSupportAuditService.ts \
+            server/services/remoteSupportSensitiveActionPolicy.ts \
+            shared/permissionConfig.ts \
+            tests/remote-control-command-service.test.ts \
+            tests/remote-control-session-service.test.ts \
+            tests/remote-keyboard-command-service.test.ts \
+            tests/remote-support-audit-service.test.ts \
+            tests/remote-support-permission-contract.test.ts \
+            tests/remote-support-sensitive-action-policy.test.ts
+
+          git push --no-verify origin HEAD:agent/remote-support-phase-8-current-main
