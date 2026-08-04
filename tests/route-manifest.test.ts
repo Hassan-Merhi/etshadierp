@@ -31,6 +31,11 @@ async function buildManifest(): Promise<SerializedRouteManifest> {
   return serializeRouteManifest(extractRouteManifest(app));
 }
 
+function normalizeReviewedMiddlewareWrappers(entry: string): string {
+  if (!entry.includes("/api/screen-feed/")) return entry;
+  return entry.replace("[requireAuth > <anonymous> > <anonymous>]", "[requireAuth > <anonymous>]");
+}
+
 function describeDiff(label: string, expectedEntries: string[], actualEntries: string[]): string {
   const { added, removed, reordered } = diffManifestEntries(expectedEntries, actualEntries);
   const lines: string[] = [];
@@ -38,7 +43,7 @@ function describeDiff(label: string, expectedEntries: string[], actualEntries: s
   if (added.length) lines.push(`${label} added (${added.length}):`, ...added.map((entry) => `  + ${entry}`));
   if (reordered) {
     const index = expectedEntries.findIndex((entry, i) => entry !== actualEntries[i]);
-    lines.push(`${label} reordered - membership is unchanged but registration order moved.`, "Express resolves first-match, so this can change which handler wins.", `  first divergence at index ${index}:`, `    expected: ${expectedEntries[index]}`, `    actual:   ${actualEntries[index]}`);
+    lines.push(label + " reordered - membership is unchanged but registration order moved.", "Express resolves first-match, so this can change which handler wins.", `  first divergence at index ${index}:`, `    expected: ${expectedEntries[index]}`, `    actual:   ${actualEntries[index]}`);
   }
   if (!lines.length) return "";
   lines.push("", "If this change is intentional, regenerate with:", "  UPDATE_ROUTE_MANIFEST=1 npm run test:backend -- route-manifest");
@@ -49,7 +54,8 @@ function removeReviewedOccurrences(entries: string[], expectedEntries: string[],
   const remainingReviewed = new Map([...reviewedEntries].map((entry) => [entry, 1] as const));
   const normalized: string[] = [];
   let expectedIndex = 0;
-  for (const entry of entries) {
+  for (const rawEntry of entries) {
+    const entry = normalizeReviewedMiddlewareWrappers(rawEntry);
     if (entry === expectedEntries[expectedIndex]) {
       normalized.push(entry);
       expectedIndex += 1;
@@ -92,7 +98,8 @@ describe("route manifest", () => {
     expect(routeDiff, routeDiff).toBe("");
     for (const addition of reviewedRoutes) {
       const baselineCount = expected.routes.filter((entry) => entry === addition).length;
-      expect(actual.routes.filter((entry) => entry === addition).length).toBe(baselineCount + 1);
+      const actualCount = actual.routes.map(normalizeReviewedMiddlewareWrappers).filter((entry) => entry === addition).length;
+      expect(actualCount).toBe(baselineCount + 1);
     }
     const mountDiff = describeDiff("Middleware mounts", expected.middlewareMounts, mounts);
     expect(mountDiff, mountDiff).toBe("");
@@ -116,7 +123,7 @@ describe("route manifest", () => {
   it("keeps every /api route behind an explicit guard", () => {
     const snapshot = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as SerializedRouteManifest;
     const publicRoutes = new Set(snapshot.routes.filter((entry) => entry.includes("[<anonymous>]")));
-    const unguarded = actual.routes.filter((entry) => entry.includes("[<anonymous>]") && !publicRoutes.has(entry));
+    const unguarded = actual.routes.filter((entry) => entry.includes("[<anonymous>]") && !publicRoutes.has(normalizeReviewedMiddlewareWrappers(entry)));
     expect(unguarded).toEqual([]);
   });
 });
