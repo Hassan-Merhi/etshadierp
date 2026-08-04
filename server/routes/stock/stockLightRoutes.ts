@@ -10,13 +10,15 @@ const MAX_STOCK_ITEM_PAGE_SIZE = 100;
 /**
  * Lightweight stock-item selector endpoint.
  *
- * Paginated requests return only stable selector/search fields. The endpoint
- * intentionally excludes opening balances, rates, values, prices, timestamps,
- * translations and other management-only fields. Full records remain available
- * from GET /api/stock-items/:id after an item is selected or opened.
+ * Ordinary requests are paginated and return only stable selector/search
+ * fields. The endpoint intentionally excludes opening balances, rates, values,
+ * prices, timestamps, translations and other management-only fields. Full
+ * records remain available from GET /api/stock-items/:id after an item is
+ * selected or opened.
  *
- * Legacy callers without paging/search parameters still receive an array while
- * they are migrated. Ordinary selector callers must use paginated mode.
+ * Bulk management and repair screens that genuinely require every lightweight
+ * identity record must opt in explicitly with all=true. Selector workflows use
+ * bounded server search, location filters and selected-ID hydration instead.
  */
 export function registerStockLightRoutes(app: Express) {
   app.get("/api/stock-items/light", requireAuth, async (req: any, res) => {
