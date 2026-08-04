@@ -35,7 +35,9 @@ export function isCompanySessionQueryKey(queryKey: QueryKey): boolean {
   return !isGlobalQueryKey(queryKey);
 }
 
-export async function cancelCompanySessionQueries(client: QueryClient): Promise<void> {
+export async function cancelCompanySessionQueries(
+  client: QueryClient,
+): Promise<void> {
   await client.cancelQueries({
     predicate: (query) => isCompanySessionQueryKey(query.queryKey),
   });
@@ -45,4 +47,15 @@ export function removeCompanySessionQueries(client: QueryClient): void {
   client.removeQueries({
     predicate: (query) => isCompanySessionQueryKey(query.queryKey),
   });
+
+  // /api/auth/me is global because it identifies the logged-in user, but its
+  // role and POS flags belong to the active company session. Resetting it here
+  // prevents a company switch from reusing stale canSellNegativeStock access.
+  // Offline company selection keeps the last authenticated snapshot available.
+  if (typeof navigator === "undefined" || navigator.onLine !== false) {
+    void client.resetQueries({
+      queryKey: ["/api/auth/me"],
+      exact: true,
+    });
+  }
 }
