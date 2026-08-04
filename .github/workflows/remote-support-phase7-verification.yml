@@ -1,0 +1,92 @@
+name: Remote support Phase 7 verification
+
+on:
+  push:
+    branches:
+      - agent/remote-support-phase-7-audit-protection
+  pull_request:
+    branches:
+      - agent/remote-support-phase-6-keyboard-control
+
+permissions:
+  contents: read
+
+concurrency:
+  group: remote-support-phase7-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    if: github.event_name == 'push' || github.head_ref == 'agent/remote-support-phase-7-audit-protection'
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - name: Checkout Phase 7 branch
+        uses: actions/checkout@v7
+        with:
+          ref: agent/remote-support-phase-7-audit-protection
+          fetch-depth: 0
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Normalize package registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Verify changed-source formatting
+        run: |
+          git fetch origin agent/remote-support-phase-6-keyboard-control --depth=1
+          mapfile -d '' changed_files < <(
+            git diff --name-only --diff-filter=ACMR -z origin/agent/remote-support-phase-6-keyboard-control...HEAD -- client/src server shared tests scripts |
+              grep -zE '\.(ts|tsx|css|mjs)$' || true
+          )
+          if [ "${#changed_files[@]}" -gt 0 ]; then
+            printf 'Checking %s changed source files\n' "${#changed_files[@]}"
+            node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
+          fi
+
+      - name: Type-check
+        run: npm run check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Production build
+        run: npm run build
+
+      - name: Remote support backend safety tests
+        run: >-
+          node node_modules/vitest/vitest.mjs run
+          tests/remote-control-session-service.test.ts
+          tests/remote-control-command-service.test.ts
+          tests/remote-keyboard-command-service.test.ts
+          tests/remote-support-audit-service.test.ts
+          tests/remote-support-sensitive-action-policy.test.ts
+          tests/remote-support-permission-contract.test.ts
+          --maxWorkers=1 --no-file-parallelism
+
+      - name: Remote support frontend safety tests
+        run: >-
+          node node_modules/vitest/vitest.mjs run
+          --config vitest.config.frontend.ts
+          client/src/hooks/remote-mouse-control-policy.test.ts
+          client/src/hooks/remote-keyboard-control-policy.test.ts
+          client/src/components/remote-support-indicator-policy.test.ts
+          --maxWorkers=1 --no-file-parallelism
+
+      - name: Repository security and architecture contracts
+        run: |
+          npm run verify:program1-observability
+          npm run verify:final-production-readiness
+          npm run verify:bandwidth
+          npm run verify:production-dependencies
+          npm run verify:server-bundle
+
+      - name: I18n audit
+        run: node scripts/audit-i18n-phase14.mjs
