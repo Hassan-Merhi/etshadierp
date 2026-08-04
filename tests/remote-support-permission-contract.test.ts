@@ -37,6 +37,6 @@ describe("remote support permission contract", () => {
     const auditRoutes = fs.readFileSync("server/routes/remoteSupportAuditRoutes.ts", "utf8");
     expect(auditRoutes).toContain("getSessionCompanyId(req)");
     expect(auditRoutes).toContain('eq(auditLog.tableName, "remote_support_sessions")');
-    expect(auditRoutes).toContain('eq(auditLog.companyId, companyId)');
+    expect(auditRoutes).toContain("eq(auditLog.companyId, companyId)");
   });
 });
