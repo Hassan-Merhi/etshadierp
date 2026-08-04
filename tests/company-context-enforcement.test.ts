@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { decideExplicitCompanyContext } from "../server/services/security/companyContextEnforcementAdapter";
+import {
+  decideExplicitCompanyContext,
+  decideRouteCompanyContext,
+} from "../server/services/security/companyContextEnforcementAdapter";
 
 describe("explicit company context enforcement", () => {
   it("accepts the authenticated company with no assertions", () => {
@@ -47,6 +50,48 @@ describe("explicit company context enforcement", () => {
       allowed: false,
       companyId: null,
       code: "COMPANY_CONTEXT_REQUIRED",
+    });
+  });
+});
+
+describe("route-aware company context enforcement", () => {
+  it("uses the pinned company for Factory raw-stock routes", () => {
+    expect(
+      decideRouteCompanyContext(
+        { currentCompanyId: 7, factoryCompanyId: 8 },
+        "/api/factory/raw-stock",
+      ),
+    ).toEqual({
+      allowed: true,
+      companyId: 8,
+      code: "COMPANY_CONTEXT_OK",
+    });
+  });
+
+  it("keeps ERP administration routes on currentCompanyId across tabs", () => {
+    expect(
+      decideRouteCompanyContext(
+        { currentCompanyId: 7, factoryCompanyId: 8 },
+        "/api/admin/users",
+      ),
+    ).toEqual({
+      allowed: true,
+      companyId: 7,
+      code: "COMPANY_CONTEXT_OK",
+    });
+  });
+
+  it("rejects a request assertion that targets the wrong route company", () => {
+    expect(
+      decideRouteCompanyContext(
+        { currentCompanyId: 7, factoryCompanyId: 8 },
+        "/api/factory/raw-stock",
+        [7],
+      ),
+    ).toEqual({
+      allowed: false,
+      companyId: 8,
+      code: "COMPANY_CONTEXT_MISMATCH",
     });
   });
 });
