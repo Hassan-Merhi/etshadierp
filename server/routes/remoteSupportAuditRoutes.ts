@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
 import { auditLog } from "@shared/schema";
 import { requireAuth } from "../auth";
 import { db } from "../db";
@@ -32,23 +32,36 @@ export function registerRemoteSupportAuditRoutes(app: Express): void {
       const page = Math.max(1, Number.isFinite(requestedPage) ? requestedPage : 1);
       const from = safeDate(req.query.from);
       const to = safeDate(req.query.to, true);
+      const search = typeof req.query.search === "string" ? req.query.search.trim().slice(0, 120) : "";
+      const searchPattern = `%${search.replace(/[%_]/g, "\\$&")}%`;
       const conditions = [
         eq(auditLog.companyId, companyId),
         eq(auditLog.tableName, "remote_support_sessions"),
         ...(from ? [gte(auditLog.createdAt, from)] : []),
         ...(to ? [lte(auditLog.createdAt, to)] : []),
+        ...(search
+          ? [
+              or(
+                ilike(auditLog.username, searchPattern),
+                ilike(auditLog.action, searchPattern),
+                ilike(auditLog.recordIdentifier, searchPattern)
+              )!,
+            ]
+          : []),
       ];
       const whereClause = and(...conditions);
       const [logs, countRows] = await Promise.all([
         db
           .select({
             id: auditLog.id,
+            userId: auditLog.userId,
+            username: auditLog.username,
             companyId: auditLog.companyId,
-            actorUserId: auditLog.userId,
-            actorUsername: auditLog.username,
             action: auditLog.action,
-            sessionId: auditLog.recordIdentifier,
-            details: auditLog.changes,
+            tableName: auditLog.tableName,
+            recordId: auditLog.recordId,
+            recordIdentifier: auditLog.recordIdentifier,
+            changes: auditLog.changes,
             createdAt: auditLog.createdAt,
           })
           .from(auditLog)
@@ -69,6 +82,7 @@ export function registerRemoteSupportAuditRoutes(app: Express): void {
         page,
         pageSize,
         totalPages: Math.max(1, Math.ceil(total / pageSize)),
+        knownModules: ["remote_support_sessions"],
       });
     } catch (error) {
       logger.error("[RemoteSupport] failed to fetch permanent audit history", { error });
