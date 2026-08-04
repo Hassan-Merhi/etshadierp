@@ -46,13 +46,13 @@ describe("remote control session safety", () => {
         keyboardControl: false,
         sensitiveActionProtection: true,
       },
-      "phase-4-test"
+      "phase-5-test"
     );
   });
 
   afterEach(() => {
     resetRemoteControlSessionStateForTests();
-    restoreRemoteSupportBootDefaults("phase-4-test-cleanup");
+    restoreRemoteSupportBootDefaults("phase-5-test-cleanup");
   });
 
   it("allows only configured controller roles", () => {
@@ -81,7 +81,7 @@ describe("remote control session safety", () => {
 
     expect(session.scope).toBe("erp-browser-tab");
     expect(session.targetTabId).toBe("erp-tab-2");
-    expect(session.capabilities).toEqual({ mouse: false, keyboard: false, browserTabOnly: true });
+    expect(session.capabilities).toEqual({ mouse: true, keyboard: false, browserTabOnly: true });
     expect(getActiveRemoteControlSession("22", "erp-tab-2")?.id).toBe(session.id);
     expect(getActiveRemoteControlSession("22", "erp-tab-1")).toBeNull();
   });
