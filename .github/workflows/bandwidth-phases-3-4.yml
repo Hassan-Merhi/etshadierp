@@ -27,6 +27,7 @@ on:
       - "shared/schema/inventory.ts"
       - "scripts/enforce-bandwidth-phases-3-4-backend.py"
       - "scripts/enforce-bandwidth-phases-3-4-frontend.py"
+      - "scripts/test-bandwidth-phases-3-4.mts"
       - "scripts/update-startup-schema-integrity.mts"
       - "scripts/verify-bandwidth-phases-3-4.mjs"
       - "tests/bandwidth-phases-3-4.test.ts"
@@ -114,6 +115,7 @@ jobs:
             server/startup-schema/011-bandwidth-search-indexes.ts \
             server/startup-schema/index.ts \
             shared/schema/inventory.ts \
+            scripts/test-bandwidth-phases-3-4.mts \
             tests/bandwidth-phases-3-4.test.ts \
             tests/startup-schema-integrity.test.ts \
             scripts/verify-bandwidth-phases-3-4.mjs
@@ -122,7 +124,7 @@ jobs:
         run: node scripts/verify-bandwidth-phases-3-4.mjs
 
       - name: Focused regression tests
-        run: node node_modules/vitest/vitest.mjs run tests/bandwidth-phases-3-4.test.ts tests/startup-schema-integrity.test.ts --maxWorkers=1 --no-file-parallelism
+        run: node node_modules/tsx/dist/cli.mjs scripts/test-bandwidth-phases-3-4.mts
 
       - name: Type-check
         run: npm run check
