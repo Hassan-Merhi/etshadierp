@@ -151,10 +151,13 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         if (options.offline || lastSyncedCompanyId.current === company.id) return true;
       }
 
+      const isInitialActivation = selectedCompanyRef.current === null;
       await cancelCompanySessionQueries(queryClient);
 
       if (options.offline) {
-        removeCompanySessionQueries(queryClient);
+        removeCompanySessionQueries(queryClient, {
+          resetAuthenticatedUser: !isInitialActivation,
+        });
         commitCompanySelection(company, { prefetch: false, serverSynced: false });
         return true;
       }
@@ -168,8 +171,19 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         return false;
       }
 
-      removeCompanySessionQueries(queryClient);
+      removeCompanySessionQueries(queryClient, {
+        resetAuthenticatedUser: !isInitialActivation,
+      });
       commitCompanySelection(company, { prefetch: true, serverSynced: true });
+
+      if (isInitialActivation) {
+        void queryClient.invalidateQueries({
+          queryKey: ["/api/auth/me"],
+          exact: true,
+          refetchType: "active",
+        });
+      }
+
       return true;
     },
     [commitCompanySelection],
@@ -223,7 +237,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         if (sessionCompanyId === target.id) {
           await switchQueueRef.current!.enqueue(async () => {
             await cancelCompanySessionQueries(queryClient);
-            removeCompanySessionQueries(queryClient);
+            removeCompanySessionQueries(queryClient, {
+              resetAuthenticatedUser: false,
+            });
             commitCompanySelection(target, { prefetch: true, serverSynced: true });
           });
           return;
@@ -236,7 +252,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         if (serverCompany) {
           await switchQueueRef.current!.enqueue(async () => {
             await cancelCompanySessionQueries(queryClient);
-            removeCompanySessionQueries(queryClient);
+            removeCompanySessionQueries(queryClient, {
+              resetAuthenticatedUser: false,
+            });
             commitCompanySelection(serverCompany, { prefetch: true, serverSynced: true });
           });
           return;
