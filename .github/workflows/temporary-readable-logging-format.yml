@@ -1,9 +1,9 @@
 name: Temporary readable logging formatter
 
 on:
-  push:
+  pull_request:
     branches:
-      - chore/readable-production-logs-phases-1-3
+      - main
 
 permissions:
   contents: read
