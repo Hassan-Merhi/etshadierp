@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { sql } from "drizzle-orm";
+import { requireAuth } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { requireSpCompany } from "./spHelpers";
@@ -124,7 +125,7 @@ export async function buildSpProductionClosureStatus(companyId: number): Promise
 }
 
 export function registerSpProductionClosureRoutes(app: Express): void {
-  app.get("/api/sp/production/closure-status", async (req: Request, res: Response) => {
+  app.get("/api/sp/production/closure-status", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = Number(await requireSpCompany(req as any, res as any));
       if (!companyId) return;
@@ -134,7 +135,7 @@ export function registerSpProductionClosureRoutes(app: Express): void {
     }
   });
 
-  app.post("/api/sp/production/evidence", async (req: Request, res: Response) => {
+  app.post("/api/sp/production/evidence", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = Number(await requireSpCompany(req as any, res as any));
       if (!companyId) return;
@@ -174,7 +175,7 @@ export function registerSpProductionClosureRoutes(app: Express): void {
     }
   });
 
-  app.post("/api/sp/production/close-rollback-window", async (req: Request, res: Response) => {
+  app.post("/api/sp/production/close-rollback-window", requireAuth, async (req: Request, res: Response) => {
     try {
       const companyId = Number(await requireSpCompany(req as any, res as any));
       if (!companyId) return;
