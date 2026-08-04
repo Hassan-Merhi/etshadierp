@@ -91,7 +91,7 @@ export function useGITContainersData({
       return res.json() as Promise<{ updated: number; trackingEnabled: boolean }>;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [queryUrl] });
+      queryClient.invalidateQueries({ queryKey: ["/api/git/containers"] });
       toast({
         title: data.trackingEnabled
           ? `Auto-tracking enabled for ${data.updated} containers`
@@ -147,7 +147,7 @@ export function useGITContainersData({
                 clearInterval(intervalId);
                 intervalId = null;
               }
-              queryClient.invalidateQueries({ queryKey: [queryUrl] });
+              queryClient.invalidateQueries({ queryKey: ["/api/git/containers"] });
             }
           }, 6000);
         }

@@ -20,6 +20,8 @@ import {
 import { eq, and, inArray, sql, isNull } from "drizzle-orm";
 
 import { isParentCompanyContext } from "../helpers/supplierBalanceHelpers";
+import { buildVoucherPage, filterAndSortVouchers, parseVoucherListQuery } from "./voucherListPaging";
+import { loadVoucherRelatedData } from "./voucherDetailBatching";
 
 /**
  * After saving a journal voucher, if it has a customer entry + a ledger account entry,
@@ -33,7 +35,10 @@ export function registerVoucherQueryRoutes(app: Express) {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      const { startDate, endDate } = req.query;
+      const parsedListQuery = parseVoucherListQuery(req.query as Record<string, unknown>);
+      if (!parsedListQuery.ok) return res.status(400).json({ message: parsedListQuery.message });
+      const listQuery = parsedListQuery.query;
+      const { startDate, endDate } = listQuery;
 
       // Check if user is POS role
       const isPOS = req.session.currentRole === "POS";
@@ -90,7 +95,10 @@ export function registerVoucherQueryRoutes(app: Express) {
         }
       }
 
-      res.json(sanitizedVouchers);
+      const filteredVouchers = filterAndSortVouchers(sanitizedVouchers as any[], listQuery);
+      res.setHeader("Cache-Control", "private, max-age=30, stale-while-revalidate=30");
+      if (!listQuery.paginated) return res.json(filteredVouchers);
+      return res.json(buildVoucherPage(filteredVouchers, listQuery.page, listQuery.pageSize));
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
@@ -349,199 +357,11 @@ export function registerVoucherQueryRoutes(app: Express) {
         }
       }
 
-      const entries = await storage.getVoucherEntriesByVoucher(id);
-
-      // If this is a Purchase voucher, also fetch the linked purchase order
-      let purchaseOrder = null;
-      if (voucher.voucherType === "Purchase") {
-        const allPOs = await storage.getAllPurchaseOrders(voucher.companyId);
-        const linkedPO = allPOs.find((po) => po.voucherId === id);
-        if (linkedPO) {
-          const lineItems = await storage.getLineItemsByPO(linkedPO.id);
-          purchaseOrder = {
-            ...linkedPO,
-            items: lineItems,
-          };
-        }
-      }
-
-      // If this is a Sales voucher, also fetch the linked sales items
-      let salesItemsList = null;
-      if (voucher.voucherType === "Sales") {
-        const items = await db.select().from(salesItems).where(eq(salesItems.voucherId, id));
-
-        if (items.length > 0) {
-          const itemsWithDetails = await Promise.all(
-            items.map(async (item) => {
-              const stockItem = await storage.getStockItemById(item.stockItemId);
-
-              // Use stored configured price if available, otherwise fall back to live lookup
-              let configuredPrice = item.configuredPrice || "0";
-              if ((!configuredPrice || configuredPrice === "0") && voucher.locationId) {
-                const [locationPrice] = await db
-                  .select()
-                  .from(stockItemLocationPrices)
-                  .where(
-                    and(
-                      eq(stockItemLocationPrices.stockItemId, item.stockItemId),
-                      eq(stockItemLocationPrices.locationId, voucher.locationId)
-                    )
-                  )
-                  .limit(1);
-                if (locationPrice) {
-                  configuredPrice = locationPrice.sellingPrice || "0";
-                }
-              }
-
-              const qty = parseFloat(item.quantity || "0");
-              const configuredPriceNum = parseFloat(configuredPrice);
-              const actualPrice = parseFloat(item.sellingPrice || "0");
-              const costPrice = parseFloat(item.costPrice || "0");
-
-              // Hassan's Profit = (Actual Selling Price - Configured Price) * Qty
-              const hassansProfit = (actualPrice - configuredPriceNum) * qty;
-              // Hassan's Total = Configured Price * Qty
-              const hassansTotal = configuredPriceNum * qty;
-              // Hassan's % = (Hassan's Profit / Hassan's Total) * 100
-              const hassansPercentage = hassansTotal > 0 ? (hassansProfit / hassansTotal) * 100 : 0;
-
-              return {
-                ...item,
-                stockItemCode: stockItem?.code || "",
-                stockItemName: stockItem?.name || "",
-                stockItemUom: stockItem?.uom || "",
-                configuredPrice,
-                hassansProfit: hassansProfit.toFixed(2),
-                hassansTotal: hassansTotal.toFixed(2),
-                hassansPercentage: hassansPercentage.toFixed(1),
-              };
-            })
-          );
-          salesItemsList = itemsWithDetails;
-        }
-      }
-
-      // If this is a Consumption, Mixed, or Production voucher, fetch adjustment details
-      let adjustmentData = null;
-      if (
-        voucher.voucherType === "Consumption" ||
-        voucher.voucherType === "Mixed" ||
-        voucher.voucherType === "Production"
-      ) {
-        const adjustment = await db
-          .select()
-          .from(stockAdjustmentVouchers)
-          .where(eq(stockAdjustmentVouchers.voucherId, id))
-          .limit(1);
-
-        if (adjustment.length > 0) {
-          const items = await db
-            .select()
-            .from(stockAdjustmentItems)
-            .where(eq(stockAdjustmentItems.adjustmentId, adjustment[0].id));
-
-          const itemsWithDetails = await Promise.all(
-            items.map(async (item) => {
-              const stockItem = await storage.getStockItemById(item.stockItemId);
-              return {
-                ...item,
-                stockItemCode: stockItem?.code || "",
-                stockItemName: stockItem?.name || "",
-                stockItemUom: stockItem?.uom || "",
-              };
-            })
-          );
-
-          const location = await storage.getLocationById(adjustment[0].locationId);
-
-          adjustmentData = {
-            ...adjustment[0],
-            locationName: location?.name || "",
-            items: itemsWithDetails,
-          };
-        } else {
-          // No adjustment record exists - return empty structure so frontend can show form
-          let adjustmentType = "production";
-          if (voucher.voucherType === "Consumption") adjustmentType = "consumption";
-          else if (voucher.voucherType === "Mixed") adjustmentType = "mixed";
-
-          adjustmentData = {
-            id: 0,
-            voucherId: id,
-            locationId: voucher.locationId || 1,
-            locationName: "",
-            adjustmentType: adjustmentType,
-            notes: voucher.description || "",
-            items: [],
-            createdAt: new Date(),
-          };
-        }
-      }
-
-      // If this is a Stock Transfer voucher, fetch transfer details
-      // Factory transfers use voucherType "Transfer"; imports/POS use "Stock Transfer" or "StockTransfer"
-      let transferData = null;
-      if (
-        voucher.voucherType === "Stock Transfer" ||
-        voucher.voucherType === "StockTransfer" ||
-        voucher.voucherType === "Transfer"
-      ) {
-        const transfer = await db
-          .select()
-          .from(stockTransferVouchers)
-          .where(eq(stockTransferVouchers.voucherId, id))
-          .limit(1);
-
-        if (transfer.length > 0) {
-          const items = await db
-            .select()
-            .from(stockTransferItems)
-            .where(eq(stockTransferItems.transferId, transfer[0].id));
-
-          const [sourceLocation, destLocation] = await Promise.all([
-            storage.getLocationById(transfer[0].sourceLocationId!),
-            storage.getLocationById(transfer[0].destinationLocationId!),
-          ]);
-
-          const itemsWithDetails = await Promise.all(
-            items.map(async (item) => {
-              const stockItem = await storage.getStockItemById(item.stockItemId);
-              // Resolve per-item source location (falls back to transfer-level source)
-              const itemSourceLoc =
-                item.sourceLocationId && item.sourceLocationId !== transfer[0].sourceLocationId
-                  ? await storage.getLocationById(item.sourceLocationId)
-                  : null;
-              return {
-                ...item,
-                stockItemCode: stockItem?.code || "",
-                stockItemName: stockItem?.name || "",
-                stockItemUom: stockItem?.uom || "",
-                sourceLocationName: itemSourceLoc?.name || sourceLocation?.name || "",
-              };
-            })
-          );
-
-          transferData = {
-            ...transfer[0],
-            sourceLocationName: sourceLocation?.name || "",
-            destinationLocationName: destLocation?.name || "",
-            items: itemsWithDetails,
-          };
-        } else {
-          // No transfer record exists - return empty structure so frontend can show form
-          transferData = {
-            id: 0,
-            voucherId: id,
-            sourceLocationId: voucher.locationId || 1,
-            destinationLocationId: voucher.locationId || 1,
-            sourceLocationName: "",
-            destinationLocationName: "",
-            notes: voucher.description || "",
-            items: [],
-            createdAt: new Date(),
-          };
-        }
-      }
+      const [entries, relatedData] = await Promise.all([
+        storage.getVoucherEntriesByVoucher(id),
+        loadVoucherRelatedData(voucher),
+      ]);
+      const { purchaseOrder, salesItems: salesItemsList, adjustmentData, transferData } = relatedData;
 
       // For credit sales, resolve customer name from the voucher entries.
       // Credit sale entries store the customer receivable account via ledgerAccountId

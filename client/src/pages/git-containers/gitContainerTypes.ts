@@ -24,25 +24,25 @@ export interface EnrichedContainerRow {
   blDocs: string | null;
   docsSentDate: string | null;
   freightStatus: string | null;
-  trackingLink: string | null;
+  trackingLink?: string | null;
   poFreight: string | null;
   // ParcelsApp auto-tracking
-  trackingProvider: string | null;
-  trackingEnabled: boolean;
-  trackingAutoUpdate: boolean;
-  trackingCarrierHint: string | null;
-  trackingLastCheckedAt: string | null;
-  trackingLastStatus: string | null;
-  trackingLastLocation: string | null;
-  trackingLastEventDate: string | null;
-  trackingLastDescription: string | null;
-  trackingError: string | null;
-  trackingChangedAt: string | null;
-  trackingDetectedCarrier: string | null;
-  trackingFallbackUsed: boolean | null;
-  trackingFallbackReason: string | null;
-  trackingNextCheckAt: string | null;
-  trackingLastSkipReason: string | null;
+  trackingProvider?: string | null;
+  trackingEnabled?: boolean;
+  trackingAutoUpdate?: boolean;
+  trackingCarrierHint?: string | null;
+  trackingLastCheckedAt?: string | null;
+  trackingLastStatus?: string | null;
+  trackingLastLocation?: string | null;
+  trackingLastEventDate?: string | null;
+  trackingLastDescription?: string | null;
+  trackingError?: string | null;
+  trackingChangedAt?: string | null;
+  trackingDetectedCarrier?: string | null;
+  trackingFallbackUsed?: boolean | null;
+  trackingFallbackReason?: string | null;
+  trackingNextCheckAt?: string | null;
+  trackingLastSkipReason?: string | null;
   maxOffloadDate: string | null;
   daysDelayed: number | null;
   docsReadyNotSent: boolean;
@@ -55,6 +55,33 @@ export interface GitContainersResponse {
   companyId?: number;
   companyName?: string;
   total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasMore: boolean;
+  summary?: {
+    total: number;
+    atSea: number;
+    atPort: number;
+    leftDar: number;
+    inTransit: number;
+    arrived: number;
+    delayed: number;
+    overdue: number;
+    totalCost: number;
+    totalTransportDuty: number;
+  };
+  facets?: {
+    companies: string[];
+    containerNumbers: string[];
+    suppliers: string[];
+    transporters: string[];
+    agents: string[];
+    trucks: string[];
+    locations: string[];
+    etaDates: string[];
+    hasContainersWithNoEta: boolean;
+  };
 }
 
 export interface AuthUser {
@@ -257,7 +284,7 @@ export interface DrawerForm {
   dutyFee: string;
   docReceived: boolean;
   docsSentDate: string;
-  trackingLink: string;
+  trackingLink?: string;
   trackingDescription: string;
   blDocs: string;
   shopName: string;
