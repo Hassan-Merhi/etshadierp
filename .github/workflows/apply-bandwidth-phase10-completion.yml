@@ -1,0 +1,33 @@
+name: Apply bandwidth Phase 10 completion
+
+on:
+  push:
+    branches:
+      - agent/bandwidth-phases-9-10
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apply-bandwidth-phase10-completion
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/bandwidth-phases-9-10
+          fetch-depth: 0
+      - run: python scripts/apply-bandwidth-phase10-completion.py
+      - run: |
+          rm -f scripts/apply-bandwidth-phase10-completion.py
+          rm -f .github/workflows/apply-bandwidth-phase10-completion.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Complete bandwidth Phase 10 scheduled export memory lifecycle"
+          git push origin HEAD:agent/bandwidth-phases-9-10
