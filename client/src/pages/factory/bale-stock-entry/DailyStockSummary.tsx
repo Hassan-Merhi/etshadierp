@@ -42,71 +42,85 @@ export function DailyStockSummary({ date }: { date: string }) {
   const isToday = date === todayStr;
 
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      {/* Label */}
-      <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground whitespace-nowrap">
-        {isToday ? "Today" : "Production"}
-      </span>
-
-      {/* Production */}
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-emerald-500/10 border-emerald-500/20">
-        <Factory className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-        <span
-          className="text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400"
-          data-testid="text-entry-today-qty"
-        >
-          {totalQty}
+    <section
+      aria-label={isToday ? "Today's factory production" : "Factory production summary"}
+      data-factory-daily-summary="true"
+      className="grid min-w-0 grid-cols-1 gap-2 min-[420px]:grid-cols-2 lg:grid-cols-4"
+    >
+      <div className="flex min-h-11 items-center rounded-lg border border-dashed px-3 py-2">
+        <span className="break-words text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          {isToday ? "Today" : "Production"}
         </span>
-        <span className="text-xs text-emerald-600/70 dark:text-emerald-400/70">bales</span>
-        <span className="w-px h-3 bg-emerald-500/30" />
-        <span
-          className="text-sm font-bold tabular-nums text-emerald-600 dark:text-emerald-400"
-          data-testid="text-entry-today-kg"
-        >
-          {formatDailyNum(totalKg)}
-        </span>
-        <span className="text-xs text-emerald-600/70 dark:text-emerald-400/70">kg</span>
       </div>
 
-      {/* Garbage */}
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-orange-500/10 border-orange-500/20">
-        <span className="text-xs font-semibold text-orange-500">Garbage</span>
-        <span
-          className="text-sm font-bold tabular-nums text-orange-600 dark:text-orange-400"
-          data-testid="text-entry-today-garbage-qty"
-        >
-          {garbageQty}
-        </span>
-        <span className="text-xs text-orange-600/70 dark:text-orange-400/70">bales</span>
-        <span className="w-px h-3 bg-orange-500/30" />
-        <span
-          className="text-sm font-bold tabular-nums text-orange-600 dark:text-orange-400"
-          data-testid="text-entry-today-garbage-kg"
-        >
-          {formatDailyNum(garbageKg)}
-        </span>
-        <span className="text-xs text-orange-600/70 dark:text-orange-400/70">kg</span>
+      <div className="flex min-w-0 items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2">
+        <Factory className="h-4 w-4 shrink-0 text-emerald-500" />
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+          <span
+            className="text-base font-bold tabular-nums text-emerald-600 dark:text-emerald-400"
+            data-testid="text-entry-today-qty"
+          >
+            {totalQty}
+          </span>
+          <span className="text-xs text-emerald-600/70 dark:text-emerald-400/70">bales</span>
+          <span className="text-muted-foreground" aria-hidden="true">
+            ·
+          </span>
+          <span
+            className="text-base font-bold tabular-nums text-emerald-600 dark:text-emerald-400"
+            data-testid="text-entry-today-kg"
+          >
+            {formatDailyNum(totalKg)}
+          </span>
+          <span className="text-xs text-emerald-600/70 dark:text-emerald-400/70">kg</span>
+        </div>
       </div>
 
-      {/* Wipers */}
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-blue-500/10 border-blue-500/20">
-        <span className="text-xs font-semibold text-blue-500">Wipers</span>
-        <span
-          className="text-sm font-bold tabular-nums text-blue-600 dark:text-blue-400"
-          data-testid="text-entry-today-wipers-qty"
-        >
-          {wipersQty}
-        </span>
-        <span className="text-xs text-blue-600/70 dark:text-blue-400/70">bales</span>
-        <span className="w-px h-3 bg-blue-500/30" />
-        <span
-          className="text-sm font-bold tabular-nums text-blue-600 dark:text-blue-400"
-          data-testid="text-entry-today-wipers-kg"
-        >
-          {formatDailyNum(wipersKg)}
-        </span>
-        <span className="text-xs text-blue-600/70 dark:text-blue-400/70">kg</span>
+      <div className="flex min-w-0 items-center gap-2 rounded-lg border border-orange-500/20 bg-orange-500/10 px-3 py-2">
+        <span className="shrink-0 text-xs font-semibold text-orange-500">Garbage</span>
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+          <span
+            className="text-base font-bold tabular-nums text-orange-600 dark:text-orange-400"
+            data-testid="text-entry-today-garbage-qty"
+          >
+            {garbageQty}
+          </span>
+          <span className="text-xs text-orange-600/70 dark:text-orange-400/70">bales</span>
+          <span className="text-muted-foreground" aria-hidden="true">
+            ·
+          </span>
+          <span
+            className="text-base font-bold tabular-nums text-orange-600 dark:text-orange-400"
+            data-testid="text-entry-today-garbage-kg"
+          >
+            {formatDailyNum(garbageKg)}
+          </span>
+          <span className="text-xs text-orange-600/70 dark:text-orange-400/70">kg</span>
+        </div>
       </div>
-    </div>
+
+      <div className="flex min-w-0 items-center gap-2 rounded-lg border border-blue-500/20 bg-blue-500/10 px-3 py-2">
+        <span className="shrink-0 text-xs font-semibold text-blue-500">Wipers</span>
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+          <span
+            className="text-base font-bold tabular-nums text-blue-600 dark:text-blue-400"
+            data-testid="text-entry-today-wipers-qty"
+          >
+            {wipersQty}
+          </span>
+          <span className="text-xs text-blue-600/70 dark:text-blue-400/70">bales</span>
+          <span className="text-muted-foreground" aria-hidden="true">
+            ·
+          </span>
+          <span
+            className="text-base font-bold tabular-nums text-blue-600 dark:text-blue-400"
+            data-testid="text-entry-today-wipers-kg"
+          >
+            {formatDailyNum(wipersKg)}
+          </span>
+          <span className="text-xs text-blue-600/70 dark:text-blue-400/70">kg</span>
+        </div>
+      </div>
+    </section>
   );
 }

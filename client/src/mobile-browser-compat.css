@@ -90,6 +90,24 @@ body {
   max-width: 100%;
 }
 
+#main-content
+  :where(
+    [data-core-erp-page],
+    [data-core-erp-header],
+    [data-core-erp-actions],
+    [data-core-erp-filters],
+    [data-core-erp-summary],
+    [data-core-erp-content]
+  ) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+[data-responsive-tabs="true"] {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
 .mobile-action-bar {
   padding-bottom: max(0.75rem, var(--safe-area-bottom));
 }
@@ -115,6 +133,19 @@ body {
 
   #main-content {
     scroll-padding-bottom: max(1rem, var(--safe-area-bottom));
+  }
+
+  #main-content [data-core-erp-filters] > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #main-content [data-core-erp-actions] {
+    padding-bottom: max(0.25rem, var(--safe-area-bottom));
+  }
+
+  #main-content [data-responsive-tabs="true"] {
+    width: 100%;
   }
 
   [data-mobile="true"][data-sidebar="sidebar"] {

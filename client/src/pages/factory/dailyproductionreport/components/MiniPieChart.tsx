@@ -3,8 +3,13 @@
  *
  * Extracted from DailyProductionReport.tsx during the Phase 4 god-file split.
  */
-import {useMemo} from "react";
-import {PieChart, Pie, Cell, Tooltip, ResponsiveContainer} from "recharts";
+import { useMemo } from "react";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
+import {
+  ResponsiveChartPanel,
+  ResponsiveChartViewport,
+  ResponsiveLegendList,
+} from "@/components/ui/responsive-report";
 
 export // ── Shared mini-pie renderer used by both new charts ──────────────────────
 function MiniPieChart({
@@ -33,62 +38,68 @@ function MiniPieChart({
   }, [allRows, classifyFn]);
 
   const slices = order
-    .filter((g) => (grouped[g] ?? 0) > 0)
-    .map((g) => ({ name: g, value: grouped[g]!, color: colors[g] ?? "#94a3b8" }));
+    .filter((group) => (grouped[group] ?? 0) > 0)
+    .map((group) => ({ name: group, value: grouped[group]!, color: colors[group] ?? "#94a3b8" }));
 
-  const total = slices.reduce((s, x) => s + x.value, 0);
+  const total = slices.reduce((sum, slice) => sum + slice.value, 0);
   if (total === 0) return null;
 
   return (
-    <div className="flex flex-col gap-2" data-testid={testId}>
-      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</span>
-      <div className="flex items-start gap-3">
-        {/* Legend */}
-        <div className="flex flex-col gap-1 min-w-0">
-          {slices.map((s) => {
-            const pct = ((s.value / total) * 100).toFixed(1);
+    <ResponsiveChartPanel data-testid={testId} aria-label={`${title} chart`}>
+      <span className="block min-w-0 break-words text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </span>
+      <div className="mt-3 grid min-w-0 grid-cols-1 items-center gap-4 lg:grid-cols-[minmax(0,1fr)_12rem]">
+        <ResponsiveLegendList aria-label={`${title} legend`}>
+          {slices.map((slice) => {
+            const percentage = ((slice.value / total) * 100).toFixed(1);
             return (
-              <div key={s.name} className="flex items-center gap-1.5">
+              <li key={slice.name} className="flex min-w-0 items-start gap-2 rounded-lg bg-muted/30 p-2">
                 <span
-                  className="inline-block rounded-sm flex-shrink-0"
-                  style={{ width: 9, height: 9, background: s.color }}
+                  className="mt-1 h-2.5 w-2.5 shrink-0 rounded-sm"
+                  style={{ background: slice.color }}
+                  aria-hidden="true"
                 />
-                <span className="text-xs text-muted-foreground whitespace-nowrap">{s.name}</span>
-                <span className="text-xs font-bold tabular-nums">{pct}%</span>
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {Math.round(s.value).toLocaleString()} kg
+                <span className="min-w-0 flex-1">
+                  <span className="block break-words text-xs font-medium text-foreground">{slice.name}</span>
+                  <span className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-muted-foreground tabular-nums">
+                    <span className="font-semibold text-foreground">{percentage}%</span>
+                    <span>{Math.round(slice.value).toLocaleString()} kg</span>
+                  </span>
                 </span>
-              </div>
+              </li>
             );
           })}
-        </div>
-        {/* Donut */}
-        <div style={{ width: 140, height: 140, flexShrink: 0 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={slices}
-                cx="50%"
-                cy="50%"
-                innerRadius={38}
-                outerRadius={62}
-                paddingAngle={2}
-                dataKey="value"
-                strokeWidth={0}
-              >
-                {slices.map((s) => (
-                  <Cell key={s.name} fill={s.color} />
-                ))}
-              </Pie>
-              <Tooltip
-                formatter={(v: number) => [`${Math.round(v).toLocaleString()} kg`, ""]}
-                contentStyle={{ fontSize: 11, borderRadius: 6 }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+        </ResponsiveLegendList>
+
+        <ResponsiveChartViewport label={`${title} pie chart`} className="mx-auto w-full max-w-[12rem]">
+          <div className="h-48 w-full min-w-0">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={1}>
+              <PieChart>
+                <Pie
+                  data={slices}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={44}
+                  outerRadius={74}
+                  paddingAngle={2}
+                  dataKey="value"
+                  strokeWidth={0}
+                >
+                  {slices.map((slice) => (
+                    <Cell key={slice.name} fill={slice.color} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  formatter={(value: number) => [`${Math.round(value).toLocaleString()} kg`, ""]}
+                  contentStyle={{ fontSize: 11, borderRadius: 6, maxWidth: "calc(100vw - 2rem)" }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </ResponsiveChartViewport>
       </div>
-    </div>
+    </ResponsiveChartPanel>
   );
 }
 
