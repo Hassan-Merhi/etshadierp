@@ -64,7 +64,7 @@ function safePayload(input: LogAlertInput) {
     companyId: input.companyId,
     logger: {
       format: loggerConfig.format,
-      minimumLevel: loggerConfig.minimumLevel,
+      minimumLevel: loggerConfig.level,
       redactionEnabled: loggerConfig.redactionEnabled,
     },
   };
