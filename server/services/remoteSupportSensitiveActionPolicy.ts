@@ -1,4 +1,4 @@
-import type { RemoteMouseCommandType } from "./remoteControlCommandService";
+export type RemoteSupportMouseCommandType = "pointer-move" | "click" | "scroll";
 
 const HIGH_RISK_ROUTE_PATTERNS = [
   /^\/settings(?:\/|$)/i,
@@ -22,7 +22,7 @@ export function isRemoteSupportHighRiskRoute(route: unknown): boolean {
 
 export function isRemoteMouseCommandAllowedOnRoute(
   route: unknown,
-  commandType: RemoteMouseCommandType
+  commandType: RemoteSupportMouseCommandType
 ): boolean {
   if (!isRemoteSupportHighRiskRoute(route)) return true;
   return commandType === "pointer-move" || commandType === "scroll";
