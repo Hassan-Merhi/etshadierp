@@ -19,7 +19,7 @@ describe("Phase 7 company access boundary", () => {
     // Developer company selection is synthetic in the existing selector and
     // set-company route, so the central boundary must resolve the same scope.
     expect(companyRoutes).toContain('req.user.role === "Developer"');
-    expect(boundary).toContain('user?.role === "Developer"');
+    expect(boundary).toContain('entry.role === "Developer"');
     expect(boundary).toContain("await storage.getAllCompanies()");
     expect(boundary).toContain("await storage.getUserCompaniesWithRoles(userId)");
   });
