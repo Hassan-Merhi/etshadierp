@@ -201,7 +201,7 @@ export function registerGitReportRoutes(app: Express) {
       const filtered = sortGitRows(applyGitTableFilters(enriched, listingQuery), listingQuery.sort);
       const summary = buildGitTableSummary(filtered);
       const explicitFull = listingQuery.all === "true" || listingQuery.profile === "full";
-      const { page, pageSize, offset } = parseGitPagination(listingQuery);
+      const { page, pageSize } = parseGitPagination(listingQuery);
       const totalPages = filtered.length === 0 ? 0 : Math.ceil(filtered.length / pageSize);
       const safePage = totalPages === 0 ? 1 : Math.min(page, totalPages);
       const safeOffset = (safePage - 1) * pageSize;

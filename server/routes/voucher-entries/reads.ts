@@ -16,6 +16,7 @@ import {
   stockAdjustmentVouchers,
   stockAdjustmentItems,
   salesItems,
+  purchaseOrders,
   locations,
   users,
 } from "@shared/schema";
@@ -188,21 +189,23 @@ export function registerVoucherEntryReadRoutes(app: Express) {
 
       // For Purchase vouchers, get purchase order line items
       if (voucher.voucherType === "Purchase") {
-        // Find the purchase order linked to this voucher
-        const allPOs = await storage.getAllPurchaseOrders(voucher.companyId);
-        const purchaseOrder = allPOs.find((po: any) => po.voucherId === id);
+        // Resolve only the purchase order linked to this voucher instead of loading
+        // every purchase order for the company.
+        const purchaseOrder = await db.query.purchaseOrders.findFirst({
+          where: eq(purchaseOrders.voucherId, id),
+        });
 
         if (purchaseOrder) {
           const lineItems = await storage.getLineItemsByPO(purchaseOrder.id);
 
           if (lineItems.length > 0) {
-            // Get supplier info (use legalName field from suppliers table)
-            const supplier = await storage.getSupplierById(purchaseOrder.supplierId);
+            // Supplier and container are independent references; resolve them together.
+            const [supplier, container] = await Promise.all([
+              storage.getSupplierById(purchaseOrder.supplierId),
+              storage.getContainerById(purchaseOrder.containerId),
+            ]);
             const supplierName = supplier?.legalName || "Unknown Supplier";
             const supplierCode = supplier?.code || "";
-
-            // Get container info
-            const container = await storage.getContainerById(purchaseOrder.containerId);
             const containerNumber = container?.containerNumber || "";
 
             const itemsWithDetails = lineItems.map((item: any) => ({

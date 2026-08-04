@@ -5,18 +5,7 @@ import { db } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireNonPOS } from "../../auth";
 
-import {
-  stockItemLocationPrices,
-  stockTransferVouchers,
-  stockTransferItems,
-  stockAdjustmentVouchers,
-  stockAdjustmentItems,
-  containers,
-  vouchers,
-  posShifts,
-  salesItems,
-  userLocations,
-} from "@shared/schema";
+import { containers, vouchers, posShifts, userLocations } from "@shared/schema";
 import { eq, and, inArray, sql, isNull } from "drizzle-orm";
 
 import { isParentCompanyContext } from "../helpers/supplierBalanceHelpers";

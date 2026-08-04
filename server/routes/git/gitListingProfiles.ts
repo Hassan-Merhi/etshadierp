@@ -182,26 +182,28 @@ export function buildGitTableSummary(rows: EnrichedContainer[]): GitListingSumma
 }
 
 export function toGitCompactRow(row: EnrichedContainer) {
-  const {
-    trackingProvider: _trackingProvider,
-    trackingEnabled: _trackingEnabled,
-    trackingAutoUpdate: _trackingAutoUpdate,
-    trackingCarrierHint: _trackingCarrierHint,
-    trackingLastCheckedAt: _trackingLastCheckedAt,
-    trackingLastStatus: _trackingLastStatus,
-    trackingLastLocation: _trackingLastLocation,
-    trackingLastEventDate: _trackingLastEventDate,
-    trackingLastDescription: _trackingLastDescription,
-    trackingError: _trackingError,
-    trackingChangedAt: _trackingChangedAt,
-    trackingDetectedCarrier: _trackingDetectedCarrier,
-    trackingFallbackUsed: _trackingFallbackUsed,
-    trackingFallbackReason: _trackingFallbackReason,
-    trackingNextCheckAt: _trackingNextCheckAt,
-    trackingLastSkipReason: _trackingLastSkipReason,
-    trackingLink: _trackingLink,
-    createdAt: _createdAt,
-    ...compact
-  } = row;
+  const compact: Record<string, unknown> = { ...row };
+  for (const key of [
+    "trackingProvider",
+    "trackingEnabled",
+    "trackingAutoUpdate",
+    "trackingCarrierHint",
+    "trackingLastCheckedAt",
+    "trackingLastStatus",
+    "trackingLastLocation",
+    "trackingLastEventDate",
+    "trackingLastDescription",
+    "trackingError",
+    "trackingChangedAt",
+    "trackingDetectedCarrier",
+    "trackingFallbackUsed",
+    "trackingFallbackReason",
+    "trackingNextCheckAt",
+    "trackingLastSkipReason",
+    "trackingLink",
+    "createdAt",
+  ]) {
+    delete compact[key];
+  }
   return compact;
 }

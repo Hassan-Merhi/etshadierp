@@ -83,10 +83,21 @@ export function usePaginatedDaybookVouchers(options: UsePaginatedDaybookVouchers
     placeholderData: (previous) => previous,
   });
 
+  const loadAllVouchers = async (): Promise<Voucher[]> => {
+    const url = new URL(queryUrl, window.location.origin);
+    url.searchParams.delete("profile");
+    url.searchParams.delete("page");
+    url.searchParams.delete("pageSize");
+    const response = await fetch(`${url.pathname}?${url.searchParams.toString()}`, { credentials: "include" });
+    if (!response.ok) throw new Error("Failed to load complete Daybook export");
+    return response.json();
+  };
+
   return {
     ...query,
     queryUrl,
     response: query.data,
     vouchers: query.data?.data ?? [],
+    loadAllVouchers,
   };
 }

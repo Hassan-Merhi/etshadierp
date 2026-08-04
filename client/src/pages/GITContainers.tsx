@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, ChangeEvent } from "react";
+import { useState, useEffect, useRef, ChangeEvent } from "react";
 import { Redirect } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -30,7 +30,6 @@ import { useToast } from "@/hooks/use-toast";
 // Sub-component imports
 import {
   EnrichedContainerRow,
-  GitContainersResponse,
   AuthUser,
   OTW_COLS,
   OtwColId,

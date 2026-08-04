@@ -420,7 +420,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   }, [voucherToEdit, voucherEntries, entriesLoading, editFormInitialized, editForm]);
 
   const [accountNameCache] = useState<Record<number, string>>({});
-  const { response: voucherPageResponse, vouchers, isLoading } = usePaginatedDaybookVouchers({
+  const { response: voucherPageResponse, vouchers, isLoading, loadAllVouchers } = usePaginatedDaybookVouchers({
     companyId: selectedCompany?.id,
     fromDate: periodFilter.fromDate,
     toDate: periodFilter.toDate,
@@ -576,7 +576,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
   });
 
   const handleExportToExcel = async () => {
-    const data = filteredVouchers.map((v) => ({
+    const exportVouchers = await loadAllVouchers();
+    const data = exportVouchers.map((v) => ({
       "Voucher Number": v.voucherNumber,
       Date: formatDisplayDate(v.voucherDate),
       Type: v.voucherType,

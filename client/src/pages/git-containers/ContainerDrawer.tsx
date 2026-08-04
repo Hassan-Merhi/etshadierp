@@ -32,14 +32,14 @@ export function ContainerDrawer({
   const [showEvents, setShowEvents] = useState(false);
 
   useEffect(() => {
-    if (open && container && container.id !== lastId) {
+    if (open && container) {
       setForm(seedForm(container));
       setTrackEnabled(container.trackingEnabled ?? false);
       setTrackAutoUpdate(container.trackingAutoUpdate ?? true);
       setTrackCarrierHint(container.trackingCarrierHint ?? "");
       setLastId(container.id);
     }
-  }, [open, container?.id, lastId]);
+  }, [open, container]);
 
   const set = (field: keyof DrawerForm, val: any) => setForm((prev) => (prev ? { ...prev, [field]: val } : prev));
 
@@ -69,7 +69,7 @@ export function ContainerDrawer({
     mutationFn: (data: Record<string, unknown>) =>
       apiRequest("PATCH", `/api/containers/${container!.id}/tracking`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [queryKey] });
+      queryClient.invalidateQueries({ queryKey: ["/api/git/containers"] });
       toast({ title: "Saved", description: `\${container?.containerNumber} updated.` });
       onClose();
     },
@@ -86,7 +86,7 @@ export function ContainerDrawer({
     mutationFn: (data: Record<string, unknown>) =>
       apiRequest("PATCH", `/api/container-tracking/${container!.id}/settings`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [queryKey] });
+      queryClient.invalidateQueries({ queryKey: ["/api/git/containers"] });
       toast({ title: "Tracking settings saved" });
     },
     onError: (err: any) => {
