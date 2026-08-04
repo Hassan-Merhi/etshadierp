@@ -91,7 +91,7 @@ export function ensureSpAccessControlStorage(): Promise<void> {
 function classifyPermission(req: Request): SpPermission {
   const path = req.path;
   const method = req.method.toUpperCase();
-  if (path.includes("migration") || path.includes("cutover") || path.includes("final-verification")) return "sp_migration";
+  if (path.includes("migration") || path.includes("cutover") || path.includes("final-verification") || path.startsWith("/production/")) return "sp_migration";
   if (path.includes("setup")) return "sp_setup";
   if (path.includes("opening-stock")) return "sp_opening_stock";
   if (path.includes("/report/") || path.includes("/export") || path.includes("reconciliation") || path.includes("profit-splits")) return "sp_reports";
@@ -105,6 +105,8 @@ function classifyPermission(req: Request): SpPermission {
 
 function sensitiveRequirement(req: Request): { confirmation: string; requireReason: boolean } | null {
   const path = req.path;
+  if (path === "/production/evidence" && req.method === "POST") return { confirmation: "RECORD SP PRODUCTION EVIDENCE", requireReason: true };
+  if (path === "/production/close-rollback-window" && req.method === "POST") return { confirmation: "CLOSE SP ROLLBACK WINDOW", requireReason: true };
   if (path.includes("/sales/") && path.endsWith("/reverse")) return { confirmation: "REVERSE SP SALE", requireReason: true };
   if (path.includes("/containers/") && path.endsWith("/cancel")) return { confirmation: "CANCEL SP CONTAINER", requireReason: true };
   if (path.includes("offload") && path.endsWith("/reverse")) return { confirmation: "REVERSE SP OFFLOAD", requireReason: true };
@@ -194,7 +196,7 @@ async function enforceSpAccess(req: Request, res: Response, next: NextFunction):
         ) VALUES (
           ${companyId}, ${userId}, ${req.session.username ?? null}, ${role}, ${permission},
           ${req.method === "GET" ? "READ" : "WRITE"}, ${req.method}, ${req.originalUrl},
-          ${req.params?.id ?? req.body?.id ?? req.body?.containerId ?? null}, ${reason || null},
+          ${req.params?.id ?? req.body?.id ?? req.body?.containerId ?? req.body?.cutoverId ?? null}, ${reason || null},
           ${confirmation || null}, ${idempotencyKey}, ${res.statusCode}, ${JSON.stringify(sanitizedBody(req.body))}::jsonb
         )
       `).catch((error) => logger.error("SP audit event write failed", { error }));

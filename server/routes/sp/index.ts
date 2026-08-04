@@ -11,6 +11,8 @@ import { registerSpOffloadRoutes } from "./spOffloadRoutes";
 import { registerSpOffloadLifecycleRoutes } from "./spOffloadLifecycleRoutes";
 import { registerSpChargeReconciliationRoutes } from "./spChargeReconciliationRoutes";
 import { registerSpFullReconciliationRoutes } from "./spFullReconciliationRoutes";
+import { registerSpProductionClosureRoutes } from "./spProductionClosureRoutes";
+import { ensureSpProductionClosureStorage } from "./spProductionClosureStorage";
 import { registerSpSalesRoutes } from "./spSalesRoutes";
 import { registerSpLifecycleRoutes } from "./spLifecycleRoutes";
 import { registerSpOpeningStockRoutes } from "./spOpeningStockRoutes";
@@ -40,6 +42,11 @@ export function registerSpRoutes(app: Express) {
       error: error instanceof Error ? error.message : String(error),
     });
   });
+  void ensureSpProductionClosureStorage().catch((error) => {
+    logger.warn("[SP Production Closure] Storage initialization deferred", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
 
   void (async () => {
     await ensureSpSupplierVoucherSyncTrigger();
@@ -62,6 +69,7 @@ export function registerSpRoutes(app: Express) {
   registerSpOffloadLifecycleRoutes(app);
   registerSpChargeReconciliationRoutes(app);
   registerSpFullReconciliationRoutes(app);
+  registerSpProductionClosureRoutes(app);
   registerSpSalesRoutes(app);
   registerSpLifecycleRoutes(app);
   registerSpOpeningStockRoutes(app);
