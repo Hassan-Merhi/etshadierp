@@ -19,6 +19,15 @@ import {
   buildSummary,
 } from "../../lib/gitHelpers";
 import type { GitFilterQuery, EnrichedContainer } from "../../lib/gitHelpers";
+import {
+  applyGitTableFilters,
+  buildGitFacets,
+  buildGitTableSummary,
+  parseGitPagination,
+  sortGitRows,
+  toGitCompactRow,
+  type GitListingQuery,
+} from "./gitListingProfiles";
 import { buildAgentsForCompany } from "./_helpers";
 
 export function registerGitReportRoutes(app: Express) {
@@ -187,13 +196,33 @@ export function registerGitReportRoutes(app: Express) {
       // Route-level pre-filter (e.g. at-port, truck-location)
       if (preFilter) enriched = preFilter(enriched);
 
-      // User-supplied query filters
-      const filtered = applyGitFilters(enriched, req.query as GitFilterQuery);
-
+      const listingQuery = req.query as GitListingQuery;
+      const facets = buildGitFacets(enriched);
+      const filtered = sortGitRows(applyGitTableFilters(enriched, listingQuery), listingQuery.sort);
+      const summary = buildGitTableSummary(filtered);
+      const explicitFull = listingQuery.all === "true" || listingQuery.profile === "full";
+      const { page, pageSize } = parseGitPagination(listingQuery);
+      const totalPages = filtered.length === 0 ? 0 : Math.ceil(filtered.length / pageSize);
+      const safePage = totalPages === 0 ? 1 : Math.min(page, totalPages);
+      const safeOffset = (safePage - 1) * pageSize;
+      const selectedRows = explicitFull ? filtered : filtered.slice(safeOffset, safeOffset + pageSize);
+      const containers = explicitFull ? selectedRows : selectedRows.map(toGitCompactRow);
       const asOf = new Date().toISOString();
+      const pageMeta = explicitFull
+        ? { page: 1, pageSize: filtered.length, totalPages: filtered.length > 0 ? 1 : 0, hasMore: false }
+        : { page: safePage, pageSize, totalPages, hasMore: safePage < totalPages };
 
+      res.setHeader("Cache-Control", "private, max-age=30, stale-while-revalidate=30");
       if (scope.mode === "all") {
-        res.json({ asOf, mode: "all", total: filtered.length, containers: filtered });
+        res.json({
+          asOf,
+          mode: "all",
+          total: filtered.length,
+          containers,
+          facets,
+          summary,
+          ...pageMeta,
+        });
       } else {
         const companyName = nameMap[scope.companyId] ?? `Company ${scope.companyId}`;
         res.json({
@@ -202,7 +231,10 @@ export function registerGitReportRoutes(app: Express) {
           companyId: scope.companyId,
           companyName,
           total: filtered.length,
-          containers: filtered,
+          containers,
+          facets,
+          summary,
+          ...pageMeta,
         });
       }
     } catch (err) {
@@ -233,6 +265,38 @@ export function registerGitReportRoutes(app: Express) {
    * Read-only. No mutations.
    */
   app.get("/api/git/containers", requireAuth, requireRole("Admin", "Owner"), (req, res) => handleGitListing(req, res));
+
+
+  app.get("/api/git/containers/:id", requireAuth, requireRole("Admin", "Owner"), async (req, res) => {
+    try {
+      const containerId = Number.parseInt(req.params.id, 10);
+      if (!Number.isFinite(containerId) || containerId <= 0) {
+        return res.status(400).json({ message: "Invalid container ID" });
+      }
+      const userId: string = (req.user as any).id;
+      const role: string = (req.user as any).role;
+      const sessionCompanyId: number | undefined = (req.session as any)?.currentCompanyId;
+      const scope = await resolveGitCompanyScope(
+        userId,
+        role,
+        req.query as Record<string, string | undefined>,
+        sessionCompanyId
+      );
+      if ("error" in scope) return res.status(scope.status).json({ message: scope.error });
+      const companyIds = scope.mode === "all" ? scope.companyIds : [scope.companyId];
+      const [rows, nameMap] = await Promise.all([
+        fetchActiveContainers(companyIds, { includeOffloaded: true, containerId }),
+        loadCompanyNames(companyIds),
+      ]);
+      const container = enrichContainers(rows, nameMap)[0];
+      if (!container) return res.status(404).json({ message: "Container not found" });
+      res.setHeader("Cache-Control", "private, max-age=15, stale-while-revalidate=15");
+      return res.json(container);
+    } catch (err) {
+      logger.error("[gitRoutes] container detail error:", { error: err });
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
 
   /**
    * GET /api/git/summary

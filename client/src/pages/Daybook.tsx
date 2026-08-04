@@ -9,6 +9,7 @@ import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { PageHeader } from "@/components/PageHeader";
+import { PaginationBar } from "@/components/PaginationBar";
 import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -55,6 +56,7 @@ import { DaybookFilters } from "./daybook/DaybookFilters";
 import { DaybookTable } from "./daybook/DaybookTable";
 import { VoucherDetailsDialog } from "./daybook/VoucherDetailsDialog";
 import { VoucherEditDialog } from "./daybook/VoucherEditDialog";
+import { usePaginatedDaybookVouchers } from "./daybook/usePaginatedDaybookVouchers";
 
 const VOUCHER_TYPE_ORDER: Record<string, number> = {
   Purchase: 0,
@@ -158,6 +160,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const [hiddenRowIds, setHiddenRowIds] = useState<Set<string>>(new Set());
   const [showHidden, setShowHidden] = useState(false);
   const DAYBOOK_PAGE_SIZE = 200;
+  const VOUCHER_PAGE_SIZE = 100;
+  const [voucherPage, setVoucherPage] = useState(1);
   const [daybookRowLimit, setDaybookRowLimit] = useState(DAYBOOK_PAGE_SIZE);
   const scrollYRef = useRef(0);
   const [viewMode, setViewMode] = useState<"detailed" | "condensed">(() => loadDaybookState()?.viewMode ?? "detailed");
@@ -416,18 +420,29 @@ export default function Daybook({ user }: { user?: any } = {}) {
   }, [voucherToEdit, voucherEntries, entriesLoading, editFormInitialized, editForm]);
 
   const [accountNameCache] = useState<Record<number, string>>({});
-  const { data: vouchers = [], isLoading } = useQuery<Voucher[]>({
-    queryKey: ["/api/vouchers", selectedCompany?.id, periodFilter.fromDate, periodFilter.toDate],
-    queryFn: async () => {
-      const p = new URLSearchParams();
-      if (periodFilter.fromDate) p.append("startDate", periodFilter.fromDate);
-      if (periodFilter.toDate) p.append("endDate", periodFilter.toDate);
-      const res = await fetch(`/api/vouchers${p.toString() ? `?${p.toString()}` : ""}`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
-    },
-    enabled: !!selectedCompany,
+  const { response: voucherPageResponse, vouchers, isLoading, loadAllVouchers } = usePaginatedDaybookVouchers({
+    companyId: selectedCompany?.id,
+    fromDate: periodFilter.fromDate,
+    toDate: periodFilter.toDate,
+    filters,
+    page: voucherPage,
+    pageSize: VOUCHER_PAGE_SIZE,
   });
+
+  useEffect(() => {
+    setVoucherPage(1);
+    setDaybookRowLimit(DAYBOOK_PAGE_SIZE);
+  }, [
+    selectedCompany?.id,
+    periodFilter.fromDate,
+    periodFilter.toDate,
+    filters.voucherType,
+    filters.searchQuery,
+    filters.sortOrder,
+    filters.minAmount,
+    filters.maxAmount,
+    filters.statusFilter,
+  ]);
 
   const { data: offloads = [], isLoading: offloadsLoading } = useQuery<OffloadListItem[]>({
     queryKey: ["/api/offloads", selectedCompany?.id, periodFilter.fromDate, periodFilter.toDate],
@@ -467,7 +482,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const allRows: DaybookRow[] = useMemo(() => {
     const rows: DaybookRow[] = [
       ...filteredVouchers.map((v) => ({ _type: "voucher" as const, data: v })),
-      ...offloads.map((o) => ({ _type: "offload" as const, data: o })),
+      ...(voucherPage === 1 ? offloads.map((o) => ({ _type: "offload" as const, data: o })) : []),
     ];
     return rows.sort((a, b) => {
       const da = a._type === "voucher" ? a.data.voucherDate : a.data.offloadedAt.slice(0, 10);
@@ -561,7 +576,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
   });
 
   const handleExportToExcel = async () => {
-    const data = filteredVouchers.map((v) => ({
+    const exportVouchers = await loadAllVouchers();
+    const data = exportVouchers.map((v) => ({
       "Voucher Number": v.voucherNumber,
       Date: formatDisplayDate(v.voucherDate),
       Type: v.voucherType,
@@ -698,6 +714,17 @@ export default function Daybook({ user }: { user?: any } = {}) {
             setDaybookRowLimit={setDaybookRowLimit}
             DAYBOOK_PAGE_SIZE={DAYBOOK_PAGE_SIZE}
             navigate={navigate}
+          />
+          <PaginationBar
+            page={voucherPageResponse?.page ?? voucherPage}
+            totalPages={voucherPageResponse?.totalPages ?? 0}
+            total={voucherPageResponse?.total ?? 0}
+            pageSize={voucherPageResponse?.pageSize ?? VOUCHER_PAGE_SIZE}
+            onPageChange={(nextPage) => {
+              setVoucherPage(nextPage);
+              setDaybookRowLimit(DAYBOOK_PAGE_SIZE);
+            }}
+            noun="vouchers"
           />
       </div>
 

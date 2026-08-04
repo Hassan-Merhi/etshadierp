@@ -5,8 +5,6 @@ import { BulkProgress } from "./gitContainerTypes";
 
 interface UseGITContainersDataProps {
   isAllowed: boolean;
-  allCompanies: boolean;
-  queryUrl: string;
   refetch: () => void;
   toast: any;
   setImportResult: (v: any) => void;
@@ -18,8 +16,6 @@ interface UseGITContainersDataProps {
 
 export function useGITContainersData({
   isAllowed,
-  allCompanies,
-  queryUrl,
   refetch,
   toast,
   setImportResult,
@@ -91,7 +87,7 @@ export function useGITContainersData({
       return res.json() as Promise<{ updated: number; trackingEnabled: boolean }>;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [queryUrl] });
+      queryClient.invalidateQueries({ queryKey: ["/api/git/containers"] });
       toast({
         title: data.trackingEnabled
           ? `Auto-tracking enabled for ${data.updated} containers`
@@ -147,7 +143,7 @@ export function useGITContainersData({
                 clearInterval(intervalId);
                 intervalId = null;
               }
-              queryClient.invalidateQueries({ queryKey: [queryUrl] });
+              queryClient.invalidateQueries({ queryKey: ["/api/git/containers"] });
             }
           }, 6000);
         }
@@ -164,7 +160,7 @@ export function useGITContainersData({
       if (intervalId) clearInterval(intervalId);
       if (stopTimeoutId) clearTimeout(stopTimeoutId);
     };
-  }, [isBulkPending, showProgressBanner, isAllowed, queryUrl, queryClient]);
+  }, [isBulkPending, showProgressBanner, isAllowed, queryClient]);
 
   return {
     importMutation,

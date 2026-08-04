@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, ChangeEvent } from "react";
+import { useState, useEffect, useRef, ChangeEvent } from "react";
 import { Redirect } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -23,18 +23,19 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
+import { PaginationBar } from "@/components/PaginationBar";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
 // Sub-component imports
 import {
   EnrichedContainerRow,
-  GitContainersResponse,
   AuthUser,
   OTW_COLS,
   OtwColId,
   DEFAULT_OTW_COL_VIS,
   BulkProgress,
+  fmt,
   type EtaFilterValue,
 } from "./git-containers/gitContainerTypes";
 import { SummaryCard } from "./git-containers/InlineCells";
@@ -46,7 +47,7 @@ import { FilterBar } from "./git-containers/FilterBar";
 import { ImportResultBanner } from "./git-containers/ImportResultBanner";
 import { useContainerSummaryStats } from "./git-containers/containerHelpers";
 import { useGITContainersData } from "./git-containers/useGITContainersData";
-import { useContainerFilters } from "./git-containers/useContainerFilters";
+import { usePaginatedGITContainers } from "./git-containers/usePaginatedGITContainers";
 
 export default function GITContainers({ embedded = false }: { embedded?: boolean } = {}) {
   const { data: user, isLoading: userLoading } = useQuery<AuthUser>({ queryKey: ["/api/auth/me"] });
@@ -78,6 +79,8 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     importId: string | null;
   } | null>(null);
   const [waSending, setWaSending] = useState(false);
+  const CONTAINER_PAGE_SIZE = 50;
+  const [page, setPage] = useState(1);
 
   const [bulkProgress, setBulkProgress] = useState<BulkProgress | null>(null);
   const [showProgressBanner, setShowProgressBanner] = useState(false);
@@ -110,20 +113,32 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const effectiveRole = user?.currentRole ?? user?.role ?? "";
   const isAllowed = allowedRoles.includes(effectiveRole);
 
-  const queryUrl = allCompanies ? "/api/git/containers?allCompanies=true" : "/api/git/containers";
-
-  const { data, isLoading, isError, error, refetch } = useQuery<GitContainersResponse>({
-    queryKey: [queryUrl],
-    staleTime: 60_000,
-    enabled: !!isAllowed,
-  });
+  const { data, isLoading, isError, error, refetch, loadContainerDetail } =
+    usePaginatedGITContainers({
+      allCompanies,
+      page,
+      pageSize: CONTAINER_PAGE_SIZE,
+      companyFilter,
+      containerFilters,
+      supplierFilters,
+      transporterFilters,
+      agentFilters,
+      truckFilters,
+      locationFilters,
+      docsFilter,
+      delayedFilter,
+      freightFilter,
+      etaFilter,
+      notesFilter,
+      sortOrder,
+      search,
+      enabled: !!isAllowed,
+    });
 
   const allContainers = data?.containers ?? [];
 
   const { importMutation, undoImportMutation, bulkEnableMutation, bulkTrackMutation } = useGITContainersData({
     isAllowed,
-    allCompanies,
-    queryUrl,
     refetch,
     toast,
     setImportResult,
@@ -135,44 +150,63 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
 
   const isBulkPending = bulkTrackMutation.isPending;
 
-  const filteredContainers = useContainerFilters({
-    allContainers,
+  const filteredContainers = allContainers;
+
+
+  const localSummary = useContainerSummaryStats({ filteredContainers });
+  const atSea = data?.summary?.atSea ?? localSummary.atSea;
+  const atPort = data?.summary?.atPort ?? localSummary.atPort;
+  const leftDar = data?.summary?.leftDar ?? localSummary.leftDar;
+  const inTransit = data?.summary?.inTransit ?? localSummary.inTransit;
+  const arrived = data?.summary?.arrived ?? localSummary.arrived;
+  const delayed = data?.summary?.delayed ?? localSummary.delayed;
+  const offloadOverdue = data?.summary?.overdue ?? localSummary.offloadOverdue;
+  const totalCost = data?.summary ? `$${fmt(data.summary.totalCost)}` : localSummary.totalCost;
+  const totalTransportDuty = data?.summary
+    ? `$${fmt(data.summary.totalTransportDuty)}`
+    : localSummary.totalTransportDuty;
+
+  const companies = data?.facets?.companies ?? [...new Set(allContainers.map((c) => c.companyName))].sort();
+  const containerNumbers = data?.facets?.containerNumbers ?? [...new Set(allContainers.map((c) => c.containerNumber))].sort();
+  const suppliers = data?.facets?.suppliers ?? ([...new Set(allContainers.map((c) => c.supplierCode).filter(Boolean))].sort() as string[]);
+  const transporters = data?.facets?.transporters ?? ([...new Set(allContainers.map((c) => c.transporter).filter(Boolean))].sort() as string[]);
+  const agents = data?.facets?.agents ?? ([...new Set(allContainers.map((c) => c.agent).filter(Boolean))].sort() as string[]);
+  const trucks = data?.facets?.trucks ?? ([...new Set(allContainers.map((c) => c.numberPlate).filter(Boolean))].sort() as string[]);
+  const locations = data?.facets?.locations ?? ([...new Set(allContainers.map((c) => c.trackingLocation).filter(Boolean))].sort() as string[]);
+  const allEtaDates = data?.facets?.etaDates ?? ([...new Set(allContainers.map((c) => c.eta).filter(Boolean))].sort() as string[]);
+  const hasContainersWithNoEta = data?.facets?.hasContainersWithNoEta ?? allContainers.some((c) => !c.eta);
+
+  async function openDrawer(c: EnrichedContainerRow) {
+    setDrawerContainer(c);
+    setDrawerOpen(true);
+    try {
+      const detail = await loadContainerDetail(c.id);
+      setDrawerContainer((current) => (current?.id === c.id ? detail : current));
+    } catch (detailError: any) {
+      toast({ title: "Failed to load container details", description: detailError.message, variant: "destructive" });
+    }
+  }
+
+
+  useEffect(() => {
+    setPage(1);
+  }, [
+    allCompanies,
     companyFilter,
-    containerFilters,
-    supplierFilters,
-    transporterFilters,
-    agentFilters,
-    truckFilters,
-    locationFilters,
+    containerFilters.join(","),
+    supplierFilters.join(","),
+    transporterFilters.join(","),
+    agentFilters.join(","),
+    truckFilters.join(","),
+    locationFilters.join(","),
     docsFilter,
     delayedFilter,
     freightFilter,
-    etaFilter,
+    etaFilter === "ALL" ? "ALL" : JSON.stringify(etaFilter),
     notesFilter,
-    search,
     sortOrder,
-  });
-
-  const { atSea, atPort, leftDar, inTransit, arrived, delayed, offloadOverdue, totalCost, totalTransportDuty } =
-    useContainerSummaryStats({ filteredContainers });
-
-  const companies = [...new Set(allContainers.map((c) => c.companyName))].sort();
-  const containerNumbers = [...new Set(allContainers.map((c) => c.containerNumber))].sort();
-  const suppliers = [...new Set(allContainers.map((c) => c.supplierCode).filter(Boolean))].sort() as string[];
-  const transporters = [...new Set(allContainers.map((c) => c.transporter).filter(Boolean))].sort() as string[];
-  const agents = [...new Set(allContainers.map((c) => c.agent).filter(Boolean))].sort() as string[];
-  const trucks = [...new Set(allContainers.map((c) => c.numberPlate).filter(Boolean))].sort() as string[];
-  const locations = [...new Set(allContainers.map((c) => c.trackingLocation).filter(Boolean))].sort() as string[];
-  const allEtaDates = useMemo(
-    () => [...new Set(allContainers.map((c) => c.eta).filter(Boolean))].sort() as string[],
-    [allContainers]
-  );
-  const hasContainersWithNoEta = useMemo(() => allContainers.some((c) => !c.eta), [allContainers]);
-
-  function openDrawer(c: EnrichedContainerRow) {
-    setDrawerContainer(c);
-    setDrawerOpen(true);
-  }
+    search,
+  ]);
 
   function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -433,7 +467,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
           <ContainerBulkActions
             isAllowed={isAllowed}
             isBulkPending={isBulkPending}
-            allContainersCount={allContainers.length}
+            allContainersCount={data?.total ?? allContainers.length}
             waSending={waSending}
             onTrackAll={() => bulkTrackMutation.mutate()}
             onImportClick={() => fileInputRef.current?.click()}
@@ -506,13 +540,20 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
             printRef={printRef}
           />
         </div>
+        <PaginationBar
+          page={data?.page ?? page}
+          totalPages={data?.totalPages ?? 0}
+          total={data?.total ?? 0}
+          pageSize={data?.pageSize ?? CONTAINER_PAGE_SIZE}
+          onPageChange={setPage}
+          noun="containers"
+        />
       </div>
 
       <ContainerDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         container={drawerContainer}
-        queryKey={queryUrl}
         sessionCompanyId={sessionCompanyId}
       />
     </div>

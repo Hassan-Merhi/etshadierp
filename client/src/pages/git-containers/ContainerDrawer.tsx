@@ -13,33 +13,29 @@ export function ContainerDrawer({
   container,
   open,
   onClose,
-  queryKey,
   sessionCompanyId,
 }: {
   container: EnrichedContainerRow | null;
   open: boolean;
   onClose: () => void;
-  queryKey: string;
   sessionCompanyId: number | null;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<DrawerForm | null>(null);
-  const [lastId, setLastId] = useState<number | null>(null);
   const [trackEnabled, setTrackEnabled] = useState(true);
   const [trackAutoUpdate, setTrackAutoUpdate] = useState(true);
   const [trackCarrierHint, setTrackCarrierHint] = useState("");
   const [showEvents, setShowEvents] = useState(false);
 
   useEffect(() => {
-    if (open && container && container.id !== lastId) {
+    if (open && container) {
       setForm(seedForm(container));
       setTrackEnabled(container.trackingEnabled ?? false);
       setTrackAutoUpdate(container.trackingAutoUpdate ?? true);
       setTrackCarrierHint(container.trackingCarrierHint ?? "");
-      setLastId(container.id);
     }
-  }, [open, container?.id, lastId]);
+  }, [open, container]);
 
   const set = (field: keyof DrawerForm, val: any) => setForm((prev) => (prev ? { ...prev, [field]: val } : prev));
 
@@ -69,7 +65,7 @@ export function ContainerDrawer({
     mutationFn: (data: Record<string, unknown>) =>
       apiRequest("PATCH", `/api/containers/${container!.id}/tracking`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [queryKey] });
+      queryClient.invalidateQueries({ queryKey: ["/api/git/containers"] });
       toast({ title: "Saved", description: `\${container?.containerNumber} updated.` });
       onClose();
     },
@@ -86,7 +82,7 @@ export function ContainerDrawer({
     mutationFn: (data: Record<string, unknown>) =>
       apiRequest("PATCH", `/api/container-tracking/${container!.id}/settings`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [queryKey] });
+      queryClient.invalidateQueries({ queryKey: ["/api/git/containers"] });
       toast({ title: "Tracking settings saved" });
     },
     onError: (err: any) => {
