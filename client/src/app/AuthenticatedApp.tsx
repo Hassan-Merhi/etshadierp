@@ -7,7 +7,6 @@ import { usePresence } from "@/hooks/use-presence";
 import { useScreenFeed } from "@/hooks/use-screen-feed";
 import { useWsInvalidation } from "@/hooks/use-ws-invalidation";
 import { LanguageOnboardingDialog } from "@/components/LanguageOnboardingDialog";
-import { RemoteSupportIndicator } from "@/components/RemoteSupportIndicator";
 import type { AuthenticatedUser } from "@/contracts/sessionContracts";
 import { useAppNavigation } from "./useAppNavigation";
 import { useAuthenticatedAppData } from "./useAuthenticatedAppData";
@@ -19,6 +18,11 @@ const PosShell = lazy(() => import("./PosShell").then((module) => ({ default: mo
 const PropertiesShell = lazy(() => import("./PropertiesShell").then((module) => ({ default: module.PropertiesShell })));
 const FactoryShell = lazy(() => import("./FactoryShell").then((module) => ({ default: module.FactoryShell })));
 const ErpShell = lazy(() => import("./ErpShell").then((module) => ({ default: module.ErpShell })));
+const RemoteSupportIndicator = lazy(() =>
+  import("@/components/RemoteSupportIndicator").then((module) => ({
+    default: module.RemoteSupportIndicator,
+  }))
+);
 
 interface AuthenticatedAppProps {
   user: AuthenticatedUser;
@@ -69,7 +73,14 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
     <AppLeaveConfirmDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm} onConfirm={handleConfirmLeave} />
   );
   const languageOnboarding = user.id === undefined ? null : <LanguageOnboardingDialog userId={user.id} />;
-  const appOverlays = <>{languageOnboarding}<RemoteSupportIndicator /></>;
+  const appOverlays = (
+    <>
+      {languageOnboarding}
+      <Suspense fallback={null}>
+        <RemoteSupportIndicator />
+      </Suspense>
+    </>
+  );
 
   if (isPOS) {
     return (
