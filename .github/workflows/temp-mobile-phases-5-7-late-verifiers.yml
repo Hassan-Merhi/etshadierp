@@ -100,11 +100,14 @@ jobs:
       - name: Production build
         run: npm run build
 
-      - name: Release safety contracts
-        run: |
-          npm run verify:program1-observability
-          npm run verify:final-production-readiness
-          npm run verify:bandwidth
+      - name: Program 1 observability after build
+        run: npm run verify:program1-observability
+
+      - name: Final production readiness after build
+        run: npm run verify:final-production-readiness
+
+      - name: Bandwidth contract after build
+        run: npm run verify:bandwidth
 
       - name: Push verified source repair
         run: |
