@@ -1,1 +1,1 @@
-one-shot formatter trigger
+standalone formatter trigger
