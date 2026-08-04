@@ -13,6 +13,7 @@ describe("Phase 7 company access boundary", () => {
     expect(boundary).toContain("await assertCompanyAccess(context.userId, targetCompanyId)");
     expect(boundary).toContain("CROSS_COMPANY_FORBIDDEN");
     expect(boundary).toContain("COMPANY_ACCESS_DENIED");
+    expect(boundary).toContain("req.session?.currentRole ?? req.user?.role");
   });
 
   it("routes transfer authorization through the central boundary", () => {
@@ -30,5 +31,30 @@ describe("Phase 7 company access boundary", () => {
     expect(exportRoute).toContain("resolveAuthorizedCompanyId(req, req.query.companyId)");
     expect(exportRoute).toContain("requireNonPOS");
     expect(exportRoute).not.toContain("isAdminOrDev && requestedCompanyId");
+  });
+
+  it("removes role-only company access from GIT container and agent reports", () => {
+    const helpers = source("server/lib/gitHelpers.ts");
+    const routes = source("server/routes/git/gitReportRoutes.ts");
+
+    expect(helpers).toContain("getAccessibleCompanyIds as getMembershipCompanyIds");
+    expect(helpers).toContain("isPrivilegedRole");
+    expect(helpers).toContain("COMPANY_ACCESS_DENIED");
+    expect(helpers).not.toContain("Admin / Developer: all companies");
+    expect(helpers).not.toContain("userCompanyRoles");
+    expect(routes).toContain("resolveGitCompanyScope");
+    expect(routes).toContain("code: scope.code");
+  });
+
+  it("scopes voucher, supplier and offload reads to accessible companies", () => {
+    const vouchers = source("server/routes/vouchers/voucherQueryRoutes.ts");
+    const offloads = source("server/routes/offloadRoutes.ts");
+
+    expect(vouchers).toContain("assertActiveCompanyAccess(req)");
+    expect(vouchers).toContain("resolveAuthorizedCompanyId(req, companyId)");
+    expect(vouchers).toContain("getAccessibleCompanyIds(access.userId)");
+    expect(vouchers).not.toContain("const companies = await storage.getAllCompanies()");
+    expect(offloads).toContain("eq(vouchers.companyId, offload.companyId)");
+    expect(offloads).toContain("COMPANY_ACCESS_DENIED");
   });
 });
