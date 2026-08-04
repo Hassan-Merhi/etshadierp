@@ -73,7 +73,7 @@ export function RemoteControlSessionWatchdog() {
     lastHeartbeatRef.current = 0;
     setState(target ? "waiting" : "idle");
     setMessage(null);
-  }, [target?.userId, target?.username]);
+  }, [target]);
 
   useEffect(() => {
     if (!target) return;
