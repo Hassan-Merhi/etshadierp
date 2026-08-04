@@ -5,7 +5,11 @@ import { storage } from "../storage";
 export type PrivilegedRole = "Admin" | "Owner" | "Developer";
 
 export class CompanyAccessError extends Error {
-  constructor(public readonly status: number, message: string, public readonly code: string) {
+  constructor(
+    public readonly status: number,
+    message: string,
+    public readonly code: string
+  ) {
     super(message);
     this.name = "CompanyAccessError";
   }
