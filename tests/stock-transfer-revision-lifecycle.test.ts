@@ -215,7 +215,7 @@ describe("stock transfer revision lifecycle", () => {
     const pending = await savePendingStockTransferRevision({
       companyId,
       transferId,
-      userId: `${PREFIX}-user`,
+      userId: `${PREFIX}-rollback-user`,
       sourceLocationIdLimit: sourceId,
       note: "Too much stock",
       items: [
