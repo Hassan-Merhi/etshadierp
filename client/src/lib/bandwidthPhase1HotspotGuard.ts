@@ -1,3 +1,5 @@
+import { isAbortError } from "./abortError";
+
 type HotspotCacheRule = {
   pattern: RegExp;
   ttlMs: number;
@@ -80,6 +82,11 @@ class SharedRequestLifetime {
 
   acquire(): void {
     this.waiters += 1;
+  }
+
+  /** True once the shared request has been abandoned; it can no longer be joined. */
+  get isAbandoned(): boolean {
+    return this.controller.signal.aborted;
   }
 
   /** A caller cancelled. Only a fully abandoned request is aborted. */
@@ -298,12 +305,33 @@ export function installBandwidthPhase1HotspotGuard(): void {
     if (cached) return cached;
 
     const signal = requestSignal(input, init);
+
+    // An internal abort belongs to whoever cancelled, never to this caller. If a
+    // shared request dies for any reason other than this caller's own signal,
+    // issue a fresh request rather than reporting a failure nobody asked for.
+    const runUnshared = () => originalFetch(input, init);
+    const shareOrRetry = async (
+      promise: Promise<Response>,
+      lifetime: SharedRequestLifetime | undefined
+    ): Promise<Response> => {
+      try {
+        return await cloneSharedResponse(promise, signal, lifetime);
+      } catch (error) {
+        if (signal?.aborted || !isAbortError(error)) throw error;
+        return runUnshared();
+      }
+    };
+
     const existing = inFlightRequests.get(key);
-    if (existing) {
-      const existingLifetime = inFlightLifetimes.get(key);
+    const existingLifetime = inFlightLifetimes.get(key);
+    // A request that has already been abandoned is doomed: its controller is
+    // aborted and only the rejection is still in flight. Joining it would hand
+    // this caller that abort, so start over instead.
+    if (existing && !existingLifetime?.isAbandoned) {
       existingLifetime?.acquire();
-      return cloneSharedResponse(existing, signal, existingLifetime);
+      return shareOrRetry(existing, existingLifetime);
     }
+    if (existing) return runUnshared();
 
     const generationAtStart = writeGeneration;
     const lifetime = new SharedRequestLifetime();
@@ -324,7 +352,7 @@ export function installBandwidthPhase1HotspotGuard(): void {
 
     inFlightRequests.set(key, request);
     inFlightLifetimes.set(key, lifetime);
-    return cloneSharedResponse(request, signal, lifetime);
+    return shareOrRetry(request, lifetime);
   };
 }
 

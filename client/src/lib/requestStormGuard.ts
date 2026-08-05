@@ -1,3 +1,5 @@
+import { isAbortError } from "./abortError";
+
 type CachedApiResponse = {
   response: Response;
   expiresAt: number;
@@ -244,6 +246,11 @@ class SharedRequestLifetime {
     this.waiters += 1;
   }
 
+  /** True once the shared request has been abandoned; it can no longer be joined. */
+  get isAbandoned(): boolean {
+    return this.controller.signal.aborted;
+  }
+
   /** A caller cancelled. Only a fully abandoned request is aborted. */
   abandon(): void {
     this.abandoned += 1;
@@ -328,15 +335,36 @@ export function installRequestStormGuard(): void {
     const cached = getCachedResponse(key);
     if (cached) return cached;
 
+    const signal = requestSignal(input, init);
+
+    // An internal abort belongs to whoever cancelled, never to this caller. If a
+    // shared request dies for any reason other than this caller's own signal,
+    // issue a fresh request rather than reporting a failure nobody asked for.
+    const runUnshared = () => originalFetch(input, init);
+    const shareOrRetry = async (
+      promise: Promise<Response>,
+      lifetime: SharedRequestLifetime | undefined
+    ): Promise<Response> => {
+      try {
+        return await waitForSharedResponse(promise, signal, lifetime);
+      } catch (error) {
+        if (signal?.aborted || !isAbortError(error)) throw error;
+        return runUnshared();
+      }
+    };
+
     const existing = inFlightGets.get(key);
-    if (existing) {
-      const existingLifetime = inFlightLifetimes.get(key);
+    const existingLifetime = inFlightLifetimes.get(key);
+    // A request that has already been abandoned is doomed: its controller is
+    // aborted and only the rejection is still in flight. Joining it would hand
+    // this caller that abort, so start over instead.
+    if (existing && !existingLifetime?.isAbandoned) {
       existingLifetime?.acquire();
-      return waitForSharedResponse(existing, requestSignal(input, init), existingLifetime);
+      return shareOrRetry(existing, existingLifetime);
     }
+    if (existing) return runUnshared();
 
     const ttlMs = cacheTtlFor(url.pathname);
-    const signal = requestSignal(input, init);
     const lifetime = new SharedRequestLifetime();
     lifetime.acquire();
     const requestPromise = (async () => {
@@ -360,7 +388,7 @@ export function installRequestStormGuard(): void {
 
     inFlightGets.set(key, requestPromise);
     inFlightLifetimes.set(key, lifetime);
-    return waitForSharedResponse(requestPromise, signal, lifetime);
+    return shareOrRetry(requestPromise, lifetime);
   };
 }
 

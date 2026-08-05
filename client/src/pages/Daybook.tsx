@@ -40,6 +40,7 @@ import { format, parseISO, addDays } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
 import { isReadonlyMigratedVoucher } from "@/lib/migratedVoucherGuard";
+import { isBlockingQueryError } from "@/lib/abortError";
 import { utils, writeFile } from "@/lib/excelHelper";
 import { getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { useDateJump } from "@/hooks/use-date-jump";
@@ -474,6 +475,14 @@ export default function Daybook({ user }: { user?: any } = {}) {
     pageSize: VOUCHER_PAGE_SIZE,
   });
 
+  // A cancelled request is not a failure, and a failed refetch that left the
+  // previous page on screen is not worth a full-table error either.
+  const daybookErrorMessage = isBlockingQueryError(isError ? error : null, vouchers.length > 0)
+    ? error instanceof Error
+      ? error.message
+      : "Failed to load transactions"
+    : null;
+
   useEffect(() => {
     setVoucherPage(1);
     setDaybookRowLimit(DAYBOOK_PAGE_SIZE);
@@ -773,9 +782,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
             DAYBOOK_PAGE_SIZE={DAYBOOK_PAGE_SIZE}
             navigate={navigate}
             isLoading={isLoading}
-            errorMessage={
-              isError ? (error instanceof Error ? error.message : "Failed to load transactions") : null
-            }
+            errorMessage={daybookErrorMessage}
             onRetry={() => void refetchVouchers()}
           />
           <PaginationBar
