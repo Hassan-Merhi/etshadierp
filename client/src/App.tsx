@@ -116,8 +116,7 @@ function ServerRestartWatcher() {
 }
 
 function AuthenticatedRoot() {
-  const { user, isLoading, isSuccess, error, loadingTimedOut, retryAuthentication, handleLogout } =
-    useAuthenticatedUser();
+  const { user, isSuccess, error, loadingTimedOut, retryAuthentication, handleLogout } = useAuthenticatedUser();
 
   if (isSuccess && user === null) return <Redirect to="/login" />;
   if (!user) {
