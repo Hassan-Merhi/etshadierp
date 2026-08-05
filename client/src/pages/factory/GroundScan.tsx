@@ -32,6 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import * as XLSX from "@/lib/excelHelper";
 import { formatNumber } from "@/lib/formatNumber";
+import { visibleTabInterval } from "@/lib/queryPolicies";
 
 import type { GroundScanItem, ScannedBale, StockLocation } from "./groundscan/types";
 import { LOCATION_KEY, STORAGE_KEY, loadLocalBales, rowToScannedBale } from "./groundscan/utils";
@@ -65,7 +66,9 @@ export default function GroundScan() {
       fetch(`/api/factory/ground-scan-items?locationId=${selectedLocationId}`, { credentials: "include" }).then((r) =>
         r.json()
       ),
-    refetchInterval: 4000,
+    staleTime: 10_000,
+    refetchInterval: visibleTabInterval(30_000),
+    refetchIntervalInBackground: false,
   });
 
   const scannedBales: ScannedBale[] = serverItems.map(rowToScannedBale);
@@ -91,7 +94,10 @@ export default function GroundScan() {
   }, [stockLocations]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ["/api/factory/ground-scan-items", selectedLocationId] });
+    queryClient.invalidateQueries(
+      { queryKey: ["/api/factory/ground-scan-items", selectedLocationId], exact: true, refetchType: "active" },
+      { cancelRefetch: false }
+    );
 
   const removeMutation = useMutation({
     mutationFn: (id: number) =>
