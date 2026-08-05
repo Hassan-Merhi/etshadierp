@@ -53,7 +53,7 @@ function shouldSkipArrow(active: Element | null): boolean {
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, onKeyDown, onCloseAutoFocus, ...props }, ref) => {
+>(({ className, children, onKeyDown, ...props }, ref) => {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !shouldSkipArrow(document.activeElement)) {
       const scrollEl = findScrollTarget(e.currentTarget);
@@ -69,11 +69,6 @@ const DialogContent = React.forwardRef<
     onKeyDown?.(e);
   };
 
-  const handleCloseAutoFocus = (e: Event) => {
-    e.preventDefault();
-    onCloseAutoFocus?.(e);
-  };
-
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -81,7 +76,6 @@ const DialogContent = React.forwardRef<
         ref={ref}
         data-slot="dialog-content"
         onKeyDown={handleKeyDown}
-        onCloseAutoFocus={handleCloseAutoFocus}
         className={cn(
           "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(var(--app-viewport-height)-1rem)] w-[calc(100vw-1rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto overscroll-contain border bg-background p-4 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:max-h-[calc(var(--app-viewport-height)-2rem)] sm:w-[calc(100vw-2rem)] sm:rounded-lg sm:p-6 motion-reduce:animate-none motion-reduce:transition-none",
           className
