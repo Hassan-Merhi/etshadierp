@@ -523,9 +523,16 @@ export default function Daybook({ user }: { user?: any } = {}) {
   }, [vouchers, filters]);
 
   const allRows: DaybookRow[] = useMemo(() => {
+    // Offloads are shown when: (a) no type filter ("all"), or (b) "Offload" is
+    // explicitly selected. Filtering by any other voucher type hides offloads so
+    // they don't bleed through and confuse a filtered view.
+    const includeOffloads =
+      filters.voucherType === "all" || filters.voucherType === "Offload";
     const rows: DaybookRow[] = [
       ...filteredVouchers.map((v) => ({ _type: "voucher" as const, data: v })),
-      ...(voucherPage === 1 ? offloads.map((o) => ({ _type: "offload" as const, data: o })) : []),
+      ...(voucherPage === 1 && includeOffloads
+        ? offloads.map((o) => ({ _type: "offload" as const, data: o }))
+        : []),
     ];
     return rows.sort((a, b) => {
       const da = a._type === "voucher" ? a.data.voucherDate : a.data.offloadedAt.slice(0, 10);
