@@ -112,9 +112,7 @@ export async function writeWorkbookToResponse(
   res.setHeader("Pragma", "no-cache");
 
   try {
-    const buf = await withHeavyExportSlot("excel-http", async () =>
-      Buffer.from(await workbook.xlsx.writeBuffer())
-    );
+    const buf = await withHeavyExportSlot("excel-http", async () => Buffer.from(await workbook.xlsx.writeBuffer()));
     if (!res.destroyed && !res.writableEnded) res.end(buf);
   } catch (error) {
     if (!res.destroyed && !res.writableEnded) res.destroy(error as Error);
