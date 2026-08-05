@@ -118,6 +118,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
           fbp.code,
           fbp.article_code AS "articleCode",
           fbp.name,
+          fbp.name_ar AS "nameAr",
           fbp.active,
           fbp.category_id AS "categoryId",
           COUNT(fb.id) FILTER (WHERE fb.status NOT IN ('REMOVED','DELETED')) AS "totalBales",
@@ -125,7 +126,7 @@ export function registerFactoryProductReadRoutes(app: Express) {
         FROM factory_bale_products fbp
         LEFT JOIN factory_bales fb ON fb.product_id = fbp.id AND fb.company_id = ${companyId}
         WHERE fbp.company_id = ${companyId}
-        GROUP BY fbp.id, fbp.code, fbp.article_code, fbp.name, fbp.active, fbp.category_id
+        GROUP BY fbp.id, fbp.code, fbp.article_code, fbp.name, fbp.name_ar, fbp.active, fbp.category_id
         ORDER BY fbp.id ASC
       `);
 

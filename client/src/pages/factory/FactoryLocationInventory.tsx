@@ -77,6 +77,7 @@ import { RenameLocationDialog } from "./factory-location-inventory/dialogs/Renam
 import { StockOverloadWarningDialog } from "./factory-location-inventory/dialogs/StockOverloadWarningDialog";
 import { RemoveBalesDialog } from "./factory-location-inventory/dialogs/RemoveBalesDialog";
 import { PrintBarcodesDialog } from "./factory-location-inventory/dialogs/PrintBarcodesDialog";
+import { productMatchesSearch } from "@shared/factoryProductSearch";
 export default function FactoryLocationInventory() {
   const { colors } = useLabelDesignColors();
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
@@ -311,6 +312,7 @@ export default function FactoryLocationInventory() {
       id: number;
       articleCode: string | null;
       name: string;
+      nameAr: string | null;
       sellingPrice: string | null;
       productionPrice: string | null;
       categoryId: number | null;
@@ -350,6 +352,7 @@ export default function FactoryLocationInventory() {
         productId: p.id,
         articleCode: p.articleCode || "",
         productName: p.name,
+        productNameAr: p.nameAr || null,
         category: p.categoryId ? (catNameMap.get(p.categoryId) ?? "Uncategorized") : "Uncategorized",
         categoryId: p.categoryId,
         quantity: 0,
@@ -596,10 +599,12 @@ export default function FactoryLocationInventory() {
   const filteredLocations = sortedLocations.filter((l) => l.name.toLowerCase().includes(locationSearch.toLowerCase()));
 
   const filteredProducts = useMemo(() => {
-    const q = productSearch.toLowerCase();
     return applySortProducts(
       activeInventoryData.filter((p) => {
-        const matchesSearch = !q || p.productName.toLowerCase().includes(q) || p.articleCode.toLowerCase().includes(q);
+        const matchesSearch = productMatchesSearch(
+          { name: p.productName, nameAr: (p as any).productNameAr, articleCode: p.articleCode },
+          productSearch
+        );
         const matchesCat = categoryFilter.length === 0 || categoryFilter.includes(p.category ?? "Uncategorized");
         const hideZero = proformaMode ? hideZeroAvailable : !showZeroStock;
         if (hideZero && p.baleCount - (p.loadingCount ?? 0) <= 0) return false;

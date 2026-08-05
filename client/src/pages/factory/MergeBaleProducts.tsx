@@ -11,12 +11,14 @@ import { ArrowLeft, ArrowLeftRight, Check, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/PageHeader";
+import { productMatchesSearch } from "@shared/factoryProductSearch";
 
 interface BaleProduct {
   id: number;
   code: string;
   articleCode: string | null;
   name: string;
+  nameAr: string | null;
   active: boolean;
   totalBales: string;
   inStockBales: string;
@@ -82,15 +84,7 @@ export default function MergeBaleProducts() {
   };
 
   const { filteredProducts, selectedProducts } = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const filteredProducts = q
-      ? products.filter(
-          (p) =>
-            p.name.toLowerCase().includes(q) ||
-            (p.code || "").toLowerCase().includes(q) ||
-            (p.articleCode || "").toLowerCase().includes(q)
-        )
-      : products;
+    const filteredProducts = search.trim() ? products.filter((p) => productMatchesSearch(p, search)) : products;
     const selectedProducts = products.filter((p) => selected.has(p.id));
     return { filteredProducts, selectedProducts };
   }, [products, search, selected]);
