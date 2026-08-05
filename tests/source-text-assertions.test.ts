@@ -58,7 +58,7 @@ interface AuditReport {
 
 const BASELINE_PATH = path.join(process.cwd(), "config/source-text-assertion-baseline.json");
 const ALLOWANCES_PATH = path.join(process.cwd(), "config/ci-ratchet-allowances.json");
-const PHASE_0_RELEASE_GATE_ASSERTIONS = 6;
+const PHASE_0_RELEASE_GATE_ASSERTIONS = 7;
 const report = auditSourceTextAssertions() as AuditReport;
 
 if (process.env.UPDATE_SOURCE_TEXT_BASELINE === "1") {
