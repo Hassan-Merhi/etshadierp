@@ -150,6 +150,11 @@ export function StockEntryScanner({
                   </span>
                   <span className="min-w-0">
                     <span className="block break-words text-sm font-bold">{p.name}</span>
+                    {p.nameAr && (
+                      <span dir="rtl" className="block break-words text-xs text-muted-foreground">
+                        {p.nameAr}
+                      </span>
+                    )}
                     <span className="block break-all font-mono text-xs text-muted-foreground">
                       {p.articleCode || p.code}
                     </span>
