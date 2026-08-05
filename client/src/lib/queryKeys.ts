@@ -16,7 +16,7 @@ import { canonicalApiUrl, companyDataKey } from "./frontendDataArchitecture";
  */
 
 export function normalizeFilters(
-  filters: Record<string, unknown> | null | undefined,
+  filters: Record<string, unknown> | null | undefined
 ): Record<string, unknown> | undefined {
   if (!filters) return undefined;
   const clean: Record<string, unknown> = {};
@@ -34,17 +34,16 @@ export const companyKeys = {
   url: (requestUrl: string, companyId: number | string | null | undefined, ...identity: readonly unknown[]) =>
     companyDataKey(requestUrl, companyId, ...identity),
 
-  reference: (url: string, companyId: number | string | null | undefined) =>
-    companyDataKey(url, companyId),
+  reference: (url: string, companyId: number | string | null | undefined) => companyDataKey(url, companyId),
 
   accounts: (
     companyId: number | string | null | undefined,
-    params?: Record<string, string | number | boolean | null | undefined>,
+    params?: Record<string, string | number | boolean | null | undefined>
   ) => companyDataKey(canonicalApiUrl("/api/accounts/all", params), companyId),
 
   vouchers: (
     companyId: number | string | null | undefined,
-    params?: Record<string, string | number | boolean | null | undefined>,
+    params?: Record<string, string | number | boolean | null | undefined>
   ) => companyDataKey(canonicalApiUrl("/api/vouchers", params), companyId),
 
   dashboardCash: (companyId: number | string | null | undefined) =>
@@ -58,16 +57,46 @@ export const companyKeys = {
 
   companyAccounts: (
     activeCompanyId: number | string | null | undefined,
-    targetCompanyId: number | string | null | undefined,
+    targetCompanyId: number | string | null | undefined
   ) => companyDataKey(`/api/company-accounts/${targetCompanyId ?? "no-company"}`, activeCompanyId, targetCompanyId),
 
-  autoTransferConfig: (
-    companyId: number | string | null | undefined,
-    modulePrefix: string,
-  ) => companyDataKey(`${modulePrefix}/auto-transfer-config`, companyId),
+  autoTransferConfig: (companyId: number | string | null | undefined, modulePrefix: string) =>
+    companyDataKey(`${modulePrefix}/auto-transfer-config`, companyId),
 
   voucherSearch: (companyId: number | string | null | undefined, search: string) =>
     companyDataKey("/api/vouchers/search", companyId, search),
+};
+
+export const referenceKeys = {
+  locations: (
+    companyId: number | string | null | undefined,
+    params?: Record<string, string | number | boolean | null | undefined>
+  ) => companyDataKey(canonicalApiUrl("/api/locations", params), companyId),
+  suppliers: (
+    companyId: number | string | null | undefined,
+    params?: Record<string, string | number | boolean | null | undefined>
+  ) => companyDataKey(canonicalApiUrl("/api/suppliers", params), companyId),
+  customers: (
+    companyId: number | string | null | undefined,
+    params?: Record<string, string | number | boolean | null | undefined>
+  ) => companyDataKey(canonicalApiUrl("/api/customers", params), companyId),
+  employees: (
+    companyId: number | string | null | undefined,
+    params?: Record<string, string | number | boolean | null | undefined>
+  ) => companyDataKey(canonicalApiUrl("/api/employees", params), companyId),
+  stockGroups: (
+    companyId: number | string | null | undefined,
+    params?: Record<string, string | number | boolean | null | undefined>
+  ) => companyDataKey(canonicalApiUrl("/api/stock-groups", params), companyId),
+  factoryWorkers: (
+    companyId: number | string | null | undefined,
+    params?: Record<string, string | number | boolean | null | undefined>
+  ) => companyDataKey(canonicalApiUrl("/api/factory/workers", params), companyId),
+  factoryBaleProducts: (
+    companyId: number | string | null | undefined,
+    params?: Record<string, string | number | boolean | null | undefined>
+  ) => companyDataKey(canonicalApiUrl("/api/factory/bale-products", params), companyId),
+  userCompanies: () => ["/api/user/companies"] as const,
 };
 
 export const factoryKeys = {
@@ -91,21 +120,21 @@ export const stockItemKeys = {
   full: (companyId: number | string | undefined) => ["/api/stock-items", companyId] as const,
   page: (
     companyId: number | string | undefined,
-    params: Record<string, string | number | boolean | null | undefined>,
+    params: Record<string, string | number | boolean | null | undefined>
   ) => companyDataKey(canonicalApiUrl("/api/stock-items", params), companyId),
 };
 
 export const analyticsKeys = {
-  locations: (companyId: number | undefined) => ["/api/locations", companyId] as const,
-  stockGroups: (companyId: number | undefined) => ["/api/stock-groups", companyId] as const,
-  suppliers: () => ["/api/suppliers"] as const,
+  locations: (companyId: number | undefined) => referenceKeys.locations(companyId),
+  stockGroups: (companyId: number | undefined) => referenceKeys.stockGroups(companyId),
+  suppliers: (companyId: number | undefined) => referenceKeys.suppliers(companyId),
   accounts: (companyId: number | undefined, startDate: string, endDate: string) =>
     companyKeys.accounts(companyId, { startDate, endDate }),
   financialSales: (companyId: number | undefined, dateRange: Record<string, string>) =>
     ["/api/financial/sales", companyId, normalizeFilters(dateRange)] as const,
   financialTransactions: (locationId: number | null, dateRange: Record<string, string>) =>
     ["/api/financial/sales", locationId, "transactions", normalizeFilters(dateRange)] as const,
-  userCompanies: () => ["/api/user/companies"] as const,
+  userCompanies: () => referenceKeys.userCompanies(),
   urlScoped: (url: string, companyId?: number) => [url, companyId] as const,
   factorySalesByCustomer: (companyId: number | undefined, url: string) =>
     ["/api/factory/analytics/sales-by-customer", companyId, url] as const,

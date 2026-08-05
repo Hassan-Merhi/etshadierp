@@ -1,3 +1,4 @@
+import { toArrayBuffer } from "../../../lib/bufferCompatibility";
 /**
  * payrollCoreRoutes: PayrollPreview endpoints.
  *
@@ -281,7 +282,7 @@ export function registerPayrollPreviewRoutes(app: Express) {
       try {
         if (fs.existsSync(logoPath)) {
           const buf = fs.readFileSync(logoPath);
-          logoId = wb.addImage({ buffer: buf as Buffer, extension: "jpeg" });
+          logoId = wb.addImage({ buffer: toArrayBuffer(buf), extension: "jpeg" });
         }
       } catch {}
 

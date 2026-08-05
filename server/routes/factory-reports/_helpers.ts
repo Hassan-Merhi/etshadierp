@@ -1,3 +1,4 @@
+import { toArrayBuffer } from "../../lib/bufferCompatibility";
 /**
  * Shared state and helpers for the factoryReportRoutes routes.
  *
@@ -88,7 +89,7 @@ export async function generateEmptyExcel(res: any, companyName: string, startDat
   let xlLogoId: number | null = null;
   try {
     if (fs.existsSync(hmdLogo)) {
-      xlLogoId = workbook.addImage({ buffer: fs.readFileSync(hmdLogo) as Buffer, extension: "jpeg" });
+      xlLogoId = workbook.addImage({ buffer: toArrayBuffer(fs.readFileSync(hmdLogo)), extension: "jpeg" });
     }
   } catch {}
   const lr = sheet.addRow([]);
@@ -267,7 +268,7 @@ export async function generateExcel(
   let xlLogoId2: number | null = null;
   try {
     if (fs.existsSync(hmdLogo)) {
-      xlLogoId2 = workbook.addImage({ buffer: fs.readFileSync(hmdLogo) as Buffer, extension: "jpeg" });
+      xlLogoId2 = workbook.addImage({ buffer: toArrayBuffer(fs.readFileSync(hmdLogo)), extension: "jpeg" });
     }
   } catch {}
   const sheet1 = workbook.addWorksheet("Summary");

@@ -1,3 +1,4 @@
+import { toArrayBuffer } from "./lib/bufferCompatibility";
 import ExcelJS from "exceljs";
 import type { ServerResponse } from "http";
 import type { Writable } from "stream";
@@ -11,7 +12,7 @@ export interface ExcelWorkbook {
 
 export async function readExcel(buffer: Buffer): Promise<ExcelWorkbook> {
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  await workbook.xlsx.load(toArrayBuffer(buffer));
 
   const SheetNames: string[] = [];
   const Sheets: Record<string, ExcelJS.Worksheet> = {};

@@ -1,3 +1,4 @@
+import { toArrayBuffer } from "../../../../lib/bufferCompatibility";
 /**
  * orderPdfExportRoutes: OrderPendingExport endpoints.
  *
@@ -67,7 +68,7 @@ export function registerOrderPendingExportRoutes(app: Express) {
       try {
         const ldLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
         if (fs.existsSync(ldLogoPath)) {
-          const ldId = workbook.addImage({ buffer: fs.readFileSync(ldLogoPath) as Buffer, extension: "jpeg" });
+          const ldId = workbook.addImage({ buffer: toArrayBuffer(fs.readFileSync(ldLogoPath)), extension: "jpeg" });
           const ldRow = sheet.addRow([]);
           ldRow.height = 90;
           sheet.addImage(ldId, { tl: { col: 2.4, row: 0 }, ext: { width: 300, height: 90 } });

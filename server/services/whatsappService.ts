@@ -1,3 +1,4 @@
+import { toArrayBuffer } from "../lib/bufferCompatibility";
 /**
  * Green API (free tier) WhatsApp service.
  * Supports individual numbers and group chats.
@@ -173,7 +174,7 @@ async function sendGreenApiFileUpload({
     const multipartBody = form.getBuffer();
     const response = await fetch(url, {
       method: "POST",
-      body: multipartBody,
+      body: toArrayBuffer(multipartBody),
       headers: form.getHeaders(),
     });
 

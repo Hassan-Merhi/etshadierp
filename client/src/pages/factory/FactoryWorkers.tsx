@@ -198,7 +198,6 @@ export default function FactoryWorkers() {
     mutationFn: (data: { name: string; workerIds: number[] }) =>
       factoryApiRequest("POST", "/api/factory/worker-categories", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/worker-categories"] });
       setCategoryDialogOpen(false);
       toast({ title: "Category created" });
     },
@@ -212,7 +211,6 @@ export default function FactoryWorkers() {
         workerIds: data.workerIds,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/worker-categories"] });
       setCategoryDialogOpen(false);
       toast({ title: "Category updated" });
     },
@@ -222,7 +220,6 @@ export default function FactoryWorkers() {
   const deleteCatMutation = useMutation({
     mutationFn: (id: number) => factoryApiRequest("DELETE", `/api/factory/worker-categories/${id}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/worker-categories"] });
       toast({ title: "Category deleted" });
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -272,7 +269,6 @@ export default function FactoryWorkers() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
       toast({ title: "Worker added" });
       resetForm();
       setCreateOpen(false);
@@ -293,7 +289,6 @@ export default function FactoryWorkers() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
       toast({ title: "Worker updated" });
       resetForm();
       setEditingWorker(null);
@@ -314,7 +309,6 @@ export default function FactoryWorkers() {
       return res.json();
     },
     onSuccess: (data: FactoryWorker) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers"] });
       toast({ title: "Worker reactivated", description: `${data.fullName} is now active again.` });
     },
     onError: (err: Error) => {

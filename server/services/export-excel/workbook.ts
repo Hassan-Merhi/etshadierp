@@ -1,3 +1,4 @@
+import { toArrayBuffer } from "../../lib/bufferCompatibility";
 import ExcelJS from "exceljs";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -831,5 +832,6 @@ export async function streamCompanyWorkbookDirect(
     totalRow.getCell(2).numFmt = "#,##0";
   }
 
-  return wb.xlsx.writeBuffer() as Promise<Buffer>;
+  const workbookBuffer = await wb.xlsx.writeBuffer();
+  return Buffer.from(new Uint8Array(toArrayBuffer(new Uint8Array(workbookBuffer))));
 }

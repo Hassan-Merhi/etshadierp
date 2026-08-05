@@ -1,3 +1,4 @@
+import { toArrayBuffer } from "../../../lib/bufferCompatibility";
 /**
  * factoryCustomersRoutes: FactoryCustomerStatementExcel endpoints.
  *
@@ -200,7 +201,7 @@ export function registerFactoryCustomerStatementExcelRoutes(app: Express) {
         const stmtLogo = path.join(process.cwd(), "server", "hmd-logo.png");
         if (fs.existsSync(stmtLogo)) {
           const slBuf = fs.readFileSync(stmtLogo);
-          const slId = workbook.addImage({ buffer: slBuf as Buffer, extension: "jpeg" });
+          const slId = workbook.addImage({ buffer: toArrayBuffer(slBuf), extension: "jpeg" });
           const slRow = sheet.addRow([]);
           slRow.height = 90;
           sheet.addImage(slId, { tl: { col: 1.9, row: 0 }, ext: { width: 300, height: 90 } });

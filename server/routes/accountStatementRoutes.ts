@@ -1,3 +1,4 @@
+import { toArrayBuffer } from "../lib/bufferCompatibility";
 /**
  * Account statement & detail routes.
  *
@@ -485,7 +486,7 @@ export function registerAccountStatementRoutes(app: Express) {
         const logoPath = path.join(process.cwd(), "server", "hmd-logo.png");
         if (fs.existsSync(logoPath)) {
           const logoBuf = fs.readFileSync(logoPath);
-          const logoId = workbook.addImage({ buffer: logoBuf as Buffer, extension: "jpeg" });
+          const logoId = workbook.addImage({ buffer: toArrayBuffer(logoBuf), extension: "jpeg" });
           const logoRow = sheet.addRow([]);
           logoRow.height = 80;
           sheet.addImage(logoId, { tl: { col: 2.5, row: 0 }, ext: { width: 260, height: 80 } });
