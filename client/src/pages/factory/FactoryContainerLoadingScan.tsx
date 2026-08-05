@@ -128,13 +128,15 @@ export default function FactoryContainerLoadingScan() {
   }, [locations, orderId]);
 
   const { data: proformas = [] } = useQuery<Proforma[]>({
-    queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+    queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`],
     queryFn: async () => {
       const res = await fetch(`/api/factory/customer-proformas?customerId=${customerId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch proformas");
       return res.json();
     },
     enabled: !!customerId,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 
   // All starred (active) proformas for this customer
@@ -160,7 +162,7 @@ export default function FactoryContainerLoadingScan() {
       return res.json();
     },
     enabled: !!orderId,
-    refetchInterval: 15000,
+    staleTime: 15_000,
   });
 
   const { data: baleRemovals = [] } = useQuery<BaleRemoval[]>({
@@ -170,7 +172,8 @@ export default function FactoryContainerLoadingScan() {
       if (!res.ok) throw new Error("Failed to fetch removal log");
       return res.json();
     },
-    enabled: !!orderId,
+    enabled: !!orderId && showRemovalLog,
+    staleTime: 30_000,
   });
 
   // When resuming: restore customer/location and show last scanned popup
@@ -278,9 +281,7 @@ export default function FactoryContainerLoadingScan() {
           return next;
         });
       }
-      queryClient.invalidateQueries({
-        queryKey: ["/api/factory/customer-orders", orderId],
-      });
+      queryClient.setQueryData<OrderDetail>(["/api/factory/customer-orders", orderId], data);
       setScanCode("");
     },
     onError: (error: Error, variables: any) => {
@@ -381,9 +382,10 @@ export default function FactoryContainerLoadingScan() {
       await modeApiRequest("DELETE", `/api/factory/customer-orders/${orderId}/bales/${baleId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["/api/factory/customer-orders", orderId],
-      });
+      queryClient.invalidateQueries(
+        { queryKey: ["/api/factory/customer-orders", orderId], exact: true, refetchType: "active" },
+        { cancelRefetch: false }
+      );
       queryClient.invalidateQueries({
         queryKey: ["/api/factory/customer-orders", orderId, "bale-removals"],
       });
@@ -414,7 +416,10 @@ export default function FactoryContainerLoadingScan() {
       return await res.json();
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
+      queryClient.invalidateQueries(
+        { queryKey: ["/api/factory/customer-orders", orderId], exact: true, refetchType: "active" },
+        { cancelRefetch: false }
+      );
       setShowImportDialog(false);
       setImportPreview([]);
       setImportRefNumbers([]);
@@ -440,7 +445,10 @@ export default function FactoryContainerLoadingScan() {
       await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/finalize-loading`, { txDate });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
+      queryClient.invalidateQueries(
+        { predicate: keyStartsWith("/api/factory/customer-orders"), refetchType: "active" },
+        { cancelRefetch: false }
+      );
       toast({
         title: "Loading finalized",
         description: "Loading has been sent for office verification",
@@ -465,7 +473,10 @@ export default function FactoryContainerLoadingScan() {
       await modeApiRequest("PATCH", `/api/factory/customer-orders/${orderId}/loading-note`, { note });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
+      queryClient.invalidateQueries(
+        { predicate: keyStartsWith("/api/factory/customer-orders"), refetchType: "active" },
+        { cancelRefetch: false }
+      );
       toast({ title: "Note saved" });
     },
     onError: (error: Error) => {

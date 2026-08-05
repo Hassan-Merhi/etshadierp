@@ -1,27 +1,64 @@
-import {useState, useRef, useEffect, useMemo} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {apiRequest, queryClient} from "@/lib/queryClient";
-import {Button} from "@/components/ui/button";
-import {Badge} from "@/components/ui/badge";
-import {Input} from "@/components/ui/input";
-import {Checkbox} from "@/components/ui/checkbox";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle} from "@/components/ui/alert-dialog";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
-import {Search, Filter, ChevronDown, ChevronRight, CheckCircle2, XCircle, MessageCircle, Eye, Trash2, RotateCcw, Check, RefreshCw, Loader2, SlidersHorizontal} from "lucide-react";
-import {useToast} from "@/hooks/use-toast";
-import {cn} from "@/lib/utils";
-import {useLocation} from "wouter";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Search,
+  Filter,
+  ChevronDown,
+  ChevronRight,
+  CheckCircle2,
+  XCircle,
+  MessageCircle,
+  Eye,
+  Trash2,
+  RotateCcw,
+  Check,
+  RefreshCw,
+  Loader2,
+  SlidersHorizontal,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { useLocation } from "wouter";
 
-import type {DisplayRow, ShippingColId, ShippingRow, TrackingRow} from "./factoryshippingcontainers/types";
-import {CLI_LEFT, CTR_LEFT, DEFAULT_COL_VIS, INV_LEFT, LIST_KEY, SHIPPING_COLS, STATUS_ORDER, fmtDate, statusColor, statusLabel, stickyCellBase, stickyHeadBase} from "./factoryshippingcontainers/utils";
-import {DocIndicator} from "./factoryshippingcontainers/components/DocIndicator";
-import {EditableCellInput} from "./factoryshippingcontainers/components/EditableCellInput";
-import {DateCellInput} from "./factoryshippingcontainers/components/DateCellInput";
-import {DocumentsModal} from "./factoryshippingcontainers/components/DocumentsModal";
-import {WhatsAppModal} from "./factoryshippingcontainers/components/WhatsAppModal";
-import {ShippingAvailabilityTable} from "./factoryshippingcontainers/components/ShippingAvailabilityTable";
+import type { DisplayRow, ShippingColId, ShippingRow, TrackingRow } from "./factoryshippingcontainers/types";
+import {
+  CLI_LEFT,
+  CTR_LEFT,
+  DEFAULT_COL_VIS,
+  INV_LEFT,
+  LIST_KEY,
+  SHIPPING_COLS,
+  STATUS_ORDER,
+  fmtDate,
+  statusColor,
+  statusLabel,
+  stickyCellBase,
+  stickyHeadBase,
+} from "./factoryshippingcontainers/utils";
+import { DocIndicator } from "./factoryshippingcontainers/components/DocIndicator";
+import { EditableCellInput } from "./factoryshippingcontainers/components/EditableCellInput";
+import { DateCellInput } from "./factoryshippingcontainers/components/DateCellInput";
+import { DocumentsModal } from "./factoryshippingcontainers/components/DocumentsModal";
+import { WhatsAppModal } from "./factoryshippingcontainers/components/WhatsAppModal";
+import { ShippingAvailabilityTable } from "./factoryshippingcontainers/components/ShippingAvailabilityTable";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export default function FactoryShippingContainers() {
@@ -34,6 +71,7 @@ export default function FactoryShippingContainers() {
   const [docsRowId, setDocsRowId] = useState<number | null>(null);
   const [waRowId, setWaRowId] = useState<number | null>(null);
   const shippingInvoiceInputRef = useRef<HTMLInputElement>(null);
+  const trackingRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [shippingInvoiceUploadingId, setShippingInvoiceUploadingId] = useState<number | null>(null);
   const [doneExpanded, setDoneExpanded] = useState(false);
   const [pendingDoneId, setPendingDoneId] = useState<number | null>(null);
@@ -74,18 +112,45 @@ export default function FactoryShippingContainers() {
     mutationFn: () => apiRequest("POST", `${LIST_KEY}/sync`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
   });
+  const syncShippingContainers = syncMutation.mutate;
   useEffect(() => {
-    syncMutation.mutate();
-  }, []);
+    if (!me?.id) return;
+    const companyScope = me.currentCompanyId ?? me.companyId ?? "current";
+    const storageKey = `factory-shipping-containers:last-sync:${companyScope}`;
+    const now = Date.now();
+    try {
+      const lastSync = Number(localStorage.getItem(storageKey) || 0);
+      if (now - lastSync < 5 * 60_000) return;
+      localStorage.setItem(storageKey, String(now));
+    } catch {
+      // Storage can be unavailable in privacy mode; a single page-mount sync is still safe.
+    }
+    syncShippingContainers();
+  }, [me?.id, me?.currentCompanyId, me?.companyId, syncShippingContainers]);
 
   const trackAllMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/factory/shipping-containers/track-now"),
     onSuccess: (data: any) => {
       toast({ title: "Tracking started", description: data?.message ?? "ETA updates will appear shortly." });
-      setTimeout(() => queryClient.invalidateQueries({ queryKey: ["/api/factory/invoice-container-tracking"] }), 8000);
+      if (trackingRefreshTimerRef.current) clearTimeout(trackingRefreshTimerRef.current);
+      trackingRefreshTimerRef.current = setTimeout(() => {
+        trackingRefreshTimerRef.current = null;
+        if (document.visibilityState !== "visible") return;
+        queryClient.invalidateQueries(
+          { queryKey: ["/api/factory/invoice-container-tracking"], exact: true, refetchType: "active" },
+          { cancelRefetch: false }
+        );
+      }, 8000);
     },
     onError: (err: any) => toast({ title: "Tracking failed", description: err.message, variant: "destructive" }),
   });
+
+  useEffect(
+    () => () => {
+      if (trackingRefreshTimerRef.current) clearTimeout(trackingRefreshTimerRef.current);
+    },
+    []
+  );
 
   const done = rows.filter((r) => r.isDone);
   const activeRows = rows.filter((r) => !r.isDone);

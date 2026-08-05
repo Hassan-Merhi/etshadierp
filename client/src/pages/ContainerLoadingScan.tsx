@@ -83,13 +83,15 @@ export default function ContainerLoadingScan() {
   });
 
   const { data: proformas = [] } = useQuery<Proforma[]>({
-    queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+    queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`],
     queryFn: async () => {
       const res = await fetch(`/api/factory/customer-proformas?customerId=${customerId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch proformas");
       return res.json();
     },
     enabled: !!customerId,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 
   const { data: orderDetail } = useQuery<OrderDetail>({
@@ -100,7 +102,7 @@ export default function ContainerLoadingScan() {
       return res.json();
     },
     enabled: !!orderId,
-    refetchInterval: 15000,
+    staleTime: 15_000,
   });
 
   // Auto-select location when there is only one option
@@ -208,7 +210,7 @@ export default function ContainerLoadingScan() {
           return next;
         });
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
+      queryClient.setQueryData<OrderDetail>(["/api/factory/customer-orders", orderId], data);
       setScanCode("");
       scannerRef.current?.focus();
     },
@@ -295,7 +297,10 @@ export default function ContainerLoadingScan() {
       await modeApiRequest("DELETE", `/api/factory/customer-orders/${orderId}/bales/${baleId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
+      queryClient.invalidateQueries(
+        { queryKey: ["/api/factory/customer-orders", orderId], exact: true, refetchType: "active" },
+        { cancelRefetch: false }
+      );
       toast({ title: "Bale removed" });
     },
     onError: (error: Error) => {
@@ -311,7 +316,10 @@ export default function ContainerLoadingScan() {
     onSuccess: () => {
       toast({ title: "Loading finalized", description: "Loading has been sent for office verification" });
       setShowFinalizeDialog(false);
-      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
+      queryClient.invalidateQueries(
+        { predicate: keyStartsWith("/api/factory/customer-orders"), refetchType: "active" },
+        { cancelRefetch: false }
+      );
       navigate("/factory/invoicing?tab=invoices");
     },
     onError: (error: Error) => {
@@ -328,10 +336,15 @@ export default function ContainerLoadingScan() {
       });
       return await res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data: unknown, note: string) => {
       toast({ title: "Note saved" });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
-      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders?status=LOADING") });
+      queryClient.setQueryData<OrderDetail>(["/api/factory/customer-orders", orderId], (current) =>
+        current ? { ...current, containerNotes: note } : current
+      );
+      queryClient.invalidateQueries(
+        { predicate: keyStartsWith("/api/factory/customer-orders?status=LOADING"), refetchType: "active" },
+        { cancelRefetch: false }
+      );
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
