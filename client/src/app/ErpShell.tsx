@@ -16,6 +16,7 @@ import { LoadingState } from "@/components/ui/page-state";
 import { SkipLink } from "@/components/ui/responsive-accessibility";
 import { Router } from "@/routes/AppRoutes";
 import { canUseAdminSearch, type ShellUser } from "./shellUser";
+import { ErpAccessBoundary } from "./ErpAccessBoundary";
 import { MODULE_ACCENT } from "@/components/sidebar/sidebarPrimitives";
 
 interface ErpShellProps {
@@ -38,49 +39,51 @@ export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog 
 
   return (
     <AppModeProvider mode="erp">
-      <SkipLink>{t("accessibility.skipToMainContent")}</SkipLink>
-      <SidebarProvider style={style as React.CSSProperties}>
-        <div ref={erpContainerRef} className="flex h-full w-full min-w-0 overflow-hidden">
-          {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
-          <AppSidebar user={user} />
-          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-            <OfflineBanner />
-            <AppTopBar
-              accentColor={MODULE_ACCENT.erp}
-              user={{ username: user.username, role: user.role ?? "" }}
-              onLogout={handleLogout}
-              onSearchOpen={() => setPaletteOpen(true)}
-            />
-            <main
-              id="main-content"
-              tabIndex={-1}
-              aria-label="ERP workspace"
-              className="flex-1 overflow-y-auto overscroll-y-contain p-3 outline-none sm:p-6"
-            >
-              <div className="w-full min-w-0 max-w-full [&_form]:min-w-0 [&_table]:w-full [&_[role=table]]:w-full [&_.overflow-x-auto]:overscroll-x-contain">
-                <ErrorBoundary resetKey={currentLocation}>
-                  <Suspense
-                    fallback={
-                      <LoadingState title="Loading workspace" description="Preparing the latest ERP information." />
-                    }
-                  >
-                    <Router user={user} />
-                  </Suspense>
-                </ErrorBoundary>
-              </div>
-            </main>
+      <ErpAccessBoundary user={user}>
+        <SkipLink>{t("accessibility.skipToMainContent")}</SkipLink>
+        <SidebarProvider style={style as React.CSSProperties}>
+          <div ref={erpContainerRef} className="flex h-full w-full min-w-0 overflow-hidden">
+            {selectedCompany?.id && <DailyRateModal companyId={selectedCompany.id} />}
+            <AppSidebar user={user} />
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+              <OfflineBanner />
+              <AppTopBar
+                accentColor={MODULE_ACCENT.erp}
+                user={{ username: user.username, role: user.role ?? "" }}
+                onLogout={handleLogout}
+                onSearchOpen={() => setPaletteOpen(true)}
+              />
+              <main
+                id="main-content"
+                tabIndex={-1}
+                aria-label="ERP workspace"
+                className="flex-1 overflow-y-auto overscroll-y-contain p-3 outline-none sm:p-6"
+              >
+                <div className="w-full min-w-0 max-w-full [&_form]:min-w-0 [&_table]:w-full [&_[role=table]]:w-full [&_.overflow-x-auto]:overscroll-x-contain">
+                  <ErrorBoundary resetKey={currentLocation}>
+                    <Suspense
+                      fallback={
+                        <LoadingState title="Loading workspace" description="Preparing the latest ERP information." />
+                      }
+                    >
+                      <Router user={user} />
+                    </Suspense>
+                  </ErrorBoundary>
+                </div>
+              </main>
+            </div>
           </div>
-        </div>
-      </SidebarProvider>
-      <CommandPalette
-        open={paletteOpen}
-        onOpenChange={setPaletteOpen}
-        hasErpAccess={hasErpAccess}
-        hasFactoryAccess={false}
-        isAdminOwner={hasAdminSearch}
-        user={user}
-      />
-      {leaveConfirmDialog}
+        </SidebarProvider>
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          hasErpAccess={hasErpAccess}
+          hasFactoryAccess={false}
+          isAdminOwner={hasAdminSearch}
+          user={user}
+        />
+        {leaveConfirmDialog}
+      </ErpAccessBoundary>
     </AppModeProvider>
   );
 }

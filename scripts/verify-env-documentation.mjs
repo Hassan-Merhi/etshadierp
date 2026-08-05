@@ -19,6 +19,7 @@ const ROOT = resolve(process.cwd());
 const SERVER_DIR = join(ROOT, "server");
 const ENV_EXAMPLES = [
   join(ROOT, ".env.example"),
+  join(ROOT, "docs", "remote-support.env.example"),
   join(ROOT, "docs", "observability", "render-logging.env.example"),
 ];
 
@@ -71,7 +72,7 @@ for (const file of collectSourceFiles(SERVER_DIR)) {
 
 const exampleText = ENV_EXAMPLES.map((file) => readFileSync(file, "utf8")).join("\n");
 const documented = new Set(
-  [...exampleText.matchAll(/^#?\s*([A-Z][A-Z_0-9]{2,})=/gm)].map((match) => match[1])
+  [...exampleText.matchAll(/^#?\s*([A-Z][A-Z_0-9]{2,})=/gm)].map((match) => match[1]),
 );
 // Platform-injected vars are described in prose, not as assignments.
 for (const match of exampleText.matchAll(/^#\s{3}([A-Z][A-Z_0-9]{2,})\s{2,}/gm)) {
@@ -91,13 +92,21 @@ if (undocumented.length === 0 && stale.length === 0) {
 console.error("\n❌  ENVIRONMENT DOCUMENTATION CHECK FAILED");
 
 if (undocumented.length > 0) {
-  console.error(`\n   ${undocumented.length} variable(s) read by the server but missing from the deployment examples:\n`);
-  for (const name of undocumented) console.error(`   • ${name}  (first seen in ${used.get(name)})`);
-  console.error("\n   Add each to .env.example or the owning module's *.env.example with its default and purpose.");
+  console.error(
+    `\n   ${undocumented.length} variable(s) read by the server but missing from the deployment examples:\n`,
+  );
+  for (const name of undocumented) {
+    console.error(`   • ${name}  (first seen in ${used.get(name)})`);
+  }
+  console.error(
+    "\n   Add each to .env.example or the owning module's *.env.example with its default and purpose.",
+  );
 }
 
 if (stale.length > 0) {
-  console.error(`\n   ${stale.length} variable(s) documented in deployment examples but read nowhere:\n`);
+  console.error(
+    `\n   ${stale.length} variable(s) documented in deployment examples but read nowhere:\n`,
+  );
   for (const name of stale) console.error(`   • ${name}`);
   console.error("\n   Remove these, or confirm they are still wired up.");
 }

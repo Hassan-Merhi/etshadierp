@@ -10,7 +10,7 @@ During actual mouse or keyboard control, the employee sees the compact active-su
 
 ## Rollout stages
 
-- `disabled` — default. No interactive session can start.
+- `disabled` — no interactive session can start.
 - `internal` — Developer controllers and explicitly listed internal controller IDs only.
 - `canary` — interactive support is limited to explicitly listed company IDs.
 - `general` — permissioned controllers may start guarded sessions in their active company.
@@ -19,7 +19,13 @@ The rollout stage is independent from the lower-level runtime flags. Runtime har
 
 ## Configuration
 
-Rollout state is deliberately runtime-only and returns to `disabled` after every application restart. A Developer must explicitly enable each rollout stage through the guarded administrative API after confirming their password. This prevents a deployment, restart, or stale configuration value from silently re-enabling interactive control.
+Production boot values are documented in `docs/remote-support.env.example`:
+
+- `REMOTE_SUPPORT_ROLLOUT_STAGE` selects `disabled`, `internal`, `canary`, or `general`. Set it explicitly to `disabled` for a fail-closed staged rollout.
+- `REMOTE_SUPPORT_CANARY_COMPANY_IDS` is a comma-separated list of positive company IDs permitted during the canary stage.
+- `REMOTE_SUPPORT_INTERNAL_CONTROLLER_USER_IDS` is a comma-separated list of controller user IDs permitted during the internal stage in addition to Developer-role controllers.
+
+Rollout changes made through the guarded administrative API are runtime-only and are not persisted. Restarting the application restores the configured production boot state. A Developer must confirm their password before changing the live rollout stage, which keeps interactive support behind both the deployment configuration and the runtime safety controls.
 
 Developer-only runtime endpoints:
 

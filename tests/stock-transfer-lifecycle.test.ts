@@ -71,9 +71,30 @@ beforeAll(async () => {
   itemId = item.id;
 
   await db.insert(inventory).values([
-    { companyId, locationId: sourceAId, stockItemId: itemId, quantity: "100", averageRate: "10", totalValue: "1000" },
-    { companyId, locationId: sourceBId, stockItemId: itemId, quantity: "50", averageRate: "10", totalValue: "500" },
-    { companyId, locationId: destinationId, stockItemId: itemId, quantity: "0", averageRate: "0", totalValue: "0" },
+    {
+      companyId,
+      locationId: sourceAId,
+      stockItemId: itemId,
+      quantity: "100",
+      averageRate: "10",
+      totalValue: "1000",
+    },
+    {
+      companyId,
+      locationId: sourceBId,
+      stockItemId: itemId,
+      quantity: "50",
+      averageRate: "10",
+      totalValue: "500",
+    },
+    {
+      companyId,
+      locationId: destinationId,
+      stockItemId: itemId,
+      quantity: "0",
+      averageRate: "0",
+      totalValue: "0",
+    },
   ]);
 
   const [voucher] = await db
