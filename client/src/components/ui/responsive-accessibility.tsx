@@ -3,12 +3,39 @@ import { cn } from "@/lib/utils";
 
 type SkipLinkProps = React.AnchorHTMLAttributes<HTMLAnchorElement>;
 
+function getHashTarget(ownerDocument: Document, href: string): HTMLElement | null {
+  if (!href.startsWith("#") || href.length <= 1) return null;
+  try {
+    return ownerDocument.getElementById(decodeURIComponent(href.slice(1)));
+  } catch {
+    return null;
+  }
+}
+
 export function SkipLink({
   className,
   children = "Skip to main content",
   href = "#main-content",
+  onClick,
   ...props
 }: SkipLinkProps) {
+  const handleClick: React.MouseEventHandler<HTMLAnchorElement> = (event) => {
+    onClick?.(event);
+    if (event.defaultPrevented) return;
+
+    const target = getHashTarget(event.currentTarget.ownerDocument, href);
+    if (!target) return;
+
+    event.preventDefault();
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ block: "start" });
+
+    const targetWindow = event.currentTarget.ownerDocument.defaultView;
+    if (targetWindow && targetWindow.location.hash !== href) {
+      targetWindow.history.replaceState(targetWindow.history.state, "", href);
+    }
+  };
+
   return (
     <a
       href={href}
@@ -17,6 +44,7 @@ export function SkipLink({
         "sr-only z-50 rounded-md bg-background px-4 py-2 text-sm font-medium text-foreground shadow-lg transition focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 motion-reduce:transition-none",
         className
       )}
+      onClick={handleClick}
       {...props}
     >
       {children}
@@ -121,9 +149,26 @@ export function HorizontalScrollRegion({
   className,
   tabIndex = 0,
   children,
+  onKeyDown,
   ...props
 }: HorizontalScrollRegionProps) {
   const descriptionId = React.useId();
+
+  const handleKeyDown: React.KeyboardEventHandler<HTMLDivElement> = (event) => {
+    onKeyDown?.(event);
+    if (event.defaultPrevented || event.target !== event.currentTarget) return;
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    if (event.currentTarget.scrollWidth <= event.currentTarget.clientWidth) return;
+
+    event.preventDefault();
+    const targetWindow = event.currentTarget.ownerDocument.defaultView;
+    const reducedMotion = targetWindow?.matchMedia("(prefers-reduced-motion: reduce)").matches ?? false;
+    const distance = Math.max(80, Math.round(event.currentTarget.clientWidth * 0.2));
+    event.currentTarget.scrollBy({
+      left: event.key === "ArrowRight" ? distance : -distance,
+      behavior: reducedMotion ? "auto" : "smooth",
+    });
+  };
 
   return (
     <div
@@ -131,6 +176,7 @@ export function HorizontalScrollRegion({
       role="region"
       aria-label={label}
       aria-describedby={descriptionId}
+      aria-keyshortcuts="ArrowLeft ArrowRight"
       tabIndex={tabIndex}
       data-horizontal-scroll="true"
       data-horizontal-scroll-region="true"
@@ -138,6 +184,7 @@ export function HorizontalScrollRegion({
         "max-w-full touch-pan-x overflow-x-auto overscroll-x-contain rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         className
       )}
+      onKeyDown={handleKeyDown}
       {...props}
     >
       <VisuallyHidden id={descriptionId}>{description}</VisuallyHidden>
