@@ -1,10 +1,25 @@
 import { isAbortError } from "./abortError";
+import {
+  BANDWIDTH_INVALIDATION_CHANNEL,
+  getBandwidthInvalidationScope,
+  shouldClearBandwidthEntry,
+  type BandwidthCacheScope,
+  type BandwidthInvalidationMessage,
+  type BandwidthInvalidationScope,
+} from "./bandwidthInvalidationPolicy";
+
+type CacheRule = {
+  pattern: RegExp;
+  ttlMs: number;
+  scope: BandwidthCacheScope;
+};
 
 type CachedApiResponse = {
   response: Response;
   expiresAt: number;
   staleUntil: number;
   lastUsedAt: number;
+  scope: BandwidthCacheScope;
 };
 
 type QueueEntry = {
@@ -24,6 +39,7 @@ const inFlightGets = new Map<string, Promise<Response>>();
 const inFlightLifetimes = new Map<string, SharedRequestLifetime>();
 const getQueue: QueueEntry[] = [];
 let activeGets = 0;
+let writeGeneration = 0;
 
 const BYPASS_PATHS = [
   /\/export(?:\/|$)/i,
@@ -37,19 +53,27 @@ const BYPASS_PATHS = [
   /^\/api\/csrf-token$/i,
 ];
 
-const CACHE_TTLS: Array<{ pattern: RegExp; ttlMs: number }> = [
-  { pattern: /^\/api\/factory\/customer-orders\/\d+$/, ttlMs: 45_000 },
-  { pattern: /^\/api\/factory\/customer-orders\/\d+\/bale-removals$/, ttlMs: 5 * 60_000 },
-  { pattern: /^\/api\/factory\/bale-stock-count$/, ttlMs: 60_000 },
-  { pattern: /^\/api\/factory\/customer-orders$/, ttlMs: 30_000 },
-  { pattern: /^\/api\/factory\/customer-proformas$/, ttlMs: 2 * 60_000 },
-  { pattern: /^\/api\/factory\/customers$/, ttlMs: 2 * 60_000 },
-  { pattern: /^\/api\/factory\/my-access$/, ttlMs: 5 * 60_000 },
-  { pattern: /^\/api\/factory\/settings$/, ttlMs: 5 * 60_000 },
-  { pattern: /^\/api\/company-settings$/, ttlMs: 5 * 60_000 },
-  { pattern: /^\/api\/companies\/\d+$/, ttlMs: 5 * 60_000 },
-  { pattern: /^\/api\/chat\/unread-count$/, ttlMs: 15_000 },
-  { pattern: /^\/api\/chatbot\/status$/, ttlMs: 2 * 60_000 },
+const CACHE_RULES: readonly CacheRule[] = [
+  { pattern: /^\/api\/factory\/customer-orders\/\d+$/, ttlMs: 45_000, scope: "live" },
+  {
+    pattern: /^\/api\/factory\/customer-orders\/\d+\/bale-removals$/,
+    ttlMs: 5 * 60_000,
+    scope: "live",
+  },
+  { pattern: /^\/api\/factory\/bale-stock-count$/, ttlMs: 60_000, scope: "live" },
+  { pattern: /^\/api\/factory\/customer-orders$/, ttlMs: 30_000, scope: "live" },
+  {
+    pattern: /^\/api\/factory\/customer-proformas$/,
+    ttlMs: 2 * 60_000,
+    scope: "reference",
+  },
+  { pattern: /^\/api\/factory\/customers$/, ttlMs: 2 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/my-access$/, ttlMs: 5 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/settings$/, ttlMs: 5 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/company-settings$/, ttlMs: 5 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/companies\/\d+$/, ttlMs: 5 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/chat\/unread-count$/, ttlMs: 15_000, scope: "live" },
+  { pattern: /^\/api\/chatbot\/status$/, ttlMs: 2 * 60_000, scope: "reference" },
 ];
 
 const HEAVY_HIDDEN_TAB_PATHS = [
@@ -84,13 +108,21 @@ function resolveRequestUrl(input: RequestInfo | URL): URL | null {
   return null;
 }
 
-function cacheTtlFor(pathname: string): number {
-  return CACHE_TTLS.find(({ pattern }) => pattern.test(pathname))?.ttlMs ?? 0;
+function cacheRuleFor(pathname: string): CacheRule | undefined {
+  return CACHE_RULES.find(({ pattern }) => pattern.test(pathname));
 }
 
-function shouldBypass(pathname: string, headers: Headers): boolean {
-  if (headers.has("range")) return true;
-  return BYPASS_PATHS.some((pattern) => pattern.test(pathname));
+function shouldBypass(pathname: string, headers: Headers, input: RequestInfo | URL, init?: RequestInit): boolean {
+  const cacheMode = init?.cache || (input instanceof Request ? input.cache : undefined);
+  const cacheControl = headers.get("cache-control") || "";
+  return (
+    headers.has("range") ||
+    headers.has("x-bypass-request-storm-guard") ||
+    cacheMode === "no-store" ||
+    cacheMode === "reload" ||
+    cacheControl.includes("no-store") ||
+    BYPASS_PATHS.some((pattern) => pattern.test(pathname))
+  );
 }
 
 function shouldDeferUntilVisible(pathname: string, ttlMs: number): boolean {
@@ -98,9 +130,17 @@ function shouldDeferUntilVisible(pathname: string, ttlMs: number): boolean {
 }
 
 function buildRequestKey(url: URL, headers: Headers): string {
-  const clientDate = headers.get("x-client-date") || "";
-  const accept = headers.get("accept") || "";
-  return `${url.toString()}|date=${clientDate}|accept=${accept}`;
+  const varyHeaders = [
+    "accept",
+    "x-client-date",
+    "x-company-id",
+    "x-factory-company-id",
+    "x-selected-company-id",
+    "x-erp-company-id",
+  ]
+    .map((name) => `${name}=${headers.get(name) || ""}`)
+    .join("|");
+  return `${url.toString()}|${varyHeaders}`;
 }
 
 function trimCache(): void {
@@ -129,8 +169,8 @@ function getCachedResponse(key: string): Response | null {
   return cached.response.clone();
 }
 
-function cacheResponse(key: string, response: Response, ttlMs: number): void {
-  if (ttlMs <= 0 || !response.ok) return;
+function cacheResponse(key: string, response: Response, rule: CacheRule, generationAtStart: number): void {
+  if (rule.ttlMs <= 0 || !response.ok || generationAtStart !== writeGeneration) return;
 
   const rawLength = response.headers.get("content-length");
   const responseBytes = rawLength ? Number(rawLength) : 0;
@@ -139,15 +179,23 @@ function cacheResponse(key: string, response: Response, ttlMs: number): void {
   const now = Date.now();
   responseCache.set(key, {
     response: response.clone(),
-    expiresAt: now + ttlMs,
-    staleUntil: now + Math.max(ttlMs, HIDDEN_TAB_STALE_MS),
+    expiresAt: now + rule.ttlMs,
+    staleUntil: now + Math.max(rule.ttlMs, HIDDEN_TAB_STALE_MS),
     lastUsedAt: now,
+    scope: rule.scope,
   });
   trimCache();
 }
 
-function clearReadCache(): void {
-  responseCache.clear();
+function clearReadCache(scope: BandwidthInvalidationScope = "all"): void {
+  if (scope === "all") {
+    responseCache.clear();
+    return;
+  }
+
+  for (const [key, cached] of responseCache) {
+    if (shouldClearBandwidthEntry(cached.scope, scope)) responseCache.delete(key);
+  }
 }
 
 function waitUntilVisible(signal?: AbortSignal | null): Promise<void> {
@@ -235,6 +283,7 @@ function acquireGetSlot(signal?: AbortSignal | null): Promise<() => void> {
  * cancelled. The real request is aborted only when every caller has abandoned
  * it, and never once a response exists — aborting after the headers arrive
  * tears down the body stream the caller is about to read.
+
  */
 class SharedRequestLifetime {
   readonly controller = new AbortController();
@@ -311,25 +360,40 @@ export function installRequestStormGuard(): void {
   (window as any).__requestStormGuardInstalled = true;
 
   const originalFetch = window.fetch.bind(window);
+  const invalidationChannel =
+    typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(BANDWIDTH_INVALIDATION_CHANNEL) : null;
+
+  invalidationChannel?.addEventListener("message", (event: MessageEvent<BandwidthInvalidationMessage>) => {
+    if (event.data?.type !== "invalidate") return;
+    writeGeneration += 1;
+    clearReadCache(event.data.scope);
+  });
+
+  const invalidate = (scope: BandwidthInvalidationScope) => {
+    writeGeneration += 1;
+    clearReadCache(scope);
+    invalidationChannel?.postMessage({ type: "invalidate", scope } satisfies BandwidthInvalidationMessage);
+  };
 
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const method = requestMethod(input, init);
     const url = resolveRequestUrl(input);
 
-    if (!url || !url.pathname.startsWith("/api/")) {
-      return originalFetch(input, init);
-    }
+    if (!url || !url.pathname.startsWith("/api/")) return originalFetch(input, init);
 
     if (method !== "GET") {
-      // Any write can change balances, stock, orders, settings or access. Clear all
-      // short-lived read snapshots first so normal TanStack invalidations always
-      // receive fresh server data immediately after the mutation.
-      clearReadCache();
-      return originalFetch(input, init);
+      if (method === "HEAD" || method === "OPTIONS") return originalFetch(input, init);
+      const invalidationScope = getBandwidthInvalidationScope(url.pathname);
+      invalidate(invalidationScope);
+      try {
+        return await originalFetch(input, init);
+      } finally {
+        invalidate(invalidationScope);
+      }
     }
 
     const headers = requestHeaders(input, init);
-    if (shouldBypass(url.pathname, headers)) return originalFetch(input, init);
+    if (shouldBypass(url.pathname, headers, input, init)) return originalFetch(input, init);
 
     const key = buildRequestKey(url, headers);
     const cached = getCachedResponse(key);
@@ -364,9 +428,11 @@ export function installRequestStormGuard(): void {
     }
     if (existing) return runUnshared();
 
-    const ttlMs = cacheTtlFor(url.pathname);
+    const rule = cacheRuleFor(url.pathname);
+    const ttlMs = rule?.ttlMs ?? 0;
     const lifetime = new SharedRequestLifetime();
     lifetime.acquire();
+    const generationAtStart = writeGeneration;
     const requestPromise = (async () => {
       if (shouldDeferUntilVisible(url.pathname, ttlMs)) await waitUntilVisible(lifetime.controller.signal);
       const release = await acquireGetSlot(lifetime.controller.signal);
@@ -375,7 +441,8 @@ export function installRequestStormGuard(): void {
         // The response exists; its body is still unread. Any later abort would
         // tear that stream down under the caller, so disarm before handing over.
         lifetime.disarm();
-        cacheResponse(key, response, ttlMs);
+        if (rule) cacheResponse(key, response, rule, generationAtStart);
+
         return response;
       } finally {
         release();
