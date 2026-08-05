@@ -19,6 +19,7 @@ import {
 } from "@shared/schema";
 import { eq, and, desc, isNull, sql } from "drizzle-orm";
 import { getCompanyId } from "./_helpers";
+import { parseListPagination, setListPaginationHeaders } from "../../../lib/listPagination";
 
 export function registerShippingContainerRowRoutes(app: Express) {
   // ── GET available-invoices for dropdown ──────────────────────────────────────
@@ -113,42 +114,74 @@ export function registerShippingContainerRowRoutes(app: Express) {
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-
-      // Pre-aggregate document counts in ONE pass instead of a correlated subquery per row.
-      // The old approach called length(file_data) inside a correlated SELECT — that forced
-      // PostgreSQL to dereference TOAST storage for every document blob on every row (N×M reads).
-      // Now we join a pre-aggregated subquery so the whole list resolves in one query plan.
+      const pagination = parseListPagination(req.query, { defaultPageSize: 100, maxPageSize: 500, force: true });
+      const params: unknown[] = [companyId];
+      const clauses = ["r.company_id = $1"];
+      if (req.query.isDone === "true" || req.query.isDone === "false") {
+        params.push(req.query.isDone === "true");
+        clauses.push(`r.is_done = $${params.length}`);
+      }
+      if (req.query.dateFrom) {
+        params.push(String(req.query.dateFrom));
+        clauses.push(`r.order_date >= $${params.length}`);
+      }
+      if (req.query.dateTo) {
+        params.push(String(req.query.dateTo));
+        clauses.push(`r.order_date <= $${params.length}`);
+      }
+      if (String(req.query.search || "").trim()) {
+        params.push(`%${String(req.query.search).trim()}%`);
+        const index = params.length;
+        clauses.push(`(
+          COALESCE(co.invoice_number, '') ILIKE $${index}
+          OR COALESCE(c.legal_name, '') ILIKE $${index}
+          OR COALESCE(co.container_number, '') ILIKE $${index}
+          OR COALESCE(co.shipping_company, '') ILIKE $${index}
+          OR COALESCE(co.destination, '') ILIKE $${index}
+        )`);
+      }
+      const whereSql = clauses.join(" AND ");
+      const countResult = await pool.query(
+        `SELECT COUNT(*)::int AS count
+         FROM factory_shipping_container_rows r
+         INNER JOIN customer_orders co ON r.customer_order_id = co.id
+         LEFT JOIN customers c ON co.customer_id = c.id
+         WHERE ${whereSql}`,
+        params
+      );
+      const limitParam = params.length + 1;
+      const offsetParam = params.length + 2;
       const { rows } = await pool.query(
         `SELECT
            r.id,
-           r.company_id        AS "companyId",
+           r.company_id AS "companyId",
            r.customer_order_id AS "customerOrderId",
-           r.order_date        AS "orderDate",
+           r.order_date AS "orderDate",
            r.eta,
            r.container_arrived_date AS "containerArrivedDate",
            r.note,
-           r.ci_number         AS "ciNumber",
-           r.is_done           AS "isDone",
-           r.done_at           AS "doneAt",
-           r.done_by           AS "doneBy",
-           r.whatsapp_sent_at  AS "whatsappSentAt",
-           r.created_at        AS "createdAt",
-           r.shipping_invoice_file_name     AS "shippingInvoiceFileName",
+           r.ci_number AS "ciNumber",
+           r.is_done AS "isDone",
+           r.done_at AS "doneAt",
+           r.done_by AS "doneBy",
+           r.whatsapp_sent_at AS "whatsappSentAt",
+           r.created_at AS "createdAt",
+           r.shipping_invoice_file_name AS "shippingInvoiceFileName",
            r.shipping_invoice_original_name AS "shippingInvoiceOriginalName",
-           r.shipping_invoice_file_url      AS "shippingInvoiceFileUrl",
-           r.shipping_invoice_file_type     AS "shippingInvoiceFileType",
-           r.tracking_link     AS "trackingLink",
-           co.invoice_number   AS "invoiceNumber",
-           co.customer_id      AS "customerId",
-           c.legal_name        AS "clientName",
-           c.phone             AS "customerPhone",
+           r.shipping_invoice_file_url AS "shippingInvoiceFileUrl",
+           r.shipping_invoice_file_type AS "shippingInvoiceFileType",
+           r.tracking_link AS "trackingLink",
+           co.invoice_number AS "invoiceNumber",
+           co.customer_id AS "customerId",
+           c.legal_name AS "clientName",
+           c.phone AS "customerPhone",
            co.status,
-           co.loading_started_at   AS "loadingDate",
+           co.loading_started_at AS "loadingDate",
            co.loading_finalized_at AS "finalizedDate",
-           co.container_number     AS "containerNumber",
-           co.shipping_company     AS "shippingCompany",
+           co.container_number AS "containerNumber",
+           co.shipping_company AS "shippingCompany",
            co.destination,
-           co.grand_total      AS "grandTotal",
+           co.grand_total AS "grandTotal",
            COALESCE(dc.doc_count, 0)::int AS "documentCount"
          FROM factory_shipping_container_rows r
          INNER JOIN customer_orders co ON r.customer_order_id = co.id
@@ -159,20 +192,20 @@ export function registerShippingContainerRowRoutes(app: Express) {
            WHERE file_name IS NOT NULL
              AND trim(file_name) <> ''
              AND file_name <> '-'
-             AND (
-               (display_name IS NOT NULL AND trim(display_name) <> '')
-               OR (original_name IS NOT NULL AND trim(original_name) <> '')
-             )
+             AND ((display_name IS NOT NULL AND trim(display_name) <> '')
+               OR (original_name IS NOT NULL AND trim(original_name) <> ''))
            GROUP BY scr_id
          ) dc ON dc.scr_id = r.id
-         WHERE r.company_id = $1
-         ORDER BY r.created_at DESC`,
-        [companyId]
+         WHERE ${whereSql}
+         ORDER BY r.created_at DESC
+         LIMIT $${limitParam} OFFSET $${offsetParam}`,
+        [...params, pagination.pageSize, pagination.offset]
       );
-
+      setListPaginationHeaders(res, countResult.rows[0]?.count ?? 0, pagination);
+      res.set("Cache-Control", "private, max-age=15");
       res.json(rows);
     } catch (error: unknown) {
-      logger.error("Error fetching shipping container rows:", { error: error });
+      logger.error("Error fetching shipping container rows:", { error });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });

@@ -145,6 +145,7 @@ export function AuditLog({
         to: filterDateTo,
         page: page.toString(),
         limit: "50",
+        profile: "summary",
       });
       const res = await apiRequest("GET", `/api/audit-log?${params.toString()}`);
       if (!res.ok) {
@@ -161,6 +162,17 @@ export function AuditLog({
     },
   });
 
+  const selectedLogId = selectedLog?.id ?? null;
+  const { data: selectedLogDetail } = useQuery({
+    queryKey: ["/api/audit-log/detail", activeCompanyId, selectedLogId],
+    enabled: activeCompanyId !== null && selectedLogId !== null,
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/audit-log?detailId=${selectedLogId}`);
+      if (!response.ok) throw new Error("Failed to load activity details");
+      return response.json();
+    },
+  });
+
   const activityLoading = isCompanyLoading || activeCompanyId === null || isLoading;
   const rawAuditLogs: any[] = data?.logs || [];
 
@@ -169,7 +181,7 @@ export function AuditLog({
   // display another company's activity.
   const auditLogs = useMemo(
     () => rawAuditLogs.filter((log: any) => Number(log.companyId) === activeCompanyId),
-    [rawAuditLogs, activeCompanyId],
+    [rawAuditLogs, activeCompanyId]
   );
 
   const totalPages = data?.totalPages || 1;
@@ -198,8 +210,12 @@ export function AuditLog({
   const errorCode = (error as any)?.code;
   const isPermissionError =
     errorStatus === 403 ||
-    String((error as any)?.message || "").toLowerCase().includes("access denied") ||
-    String((error as any)?.message || "").toLowerCase().includes("permission");
+    String((error as any)?.message || "")
+      .toLowerCase()
+      .includes("access denied") ||
+    String((error as any)?.message || "")
+      .toLowerCase()
+      .includes("permission");
   const isCompanyError = errorStatus === 409 || errorCode === "AUDIT_COMPANY_REQUIRED";
 
   return (
@@ -396,8 +412,8 @@ export function AuditLog({
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-[420px]">
                         <div className="flex items-center gap-2 min-w-0">
-                          <span className="truncate min-w-0" title={getDetailsSentence(log)}>
-                            {getDetailsSentence(log)}
+                          <span className="truncate min-w-0" title={log.changeSummary || getDetailsSentence(log)}>
+                            {log.changeSummary || getDetailsSentence(log)}
                           </span>
                           <ExternalLink className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-50" />
                         </div>
@@ -435,7 +451,7 @@ export function AuditLog({
         </div>
       )}
 
-      {selectedLog && <AuditLogDialog log={selectedLog} onClose={() => setSelectedLog(null)} />}
+      {selectedLog && <AuditLogDialog log={selectedLogDetail || selectedLog} onClose={() => setSelectedLog(null)} />}
     </div>
   );
 }

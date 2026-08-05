@@ -124,9 +124,9 @@ export default function FactoryWorkers() {
   });
 
   const { data: workers, isLoading } = useQuery<FactoryWorker[]>({
-    queryKey: ["/api/factory/workers"],
+    queryKey: ["/api/factory/workers", "full"],
     queryFn: async () => {
-      const res = await fetch("/api/factory/workers", { credentials: "include" });
+      const res = await fetch("/api/factory/workers?profile=full", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch workers");
       return res.json();
     },

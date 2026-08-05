@@ -97,6 +97,42 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
       const customerId = req.query.customerId ? parseOptionalId(req.query.customerId) : null;
       if (!customerId) return res.status(400).json({ message: "customerId is required" });
 
+      const profile = String(req.query.profile || "full");
+      if (profile === "summary") {
+        const rawSummary = await db.execute(sql`
+        SELECT
+          cp.id,
+          cp.company_id,
+          cp.customer_id,
+          cp.name,
+          cp.is_active,
+          cp.created_at,
+          COALESCE(NULLIF(to_jsonb(cp)->>'updated_at', '')::timestamptz, cp.created_at) AS updated_at,
+          (
+            SELECT COUNT(*)::int
+            FROM customer_proforma_lines cpl
+            WHERE cpl.proforma_id = cp.id
+          ) AS line_count
+        FROM customer_proformas cp
+        WHERE cp.company_id = ${companyId}
+          AND cp.customer_id = ${customerId}
+          AND cp.deleted_at IS NULL
+        ORDER BY cp.name ASC
+      `);
+        const summaries = ((rawSummary as any).rows ?? (rawSummary as unknown as any[])).map((row: any) => ({
+          id: row.id,
+          companyId: row.company_id,
+          customerId: row.customer_id,
+          name: row.name ?? "",
+          isActive: row.is_active ?? false,
+          lineCount: Number(row.line_count) || 0,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at ?? row.created_at,
+        }));
+        res.set("Cache-Control", "private, max-age=60");
+        return res.json(summaries);
+      }
+
       // SELECT * to avoid explicit-column failures when the Drizzle schema has
       // columns not yet migrated to production (e.g. is_active added later).
       const rawProformasRes = await db.execute(

@@ -49,11 +49,11 @@ export default function PendingInvoices() {
   const { toast } = useToast();
 
   const { data: pendingOrders = [], isLoading: pendingLoading } = useQuery<CustomerOrder[]>({
-    queryKey: ["/api/factory/customer-orders?status=PENDING_VERIFICATION"],
+    queryKey: ["/api/factory/customer-orders?status=PENDING_VERIFICATION&profile=summary&pageSize=250"],
   });
 
   const { data: verifiedOrders = [], isLoading: verifiedLoading } = useQuery<CustomerOrder[]>({
-    queryKey: ["/api/factory/customer-orders?status=VERIFIED"],
+    queryKey: ["/api/factory/customer-orders?status=VERIFIED&profile=summary&pageSize=250"],
   });
 
   const deleteMutation = useMutation({

@@ -1,8 +1,17 @@
 import { isAbortError } from "./abortError";
+import {
+  BANDWIDTH_INVALIDATION_CHANNEL,
+  getBandwidthInvalidationScope,
+  shouldClearBandwidthEntry,
+  type BandwidthCacheScope,
+  type BandwidthInvalidationMessage,
+  type BandwidthInvalidationScope,
+} from "./bandwidthInvalidationPolicy";
 
 type HotspotCacheRule = {
   pattern: RegExp;
   ttlMs: number;
+  scope: BandwidthCacheScope;
   maxResponseBytes?: number;
 };
 
@@ -10,53 +19,66 @@ type CachedHotspotResponse = {
   response: Response;
   expiresAt: number;
   lastUsedAt: number;
+  scope: BandwidthCacheScope;
 };
 
 const DEFAULT_MAX_RESPONSE_BYTES = 1_500_000;
 const MAX_CACHE_ENTRIES = 32;
 
-// These routes are the highest recurring API consumers in the July 28 production
-// bandwidth snapshots. The snapshots are deliberately short-lived and every
-// state-changing request clears them before and after the write.
+// These routes are the highest recurring API consumers in production
+// bandwidth snapshots. Live workflow data uses short snapshots. Reference
+// data survives unrelated scans/vouchers and is cleared only by scope,
+// settings, access or reference-data writes.
 const HOTSPOT_RULES: HotspotCacheRule[] = [
-  { pattern: /^\/api\/containers\/otw-items$/, ttlMs: 30_000, maxResponseBytes: 4_000_000 },
-  { pattern: /^\/api\/inventory$/, ttlMs: 30_000 },
-  { pattern: /^\/api\/containers$/, ttlMs: 30_000 },
-  { pattern: /^\/api\/location-summary$/, ttlMs: 30_000 },
-  { pattern: /^\/api\/locations\/\d+\/inventory$/, ttlMs: 30_000 },
-  { pattern: /^\/api\/factory\/location-inventory\/\d+$/, ttlMs: 30_000 },
-  { pattern: /^\/api\/ledger-accounts$/, ttlMs: 60_000 },
-  { pattern: /^\/api\/factory\/containers$/, ttlMs: 45_000 },
-  { pattern: /^\/api\/git\/containers$/, ttlMs: 30_000 },
-  { pattern: /^\/api\/factory\/bale-products$/, ttlMs: 2 * 60_000 },
-  { pattern: /^\/api\/factory\/workers$/, ttlMs: 60_000 },
-  { pattern: /^\/api\/factory\/workers\/attendance-report$/, ttlMs: 30_000 },
-  { pattern: /^\/api\/factory\/monthly-salary-summary$/, ttlMs: 60_000 },
-  { pattern: /^\/api\/factory\/production-value-report$/, ttlMs: 30_000 },
-  { pattern: /^\/api\/factory\/bale-ledger$/, ttlMs: 30_000 },
-  { pattern: /^\/api\/factory\/raw-stock\/available-containers$/, ttlMs: 30_000 },
-  { pattern: /^\/api\/factory\/raw-stock$/, ttlMs: 30_000 },
-  { pattern: /^\/api\/factory\/raw-stock\/history\/\d+$/, ttlMs: 30_000 },
-  { pattern: /^\/api\/factory\/mix-batches$/, ttlMs: 30_000 },
-  { pattern: /^\/api\/factory\/ground-scan-items$/, ttlMs: 30_000 },
-  { pattern: /^\/api\/factory\/daily-bale-scans(?:\/produced)?$/, ttlMs: 15_000 },
-  { pattern: /^\/api\/factory\/suppliers$/, ttlMs: 2 * 60_000 },
-  { pattern: /^\/api\/factory\/suppliers\/with-balances$/, ttlMs: 30_000 },
-  { pattern: /^\/api\/factory\/suppliers\/\d+\/broker-statement$/, ttlMs: 30_000 },
-  { pattern: /^\/api\/factory\/categories$/, ttlMs: 5 * 60_000 },
-  { pattern: /^\/api\/accounts\/all$/, ttlMs: 30_000 },
-  { pattern: /^\/api\/accounts\/voucher-sidebar$/, ttlMs: 30_000 },
-  { pattern: /^\/api\/employees$/, ttlMs: 60_000 },
-  { pattern: /^\/api\/factory\/users$/, ttlMs: 60_000 },
-  { pattern: /^\/api\/factory\/(?:rental\/)?cash-accounts$/, ttlMs: 60_000 },
-  { pattern: /^\/api\/stock-items\/light$/, ttlMs: 5 * 60_000 },
-  { pattern: /^\/api\/factory\/customer-price-lists\/\d+$/, ttlMs: 60_000 },
-  { pattern: /^\/api\/factory\/daybook$/, ttlMs: 15_000 },
-  { pattern: /^\/api\/reports\/stock-movement$/, ttlMs: 30_000 },
-  { pattern: /^\/api\/user\/companies$/, ttlMs: 5 * 60_000 },
-  { pattern: /^\/api\/user-preferences$/, ttlMs: 5 * 60_000 },
-  { pattern: /^\/api\/factory\/label-design-colors$/, ttlMs: 5 * 60_000 },
-  { pattern: /^\/api\/barcode\/[^/]+$/, ttlMs: 10_000 },
+  { pattern: /^\/api\/containers\/otw-items$/, ttlMs: 30_000, scope: "live", maxResponseBytes: 4_000_000 },
+  { pattern: /^\/api\/inventory$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/containers$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/location-summary$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/locations$/, ttlMs: 5 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/locations\/\d+\/inventory$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/factory\/location-inventory\/\d+$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/ledger-accounts$/, ttlMs: 5 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/containers$/, ttlMs: 45_000, scope: "live" },
+  { pattern: /^\/api\/git\/containers$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/factory\/shipping-container-rows$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/factory\/invoice-container-tracking$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/factory\/bale-products$/, ttlMs: 2 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/api\/factory\/bale-products$/, ttlMs: 2 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/workers$/, ttlMs: 5 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/workers\/attendance-report$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/factory\/monthly-salary-summary$/, ttlMs: 60_000, scope: "live" },
+  { pattern: /^\/api\/factory\/production-value-report$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/factory\/bale-ledger$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/factory\/raw-stock\/available-containers$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/factory\/raw-stock$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/factory\/raw-stock\/history\/\d+$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/factory\/mix-batches$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/factory\/ground-scan-items$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/factory\/daily-bale-scans(?:\/produced)?$/, ttlMs: 15_000, scope: "live" },
+  {
+    pattern: /^\/api\/factory\/customer-orders\/\d+\/verification-summary$/,
+    ttlMs: 30_000,
+    scope: "live",
+  },
+  { pattern: /^\/api\/factory\/suppliers$/, ttlMs: 2 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/suppliers\/with-balances$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/factory\/suppliers\/\d+\/broker-statement$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/factory\/categories$/, ttlMs: 5 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/accounts\/all$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/accounts\/voucher-sidebar$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/audit-log$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/vouchers\/\d+$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/employees$/, ttlMs: 5 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/users$/, ttlMs: 5 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/(?:rental\/)?cash-accounts$/, ttlMs: 5 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/stock-items\/light$/, ttlMs: 5 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/customer-price-lists\/\d+$/, ttlMs: 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/daybook$/, ttlMs: 15_000, scope: "live" },
+  { pattern: /^\/api\/reports\/stock-movement$/, ttlMs: 30_000, scope: "live" },
+  { pattern: /^\/api\/user\/companies$/, ttlMs: 5 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/user-preferences$/, ttlMs: 5 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/label-design-colors$/, ttlMs: 5 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/barcode\/[^/]+$/, ttlMs: 10_000, scope: "live" },
 ];
 
 const responseCache = new Map<string, CachedHotspotResponse>();
@@ -73,6 +95,7 @@ let writeGeneration = 0;
  * only when every caller has abandoned it, and never once a response exists —
  * aborting after the headers arrive tears down the body stream the caller is
  * about to read.
+
  */
 class SharedRequestLifetime {
   readonly controller = new AbortController();
@@ -161,8 +184,15 @@ function buildCacheKey(url: URL, headers: Headers): string {
   return `${url.toString()}|${varyHeaders}`;
 }
 
-function clearCache(): void {
-  responseCache.clear();
+function clearCache(scope: BandwidthInvalidationScope = "all"): void {
+  if (scope === "all") {
+    responseCache.clear();
+    return;
+  }
+
+  for (const [key, cached] of responseCache) {
+    if (shouldClearBandwidthEntry(cached.scope, scope)) responseCache.delete(key);
+  }
 }
 
 function trimCache(): void {
@@ -198,6 +228,7 @@ function cacheResponse(key: string, response: Response, rule: HotspotCacheRule, 
     response: response.clone(),
     expiresAt: now + rule.ttlMs,
     lastUsedAt: now,
+    scope: rule.scope,
   });
   trimCache();
 }
@@ -267,6 +298,22 @@ export function installBandwidthPhase1HotspotGuard(): void {
   (window as any).__bandwidthPhase1HotspotGuardInstalled = true;
 
   const originalFetch = window.fetch.bind(window);
+  const invalidationChannel =
+    typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(BANDWIDTH_INVALIDATION_CHANNEL) : null;
+
+  invalidationChannel?.addEventListener("message", (event: MessageEvent<BandwidthInvalidationMessage>) => {
+    if (event.data?.type !== "invalidate") return;
+    writeGeneration += 1;
+    if (event.data.scope === "all") clearCache();
+    else clearCache("live");
+  });
+
+  const invalidate = (scope: BandwidthInvalidationScope) => {
+    writeGeneration += 1;
+    if (scope === "all") clearCache();
+    else clearCache("live");
+    invalidationChannel?.postMessage({ type: "invalidate", scope } satisfies BandwidthInvalidationMessage);
+  };
 
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const method = requestMethod(input, init);
@@ -275,17 +322,12 @@ export function installBandwidthPhase1HotspotGuard(): void {
 
     if (method !== "GET") {
       if (method === "HEAD" || method === "OPTIONS") return originalFetch(input, init);
-      writeGeneration += 1;
-      clearCache();
+      const invalidationScope = getBandwidthInvalidationScope(url.pathname);
+      invalidate(invalidationScope);
       try {
-        const response = await originalFetch(input, init);
-        writeGeneration += 1;
-        clearCache();
-        return response;
-      } catch (error) {
-        writeGeneration += 1;
-        clearCache();
-        throw error;
+        return await originalFetch(input, init);
+      } finally {
+        invalidate(invalidationScope);
       }
     }
 
@@ -300,6 +342,7 @@ export function installBandwidthPhase1HotspotGuard(): void {
     if (cached) return cached;
 
     const signal = requestSignal(input, init);
+    await waitUntilVisible(signal);
 
     // An internal abort belongs to whoever cancelled, never to this caller. If a
     // shared request dies for any reason other than this caller's own signal,
