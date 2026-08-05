@@ -2,6 +2,7 @@ import { useState, useMemo, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
+import { isBlockingQueryError } from "@/lib/abortError";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -62,6 +63,7 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
     data: containers = [],
     isLoading: loadingContainers,
     error: containersError,
+    refetch: refetchContainers,
   } = useQuery<Container[]>({
     queryKey: ["/api/containers"],
   });
@@ -71,6 +73,7 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
     data: otwItemsRaw = [],
     isLoading: loadingOtwItems,
     error: otwItemsError,
+    refetch: refetchOtwItems,
   } = useQuery<StockItem[]>({
     queryKey: ["/api/containers/otw-items"],
   });
@@ -78,7 +81,17 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
   const otwContainers = useMemo(() => containers.filter((c) => c.status === "OTW"), [containers]);
 
   const isLoading = loadingContainers || loadingOtwItems;
-  const hasErrors = containersError || otwItemsError;
+  // A failed background refetch leaves the last good data on screen and an error
+  // beside it, and a cancelled request is not a failure at all. Report only what
+  // actually left the page without data.
+  const containersFailed = isBlockingQueryError(containersError, containers.length > 0);
+  const otwItemsFailed = isBlockingQueryError(otwItemsError, otwItemsRaw.length > 0);
+  const hasErrors = containersFailed || otwItemsFailed;
+
+  const retryFailedQueries = () => {
+    if (containersFailed) void refetchContainers();
+    if (otwItemsFailed) void refetchOtwItems();
+  };
 
   const stockItems: StockItem[] = otwItemsRaw;
 
@@ -461,10 +474,14 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error Loading Data</AlertTitle>
-          <AlertDescription>
-            {containersError ? "Failed to load containers. " : ""}
-            {otwItemsError ? "Failed to load stock items. " : ""}
-            Please try refreshing the page.
+          <AlertDescription className="flex flex-wrap items-center gap-2">
+            <span>
+              {containersFailed ? "Failed to load containers. " : ""}
+              {otwItemsFailed ? "Failed to load stock items. " : ""}
+            </span>
+            <Button variant="outline" size="sm" onClick={retryFailedQueries} data-testid="button-otw-retry">
+              Try again
+            </Button>
           </AlertDescription>
         </Alert>
       )}

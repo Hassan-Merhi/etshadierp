@@ -18,7 +18,10 @@ describe("tracking containers abort recovery", () => {
   it("recovers aborted tracking requests instead of leaving permanent error UI", () => {
     const boundary = source("client/src/pages/tracking/TrackingContainersTab.tsx");
 
-    expect(boundary).toContain('name === "AbortError"');
+    // The abort check itself lives in @/lib/abortError so every surface that
+    // renders error UI classifies cancellation the same way.
+    expect(boundary).toContain("isAbortError");
+    expect(source("client/src/lib/abortError.ts")).toContain('name === "AbortError"');
     expect(boundary).toContain("queryClient.getQueryCache().subscribe");
     expect(boundary).toContain("queryClient.resetQueries");
     expect(boundary).toContain("recovering.has(query.queryHash)");
