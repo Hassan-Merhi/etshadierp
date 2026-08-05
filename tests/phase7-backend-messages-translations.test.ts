@@ -7,8 +7,8 @@ import {
 
 describe("Phase 7 backend-message translations", () => {
   it("covers every reviewed backend phrase exactly once", () => {
-    expect(backendMessagesPhase7Translations).toHaveLength(400);
-    expect(new Set(backendMessagesPhase7Translations.map((entry) => entry.en)).size).toBe(400);
+    expect(backendMessagesPhase7Translations).toHaveLength(405);
+    expect(new Set(backendMessagesPhase7Translations.map((entry) => entry.en)).size).toBe(405);
 
     for (const entry of backendMessagesPhase7Translations) {
       expect(entry.en.trim()).not.toBe("");
@@ -30,7 +30,7 @@ describe("Phase 7 backend-message translations", () => {
     );
   });
 
-  it("preserves dynamic job, stock, voucher, amount and company references", () => {
+  it("preserves business values while translating nested operational fragments", () => {
     expect(translatePhase7BackendMessageText("Import job JOB-42 not found", "ar")).toBe(
       "لم يتم العثور على مهمة الاستيراد JOB-42"
     );
@@ -47,8 +47,19 @@ describe("Phase 7 backend-message translations", () => {
       )
     ).toBe('السند JV-88: «Office rent» — 1,500 من Main Bank');
     expect(
-      translatePhase7BackendMessageText("Daily ZIP sent to WhatsApp — 3 companies for August; 1 skipped.", "fr")
-    ).toBe("ZIP quotidien envoyé sur WhatsApp — 3 entreprise(s) for August; 1 skipped.");
+      translatePhase7BackendMessageText(
+        "Daily ZIP sent to WhatsApp — 3 companies (start → today) (1 skipped).",
+        "fr"
+      )
+    ).toBe(
+      "ZIP quotidien envoyé sur WhatsApp — 3 entreprise(s) (début → aujourd’hui) (1 ignorée(s))."
+    );
+    expect(
+      translatePhase7BackendMessageText(
+        "Daily ZIP sent to WhatsApp — 3 companies (full history).",
+        "ar"
+      )
+    ).toBe("تم إرسال ملف ZIP اليومي إلى واتساب — 3 شركة (السجل الكامل).");
   });
 
   it("switches directly between Arabic and French", () => {
