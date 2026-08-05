@@ -85,6 +85,7 @@ jobs:
             scripts/run-phase9-language-browser-smoke.mjs \
             scripts/verify-multilingual-phases-4-7-current-main.mjs \
             scripts/verify-phase8-current-main-reconciliation.mjs \
+            scripts/verify-phase9-current-main-release.mjs \
             scripts/verify-phase9-final-i18n-baseline.mjs \
             tests/phase8-rtl-responsive-accessibility.test.ts \
             tests/phase9-final-release-gate.test.ts \
@@ -121,6 +122,7 @@ jobs:
         run: |
           node scripts/verify-multilingual-phases-4-7-current-main.mjs
           node scripts/verify-phase8-current-main-reconciliation.mjs
+          node scripts/verify-phase9-current-main-release.mjs
 
       - name: Final production readiness
         id: readiness
