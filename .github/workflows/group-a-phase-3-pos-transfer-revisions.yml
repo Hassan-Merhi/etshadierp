@@ -17,6 +17,8 @@ jobs:
   implement-and-verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 75
+    env:
+      DATABASE_URL: postgresql://phase3:phase3@127.0.0.1:5432/phase3
     steps:
       - uses: actions/checkout@v4
         with:
@@ -101,4 +103,4 @@ jobs:
           git commit -m "Complete Group A Phase 3 immutable transfer revisions"
           git push origin HEAD:agent/group-a-phase-3-pos-transfer-revisions
 
-# Retrigger after the workflow file exists on the branch.
+# Validation retry uses an isolated non-connecting database URL for module bootstrap.
