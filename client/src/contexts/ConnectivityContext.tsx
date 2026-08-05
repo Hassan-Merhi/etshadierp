@@ -264,7 +264,10 @@ function FullConnectivityProvider({ children }: Props) {
         const { queryClient } = await import("@/lib/queryClient");
         void upsertGlobalSyncState({ lastSyncedAt: evt.detail.lastSyncedAt });
         runWhenIdle(() => {
-          void queryClient.invalidateQueries({ refetchType: "active" });
+          // Let in-flight requests land rather than aborting and restarting
+          // them; the queued writes have just been flushed, so a refetch of
+          // everything not already loading is enough.
+          void queryClient.invalidateQueries({ refetchType: "active" }, { cancelRefetch: false });
         });
       }
       void refreshCounts();

@@ -142,6 +142,24 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     if (options.prefetch) prefetchReferenceData(company.id, company.role);
   }, []);
 
+  /**
+   * Adopts the company the server session already points at.
+   *
+   * This is not a switch: no request has gone anywhere else, so there is
+   * nothing stale to clear. Cancelling and removing here used to abort every
+   * query the page had already started — the sidebar, the route's own data —
+   * and then drop their cache entries, so each page loaded twice on entry and
+   * the aborted requests surfaced as "the operation was aborted" errors. The
+   * cache is in-memory only and logout clears it, so anything already fetched
+   * belongs to this user and this company. Just commit the selection.
+   */
+  const adoptServerCompany = useCallback(
+    (company: Company) => {
+      commitCompanySelection(company, { prefetch: true, serverSynced: true });
+    },
+    [commitCompanySelection]
+  );
+
   const performCompanySelection = useCallback(
     async (company: Company, options: CompanySelectionOptions = {}): Promise<boolean> => {
       if (selectedCompanyRef.current?.id === company.id) {
@@ -231,11 +249,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       .then(async ({ companyId: sessionCompanyId }) => {
         if (sessionCompanyId === target.id) {
           await switchQueueRef.current!.enqueue(async () => {
-            await cancelCompanySessionQueries(queryClient);
-            removeCompanySessionQueries(queryClient, {
-              resetAuthenticatedUser: false,
-            });
-            commitCompanySelection(target, { prefetch: true, serverSynced: true });
+            adoptServerCompany(target);
           });
           return;
         }
@@ -245,12 +259,10 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
 
         const serverCompany = companies.find((company) => company.id === sessionCompanyId);
         if (serverCompany) {
+          // The switch was refused, so the session still points where it did
+          // and the requests already in flight were made against it.
           await switchQueueRef.current!.enqueue(async () => {
-            await cancelCompanySessionQueries(queryClient);
-            removeCompanySessionQueries(queryClient, {
-              resetAuthenticatedUser: false,
-            });
-            commitCompanySelection(serverCompany, { prefetch: true, serverSynced: true });
+            adoptServerCompany(serverCompany);
           });
           return;
         }
@@ -262,7 +274,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         console.error("[Company] Initial company synchronization failed; retrying.", error);
         scheduleInitialSyncRetry();
       });
-  }, [commitCompanySelection, companies, initialSyncAttempt, scheduleInitialSyncRetry, selectCompany, selectedCompany]);
+  }, [adoptServerCompany, companies, initialSyncAttempt, scheduleInitialSyncRetry, selectCompany, selectedCompany]);
 
   return (
     <CompanyContext.Provider
