@@ -56,7 +56,7 @@ jobs:
             client/src/pages/vouchers/StockTransferRevisionHistory.tsx \
             client/src/pages/pos/postransferorders/types.ts \
             client/src/pages/pos/postransferorders/components/ViewTransferDialog.tsx \
-            tests/ui/group-a-phase-3-pos-transfer-revisions.test.ts \
+            tests/group-a-phase-3-pos-transfer-revisions.test.ts \
             tests/startup-schema-integrity.test.ts \
             scripts/verify-group-a-phase-3.mjs
 
@@ -69,7 +69,7 @@ jobs:
       - name: Run Phase 3 focused lifecycle tests
         run: |
           node node_modules/vitest/vitest.mjs run \
-            tests/ui/group-a-phase-3-pos-transfer-revisions.test.ts \
+            tests/group-a-phase-3-pos-transfer-revisions.test.ts \
             --maxWorkers=1 --no-file-parallelism
 
       - name: Type-check
@@ -99,7 +99,7 @@ jobs:
             client/src/pages/vouchers/StockTransferRevisionHistory.tsx \
             client/src/pages/pos/postransferorders/types.ts \
             client/src/pages/pos/postransferorders/components/ViewTransferDialog.tsx \
-            tests/ui/group-a-phase-3-pos-transfer-revisions.test.ts \
+            tests/group-a-phase-3-pos-transfer-revisions.test.ts \
             tests/startup-schema-integrity.test.ts \
             scripts/verify-group-a-phase-3.mjs
           git commit -m "Complete Group A Phase 3 immutable transfer revisions"
