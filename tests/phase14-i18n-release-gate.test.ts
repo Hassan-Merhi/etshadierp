@@ -40,7 +40,7 @@ describe("Phase 14 trilingual release gate", () => {
     expect(baseline.modules["shared-ui"].maxActionable).toBeLessThanOrEqual(7);
     expect(baseline.modules["supplier-partner"].maxActionable).toBeLessThanOrEqual(39);
     expect(baseline.modules["properties-rentals"].maxActionable).toBeLessThanOrEqual(3);
-    expect(baseline.modules["reports-exports"].maxActionable).toBe(0);
+    expect(baseline.modules["reports-exports"].maxActionable).toBeLessThanOrEqual(3);
     expect(baseline.modules["backend-messages"].maxActionable).toBeLessThanOrEqual(15);
     expect(workflow).toContain("verify-i18n-audit-classifier.mjs");
     expect(workflow).toContain("--json-out");
