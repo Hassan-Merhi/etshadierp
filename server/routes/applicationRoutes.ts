@@ -54,6 +54,7 @@ import { registerRemoteSupportRolloutRoutes } from "./remoteSupportRolloutRoutes
 import { installRemoteSupportSessionStopAudit } from "../services/remoteSupportAuditService";
 import { registerReportsRoutes } from "./reportsRoutes";
 import { registerScreenFeedRoutes } from "./screenFeedRoutes";
+import { registerScreenFeedTransportHardening } from "./screenFeedTransportHardening";
 import { registerSpRoutes } from "./sp";
 import { registerSpMigrationRoutes } from "./sp-migration";
 import { registerStatsRoutes } from "./statsRoutes";
@@ -132,6 +133,7 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerLegacyHealthRoutes(app);
   registerAuthRoutes(app);
   registerPasskeyRoutes(app);
+  registerScreenFeedTransportHardening(app);
   registerScreenFeedRoutes(app);
   registerRemoteControlSessionRoutes(app);
   registerRemoteKeyboardControlRoutes(app);
