@@ -57,7 +57,9 @@ describe("Mobile responsiveness Phase 10 performance and offline behavior", () =
       "schedulePoll",
       "scheduleCounts",
       'window.addEventListener("erp:app-visible"',
-      'queryClient.invalidateQueries({ refetchType: "active" })',
+      // cancelRefetch: false keeps a sync-triggered invalidation from aborting
+      // the requests already on their way.
+      'queryClient.invalidateQueries({ refetchType: "active" }, { cancelRefetch: false })',
     ]) {
       expect(connectivity).toContain(token);
     }

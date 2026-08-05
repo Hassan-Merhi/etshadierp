@@ -29,14 +29,24 @@ export function useWsInvalidation() {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = setTimeout(() => {
         if (!unmountedRef.current) {
-          queryClient.invalidateQueries({
-            refetchType: "active",
-            predicate: (query) => {
-              const key = query.queryKey[0];
-              if (typeof key !== "string") return true;
-              return !STABLE_QUERY_PREFIXES.some((prefix) => key.startsWith(prefix));
+          queryClient.invalidateQueries(
+            {
+              refetchType: "active",
+              predicate: (query) => {
+                const key = query.queryKey[0];
+                if (typeof key !== "string") return true;
+                return !STABLE_QUERY_PREFIXES.some((prefix) => key.startsWith(prefix));
+              },
             },
-          });
+            // Do not abort requests that are already on their way. This fires
+            // whenever anyone anywhere writes anything, so with the default
+            // (cancelRefetch: true) every in-flight request on screen is
+            // aborted and restarted several times a minute — the work is
+            // thrown away, the request count doubles, and the aborts surface
+            // as load failures. A request issued moments ago is fresh enough;
+            // let it land and refetch the rest.
+            { cancelRefetch: false },
+          );
         }
       }, 800);
     }
