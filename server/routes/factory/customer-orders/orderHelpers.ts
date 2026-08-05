@@ -1,3 +1,4 @@
+import { toArrayBuffer } from "../../../lib/bufferCompatibility";
 import { db } from "../../../db";
 
 import {
@@ -141,7 +142,7 @@ export async function buildOrderExcelBuffer(
     const logoPath = path.join(process.cwd(), "server", "hmd-logo.png");
     if (fs.existsSync(logoPath)) {
       const logoBuf = fs.readFileSync(logoPath);
-      const logoId = workbook.addImage({ buffer: logoBuf as Buffer, extension: "jpeg" });
+      const logoId = workbook.addImage({ buffer: toArrayBuffer(logoBuf), extension: "jpeg" });
       sheet.addImage(logoId, { tl: { col: 0, row: 0 }, ext: { width: 180, height: 110 } });
     }
   } catch {}
