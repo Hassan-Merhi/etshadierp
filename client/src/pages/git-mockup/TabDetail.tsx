@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertTriangle, FileX, Search, CheckCircle2, XCircle, LayoutGrid, List, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { fmt, fmtD, parseNum, COMPANY_COLORS, getRealRowBg } from "./helpers";
+import { fmt, fmtD, gitContainersUrl, parseNum, COMPANY_COLORS, getRealRowBg } from "./helpers";
 import { WorkbookLegend, RealWorkbookBlock } from "./WorkbookBlock";
 import type { GitContainersResponse, EnrichedContainerApi, CompanyViewMode } from "./types";
 
@@ -15,7 +15,7 @@ export function TabDetail() {
   const [view, setView] = useState<"workbook" | "flat">("workbook");
   const [search, setSearch] = useState("");
 
-  const queryUrl = companyMode === "all" ? "/api/git/containers?allCompanies=true" : "/api/git/containers";
+  const queryUrl = gitContainersUrl({ allCompanies: companyMode === "all" });
 
   const { data, isLoading, isError, error } = useQuery<GitContainersResponse>({
     queryKey: [queryUrl],
