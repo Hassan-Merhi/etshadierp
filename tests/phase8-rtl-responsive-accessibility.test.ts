@@ -31,16 +31,26 @@ describe("Phase 8 RTL responsive accessibility contract", () => {
   it("keeps business values isolated while forcing codes and numbers to LTR", () => {
     const css = read("client/src/styles/rtl-hardening.css");
 
-    expect(css).toContain("[data-business-value]");
-    expect(css).toContain("[data-company-name]");
-    expect(css).toContain("[data-account-name]");
-    expect(css).toContain("[data-article-code]");
-    expect(css).toContain("[data-container-number]");
-    expect(css).toContain("[data-voucher-number]");
-    expect(css).toContain("[data-currency-value]");
-    expect(css).toContain('input[inputmode="decimal"]');
-    expect(css).toContain("unicode-bidi: isolate");
-    expect(css).toContain("direction: ltr");
+    for (const token of [
+      "[data-business-value]",
+      "[data-stock-name]",
+      "[data-stock-item-name]",
+      "[data-stock-group]",
+      "[data-stock-group-name]",
+      "[data-company-name]",
+      "[data-account-name]",
+      "[data-article-code]",
+      "[data-container-number]",
+      "[data-voucher-number]",
+      "[data-currency-value]",
+      "[data-money-value]",
+      "[data-quantity-value]",
+      'input[inputmode="decimal"]',
+      "unicode-bidi: isolate",
+      "direction: ltr",
+    ]) {
+      expect(css).toContain(token);
+    }
   });
 
   it("hardens shared overlays, sidebars, top bars and horizontal data", () => {
@@ -62,6 +72,7 @@ describe("Phase 8 RTL responsive accessibility contract", () => {
       "forced-colors",
       "pointer: coarse",
       "focus-visible",
+      "scrollbar-gutter: stable both-edges",
     ]) {
       expect(css).toContain(token);
     }
@@ -70,12 +81,42 @@ describe("Phase 8 RTL responsive accessibility contract", () => {
     expect(dialog).toContain('data-slot="dialog-close"');
     expect(dialog).toContain('data-slot="dialog-header"');
     expect(dialog).toContain('data-slot="dialog-footer"');
+    expect(dialog).not.toContain("handleCloseAutoFocus");
+    expect(dialog).not.toContain("onCloseAutoFocus={handleCloseAutoFocus}");
     expect(sheet).toContain('data-slot="sheet-content"');
     expect(sheet).toContain('data-slot="sheet-close"');
     expect(sheet).toContain("data-sheet-side={side}");
     expect(topBar).toContain("useApplicationDirection");
     expect(topBar).toContain('data-slot="app-top-bar-actions"');
     expect(responsive).toContain('data-horizontal-scroll-region="true"');
+    expect(responsive).toContain('aria-keyshortcuts="ArrowLeft ArrowRight"');
+    expect(responsive).toContain("event.currentTarget.scrollBy");
+  });
+
+  it("focuses the actual main landmark when skip navigation is activated", () => {
+    const responsive = read("client/src/components/ui/responsive-accessibility.tsx");
+
+    expect(responsive).toContain("getHashTarget");
+    expect(responsive).toContain("target.focus({ preventScroll: true })");
+    expect(responsive).toContain('target.scrollIntoView({ block: "start" })');
+    expect(responsive).toContain("history.replaceState");
+  });
+
+  it("mirrors left and right sheets and sidebars independently", () => {
+    const css = read("client/src/styles/rtl-hardening.css");
+
+    for (const token of [
+      '[data-slot="sheet-content"][data-sheet-side="left"]',
+      '[data-slot="sheet-content"][data-sheet-side="right"]',
+      '[data-slot="sidebar"][data-side="left"]',
+      '[data-slot="sidebar"][data-side="right"]',
+      '[data-mobile="true"][data-sheet-side="left"]',
+      '[data-mobile="true"][data-sheet-side="right"]',
+      "--tw-enter-translate-x: 100%",
+      "--tw-enter-translate-x: -100%",
+    ]) {
+      expect(css).toContain(token);
+    }
   });
 
   it("provides translated skip navigation in every application shell", () => {
