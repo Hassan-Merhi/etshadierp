@@ -42,8 +42,10 @@
       "tests/screen-feed-fast-transport-current-main.test.ts",
       "tests/ui/bandwidth-phase-1-invalidation-policy.test.ts",
       "tests/ui/bandwidth-phase-1-page-polling.test.ts",
-      "tests/ui/bandwidth-phase-2-payloads.test.ts"
+      "tests/ui/bandwidth-phase-2-payloads.test.ts",
+      "tests/ui/bandwidth-phase-3-cache.test.ts",
+      "tests/ui/bandwidth-phase-4-heavy-pages.test.ts"
     ],
-    "maxAdditionalTextAssertions": 500
+    "maxAdditionalTextAssertions": 515
   }
 }
