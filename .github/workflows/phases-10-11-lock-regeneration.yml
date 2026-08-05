@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 jobs:
-  regenerate-and-verify:
+  repair-and-verify:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -30,31 +30,40 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: npm
 
-      - name: Apply Phase 10 and 11 versions
-        run: node scripts/regenerate-phases-10-11.mjs
+      - name: Install regenerated dependency graph
+        run: npm ci --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org/
 
-      - name: Regenerate npm lockfile
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org/
+      - name: Apply Node 26 buffer compatibility
+        run: node scripts/apply-node26-buffer-compat.mjs
 
-      - name: Regenerate pnpm lockfile
+      - name: Format compatibility changes
         shell: bash
         run: |
-          corepack enable
-          corepack prepare pnpm@10.14.0 --activate
-          pnpm install --lockfile-only --ignore-scripts --no-frozen-lockfile
+          node node_modules/prettier/bin/prettier.cjs --write \
+            server/lib/bufferCompatibility.ts \
+            server/excelHelper.ts \
+            server/routes/accountStatementRoutes.ts \
+            server/routes/factory-payroll/exports.ts \
+            server/routes/factory-reports/_helpers.ts \
+            server/routes/factory/customer-orders/orderHelpers.ts \
+            server/routes/factory/customer-orders/pdf-export/loading-status.ts \
+            server/routes/factory/customer-orders/pdf-export/pending.ts \
+            server/routes/factory/customer-proformas/exports.ts \
+            server/routes/factory/customers-core/statement-excel.ts \
+            server/routes/payroll/core/preview.ts \
+            server/services/export-excel/workbook.ts \
+            server/services/sp-sales-form/generate.ts \
+            server/services/whatsappService.ts
 
-      - name: Commit coherent dependency graph
+      - name: Commit compatibility repairs
         shell: bash
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add package.json package-lock.json pnpm-lock.yaml render.yaml .nvmrc
+          git add server
           git diff --cached --check
-          git commit -m "chore(deps): complete phases 10 and 11 upgrades"
+          git commit -m "fix: support TypeScript 6 and Node 26 buffer types"
           git push origin HEAD:agent/phases-10-11-lock-regeneration-current-main
-
-      - name: Install regenerated dependency graph
-        run: npm ci --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org/
 
       - name: Type-check major SDK and runtime upgrades
         run: npm run check
