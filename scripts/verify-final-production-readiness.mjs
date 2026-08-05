@@ -86,6 +86,7 @@ requireMarkers("docs/historical-replay-phase-8-production-readiness.md", [
 const renderConfig = requireMarkers("render.yaml", [
   "healthCheckPath: /api/health/ready",
   "startCommand: npm start",
+  "autoDeployTrigger: checksPass",
 ]);
 
 for (const forbidden of ["HISTORICAL_REPLAY_APPLY_MODE", "HISTORICAL_REPLAY_RELEASE_ID", "MIGRATION_CONFIRMATION"]) {
