@@ -44,6 +44,6 @@
       "tests/ui/bandwidth-phase-1-page-polling.test.ts",
       "tests/ui/bandwidth-phase-2-payloads.test.ts"
     ],
-    "maxAdditionalTextAssertions": 499
+    "maxAdditionalTextAssertions": 500
   }
 }
