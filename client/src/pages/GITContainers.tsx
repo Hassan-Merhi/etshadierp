@@ -25,6 +25,7 @@ import {
 import { PageHeader } from "@/components/PageHeader";
 import { PaginationBar } from "@/components/PaginationBar";
 import { cn } from "@/lib/utils";
+import { isBlockingQueryError } from "@/lib/abortError";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { authenticatedUserQueryOptions } from "@/contracts/sessionQueryContracts";
@@ -276,7 +277,9 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     );
   }
 
-  if (isError) {
+  // A cancelled request never failed, and a failed refetch that left the last
+  // page on screen does not warrant replacing it with an error screen.
+  if (isBlockingQueryError(isError ? error : null, allContainers.length > 0)) {
     return (
       <div className="flex flex-col h-full overflow-hidden">
         {!embedded && <PageHeader title="Containers OTW" subtitle="Active container logistics and tracking" />}

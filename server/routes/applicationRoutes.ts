@@ -89,9 +89,15 @@ import { registerIntercompanyPosConfigRoutes } from "./pos/intercompanyPosConfig
 function registerWriteInvalidationSignal(app: Express): void {
   app.use((req, res, next) => {
     if (["POST", "PATCH", "PUT", "DELETE"].includes(req.method)) {
+      // Read the company off the session before the handler runs: a write that
+      // changes the session (set-company, logout) would otherwise be attributed
+      // to whichever company the session ended up in.
+      const companyId = Number((req.session as any)?.currentCompanyId) || null;
       res.on("finish", () => {
         if (res.statusCode >= 200 && res.statusCode < 300) {
-          broadcast({ type: "invalidate" });
+          // A write only concerns the company it happened in. Clients elsewhere
+          // used to refetch everything on screen for it.
+          broadcast({ type: "invalidate" }, { companyId });
         }
       });
     }

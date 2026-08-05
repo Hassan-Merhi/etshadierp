@@ -1,4 +1,5 @@
-import { lazy, type ReactNode, Suspense, useEffect } from "react";
+import { type ReactNode, Suspense, useEffect } from "react";
+import { lazyRetry as lazy } from "@/lib/lazyRetry";
 import { useLocation } from "wouter";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";

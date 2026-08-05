@@ -4,14 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { fmt, fmtD, parseNum, getRealRowBg } from "./helpers";
+import { fmt, fmtD, gitContainersUrl, parseNum, getRealRowBg } from "./helpers";
 import type { GitContainersResponse, EnrichedContainerApi, CompanyViewMode } from "./types";
 import { PORT_BUCKETS as BUCKETS } from "./types";
 
 export function TabPortReport() {
   const [companyMode, setCompanyMode] = useState<CompanyViewMode>("session");
 
-  const queryUrl = companyMode === "all" ? "/api/git/containers?allCompanies=true" : "/api/git/containers";
+  const queryUrl = gitContainersUrl({ allCompanies: companyMode === "all" });
 
   const { data, isLoading, isError, error } = useQuery<GitContainersResponse>({
     queryKey: [queryUrl],

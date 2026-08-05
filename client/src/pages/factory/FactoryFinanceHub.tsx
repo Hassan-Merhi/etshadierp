@@ -1,4 +1,5 @@
-import { Suspense, lazy } from "react";
+import { Suspense } from "react";
+import { lazyRetry as lazy } from "@/lib/lazyRetry";
 import { useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { HardHat, Users, UserRound, FileText, Landmark } from "lucide-react";

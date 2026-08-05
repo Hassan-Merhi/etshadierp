@@ -1,12 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCompany } from "@/contexts/CompanyContext";
+import { isAbortError } from "@/lib/abortError";
 import GITContainers from "@/pages/GITContainers";
-
-function isAbortError(error: unknown): boolean {
-  const name = (error as { name?: string } | null)?.name;
-  return name === "AbortError";
-}
 
 /**
  * Containers OTW loads a large, company-scoped query. Two things used to leave

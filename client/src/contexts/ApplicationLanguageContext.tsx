@@ -80,7 +80,7 @@ export function ApplicationLanguageProvider({ children }: { children: ReactNode 
       setLanguageState(normalized);
       window.dispatchEvent(new CustomEvent<ApplicationLanguage>(APPLICATION_LANGUAGE_EVENT, { detail: normalized }));
       preferenceMutation.mutate(normalized);
-      void queryClient.invalidateQueries({ refetchType: "active" });
+      void queryClient.invalidateQueries({ refetchType: "active" }, { cancelRefetch: false });
     },
     [preferenceMutation.mutate]
   );

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, FileX, MessageSquare, CheckCircle2, Truck, DollarSign } from "lucide-react";
-import { fmt, fmtD, parseNum } from "./helpers";
+import { fmt, fmtD, gitContainersUrl, parseNum } from "./helpers";
 import type { GitContainersResponse, EnrichedContainerApi, CompanyViewMode } from "./types";
 
 export function TabWhatsApp() {
@@ -13,7 +13,7 @@ export function TabWhatsApp() {
   const [inclAgents, setInclAgents] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const queryUrl = companyMode === "all" ? "/api/git/containers?allCompanies=true" : "/api/git/containers";
+  const queryUrl = gitContainersUrl({ allCompanies: companyMode === "all" });
 
   const { data, isLoading, isError, error } = useQuery<GitContainersResponse>({
     queryKey: [queryUrl],
