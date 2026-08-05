@@ -8,6 +8,7 @@ import { backendMessagesPhase7TranslationsPart5 } from "./backendMessagesPhase7T
 import { backendMessagesPhase7TranslationsPart6 } from "./backendMessagesPhase7Translations.part6";
 import { backendMessagesPhase7TranslationsPart7 } from "./backendMessagesPhase7Translations.part7";
 import { backendMessagesPhase7TranslationsPart8 } from "./backendMessagesPhase7Translations.part8";
+import { backendMessagesPhase7TranslationsPart9 } from "./backendMessagesPhase7Translations.part9";
 
 export const backendMessagesPhase7Translations: readonly Phase7BackendMessagesEntry[] = [
   ...backendMessagesPhase7TranslationsPart1,
@@ -18,11 +19,13 @@ export const backendMessagesPhase7Translations: readonly Phase7BackendMessagesEn
   ...backendMessagesPhase7TranslationsPart6,
   ...backendMessagesPhase7TranslationsPart7,
   ...backendMessagesPhase7TranslationsPart8,
+  ...backendMessagesPhase7TranslationsPart9,
 ];
 
 const languages = ["en", "ar", "fr"] as const;
 const englishTemplateToken = /\$\{[^}]+\}/g;
 const indexedTemplateToken = /\{(\d+)\}/g;
+const MAX_NESTED_CAPTURE_DEPTH = 2;
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -51,7 +54,9 @@ function templateSpecificity(value: string): number {
 function hasTranslatableStaticText(value: string): boolean {
   indexedTemplateToken.lastIndex = 0;
   const staticText = value.replace(indexedTemplateToken, "");
-  return /[\p{L}\p{N}]/u.test(staticText);
+  indexedTemplateToken.lastIndex = 0;
+  const placeholderCount = Array.from(value.matchAll(indexedTemplateToken)).length;
+  return /[\p{L}\p{N}]/u.test(staticText) || (placeholderCount >= 2 && staticText.includes("→"));
 }
 
 type CompiledTemplate = {
@@ -122,7 +127,30 @@ function renderTemplate(template: string, values: readonly string[]): string {
   return template.replace(indexedTemplateToken, (_token, rawIndex: string) => values[Number(rawIndex)] ?? "");
 }
 
-function translateCompiledTemplate(value: string, language: ApplicationLanguage): string | null {
+function translateNormalizedValue(
+  value: string,
+  language: ApplicationLanguage,
+  depth: number
+): string | null {
+  const exactEntry = exactEntryByVisibleText.get(value);
+  return exactEntry?.[language] ?? translateCompiledTemplate(value, language, depth);
+}
+
+function translateCapturedValue(value: string, language: ApplicationLanguage, depth: number): string {
+  if (depth >= MAX_NESTED_CAPTURE_DEPTH) return value;
+  const leading = value.match(/^\s*/)?.[0] ?? "";
+  const trailing = value.match(/\s*$/)?.[0] ?? "";
+  const normalized = value.trim();
+  if (!normalized) return value;
+  const translated = translateNormalizedValue(normalized, language, depth + 1);
+  return translated === null ? value : `${leading}${translated}${trailing}`;
+}
+
+function translateCompiledTemplate(
+  value: string,
+  language: ApplicationLanguage,
+  depth = 0
+): string | null {
   for (const template of compiledTemplates) {
     for (const sourceLanguage of languages) {
       const match = template.patterns[sourceLanguage].exec(value);
@@ -131,7 +159,7 @@ function translateCompiledTemplate(value: string, language: ApplicationLanguage)
       const values: string[] = [];
       const order = template.captureOrder[sourceLanguage];
       for (let index = 0; index < order.length; index += 1) {
-        values[order[index]] = match[index + 1];
+        values[order[index]] = translateCapturedValue(match[index + 1], language, depth);
       }
       return renderTemplate(template.render[language], values);
     }
@@ -154,7 +182,6 @@ export function translatePhase7BackendMessageText(value: string, language: Appli
   const normalized = value.trim();
   if (!normalized) return null;
 
-  const exactEntry = exactEntryByVisibleText.get(normalized);
-  const translated = exactEntry?.[language] ?? translateCompiledTemplate(normalized, language);
+  const translated = translateNormalizedValue(normalized, language, 0);
   return translated === null ? null : `${leading}${translated}${trailing}`;
 }
