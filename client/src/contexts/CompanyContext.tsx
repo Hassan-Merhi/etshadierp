@@ -26,6 +26,7 @@ const PREFETCH_KEYS = [
 ] as const;
 
 const MAX_INITIAL_SYNC_FAILURES = 3;
+const COMPANY_SYNC_FAILURE_CODE = "COMPANY_SYNC_FAILED";
 
 function prefetchReferenceData(companyId: number, role?: string) {
   if (role === "POS") return;
@@ -272,7 +273,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       void selectCompany(target, { offline: true })
         .then((ok) => {
           if (ok) clearInitialSyncFailure();
-          else scheduleInitialSyncRetry(new Error("COMPANY_SYNC_FAILED"));
+          else scheduleInitialSyncRetry(new Error(COMPANY_SYNC_FAILURE_CODE));
         })
         .catch(scheduleInitialSyncRetry);
       return;
@@ -307,7 +308,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
         }
 
         console.error("[Company] Failed to synchronize the initial company selection; retrying.");
-        scheduleInitialSyncRetry(new Error("COMPANY_SYNC_FAILED"));
+        scheduleInitialSyncRetry(new Error(COMPANY_SYNC_FAILURE_CODE));
       })
       .catch((error: unknown) => {
         console.error("[Company] Initial company synchronization failed; retrying.", error);
