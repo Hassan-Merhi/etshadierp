@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { apiRequest } from "@/lib/queryClient";
+import { companyQueryKey } from "@/lib/companyQueryScope";
+import { liveCountQueryPolicy, stableReferenceQueryPolicy } from "@/lib/queryPolicies";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -119,23 +121,23 @@ export function NotificationsCenter() {
 
   // ── Unread count (scoped to current company) ──────────────────────────────────
   const { data: unreadData } = useQuery<{ count: number }>({
-    queryKey: ["/api/notifications/unread-count", companyId],
+    queryKey: companyQueryKey("/api/notifications/unread-count", companyId),
     queryFn: async () => {
       const r = await fetch("/api/notifications/unread-count", { credentials: "include" });
       return r.ok ? r.json() : { count: 0 };
     },
-    refetchInterval: 30_000,
-    staleTime: 20_000,
+    ...liveCountQueryPolicy(60_000),
+    enabled: !!companyId,
   });
 
   const { data: icCountData } = useQuery<{ count: number }>({
-    queryKey: ["/api/intercompany-requests/pending-count"],
+    queryKey: companyQueryKey("/api/intercompany-requests/pending-count", companyId),
     queryFn: async () => {
       const r = await fetch("/api/intercompany-requests/pending-count", { credentials: "include" });
       return r.ok ? r.json() : { count: 0 };
     },
-    refetchInterval: 30_000,
-    staleTime: 20_000,
+    ...liveCountQueryPolicy(60_000),
+    enabled: !!companyId,
   });
 
   const totalBadge = (unreadData?.count ?? 0) + (icCountData?.count ?? 0);
@@ -143,7 +145,7 @@ export function NotificationsCenter() {
   // ── Notifications list — always unread only, scoped to current company ────────
   const typeParam = activeTab === "all" || activeTab === "intercompany" ? undefined : activeTab;
 
-  const qKey = ["/api/notifications", activeTab, companyId];
+  const qKey = companyQueryKey("/api/notifications", companyId, activeTab);
   const { data: notifList = [], isLoading: notifLoading } = useQuery<NotificationItem[]>({
     queryKey: qKey,
     queryFn: async () => {
@@ -152,36 +154,37 @@ export function NotificationsCenter() {
       const r = await fetch(`/api/notifications?${params}`, { credentials: "include" });
       return r.ok ? r.json() : [];
     },
-    enabled: open && activeTab !== "intercompany",
-    refetchInterval: 30_000,
+    ...liveCountQueryPolicy(60_000),
+    enabled: open && activeTab !== "intercompany" && !!companyId,
   });
 
   // ── IC requests ───────────────────────────────────────────────────────────────
   const { data: icRequests = [], isLoading: icLoading } = useQuery<ICRequest[]>({
-    queryKey: ["/api/intercompany-requests", "pending"],
+    queryKey: companyQueryKey("/api/intercompany-requests", companyId, "pending"),
     queryFn: async () => {
       const r = await fetch("/api/intercompany-requests?status=pending", { credentials: "include" });
       return r.ok ? r.json() : [];
     },
-    enabled: open && activeTab === "intercompany",
-    refetchInterval: 30_000,
+    ...liveCountQueryPolicy(60_000),
+    enabled: open && activeTab === "intercompany" && !!companyId,
   });
 
   // Dest accounts for IC approve dialog
   const { data: destAccounts = [] } = useQuery<LedgerAccount[]>({
-    queryKey: ["/api/ledger-accounts", approveReq?.destCompanyId],
+    queryKey: companyQueryKey("/api/ledger-accounts", approveReq?.destCompanyId),
     queryFn: async () => {
       if (!approveReq?.destCompanyId) return [];
       const r = await fetch(`/api/ledger-accounts?companyId=${approveReq.destCompanyId}`, { credentials: "include" });
       return r.ok ? r.json() : [];
     },
-    enabled: !!approveReq,
+    ...stableReferenceQueryPolicy,
+    enabled: !!approveReq?.destCompanyId,
   });
 
   // ── Mutations ─────────────────────────────────────────────────────────────────
   const invalidateNotifs = () => {
-    queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/notifications"], refetchType: "active" });
+    queryClient.invalidateQueries({ queryKey: ["/api/notifications/unread-count"], refetchType: "active" });
   };
 
   const markReadMutation = useMutation({
@@ -198,8 +201,8 @@ export function NotificationsCenter() {
   });
 
   const invalidateIC = () => {
-    queryClient.invalidateQueries({ queryKey: ["/api/intercompany-requests"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/intercompany-requests/pending-count"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/intercompany-requests"], refetchType: "active" });
+    queryClient.invalidateQueries({ queryKey: ["/api/intercompany-requests/pending-count"], refetchType: "active" });
   };
 
   const approveMutation = useMutation({

@@ -2,6 +2,7 @@ import { QueryClient, QueryFunction, MutationCache, QueryCache } from "@tanstack
 import { isSafeToQueue, enqueueRequest, getDescriptionForRequest } from "./offlineQueue";
 import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
 import { toast } from "@/hooks/use-toast";
+import { accessQueryPolicy, stableReferenceQueryPolicy, stableSettingsQueryPolicy } from "./queryPolicies";
 
 /* ── Timezone-aware date utility ───────────────────────────────────────────── */
 // Stores the configured timezone for the current company.
@@ -587,3 +588,34 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+export const STABLE_REFERENCE_QUERY_PREFIXES = [
+  "/api/ledger-accounts",
+  "/api/locations",
+  "/api/suppliers",
+  "/api/customers",
+  "/api/employees",
+  "/api/bank-accounts",
+  "/api/fixed-assets",
+  "/api/stock-groups",
+  "/api/stock-categories",
+  "/api/stock-grades",
+] as const;
+
+export const STABLE_SETTINGS_QUERY_PREFIXES = [
+  "/api/company-settings",
+  "/api/factory/settings",
+  "/api/user/preferences",
+] as const;
+
+export const ACCESS_QUERY_PREFIXES = ["/api/my-erp-pages", "/api/factory/my-access"] as const;
+
+for (const prefix of STABLE_REFERENCE_QUERY_PREFIXES) {
+  queryClient.setQueryDefaults([prefix], stableReferenceQueryPolicy);
+}
+for (const prefix of STABLE_SETTINGS_QUERY_PREFIXES) {
+  queryClient.setQueryDefaults([prefix], stableSettingsQueryPolicy);
+}
+for (const prefix of ACCESS_QUERY_PREFIXES) {
+  queryClient.setQueryDefaults([prefix], accessQueryPolicy);
+}
