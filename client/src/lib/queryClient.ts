@@ -3,6 +3,7 @@ import { isSafeToQueue, enqueueRequest, getDescriptionForRequest } from "./offli
 import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
 import { toast } from "@/hooks/use-toast";
 import { accessQueryPolicy, stableReferenceQueryPolicy, stableSettingsQueryPolicy } from "./queryPolicies";
+import { isAbortError } from "./abortError";
 
 /* ── Timezone-aware date utility ───────────────────────────────────────────── */
 // Stores the configured timezone for the current company.
@@ -581,7 +582,14 @@ export const queryClient = new QueryClient({
       refetchOnReconnect: false,
       staleTime: 5 * 60 * 1000,
       gcTime: 30 * 60 * 1000,
-      retry: false,
+      // Failures are not retried — a 4xx/5xx is real and the page should say so.
+      // An abort is different: the request was cancelled, by a page the user has
+      // already left or by a request guard reclaiming a shared fetch, and
+      // rendering it as a failure asks the user to act on something that never
+      // failed. Retry those once so the query resolves instead of settling into
+      // an error state nobody can clear without a page reload.
+      retry: (failureCount, error) => isAbortError(error) && failureCount < 1,
+      retryDelay: 250,
     },
     mutations: {
       retry: false,
