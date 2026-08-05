@@ -133,7 +133,9 @@ describe("stock transfer optional lifecycle", () => {
     expect(result.transition).toBe("draft-edit");
     expect(result.inventoryApplied).toBe(false);
     expect(result.items).toHaveLength(2);
-    expect([await inventoryQty(sourceAId), await inventoryQty(sourceBId), await inventoryQty(destinationId)]).toEqual(before);
+    expect([await inventoryQty(sourceAId), await inventoryQty(sourceBId), await inventoryQty(destinationId)]).toEqual(
+      before
+    );
 
     const [transfer] = await db.select().from(stockTransferVouchers).where(eq(stockTransferVouchers.id, transferId));
     expect(transfer.sourceLocationId).toBeNull();
@@ -157,7 +159,9 @@ describe("stock transfer optional lifecycle", () => {
     const before = [await inventoryQty(sourceAId), await inventoryQty(sourceBId), await inventoryQty(destinationId)];
     const second = await finalizeOptionalStockTransfer(companyId, voucherId);
     expect(second.transition).toBe("no-op");
-    expect([await inventoryQty(sourceAId), await inventoryQty(sourceBId), await inventoryQty(destinationId)]).toEqual(before);
+    expect([await inventoryQty(sourceAId), await inventoryQty(sourceBId), await inventoryQty(destinationId)]).toEqual(
+      before
+    );
   });
 
   it("reverses the old posted quantities before applying a posted edit", async () => {
