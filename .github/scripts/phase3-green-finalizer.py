@@ -40,7 +40,7 @@ replace_once(
 # lazyPages deliberately aliases the retry wrapper as lazy. Both architecture
 # tests must recognize the resilient import rather than require React.lazy.
 for path in ["tests/frontend-lazy-imports.test.ts", "tests/frontend-layout.test.ts"]:
-    replace_once(path, 'toContain("import { lazy }")', 'toContain("import { lazyRetry as lazy }")')
+    replace_once(path, "import { lazy }", "import { lazyRetry as lazy }")
 
 # The production helper intentionally caps remote-screen capture at viewport
 # scale to avoid 25% more pixels. Align the stale assertion with that policy.
