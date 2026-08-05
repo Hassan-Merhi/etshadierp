@@ -62,6 +62,15 @@ jobs:
           python /tmp/phase3-green-finalizer.py
           git add -A
 
+      - name: Verify migration registry
+        run: node scripts/verify-migration-registry.mjs --json
+
+      - name: Prepare disposable database schema
+        run: node node_modules/drizzle-kit/bin.cjs push --force
+
+      - name: Verify disposable database schema
+        run: node scripts/verify-ci-disposable-schema.mjs
+
       - name: Regenerate reviewed route manifest
         run: UPDATE_ROUTE_MANIFEST=1 npm run test:backend -- route-manifest
 
@@ -91,15 +100,6 @@ jobs:
 
       - name: TypeScript
         run: npm run check
-
-      - name: Verify migration registry
-        run: node scripts/verify-migration-registry.mjs --json
-
-      - name: Prepare disposable database schema
-        run: node node_modules/drizzle-kit/bin.cjs push --force
-
-      - name: Verify disposable database schema
-        run: node scripts/verify-ci-disposable-schema.mjs
 
       - name: Full backend tests
         run: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
