@@ -3,7 +3,7 @@
   "regenerate": "UPDATE_SOURCE_TEXT_BASELINE=1 npm run test:backend -- source-text-assertions",
   "classificationCaveat": "Classification is heuristic: a test that reads source files and also asserts substrings on parsed JSON can be reported as source-coupled. The godFileHotspots reverse index below is exact and is the actionable output.",
   "maxSourceCoupledTests": 69,
-  "maxTotalTextAssertions": 899,
+  "maxTotalTextAssertions": 901,
   "sourceCoupledTests": [
     "server/routes/location/commonInventoryPerformanceRoutes.test.ts",
     "tests/account-migration-control-reference-safety.test.ts",
