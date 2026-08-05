@@ -14,6 +14,15 @@ const EXPECTED_ANONYMOUS_SESSION_REASONS = new Set([
   "SESSION_USER_REQUIRED",
 ]);
 
+// Session expiry is a normal lifecycle event (browser left open, user idle, etc.).
+// Log at WARN so operators can distinguish routine expiry from real security incidents.
+const SESSION_EXPIRY_REASONS = new Set([
+  "SESSION_IDLE_EXPIRED",
+  "SESSION_ABSOLUTE_EXPIRED",
+  "SESSION_TIMESTAMPS_INVALID",
+  "SESSION_COMPANY_REQUIRED",
+]);
+
 function logDenied(params: {
   userId?: string | null;
   username?: string | null;
@@ -40,6 +49,11 @@ function logDenied(params: {
 
   if (isExpectedAnonymousRequest) {
     logger.info(payload);
+    return;
+  }
+
+  if (SESSION_EXPIRY_REASONS.has(params.reason)) {
+    logger.warn(payload);
     return;
   }
 
