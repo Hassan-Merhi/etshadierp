@@ -166,4 +166,25 @@ export const phase3SharedUiTranslationsPart5: readonly Phase3SharedUiEntry[] = [
   },
   { en: "Refresh application", ar: "تحديث التطبيق", fr: "Actualiser l’application" },
   { en: "Completed successfully", ar: "اكتمل بنجاح", fr: "Terminé avec succès" },
+  { en: "Superseded", ar: "تم استبدالها", fr: "Remplacée" },
+  { en: "Was", ar: "السابق", fr: "Avant" },
+  { en: "Now", ar: "الآن", fr: "Maintenant" },
+  {
+    en: "Failed to load order.",
+    ar: "فشل تحميل أمر التحويل.",
+    fr: "Échec du chargement de l’ordre de transfert.",
+  },
+  {
+    en: "Pending Admin Review",
+    ar: "بانتظار مراجعة المسؤول",
+    fr: "En attente de validation administrative",
+  },
+  { en: "Revision History", ar: "سجل المراجعات", fr: "Historique des révisions" },
+  { en: "No revisions yet", ar: "لا توجد مراجعات بعد", fr: "Aucune révision pour le moment" },
+  {
+    en: "Pending POS adjustment — awaiting admin approval",
+    ar: "تعديل نقطة البيع قيد الانتظار — بانتظار موافقة المسؤول",
+    fr: "Ajustement du point de vente en attente — validation administrative requise",
+  },
+  { en: "Approve", ar: "موافقة", fr: "Approuver" },
 ];

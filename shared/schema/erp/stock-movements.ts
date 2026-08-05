@@ -1,4 +1,15 @@
-import { pgTable, text, varchar, serial, integer, decimal, boolean, timestamp } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  varchar,
+  serial,
+  integer,
+  decimal,
+  boolean,
+  timestamp,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { locations } from "../common";
@@ -121,15 +132,35 @@ export const insertStockAdjustmentItemSchema = createInsertSchema(stockAdjustmen
 export type InsertStockAdjustmentItem = z.infer<typeof insertStockAdjustmentItemSchema>;
 export type StockAdjustmentItem = typeof stockAdjustmentItems.$inferSelect;
 
-export const stockTransferRevisions = pgTable("stock_transfer_revisions", {
-  id: serial("id").primaryKey(),
-  transferId: integer("transfer_id").notNull(),
-  revisionNumber: integer("revision_number").notNull(),
-  note: text("note"),
-  optional: boolean("optional").default(false).notNull(),
-  revisionDate: timestamp("revision_date").notNull().defaultNow(),
-  createdBy: varchar("created_by"),
-});
+export const stockTransferRevisions = pgTable(
+  "stock_transfer_revisions",
+  {
+    id: serial("id").primaryKey(),
+    transferId: integer("transfer_id").notNull(),
+    revisionNumber: integer("revision_number").notNull(),
+    note: text("note"),
+    optional: boolean("optional").default(false).notNull(),
+    revisionDate: timestamp("revision_date").notNull().defaultNow(),
+    createdBy: varchar("created_by"),
+    status: text("status").notNull().default("pending"),
+    reviewedAt: timestamp("reviewed_at"),
+    reviewedBy: varchar("reviewed_by"),
+    rejectionReason: text("rejection_reason"),
+    supersededByRevisionId: integer("superseded_by_revision_id"),
+    payloadHash: varchar("payload_hash", { length: 64 }),
+  },
+  (table) => ({
+    transferRevisionUnique: uniqueIndex("stock_transfer_revisions_transfer_number_unique").on(
+      table.transferId,
+      table.revisionNumber
+    ),
+    transferStatusRevisionIndex: index("stock_transfer_revisions_transfer_status_number_idx").on(
+      table.transferId,
+      table.status,
+      table.revisionNumber
+    ),
+  })
+);
 
 export const stockTransferRevisionItems = pgTable("stock_transfer_revision_items", {
   id: serial("id").primaryKey(),
