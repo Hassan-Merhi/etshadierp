@@ -40,7 +40,8 @@ export function normalizeImmutableRevisionItems(
     if (Math.abs(delta) < 0.0005) continue;
 
     const key = `${stockItemId}:${sourceLocationId}`;
-    if (byKey.has(key)) throw new Error(`Revision contains duplicate item ${stockItemId} at source ${sourceLocationId}`);
+    if (byKey.has(key))
+      throw new Error(`Revision contains duplicate item ${stockItemId} at source ${sourceLocationId}`);
     byKey.set(key, {
       stockItemId,
       stockItemName: String(raw.stockItemName || `Item ${stockItemId}`).trim(),
@@ -59,10 +60,7 @@ export function normalizeImmutableRevisionItems(
   return normalized;
 }
 
-export function immutableRevisionPayloadHash(
-  items: NormalizedImmutableRevisionItem[],
-  note: string | null
-): string {
+export function immutableRevisionPayloadHash(items: NormalizedImmutableRevisionItem[], note: string | null): string {
   return createHash("sha256")
     .update(
       JSON.stringify({

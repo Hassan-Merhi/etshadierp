@@ -49,13 +49,23 @@ export interface RevisionItem {
   newQuantity: string;
 }
 
+export type RevisionStatus = "pending" | "approved" | "rejected" | "cancelled" | "superseded";
+
 export interface Revision {
   id: number;
   revisionNumber: number;
   note?: string;
   optional: boolean;
-  createdBy?: number | null;
+  status: RevisionStatus;
+  createdBy?: string | number | null;
   createdAt: string;
+  revisionDate?: string;
+  reviewedAt?: string | null;
+  reviewedBy?: string | null;
+  rejectionReason?: string | null;
+  supersededByRevisionId?: number | null;
+  sourceLocationName?: string | null;
+  destinationLocationName?: string | null;
   items: RevisionItem[];
 }
 

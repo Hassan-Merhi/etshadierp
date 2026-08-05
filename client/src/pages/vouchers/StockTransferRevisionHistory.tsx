@@ -2,10 +2,34 @@ import { format } from "date-fns";
 import { GitBranch } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import { EmptyState } from "@/components/ui/empty-state";
 import { History, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+type RevisionStatus = "pending" | "approved" | "rejected" | "cancelled" | "superseded";
+
+function revisionStatus(revision: any): RevisionStatus {
+  return revision.status ?? (revision.optional ? "pending" : "approved");
+}
+
+function revisionStatusLabel(status: RevisionStatus): string {
+  return status === "pending"
+    ? "Pending Review"
+    : status === "approved"
+      ? "Approved"
+      : status === "rejected"
+        ? "Rejected"
+        : status === "superseded"
+          ? "Superseded"
+          : "Cancelled";
+}
+
+function revisionStatusVariant(status: RevisionStatus): "default" | "secondary" | "destructive" | "outline" {
+  if (status === "approved") return "default";
+  if (status === "rejected" || status === "cancelled") return "destructive";
+  if (status === "pending") return "secondary";
+  return "outline";
+}
 
 interface StockTransferRevisionHistoryProps {
   voucherIdToEdit: number | null;
@@ -67,7 +91,7 @@ export function StockTransferRevisionHistory({
           ) : (
             transferRevisions.map((rev: any) => (
               <div key={rev.id} className="border rounded-md overflow-hidden">
-                {rev.optional && (
+                {revisionStatus(rev) === "pending" && (
                   <div className="flex items-center justify-between gap-3 px-3 py-2 status-warning border-b">
                     <span className="text-xs font-medium">Pending POS adjustment — awaiting admin approval</span>
                     <Button
@@ -82,37 +106,29 @@ export function StockTransferRevisionHistory({
                 )}
                 <div className="flex items-center justify-between gap-3 p-3 bg-muted/40 flex-wrap">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant={rev.optional ? "secondary" : "default"}>Rev {rev.revisionNumber}</Badge>
-                    {rev.optional && (
-                      <Badge variant="outline" className="text-xs">
-                        Reference Only
-                      </Badge>
-                    )}
+                    <Badge variant={revisionStatusVariant(revisionStatus(rev))}>Rev {rev.revisionNumber}</Badge>
+                    <Badge variant={revisionStatusVariant(revisionStatus(rev))} className="text-xs">
+                      {revisionStatusLabel(revisionStatus(rev))}
+                    </Badge>
                     <span className="text-xs text-muted-foreground">
                       {rev.revisionDate ? format(new Date(rev.revisionDate), "yyyy-MM-dd") : ""}
                     </span>
                     {rev.note && <span className="text-xs italic text-muted-foreground">"{rev.note}"</span>}
                   </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-muted-foreground">Reference only:</span>
-                    <Switch
-                      checked={rev.optional}
-                      onCheckedChange={async (checked) => {
-                        try {
-                          await modeApiRequest("PATCH", `/api/stock-transfer-revisions/${rev.id}/optional`, {
-                            optional: checked,
-                          });
-                        } finally {
-                          setTransferRevisionsExpanded(true);
-                          queryClient.invalidateQueries({
-                            queryKey: ["/api/stock-transfers", lastKnownTransferIdRef.current, "revisions"],
-                          });
-                        }
-                      }}
-                      data-testid={`switch-transfer-revision-optional-${rev.id}`}
-                    />
+                  <div className="text-xs text-muted-foreground text-right">
+                    <div>
+                      {rev.sourceLocationName || rev.items?.[0]?.sourceLocationName || "Unknown"}
+                      {" → "}
+                      {rev.destinationLocationName || "Unknown"}
+                    </div>
+                    {rev.reviewedAt && <div>Reviewed {format(new Date(rev.reviewedAt), "yyyy-MM-dd")}</div>}
                   </div>
                 </div>
+                {rev.rejectionReason && (
+                  <div className="px-3 py-2 text-xs text-destructive border-t bg-destructive/5">
+                    Reason: {rev.rejectionReason}
+                  </div>
+                )}
                 {rev.items && rev.items.length > 0 && (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   normalizeImmutableRevisionItems,
   type ImmutableRevisionItemInput,
-} from "../server/services/immutableStockTransferRevisionLifecycle";
+} from "../server/services/immutableStockTransferRevisionInput";
 
 const item = (overrides: Partial<ImmutableRevisionItemInput> = {}): ImmutableRevisionItemInput => ({
   stockItemId: 10,

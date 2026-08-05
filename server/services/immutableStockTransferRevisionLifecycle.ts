@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "../db";
 import { adjustInventory } from "../inventoryHelper";
@@ -11,22 +10,17 @@ import {
   stockTransferVouchers,
   vouchers,
 } from "@shared/schema";
+import {
+  immutableRevisionPayloadHash,
+  normalizeImmutableRevisionItems,
+  type ImmutableRevisionItemInput,
+  type NormalizedImmutableRevisionItem,
+} from "./immutableStockTransferRevisionInput";
 
-export type StockTransferRevisionStatus =
-  | "pending"
-  | "approved"
-  | "rejected"
-  | "cancelled"
-  | "superseded";
+export { normalizeImmutableRevisionItems } from "./immutableStockTransferRevisionInput";
+export type { ImmutableRevisionItemInput } from "./immutableStockTransferRevisionInput";
 
-export interface ImmutableRevisionItemInput {
-  stockItemId: number;
-  stockItemName: string;
-  sourceLocationId: number;
-  sourceLocationName?: string | null;
-  originalQuantity: number;
-  newQuantity: number;
-}
+export type StockTransferRevisionStatus = "pending" | "approved" | "rejected" | "cancelled" | "superseded";
 
 export interface CreateImmutableRevisionInput {
   companyId: number;
@@ -65,10 +59,6 @@ export interface ReviewImmutableRevisionResult {
   totalAmount: string;
 }
 
-interface NormalizedItem extends ImmutableRevisionItemInput {
-  delta: number;
-}
-
 function rows<T = Record<string, unknown>>(result: any): T[] {
   return (result?.rows ?? result ?? []) as T[];
 }
@@ -83,64 +73,10 @@ function positiveInteger(value: unknown, label: string): number {
   return parsed;
 }
 
-function finiteNonNegative(value: unknown, label: string): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) throw new Error(`${label} must be a non-negative number`);
-  return parsed;
-}
-
 function lifecycleError(message: string, code: string): Error {
   const error: any = new Error(message);
   error.code = code;
   return error;
-}
-
-export function normalizeImmutableRevisionItems(items: ImmutableRevisionItemInput[]): NormalizedItem[] {
-  if (!Array.isArray(items) || items.length === 0) throw new Error("At least one changed item is required");
-  const byKey = new Map<string, NormalizedItem>();
-
-  for (const raw of items) {
-    const stockItemId = positiveInteger(raw.stockItemId, "Stock item ID");
-    const sourceLocationId = positiveInteger(raw.sourceLocationId, "Source location ID");
-    const originalQuantity = finiteNonNegative(raw.originalQuantity, "Original quantity");
-    const newQuantity = finiteNonNegative(raw.newQuantity, "New quantity");
-    const delta = newQuantity - originalQuantity;
-    if (Math.abs(delta) < 0.0005) continue;
-
-    const key = `${stockItemId}:${sourceLocationId}`;
-    if (byKey.has(key)) throw new Error(`Revision contains duplicate item ${stockItemId} at source ${sourceLocationId}`);
-    byKey.set(key, {
-      stockItemId,
-      stockItemName: String(raw.stockItemName || `Item ${stockItemId}`).trim(),
-      sourceLocationId,
-      sourceLocationName: raw.sourceLocationName ? String(raw.sourceLocationName).trim() : null,
-      originalQuantity,
-      newQuantity,
-      delta,
-    });
-  }
-
-  const normalized = Array.from(byKey.values()).sort(
-    (a, b) => a.sourceLocationId - b.sourceLocationId || a.stockItemId - b.stockItemId
-  );
-  if (normalized.length === 0) throw new Error("Revision has no effective quantity changes");
-  return normalized;
-}
-
-function payloadHash(items: NormalizedItem[], note: string | null): string {
-  return createHash("sha256")
-    .update(
-      JSON.stringify({
-        note,
-        items: items.map((item) => ({
-          stockItemId: item.stockItemId,
-          sourceLocationId: item.sourceLocationId,
-          originalQuantity: item.originalQuantity.toFixed(3),
-          newQuantity: item.newQuantity.toFixed(3),
-        })),
-      })
-    )
-    .digest("hex");
 }
 
 async function lockTransfer(tx: any, transferId: number) {
@@ -218,11 +154,11 @@ async function assertCompanyScope(
   }
 }
 
-async function assertSubmittedBaseline(tx: any, transferId: number, items: NormalizedItem[]) {
+async function assertSubmittedBaseline(tx: any, transferId: number, items: NormalizedImmutableRevisionItem[]) {
   const current = await tx.select().from(stockTransferItems).where(eq(stockTransferItems.transferId, transferId));
   for (const item of items) {
     const row = current.find(
-      (candidate) =>
+      (candidate: typeof stockTransferItems.$inferSelect) =>
         candidate.stockItemId === item.stockItemId && candidate.sourceLocationId === item.sourceLocationId
     );
     const currentQuantity = Number(row?.quantity ?? 0);
@@ -247,7 +183,7 @@ export async function createImmutableStockTransferRevision(
   if (!userId) throw new Error("User ID is required");
   const note = input.note?.trim() || null;
   const normalized = normalizeImmutableRevisionItems(input.items);
-  const hash = payloadHash(normalized, note);
+  const hash = immutableRevisionPayloadHash(normalized, note);
 
   return db.transaction(async (tx) => {
     const transfer = await lockTransfer(tx, transferId);
@@ -282,10 +218,7 @@ export async function createImmutableStockTransferRevision(
       : [];
 
     if (previousPending.some((revision) => revision.payload_hash === hash)) {
-      throw lifecycleError(
-        "An identical pending revision already exists",
-        "STOCK_TRANSFER_REVISION_DUPLICATE"
-      );
+      throw lifecycleError("An identical pending revision already exists", "STOCK_TRANSFER_REVISION_DUPLICATE");
     }
 
     const maxRow = firstRow<any>(
@@ -488,8 +421,7 @@ export async function approveImmutableStockTransferRevision(
       const sourceLocationId = positiveInteger(item.sourceLocationId, "Source location ID");
       const existing =
         existingItems.find(
-          (candidate) =>
-            candidate.stockItemId === item.stockItemId && candidate.sourceLocationId === sourceLocationId
+          (candidate) => candidate.stockItemId === item.stockItemId && candidate.sourceLocationId === sourceLocationId
         ) || null;
       const oldQuantity = Number(existing?.quantity ?? 0);
       const expectedQuantity = Number(item.originalQuantity);
@@ -621,7 +553,10 @@ export async function approveImmutableStockTransferRevision(
     );
     const headerSourceId = uniqueSources.length === 1 ? uniqueSources[0] : null;
 
-    await tx.update(stockTransferVouchers).set({ sourceLocationId: headerSourceId }).where(eq(stockTransferVouchers.id, transferId));
+    await tx
+      .update(stockTransferVouchers)
+      .set({ sourceLocationId: headerSourceId })
+      .where(eq(stockTransferVouchers.id, transferId));
     await tx
       .update(vouchers)
       .set({ totalAmount, locationId: headerSourceId, ...(headerSourceId === null ? { locationName: null } : {}) })
@@ -722,7 +657,10 @@ export async function rejectImmutableStockTransferRevision(
   });
 }
 
-export async function resolveTransferIdByVoucher(companyIdInput: number, voucherIdInput: number): Promise<number | null> {
+export async function resolveTransferIdByVoucher(
+  companyIdInput: number,
+  voucherIdInput: number
+): Promise<number | null> {
   const companyId = positiveInteger(companyIdInput, "Company ID");
   const voucherId = positiveInteger(voucherIdInput, "Voucher ID");
   const row = firstRow<any>(
@@ -804,9 +742,7 @@ export async function listImmutableStockTransferRevisions(companyIdInput: number
       reviewedAt: revision.reviewed_at,
       reviewedBy: revision.reviewed_by,
       rejectionReason: revision.rejection_reason,
-      supersededByRevisionId: revision.superseded_by_revision_id
-        ? Number(revision.superseded_by_revision_id)
-        : null,
+      supersededByRevisionId: revision.superseded_by_revision_id ? Number(revision.superseded_by_revision_id) : null,
       sourceLocationId: revision.source_location_id ? Number(revision.source_location_id) : null,
       sourceLocationName:
         sourceNames.length === 1

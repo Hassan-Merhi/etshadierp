@@ -62,13 +62,7 @@ function sendError(res: Response, error: unknown, context: string) {
   const payload: Record<string, unknown> = {
     message: String((error as any)?.message ?? `Failed to ${context.toLowerCase()} stock transfer revision`),
   };
-  for (const field of [
-    "code",
-    "stockItemId",
-    "sourceLocationId",
-    "requiredQuantity",
-    "availableQuantity",
-  ]) {
+  for (const field of ["code", "stockItemId", "sourceLocationId", "requiredQuantity", "availableQuantity"]) {
     if ((error as any)?.[field] !== undefined) payload[field] = (error as any)[field];
   }
   return res.status(status).json(payload);
@@ -115,9 +109,7 @@ export function registerImmutableStockTransferRevisionRoutes(app: Express) {
         return res.status(403).json({ message: "POS users may only submit revisions for admin review" });
       }
       const assignedLocationId =
-        role === "POS"
-          ? Number(req.user?.assignedLocationId ?? req.session.currentLocationId ?? 0) || null
-          : null;
+        role === "POS" ? Number(req.user?.assignedLocationId ?? req.session.currentLocationId ?? 0) || null : null;
       if (role === "POS" && !assignedLocationId) {
         return res.status(403).json({ message: "POS user has no assigned source location" });
       }
@@ -219,11 +211,17 @@ export function registerImmutableStockTransferRevisionRoutes(app: Express) {
         if (!actorId) return res.status(401).json({ message: "User session is required" });
 
         const result = await approveImmutableStockTransferRevision(companyId, revisionId, actorId);
-        await auditRevision(req, companyId, revisionId, `transfer-${result.transferId}-revision-${result.revisionNumber}`, {
-          status: { old: "pending", new: result.transition },
-          changedItemCount: { old: 0, new: result.changedItemCount },
-          totalAmount: { old: null, new: result.totalAmount },
-        });
+        await auditRevision(
+          req,
+          companyId,
+          revisionId,
+          `transfer-${result.transferId}-revision-${result.revisionNumber}`,
+          {
+            status: { old: "pending", new: result.transition },
+            changedItemCount: { old: 0, new: result.changedItemCount },
+            totalAmount: { old: null, new: result.totalAmount },
+          }
+        );
         return res.json({ success: true, ...result });
       } catch (error) {
         return sendError(res, error, "Approve");
@@ -248,16 +246,17 @@ export function registerImmutableStockTransferRevisionRoutes(app: Express) {
         if (!actorId) return res.status(401).json({ message: "User session is required" });
         const parsed = rejectionSchema.parse(req.body ?? {});
 
-        const result = await rejectImmutableStockTransferRevision(
+        const result = await rejectImmutableStockTransferRevision(companyId, revisionId, actorId, parsed.reason);
+        await auditRevision(
+          req,
           companyId,
           revisionId,
-          actorId,
-          parsed.reason
+          `transfer-${result.transferId}-revision-${result.revisionNumber}`,
+          {
+            status: { old: "pending", new: result.transition },
+            reason: { old: null, new: parsed.reason || null },
+          }
         );
-        await auditRevision(req, companyId, revisionId, `transfer-${result.transferId}-revision-${result.revisionNumber}`, {
-          status: { old: "pending", new: result.transition },
-          reason: { old: null, new: parsed.reason || null },
-        });
         return res.json({ success: true, ...result });
       } catch (error) {
         if (error instanceof z.ZodError) {
