@@ -222,7 +222,10 @@ if (process.env.DATABASE_URL || process.env.PGHOST) {
   logger.info(`✓ PostgreSQL session store configured (SSL: ${requiresSSL ? "enabled" : "disabled"})`);
 }
 
-app.use(session(sessionConfig));
+// Held so the WebSocket upgrade can resolve the same session and learn which
+// company a socket belongs to; see setupWS.
+const sessionMiddleware = session(sessionConfig);
+app.use(sessionMiddleware);
 
 // Globally block all mutation requests (POST/PUT/PATCH/DELETE) for View Only role.
 // Must run after session middleware so req.session.currentRole is populated.
@@ -414,7 +417,7 @@ let migrationsDone = false;
   // proxy to send a request on a dead connection → socket hang-up retries.
   server.keepAliveTimeout = 65_000;
   server.headersTimeout = 66_000;
-  setupWS(server);
+  setupWS(server, sessionMiddleware);
   if (process.env.ENABLE_SCHEDULERS !== "false") {
     startScheduler();
     logger.info("[Schedulers] Started (ENABLE_SCHEDULERS != false)");
