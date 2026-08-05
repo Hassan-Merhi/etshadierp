@@ -112,6 +112,19 @@ export async function resolveAuthorizedCompanyId(req: Request, requestedCompanyI
 
 export async function assertActiveCompanyAccess(req: Request): Promise<CompanyAccessContext> {
   const context = getCompanyAccessContext(req);
+
+  // The set-company route grants Developer (and Admin) users access to any company
+  // by creating a synthetic role object without writing it to user_company_roles.
+  // A subsequent DB lookup via assertCompanyAccess would therefore not find the
+  // Developer entry and would throw COMPANY_ACCESS_DENIED — causing routes like
+  // /api/vouchers and /api/offloads to silently return empty data.
+  //
+  // Mirror the set-company policy: if the session role is Developer or Admin, the
+  // user already passed the set-company gate; trust that and skip the DB check.
+  if (context.role === "Developer" || context.role === "Admin") {
+    return context;
+  }
+
   await assertCompanyAccess(context.userId, context.activeCompanyId);
   return context;
 }
