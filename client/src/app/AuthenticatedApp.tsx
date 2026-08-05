@@ -20,9 +20,7 @@ const PropertiesShell = lazy(() => import("./PropertiesShell").then((module) => 
 const FactoryShell = lazy(() => import("./FactoryShell").then((module) => ({ default: module.FactoryShell })));
 const ErpShell = lazy(() => import("./ErpShell").then((module) => ({ default: module.ErpShell })));
 const RemoteSupportIndicator = lazy(() =>
-  import("@/components/RemoteSupportIndicator").then((module) => ({
-    default: module.RemoteSupportIndicator,
-  }))
+  import("@/components/RemoteSupportIndicator").then((module) => ({ default: module.RemoteSupportIndicator }))
 );
 
 interface AuthenticatedAppProps {

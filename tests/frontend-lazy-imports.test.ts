@@ -114,10 +114,14 @@ describe("lazyPages.ts — lazy import file existence", () => {
     expect(lazyPaths.length).toBeGreaterThanOrEqual(50);
   });
 
-  it("lazyPages.ts itself is parseable and contains React.lazy calls", () => {
-    expect(lazyPagesSource).toContain("React.lazy");
-    // The file uses the `lazy` import from react
-    expect(lazyPagesSource).toContain('import { lazy }');
+  it("lazyPages.ts itself is parseable and declares lazy page exports", () => {
+    // The file imports a lazy factory under the local name `lazy` — the source
+    // module is an implementation detail (currently `lazyRetry`, which wraps
+    // React.lazy with retry-on-chunk-error), so assert on the binding and on
+    // the resulting `lazy(() => import(...))` call shape instead of a literal
+    // `React.lazy` / `from "react"` spelling.
+    expect(lazyPagesSource).toMatch(/import\s+\{[^}]*\blazy\b[^}]*\}\s+from/);
+    expect(lazyPagesSource).toMatch(/export const \w+ = lazy\(\(\) => import\(/);
   });
 
   // One test per unique import path — dynamic generation so failures show

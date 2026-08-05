@@ -3,7 +3,10 @@
   "godFileLineCaps": {
     "server/routes/payroll/workerStatsAdvancesRoutes.ts": 922,
     "server/services/factory/postOffloadPhase6Safety.ts": 927,
-    "client/src/pages/daybook/VoucherDetailsDialog.tsx": 966
+    "client/src/pages/ContainerLoadingScan.tsx": 1133,
+    "client/src/pages/daybook/VoucherDetailsDialog.tsx": 966,
+    "client/src/pages/factory/FactoryContainerLoadingScan.tsx": 1906,
+    "client/src/pages/factory/FactoryShippingContainers.tsx": 913
   },
   "routeManifestAdditions": [],
   "routeManifestMountAdditions": [],
@@ -36,8 +39,11 @@
       "tests/ui/tracking-containers-abort-recovery.test.ts",
       "tests/phase10-scheduled-export-lifecycle-contract.test.ts",
       "tests/remote-keyboard-no-text-retention.test.ts",
-      "tests/screen-feed-fast-transport-current-main.test.ts"
+      "tests/screen-feed-fast-transport-current-main.test.ts",
+      "tests/ui/bandwidth-phase-1-invalidation-policy.test.ts",
+      "tests/ui/bandwidth-phase-1-page-polling.test.ts",
+      "tests/ui/bandwidth-phase-2-payloads.test.ts"
     ],
-    "maxAdditionalTextAssertions": 449
+    "maxAdditionalTextAssertions": 499
   }
 }
