@@ -119,9 +119,10 @@ export async function fetchStockMovements(
     const qty = parseFloat(r.qty || "0");
     const value = parseFloat(r.totalCost || "0");
     const vt = r.voucherType || "Sales";
+    const isPOS = vt.toLowerCase().includes("pos");
     results.push({
       date: r.date,
-      particulars: r.voucherNumber,
+      particulars: isPOS ? "Cash" : r.voucherNumber,
       vchType: vt,
       voucherId: r.voucherId,
       poId: null,
