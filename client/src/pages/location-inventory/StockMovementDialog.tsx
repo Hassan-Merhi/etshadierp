@@ -217,10 +217,7 @@ export function StockMovementDialog({
                           {editUrl ? (
                             <button
                               onClick={() => {
-                                navigate(editUrl);
-                                setStockMovementOpen(false);
-                                setDrillMonth(null);
-                                setStockMovementItem(null);
+                                window.open(editUrl, "_blank", "noopener,noreferrer");
                               }}
                               className="text-left text-primary hover:underline"
                               data-testid={`link-drill-particulars-${idx}`}
