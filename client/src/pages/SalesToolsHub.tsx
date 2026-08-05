@@ -1,4 +1,5 @@
-import { Suspense, lazy } from "react";
+import { Suspense } from "react";
+import { lazyRetry as lazy } from "@/lib/lazyRetry";
 import { useQuery } from "@tanstack/react-query";
 import { Book, ArrowLeftRight, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";

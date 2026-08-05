@@ -1,4 +1,5 @@
-import { useState, lazy, Suspense } from "react";
+import { useState, Suspense } from "react";
+import { lazyRetry as lazy } from "@/lib/lazyRetry";
 import {
   Factory,
   Package,

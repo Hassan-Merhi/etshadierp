@@ -193,7 +193,11 @@ window.addEventListener("unhandledrejection", (event) => {
     combined.includes("ChunkLoadError") ||
     reason?.name === "ChunkLoadError";
 
-  if (isChunkFailure) {
+  // A cancelled request is not a stale build. Reloading the page over one
+  // discards whatever the user was doing to recover from nothing.
+  const isCancellation = reason?.name === "AbortError" || reason?.name === "CancelledError";
+
+  if (isChunkFailure && !isCancellation) {
     event.preventDefault();
     void recoverFromStaleAssets();
   }
