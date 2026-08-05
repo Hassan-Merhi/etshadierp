@@ -7,6 +7,7 @@ const BASE_URL = (process.env.ERP_SMOKE_BASE_URL || "http://127.0.0.1:5000").rep
 const USERNAME = process.env.ERP_SMOKE_USERNAME || "";
 const PASSWORD = process.env.ERP_SMOKE_PASSWORD || "";
 const AUTHENTICATED = Boolean(USERNAME && PASSWORD);
+const REQUIRE_AUTHENTICATED = process.env.ERP_SMOKE_REQUIRE_AUTHENTICATED === "1";
 const TIMEOUT_MS = Number(process.env.ERP_SMOKE_TIMEOUT_MS || 45_000);
 const OUTPUT_DIR = path.resolve(process.env.ERP_SMOKE_OUTPUT_DIR || "artifacts/phase9-language-browser");
 const REQUIRE_EXACT_ROUTES = process.env.ERP_SMOKE_REQUIRE_EXACT_ROUTES === "1";
@@ -45,6 +46,7 @@ const AUTHENTICATED_ROUTES = (process.env.ERP_SMOKE_ROUTES || DEFAULT_AUTHENTICA
 const report = {
   baseUrl: BASE_URL,
   authenticatedRoutes: AUTHENTICATED,
+  authenticatedRequired: REQUIRE_AUTHENTICATED,
   startedAt: new Date().toISOString(),
   cases: [],
   failures: [],
@@ -97,6 +99,24 @@ async function login(page) {
   await waitForSettledUi(page);
 }
 
+async function activateSkipNavigation(page) {
+  const result = await page.evaluate(() => {
+    const link = document.querySelector('[data-slot="skip-link"]');
+    if (!(link instanceof HTMLAnchorElement)) {
+      return { available: false, activeElementId: "", hash: window.location.hash };
+    }
+    link.focus();
+    link.click();
+    return {
+      available: true,
+      activeElementId: document.activeElement instanceof HTMLElement ? document.activeElement.id : "",
+      hash: window.location.hash,
+    };
+  });
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+  return result;
+}
+
 async function readPageState(page) {
   return page.evaluate(() => {
     const visibleRect = (element) => {
@@ -110,9 +130,19 @@ async function readPageState(page) {
 
     const ltrSelectors = [
       "[data-article-code]",
+      "[data-account-code]",
       "[data-container-number]",
       "[data-voucher-number]",
+      "[data-contract-reference]",
+      "[data-document-reference]",
+      "[data-identifier]",
+      "[data-reference]",
       "[data-currency-value]",
+      "[data-money-value]",
+      "[data-quantity-value]",
+      "[data-date-value]",
+      "[data-phone-value]",
+      "[data-email-value]",
       'input[type="number"]',
       'input[inputmode="decimal"]',
       'input[inputmode="numeric"]',
@@ -129,6 +159,18 @@ async function readPageState(page) {
         }
       }
     }
+
+    const sidebarContainer = document.querySelector('[data-slot="sidebar-container"]');
+    const sidebarRoot = sidebarContainer?.closest('[data-slot="sidebar"]');
+    const sidebarRect = visibleRect(sidebarContainer);
+    const sidebar = sidebarRect
+      ? {
+          declaredSide: sidebarRoot instanceof HTMLElement ? sidebarRoot.dataset.side || "left" : "left",
+          left: sidebarRect.x,
+          right: sidebarRect.x + sidebarRect.width,
+          width: sidebarRect.width,
+        }
+      : null;
 
     const root = document.documentElement;
     const body = document.body;
@@ -148,10 +190,28 @@ async function readPageState(page) {
       password: visibleRect(document.querySelector('[data-testid="input-password"]')),
       main: visibleRect(document.getElementById("main-content")),
       shell: visibleRect(document.querySelector('[data-slot="sidebar-wrapper"]')),
+      sidebar,
       recoveryOverlay: Boolean(document.getElementById("stale-asset-recovery")),
       ltrViolations,
     };
   });
+}
+
+function assertSidebarEdge(state, expectedDirection, label) {
+  if (!state.sidebar) return [];
+  const declaredSide = state.sidebar.declaredSide === "right" ? "right" : "left";
+  const expectedPhysicalSide =
+    expectedDirection === "rtl" ? (declaredSide === "left" ? "right" : "left") : declaredSide;
+  const tolerance = 3;
+  if (expectedPhysicalSide === "left" && Math.abs(state.sidebar.left) > tolerance) {
+    return [`${label}: ${declaredSide} sidebar is ${Math.round(state.sidebar.left)}px from the left edge`];
+  }
+  if (expectedPhysicalSide === "right" && Math.abs(state.viewport.width - state.sidebar.right) > tolerance) {
+    return [
+      `${label}: ${declaredSide} sidebar is ${Math.round(state.viewport.width - state.sidebar.right)}px from the right edge`,
+    ];
+  }
+  return [];
 }
 
 function assertPage(state, expectedLanguage, expectedDirection, mode, label) {
@@ -185,6 +245,7 @@ function assertPage(state, expectedLanguage, expectedDirection, mode, label) {
   } else {
     if (!state.main) failures.push(`${label}: #main-content is missing or invisible`);
     if (!state.shell) failures.push(`${label}: application shell is missing or invisible`);
+    failures.push(...assertSidebarEdge(state, expectedDirection, label));
   }
 
   return failures;
@@ -264,6 +325,18 @@ try {
             if (REQUIRE_EXACT_ROUTES && !state.path.startsWith(route)) {
               failures.push(`${label}: redirected to ${state.path}`);
             }
+
+            const skipNavigation = await activateSkipNavigation(page);
+            if (!skipNavigation.available) failures.push(`${label}: skip navigation link is missing`);
+            if (skipNavigation.available && skipNavigation.activeElementId !== "main-content") {
+              failures.push(
+                `${label}: skip navigation focused ${skipNavigation.activeElementId || "nothing"} instead of main-content`,
+              );
+            }
+            if (skipNavigation.available && skipNavigation.hash !== "#main-content") {
+              failures.push(`${label}: skip navigation did not preserve the #main-content hash`);
+            }
+
             const screenshot = await capture(page, language.code, viewport.name, route);
             report.cases.push({
               language: language.code,
@@ -271,6 +344,7 @@ try {
               requestedRoute: route,
               status,
               state,
+              skipNavigation,
               screenshot,
               failures,
             });
@@ -289,12 +363,20 @@ try {
   await browser.close();
 }
 
+if (REQUIRE_AUTHENTICATED && !AUTHENTICATED) {
+  report.failures.push(
+    "Authenticated browser coverage is required, but ERP_SMOKE_USERNAME and ERP_SMOKE_PASSWORD were not provided.",
+  );
+}
+
 report.finishedAt = new Date().toISOString();
 report.failures = [...new Set(report.failures)];
 await fs.writeFile(path.join(OUTPUT_DIR, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
 
 if (!AUTHENTICATED) {
-  console.log("Authenticated route checks were skipped because ERP_SMOKE_USERNAME and ERP_SMOKE_PASSWORD were not provided.");
+  const message = "Authenticated route checks were skipped because ERP_SMOKE_USERNAME and ERP_SMOKE_PASSWORD were not provided.";
+  if (REQUIRE_AUTHENTICATED) console.error(message);
+  else console.log(message);
 }
 
 if (report.failures.length > 0) {

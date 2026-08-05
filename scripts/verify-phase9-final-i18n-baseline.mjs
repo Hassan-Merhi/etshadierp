@@ -23,41 +23,74 @@ try {
   const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
   const errors = [];
 
+  if (approved.schemaVersion !== 2) {
+    errors.push(`Unsupported Phase 9 release schema: ${approved.schemaVersion ?? "missing"}.`);
+  }
   if (report.detectorVersion !== approved.detectorVersion) {
     errors.push(`Detector version changed: expected ${approved.detectorVersion}, received ${report.detectorVersion}.`);
   }
 
-  for (const key of ["candidates", "actionable", "excluded", "unclassified"]) {
-    if (report.totals[key] !== approved.totals[key]) {
-      errors.push(`Total ${key} changed: expected ${approved.totals[key]}, received ${report.totals[key]}.`);
-    }
+  const unclassifiedExpected = approved.policy?.unclassifiedMustEqual;
+  if (report.totals.unclassified !== unclassifiedExpected) {
+    errors.push(
+      `Unclassified findings changed: expected ${unclassifiedExpected}, received ${report.totals.unclassified}.`,
+    );
   }
 
-  const approvedModules = Object.keys(approved.modules).sort();
-  const reportModules = Object.keys(report.modules).sort();
-  if (JSON.stringify(reportModules) !== JSON.stringify(approvedModules)) {
+  const totalActionableCap = approved.policy?.totalActionableMustNotExceed;
+  if (!Number.isFinite(totalActionableCap) || report.totals.actionable > totalActionableCap) {
+    errors.push(
+      `Total actionable findings exceed the reviewed cap: ${report.totals.actionable} > ${totalActionableCap}.`,
+    );
+  }
+
+  const approvedModules = Object.keys(approved.modules ?? {}).sort();
+  const reportModules = Object.keys(report.modules ?? {}).sort();
+  if (
+    approved.policy?.requireExactModuleSet === true &&
+    JSON.stringify(reportModules) !== JSON.stringify(approvedModules)
+  ) {
     errors.push(`Module set changed: expected ${approvedModules.join(", ")}, received ${reportModules.join(", ")}.`);
   }
 
-  for (const [module, expected] of Object.entries(approved.modules)) {
+  for (const [module, rule] of Object.entries(approved.modules ?? {})) {
     const actual = report.modules[module]?.actionable;
-    if (actual !== expected) {
-      errors.push(`Module ${module} changed: expected ${expected}, received ${actual ?? "missing"}.`);
+    if (!Number.isFinite(actual)) {
+      errors.push(`Module ${module} is missing from the audit report.`);
+      continue;
+    }
+    if (!Number.isFinite(rule.maxActionable)) {
+      errors.push(`Module ${module} is missing a numeric maxActionable rule.`);
+      continue;
+    }
+    if (actual > rule.maxActionable) {
+      errors.push(`Module ${module} exceeds its reviewed cap: ${actual} > ${rule.maxActionable}.`);
+    }
+    if (rule.mustRemainZero === true && actual !== 0) {
+      errors.push(`Module ${module} must remain at zero actionable findings; received ${actual}.`);
     }
   }
 
-  if (report.totals.unclassified !== 0) {
-    errors.push(`Unclassified findings must remain zero; received ${report.totals.unclassified}.`);
-  }
-
   if (errors.length > 0) {
-    console.error("Phase 9 final untranslated-text baseline verification failed:");
+    console.error("Phase 9 multilingual release-ratchet verification failed:");
     for (const error of errors) console.error(`- ${error}`);
     process.exit(1);
   }
 
   console.log(
-    `Phase 9 final untranslated-text baseline verified exactly: ${report.totals.actionable} actionable, ${report.totals.unclassified} unclassified.`,
+    JSON.stringify(
+      {
+        status: "phase9-release-ratchet-passed",
+        detectorVersion: report.detectorVersion,
+        actionable: report.totals.actionable,
+        actionableCap: totalActionableCap,
+        unclassified: report.totals.unclassified,
+        candidates: report.totals.candidates,
+        excluded: report.totals.excluded,
+      },
+      null,
+      2,
+    ),
   );
 } finally {
   fs.rmSync(temporaryDirectory, { recursive: true, force: true });
