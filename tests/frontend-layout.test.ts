@@ -185,8 +185,10 @@ describe("App routing infrastructure is intact", () => {
 
   it("lazyPages.ts — file is importable as a module (no syntax errors detected by reading)", () => {
     const s = src("client/src/lazyPages.ts");
-    // Basic sanity: has imports and exports
-    expect(s).toContain("import { lazy }");
+    // Basic sanity: has imports and exports. The lazy factory is imported under
+    // the local name `lazy`, but the module it comes from is an implementation
+    // detail (currently `lazyRetry`), so match the binding rather than the path.
+    expect(s).toMatch(/import\s+\{[^}]*\blazy\b[^}]*\}\s+from/);
     expect(s).toContain("export const");
     // File should not be empty
     expect(s.length).toBeGreaterThan(1000);
