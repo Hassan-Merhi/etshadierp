@@ -31,11 +31,7 @@ async function inventoryQty(locationId: number): Promise<number> {
     .select({ quantity: inventory.quantity })
     .from(inventory)
     .where(
-      and(
-        eq(inventory.companyId, companyId),
-        eq(inventory.locationId, locationId),
-        eq(inventory.stockItemId, itemId)
-      )
+      and(eq(inventory.companyId, companyId), eq(inventory.locationId, locationId), eq(inventory.stockItemId, itemId))
     );
   return Number(row?.quantity ?? 0);
 }
@@ -199,10 +195,7 @@ describe("stock transfer revision lifecycle", () => {
     expect(await inventoryQty(sourceId)).toBe(85);
     expect(await inventoryQty(destinationId)).toBe(15);
 
-    const [line] = await db
-      .select()
-      .from(stockTransferItems)
-      .where(eq(stockTransferItems.transferId, transferId));
+    const [line] = await db.select().from(stockTransferItems).where(eq(stockTransferItems.transferId, transferId));
     expect(Number(line.quantity)).toBe(15);
 
     const beforeRepeat = [await inventoryQty(sourceId), await inventoryQty(destinationId)];
@@ -215,7 +208,7 @@ describe("stock transfer revision lifecycle", () => {
     const pending = await savePendingStockTransferRevision({
       companyId,
       transferId,
-      userId: `${PREFIX}-user`,
+      userId: `${PREFIX}-rollback-user`,
       sourceLocationIdLimit: sourceId,
       note: "Too much stock",
       items: [

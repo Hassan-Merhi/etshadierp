@@ -44,6 +44,10 @@ const compatibilityTranslationFiles = [
 ];
 
 const reviewedTechnicalValues = new Set([
+  // Detector false positive: `requestJson<ControllerSessionsResponse>(...)` reads as JSX to the
+  // scanner, so the generic call's function name surfaces as translatable text. It is an
+  // identifier, never rendered.
+  "requestJson",
   "seg.isSkip ? (",
   "text-success",
   "text-warning",

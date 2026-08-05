@@ -119,9 +119,24 @@
       "pinnedBy": [
         "tests/frontend-layout.test.ts"
       ]
+    },
+    {
+      "path": "client/src/pages/factory/FactoryContainerLoadingScan.tsx",
+      "lines": 1906,
+      "pinnedBy": [
+        "tests/ui/bandwidth-phase-1-page-polling.test.ts"
+      ]
+    },
+    {
+      "path": "client/src/pages/ContainerLoadingScan.tsx",
+      "lines": 1133,
+      "pinnedBy": [
+        "tests/ui/bandwidth-phase-1-page-polling.test.ts"
+      ]
     }
   ],
   "pinnedPathsNoLongerPresent": [
+    "client/src/components/GlobalLanguageSwitch.tsx",
     "server/chat/reports/legacyReportEngine.ts",
     "server/routes/authRoutesLegacy.ts",
     "server/routes/customerRoutesLegacy.ts",

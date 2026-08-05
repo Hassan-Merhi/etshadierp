@@ -230,16 +230,16 @@ html[dir="rtl"] a[href="#main-content"]:focus {
 }
 
 :where(
-    button,
-    a,
-    input,
-    textarea,
-    select,
-    [role="button"],
-    [role="menuitem"],
-    [role="option"],
-    [data-horizontal-scroll-region]
-  ):focus-visible {
+  button,
+  a,
+  input,
+  textarea,
+  select,
+  [role="button"],
+  [role="menuitem"],
+  [role="option"],
+  [data-horizontal-scroll-region]
+):focus-visible {
   outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;
 }

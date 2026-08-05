@@ -104,7 +104,20 @@ requireText(hotspotGuard, "inFlightRequests", "Identical hotspot GETs must share
 requireText(hotspotGuard, "writeGeneration", "Writes must prevent raced GETs from caching stale data.");
 requireText(hotspotGuard, "writeGeneration += 1", "Every write boundary must advance the cache generation.");
 requireText(hotspotGuard, "clearCache();", "Writes must clear short-lived hotspot snapshots.");
-requireText(hotspotGuard, "waitUntilVisible(signal)", "Heavy hotspot reads must pause in hidden tabs.");
+// Asserted on behavior rather than on the exact argument expression: the abort signal handed to
+// waitUntilVisible is the shared request lifetime's, not the per-caller one, so that a single
+// cancelled caller cannot abort a request other callers are still waiting on.
+requireText(hotspotGuard, "await waitUntilVisible(", "Heavy hotspot reads must pause in hidden tabs.");
+requireText(
+  hotspotGuard,
+  'document.visibilityState !== "hidden"',
+  "The hidden-tab pause must key off document visibility."
+);
+requireText(
+  hotspotGuard,
+  'document.addEventListener("visibilitychange"',
+  "Paused hotspot reads must resume when the tab becomes visible again."
+);
 requireText(
   hotspotGuard,
   "x-bypass-request-storm-guard",

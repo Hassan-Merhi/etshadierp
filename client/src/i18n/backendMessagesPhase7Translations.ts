@@ -62,6 +62,7 @@ function hasTranslatableStaticText(value: string): boolean {
 type CompiledTemplate = {
   patterns: Record<ApplicationLanguage, RegExp>;
   captureOrder: Record<ApplicationLanguage, readonly number[]>;
+  adjacentRuns: Record<ApplicationLanguage, readonly (readonly number[])[]>;
   render: Record<ApplicationLanguage, string>;
   specificity: number;
 };
@@ -69,21 +70,33 @@ type CompiledTemplate = {
 function compileLanguageTemplate(
   value: string,
   language: ApplicationLanguage
-): { pattern: RegExp; captureOrder: readonly number[] } {
+): { pattern: RegExp; captureOrder: readonly number[]; adjacentRuns: readonly (readonly number[])[] } {
   const normalized = normalizeTemplate(value, language);
   const captureOrder: number[] = [];
+  // Placeholders with no static text between them compile to adjacent lazy groups, which the regex
+  // engine cannot split meaningfully — the earlier group always wins empty. Record those runs so a
+  // match can redistribute the combined text across them afterwards.
+  const adjacentRuns: number[][] = [];
   let cursor = 0;
   let source = "^";
+  let position = 0;
   indexedTemplateToken.lastIndex = 0;
   for (const match of normalized.matchAll(indexedTemplateToken)) {
     const offset = match.index ?? 0;
-    source += escapeRegex(normalized.slice(cursor, offset));
+    const staticText = normalized.slice(cursor, offset);
+    source += escapeRegex(staticText);
     source += "(.*?)";
     captureOrder.push(Number(match[1]));
+    if (position > 0 && staticText === "") {
+      const openRun = adjacentRuns[adjacentRuns.length - 1];
+      if (openRun && openRun[openRun.length - 1] === position - 1) openRun.push(position);
+      else adjacentRuns.push([position - 1, position]);
+    }
     cursor = offset + match[0].length;
+    position += 1;
   }
   source += `${escapeRegex(normalized.slice(cursor))}$`;
-  return { pattern: new RegExp(source, "u"), captureOrder };
+  return { pattern: new RegExp(source, "u"), captureOrder, adjacentRuns };
 }
 
 const exactEntryByVisibleText = new Map<string, Phase7BackendMessagesEntry>();
@@ -104,7 +117,10 @@ for (const entry of backendMessagesPhase7Translations) {
 
   const compiledByLanguage = Object.fromEntries(
     languages.map((language) => [language, compileLanguageTemplate(entry[language], language)])
-  ) as Record<ApplicationLanguage, { pattern: RegExp; captureOrder: readonly number[] }>;
+  ) as Record<
+    ApplicationLanguage,
+    { pattern: RegExp; captureOrder: readonly number[]; adjacentRuns: readonly (readonly number[])[] }
+  >;
 
   compiledTemplates.push({
     patterns: Object.fromEntries(
@@ -113,6 +129,9 @@ for (const entry of backendMessagesPhase7Translations) {
     captureOrder: Object.fromEntries(
       languages.map((language) => [language, compiledByLanguage[language].captureOrder])
     ) as Record<ApplicationLanguage, readonly number[]>,
+    adjacentRuns: Object.fromEntries(
+      languages.map((language) => [language, compiledByLanguage[language].adjacentRuns])
+    ) as Record<ApplicationLanguage, readonly (readonly number[])[]>,
     render: Object.fromEntries(
       languages.map((language) => [language, normalizeTemplate(entry[language], language)])
     ) as Record<ApplicationLanguage, string>,
@@ -127,11 +146,7 @@ function renderTemplate(template: string, values: readonly string[]): string {
   return template.replace(indexedTemplateToken, (_token, rawIndex: string) => values[Number(rawIndex)] ?? "");
 }
 
-function translateNormalizedValue(
-  value: string,
-  language: ApplicationLanguage,
-  depth: number
-): string | null {
+function translateNormalizedValue(value: string, language: ApplicationLanguage, depth: number): string | null {
   const exactEntry = exactEntryByVisibleText.get(value);
   return exactEntry?.[language] ?? translateCompiledTemplate(value, language, depth);
 }
@@ -146,20 +161,76 @@ function translateCapturedValue(value: string, language: ApplicationLanguage, de
   return translated === null ? value : `${leading}${translated}${trailing}`;
 }
 
-function translateCompiledTemplate(
-  value: string,
+const MAX_ADJACENT_SPLIT_LENGTH = 200;
+
+/**
+ * Redistribute the text captured by a run of adjacent placeholders.
+ *
+ * `${rangeLabel}${skippedNote}` compiles to `(.*?)(.*?)`, so the engine hands the first group an
+ * empty string and lets the second swallow "(start → today) (1 skipped)" whole — which then matches
+ * the "(… skipped)" template and renders the range untranslated inside an otherwise French message.
+ *
+ * Try every way of cutting the combined text into `count` pieces and keep the arrangement where the
+ * most non-empty pieces are independently translatable. Two real fragments beat one mangled one, so
+ * the range and the skipped note each land in their own placeholder.
+ */
+function splitAdjacentCaptures(
+  combined: string,
+  count: number,
   language: ApplicationLanguage,
-  depth = 0
-): string | null {
+  depth: number
+): string[] {
+  if (count < 2 || !combined) return Array.from({ length: count }, (_, index) => (index === count - 1 ? combined : ""));
+  if (combined.length > MAX_ADJACENT_SPLIT_LENGTH) {
+    return Array.from({ length: count }, (_, index) => (index === count - 1 ? combined : ""));
+  }
+
+  let bestParts: string[] | null = null;
+  let bestScore = -1;
+
+  const walk = (rest: string, remaining: number, parts: string[]) => {
+    if (remaining === 1) {
+      const candidate = [...parts, rest];
+      let score = 0;
+      for (const part of candidate) {
+        const normalized = part.trim();
+        if (!normalized) continue;
+        if (translateNormalizedValue(normalized, language, depth + 1) !== null) score += 1;
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        bestParts = candidate;
+      }
+      return;
+    }
+    for (let cut = 0; cut <= rest.length; cut += 1) {
+      walk(rest.slice(cut), remaining - 1, [...parts, rest.slice(0, cut)]);
+    }
+  };
+
+  walk(combined, count, []);
+  return bestParts ?? Array.from({ length: count }, (_, index) => (index === count - 1 ? combined : ""));
+}
+
+function translateCompiledTemplate(value: string, language: ApplicationLanguage, depth = 0): string | null {
   for (const template of compiledTemplates) {
     for (const sourceLanguage of languages) {
       const match = template.patterns[sourceLanguage].exec(value);
       if (!match) continue;
 
-      const values: string[] = [];
       const order = template.captureOrder[sourceLanguage];
+      const capturedByPosition = order.map((_entry, index) => match[index + 1] ?? "");
+      for (const run of template.adjacentRuns[sourceLanguage]) {
+        const combined = run.map((position) => capturedByPosition[position]).join("");
+        const parts = splitAdjacentCaptures(combined, run.length, language, depth);
+        run.forEach((position, partIndex) => {
+          capturedByPosition[position] = parts[partIndex];
+        });
+      }
+
+      const values: string[] = [];
       for (let index = 0; index < order.length; index += 1) {
-        values[order[index]] = translateCapturedValue(match[index + 1], language, depth);
+        values[order[index]] = translateCapturedValue(capturedByPosition[index], language, depth);
       }
       return renderTemplate(template.render[language], values);
     }

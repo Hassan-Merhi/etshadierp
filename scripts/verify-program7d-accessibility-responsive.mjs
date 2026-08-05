@@ -73,11 +73,8 @@ for (const [name, source] of [
 }
 
 for (const token of [
-  "100dvh",
   "overflow-y-auto",
   "overscroll-contain",
-  "min-h-10",
-  "min-w-10",
   "motion-reduce:animate-none",
   "motion-reduce:transition-none",
   'aria-label="Close dialog"',
@@ -89,15 +86,30 @@ for (const token of [
   if (!sources.dialog.includes(token)) failures.push(`Accessible dialog contract missing: ${token}`);
 }
 
-for (const token of [
-  'data-slot="sheet-content"',
-  'data-slot="sheet-close"',
-  'data-sheet-side={side}',
-  "min-h-10",
-  "min-w-10",
-  "motion-reduce:animate-none",
-]) {
+// The dialog is bounded by --app-viewport-height rather than a literal 100dvh. That variable is
+// declared 100vh with an @supports (height: 100dvh) upgrade (asserted against the viewport CSS
+// below), so it stays dvh-correct on mobile while still degrading on browsers without dvh.
+if (!sources.dialog.includes("var(--app-viewport-height)")) {
+  failures.push("Accessible dialog contract missing: dynamic viewport height bound");
+}
+
+for (const token of ['data-slot="sheet-content"', 'data-slot="sheet-close"', "data-sheet-side={side}", "motion-reduce:animate-none"]) {
   if (!sources.sheet.includes(token)) failures.push(`Accessible sheet contract missing: ${token}`);
+}
+
+// Touch targets are a floor, not an exact value: min-h-10/min-w-10 (40px) is the minimum, and the
+// close controls may exceed it. Assert the floor so a larger target cannot fail the contract.
+const MIN_TOUCH_TARGET_STEP = 10;
+for (const [name, source] of [
+  ["dialog", sources.dialog],
+  ["sheet", sources.sheet],
+]) {
+  for (const axis of ["h", "w"]) {
+    const steps = [...source.matchAll(new RegExp(`min-${axis}-(\\d+)`, "g"))].map((match) => Number(match[1]));
+    if (!steps.some((step) => step >= MIN_TOUCH_TARGET_STEP)) {
+      failures.push(`Accessible ${name} contract missing: min-${axis}-${MIN_TOUCH_TARGET_STEP} or larger touch target`);
+    }
+  }
 }
 
 for (const token of [

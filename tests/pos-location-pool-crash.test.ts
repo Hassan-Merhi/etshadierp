@@ -45,7 +45,8 @@ describe("POS location database-pool crash protection", () => {
     expect(context).toContain('if (role === "POS") return;');
     expect(context).toContain("role: assignment.role");
     expect(context).toContain("prefetchReferenceData(company.id, company.role)");
-    expect(context).toContain("commitCompanySelection(target, { prefetch: true, serverSynced: true })");
+    expect(context).toContain("adoptServerCompany(target)");
+    expect(context).toContain("commitCompanySelection(company, { prefetch: true, serverSynced: true })");
   });
 
   it("does not mount the hidden ERP command palette for ordinary POS users", () => {

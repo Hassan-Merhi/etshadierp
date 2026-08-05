@@ -44,15 +44,12 @@ function extractLazyPaths(source: string): string[] {
  * Covers the pattern:
  *   lazy(() => import("@/pages/X").then((m) => ({ default: m.ExportName })))
  */
-function extractNamedReExports(
-  source: string
-): Array<{ aliasPath: string; exportName: string }> {
+function extractNamedReExports(source: string): Array<{ aliasPath: string; exportName: string }> {
   const results: Array<{ aliasPath: string; exportName: string }> = [];
   // Match: import("@/...").then((m) => ({ default: m.Something }))
   // Note: the multi-line format has a trailing comma — `m.Name,\n  }))` —
   // so we use [,\s]* (not just \s*) between the export name and closing }.
-  const regex =
-    /import\("(@\/[^"]+)"\)\.then\(\s*\(m\)\s*=>\s*\(\{\s*default:\s*m\.(\w+)[,\s]*\}\)\s*\)/g;
+  const regex = /import\("(@\/[^"]+)"\)\.then\(\s*\(m\)\s*=>\s*\(\{\s*default:\s*m\.(\w+)[,\s]*\}\)\s*\)/g;
   let m: RegExpExecArray | null;
   while ((m = regex.exec(source)) !== null) {
     results.push({ aliasPath: m[1], exportName: m[2] });
@@ -91,15 +88,9 @@ function resolveAlias(aliasPath: string): string | null {
 function fileHasNamedExport(filePath: string, exportName: string): boolean {
   const source = readFileSync(filePath, "utf-8");
   // Direct named export declarations
-  if (
-    new RegExp(
-      `export\\s+(function|const|class|let|var)\\s+${exportName}\\b`
-    ).test(source)
-  )
-    return true;
+  if (new RegExp(`export\\s+(function|const|class|let|var)\\s+${exportName}\\b`).test(source)) return true;
   // Re-export: export { X } or export { Foo as X }
-  if (new RegExp(`export\\s+\\{[^}]*\\b${exportName}\\b[^}]*\\}`).test(source))
-    return true;
+  if (new RegExp(`export\\s+\\{[^}]*\\b${exportName}\\b[^}]*\\}`).test(source)) return true;
   return false;
 }
 
@@ -114,10 +105,14 @@ describe("lazyPages.ts — lazy import file existence", () => {
     expect(lazyPaths.length).toBeGreaterThanOrEqual(50);
   });
 
-  it("lazyPages.ts itself is parseable and contains React.lazy calls", () => {
-    expect(lazyPagesSource).toContain("React.lazy");
-    // The file uses the `lazy` import from react
-    expect(lazyPagesSource).toContain('import { lazy }');
+  it("lazyPages.ts itself is parseable and declares lazy page exports", () => {
+    // The file imports a lazy factory under the local name `lazy` — the source
+    // module is an implementation detail (currently `lazyRetry`, which wraps
+    // React.lazy with retry-on-chunk-error), so assert on the binding and on
+    // the resulting `lazy(() => import(...))` call shape instead of a literal
+    // `React.lazy` / `from "react"` spelling.
+    expect(lazyPagesSource).toMatch(/import\s+\{[^}]*\blazy\b[^}]*\}\s+from/);
+    expect(lazyPagesSource).toMatch(/export const \w+ = lazy\(\(\) => import\(/);
   });
 
   // One test per unique import path — dynamic generation so failures show
@@ -146,10 +141,7 @@ describe("lazyPages.ts — named re-export shapes (.then((m) => m.Named))", () =
   for (const { aliasPath, exportName } of namedReExports) {
     it(`${aliasPath} exports "${exportName}" (used in .then() re-export)`, () => {
       const filePath = resolveAlias(aliasPath);
-      expect(
-        filePath,
-        `File not found for ${aliasPath}`
-      ).not.toBeNull();
+      expect(filePath, `File not found for ${aliasPath}`).not.toBeNull();
 
       const hasExport = fileHasNamedExport(filePath!, exportName);
       expect(
