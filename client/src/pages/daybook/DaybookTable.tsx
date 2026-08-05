@@ -38,6 +38,9 @@ interface DaybookTableProps {
   setDaybookRowLimit: (n: number | ((prev: number) => number)) => void;
   DAYBOOK_PAGE_SIZE: number;
   navigate: (path: string) => void;
+  isLoading?: boolean;
+  errorMessage?: string | null;
+  onRetry?: () => void;
 }
 
 export function DaybookTable({
@@ -69,10 +72,39 @@ export function DaybookTable({
   setDaybookRowLimit,
   DAYBOOK_PAGE_SIZE,
   navigate,
+  isLoading = false,
+  errorMessage = null,
+  onRetry,
 }: DaybookTableProps) {
   const rowId = (row: DaybookRow): string => {
     return row._type === "voucher" ? `voucher-${(row.data as Voucher).id}` : `offload-${row.data.id}`;
   };
+
+  // Loading, failure and empty are three different situations. Rendering a bare
+  // header for all three makes a failed request look like a day with no
+  // transactions, so each one gets its own visible state.
+  const statusMessage: JSX.Element | null = errorMessage ? (
+    <div className="flex flex-col items-center gap-2 py-10 text-center" data-testid="daybook-error">
+      <p className="text-sm text-destructive">{errorMessage}</p>
+      {onRetry && (
+        <Button variant="outline" size="sm" onClick={onRetry} data-testid="button-daybook-retry">
+          Try again
+        </Button>
+      )}
+    </div>
+  ) : isLoading ? (
+    <div className="space-y-2 py-4" data-testid="daybook-loading">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <Skeleton key={index} className="h-8 w-full" />
+      ))}
+    </div>
+  ) : visibleRows.length === 0 ? (
+    <p className="text-sm text-muted-foreground text-center py-12" data-testid="daybook-empty">
+      No transactions found for the selected period and filters.
+    </p>
+  ) : null;
+
+  if (statusMessage) return statusMessage;
 
   if (viewMode === "condensed") {
     // Build date → type → rows structure (preserving date order from visibleRows)

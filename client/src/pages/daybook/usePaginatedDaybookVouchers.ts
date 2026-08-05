@@ -5,6 +5,8 @@ import {
   canonicalApiUrl,
   frontendQueryPolicies,
   paginatedCompanyDataKey,
+  unwrapList,
+  unwrapPage,
   type QueryParams,
 } from "@/lib/frontendDataArchitecture";
 import type { Voucher } from "./types";
@@ -73,7 +75,7 @@ export function usePaginatedDaybookVouchers(options: UsePaginatedDaybookVouchers
   );
   const queryUrl = useMemo(() => canonicalApiUrl("/api/vouchers", queryParams), [queryParams]);
 
-  const query = useQuery<PaginatedVoucherResponse>({
+  const query = useQuery<PaginatedVoucherResponse | Voucher[]>({
     queryKey: paginatedCompanyDataKey(
       queryUrl,
       options.companyId,
@@ -94,6 +96,14 @@ export function usePaginatedDaybookVouchers(options: UsePaginatedDaybookVouchers
     placeholderData: (previous) => previous,
   });
 
+  // The endpoint answers with a paginated envelope, but a plain array is still a
+  // valid legacy shape. Normalizing both keeps the table populated either way
+  // instead of silently rendering zero rows when the envelope is missing.
+  const page = useMemo(
+    () => unwrapPage<Voucher>(query.data, { page: options.page, pageSize: options.pageSize }),
+    [query.data, options.page, options.pageSize],
+  );
+
   const loadAllVouchers = async (): Promise<Voucher[]> => {
     const exportUrl = canonicalApiUrl("/api/vouchers", {
       ...queryParams,
@@ -106,14 +116,14 @@ export function usePaginatedDaybookVouchers(options: UsePaginatedDaybookVouchers
       const body = await response.json().catch(() => ({ message: "Failed to load complete Daybook export" }));
       throw new Error(body.message || "Failed to load complete Daybook export");
     }
-    return response.json();
+    return unwrapList<Voucher>(await response.json());
   };
 
   return {
     ...query,
     queryUrl,
-    response: query.data,
-    vouchers: query.data?.data ?? [],
+    response: page,
+    vouchers: page.data,
     loadAllVouchers,
   };
 }
