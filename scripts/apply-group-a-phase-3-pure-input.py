@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 def replace_once(text: str, old: str, new: str, label: str) -> str:
-    if new in text:
+    if new and new in text:
         return text
     if old not in text:
         raise RuntimeError(f"Could not find {label}")
@@ -70,6 +70,12 @@ if normalize_start < 0 or payload_start < 0 or lock_start < 0:
 else:
     text = text[:normalize_start] + text[lock_start:]
 text = text.replace('const hash = payloadHash(normalized, note);', 'const hash = immutableRevisionPayloadHash(normalized, note);')
+text = text.replace(
+    '''    const row = current.find(
+      (candidate) =>''',
+    '''    const row = current.find(
+      (candidate: typeof stockTransferItems.$inferSelect) =>'''
+)
 path.write_text(text)
 
 path = Path("tests/group-a-phase-3-pos-transfer-revisions.test.ts")
