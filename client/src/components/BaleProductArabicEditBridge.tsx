@@ -50,7 +50,15 @@ export function BaleProductArabicEditBridge() {
   const bypassRef = useRef(false);
   const savingRef = useRef(false);
   const productsRef = useRef<ProductTranslation[]>([]);
+  const hydratedKeyRef = useRef<string | null>(null);
+  const refetchedKeyRef = useRef<string | null>(null);
+  const dirtyRef = useRef(false);
   const { toast } = useToast();
+
+  const loadProducts = async () => {
+    const response = await fetch("/api/factory/bale-products?lang=en", { credentials: "include" });
+    productsRef.current = response.ok ? await response.json() : productsRef.current;
+  };
 
   useEffect(() => {
     nameArRef.current = nameAr;
@@ -63,16 +71,7 @@ export function BaleProductArabicEditBridge() {
   }, [productId]);
 
   useEffect(() => {
-    let cancelled = false;
-    void fetch("/api/factory/bale-products?lang=en", { credentials: "include" })
-      .then((response) => (response.ok ? response.json() : []))
-      .then((products: ProductTranslation[]) => {
-        if (!cancelled) productsRef.current = products;
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
+    void loadProducts().catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -82,6 +81,9 @@ export function BaleProductArabicEditBridge() {
         setDialog(null);
         setMountNode(null);
         setProductId(null);
+        hydratedKeyRef.current = null;
+        refetchedKeyRef.current = null;
+        dirtyRef.current = false;
         return;
       }
 
@@ -103,6 +105,21 @@ export function BaleProductArabicEditBridge() {
       setDialog(nextDialog);
       setMountNode(target);
       setProductId(product?.id ?? null);
+
+      // The cached catalog can predate this product (e.g. it was just created), so
+      // refetch once per unresolved article code instead of leaving the fields inert.
+      if (!product && articleCode && refetchedKeyRef.current !== articleCode) {
+        refetchedKeyRef.current = articleCode;
+        void loadProducts().catch(() => undefined);
+      }
+
+      // Only seed the Arabic fields when we switch to a different product, and never
+      // once the user has started typing — this loop reruns every 300ms and on every
+      // DOM mutation, so unconditional seeding wipes input as it is entered.
+      if (dirtyRef.current) return;
+      if (hydratedKeyRef.current === articleCode && product) return;
+
+      hydratedKeyRef.current = product ? articleCode : null;
       setNameAr(product?.nameAr ?? "");
       setDescriptionAr(product?.descriptionAr ?? "");
     };
@@ -145,6 +162,9 @@ export function BaleProductArabicEditBridge() {
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.message || "Unable to update Arabic translation");
         await queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
+        await loadProducts().catch(() => undefined);
+        dirtyRef.current = false;
+        hydratedKeyRef.current = null;
         bypassRef.current = true;
         button.click();
       } catch (error) {
@@ -170,7 +190,10 @@ export function BaleProductArabicEditBridge() {
           id="edit-product-name-ar"
           dir="rtl"
           value={nameAr}
-          onChange={(event) => setNameAr(event.target.value)}
+          onChange={(event) => {
+            dirtyRef.current = true;
+            setNameAr(event.target.value);
+          }}
           placeholder="اسم المنتج بالعربية"
         />
       </div>
@@ -180,7 +203,10 @@ export function BaleProductArabicEditBridge() {
           id="edit-product-description-ar"
           dir="rtl"
           value={descriptionAr}
-          onChange={(event) => setDescriptionAr(event.target.value)}
+          onChange={(event) => {
+            dirtyRef.current = true;
+            setDescriptionAr(event.target.value);
+          }}
           placeholder="وصف المنتج بالعربية"
         />
       </div>
