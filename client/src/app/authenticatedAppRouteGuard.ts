@@ -14,7 +14,7 @@ const SUPPLIER_PARTNER_PATHS = new Set([
 export type AuthenticatedAppRouteDecision =
   | { kind: "continue" }
   | { kind: "loading" }
-  | { kind: "empty" }
+  | { kind: "recovery" }
   | { kind: "redirect"; to: string };
 
 interface ResolveAuthenticatedAppRouteOptions {
@@ -72,7 +72,7 @@ export function resolveAuthenticatedAppRoute({
     currentLocation !== "/intercompany-requests"
   ) {
     if (myAccessLoading) decision = { kind: "loading" };
-    else if (myAccess === undefined && !myAccessError) decision = { kind: "empty" };
+    else if (myAccessError || myAccess === undefined) decision = { kind: "recovery" };
     else decision = { kind: "redirect", to: factoryDefaultPage };
   } else if (isFactoryRoute && !hasFactoryAccess) {
     decision = { kind: "redirect", to: "/" };

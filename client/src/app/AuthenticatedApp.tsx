@@ -29,7 +29,12 @@ interface AuthenticatedAppProps {
 }
 
 export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) {
-  const { selectedCompany, isLoading: companyLoading } = useCompany();
+  const {
+    selectedCompany,
+    isLoading: companyLoading,
+    error: companyError,
+    retry: retryCompanyBootstrap,
+  } = useCompany();
   useMobilePerformanceLifecycle();
   usePresence(true);
   useScreenFeed();
@@ -48,10 +53,39 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
     }
   }, [currentLocation]);
 
-  const { chatUnread, posImportEnabled, myAccess, myAccessLoading, myAccessError, factorySettings } =
-    useAuthenticatedAppData({ selectedCompanyId: selectedCompany?.id, userPresent: true, isPOS });
+  const {
+    chatUnread,
+    posImportEnabled,
+    myAccess,
+    myAccessLoading,
+    myAccessError,
+    retryMyAccess,
+    factorySettings,
+    factorySettingsLoading,
+    factorySettingsError,
+    retryFactorySettings,
+  } = useAuthenticatedAppData({ selectedCompanyId: selectedCompany?.id, userPresent: true, isPOS });
 
-  if (companyLoading || !selectedCompany) return <AppLoadingState />;
+  if (companyLoading) return <AppLoadingState />;
+  if (companyError || !selectedCompany) {
+    return <AppLoadingState forceRecovery onRecover={() => void retryCompanyBootstrap()} />;
+  }
+
+  const usesAccessContract =
+    !isPOS && selectedCompany.companyType !== "properties" && selectedCompany.companyType !== "supplier_partner";
+  if (usesAccessContract && myAccessLoading) return <AppLoadingState />;
+  if (usesAccessContract && (myAccessError || !myAccess)) {
+    return <AppLoadingState forceRecovery onRecover={() => void retryMyAccess()} />;
+  }
+
+  const isFactoryContext =
+    selectedCompany.companyType === "factory" ||
+    selectedCompany.companyType === "factory_v2" ||
+    currentLocation.startsWith("/factory/");
+  if (isFactoryContext && factorySettingsLoading) return <AppLoadingState />;
+  if (isFactoryContext && factorySettingsError) {
+    return <AppLoadingState forceRecovery onRecover={() => void retryFactorySettings()} />;
+  }
 
   const isAdminOwner = user.role === "Admin" || user.role === "Owner" || user.role === "Developer";
   const routeState = resolveAuthenticatedAppRoute({
@@ -65,7 +99,9 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
   });
 
   if (routeState.decision.kind === "loading") return <AppLoadingState />;
-  if (routeState.decision.kind === "empty") return null;
+  if (routeState.decision.kind === "recovery") {
+    return <AppLoadingState forceRecovery onRecover={() => void retryMyAccess()} />;
+  }
   if (routeState.decision.kind === "redirect") return <Redirect replace to={routeState.decision.to} />;
 
   const leaveConfirmDialog = (

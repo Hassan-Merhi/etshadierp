@@ -57,11 +57,12 @@ export function authenticatedUserQueryOptions() {
     queryKey: authenticatedUserQueryKey,
     queryFn: ({ signal }) => fetchAuthenticatedUser(signal),
     select: (cachedValue) => parseAuthenticatedUser(cachedValue),
-    retry: false,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 2_000),
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    refetchOnReconnect: true,
   });
 }
 
