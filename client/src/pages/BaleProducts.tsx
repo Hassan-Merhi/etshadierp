@@ -43,6 +43,7 @@ import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
+import { productMatchesSearch } from "@shared/factoryProductSearch";
 import { CreateBaleProductDialog } from "../components/CreateBaleProductDialog";
 import { AdminAuthDialog } from "@/components/AdminAuthDialog";
 import type { FactoryBaleProduct, FactoryCategory } from "@shared/schema";
@@ -154,18 +155,12 @@ export default function BaleProducts() {
   const distinctWeights = Array.from(
     new Set((allActiveProducts ?? []).map((p) => p.weightPerBaleKg).filter(Boolean) as string[])
   ).sort((a, b) => parseFloat(a) - parseFloat(b));
-  const searchLower = searchQuery.trim().toLowerCase();
   const activeProducts = allActiveProducts
     ?.filter((p) => !showZeroPrice || parseFloat(p.sellingPrice || "0") === 0)
     ?.filter((p) => !showNoColor || !p.labelDesignColor)
     ?.filter((p) => filterCategoryId === null || p.categoryId === filterCategoryId)
     ?.filter((p) => filterWeight === null || String(p.weightPerBaleKg) === filterWeight)
-    ?.filter(
-      (p) =>
-        !searchLower ||
-        (p.articleCode ?? "").toLowerCase().includes(searchLower) ||
-        (p.name ?? "").toLowerCase().includes(searchLower)
-    );
+    ?.filter((p) => productMatchesSearch(p, searchQuery));
   const hiddenProducts = products?.filter((p) => p.active === false);
 
   const toggleSelectId = (id: number) => {

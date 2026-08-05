@@ -19,6 +19,7 @@ import {
   type LabelData,
 } from "@/lib/labelHtml";
 import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
+import { productMatchesSearch } from "@shared/factoryProductSearch";
 
 import { StockEntryCart } from "./StockEntryCart";
 import {
@@ -249,16 +250,7 @@ export function StockEntryTab() {
 
   const filteredProducts =
     scanInput.trim().length > 0
-      ? (activeProducts || [])
-          .filter((p) => {
-            const term = scanInput.trim().toLowerCase();
-            return (
-              p.name.toLowerCase().includes(term) ||
-              p.articleCode?.toLowerCase().includes(term) ||
-              p.code.toLowerCase().includes(term)
-            );
-          })
-          .slice(0, 1000)
+      ? (activeProducts || []).filter((p) => productMatchesSearch(p, scanInput)).slice(0, 1000)
       : [];
 
   const selectProduct = (product: FactoryBaleProduct) => {
