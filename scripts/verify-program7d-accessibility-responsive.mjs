@@ -73,7 +73,7 @@ for (const [name, source] of [
 }
 
 for (const token of [
-  "100dvh",
+  "var(--app-viewport-height)",
   "overflow-y-auto",
   "overscroll-contain",
   "min-h-10",
