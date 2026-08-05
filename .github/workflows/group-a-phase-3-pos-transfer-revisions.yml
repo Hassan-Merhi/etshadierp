@@ -40,6 +40,7 @@ jobs:
         run: |
           python scripts/apply-group-a-phase-3.py
           python scripts/apply-group-a-phase-3-ui.py
+          python scripts/apply-group-a-phase-3-pure-input.py
 
       - name: Update pinned startup migration integrity
         run: node --import tsx scripts/update-startup-schema-integrity.ts
@@ -50,6 +51,7 @@ jobs:
             server/startup-schema/index.ts \
             server/startup-schema/011-stock-transfer-revision-integrity.ts \
             shared/schema/erp/stock-movements.ts \
+            server/services/immutableStockTransferRevisionInput.ts \
             server/services/immutableStockTransferRevisionLifecycle.ts \
             server/routes/vouchers/immutableStockTransferRevisionRoutes.ts \
             server/routes/voucherRoutes.ts \
@@ -93,6 +95,7 @@ jobs:
             server/startup-schema/index.ts \
             server/startup-schema/011-stock-transfer-revision-integrity.ts \
             shared/schema/erp/stock-movements.ts \
+            server/services/immutableStockTransferRevisionInput.ts \
             server/services/immutableStockTransferRevisionLifecycle.ts \
             server/routes/vouchers/immutableStockTransferRevisionRoutes.ts \
             server/routes/voucherRoutes.ts \
