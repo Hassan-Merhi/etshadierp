@@ -35,7 +35,9 @@ html[dir="rtl"] [contenteditable="true"]:not([dir="ltr"]) {
 }
 
 html[dir="rtl"] [data-business-value],
+html[dir="rtl"] [data-stock-name],
 html[dir="rtl"] [data-stock-item-name],
+html[dir="rtl"] [data-stock-group],
 html[dir="rtl"] [data-stock-group-name],
 html[dir="rtl"] [data-account-name],
 html[dir="rtl"] [data-company-name],
@@ -56,7 +58,10 @@ html[dir="rtl"] [data-voucher-number],
 html[dir="rtl"] [data-contract-reference],
 html[dir="rtl"] [data-document-reference],
 html[dir="rtl"] [data-identifier],
+html[dir="rtl"] [data-reference],
 html[dir="rtl"] [data-currency-value],
+html[dir="rtl"] [data-money-value],
+html[dir="rtl"] [data-quantity-value],
 html[dir="rtl"] [data-date-value],
 html[dir="rtl"] [data-phone-value],
 html[dir="rtl"] [data-email-value],
@@ -111,6 +116,36 @@ html[dir="rtl"] [data-slot="sheet-footer"] {
   justify-content: flex-start;
 }
 
+html[dir="rtl"] [data-slot="sheet-content"][data-sheet-side="left"] {
+  right: 0;
+  left: auto;
+  border-right-width: 0;
+  border-left-width: 1px;
+}
+
+html[dir="rtl"] [data-slot="sheet-content"][data-sheet-side="right"] {
+  right: auto;
+  left: 0;
+  border-right-width: 1px;
+  border-left-width: 0;
+}
+
+html[dir="rtl"] [data-slot="sheet-content"][data-sheet-side="left"][data-state="open"] {
+  --tw-enter-translate-x: 100%;
+}
+
+html[dir="rtl"] [data-slot="sheet-content"][data-sheet-side="left"][data-state="closed"] {
+  --tw-exit-translate-x: 100%;
+}
+
+html[dir="rtl"] [data-slot="sheet-content"][data-sheet-side="right"][data-state="open"] {
+  --tw-enter-translate-x: -100%;
+}
+
+html[dir="rtl"] [data-slot="sheet-content"][data-sheet-side="right"][data-state="closed"] {
+  --tw-exit-translate-x: -100%;
+}
+
 html[dir="rtl"] [data-slot="sidebar"][data-side="left"] [data-slot="sidebar-container"] {
   right: 0;
   left: auto;
@@ -126,11 +161,33 @@ html[dir="rtl"] [data-slot="sidebar"][data-side="left"][data-state="expanded"] [
   right: 0;
 }
 
-html[dir="rtl"] [data-slot="sidebar"][data-mobile="true"] {
+html[dir="rtl"] [data-slot="sidebar"][data-side="right"] [data-slot="sidebar-container"] {
+  right: auto;
+  left: 0;
+  border-right-width: 1px;
+  border-left-width: 0;
+}
+
+html[dir="rtl"] [data-slot="sidebar"][data-side="right"][data-collapsible="offcanvas"] [data-slot="sidebar-container"] {
+  left: calc(var(--sidebar-width) * -1);
+}
+
+html[dir="rtl"] [data-slot="sidebar"][data-side="right"][data-state="expanded"] [data-slot="sidebar-container"] {
+  left: 0;
+}
+
+html[dir="rtl"] [data-slot="sidebar"][data-mobile="true"][data-sheet-side="left"] {
   right: 0;
   left: auto;
   border-right-width: 0;
   border-left-width: 1px;
+}
+
+html[dir="rtl"] [data-slot="sidebar"][data-mobile="true"][data-sheet-side="right"] {
+  right: auto;
+  left: 0;
+  border-right-width: 1px;
+  border-left-width: 0;
 }
 
 html[dir="rtl"] [data-slot="sidebar-group-action"] {
@@ -148,6 +205,7 @@ html[dir="rtl"] [data-slot="context-menu-sub-trigger"] > svg:last-child {
   transform: rotate(180deg);
 }
 
+html[dir="rtl"] [data-slot="skip-link"]:focus,
 html[dir="rtl"] a[href="#main-content"]:focus {
   right: 1rem;
   left: auto;
@@ -168,10 +226,20 @@ html[dir="rtl"] a[href="#main-content"]:focus {
 .overflow-x-auto,
 .overflow-x-scroll {
   overscroll-behavior-inline: contain;
-  scrollbar-gutter: stable;
+  scrollbar-gutter: stable both-edges;
 }
 
-:where(button, a, input, textarea, select, [role="button"], [role="menuitem"], [role="option"]):focus-visible {
+:where(
+    button,
+    a,
+    input,
+    textarea,
+    select,
+    [role="button"],
+    [role="menuitem"],
+    [role="option"],
+    [data-horizontal-scroll-region]
+  ):focus-visible {
   outline: 2px solid hsl(var(--ring));
   outline-offset: 2px;
 }
@@ -234,7 +302,7 @@ html[dir="rtl"] a[href="#main-content"]:focus {
 }
 
 @media (forced-colors: active) {
-  :where(button, a, input, textarea, select, [role="button"]):focus-visible {
+  :where(button, a, input, textarea, select, [role="button"], [data-horizontal-scroll-region]):focus-visible {
     outline: 2px solid CanvasText;
   }
 }
