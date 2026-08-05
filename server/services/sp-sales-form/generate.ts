@@ -1,3 +1,4 @@
+import { toArrayBuffer } from "../../lib/bufferCompatibility";
 import ExcelJS from "exceljs";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
@@ -752,14 +753,14 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
 
   // ── 7. Output ─────────────────────────────────────────────────────────────
   const rawBuf = await wb.xlsx.writeBuffer();
-  const buf = Buffer.isBuffer(rawBuf) ? rawBuf : Buffer.from(rawBuf);
+  const buf = Buffer.from(new Uint8Array(rawBuf));
 
   // ── 8. Post-export formula error scan ─────────────────────────────────────
   // Re-read the generated buffer and scan every cell result for Excel error strings.
   // If any critical sheet contains errors, fail loudly instead of sending a broken file.
   try {
     const wbCheck = new ExcelJS.Workbook();
-    await wbCheck.xlsx.load(buf);
+    await wbCheck.xlsx.load(toArrayBuffer(buf));
     const errorsBySheet: Record<string, string[]> = {};
     for (const ws of wbCheck.worksheets) {
       ws.eachRow({ includeEmpty: false }, (row) => {

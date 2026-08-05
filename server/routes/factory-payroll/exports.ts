@@ -1,3 +1,4 @@
+import { toArrayBuffer } from "../../lib/bufferCompatibility";
 /**
  * factoryPayrollRoutes: FactoryPayrollExport endpoints.
  *
@@ -216,7 +217,7 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
       try {
         if (fs.existsSync(xlogoPath)) {
           const buf = fs.readFileSync(xlogoPath);
-          xlogoId = workbook.addImage({ buffer: buf as Buffer, extension: "jpeg" });
+          xlogoId = workbook.addImage({ buffer: toArrayBuffer(buf), extension: "jpeg" });
         }
       } catch {}
 

@@ -1,3 +1,4 @@
+import { toArrayBuffer } from "../../../lib/bufferCompatibility";
 /**
  * factoryCustomerProformaRoutes: FactoryCustomerProformaExport endpoints.
  *
@@ -125,7 +126,7 @@ export function registerFactoryCustomerProformaExportRoutes(app: Express) {
         const pxLogo = path.join(process.cwd(), "server", "hmd-logo.png");
         if (fs.existsSync(pxLogo)) {
           const pxBuf = fs.readFileSync(pxLogo);
-          const pxId = workbook.addImage({ buffer: pxBuf as Buffer, extension: "jpeg" });
+          const pxId = workbook.addImage({ buffer: toArrayBuffer(pxBuf), extension: "jpeg" });
           const pxLogoRow = sheet.addRow([]);
           pxLogoRow.height = 90;
           sheet.addImage(pxId, { tl: { col: 2.5, row: 0 }, ext: { width: 300, height: 90 } });
