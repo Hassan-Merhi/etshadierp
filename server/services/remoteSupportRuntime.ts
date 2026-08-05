@@ -61,7 +61,7 @@ const productionKeyboardControlEnabled =
 
 const bootFlags: RemoteSupportFlags = {
   screenFeedEnabled: !HARD_DISABLED,
-  fastScreenFeed: !HARD_DISABLED,
+  fastScreenFeed: false,
   remoteControl: productionRemoteControlEnabled,
   keyboardControl: productionKeyboardControlEnabled,
   sensitiveActionProtection: true,
