@@ -14,12 +14,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Check, X, Pencil, Search, Tag, RefreshCw, AlertCircle, Download, Upload } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { ExcelJS, readFile } from "@/lib/excelHelper";
+import { productMatchesSearch } from "@shared/factoryProductSearch";
 
 interface FactoryBaleProduct {
   id: number;
   code: string;
   articleCode: string | null;
   name: string;
+  nameAr: string | null;
   description: string | null;
   weightPerBaleKg: string | null;
   categoryId: number | null;
@@ -211,11 +213,7 @@ export default function FactoryPriceList() {
 
   const filteredProducts = products.filter((p) => {
     if (!p.active) return false;
-    const matchSearch =
-      !search ||
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      (p.articleCode || "").toLowerCase().includes(search.toLowerCase()) ||
-      (p.code || "").toLowerCase().includes(search.toLowerCase());
+    const matchSearch = productMatchesSearch(p, search);
     const matchCategory = categoryFilter === "all" || String(p.categoryId) === categoryFilter;
     const matchZeroOnly = !showZeroOnly || parseFloat(p.sellingPrice || "0") === 0;
     return matchSearch && matchCategory && matchZeroOnly;

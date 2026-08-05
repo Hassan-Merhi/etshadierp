@@ -8,12 +8,14 @@ import { Loader2, Upload, Trash2, ImagePlus, Search, Images, ChevronLeft } from 
 import { useToast } from "@/hooks/use-toast";
 import type { FactoryBaleProductImage } from "@shared/schema";
 import { PageHeader } from "@/components/PageHeader";
+import { productMatchesSearch } from "@shared/factoryProductSearch";
 
 interface BaleProduct {
   id: number;
   code: string;
   articleCode: string;
   name: string;
+  nameAr?: string | null;
   categoryId?: number;
   active?: boolean;
 }
@@ -102,15 +104,7 @@ export default function BaleProductImages() {
     [handleFiles]
   );
 
-  const filteredProducts = (productsQuery.data ?? []).filter((p) => {
-    const q = search.toLowerCase();
-    return (
-      !q ||
-      p.name.toLowerCase().includes(q) ||
-      p.articleCode.toLowerCase().includes(q) ||
-      p.code.toLowerCase().includes(q)
-    );
-  });
+  const filteredProducts = (productsQuery.data ?? []).filter((p) => productMatchesSearch(p, search));
 
   const images = imagesQuery.data ?? [];
 

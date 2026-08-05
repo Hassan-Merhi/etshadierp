@@ -112,6 +112,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
           productId: number;
           articleCode: string;
           productName: string;
+          productNameAr: string | null;
           category: string | null;
           categoryId: number | null;
           quantity: number;
@@ -151,6 +152,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
             productId: product?.id || b.productId || 0,
             articleCode: product?.articleCode || b.articleCode || b.baleCode || "",
             productName: product?.name || b.productName || "Unknown",
+            productNameAr: (product as any)?.nameAr || null,
             category: categoryName,
             categoryId,
             quantity: qty,
@@ -233,6 +235,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
           productId: number;
           articleCode: string;
           productName: string;
+          productNameAr: string | null;
           category: string | null;
           categoryId: number | null;
           quantity: number;
@@ -266,6 +269,7 @@ export function registerFactoryLocationInventoryRoutes(app: Express) {
             productId: product?.id || b.productId || 0,
             articleCode: product?.articleCode || b.articleCode || b.baleCode || "",
             productName: product?.name || b.productName || "Unknown",
+            productNameAr: (product as any)?.nameAr || null,
             category: categoryName,
             categoryId,
             quantity: qty,

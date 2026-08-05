@@ -55,6 +55,8 @@ import * as XLSX from "@/lib/excelHelper";
 
 import type { CartItem, CreatedBale } from "./wipersreentry/types";
 import { isWipers, isWipersBale } from "./wipersreentry/utils";
+import { productMatchesSearch } from "@shared/factoryProductSearch";
+
 export default function WipersReEntry() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
@@ -98,16 +100,7 @@ export default function WipersReEntry() {
 
   const filteredProducts =
     searchInput.trim().length > 0
-      ? wiperProducts
-          .filter((p) => {
-            const term = searchInput.trim().toLowerCase();
-            return (
-              p.name.toLowerCase().includes(term) ||
-              p.articleCode?.toLowerCase().includes(term) ||
-              p.code.toLowerCase().includes(term)
-            );
-          })
-          .slice(0, 20)
+      ? wiperProducts.filter((p) => productMatchesSearch(p, searchInput)).slice(0, 20)
       : wiperProducts.slice(0, 20);
 
   const totalQty = cart.reduce((s, i) => s + i.qty, 0);
