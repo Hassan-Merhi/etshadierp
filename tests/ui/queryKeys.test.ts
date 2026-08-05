@@ -7,6 +7,7 @@
 import {
   normalizeFilters,
   companyKeys,
+  referenceKeys,
   factoryKeys,
   inventoryKeys,
   stockItemKeys,
@@ -41,11 +42,7 @@ describe("normalizeFilters", () => {
 
 describe("companyKeys", () => {
   it("keeps the real URL first and active company second", () => {
-    expect(companyKeys.scoped("/api/accounts/all", 7, "2026-07-29")).toEqual([
-      "/api/accounts/all",
-      7,
-      "2026-07-29",
-    ]);
+    expect(companyKeys.scoped("/api/accounts/all", 7, "2026-07-29")).toEqual(["/api/accounts/all", 7, "2026-07-29"]);
   });
 
   it("uses canonical request URLs and company scope", () => {
@@ -70,20 +67,21 @@ describe("companyKeys", () => {
   });
 
   it("scopes auto-transfer rules to the active company", () => {
-    expect(companyKeys.autoTransferConfig(5, "/api/erp/rental")).toEqual([
-      "/api/erp/rental/auto-transfer-config",
-      5,
-    ]);
+    expect(companyKeys.autoTransferConfig(5, "/api/erp/rental")).toEqual(["/api/erp/rental/auto-transfer-config", 5]);
   });
 });
 
 describe("factory / inventory key factories", () => {
-  it("puts the real URL first, then company, then normalised filters", () => {
-    expect(factoryKeys.bales(7, { page: 2, empty: "" })).toEqual([
-      "/api/factory/bales",
-      7,
-      { page: 2 },
+  it("canonicalizes reference-list parameters and keeps company scope", () => {
+    expect(referenceKeys.locations(4, { includeInactive: true, search: "" })).toEqual([
+      "/api/locations?includeInactive=true",
+      4,
     ]);
+    expect(referenceKeys.suppliers(4)).not.toEqual(referenceKeys.suppliers(5));
+  });
+
+  it("puts the real URL first, then company, then normalised filters", () => {
+    expect(factoryKeys.bales(7, { page: 2, empty: "" })).toEqual(["/api/factory/bales", 7, { page: 2 }]);
   });
 
   it("normalises filters to undefined when nothing meaningful is passed", () => {
@@ -122,7 +120,7 @@ describe("analyticsKeys", () => {
   });
 
   it("exposes stable global keys with no company scoping", () => {
-    expect(analyticsKeys.suppliers()).toEqual(["/api/suppliers"]);
+    expect(analyticsKeys.suppliers(7)).toEqual(["/api/suppliers", 7]);
     expect(analyticsKeys.userCompanies()).toEqual(["/api/user/companies"]);
   });
 });

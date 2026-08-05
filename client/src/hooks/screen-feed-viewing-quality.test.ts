@@ -14,10 +14,10 @@ describe("screen feed viewing quality helpers", () => {
     expect(normalizeScreenFeedPoint(-20, 900, 1000, 500)).toEqual({ x: 0, y: 1 });
   });
 
-  it("bounds capture scale to preserve detail without unbounded pixels", () => {
+  it("uses viewport resolution to avoid unnecessary remote-feed pixels", () => {
     expect(getScreenFeedCaptureScale(0.5)).toBe(1);
     expect(getScreenFeedCaptureScale(1)).toBe(1);
-    expect(getScreenFeedCaptureScale(2)).toBe(1.25);
+    expect(getScreenFeedCaptureScale(2)).toBe(1);
   });
 
   it("allows same-origin and in-memory assets while rejecting remote assets", () => {

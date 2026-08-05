@@ -18,7 +18,9 @@ type CachedApiResponse = {
   response: Response;
   expiresAt: number;
   staleUntil: number;
+  revalidateUntil: number;
   lastUsedAt: number;
+  etag: string | null;
   scope: BandwidthCacheScope;
 };
 
@@ -33,6 +35,7 @@ const MAX_CONCURRENT_API_GETS = 6;
 const MAX_CACHE_ENTRIES = 32;
 const MAX_CACHEABLE_RESPONSE_BYTES = 1_500_000;
 const HIDDEN_TAB_STALE_MS = 10 * 60_000;
+const CONDITIONAL_REVALIDATION_MS = 2 * 60 * 60_000;
 
 const responseCache = new Map<string, CachedApiResponse>();
 const inFlightGets = new Map<string, Promise<Response>>();
@@ -55,22 +58,36 @@ const BYPASS_PATHS = [
 
 const CACHE_RULES: readonly CacheRule[] = [
   { pattern: /^\/api\/factory\/customer-orders\/\d+$/, ttlMs: 45_000, scope: "live" },
-  {
-    pattern: /^\/api\/factory\/customer-orders\/\d+\/bale-removals$/,
-    ttlMs: 5 * 60_000,
-    scope: "live",
-  },
+  { pattern: /^\/api\/factory\/customer-orders\/\d+\/bale-removals$/, ttlMs: 5 * 60_000, scope: "live" },
   { pattern: /^\/api\/factory\/bale-stock-count$/, ttlMs: 60_000, scope: "live" },
   { pattern: /^\/api\/factory\/customer-orders$/, ttlMs: 30_000, scope: "live" },
-  {
-    pattern: /^\/api\/factory\/customer-proformas$/,
-    ttlMs: 2 * 60_000,
-    scope: "reference",
-  },
-  { pattern: /^\/api\/factory\/customers$/, ttlMs: 2 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/customer-proformas$/, ttlMs: 2 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/customers$/, ttlMs: 30 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/suppliers$/, ttlMs: 30 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/bale-products$/, ttlMs: 30 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/workers$/, ttlMs: 30 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/employees$/, ttlMs: 30 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/cash-accounts$/, ttlMs: 30 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/worker-categories$/, ttlMs: 30 * 60_000, scope: "reference" },
   { pattern: /^\/api\/factory\/my-access$/, ttlMs: 5 * 60_000, scope: "reference" },
-  { pattern: /^\/api\/factory\/settings$/, ttlMs: 5 * 60_000, scope: "reference" },
-  { pattern: /^\/api\/company-settings$/, ttlMs: 5 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/settings$/, ttlMs: 15 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/company-settings$/, ttlMs: 15 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/user\/preferences$/, ttlMs: 15 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/my-erp-pages$/, ttlMs: 5 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/user\/companies$/, ttlMs: 30 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/ledger-accounts(?:\/parent-groups)?$/, ttlMs: 30 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/locations$/, ttlMs: 30 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/suppliers$/, ttlMs: 30 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/customers$/, ttlMs: 30 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/employees$/, ttlMs: 30 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/bank-accounts$/, ttlMs: 30 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/fixed-assets$/, ttlMs: 30 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/stock-groups$/, ttlMs: 30 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/stock-categories$/, ttlMs: 30 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/stock-grades$/, ttlMs: 30 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/stock-items\/(?:light|all-code-aliases)$/, ttlMs: 30 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/worker-groups\/with-members$/, ttlMs: 30 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/employee-groups$/, ttlMs: 30 * 60_000, scope: "reference" },
   { pattern: /^\/api\/companies\/\d+$/, ttlMs: 5 * 60_000, scope: "reference" },
   { pattern: /^\/api\/chat\/unread-count$/, ttlMs: 15_000, scope: "live" },
   { pattern: /^\/api\/chatbot\/status$/, ttlMs: 2 * 60_000, scope: "reference" },
@@ -161,10 +178,31 @@ function getCachedResponse(key: string): Response | null {
   const validUntil = mayUseStale ? cached.staleUntil : cached.expiresAt;
 
   if (now > validUntil) {
-    responseCache.delete(key);
+    if (now > cached.revalidateUntil) responseCache.delete(key);
     return null;
   }
 
+  cached.lastUsedAt = now;
+  return cached.response.clone();
+}
+
+function getRevalidationEntry(key: string): CachedApiResponse | null {
+  const cached = responseCache.get(key);
+  if (!cached) return null;
+  const now = Date.now();
+  if (!cached.etag || now > cached.revalidateUntil) {
+    if (now > cached.revalidateUntil) responseCache.delete(key);
+    return null;
+  }
+  cached.lastUsedAt = now;
+  return cached;
+}
+
+function refreshRevalidatedEntry(cached: CachedApiResponse, rule: CacheRule): Response {
+  const now = Date.now();
+  cached.expiresAt = now + rule.ttlMs;
+  cached.staleUntil = now + Math.max(rule.ttlMs, HIDDEN_TAB_STALE_MS);
+  cached.revalidateUntil = now + Math.max(rule.ttlMs, CONDITIONAL_REVALIDATION_MS);
   cached.lastUsedAt = now;
   return cached.response.clone();
 }
@@ -181,20 +219,27 @@ function cacheResponse(key: string, response: Response, rule: CacheRule, generat
     response: response.clone(),
     expiresAt: now + rule.ttlMs,
     staleUntil: now + Math.max(rule.ttlMs, HIDDEN_TAB_STALE_MS),
+    revalidateUntil: now + Math.max(rule.ttlMs, CONDITIONAL_REVALIDATION_MS),
     lastUsedAt: now,
+    etag: response.headers.get("etag"),
     scope: rule.scope,
   });
   trimCache();
 }
 
 function clearReadCache(scope: BandwidthInvalidationScope = "all"): void {
-  if (scope === "all") {
-    responseCache.clear();
-    return;
-  }
-
+  const now = Date.now();
   for (const [key, cached] of responseCache) {
-    if (shouldClearBandwidthEntry(cached.scope, scope)) responseCache.delete(key);
+    if (scope !== "all" && !shouldClearBandwidthEntry(cached.scope, scope)) continue;
+    if (!cached.etag || now > cached.revalidateUntil) {
+      responseCache.delete(key);
+      continue;
+    }
+    // Keep the representation only as a validator. The next read must contact
+    // the authenticated server and can reuse the body solely after a 304.
+    cached.expiresAt = 0;
+    cached.staleUntil = 0;
+    cached.lastUsedAt = now;
   }
 }
 
@@ -314,8 +359,15 @@ class SharedRequestLifetime {
   }
 }
 
-function forwardRequestInit(init: RequestInit | undefined, signal: AbortSignal): RequestInit {
-  return { ...(init ?? {}), signal };
+function forwardRequestInit(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+  signal: AbortSignal,
+  etag?: string | null
+): RequestInit {
+  const headers = requestHeaders(input, init);
+  if (etag && !headers.has("if-none-match")) headers.set("If-None-Match", etag);
+  return { ...(init ?? {}), headers, signal };
 }
 
 async function waitForSharedResponse(
@@ -430,6 +482,7 @@ export function installRequestStormGuard(): void {
 
     const rule = cacheRuleFor(url.pathname);
     const ttlMs = rule?.ttlMs ?? 0;
+    const revalidationEntry = rule ? getRevalidationEntry(key) : null;
     const lifetime = new SharedRequestLifetime();
     lifetime.acquire();
     const generationAtStart = writeGeneration;
@@ -437,10 +490,21 @@ export function installRequestStormGuard(): void {
       if (shouldDeferUntilVisible(url.pathname, ttlMs)) await waitUntilVisible(lifetime.controller.signal);
       const release = await acquireGetSlot(lifetime.controller.signal);
       try {
-        const response = await originalFetch(input, forwardRequestInit(init, lifetime.controller.signal));
+        const response = await originalFetch(
+          input,
+          forwardRequestInit(input, init, lifetime.controller.signal, revalidationEntry?.etag)
+        );
         // The response exists; its body is still unread. Any later abort would
         // tear that stream down under the caller, so disarm before handing over.
         lifetime.disarm();
+        if (response.status === 304 && rule && revalidationEntry) {
+          const cached = refreshRevalidatedEntry(revalidationEntry, rule);
+          if (generationAtStart !== writeGeneration) {
+            revalidationEntry.expiresAt = 0;
+            revalidationEntry.staleUntil = 0;
+          }
+          return cached;
+        }
         if (rule) cacheResponse(key, response, rule, generationAtStart);
 
         return response;
