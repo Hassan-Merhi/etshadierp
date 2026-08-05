@@ -8,10 +8,7 @@ interface UseAnalyticsReferenceQueriesProps {
   activeSection: string;
 }
 
-export function useAnalyticsReferenceQueries({
-  selectedCompanyId,
-  activeSection,
-}: UseAnalyticsReferenceQueriesProps) {
+export function useAnalyticsReferenceQueries({ selectedCompanyId, activeSection }: UseAnalyticsReferenceQueriesProps) {
   const locationsQuery = useQuery<Location[]>({
     queryKey: analyticsKeys.locations(selectedCompanyId),
     queryFn: () => fetchAnalyticsArray<Location>("/api/locations", "Failed to fetch locations"),
@@ -25,7 +22,7 @@ export function useAnalyticsReferenceQueries({
   });
 
   const suppliersQuery = useQuery<Supplier[]>({
-    queryKey: analyticsKeys.suppliers(),
+    queryKey: analyticsKeys.suppliers(selectedCompanyId),
     queryFn: () => fetchAnalyticsArray<Supplier>("/api/suppliers", "Failed to fetch suppliers"),
     enabled: !!selectedCompanyId && activeSection === "containers",
   });

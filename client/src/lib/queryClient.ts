@@ -2,7 +2,16 @@ import { QueryClient, QueryFunction, MutationCache, QueryCache } from "@tanstack
 import { isSafeToQueue, enqueueRequest, getDescriptionForRequest } from "./offlineQueue";
 import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
 import { toast } from "@/hooks/use-toast";
-import { accessQueryPolicy, stableReferenceQueryPolicy, stableSettingsQueryPolicy } from "./queryPolicies";
+import {
+  ACCESS_API_ENDPOINTS,
+  STABLE_REFERENCE_API_ENDPOINTS,
+  STABLE_SETTINGS_API_ENDPOINTS,
+  accessQueryPolicy,
+  stableReferenceQueryPolicy,
+  stableSettingsQueryPolicy,
+  staleTimeForQueryKey,
+} from "./queryPolicies";
+import { applyReferenceMutationResponse } from "./referenceMutationCache";
 import { isAbortError } from "./abortError";
 
 /* ── Timezone-aware date utility ───────────────────────────────────────────── */
@@ -121,6 +130,8 @@ export async function verifySessionExpired(originalFetch: typeof window.fetch): 
 // interfering with the login flow itself.
 const AUTH_PATHS = new Set(["/api/auth/me", "/api/auth/login", "/api/auth/logout", "/api/csrf-token"]);
 
+let referenceMutationQueryClient: QueryClient | null = null;
+
 export async function handlePossibleSessionExpiry(
   response: Response,
   pathname: string | null,
@@ -185,8 +196,18 @@ if (typeof window !== "undefined" && !(window as any).__csrfFetchPatched) {
       /* opaque URL — skip */
     }
 
+    const method = (init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
+    const applyReferenceMutation = async (response: Response) => {
+      if (!referenceMutationQueryClient || !pathname) return;
+      await applyReferenceMutationResponse({
+        client: referenceMutationQueryClient,
+        method,
+        pathname,
+        response,
+      });
+    };
+
     try {
-      const method = (init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
       const isStateChanging = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
       const isApi = !!pathname && pathname.startsWith("/api/") && pathname !== "/api/csrf-token";
 
@@ -199,6 +220,7 @@ if (typeof window !== "undefined" && !(window as any).__csrfFetchPatched) {
             const newInit: RequestInit = { ...init, headers: existingHeaders };
             if (newInit.credentials === undefined) newInit.credentials = "include";
             const res = await originalFetch(input, newInit);
+            await applyReferenceMutation(res);
 
             // If the server rejected our token (stale after restart/session regen),
             // clear the cache, fetch a fresh token, and retry exactly once.
@@ -226,6 +248,7 @@ if (typeof window !== "undefined" && !(window as any).__csrfFetchPatched) {
     // GET (and other non-state-changing) requests fall through here.
     // Capture the response so we can detect session expiry on polling queries.
     const fallbackRes = await originalFetch(input, init);
+    await applyReferenceMutation(fallbackRes);
     // Verify session before redirecting — a business 401 must not log users out.
     await handlePossibleSessionExpiry(fallbackRes, pathname, originalFetch);
     return fallbackRes;
@@ -580,7 +603,7 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: false,
       refetchOnMount: false,
       refetchOnReconnect: false,
-      staleTime: 5 * 60 * 1000,
+      staleTime: (query) => staleTimeForQueryKey(query.queryKey),
       gcTime: 30 * 60 * 1000,
       // Failures are not retried — a 4xx/5xx is real and the page should say so.
       // An abort is different: the request was cancelled, by a page the user has
@@ -597,26 +620,11 @@ export const queryClient = new QueryClient({
   },
 });
 
-export const STABLE_REFERENCE_QUERY_PREFIXES = [
-  "/api/ledger-accounts",
-  "/api/locations",
-  "/api/suppliers",
-  "/api/customers",
-  "/api/employees",
-  "/api/bank-accounts",
-  "/api/fixed-assets",
-  "/api/stock-groups",
-  "/api/stock-categories",
-  "/api/stock-grades",
-] as const;
+referenceMutationQueryClient = queryClient;
 
-export const STABLE_SETTINGS_QUERY_PREFIXES = [
-  "/api/company-settings",
-  "/api/factory/settings",
-  "/api/user/preferences",
-] as const;
-
-export const ACCESS_QUERY_PREFIXES = ["/api/my-erp-pages", "/api/factory/my-access"] as const;
+export const STABLE_REFERENCE_QUERY_PREFIXES = STABLE_REFERENCE_API_ENDPOINTS;
+export const STABLE_SETTINGS_QUERY_PREFIXES = STABLE_SETTINGS_API_ENDPOINTS;
+export const ACCESS_QUERY_PREFIXES = ACCESS_API_ENDPOINTS;
 
 for (const prefix of STABLE_REFERENCE_QUERY_PREFIXES) {
   queryClient.setQueryDefaults([prefix], stableReferenceQueryPolicy);
