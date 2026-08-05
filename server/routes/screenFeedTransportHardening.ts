@@ -51,7 +51,7 @@ function matchesEtag(header: string | string[] | undefined, etag: string): boole
 }
 
 function installReconnectJitter(res: Response): void {
-  const originalWrite = res.write.bind(res);
+  const originalWrite = res.write.bind(res) as (...args: any[]) => boolean;
   let retryRewritten = false;
   res.write = ((chunk: any, ...args: any[]) => {
     if (!retryRewritten && typeof chunk === "string" && chunk.includes("retry: 3000")) {
@@ -97,10 +97,7 @@ function clearTransportPressureState(pathname: string, method: string): void {
 }
 
 function enforceUploadPressure(req: Request, res: Response, next: NextFunction): void {
-  const sessionUserId = getSessionUserId(req);
-  if (sessionUserId === null || sessionUserId === undefined) return next();
-
-  const userId = String(sessionUserId);
+  const userId = getSessionUserId(req);
   const fastEnabled = isRemoteSupportEnabled("fastScreenFeed");
   const dataUrl = req.body?.dataUrl;
   const activeLimit = fastEnabled ? FAST_MAX_FRAME_SIZE : LEGACY_MAX_FRAME_SIZE;
