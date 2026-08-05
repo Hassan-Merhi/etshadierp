@@ -8,7 +8,11 @@ export const remoteSupportPhase5Translations: readonly Phase7BackendMessagesEntr
     ar: "عرض وتنقل آمنان",
     fr: "Consultation et navigation sécurisées",
   },
-  { en: "Keyboard disabled", ar: "لوحة المفاتيح معطلة", fr: "Clavier désactivé" },
+  {
+    en: "Keyboard disabled",
+    ar: "لوحة المفاتيح معطلة",
+    fr: "Clavier désactivé",
+  },
   { en: "Stop mouse", ar: "إيقاف الماوس", fr: "Arrêter la souris" },
   { en: "Enable", ar: "تفعيل", fr: "Activer" },
   {
@@ -43,8 +47,31 @@ export const remoteSupportPhase5Translations: readonly Phase7BackendMessagesEntr
     ar: "فشل تأكيد كلمة المرور.",
     fr: "La confirmation du mot de passe a échoué.",
   },
-  { en: "Mouse command failed.", ar: "فشل أمر الماوس.", fr: "La commande de souris a échoué." },
-  { en: "Remote mouse request failed.", ar: "فشل طلب الماوس البعيد.", fr: "La requête de souris distante a échoué." },
+  {
+    en: "Mouse command failed.",
+    ar: "فشل أمر الماوس.",
+    fr: "La commande de souris a échoué.",
+  },
+  {
+    en: "Remote mouse request failed.",
+    ar: "فشل طلب الماوس البعيد.",
+    fr: "La requête de souris distante a échoué.",
+  },
+  {
+    en: "Frame payload is too large.",
+    ar: "حجم بيانات الإطار كبير جدًا.",
+    fr: "La charge utile de la trame est trop volumineuse.",
+  },
+  {
+    en: "Frame producer is sending too quickly.",
+    ar: "يتم إرسال الإطارات بسرعة كبيرة.",
+    fr: "Les trames sont envoyées trop rapidement.",
+  },
+  {
+    en: "Invalid watched user ID.",
+    ar: "معرّف المستخدم المُراقَب غير صالح.",
+    fr: "L’identifiant de l’utilisateur surveillé n’est pas valide.",
+  },
   { en: "Executed", ar: "تم التنفيذ", fr: "Exécutée" },
   { en: "Blocked", ar: "محظور", fr: "Bloquée" },
   { en: "Ignored", ar: "تم التجاهل", fr: "Ignorée" },
@@ -53,7 +80,11 @@ export const remoteSupportPhase5Translations: readonly Phase7BackendMessagesEntr
     ar: "وحدة التحكم هذه لا تملك الجلسة.",
     fr: "Ce contrôleur ne possède pas la session.",
   },
-  { en: "Mouse control is disabled.", ar: "التحكم بالماوس معطل.", fr: "Le contrôle de la souris est désactivé." },
+  {
+    en: "Mouse control is disabled.",
+    ar: "التحكم بالماوس معطل.",
+    fr: "Le contrôle de la souris est désactivé.",
+  },
   {
     en: "This command channel is not bound to this ERP tab.",
     ar: "قناة الأوامر هذه غير مرتبطة بعلامة تبويب ERP هذه.",
@@ -69,7 +100,11 @@ export const remoteSupportPhase5Translations: readonly Phase7BackendMessagesEntr
     ar: "أكد كلمة المرور قبل تفعيل التحكم بالماوس.",
     fr: "Confirmez votre mot de passe avant d’activer le contrôle de la souris.",
   },
-  { en: "Unsupported mouse command.", ar: "أمر ماوس غير مدعوم.", fr: "Commande de souris non prise en charge." },
+  {
+    en: "Unsupported mouse command.",
+    ar: "أمر ماوس غير مدعوم.",
+    fr: "Commande de souris non prise en charge.",
+  },
   {
     en: "Mouse coordinates must be normalized.",
     ar: "يجب أن تكون إحداثيات الماوس مطبّعة.",
@@ -85,7 +120,11 @@ export const remoteSupportPhase5Translations: readonly Phase7BackendMessagesEntr
     ar: "علامة تبويب ERP الخاصة بالموظف غير جاهزة لاستقبال أوامر الماوس.",
     fr: "L’onglet ERP de l’employé n’est pas prêt à recevoir les commandes de souris.",
   },
-  { en: "Mouse command not found.", ar: "لم يتم العثور على أمر الماوس.", fr: "Commande de souris introuvable." },
+  {
+    en: "Mouse command not found.",
+    ar: "لم يتم العثور على أمر الماوس.",
+    fr: "Commande de souris introuvable.",
+  },
   {
     en: "Unsupported mouse command result.",
     ar: "نتيجة أمر الماوس غير مدعومة.",
