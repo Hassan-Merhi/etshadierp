@@ -186,12 +186,7 @@ function getCachedResponse(key: string): Response | null {
   return cached.response.clone();
 }
 
-function cacheResponse(
-  key: string,
-  response: Response,
-  rule: HotspotCacheRule,
-  generationAtStart: number
-): void {
+function cacheResponse(key: string, response: Response, rule: HotspotCacheRule, generationAtStart: number): void {
   if (!response.ok || generationAtStart !== writeGeneration) return;
   const rawLength = response.headers.get("content-length");
   const responseBytes = rawLength ? Number(rawLength) : 0;

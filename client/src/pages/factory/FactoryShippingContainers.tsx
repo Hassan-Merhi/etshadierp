@@ -1,27 +1,64 @@
-import {useState, useRef, useEffect, useMemo} from "react";
-import {useQuery, useMutation} from "@tanstack/react-query";
-import {apiRequest, queryClient} from "@/lib/queryClient";
-import {Button} from "@/components/ui/button";
-import {Badge} from "@/components/ui/badge";
-import {Input} from "@/components/ui/input";
-import {Checkbox} from "@/components/ui/checkbox";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle} from "@/components/ui/alert-dialog";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
-import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
-import {Search, Filter, ChevronDown, ChevronRight, CheckCircle2, XCircle, MessageCircle, Eye, Trash2, RotateCcw, Check, RefreshCw, Loader2, SlidersHorizontal} from "lucide-react";
-import {useToast} from "@/hooks/use-toast";
-import {cn} from "@/lib/utils";
-import {useLocation} from "wouter";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Search,
+  Filter,
+  ChevronDown,
+  ChevronRight,
+  CheckCircle2,
+  XCircle,
+  MessageCircle,
+  Eye,
+  Trash2,
+  RotateCcw,
+  Check,
+  RefreshCw,
+  Loader2,
+  SlidersHorizontal,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { useLocation } from "wouter";
 
-import type {DisplayRow, ShippingColId, ShippingRow, TrackingRow} from "./factoryshippingcontainers/types";
-import {CLI_LEFT, CTR_LEFT, DEFAULT_COL_VIS, INV_LEFT, LIST_KEY, SHIPPING_COLS, STATUS_ORDER, fmtDate, statusColor, statusLabel, stickyCellBase, stickyHeadBase} from "./factoryshippingcontainers/utils";
-import {DocIndicator} from "./factoryshippingcontainers/components/DocIndicator";
-import {EditableCellInput} from "./factoryshippingcontainers/components/EditableCellInput";
-import {DateCellInput} from "./factoryshippingcontainers/components/DateCellInput";
-import {DocumentsModal} from "./factoryshippingcontainers/components/DocumentsModal";
-import {WhatsAppModal} from "./factoryshippingcontainers/components/WhatsAppModal";
-import {ShippingAvailabilityTable} from "./factoryshippingcontainers/components/ShippingAvailabilityTable";
+import type { DisplayRow, ShippingColId, ShippingRow, TrackingRow } from "./factoryshippingcontainers/types";
+import {
+  CLI_LEFT,
+  CTR_LEFT,
+  DEFAULT_COL_VIS,
+  INV_LEFT,
+  LIST_KEY,
+  SHIPPING_COLS,
+  STATUS_ORDER,
+  fmtDate,
+  statusColor,
+  statusLabel,
+  stickyCellBase,
+  stickyHeadBase,
+} from "./factoryshippingcontainers/utils";
+import { DocIndicator } from "./factoryshippingcontainers/components/DocIndicator";
+import { EditableCellInput } from "./factoryshippingcontainers/components/EditableCellInput";
+import { DateCellInput } from "./factoryshippingcontainers/components/DateCellInput";
+import { DocumentsModal } from "./factoryshippingcontainers/components/DocumentsModal";
+import { WhatsAppModal } from "./factoryshippingcontainers/components/WhatsAppModal";
+import { ShippingAvailabilityTable } from "./factoryshippingcontainers/components/ShippingAvailabilityTable";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export default function FactoryShippingContainers() {
