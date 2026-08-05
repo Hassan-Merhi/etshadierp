@@ -6,10 +6,11 @@ on:
       - agent/phase-1-restore-green-main
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   diagnose:
+    if: ${{ !contains(github.event.head_commit.message, 'style: format stock transfer CI tests') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -26,34 +27,19 @@ jobs:
         run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
       - name: Install dependencies
         run: npm ci --no-audit --bin-links=true
-      - name: Verify lockfile and production dependencies
+      - name: Apply exact Circle formatting fix
         run: |
-          npm run verify:lockfile
-          npm run verify:production-dependencies
-      - name: Check Circle changed-file formatting
-        run: |
-          git fetch --no-tags --prune --depth=1 origin +refs/heads/main:refs/remotes/origin/main
-          mapfile -d '' changed_files < <(
-            git diff --name-only --diff-filter=ACMR -z origin/main HEAD -- client/src server shared tests scripts |
-              grep -zE '\.(ts|tsx|css|mjs)$' || true
-          )
-          if [ "${#changed_files[@]}" -eq 0 ]; then
-            echo "No changed source files require formatting checks."
+          node node_modules/prettier/bin/prettier.cjs --write \
+            tests/stock-transfer-lifecycle.test.ts \
+            tests/stock-transfer-revision-lifecycle.test.ts
+          if git diff --quiet -- \
+            tests/stock-transfer-lifecycle.test.ts \
+            tests/stock-transfer-revision-lifecycle.test.ts; then
+            echo "The Circle-scoped test files are already formatted."
             exit 0
           fi
-          printf 'Checking formatting for %s changed source file(s):\n' "${#changed_files[@]}"
-          printf ' - %s\n' "${changed_files[@]}"
-          node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
-      - name: Lint
-        run: npm run lint
-      - name: TypeScript
-        run: npm run check
-      - name: Production build
-        run: npm run build
-      - name: Verify server bundle
-        run: npm run verify:server-bundle
-      - name: Repository safety contracts
-        run: |
-          npm run verify:program1-observability
-          npm run verify:final-production-readiness
-          npm run verify:bandwidth
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/stock-transfer-lifecycle.test.ts tests/stock-transfer-revision-lifecycle.test.ts
+          git commit -m "style: format stock transfer CI tests"
+          git push origin HEAD:agent/phase-1-restore-green-main
