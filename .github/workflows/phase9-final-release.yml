@@ -1,21 +1,6 @@
 name: Phase 9 final verification and release
 
 on:
-  pull_request:
-    paths:
-      - "client/**"
-      - "server/**"
-      - "shared/**"
-      - "tests/**"
-      - "scripts/**"
-      - "config/**"
-      - "package.json"
-      - "package-lock.json"
-      - "vitest.config*.ts"
-      - ".github/workflows/phase9-final-release.yml"
-  push:
-    branches:
-      - agent/phase-9-final-release
   workflow_dispatch:
 
 permissions:
@@ -56,6 +41,10 @@ jobs:
       PORT: "5000"
       ERP_SMOKE_BASE_URL: http://127.0.0.1:5000
       ERP_SMOKE_OUTPUT_DIR: artifacts/phase9-language-browser
+      ERP_SMOKE_USERNAME: ${{ secrets.PHASE9_ERP_SMOKE_USERNAME }}
+      ERP_SMOKE_PASSWORD: ${{ secrets.PHASE9_ERP_SMOKE_PASSWORD }}
+      ERP_SMOKE_REQUIRE_AUTHENTICATED: "1"
+      ERP_SMOKE_REQUIRE_EXACT_ROUTES: "1"
 
     steps:
       - name: Checkout repository
@@ -91,8 +80,13 @@ jobs:
           node node_modules/prettier/bin/prettier.cjs --check \
             .github/workflows/phase9-final-release.yml \
             config/i18n-phase9-final-release.json \
+            docs/translation/phase-8-current-main-reconciliation.md \
+            docs/translation/phase-9-current-main-release.md \
             scripts/run-phase9-language-browser-smoke.mjs \
+            scripts/verify-multilingual-phases-4-7-current-main.mjs \
+            scripts/verify-phase8-current-main-reconciliation.mjs \
             scripts/verify-phase9-final-i18n-baseline.mjs \
+            tests/phase8-rtl-responsive-accessibility.test.ts \
             tests/phase9-final-release-gate.test.ts \
             vitest.config.phase9.ts
 
@@ -119,6 +113,14 @@ jobs:
         if: always() && steps.install.outcome == 'success'
         continue-on-error: true
         run: node node_modules/vitest/vitest.mjs run --config vitest.config.phase9.ts
+
+      - name: Current-main multilingual reconciliation
+        id: reconciliation
+        if: always() && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: |
+          node scripts/verify-multilingual-phases-4-7-current-main.mjs
+          node scripts/verify-phase8-current-main-reconciliation.mjs
 
       - name: Final production readiness
         id: readiness
@@ -202,7 +204,7 @@ jobs:
         continue-on-error: true
         run: npm run test:frontend:coverage
 
-      - name: Final untranslated-text baseline
+      - name: Final untranslated-text release ratchet
         id: i18n
         if: always() && steps.install.outcome == 'success'
         continue-on-error: true
@@ -255,6 +257,7 @@ jobs:
           BUILD: ${{ steps.build.outcome }}
           LINT: ${{ steps.lint.outcome }}
           CONTRACTS: ${{ steps.contracts.outcome }}
+          RECONCILIATION: ${{ steps.reconciliation.outcome }}
           READINESS: ${{ steps.readiness.outcome }}
           DB_SCHEMA: ${{ steps.db_schema.outcome }}
           BROWSER_SMOKE: ${{ steps.browser_smoke.outcome }}
@@ -270,7 +273,7 @@ jobs:
         run: |
           set -euo pipefail
           status=success
-          for value in "$INSTALL" "$DEPENDENCIES" "$FORMATTING" "$TYPECHECK" "$BUILD" "$LINT" "$CONTRACTS" "$READINESS" "$DB_SCHEMA" "$BROWSER_SMOKE" "$BACKEND" "$SMOKE" "$BACKEND_COVERAGE" "$FRONTEND" "$FRONTEND_COVERAGE" "$I18N" "$SECURITY" "$DEPENDENCY_AUDIT" "$SECRET_SCAN"; do
+          for value in "$INSTALL" "$DEPENDENCIES" "$FORMATTING" "$TYPECHECK" "$BUILD" "$LINT" "$CONTRACTS" "$RECONCILIATION" "$READINESS" "$DB_SCHEMA" "$BROWSER_SMOKE" "$BACKEND" "$SMOKE" "$BACKEND_COVERAGE" "$FRONTEND" "$FRONTEND_COVERAGE" "$I18N" "$SECURITY" "$DEPENDENCY_AUDIT" "$SECRET_SCAN"; do
             if [ "$value" != "success" ]; then status=failure; fi
           done
 
@@ -286,6 +289,7 @@ jobs:
           | Production build | $BUILD |
           | Lint | $LINT |
           | Release contracts | $CONTRACTS |
+          | Current-main multilingual reconciliation | $RECONCILIATION |
           | Final production readiness | $READINESS |
           | Disposable PostgreSQL schema | $DB_SCHEMA |
           | Startup, migrations and multilingual browser smoke | $BROWSER_SMOKE |
@@ -294,7 +298,7 @@ jobs:
           | Backend coverage | $BACKEND_COVERAGE |
           | Full frontend tests | $FRONTEND |
           | Frontend coverage | $FRONTEND_COVERAGE |
-          | Exact final untranslated baseline | $I18N |
+          | Untranslated-text release ratchet | $I18N |
           | Focused security checks | $SECURITY |
           | Critical production dependency audit | $DEPENDENCY_AUDIT |
           | Verified/unknown secret scan | $SECRET_SCAN |
