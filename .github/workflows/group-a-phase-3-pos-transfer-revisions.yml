@@ -60,6 +60,7 @@ jobs:
             client/src/pages/pos/postransferorders/components/ViewTransferDialog.tsx \
             tests/group-a-phase-3-pos-transfer-revisions.test.ts \
             tests/startup-schema-integrity.test.ts \
+            vitest.config.phase3.ts \
             scripts/verify-group-a-phase-3.mjs
 
       - name: Verify Phase 3 contracts and migration integrity values
@@ -71,7 +72,7 @@ jobs:
       - name: Run Phase 3 focused lifecycle tests
         run: |
           node node_modules/vitest/vitest.mjs run \
-            tests/group-a-phase-3-pos-transfer-revisions.test.ts \
+            --config vitest.config.phase3.ts \
             --maxWorkers=1 --no-file-parallelism
 
       - name: Type-check
@@ -104,6 +105,7 @@ jobs:
             client/src/pages/pos/postransferorders/components/ViewTransferDialog.tsx \
             tests/group-a-phase-3-pos-transfer-revisions.test.ts \
             tests/startup-schema-integrity.test.ts \
+            vitest.config.phase3.ts \
             scripts/verify-group-a-phase-3.mjs
           git commit -m "Complete Group A Phase 3 immutable transfer revisions"
           git push origin HEAD:agent/group-a-phase-3-pos-transfer-revisions
