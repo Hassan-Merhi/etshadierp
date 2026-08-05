@@ -100,3 +100,5 @@ jobs:
             scripts/verify-group-a-phase-3.mjs
           git commit -m "Complete Group A Phase 3 immutable transfer revisions"
           git push origin HEAD:agent/group-a-phase-3-pos-transfer-revisions
+
+# Retrigger after the workflow file exists on the branch.
