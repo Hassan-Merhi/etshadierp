@@ -1,0 +1,102 @@
+name: Group A Phase 3 POS transfer revisions
+
+on:
+  push:
+    branches:
+      - agent/group-a-phase-3-pos-transfer-revisions
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: group-a-phase-3-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  implement-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/group-a-phase-3-pos-transfer-revisions
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Normalize public npm registry
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Apply Phase 3 current-main patches
+        run: |
+          python scripts/apply-group-a-phase-3.py
+          python scripts/apply-group-a-phase-3-ui.py
+
+      - name: Update pinned startup migration integrity
+        run: node --import tsx scripts/update-startup-schema-integrity.ts
+
+      - name: Format Phase 3 files
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            server/startup-schema/index.ts \
+            server/startup-schema/011-stock-transfer-revision-integrity.ts \
+            shared/schema/erp/stock-movements.ts \
+            server/services/immutableStockTransferRevisionLifecycle.ts \
+            server/routes/vouchers/immutableStockTransferRevisionRoutes.ts \
+            server/routes/voucherRoutes.ts \
+            client/src/pages/vouchers/StockTransferRevisionHistory.tsx \
+            client/src/pages/pos/postransferorders/types.ts \
+            client/src/pages/pos/postransferorders/components/ViewTransferDialog.tsx \
+            tests/ui/group-a-phase-3-pos-transfer-revisions.test.ts \
+            tests/startup-schema-integrity.test.ts \
+            scripts/verify-group-a-phase-3.mjs
+
+      - name: Verify Phase 3 contracts
+        run: node scripts/verify-group-a-phase-3.mjs
+
+      - name: Run Phase 3 focused tests
+        run: |
+          node node_modules/vitest/vitest.mjs run \
+            tests/ui/group-a-phase-3-pos-transfer-revisions.test.ts \
+            tests/startup-schema-integrity.test.ts \
+            --maxWorkers=1 --no-file-parallelism
+
+      - name: Type-check
+        run: npm run check
+
+      - name: Production build
+        run: npm run build
+
+      - name: Verify bandwidth budget
+        run: npm run verify:bandwidth
+
+      - name: Commit completed Phase 3 implementation
+        run: |
+          if git diff --quiet; then
+            echo "Group A Phase 3 is already applied."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            server/startup-schema/index.ts \
+            server/startup-schema/011-stock-transfer-revision-integrity.ts \
+            shared/schema/erp/stock-movements.ts \
+            server/services/immutableStockTransferRevisionLifecycle.ts \
+            server/routes/vouchers/immutableStockTransferRevisionRoutes.ts \
+            server/routes/voucherRoutes.ts \
+            client/src/pages/vouchers/StockTransferRevisionHistory.tsx \
+            client/src/pages/pos/postransferorders/types.ts \
+            client/src/pages/pos/postransferorders/components/ViewTransferDialog.tsx \
+            tests/ui/group-a-phase-3-pos-transfer-revisions.test.ts \
+            tests/startup-schema-integrity.test.ts \
+            scripts/verify-group-a-phase-3.mjs
+          git commit -m "Complete Group A Phase 3 immutable transfer revisions"
+          git push origin HEAD:agent/group-a-phase-3-pos-transfer-revisions
