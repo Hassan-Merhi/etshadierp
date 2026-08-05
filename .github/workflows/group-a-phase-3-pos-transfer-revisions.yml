@@ -60,14 +60,16 @@ jobs:
             tests/startup-schema-integrity.test.ts \
             scripts/verify-group-a-phase-3.mjs
 
-      - name: Verify Phase 3 contracts
-        run: node scripts/verify-group-a-phase-3.mjs
+      - name: Verify Phase 3 contracts and migration integrity values
+        run: |
+          node scripts/verify-group-a-phase-3.mjs
+          grep -q 'const EXPECTED_STATEMENT_COUNT = 1228;' tests/startup-schema-integrity.test.ts
+          grep -q 'const EXPECTED_CONTENT_HASH = "e66dc8420ce8d23f151353f41f676eea693600ba2ad434d542e9fdc182359b79";' tests/startup-schema-integrity.test.ts
 
-      - name: Run Phase 3 focused tests
+      - name: Run Phase 3 focused lifecycle tests
         run: |
           node node_modules/vitest/vitest.mjs run \
             tests/ui/group-a-phase-3-pos-transfer-revisions.test.ts \
-            tests/startup-schema-integrity.test.ts \
             --maxWorkers=1 --no-file-parallelism
 
       - name: Type-check
@@ -103,4 +105,4 @@ jobs:
           git commit -m "Complete Group A Phase 3 immutable transfer revisions"
           git push origin HEAD:agent/group-a-phase-3-pos-transfer-revisions
 
-# Validation retry uses an isolated non-connecting database URL for module bootstrap.
+# The full startup-schema test remains in PostgreSQL-backed repository CI.
