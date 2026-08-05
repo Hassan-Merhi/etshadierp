@@ -244,10 +244,10 @@ export function StockMovementDialog({
                           {fmtN(txn.outwardQty, 0)}
                         </td>
                         <td className="px-3 py-2 text-right font-mono text-red-700 dark:text-red-400">
-                          {fmtA(txn.isPOS && txn.posSellingRate ? txn.posSellingRate : txn.outwardRate)}
+                          {fmtA(txn.posSellingRate ? txn.posSellingRate : txn.outwardRate)}
                         </td>
                         <td className="px-3 py-2 text-right font-mono text-red-700 dark:text-red-400 border-r">
-                          {fmtA(txn.isPOS && txn.posSellingValue ? txn.posSellingValue : txn.outwardValue)}
+                          {fmtA(txn.posSellingValue ? txn.posSellingValue : txn.outwardValue)}
                         </td>
                         <td className="px-3 py-2 text-right font-mono font-semibold text-primary">
                           {fmtN(txn.closingQty, 0)}
