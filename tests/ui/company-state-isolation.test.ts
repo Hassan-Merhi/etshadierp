@@ -20,7 +20,10 @@ describe("frontend company-state isolation wiring", () => {
 
     expect(context).toContain("createCompanySwitchQueue");
     expect(context).toContain("cancelCompanySessionQueries(queryClient)");
-    expect(context).toContain("removeCompanySessionQueries(queryClient)");
+    // Matched without the closing paren: the call now passes a scoping options object
+    // (removeCompanySessionQueries(queryClient, { ... })), and the previous exact-literal match
+    // failed on the extra argument even though the cache clearing it guards became more precise.
+    expect(context).toContain("removeCompanySessionQueries(queryClient");
     expect(context).toContain("const ok = await switchCompanyOnServer(company.id)");
     expect(context).toContain("commitCompanySelection(company, { prefetch: true, serverSynced: true })");
     expect(context).toContain("commitCompanySelection(company, { prefetch: false, serverSynced: false })");

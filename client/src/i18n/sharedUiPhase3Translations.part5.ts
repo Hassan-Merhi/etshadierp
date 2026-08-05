@@ -187,4 +187,13 @@ export const phase3SharedUiTranslationsPart5: readonly Phase3SharedUiEntry[] = [
     fr: "Ajustement du point de vente en attente — validation administrative requise",
   },
   { en: "Approve", ar: "موافقة", fr: "Approuver" },
+  { en: "Company data unavailable", ar: "بيانات الشركة غير متاحة", fr: "Données de l’entreprise indisponibles" },
+  { en: "Company unavailable", ar: "الشركة غير متاحة", fr: "Entreprise indisponible" },
+  {
+    en: "Unable to prepare remote control.",
+    ar: "تعذر تجهيز التحكم عن بعد.",
+    fr: "Impossible de préparer le contrôle à distance.",
+  },
+  { en: "Page actions", ar: "إجراءات الصفحة", fr: "Actions de la page" },
+  { en: "Row actions", ar: "إجراءات الصف", fr: "Actions de la ligne" },
 ];

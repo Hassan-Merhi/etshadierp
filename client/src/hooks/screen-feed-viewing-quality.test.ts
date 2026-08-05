@@ -14,10 +14,18 @@ describe("screen feed viewing quality helpers", () => {
     expect(normalizeScreenFeedPoint(-20, 900, 1000, 500)).toEqual({ x: 0, y: 1 });
   });
 
-  it("bounds capture scale to preserve detail without unbounded pixels", () => {
+  // Capture is pinned to viewport resolution rather than tracking devicePixelRatio. The old 1.25x
+  // upscale at DPR 2 sent 25% more pixels on ordinary Windows display scaling for detail remote
+  // support does not need, so the implementation now clamps every ratio to 1. Guard that it stays
+  // clamped — including for hostile input — rather than re-asserting the upscale it replaced.
+  it("pins capture scale to viewport resolution for every device pixel ratio", () => {
     expect(getScreenFeedCaptureScale(0.5)).toBe(1);
     expect(getScreenFeedCaptureScale(1)).toBe(1);
-    expect(getScreenFeedCaptureScale(2)).toBe(1.25);
+    expect(getScreenFeedCaptureScale(2)).toBe(1);
+    expect(getScreenFeedCaptureScale(3)).toBe(1);
+    expect(getScreenFeedCaptureScale(0)).toBe(1);
+    expect(getScreenFeedCaptureScale(-1)).toBe(1);
+    expect(getScreenFeedCaptureScale(Number.NaN)).toBe(1);
   });
 
   it("allows same-origin and in-memory assets while rejecting remote assets", () => {

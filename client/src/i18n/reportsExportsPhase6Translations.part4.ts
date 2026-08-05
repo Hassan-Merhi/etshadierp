@@ -87,4 +87,11 @@ export const reportsExportsPhase6TranslationsPart4: readonly Phase6ReportsExport
   },
   { en: "Year", ar: "السنة", fr: "Année" },
   { en: "ZIP not ready", ar: "ملف ZIP غير جاهز", fr: "Le fichier ZIP n’est pas prêt" },
+  {
+    en: "Expected an in-memory export attachment",
+    ar: "كان من المتوقع مرفق تصدير في الذاكرة",
+    fr: "Une pièce jointe d’export en mémoire était attendue",
+  },
+  { en: "Invalid container ID", ar: "معرف الحاوية غير صالح", fr: "Identifiant de conteneur invalide" },
+  { en: "Container not found", ar: "الحاوية غير موجودة", fr: "Conteneur introuvable" },
 ];
