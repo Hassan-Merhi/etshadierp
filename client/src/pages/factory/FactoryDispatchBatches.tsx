@@ -16,6 +16,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/PageHeader";
 import { Plus, Truck, Package, Filter, ChevronRight, Search, BarChart2 } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+import { visibleTabInterval } from "@/lib/queryPolicies";
 
 interface Customer {
   id: number;
@@ -119,22 +120,28 @@ export default function FactoryDispatchBatches() {
       if (!res.ok) throw new Error((await res.json()).message);
       return res.json();
     },
-    refetchInterval: 60_000,
+    staleTime: 30_000,
+    refetchInterval: visibleTabInterval(60_000),
+    refetchIntervalInBackground: false,
   });
 
   const { data: customers = [] } = useQuery<Customer[]>({ queryKey: ["/api/factory/customers"] });
 
   const { data: proformas = [] } = useQuery<Proforma[]>({
-    queryKey: [`/api/factory/customer-proformas?customerId=${form.customerId}`, form.customerId],
+    queryKey: [`/api/factory/customer-proformas?customerId=${form.customerId}&profile=summary&pageSize=250`],
     queryFn: async () => {
       if (!form.customerId) return [];
-      const res = await fetch(`/api/factory/customer-proformas?customerId=${form.customerId}`, {
-        credentials: "include",
-      });
+      const res = await fetch(
+        `/api/factory/customer-proformas?customerId=${form.customerId}&profile=summary&pageSize=250`,
+        {
+          credentials: "include",
+        }
+      );
       if (!res.ok) return [];
       return res.json();
     },
     enabled: !!form.customerId && createOpen,
+    staleTime: 5 * 60_000,
   });
 
   interface ReportsSummary {
@@ -153,7 +160,9 @@ export default function FactoryDispatchBatches() {
       return res.json();
     },
     enabled: activeTab === "reports",
-    refetchInterval: 60_000,
+    staleTime: 30_000,
+    refetchInterval: activeTab === "reports" ? visibleTabInterval(60_000) : false,
+    refetchIntervalInBackground: false,
   });
 
   const activeProformas = proformas.filter((p) => p.isActive);
@@ -176,7 +185,10 @@ export default function FactoryDispatchBatches() {
       return res.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/dispatch-batches"] });
+      queryClient.invalidateQueries(
+        { queryKey: ["/api/factory/dispatch-batches"], refetchType: "active" },
+        { cancelRefetch: false }
+      );
       toast({ title: "Batch created", description: `Dispatch batch ${data.batch?.batchNumber} created.` });
       setCreateOpen(false);
       resetForm();

@@ -20,6 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
+import { visibleTabInterval } from "@/lib/queryPolicies";
 import * as XLSX from "@/lib/excelHelper";
 
 function toLocalDateStr(d: Date): string {
@@ -109,13 +110,17 @@ export default function DailyScan() {
     return () => clearTimeout(t);
   }, [selectedDate]);
 
+  const isToday = selectedDate === today;
+
   const { data: dayBales = [], isLoading: loadingBales } = useQuery<DayBale[]>({
     queryKey: ["/api/factory/daily-bale-scans/produced", selectedDate],
     queryFn: () =>
       fetch(`/api/factory/daily-bale-scans/produced?date=${selectedDate}&pageSize=1000`, {
         credentials: "include",
       }).then((r) => r.json()),
-    refetchInterval: 10000,
+    staleTime: isToday ? 15_000 : 5 * 60_000,
+    refetchInterval: isToday ? visibleTabInterval(60_000) : false,
+    refetchIntervalInBackground: false,
   });
 
   const { data: scans = [], isLoading: loadingScans } = useQuery<DailyScanRow[]>({
@@ -124,11 +129,12 @@ export default function DailyScan() {
       fetch(`/api/factory/daily-bale-scans?date=${selectedDate}&pageSize=1000`, { credentials: "include" }).then((r) =>
         r.json()
       ),
-    refetchInterval: 10000,
+    staleTime: isToday ? 15_000 : 5 * 60_000,
+    refetchInterval: isToday ? visibleTabInterval(60_000) : false,
+    refetchIntervalInBackground: false,
   });
 
   const isLoading = loadingBales || loadingScans;
-  const isToday = selectedDate === today;
 
   // Build lookup structures
   const scannedRefMap = new Map<string, DailyScanRow>(scans.map((s) => [s.reference_number, s]));
@@ -195,6 +201,11 @@ export default function DailyScan() {
         return;
       }
 
+      const savedScan = (await saveRes.json()) as DailyScanRow;
+      queryClient.setQueryData<DailyScanRow[]>(["/api/factory/daily-bale-scans", selectedDate], (current = []) =>
+        current.some((scan) => scan.id === savedScan.id) ? current : [...current, savedScan]
+      );
+
       showFeedback({
         type: "success",
         refCode: ref,
@@ -202,7 +213,6 @@ export default function DailyScan() {
         articleCode: bale.article_code,
         message: `${bale.weight_kg ? formatNumber(parseFloat(bale.weight_kg)) + " kg · " : ""}Verified`,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/daily-bale-scans", selectedDate] });
     } catch {
       showFeedback({ type: "error", refCode: ref, message: "Failed to record scan" });
     } finally {
@@ -215,8 +225,12 @@ export default function DailyScan() {
     mutationFn: async (id: number) => {
       const res = await apiRequest("DELETE", `/api/factory/daily-bale-scans/${id}`);
       if (!res.ok) throw new Error("Failed to remove");
+      return id;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/factory/daily-bale-scans", selectedDate] }),
+    onSuccess: (id) =>
+      queryClient.setQueryData<DailyScanRow[]>(["/api/factory/daily-bale-scans", selectedDate], (current = []) =>
+        current.filter((scan) => scan.id !== id)
+      ),
     onError: () => toast({ title: "Error", description: "Could not remove scan.", variant: "destructive" }),
   });
 

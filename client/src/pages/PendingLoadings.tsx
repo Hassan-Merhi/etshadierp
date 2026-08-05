@@ -7,6 +7,7 @@ import { Clock, Package, Play, StickyNote } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState, LoadingRows } from "@/components/ui/display-state";
 import { PageActions, PageShell } from "@/components/ui/page-shell";
+import { visibleTabInterval } from "@/lib/queryPolicies";
 
 interface PendingLoad {
   id: number;
@@ -26,7 +27,9 @@ export default function PendingLoadings() {
 
   const { data: loads = [], isLoading } = useQuery<PendingLoad[]>({
     queryKey: ["/api/factory/customer-orders?status=LOADING&profile=summary&pageSize=250"],
-    refetchInterval: 30000,
+    staleTime: 30_000,
+    refetchInterval: visibleTabInterval(60_000),
+    refetchIntervalInBackground: false,
   });
 
   const formatDate = (dateStr: string | null) => {
