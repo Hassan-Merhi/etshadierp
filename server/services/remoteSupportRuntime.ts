@@ -50,14 +50,14 @@ type RemoteSupportMetric =
 const HARD_DISABLED = process.env.DISABLE_SCREEN_FEED === "true";
 const startedAt = new Date();
 
-function productionFeatureEnabled(environmentKey: string): boolean {
+function productionFeatureEnabled(value: string | undefined): boolean {
   if (HARD_DISABLED || process.env.NODE_ENV !== "production") return false;
-  return process.env[environmentKey]?.trim().toLowerCase() !== "false";
+  return value?.trim().toLowerCase() !== "false";
 }
 
-const productionRemoteControlEnabled = productionFeatureEnabled("REMOTE_SUPPORT_REMOTE_CONTROL");
+const productionRemoteControlEnabled = productionFeatureEnabled(process.env.REMOTE_SUPPORT_REMOTE_CONTROL);
 const productionKeyboardControlEnabled =
-  productionRemoteControlEnabled && productionFeatureEnabled("REMOTE_SUPPORT_KEYBOARD_CONTROL");
+  productionRemoteControlEnabled && productionFeatureEnabled(process.env.REMOTE_SUPPORT_KEYBOARD_CONTROL);
 
 const bootFlags: RemoteSupportFlags = {
   screenFeedEnabled: !HARD_DISABLED,
@@ -142,7 +142,7 @@ export function isRemoteSupportEnabled(flag: RemoteSupportFlagName): boolean {
 
 export function updateRemoteSupportFlags(
   patch: Partial<RemoteSupportFlags>,
-  actor: string
+  actor: string,
 ): RemoteSupportRuntimeSnapshot {
   const allowedKeys: RemoteSupportFlagName[] = [
     "screenFeedEnabled",
@@ -154,8 +154,8 @@ export function updateRemoteSupportFlags(
 
   const safePatch = Object.fromEntries(
     Object.entries(patch).filter(
-      ([key, value]) => allowedKeys.includes(key as RemoteSupportFlagName) && typeof value === "boolean"
-    )
+      ([key, value]) => allowedKeys.includes(key as RemoteSupportFlagName) && typeof value === "boolean",
+    ),
   ) as Partial<RemoteSupportFlags>;
 
   flags = normalizeFlags({ ...flags, ...safePatch });

@@ -86,7 +86,12 @@ requireMarkers("docs/historical-replay-phase-8-production-readiness.md", [
 const renderConfig = requireMarkers("render.yaml", [
   "healthCheckPath: /api/health/ready",
   "startCommand: npm start",
+  "autoDeployTrigger: checksPass",
 ]);
+
+if (/^\s*autoDeploy:\s*true\s*$/m.test(renderConfig)) {
+  failures.push("render.yaml must not deploy before repository checks pass");
+}
 
 for (const forbidden of ["HISTORICAL_REPLAY_APPLY_MODE", "HISTORICAL_REPLAY_RELEASE_ID", "MIGRATION_CONFIRMATION"]) {
   if (renderConfig.includes(forbidden)) {
