@@ -73,13 +73,16 @@ Trusted local pointer, keyboard, before-input or input activity immediately clea
 - Results contain only `executed`, `blocked` or `ignored` and a bounded reason; field values are never returned.
 - Disabling mouse, keyboard runtime support, remote control or the full screen feed revokes keyboard capability.
 - Session expiry, target disconnect, controller disconnect, restore-defaults and emergency stop terminate keyboard access.
+- Session-stop cleanup immediately removes authorization, listeners, rate state and outstanding result-correlation receipts.
 
 ## Storage
 
-Phase 6 authorization and command state is transient and in memory. No SQL or migration is required. Permanent metadata-only auditing is introduced in Phase 7 using the existing audit-log infrastructure.
+Password values are never accepted or stored by the remote-support subsystem. Inserted keyboard text exists only in the command being delivered to the exact target tab and is not retained in the result-correlation store. The store keeps only the command identifier, session identifier and creation timestamp until a bounded result arrives or the receipt expires.
+
+Authorization and transport state remain transient and in memory. Permanent Phase 7 auditing stores metadata only, including text length where relevant, and never stores inserted text. No SQL or migration is required.
 
 ## Verification
 
-Focused backend coverage validates password freshness, mouse dependency, exact target-tab ownership, bounded text and keys, command sequencing, result ownership, rate limits, stream failures, revocation and listener isolation.
+Focused backend coverage validates password freshness, mouse dependency, exact target-tab ownership, bounded text and keys, command sequencing, result ownership, rate limits, stream failures, revocation, immediate stop cleanup, metadata-only result correlation and listener isolation.
 
 Focused frontend coverage validates safe-field classification, credential and financial blocking, React-compatible input/change events, text insertion, deletion, caret movement, textarea line breaks, safe Tab navigation, select and explicit checkbox handling, local-user priority, max-length enforcement and fail-closed behavior.

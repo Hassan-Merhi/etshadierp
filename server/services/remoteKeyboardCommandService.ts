@@ -4,6 +4,7 @@ import { evaluateRemoteSupportRollout } from "./remoteSupportRollout";
 import {
   getRemoteControlSession,
   setRemoteControlKeyboardCapability,
+  subscribeRemoteControlSessionStops,
   type RemoteControlSession,
 } from "./remoteControlSessionService";
 
@@ -70,6 +71,11 @@ interface RateWindow {
   count: number;
 }
 
+interface RemoteKeyboardCommandReceipt {
+  sessionId: string;
+  createdAt: number;
+}
+
 const PASSWORD_CONFIRMATION_MAX_AGE_MS = 5 * 60 * 1000;
 const COMMAND_RETENTION_MS = 2 * 60 * 1000;
 const RATE_WINDOW_MS = 1000;
@@ -93,9 +99,10 @@ const ALLOWED_KEYS = new Set<RemoteKeyboardKey>([
 const commandListeners = new Map<string, Set<CommandListener>>();
 const resultListeners = new Map<string, Set<ResultListener>>();
 const authorizations = new Map<string, RemoteKeyboardAuthorization>();
-const commandHistory = new Map<string, RemoteKeyboardCommand>();
+const commandReceipts = new Map<string, RemoteKeyboardCommandReceipt>();
 const sequenceBySession = new Map<string, number>();
 const rateWindows = new Map<string, RateWindow>();
+let unsubscribeSessionStopCleanup: (() => void) | null = null;
 
 function cleanIdentifier(value: unknown, maxLength = 160): string {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
@@ -196,8 +203,8 @@ function clearSessionKeyboardState(sessionId: string, disableCapability: boolean
   sequenceBySession.delete(sessionId);
   commandListeners.delete(sessionId);
   resultListeners.delete(sessionId);
-  for (const [commandId, command] of commandHistory) {
-    if (command.sessionId === sessionId) commandHistory.delete(commandId);
+  for (const [commandId, receipt] of commandReceipts) {
+    if (receipt.sessionId === sessionId) commandReceipts.delete(commandId);
   }
   if (disableCapability) setRemoteControlKeyboardCapability(sessionId, false);
 }
@@ -341,10 +348,10 @@ export function publishRemoteKeyboardCommand(input: {
     createdAt: now,
   };
 
-  commandHistory.set(command.id, command);
+  commandReceipts.set(command.id, { sessionId: command.sessionId, createdAt: command.createdAt });
   const delivered = notify(commandListeners.get(session.id), command);
   if (delivered === 0) {
-    commandHistory.delete(command.id);
+    commandReceipts.delete(command.id);
     throw new RemoteKeyboardControlError(
       "TARGET_KEYBOARD_CHANNEL_UNAVAILABLE",
       409,
@@ -385,8 +392,8 @@ export function publishRemoteKeyboardCommandResult(input: {
   const now = input.now ?? Date.now();
   const session = activeSessionForTarget(input.sessionId, input.targetUserId, input.targetTabId, false);
   const commandId = cleanIdentifier(input.commandId);
-  const command = commandHistory.get(commandId);
-  if (!command || command.sessionId !== session.id) {
+  const receipt = commandReceipts.get(commandId);
+  if (!receipt || receipt.sessionId !== session.id) {
     throw new RemoteKeyboardControlError("KEYBOARD_COMMAND_NOT_FOUND", 404, "Keyboard command not found.");
   }
   if (input.status !== "executed" && input.status !== "blocked" && input.status !== "ignored") {
@@ -400,7 +407,7 @@ export function publishRemoteKeyboardCommandResult(input: {
     reason: cleanReason(input.reason),
     completedAt: now,
   };
-  commandHistory.delete(commandId);
+  commandReceipts.delete(commandId);
   notify(resultListeners.get(session.id), result);
   return { ...result };
 }
@@ -446,19 +453,29 @@ export function cleanupRemoteKeyboardCommandState(now = Date.now()): void {
     }
   }
 
-  for (const [commandId, command] of commandHistory) {
-    if (now - command.createdAt > COMMAND_RETENTION_MS) commandHistory.delete(commandId);
+  for (const [commandId, receipt] of commandReceipts) {
+    if (now - receipt.createdAt > COMMAND_RETENTION_MS) commandReceipts.delete(commandId);
   }
 }
 
+export function installRemoteKeyboardSessionStopCleanup(): void {
+  if (unsubscribeSessionStopCleanup) return;
+  unsubscribeSessionStopCleanup = subscribeRemoteControlSessionStops((session) => {
+    clearSessionKeyboardState(session.id, false);
+  });
+}
+
 export function resetRemoteKeyboardCommandStateForTests(): void {
+  unsubscribeSessionStopCleanup?.();
+  unsubscribeSessionStopCleanup = null;
   commandListeners.clear();
   resultListeners.clear();
   authorizations.clear();
-  commandHistory.clear();
+  commandReceipts.clear();
   sequenceBySession.clear();
   rateWindows.clear();
 }
 
+installRemoteKeyboardSessionStopCleanup();
 const cleanupTimer = setInterval(() => cleanupRemoteKeyboardCommandState(), 3000);
 (cleanupTimer as unknown as { unref?: () => void }).unref?.();
