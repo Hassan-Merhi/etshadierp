@@ -19,6 +19,7 @@ const HIDDEN_TAB_STALE_MS = 10 * 60_000;
 
 const responseCache = new Map<string, CachedApiResponse>();
 const inFlightGets = new Map<string, Promise<Response>>();
+const inFlightLifetimes = new Map<string, SharedRequestLifetime>();
 const getQueue: QueueEntry[] = [];
 let activeGets = 0;
 
@@ -223,22 +224,70 @@ function acquireGetSlot(signal?: AbortSignal | null): Promise<() => void> {
   });
 }
 
-async function waitForSharedResponse(promise: Promise<Response>, signal?: AbortSignal | null): Promise<Response> {
-  if (!signal) return (await promise).clone();
-  if (signal.aborted) throw new DOMException("The operation was aborted.", "AbortError");
+/**
+ * Tracks how many callers still want a shared in-flight GET. The underlying
+ * fetch runs on a controller of our own rather than on the first caller's
+ * signal: otherwise a caller that cancels (a React Query key change, a company
+ * switch, an unmount) aborts the network request that later, still-live callers
+ * are waiting on, and they receive an AbortError for a request they never
+ * cancelled. The real request is only aborted once every waiter has let go.
+ */
+class SharedRequestLifetime {
+  readonly controller = new AbortController();
+  private waiters = 0;
+
+  acquire(): void {
+    this.waiters += 1;
+  }
+
+  release(): void {
+    this.waiters = Math.max(0, this.waiters - 1);
+    if (this.waiters === 0) this.controller.abort();
+  }
+}
+
+function forwardRequestInit(init: RequestInit | undefined, signal: AbortSignal): RequestInit {
+  return { ...(init ?? {}), signal };
+}
+
+async function waitForSharedResponse(
+  promise: Promise<Response>,
+  signal?: AbortSignal | null,
+  lifetime?: SharedRequestLifetime
+): Promise<Response> {
+  if (!signal) {
+    try {
+      return (await promise).clone();
+    } finally {
+      lifetime?.release();
+    }
+  }
+
+  if (signal.aborted) {
+    lifetime?.release();
+    throw new DOMException("The operation was aborted.", "AbortError");
+  }
 
   return new Promise<Response>((resolve, reject) => {
-    const onAbort = () => reject(new DOMException("The operation was aborted.", "AbortError"));
+    let settled = false;
+    const settle = () => {
+      if (settled) return false;
+      settled = true;
+      signal.removeEventListener("abort", onAbort);
+      lifetime?.release();
+      return true;
+    };
+    function onAbort() {
+      if (settle()) reject(new DOMException("The operation was aborted.", "AbortError"));
+    }
     signal.addEventListener("abort", onAbort, { once: true });
 
     promise.then(
       (response) => {
-        signal.removeEventListener("abort", onAbort);
-        resolve(response.clone());
+        if (settle()) resolve(response.clone());
       },
       (error) => {
-        signal.removeEventListener("abort", onAbort);
-        reject(error);
+        if (settle()) reject(error);
       }
     );
   });
@@ -274,15 +323,21 @@ export function installRequestStormGuard(): void {
     if (cached) return cached;
 
     const existing = inFlightGets.get(key);
-    if (existing) return waitForSharedResponse(existing, requestSignal(input, init));
+    if (existing) {
+      const existingLifetime = inFlightLifetimes.get(key);
+      existingLifetime?.acquire();
+      return waitForSharedResponse(existing, requestSignal(input, init), existingLifetime);
+    }
 
     const ttlMs = cacheTtlFor(url.pathname);
     const signal = requestSignal(input, init);
+    const lifetime = new SharedRequestLifetime();
+    lifetime.acquire();
     const requestPromise = (async () => {
-      if (shouldDeferUntilVisible(url.pathname, ttlMs)) await waitUntilVisible(signal);
-      const release = await acquireGetSlot(signal);
+      if (shouldDeferUntilVisible(url.pathname, ttlMs)) await waitUntilVisible(lifetime.controller.signal);
+      const release = await acquireGetSlot(lifetime.controller.signal);
       try {
-        const response = await originalFetch(input, init);
+        const response = await originalFetch(input, forwardRequestInit(init, lifetime.controller.signal));
         cacheResponse(key, response, ttlMs);
         return response;
       } finally {
@@ -290,10 +345,12 @@ export function installRequestStormGuard(): void {
       }
     })().finally(() => {
       inFlightGets.delete(key);
+      inFlightLifetimes.delete(key);
     });
 
     inFlightGets.set(key, requestPromise);
-    return waitForSharedResponse(requestPromise, signal);
+    inFlightLifetimes.set(key, lifetime);
+    return waitForSharedResponse(requestPromise, signal, lifetime);
   };
 }
 

@@ -287,6 +287,9 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
             <p className="text-xs text-muted-foreground">
               {error instanceof Error ? error.message : "Unknown error"}
             </p>
+            <Button variant="outline" size="sm" onClick={() => void refetch()} data-testid="button-containers-retry">
+              Try again
+            </Button>
           </div>
         </div>
       </div>

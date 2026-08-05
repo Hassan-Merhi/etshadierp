@@ -59,7 +59,33 @@ const HOTSPOT_RULES: HotspotCacheRule[] = [
 
 const responseCache = new Map<string, CachedHotspotResponse>();
 const inFlightRequests = new Map<string, Promise<Response>>();
+const inFlightLifetimes = new Map<string, SharedRequestLifetime>();
 let writeGeneration = 0;
+
+/**
+ * Keeps a deduplicated request alive for every caller that is still waiting on
+ * it. The network fetch runs on this controller instead of the first caller's
+ * signal, so one caller cancelling (a React Query key change, a company switch,
+ * an unmount) no longer aborts the request that later callers are sharing and
+ * leaves them with an AbortError they never asked for.
+ */
+class SharedRequestLifetime {
+  readonly controller = new AbortController();
+  private waiters = 0;
+
+  acquire(): void {
+    this.waiters += 1;
+  }
+
+  release(): void {
+    this.waiters = Math.max(0, this.waiters - 1);
+    if (this.waiters === 0) this.controller.abort();
+  }
+}
+
+function forwardRequestInit(init: RequestInit | undefined, signal: AbortSignal): RequestInit {
+  return { ...(init ?? {}), signal };
+}
 
 function resolveUrl(input: RequestInfo | URL): URL | null {
   try {
@@ -185,21 +211,43 @@ function waitUntilVisible(signal?: AbortSignal | null): Promise<void> {
   });
 }
 
-async function cloneSharedResponse(request: Promise<Response>, signal?: AbortSignal | null): Promise<Response> {
-  if (!signal) return (await request).clone();
-  if (signal.aborted) throw new DOMException("The operation was aborted.", "AbortError");
+async function cloneSharedResponse(
+  request: Promise<Response>,
+  signal?: AbortSignal | null,
+  lifetime?: SharedRequestLifetime
+): Promise<Response> {
+  if (!signal) {
+    try {
+      return (await request).clone();
+    } finally {
+      lifetime?.release();
+    }
+  }
+
+  if (signal.aborted) {
+    lifetime?.release();
+    throw new DOMException("The operation was aborted.", "AbortError");
+  }
 
   return new Promise<Response>((resolve, reject) => {
-    const onAbort = () => reject(new DOMException("The operation was aborted.", "AbortError"));
+    let settled = false;
+    const settle = () => {
+      if (settled) return false;
+      settled = true;
+      signal.removeEventListener("abort", onAbort);
+      lifetime?.release();
+      return true;
+    };
+    function onAbort() {
+      if (settle()) reject(new DOMException("The operation was aborted.", "AbortError"));
+    }
     signal.addEventListener("abort", onAbort, { once: true });
     request.then(
       (response) => {
-        signal.removeEventListener("abort", onAbort);
-        resolve(response.clone());
+        if (settle()) resolve(response.clone());
       },
       (error) => {
-        signal.removeEventListener("abort", onAbort);
-        reject(error);
+        if (settle()) reject(error);
       }
     );
   });
@@ -244,20 +292,28 @@ export function installBandwidthPhase1HotspotGuard(): void {
 
     const signal = requestSignal(input, init);
     const existing = inFlightRequests.get(key);
-    if (existing) return cloneSharedResponse(existing, signal);
+    if (existing) {
+      const existingLifetime = inFlightLifetimes.get(key);
+      existingLifetime?.acquire();
+      return cloneSharedResponse(existing, signal, existingLifetime);
+    }
 
     const generationAtStart = writeGeneration;
+    const lifetime = new SharedRequestLifetime();
+    lifetime.acquire();
     const request = (async () => {
-      await waitUntilVisible(signal);
-      const response = await originalFetch(input, init);
+      await waitUntilVisible(lifetime.controller.signal);
+      const response = await originalFetch(input, forwardRequestInit(init, lifetime.controller.signal));
       cacheResponse(key, response, rule, generationAtStart);
       return response;
     })().finally(() => {
       inFlightRequests.delete(key);
+      inFlightLifetimes.delete(key);
     });
 
     inFlightRequests.set(key, request);
-    return cloneSharedResponse(request, signal);
+    inFlightLifetimes.set(key, lifetime);
+    return cloneSharedResponse(request, signal, lifetime);
   };
 }
 
