@@ -104,7 +104,8 @@ function enforceUploadPressure(req: Request, res: Response, next: NextFunction):
 
   if (typeof dataUrl === "string" && dataUrl.length > activeLimit) {
     recordRemoteSupportMetric("frameRejected");
-    return res.status(413).json({ message: "Frame payload is too large." });
+    res.status(413).json({ message: "Frame payload is too large." });
+    return;
   }
 
   if (!fastEnabled) return next();
@@ -114,7 +115,8 @@ function enforceUploadPressure(req: Request, res: Response, next: NextFunction):
   if (now - previous < FAST_MIN_UPLOAD_INTERVAL_MS) {
     recordRemoteSupportMetric("frameRejected");
     res.setHeader("Retry-After", String(FAST_RETRY_AFTER_SECONDS));
-    return res.status(429).json({ message: "Frame producer is sending too quickly." });
+    res.status(429).json({ message: "Frame producer is sending too quickly." });
+    return;
   }
 
   lastFastUploadAt.set(userId, now);

@@ -457,7 +457,15 @@ export default function Daybook({ user }: { user?: any } = {}) {
   }, [voucherToEdit, voucherEntries, entriesLoading, editFormInitialized, editForm]);
 
   const [accountNameCache] = useState<Record<number, string>>({});
-  const { response: voucherPageResponse, vouchers, isLoading, loadAllVouchers } = usePaginatedDaybookVouchers({
+  const {
+    response: voucherPageResponse,
+    vouchers,
+    isLoading,
+    isError,
+    error,
+    refetch: refetchVouchers,
+    loadAllVouchers,
+  } = usePaginatedDaybookVouchers({
     companyId: selectedCompany?.id,
     fromDate: periodFilter.fromDate,
     toDate: periodFilter.toDate,
@@ -764,6 +772,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
             setDaybookRowLimit={setDaybookRowLimit}
             DAYBOOK_PAGE_SIZE={DAYBOOK_PAGE_SIZE}
             navigate={navigate}
+            isLoading={isLoading}
+            errorMessage={
+              isError ? (error instanceof Error ? error.message : "Failed to load transactions") : null
+            }
+            onRetry={() => void refetchVouchers()}
           />
           <PaginationBar
             page={voucherPageResponse?.page ?? voucherPage}

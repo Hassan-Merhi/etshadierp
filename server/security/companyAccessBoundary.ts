@@ -56,7 +56,18 @@ export function isPrivilegedRole(role: string | null | undefined): role is Privi
  */
 export async function getAccessibleCompanyIds(userId: string): Promise<Set<number>> {
   const roles = await storage.getUserCompaniesWithRoles(userId);
-  if (roles.some((entry: any) => entry.role === "Developer")) {
+
+  // A Developer may hold the role either per company (user_company_roles) or only
+  // on the user record itself. set-company accepts the account-level role and
+  // fabricates a company role for it, so the boundary must honour the same source
+  // of truth — otherwise the selected company is unreachable for every data route.
+  let isDeveloper = roles.some((entry: any) => entry.role === "Developer");
+  if (!isDeveloper) {
+    const user = await storage.getUser(userId);
+    isDeveloper = (user as any)?.role === "Developer";
+  }
+
+  if (isDeveloper) {
     const companies = await storage.getAllCompanies();
     return new Set(
       companies
