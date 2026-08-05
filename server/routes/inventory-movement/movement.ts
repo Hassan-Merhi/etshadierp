@@ -26,14 +26,10 @@ export function registerInventoryMovementReportRoutes(app: Express) {
 
       const stockItemId = parseInt(siStr as string);
       const locationId = locStr ? parseInt(locStr as string) : null;
-      const sd = (startDate as string) || null;
-      const ed = (endDate as string) || null;
-
-      if (!sd || !ed)
-        return res.json({
-          months: [],
-          grandTotal: { inwardQty: 0, inwardValue: 0, outwardQty: 0, outwardValue: 0, closingQty: 0, closingValue: 0 },
-        });
+      // When no dates supplied (All Time preset), span from a safe epoch to today.
+      const today = new Date().toISOString().slice(0, 10);
+      const sd = (startDate as string) || "2000-01-01";
+      const ed = (endDate as string) || today;
 
       // Opening balance for the period.
       // NOTE: stockItems.openingQty/openingRate are COMPANY-WIDE master fields, not
