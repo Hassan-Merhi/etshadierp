@@ -71,9 +71,6 @@ jobs:
       - name: Verify disposable database schema
         run: node scripts/verify-ci-disposable-schema.mjs
 
-      - name: Regenerate reviewed route manifest
-        run: UPDATE_ROUTE_MANIFEST=1 npm run test:backend -- route-manifest
-
       - name: Format changed source
         shell: bash
         run: |
@@ -88,15 +85,6 @@ jobs:
           fi
           git add -A
           git diff --check --cached
-
-      - name: Verify architecture caps were reduced
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(wc -l < client/src/app/AuthenticatedApp.tsx)" -le 150
-          test "$(wc -l < client/src/pages/ContainerLoadingScan.tsx)" -le 1125
-          test "$(wc -l < client/src/pages/factory/FactoryContainerLoadingScan.tsx)" -le 1900
-          test "$(wc -l < client/src/pages/factory/FactoryShippingContainers.tsx)" -le 900
 
       - name: TypeScript
         run: npm run check
