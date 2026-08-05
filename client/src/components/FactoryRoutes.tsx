@@ -8,7 +8,7 @@
  *   myAccess          — factory access data (pageKeys, hiddenCostFields)
  *   factoryDefaultPage — computed landing page for this user
  */
-import { lazy } from "react";
+import { lazyRetry as lazy } from "@/lib/lazyRetry";
 import { Switch, Route, Redirect } from "wouter";
 import {
   AccountingCreate, Agents, Analytics, BalanceRepair,

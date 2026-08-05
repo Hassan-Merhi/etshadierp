@@ -1,4 +1,5 @@
-import { Suspense, lazy } from "react";
+import { Suspense } from "react";
+import { lazyRetry as lazy } from "@/lib/lazyRetry";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Truck, Users } from "lucide-react";
 import { useHubQueryState } from "@/hooks/use-hub-query-state";

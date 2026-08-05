@@ -3,7 +3,7 @@
  * Centralised here so App.tsx stays focused on routing logic.
  * Each export is a React.lazy() component; import them where needed.
  */
-import { lazy } from "react";
+import { lazyRetry as lazy } from "@/lib/lazyRetry";
 
 // ── Core ERP pages ────────────────────────────────────────────────────────────
 export const Dashboard = lazy(() => import("@/pages/Dashboard"));
