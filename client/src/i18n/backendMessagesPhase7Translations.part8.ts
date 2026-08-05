@@ -251,4 +251,99 @@ export const backendMessagesPhase7TranslationsPart8: readonly Phase7BackendMessa
     ar: "تعذر العثور على مجلد البناء {0}. تأكد من بناء الواجهة أولًا.",
     fr: "Impossible de trouver le répertoire de build {0}. Assurez-vous d’abord de compiler le client.",
   },
+  {
+    en: "${label} must be a positive integer",
+    ar: "يجب أن تكون قيمة {0} عددًا صحيحًا موجبًا",
+    fr: "{0} doit être un entier positif",
+  },
+  {
+    en: "Stock transfer not found",
+    ar: "لم يتم العثور على تحويل المخزون",
+    fr: "Transfert de stock introuvable",
+  },
+  {
+    en: "Voucher is not a stock transfer",
+    ar: "السند ليس تحويل مخزون",
+    fr: "La pièce n’est pas un transfert de stock",
+  },
+  {
+    en: "Deleted stock transfers cannot be revised",
+    ar: "لا يمكن مراجعة تحويلات المخزون المحذوفة",
+    fr: "Les transferts de stock supprimés ne peuvent pas être révisés",
+  },
+  {
+    en: "User ID is required",
+    ar: "معرّف المستخدم مطلوب",
+    fr: "L’identifiant utilisateur est requis",
+  },
+  {
+    en: "Revision source and destination locations must be different",
+    ar: "يجب أن يكون موقع مصدر المراجعة مختلفًا عن موقع الوجهة",
+    fr: "Les emplacements source et destination de la révision doivent être différents",
+  },
+  {
+    en: "Reviewer ID is required",
+    ar: "معرّف المراجع مطلوب",
+    fr: "L’identifiant du réviseur est requis",
+  },
+  {
+    en: "Revision not found",
+    ar: "لم يتم العثور على المراجعة",
+    fr: "Révision introuvable",
+  },
+  {
+    en: "Pending revision has no items",
+    ar: "لا تحتوي المراجعة المعلقة على أصناف",
+    fr: "La révision en attente ne contient aucun article",
+  },
+  {
+    en: "Transfer ID is required",
+    ar: "معرّف التحويل مطلوب",
+    fr: "L’identifiant du transfert est requis",
+  },
+  {
+    en: "User session is required",
+    ar: "جلسة المستخدم مطلوبة",
+    fr: "Une session utilisateur est requise",
+  },
+  {
+    en: "POS users may only submit revisions for admin review",
+    ar: "يمكن لمستخدمي نقطة البيع إرسال المراجعات لموافقة المسؤول فقط",
+    fr: "Les utilisateurs du point de vente peuvent uniquement soumettre des révisions à la validation administrative",
+  },
+  {
+    en: "POS user has no assigned source location",
+    ar: "لا يوجد موقع مصدر معيّن لمستخدم نقطة البيع",
+    fr: "Aucun emplacement source n’est attribué à l’utilisateur du point de vente",
+  },
+  {
+    en: "Invalid revision data",
+    ar: "بيانات المراجعة غير صالحة",
+    fr: "Données de révision non valides",
+  },
+  {
+    en: "Voucher ID is required",
+    ar: "معرّف السند مطلوب",
+    fr: "L’identifiant de la pièce est requis",
+  },
+  {
+    en: "Revision ID is required",
+    ar: "معرّف المراجعة مطلوب",
+    fr: "L’identifiant de la révision est requis",
+  },
+  {
+    en: "Invalid rejection data",
+    ar: "بيانات الرفض غير صالحة",
+    fr: "Données de rejet non valides",
+  },
+  {
+    en: "Revision status is immutable. Approve or reject the pending revision instead.",
+    ar: "حالة المراجعة غير قابلة للتغيير. وافق على المراجعة المعلقة أو ارفضها بدلًا من ذلك.",
+    fr: "Le statut de la révision est immuable. Approuvez ou rejetez plutôt la révision en attente.",
+  },
+  {
+    en: "Revision history is immutable and cannot be deleted.",
+    ar: "سجل المراجعات غير قابل للتغيير ولا يمكن حذفه.",
+    fr: "L’historique des révisions est immuable et ne peut pas être supprimé.",
+  },
 ];
