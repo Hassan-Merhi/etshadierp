@@ -18,6 +18,7 @@ import {
   immutableRevisionPayloadHash,
   normalizeImmutableRevisionItems,
   type ImmutableRevisionItemInput,
+  type NormalizedImmutableRevisionItem,
 } from "./immutableStockTransferRevisionInput";
 
 export { normalizeImmutableRevisionItems } from "./immutableStockTransferRevisionInput";
@@ -70,6 +71,7 @@ if normalize_start < 0 or payload_start < 0 or lock_start < 0:
 else:
     text = text[:normalize_start] + text[lock_start:]
 text = text.replace('const hash = payloadHash(normalized, note);', 'const hash = immutableRevisionPayloadHash(normalized, note);')
+text = text.replace('items: NormalizedItem[]', 'items: NormalizedImmutableRevisionItem[]')
 text = text.replace(
     '''    const row = current.find(
       (candidate) =>''',
