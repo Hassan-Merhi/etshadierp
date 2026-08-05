@@ -42,6 +42,15 @@ commands:
     steps:
       - checkout
       - run:
+          name: Pin checkout to the triggering commit
+          command: |
+            echo "CircleCI requested SHA: ${CIRCLE_SHA1}"
+            git fetch --no-tags --prune origin "${CIRCLE_SHA1}"
+            git reset --hard "${CIRCLE_SHA1}"
+            git clean -ffdx
+            test "$(git rev-parse HEAD)" = "${CIRCLE_SHA1}"
+            git status --short
+      - run:
           name: Normalize package registry URLs
           command: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
       - node/install-packages:
