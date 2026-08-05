@@ -6,18 +6,22 @@ function read(path: string) {
 }
 
 describe("Phase 9 final verification and release contract", () => {
-  it("locks the approved untranslated-text baseline exactly", () => {
+  it("enforces a reviewed current-main untranslated-text ratchet", () => {
     const approved = JSON.parse(read("config/i18n-phase9-final-release.json"));
     const verifier = read("scripts/verify-phase9-final-i18n-baseline.mjs");
 
+    expect(approved.schemaVersion).toBe(2);
     expect(approved.detectorVersion).toBe(9);
-    expect(approved.totals.actionable).toBe(12545);
-    expect(approved.totals.unclassified).toBe(0);
-    expect(approved.modules["backend-messages"]).toBe(0);
-    expect(approved.modules["shared-ui"]).toBe(0);
-    expect(verifier).toContain("report.totals[key] !== approved.totals[key]");
-    expect(verifier).toContain("report.modules[module]?.actionable");
-    expect(verifier).toContain("Unclassified findings must remain zero");
+    expect(approved.policy.unclassifiedMustEqual).toBe(0);
+    expect(approved.policy.totalActionableMustNotExceed).toBe(12545);
+    expect(approved.policy.requireExactModuleSet).toBe(true);
+    expect(approved.modules["backend-messages"]).toEqual({ maxActionable: 0, mustRemainZero: true });
+    expect(approved.modules["shared-ui"]).toEqual({ maxActionable: 0, mustRemainZero: true });
+    expect(verifier).toContain("report.totals.actionable > totalActionableCap");
+    expect(verifier).toContain("actual > rule.maxActionable");
+    expect(verifier).toContain("rule.mustRemainZero === true && actual !== 0");
+    expect(verifier).toContain("Unclassified findings changed");
+    expect(verifier).not.toContain("report.totals.candidates !== approved.totals.candidates");
   });
 
   it("tests English Arabic and French browser direction across responsive viewports", () => {
@@ -31,16 +35,24 @@ describe("Phase 9 final verification and release contract", () => {
     expect(smoke).toContain('{ name: "desktop", width: 1440, height: 900');
     expect(smoke).toContain("state.ltrViolations.length > 0");
     expect(smoke).toContain("state.horizontalOverflow");
-    expect(smoke).toContain("ERP_SMOKE_USERNAME");
+    expect(smoke).toContain("activateSkipNavigation");
+    expect(smoke).toContain('activeElementId !== "main-content"');
+    expect(smoke).toContain("assertSidebarEdge");
+    expect(smoke).toContain("ERP_SMOKE_REQUIRE_AUTHENTICATED");
+    expect(smoke).toContain("Authenticated browser coverage is required");
+    expect(smoke).toContain('"[data-money-value]"');
+    expect(smoke).toContain('"[data-quantity-value]"');
   });
 
-  it("runs the complete Phase 9 release matrix", () => {
+  it("keeps the complete release matrix manual and current-main scoped", () => {
     const workflow = read(".github/workflows/phase9-final-release.yml");
 
     for (const token of [
+      "workflow_dispatch:",
       "TypeScript",
       "Production build",
       "Lint",
+      "Current-main multilingual reconciliation",
       "Prepare disposable PostgreSQL schema",
       "Application startup and multilingual browser smoke",
       "Full backend tests",
@@ -48,11 +60,17 @@ describe("Phase 9 final verification and release contract", () => {
       "Full frontend tests",
       "Frontend coverage thresholds",
       "API smoke sweep",
-      "Final untranslated-text baseline",
+      "Final untranslated-text release ratchet",
       "Focused security checks",
       "Critical production dependency audit",
       "Verified secret scan",
       "Final production readiness",
+      "scripts/verify-multilingual-phases-4-7-current-main.mjs",
+      "scripts/verify-phase8-current-main-reconciliation.mjs",
+      "ERP_SMOKE_REQUIRE_AUTHENTICATED: \"1\"",
+      "ERP_SMOKE_REQUIRE_EXACT_ROUTES: \"1\"",
+      "PHASE9_ERP_SMOKE_USERNAME",
+      "PHASE9_ERP_SMOKE_PASSWORD",
     ]) {
       expect(workflow).toContain(token);
     }
@@ -61,10 +79,13 @@ describe("Phase 9 final verification and release contract", () => {
     expect(workflow).toContain("scripts/run-phase9-language-browser-smoke.mjs");
     expect(workflow).toContain("scripts/verify-phase9-final-i18n-baseline.mjs");
     expect(workflow).toContain("Record and enforce final release result");
+    expect(workflow).toContain("RECONCILIATION: ${{ steps.reconciliation.outcome }}");
     expect(workflow).toContain("INSTALL: ${{ steps.install.outcome }}");
     expect(workflow).toContain("SECRET_SCAN: ${{ steps.secret_scan.outcome }}");
     expect(workflow).toContain("set -euo pipefail");
     expect(workflow).toContain('test "$status" = "success"');
+    expect(workflow).not.toContain("pull_request:");
+    expect(workflow).not.toContain("push:");
     expect(workflow).not.toContain("steps.release_result.outputs.status");
   });
 });
