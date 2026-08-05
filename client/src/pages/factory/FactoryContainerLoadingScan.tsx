@@ -128,9 +128,11 @@ export default function FactoryContainerLoadingScan() {
   }, [locations, orderId]);
 
   const { data: proformas = [] } = useQuery<Proforma[]>({
-    queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`],
+    queryKey: [`/api/factory/customer-proformas?customerId=${customerId}&profile=summary`],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/customer-proformas?customerId=${customerId}`, { credentials: "include" });
+      const res = await fetch(`/api/factory/customer-proformas?customerId=${customerId}&profile=summary`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch proformas");
       return res.json();
     },

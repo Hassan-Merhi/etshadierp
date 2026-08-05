@@ -144,12 +144,23 @@ export default function FactoryInvoiceCreate() {
     refetchOnWindowFocus: false,
   });
 
-  const { data: proformas = [] } = useQuery<Proforma[]>({
-    queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+  const { data: proformaSummaries = [] } = useQuery<Array<Omit<Proforma, "lines"> & { lineCount: number }>>({
+    queryKey: [`/api/factory/customer-proformas?customerId=${customerId}&profile=summary`],
     enabled: !!customerId,
   });
 
-  const activeProforma = proformas.find((p) => p.isActive) || null;
+  const activeProformaSummary = proformaSummaries.find((proforma) => proforma.isActive) || null;
+  const { data: activeProforma = null } = useQuery<Proforma>({
+    queryKey: ["/api/factory/customer-proformas/detail", activeProformaSummary?.id],
+    queryFn: async () => {
+      const response = await fetch(`/api/factory/customer-proformas/${activeProformaSummary?.id}`, {
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to load proforma details");
+      return response.json();
+    },
+    enabled: !!activeProformaSummary?.id,
+  });
 
   const createOrderMutation = useMutation({
     mutationFn: async (data: { companyId: number; customerId: number; orderDate: string; proformaIdUsed: number }) => {
@@ -586,7 +597,7 @@ export default function FactoryInvoiceCreate() {
               </div>
             )}
 
-            {customerId && !activeProforma && proformas.length === 0 && (
+            {customerId && !activeProforma && proformaSummaries.length === 0 && (
               <p className="text-sm text-destructive" data-testid="text-no-proforma">
                 No active proforma found for this customer
               </p>

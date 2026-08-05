@@ -18,7 +18,8 @@ import {
   customers,
   insertCustomerOrderSchema,
 } from "@shared/schema";
-import { eq, and, or, desc, sql, inArray, isNull } from "drizzle-orm";
+import { eq, and, or, desc, sql, inArray, isNull, gte, lte } from "drizzle-orm";
+import { parseListPagination, setListPaginationHeaders } from "../../../lib/listPagination";
 
 export function registerOrderCrudRoutes(app: Express) {
   app.get("/api/factory/customer-orders", requireAuth, async (req: any, res: any) => {
@@ -33,8 +34,15 @@ export function registerOrderCrudRoutes(app: Express) {
       const queryProformaId = parseOptionalId(req.query.proformaId);
       if (queryProformaId !== null) conditions.push(eq(customerOrders.proformaIdUsed, queryProformaId));
       if (req.query.showHidden !== "1") conditions.push(eq(customerOrders.isHidden, false));
+      if (req.query.dateFrom) conditions.push(gte(customerOrders.orderDate, String(req.query.dateFrom)));
+      if (req.query.dateTo) conditions.push(lte(customerOrders.orderDate, String(req.query.dateTo)));
+      const pagination = parseListPagination(req.query, {
+        defaultPageSize: 100,
+        maxPageSize: 250,
+        force: req.query.profile === "summary",
+      });
 
-      const orders = await db
+      const ordersQuery = db
         .select({
           id: customerOrders.id,
           companyId: customerOrders.companyId,
@@ -85,8 +93,20 @@ export function registerOrderCrudRoutes(app: Express) {
         .leftJoin(customers, eq(customerOrders.customerId, customers.id))
         .leftJoin(customerProformas, eq(customerOrders.proformaIdUsed, customerProformas.id))
         .where(and(...conditions))
-        .orderBy(desc(customerOrders.createdAt));
+        .orderBy(desc(customerOrders.createdAt))
+        .$dynamic();
 
+      const orders = pagination.requested
+        ? await ordersQuery.limit(pagination.pageSize).offset(pagination.offset)
+        : await ordersQuery;
+      if (pagination.requested) {
+        const [countRow] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(customerOrders)
+          .where(and(...conditions));
+        setListPaginationHeaders(res, countRow?.count ?? 0, pagination);
+      }
+      res.set("Cache-Control", "private, max-age=15");
       res.json(orders);
     } catch (error: unknown) {
       logger.error("Error fetching customer orders:", { error: error });
