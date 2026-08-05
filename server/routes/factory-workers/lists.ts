@@ -13,6 +13,7 @@ import { eq, and, sql, ilike, isNotNull } from "drizzle-orm";
 import { factoryWorkers, factoryPayrolls, factoryWorkerDocuments, factoryWorkerAdvances } from "@shared/schema";
 
 import { getFactoryCompanyId } from "./_helpers";
+import { parseListPagination, setListPaginationHeaders } from "../../lib/listPagination";
 
 export function registerFactoryWorkerListRoutes(app: Express, requireAuth: any, db: any) {
   // GET /api/factory/workers/with-balances - List active workers with computed current balances
@@ -96,6 +97,60 @@ export function registerFactoryWorkerListRoutes(app: Express, requireAuth: any, 
       }
       if (department) {
         conditions.push(eq(factoryWorkers.department, department as string));
+      }
+
+      if (req.query.profile !== "full") {
+        const pagination = parseListPagination(req.query, {
+          defaultPageSize: 250,
+          maxPageSize: 500,
+          force: req.query.profile === "summary",
+        });
+        const summaryQuery = db
+          .select({
+            id: factoryWorkers.id,
+            companyId: factoryWorkers.companyId,
+            employeeCode: factoryWorkers.employeeCode,
+            fullName: factoryWorkers.fullName,
+            position: factoryWorkers.position,
+            department: factoryWorkers.department,
+            dateJoined: factoryWorkers.dateJoined,
+            salaryType: factoryWorkers.salaryType,
+            baseSalary: factoryWorkers.baseSalary,
+            perBaleRate: factoryWorkers.perBaleRate,
+            perKgRate: factoryWorkers.perKgRate,
+            overtimeRate: factoryWorkers.overtimeRate,
+            shiftType: factoryWorkers.shiftType,
+            active: factoryWorkers.active,
+            paymentMethod: factoryWorkers.paymentMethod,
+            payFrequency: factoryWorkers.payFrequency,
+            hourlyRate: factoryWorkers.hourlyRate,
+            weeklySalary: factoryWorkers.weeklySalary,
+            biWeeklySalary: factoryWorkers.biWeeklySalary,
+            transportAllowance: factoryWorkers.transportAllowance,
+            pendingAdvanceBalance: sql<string>`COALESCE((
+              SELECT SUM(fwa.remaining_balance)
+              FROM factory_worker_advances fwa
+              WHERE fwa.worker_id = ${factoryWorkers.id}
+                AND fwa.company_id = ${companyId}
+                AND fwa.remaining_balance > 0
+            ), 0)::text`,
+          })
+          .from(factoryWorkers)
+          .where(and(...conditions))
+          .orderBy(factoryWorkers.fullName)
+          .$dynamic();
+        const summary = pagination.requested
+          ? await summaryQuery.limit(pagination.pageSize).offset(pagination.offset)
+          : await summaryQuery;
+        if (pagination.requested) {
+          const countRows = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(factoryWorkers)
+            .where(and(...conditions));
+          setListPaginationHeaders(res, countRows[0]?.count ?? 0, pagination);
+        }
+        res.set("Cache-Control", "private, max-age=120");
+        return res.json(summary);
       }
 
       const results = await db

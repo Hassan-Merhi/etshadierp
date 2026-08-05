@@ -138,7 +138,7 @@ export default function FactoryPendingLoadings() {
   }, []);
 
   const { data: loads = [], isLoading } = useQuery<PendingLoad[]>({
-    queryKey: ["/api/factory/customer-orders?status=LOADING"],
+    queryKey: ["/api/factory/customer-orders?status=LOADING&profile=summary&pageSize=250"],
     refetchInterval: 60000,
   });
 
@@ -146,7 +146,7 @@ export default function FactoryPendingLoadings() {
     queryKey: ["/api/factory/customer-proformas", linkTarget?.customerId],
     queryFn: async () => {
       if (!linkTarget) return [];
-      const res = await fetch(`/api/factory/customer-proformas?customerId=${linkTarget.customerId}`, {
+      const res = await fetch(`/api/factory/customer-proformas?customerId=${linkTarget.customerId}&profile=summary`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch proformas");

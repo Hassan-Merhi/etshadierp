@@ -25,7 +25,7 @@ export default function PendingLoadings() {
   const [, navigate] = useLocation();
 
   const { data: loads = [], isLoading } = useQuery<PendingLoad[]>({
-    queryKey: ["/api/factory/customer-orders?status=LOADING"],
+    queryKey: ["/api/factory/customer-orders?status=LOADING&profile=summary&pageSize=250"],
     refetchInterval: 30000,
   });
 
@@ -44,10 +44,7 @@ export default function PendingLoadings() {
     <PageShell className="flex min-h-full flex-col">
       <PageHeader title="Pending Loadings" subtitle="In-progress container loads saved for later">
         <PageActions>
-          <Button
-            onClick={() => navigate("/factory/sales/loading/new")}
-            data-testid="button-start-new"
-          >
+          <Button onClick={() => navigate("/factory/sales/loading/new")} data-testid="button-start-new">
             <Play className="h-4 w-4 mr-2" />
             Start New Loading
           </Button>
@@ -62,10 +59,7 @@ export default function PendingLoadings() {
           title="No pending loads"
           description="All container loadings are either complete or not yet started."
           action={
-            <Button
-              onClick={() => navigate("/factory/sales/loading/new")}
-              data-testid="button-start-new-empty"
-            >
+            <Button onClick={() => navigate("/factory/sales/loading/new")} data-testid="button-start-new-empty">
               <Play className="h-4 w-4 mr-2" />
               Start New Loading
             </Button>

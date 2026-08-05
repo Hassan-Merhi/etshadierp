@@ -83,9 +83,11 @@ export default function ContainerLoadingScan() {
   });
 
   const { data: proformas = [] } = useQuery<Proforma[]>({
-    queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`],
+    queryKey: [`/api/factory/customer-proformas?customerId=${customerId}&profile=summary`],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/customer-proformas?customerId=${customerId}`, { credentials: "include" });
+      const res = await fetch(`/api/factory/customer-proformas?customerId=${customerId}&profile=summary`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch proformas");
       return res.json();
     },
@@ -342,7 +344,10 @@ export default function ContainerLoadingScan() {
         current ? { ...current, containerNotes: note } : current
       );
       queryClient.invalidateQueries(
-        { predicate: keyStartsWith("/api/factory/customer-orders?status=LOADING"), refetchType: "active" },
+        {
+          predicate: keyStartsWith("/api/factory/customer-orders?status=LOADING&profile=summary&pageSize=250"),
+          refetchType: "active",
+        },
         { cancelRefetch: false }
       );
     },
