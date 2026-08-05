@@ -7,6 +7,7 @@ const BASE_URL = (process.env.ERP_SMOKE_BASE_URL || "http://127.0.0.1:5000").rep
 const USERNAME = process.env.ERP_SMOKE_USERNAME || "";
 const PASSWORD = process.env.ERP_SMOKE_PASSWORD || "";
 const AUTHENTICATED = Boolean(USERNAME && PASSWORD);
+const REQUIRE_AUTHENTICATED = process.env.ERP_SMOKE_REQUIRE_AUTHENTICATED === "1";
 const TIMEOUT_MS = Number(process.env.ERP_SMOKE_TIMEOUT_MS || 45_000);
 const OUTPUT_DIR = path.resolve(process.env.ERP_SMOKE_OUTPUT_DIR || "artifacts/phase9-language-browser");
 const REQUIRE_EXACT_ROUTES = process.env.ERP_SMOKE_REQUIRE_EXACT_ROUTES === "1";
@@ -45,6 +46,7 @@ const AUTHENTICATED_ROUTES = (process.env.ERP_SMOKE_ROUTES || DEFAULT_AUTHENTICA
 const report = {
   baseUrl: BASE_URL,
   authenticatedRoutes: AUTHENTICATED,
+  authenticatedRequired: REQUIRE_AUTHENTICATED,
   startedAt: new Date().toISOString(),
   cases: [],
   failures: [],
@@ -204,10 +206,7 @@ function assertSidebarEdge(state, expectedDirection, label) {
   if (expectedPhysicalSide === "left" && Math.abs(state.sidebar.left) > tolerance) {
     return [`${label}: ${declaredSide} sidebar is ${Math.round(state.sidebar.left)}px from the left edge`];
   }
-  if (
-    expectedPhysicalSide === "right" &&
-    Math.abs(state.viewport.width - state.sidebar.right) > tolerance
-  ) {
+  if (expectedPhysicalSide === "right" && Math.abs(state.viewport.width - state.sidebar.right) > tolerance) {
     return [
       `${label}: ${declaredSide} sidebar is ${Math.round(state.viewport.width - state.sidebar.right)}px from the right edge`,
     ];
@@ -364,12 +363,20 @@ try {
   await browser.close();
 }
 
+if (REQUIRE_AUTHENTICATED && !AUTHENTICATED) {
+  report.failures.push(
+    "Authenticated browser coverage is required, but ERP_SMOKE_USERNAME and ERP_SMOKE_PASSWORD were not provided.",
+  );
+}
+
 report.finishedAt = new Date().toISOString();
 report.failures = [...new Set(report.failures)];
 await fs.writeFile(path.join(OUTPUT_DIR, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
 
 if (!AUTHENTICATED) {
-  console.log("Authenticated route checks were skipped because ERP_SMOKE_USERNAME and ERP_SMOKE_PASSWORD were not provided.");
+  const message = "Authenticated route checks were skipped because ERP_SMOKE_USERNAME and ERP_SMOKE_PASSWORD were not provided.";
+  if (REQUIRE_AUTHENTICATED) console.error(message);
+  else console.log(message);
 }
 
 if (report.failures.length > 0) {
