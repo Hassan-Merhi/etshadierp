@@ -4,7 +4,7 @@
  * Registered by ./index.ts in the original order; Express resolves
  * first-match, so that order is behaviour.
  */
-import type { Express } from "express";
+import type { Express, Response } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
@@ -19,12 +19,16 @@ import {
 } from "@shared/schema";
 import { and, asc, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 
+function sendTransferNotFound(res: Response) {
+  return res.status(404).json({ message: "Transfer not found" });
+}
+
 export function registerPosTransferDetailRoutes(app: Express) {
   // POS Transfer Order Detail endpoint - returns full detail with names
   app.get("/api/pos-transfer-detail", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "Company context required" });
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const voucherId = req.query.voucherId ? parseInt(req.query.voucherId as string) : null;
       if (!voucherId) return res.status(400).json({ message: "voucherId required" });
@@ -46,7 +50,7 @@ export function registerPosTransferDetailRoutes(app: Express) {
         .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
         .where(and(eq(stockTransferVouchers.voucherId, voucherId), eq(vouchers.companyId, companyId)))
         .limit(1);
-      if (!transferRow) return res.status(404).json({ message: "Transfer not found" });
+      if (!transferRow) return sendTransferNotFound(res);
 
       const isPosUser = req.user?.role === "POS";
       const requestedPosLocationId = isPosUser
@@ -68,7 +72,7 @@ export function registerPosTransferDetailRoutes(app: Express) {
         (!transferRow.sourceLocationId || locationMap.has(transferRow.sourceLocationId)) &&
         (!requestedPosLocationId || locationMap.has(requestedPosLocationId));
       if (!transferLocationsAreScoped) {
-        return res.status(404).json({ message: "Transfer not found" });
+        return sendTransferNotFound(res);
       }
 
       const itemRows = await db
