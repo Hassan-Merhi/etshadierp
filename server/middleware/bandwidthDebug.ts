@@ -25,6 +25,14 @@ type EndpointAggregate = {
   maxHeapDeltaBytes: number;
   dbQueryCount: number;
   dbDurationMs: number;
+  status200Count: number;
+  status304Count: number;
+  otherStatusCount: number;
+  cacheHitCount: number;
+  cacheMissCount: number;
+  cacheRevalidationCount: number;
+  companyContexts: Set<string>;
+  pageContexts: Set<string>;
 };
 
 type EndpointDiagnosticRow = {
@@ -39,6 +47,15 @@ type EndpointDiagnosticRow = {
   maxDurationMs: number;
   dbQueryCount: number;
   averageDbDurationMs: number;
+  status200: number;
+  status304: number;
+  otherStatuses: number;
+  cacheHits: number;
+  cacheMisses: number;
+  cacheRevalidations: number;
+  suspectedLoop: boolean;
+  companyContexts: string[];
+  pageContexts: string[];
 };
 
 type BandwidthBudgetConfig = {
@@ -160,7 +177,46 @@ function getLargeResponseThresholdBytes(path: string): number {
   return kilobytesToBytes(process.env.BANDWIDTH_DEBUG_THRESHOLD_KB, DEFAULT_THRESHOLD_BYTES);
 }
 
-function formatRow(aggregate: EndpointAggregate): EndpointDiagnosticRow {
+type CacheOutcome = "hit" | "miss" | "revalidated" | "unknown";
+
+function classifyCacheOutcome(statusCode: number, cacheHeader: unknown): CacheOutcome {
+  if (statusCode === 304) return "revalidated";
+  const value = String(cacheHeader || "")
+    .trim()
+    .toUpperCase();
+  if (value === "HIT" || value === "COALESCED") return "hit";
+  if (value === "MISS" || value === "BYPASS") return "miss";
+  return "unknown";
+}
+
+function isSuspectedLoop(requestCount: number, windowMs: number): boolean {
+  const threshold = Math.max(10, Math.ceil(windowMs / 30_000));
+  return requestCount >= threshold;
+}
+
+function requestCompanyContext(req: Request): string | null {
+  const session = (
+    req as Request & {
+      session?: { currentCompanyId?: unknown; factoryCompanyId?: unknown };
+    }
+  ).session;
+  const companyId = session?.factoryCompanyId ?? session?.currentCompanyId;
+  return companyId == null ? null : String(companyId);
+}
+
+function requestPageContext(req: Request): string | null {
+  const explicit = req.get("x-erp-page");
+  if (explicit) return explicit.slice(0, 160);
+  const referer = req.get("referer");
+  if (!referer) return null;
+  try {
+    return new URL(referer, "http://erp.local").pathname.slice(0, 160);
+  } catch {
+    return null;
+  }
+}
+
+function formatRow(aggregate: EndpointAggregate, windowMs: number): EndpointDiagnosticRow {
   const count = Math.max(aggregate.requestCount, 1);
   return {
     method: aggregate.method,
@@ -174,12 +230,21 @@ function formatRow(aggregate: EndpointAggregate): EndpointDiagnosticRow {
     maxDurationMs: aggregate.maxDurationMs,
     dbQueryCount: aggregate.dbQueryCount,
     averageDbDurationMs: Math.round(aggregate.dbDurationMs / count),
+    status200: aggregate.status200Count,
+    status304: aggregate.status304Count,
+    otherStatuses: aggregate.otherStatusCount,
+    cacheHits: aggregate.cacheHitCount,
+    cacheMisses: aggregate.cacheMissCount,
+    cacheRevalidations: aggregate.cacheRevalidationCount,
+    suspectedLoop: isSuspectedLoop(aggregate.requestCount, windowMs),
+    companyContexts: [...aggregate.companyContexts].sort(),
+    pageContexts: [...aggregate.pageContexts].sort(),
   };
 }
 
-function sortRows(rows: EndpointAggregate[]): EndpointDiagnosticRow[] {
+function sortRows(rows: EndpointAggregate[], windowMs: number): EndpointDiagnosticRow[] {
   return rows
-    .map(formatRow)
+    .map((row) => formatRow(row, windowMs))
     .sort((left, right) =>
       right.totalResponseBytes !== left.totalResponseBytes
         ? right.totalResponseBytes - left.totalResponseBytes
@@ -228,6 +293,8 @@ function evaluateBandwidthBudgets(
       message: "API response bandwidth exceeded its reporting-window budget",
       observedBytes: totalApiResponseBytes,
       budgetBytes: config.apiWindowBytes,
+      method: topApi?.method,
+      path: topApi?.path,
     });
   }
   if (totalStaticAssetResponseBytes > config.staticWindowBytes) {
@@ -236,6 +303,8 @@ function evaluateBandwidthBudgets(
       message: "Static-asset bandwidth exceeded its reporting-window budget",
       observedBytes: totalStaticAssetResponseBytes,
       budgetBytes: config.staticWindowBytes,
+      method: topStatic?.method,
+      path: topStatic?.path,
     });
   }
   if (topApi && topApi.totalResponseBytes > config.endpointWindowBytes) {
@@ -287,8 +356,8 @@ function emitRanking(): void {
   }
 
   const budgetSnapshot = evaluateBandwidthBudgets(apiAggregates, staticAggregates);
-  const fullApiRows = sortRows(apiAggregates);
-  const fullStaticRows = sortRows(staticAggregates);
+  const fullApiRows = sortRows(apiAggregates, windowMs);
+  const fullStaticRows = sortRows(staticAggregates, windowMs);
   const generatedAt = new Date().toISOString();
 
   latestDiagnosticSnapshot = {
@@ -324,6 +393,9 @@ function emitRanking(): void {
   });
 
   for (const violation of budgetSnapshot.violations) {
+    const endpoint = [...fullApiRows, ...fullStaticRows].find(
+      (row) => row.method === violation.method && row.path === violation.path
+    );
     recordOperationalEvent({
       category: "bandwidth",
       code: violation.code,
@@ -334,6 +406,17 @@ function emitRanking(): void {
       responseBytes: violation.observedBytes,
       budgetBytes: violation.budgetBytes,
       windowMs,
+      requests: endpoint?.requests,
+      averageResponseBytes: endpoint?.averageResponseBytes,
+      maxResponseBytes: endpoint?.maxResponseBytes,
+      status200: endpoint?.status200,
+      status304: endpoint?.status304,
+      cacheHits: endpoint?.cacheHits,
+      cacheMisses: endpoint?.cacheMisses,
+      cacheRevalidations: endpoint?.cacheRevalidations,
+      suspectedLoop: endpoint?.suspectedLoop,
+      companyContexts: endpoint?.companyContexts,
+      pageContexts: endpoint?.pageContexts,
     });
   }
 
@@ -400,10 +483,29 @@ export function bandwidthDebugMiddleware(req: Request, res: Response, next: Next
           maxHeapDeltaBytes: 0,
           dbQueryCount: 0,
           dbDurationMs: 0,
+          status200Count: 0,
+          status304Count: 0,
+          otherStatusCount: 0,
+          cacheHitCount: 0,
+          cacheMissCount: 0,
+          cacheRevalidationCount: 0,
+          companyContexts: new Set<string>(),
+          pageContexts: new Set<string>(),
         };
 
         aggregate.requestCount += 1;
         if (res.statusCode >= 500) aggregate.errorCount += 1;
+        if (res.statusCode === 200) aggregate.status200Count += 1;
+        else if (res.statusCode === 304) aggregate.status304Count += 1;
+        else aggregate.otherStatusCount += 1;
+        const cacheOutcome = classifyCacheOutcome(res.statusCode, res.getHeader("X-ERP-Read-Cache"));
+        if (cacheOutcome === "hit") aggregate.cacheHitCount += 1;
+        else if (cacheOutcome === "miss") aggregate.cacheMissCount += 1;
+        else if (cacheOutcome === "revalidated") aggregate.cacheRevalidationCount += 1;
+        const companyContext = requestCompanyContext(req);
+        const pageContext = requestPageContext(req);
+        if (companyContext) aggregate.companyContexts.add(companyContext);
+        if (pageContext) aggregate.pageContexts.add(pageContext);
         aggregate.totalResponseBytes += totalBytes;
         aggregate.maxResponseBytes = Math.max(aggregate.maxResponseBytes, totalBytes);
         aggregate.totalDurationMs += durationMs;
@@ -430,6 +532,9 @@ export function bandwidthDebugMiddleware(req: Request, res: Response, next: Next
             heapDeltaBytes,
             dbQueryCount: databaseMetrics.dbQueryCount,
             dbDurationMs: databaseMetrics.dbDurationMs,
+            cacheOutcome,
+            companyContext,
+            pageContext,
           });
         }
       }
@@ -451,6 +556,10 @@ export const __bandwidthDebugTesting = {
   evaluateBandwidthBudgets,
   getBandwidthBudgetConfig,
   getBandwidthDiagnosticSnapshot,
+  classifyCacheOutcome,
+  isSuspectedLoop,
+  requestCompanyContext,
+  requestPageContext,
   clear(): void {
     aggregates.clear();
     latestDiagnosticSnapshot = {

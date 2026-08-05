@@ -32,6 +32,20 @@ export interface OperationalEventInput {
   heapDeltaBytes?: number;
   dbQueryCount?: number;
   dbDurationMs?: number;
+  requests?: number;
+  averageResponseBytes?: number;
+  maxResponseBytes?: number;
+  status200?: number;
+  status304?: number;
+  cacheHits?: number;
+  cacheMisses?: number;
+  cacheRevalidations?: number;
+  suspectedLoop?: boolean;
+  companyContexts?: string[];
+  pageContexts?: string[];
+  cacheOutcome?: string;
+  companyContext?: string | null;
+  pageContext?: string | null;
 }
 
 interface OperationalEventRecord extends OperationalEventInput {
@@ -54,7 +68,10 @@ const codeSummaries = new Map<string, OperationalEventCodeSummary>();
 const recentEvents: OperationalEventRecord[] = [];
 
 function normalizeCode(code: string): string {
-  const normalized = code.trim().toLowerCase().replace(/[^a-z0-9_.-]+/g, "_");
+  const normalized = code
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_.-]+/g, "_");
   return normalized.slice(0, 80) || "unknown_event";
 }
 
@@ -118,6 +135,20 @@ export function recordOperationalEvent(input: OperationalEventInput): void {
     heapDeltaBytes: event.heapDeltaBytes,
     dbQueryCount: event.dbQueryCount,
     dbDurationMs: event.dbDurationMs,
+    requests: event.requests,
+    averageResponseBytes: event.averageResponseBytes,
+    maxResponseBytes: event.maxResponseBytes,
+    status200: event.status200,
+    status304: event.status304,
+    cacheHits: event.cacheHits,
+    cacheMisses: event.cacheMisses,
+    cacheRevalidations: event.cacheRevalidations,
+    suspectedLoop: event.suspectedLoop,
+    companyContexts: event.companyContexts,
+    pageContexts: event.pageContexts,
+    cacheOutcome: event.cacheOutcome,
+    companyContext: event.companyContext,
+    pageContext: event.pageContext,
   };
 
   if (event.severity === "critical") logger.error(event.message, context);
@@ -146,7 +177,7 @@ export function recordOperationalEvent(input: OperationalEventInput): void {
 export function recordIntegrityEvent(
   code: string,
   message: string,
-  context: Omit<OperationalEventInput, "category" | "code" | "message"> = { severity: "warning" },
+  context: Omit<OperationalEventInput, "category" | "code" | "message"> = { severity: "warning" }
 ): void {
   recordOperationalEvent({ category: "integrity", code, message, ...context });
 }

@@ -44,4 +44,17 @@ describe("bandwidth logging policy", () => {
     expect(__bandwidthDebugTesting.isDocumentOrExportPath("/api/factory/customer-statement/download-pdf")).toBe(true);
     expect(__bandwidthDebugTesting.isDocumentOrExportPath("/api/locations/135/inventory")).toBe(false);
   });
+
+  it("classifies cache hits, misses and conditional revalidation", () => {
+    expect(__bandwidthDebugTesting.classifyCacheOutcome(200, "HIT")).toBe("hit");
+    expect(__bandwidthDebugTesting.classifyCacheOutcome(200, "COALESCED")).toBe("hit");
+    expect(__bandwidthDebugTesting.classifyCacheOutcome(200, "MISS")).toBe("miss");
+    expect(__bandwidthDebugTesting.classifyCacheOutcome(304, undefined)).toBe("revalidated");
+  });
+
+  it("flags request rates consistent with a polling loop", () => {
+    expect(__bandwidthDebugTesting.isSuspectedLoop(9, 5 * 60_000)).toBe(false);
+    expect(__bandwidthDebugTesting.isSuspectedLoop(10, 5 * 60_000)).toBe(true);
+    expect(__bandwidthDebugTesting.isSuspectedLoop(20, 10 * 60_000)).toBe(true);
+  });
 });
