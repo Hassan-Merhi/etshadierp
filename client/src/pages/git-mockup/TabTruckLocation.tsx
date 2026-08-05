@@ -6,7 +6,7 @@ import { AlertCircle, Truck, Loader2, MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
-import { groupBySupplier } from "./helpers";
+import { gitContainersUrl, groupBySupplier } from "./helpers";
 import type { GitContainersResponse, EnrichedContainerApi, CompanyViewMode } from "./types";
 import { STATUS_BADGE as STATUS_BADGE_MAP } from "./types";
 
@@ -16,10 +16,7 @@ export function TabTruckLocation() {
   const printRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  const queryUrl =
-    companyMode === "all"
-      ? "/api/git/containers?allCompanies=true&includeOffloaded=true"
-      : "/api/git/containers?includeOffloaded=true";
+  const queryUrl = gitContainersUrl({ allCompanies: companyMode === "all", includeOffloaded: true });
 
   const { data, isLoading, isError, error } = useQuery<GitContainersResponse>({
     queryKey: [queryUrl],

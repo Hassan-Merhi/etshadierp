@@ -1,5 +1,21 @@
 import type { ApiAllocatedRow, ApiAllocStatus, EnrichedContainerApi } from "./types";
 
+/**
+ * GET /api/git/containers paginates at 50 rows per page by default. The GIT
+ * report tabs aggregate over the whole fleet — shop groupings, "on the road"
+ * counts, totals — so a first page silently truncates them (58 containers on
+ * the road rendered as 50). `all=true` asks the server for the complete
+ * filtered listing instead of one page.
+ */
+export function gitContainersUrl(
+  { allCompanies = false, includeOffloaded = false }: { allCompanies?: boolean; includeOffloaded?: boolean } = {}
+): string {
+  const params = new URLSearchParams({ all: "true" });
+  if (allCompanies) params.set("allCompanies", "true");
+  if (includeOffloaded) params.set("includeOffloaded", "true");
+  return `/api/git/containers?${params.toString()}`;
+}
+
 export function fmt(n: number, decimals = 0) {
   return n.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }

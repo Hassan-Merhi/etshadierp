@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertTriangle, FileX, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { fmt, parseNum, COMPANY_COLORS } from "./helpers";
+import { fmt, gitContainersUrl, parseNum, COMPANY_COLORS } from "./helpers";
 import type { GitContainersResponse, EnrichedContainerApi, CompanyViewMode } from "./types";
 
 function StatCard({
@@ -94,7 +94,7 @@ function SummaryGroupTable({
 export function TabSummary() {
   const [companyMode, setCompanyMode] = useState<CompanyViewMode>("session");
 
-  const queryUrl = companyMode === "all" ? "/api/git/containers?allCompanies=true" : "/api/git/containers";
+  const queryUrl = gitContainersUrl({ allCompanies: companyMode === "all" });
 
   const { data, isLoading, isError, error } = useQuery<GitContainersResponse>({
     queryKey: [queryUrl],
