@@ -53,6 +53,26 @@ describe("shared in-flight request abort isolation", () => {
     await expect(response.json()).resolves.toEqual({ containers: [] });
   });
 
+  it("leaves the response body readable after the only caller is served", async () => {
+    // Regression: releasing the shared request on success dropped the waiter
+    // count to zero and aborted the controller, which tore down the body stream
+    // before the caller could read it. Every deduplicated GET — /api/auth/me
+    // included — then failed to parse, which logged the user straight back out.
+    let observedSignal: AbortSignal | undefined;
+    const guardedFetch = await installGuard(((_input: any, init?: RequestInit) => {
+      observedSignal = init?.signal ?? undefined;
+      return Promise.resolve(
+        new Response(JSON.stringify({ id: "user-1" }), { headers: { "Content-Type": "application/json" } })
+      );
+    }) as unknown as typeof fetch);
+
+    const controller = new AbortController();
+    const response = await guardedFetch("/api/auth/me", { signal: controller.signal });
+
+    expect(observedSignal?.aborted).toBe(false);
+    await expect(response.json()).resolves.toEqual({ id: "user-1" });
+  });
+
   it("aborts the underlying request once every caller has let go", async () => {
     let observedSignal: AbortSignal | undefined;
     const guardedFetch = await installGuard(((_input: any, init?: RequestInit) => {

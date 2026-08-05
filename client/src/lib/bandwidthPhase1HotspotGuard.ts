@@ -67,19 +67,32 @@ let writeGeneration = 0;
  * it. The network fetch runs on this controller instead of the first caller's
  * signal, so one caller cancelling (a React Query key change, a company switch,
  * an unmount) no longer aborts the request that later callers are sharing and
- * leaves them with an AbortError they never asked for.
+ * leaves them with an AbortError they never asked for. The request is aborted
+ * only when every caller has abandoned it, and never once a response exists —
+ * aborting after the headers arrive tears down the body stream the caller is
+ * about to read.
  */
 class SharedRequestLifetime {
   readonly controller = new AbortController();
   private waiters = 0;
+  private abandoned = 0;
+  private disarmed = false;
 
   acquire(): void {
     this.waiters += 1;
   }
 
-  release(): void {
-    this.waiters = Math.max(0, this.waiters - 1);
-    if (this.waiters === 0) this.controller.abort();
+  /** A caller cancelled. Only a fully abandoned request is aborted. */
+  abandon(): void {
+    this.abandoned += 1;
+    if (this.disarmed || this.abandoned < this.waiters) return;
+    this.disarmed = true;
+    this.controller.abort();
+  }
+
+  /** The request produced a response (or failed on its own); never abort it now. */
+  disarm(): void {
+    this.disarmed = true;
   }
 }
 
@@ -216,38 +229,32 @@ async function cloneSharedResponse(
   signal?: AbortSignal | null,
   lifetime?: SharedRequestLifetime
 ): Promise<Response> {
-  if (!signal) {
-    try {
-      return (await request).clone();
-    } finally {
-      lifetime?.release();
-    }
-  }
+  if (!signal) return (await request).clone();
 
   if (signal.aborted) {
-    lifetime?.release();
+    lifetime?.abandon();
     throw new DOMException("The operation was aborted.", "AbortError");
   }
 
   return new Promise<Response>((resolve, reject) => {
     let settled = false;
-    const settle = () => {
+    const settle = (abandoned: boolean) => {
       if (settled) return false;
       settled = true;
       signal.removeEventListener("abort", onAbort);
-      lifetime?.release();
+      if (abandoned) lifetime?.abandon();
       return true;
     };
     function onAbort() {
-      if (settle()) reject(new DOMException("The operation was aborted.", "AbortError"));
+      if (settle(true)) reject(new DOMException("The operation was aborted.", "AbortError"));
     }
     signal.addEventListener("abort", onAbort, { once: true });
     request.then(
       (response) => {
-        if (settle()) resolve(response.clone());
+        if (settle(false)) resolve(response.clone());
       },
       (error) => {
-        if (settle()) reject(error);
+        if (settle(false)) reject(error);
       }
     );
   });
@@ -304,9 +311,13 @@ export function installBandwidthPhase1HotspotGuard(): void {
     const request = (async () => {
       await waitUntilVisible(lifetime.controller.signal);
       const response = await originalFetch(input, forwardRequestInit(init, lifetime.controller.signal));
+      // The response exists; its body is still unread. Any later abort would
+      // tear that stream down under the caller, so disarm before handing over.
+      lifetime.disarm();
       cacheResponse(key, response, rule, generationAtStart);
       return response;
     })().finally(() => {
+      lifetime.disarm();
       inFlightRequests.delete(key);
       inFlightLifetimes.delete(key);
     });
