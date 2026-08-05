@@ -3,12 +3,7 @@ import request from "supertest";
 import { eq, inArray } from "drizzle-orm";
 import { db, pool } from "../server/db";
 import * as schema from "../shared/schema";
-import {
-  cleanupTestData,
-  closeTestServer,
-  seedTestData,
-  type TestContext,
-} from "./setup";
+import { cleanupTestData, closeTestServer, seedTestData, type TestContext } from "./setup";
 
 const TEST_PREFIX = "postransferiso";
 
@@ -43,17 +38,11 @@ async function removeCreatedTransfers() {
     await db
       .delete(schema.stockTransferRevisionItems)
       .where(inArray(schema.stockTransferRevisionItems.revisionId, revisionIds));
-    await db
-      .delete(schema.stockTransferRevisions)
-      .where(inArray(schema.stockTransferRevisions.id, revisionIds));
+    await db.delete(schema.stockTransferRevisions).where(inArray(schema.stockTransferRevisions.id, revisionIds));
   }
 
-  await db
-    .delete(schema.stockTransferItems)
-    .where(inArray(schema.stockTransferItems.transferId, transferIds));
-  await db
-    .delete(schema.stockTransferVouchers)
-    .where(inArray(schema.stockTransferVouchers.id, transferIds));
+  await db.delete(schema.stockTransferItems).where(inArray(schema.stockTransferItems.transferId, transferIds));
+  await db.delete(schema.stockTransferVouchers).where(inArray(schema.stockTransferVouchers.id, transferIds));
 
   const voucherIds = [secondVoucherId, invalidVoucherId].filter(Boolean);
   if (voucherIds.length > 0) {
@@ -240,9 +229,7 @@ afterAll(async () => {
     if (!String(error).includes("login_history_company_id_fkey")) throw error;
 
     await new Promise((resolve) => setTimeout(resolve, 25));
-    await pool.query("DELETE FROM login_history WHERE company_id = ANY($1::int[])", [
-      [ctx.companyId, secondCompanyId],
-    ]);
+    await pool.query("DELETE FROM login_history WHERE company_id = ANY($1::int[])", [[ctx.companyId, secondCompanyId]]);
     await cleanupTestData(TEST_PREFIX);
   }
 }, 30000);

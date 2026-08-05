@@ -60,9 +60,7 @@ export function registerPosTransferDetailRoutes(app: Express) {
       const transferLocationRows = await db
         .select({ id: locations.id, name: locations.name })
         .from(locations)
-        .where(
-          and(eq(locations.companyId, companyId), inArray(locations.id, Array.from(requiredLocationIds)))
-        );
+        .where(and(eq(locations.companyId, companyId), inArray(locations.id, Array.from(requiredLocationIds))));
       const locationMap = new Map(transferLocationRows.map((location) => [location.id, location.name]));
 
       const transferLocationsAreScoped =
@@ -93,10 +91,7 @@ export function registerPosTransferDetailRoutes(app: Express) {
         )
         .leftJoin(
           locations,
-          and(
-            eq(stockTransferItems.sourceLocationId, locations.id),
-            eq(locations.companyId, companyId)
-          )
+          and(eq(stockTransferItems.sourceLocationId, locations.id), eq(locations.companyId, companyId))
         )
         .where(
           and(
@@ -134,7 +129,9 @@ export function registerPosTransferDetailRoutes(app: Express) {
         .orderBy(asc(stockTransferRevisions.revisionNumber));
 
       // POS users only see their own revisions; non-POS users (admins) see all
-      const visibleRevisionRows = isPosUser ? revisionRows.filter((revision) => revision.createdBy === req.user?.id) : revisionRows;
+      const visibleRevisionRows = isPosUser
+        ? revisionRows.filter((revision) => revision.createdBy === req.user?.id)
+        : revisionRows;
 
       const revisions = await Promise.all(
         visibleRevisionRows.map(async (revision) => {
@@ -154,17 +151,11 @@ export function registerPosTransferDetailRoutes(app: Express) {
             .from(stockTransferRevisionItems)
             .innerJoin(
               stockItems,
-              and(
-                eq(stockTransferRevisionItems.stockItemId, stockItems.id),
-                eq(stockItems.companyId, companyId)
-              )
+              and(eq(stockTransferRevisionItems.stockItemId, stockItems.id), eq(stockItems.companyId, companyId))
             )
             .leftJoin(
               locations,
-              and(
-                eq(stockTransferRevisionItems.sourceLocationId, locations.id),
-                eq(locations.companyId, companyId)
-              )
+              and(eq(stockTransferRevisionItems.sourceLocationId, locations.id), eq(locations.companyId, companyId))
             )
             .where(
               and(
