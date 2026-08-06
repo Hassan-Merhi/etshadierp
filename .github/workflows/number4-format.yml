@@ -36,38 +36,58 @@ jobs:
             node node_modules/prettier/bin/prettier.cjs --write "${files[@]}"
           fi
 
-      - name: Recut changed god-file baselines only
+      - name: Recut measured god-file boundaries
         shell: bash
         run: |
-          git fetch origin main
-          base="$(git merge-base origin/main HEAD)"
-          BASE="$base" node --input-type=module <<'NODE'
+          node --input-type=module <<'NODE'
           import fs from 'node:fs';
-          import { execFileSync } from 'node:child_process';
+          import path from 'node:path';
 
           const configPath = 'config/god-file-boundaries.json';
           const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-          const changed = new Set(
-            execFileSync('git', ['diff', '--name-only', '--diff-filter=ACMR', `${process.env.BASE}...HEAD`], { encoding: 'utf8' })
-              .trim()
-              .split('\n')
-              .filter(Boolean),
-          );
-          const bucket = config.repositoryScan.ratchetBucketLines;
-          let touched = false;
-          for (const [file, cap] of Object.entries(config.repositoryScan.grandfathered)) {
-            if (!changed.has(file) || !fs.existsSync(file)) continue;
-            const text = fs.readFileSync(file, 'utf8');
-            const lines = text.length === 0 ? 0 : text.split(/\r?\n/).length;
-            const nextCap = Math.ceil(lines / bucket) * bucket;
-            if (lines > cap || lines <= cap - bucket) {
-              config.repositoryScan.grandfathered[file] = nextCap;
-              touched = true;
-              console.log(`${file}: ${cap} -> ${nextCap} (${lines} lines)`);
+          const scan = config.repositoryScan;
+          const bucket = scan.ratchetBucketLines;
+          const files = [];
+
+          function walk(root) {
+            if (!fs.existsSync(root)) return;
+            for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+              if (entry.isDirectory() && scan.excludeDirectories.includes(entry.name)) continue;
+              const full = path.join(root, entry.name);
+              if (entry.isDirectory()) walk(full);
+              else {
+                const relative = full.split(path.sep).join('/');
+                if (scan.extensions.includes(path.extname(entry.name)) && !scan.excludeFiles.includes(relative)) {
+                  files.push(relative);
+                }
+              }
             }
           }
+
+          for (const root of scan.roots) walk(root);
+          let touched = false;
+          for (const file of files) {
+            const source = fs.readFileSync(file, 'utf8');
+            const lines = source.length === 0 ? 0 : source.split(/\r?\n/).length;
+            const oldCap = scan.grandfathered[file];
+            if (lines > scan.softMaxLines) {
+              const nextCap = Math.ceil(lines / bucket) * bucket;
+              if (oldCap === undefined || lines > oldCap || lines <= oldCap - bucket) {
+                scan.grandfathered[file] = nextCap;
+                touched = true;
+                console.log(`${file}: ${oldCap ?? 'new'} -> ${nextCap} (${lines} lines)`);
+              }
+            } else if (oldCap !== undefined) {
+              delete scan.grandfathered[file];
+              touched = true;
+              console.log(`${file}: removed baseline (${lines} lines)`);
+            }
+          }
+
           if (touched) {
             config.version += 1;
+            const ordered = Object.fromEntries(Object.entries(scan.grandfathered).sort(([a], [b]) => a.localeCompare(b)));
+            scan.grandfathered = ordered;
             fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
           }
           NODE
@@ -90,8 +110,5 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git rm .github/workflows/number4-format.yml
           git add -A
-          if git diff --cached --quiet; then
-            exit 0
-          fi
           git commit -m 'Complete formatting and god-file ratchet pass'
           git push origin HEAD:claude/format-ratchet-database-tls-5nvvde
