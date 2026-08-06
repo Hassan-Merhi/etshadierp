@@ -86,19 +86,39 @@ describe("screen feed viewer layout", () => {
 
   it("polls delayed connected feeds but reconnects disconnected or stale feeds", () => {
     expect(
-      decideScreenFeedRecovery({ hasFrame: true, liveConnected: true, frameAgeMs: 7000, recoveryAttempt: 1 })
+      decideScreenFeedRecovery({
+        hasFrame: true,
+        liveConnected: true,
+        frameAgeMs: 7000,
+        recoveryAttempt: 1,
+      })
     ).toMatchObject({ quality: "delayed", action: "poll", reason: "frame-delayed" });
     expect(
-      decideScreenFeedRecovery({ hasFrame: true, liveConnected: false, frameAgeMs: 7000, recoveryAttempt: 1 })
+      decideScreenFeedRecovery({
+        hasFrame: true,
+        liveConnected: false,
+        frameAgeMs: 7000,
+        recoveryAttempt: 1,
+      })
     ).toMatchObject({ quality: "delayed", action: "reconnect", reason: "transport-disconnected" });
     expect(
-      decideScreenFeedRecovery({ hasFrame: true, liveConnected: true, frameAgeMs: 16000, recoveryAttempt: 1 })
+      decideScreenFeedRecovery({
+        hasFrame: true,
+        liveConnected: true,
+        frameAgeMs: 16000,
+        recoveryAttempt: 1,
+      })
     ).toMatchObject({ quality: "stale", action: "reconnect", reason: "frame-stale" });
   });
 
   it("does not schedule recovery for a healthy feed", () => {
     expect(
-      decideScreenFeedRecovery({ hasFrame: true, liveConnected: true, frameAgeMs: 1200, recoveryAttempt: 4 })
+      decideScreenFeedRecovery({
+        hasFrame: true,
+        liveConnected: true,
+        frameAgeMs: 1200,
+        recoveryAttempt: 4,
+      })
     ).toEqual({
       quality: "excellent",
       action: "none",
