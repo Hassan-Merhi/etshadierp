@@ -60,9 +60,8 @@ export function sanitizeScreenFeedCursor(value: unknown, now = Date.now()): Scre
   const cursor = value as Record<string, unknown>;
   const x = normalizedCoordinate(cursor.x);
   const y = normalizedCoordinate(cursor.y);
-  const suppliedTs = finiteNumber(cursor.ts);
-  const ts = suppliedTs !== null && Math.abs(now - suppliedTs) <= MAX_POINTER_AGE_MS ? suppliedTs : now;
-  if (x === null || y === null) return null;
+  const ts = finiteNumber(cursor.ts);
+  if (x === null || y === null || ts === null || Math.abs(now - ts) > MAX_POINTER_AGE_MS) return null;
 
   return {
     x,
