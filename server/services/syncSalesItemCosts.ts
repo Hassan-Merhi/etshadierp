@@ -17,6 +17,14 @@
  */
 
 import { db } from "../db";
+import {
+  addInventoryValues,
+  inventoryMoney,
+  inventoryUnitCost,
+  multiplyInventoryValues,
+  subtractInventoryValues,
+  toInventoryDecimal,
+} from "../lib/inventoryMath";
 import { inventory, salesItems, vouchers } from "@shared/schema";
 import { eq, and, isNull } from "drizzle-orm";
 
@@ -25,14 +33,6 @@ export interface SyncSalesItemCostsResult {
   stockItemsProcessed: number;
 }
 
-/**
- * Sync sales_items cost fields for the given stock items at the given location
- * by reading the current inventory.averageRate for each item.
- *
- * @param companyId  The ERP company whose sales_items to update
- * @param locationId The location where inventory lives (offload location)
- * @param stockItemIds  The stock items affected by the offload / charge edit
- */
 export async function syncSalesItemCostsForStockItems(
   companyId: number,
   locationId: number,
@@ -43,8 +43,7 @@ export async function syncSalesItemCostsForStockItems(
   let updatedCount = 0;
 
   for (const stockItemId of stockItemIds) {
-    // Read the updated averageRate from inventory at the offload location.
-    let newCostPrice = 0;
+    let newCostPrice = toInventoryDecimal(0);
 
     const [invRecord] = await db
       .select({ averageRate: inventory.averageRate })
@@ -53,23 +52,20 @@ export async function syncSalesItemCostsForStockItems(
       .limit(1);
 
     if (invRecord) {
-      newCostPrice = parseFloat(invRecord.averageRate || "0");
+      newCostPrice = toInventoryDecimal(invRecord.averageRate);
     }
 
-    // Fall back to any location if that specific location has no record yet
-    // (e.g. first offload to a fresh location — inventory row was just created).
-    if (newCostPrice === 0) {
+    if (newCostPrice.isZero()) {
       const [anyInv] = await db
         .select({ averageRate: inventory.averageRate })
         .from(inventory)
         .where(eq(inventory.stockItemId, stockItemId))
         .limit(1);
-      if (anyInv) newCostPrice = parseFloat(anyInv.averageRate || "0");
+      if (anyInv) newCostPrice = toInventoryDecimal(anyInv.averageRate);
     }
 
-    if (newCostPrice === 0) continue;
+    if (newCostPrice.isZero()) continue;
 
-    // Find all sales_items for this stock item sold from this location in this company.
     const itemsToUpdate = await db
       .select({
         salesItemId: salesItems.id,
@@ -90,21 +86,19 @@ export async function syncSalesItemCostsForStockItems(
       );
 
     for (const item of itemsToUpdate) {
-      const oldCostPrice = parseFloat(item.oldCostPrice || "0");
-      // Skip rows where the cost hasn't meaningfully changed
-      if (Math.abs(newCostPrice - oldCostPrice) <= 0.001) continue;
+      const oldCostPrice = toInventoryDecimal(item.oldCostPrice);
+      if (newCostPrice.minus(oldCostPrice).abs().lessThanOrEqualTo("0.001")) continue;
 
-      const qty = parseFloat(item.quantity || "0");
-      const sellingPrice = parseFloat(item.sellingPrice || "0");
-      const totalCost = qty * newCostPrice;
-      const profit = qty * sellingPrice - totalCost;
+      const totalCost = multiplyInventoryValues(item.quantity, newCostPrice);
+      const salesValue = multiplyInventoryValues(item.quantity, item.sellingPrice);
+      const profit = subtractInventoryValues(salesValue, totalCost);
 
       await db
         .update(salesItems)
         .set({
-          costPrice: newCostPrice.toFixed(2),
-          totalCost: totalCost.toFixed(2),
-          profit: profit.toFixed(2),
+          costPrice: inventoryUnitCost(newCostPrice),
+          totalCost: inventoryMoney(totalCost),
+          profit: inventoryMoney(profit),
         })
         .where(eq(salesItems.id, item.salesItemId));
 
@@ -115,20 +109,6 @@ export async function syncSalesItemCostsForStockItems(
   return { updatedCount, stockItemsProcessed: stockItemIds.length };
 }
 
-/**
- * Apply a per-unit cost delta to the inventory averageRate for a set of stock
- * items at a given location, then sync sales_items costs.
- *
- * Used by the PATCH /api/containers/:id/offload route when extra charges are
- * edited in-place on an already-offloaded container — in that path the
- * inventory averageRate is NOT automatically recomputed by the route, so we
- * compute the delta and apply it manually before syncing.
- *
- * @param companyId    The ERP company
- * @param locationId   The offload location
- * @param stockItemIds Stock items affected
- * @param delta        Change in cost per unit (newAdditionalCostPerBale − old)
- */
 export async function applyInventoryRateDeltaAndSync(
   companyId: number,
   locationId: number,
@@ -137,9 +117,8 @@ export async function applyInventoryRateDeltaAndSync(
 ): Promise<SyncSalesItemCostsResult> {
   if (stockItemIds.length === 0) return { updatedCount: 0, stockItemsProcessed: 0 };
 
-  // Apply the delta to inventory.averageRate for each stock item.
-  // We do this first so syncSalesItemCostsForStockItems picks up the updated rate.
-  if (Math.abs(delta) > 0.001) {
+  const rateDelta = toInventoryDecimal(delta);
+  if (rateDelta.abs().greaterThan("0.001")) {
     for (const stockItemId of stockItemIds) {
       const [invRecord] = await db
         .select({
@@ -153,22 +132,20 @@ export async function applyInventoryRateDeltaAndSync(
 
       if (!invRecord) continue;
 
-      const currentRate = parseFloat(invRecord.averageRate || "0");
-      const currentQty = parseFloat(invRecord.quantity || "0");
-      const newRate = Math.max(0, currentRate + delta);
-      const newTotalValue = currentQty * newRate;
+      const candidateRate = addInventoryValues(invRecord.averageRate, rateDelta);
+      const newRate = candidateRate.isNegative() ? toInventoryDecimal(0) : candidateRate;
+      const newTotalValue = multiplyInventoryValues(invRecord.quantity, newRate);
 
       await db
         .update(inventory)
         .set({
-          averageRate: newRate.toFixed(2),
-          totalValue: newTotalValue.toFixed(2),
+          averageRate: inventoryUnitCost(newRate),
+          totalValue: inventoryMoney(newTotalValue),
           lastUpdated: new Date(),
         })
         .where(eq(inventory.id, invRecord.id));
     }
   }
 
-  // Now sync sales_items with the updated rates.
   return syncSalesItemCostsForStockItems(companyId, locationId, stockItemIds);
 }
