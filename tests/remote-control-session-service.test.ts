@@ -15,6 +15,7 @@ import {
 import { restoreRemoteSupportBootDefaults, updateRemoteSupportFlags } from "../server/services/remoteSupportRuntime";
 import { resetRemoteSupportRolloutForTests, updateRemoteSupportRollout } from "../server/services/remoteSupportRollout";
 
+// Keep controller-company and target-company safety behavior covered together.
 const now = Date.now();
 const companyId = 7;
 
