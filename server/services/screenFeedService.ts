@@ -26,7 +26,8 @@ function boundedNumber(value: unknown, minimum: number, maximum: number): number
 }
 
 function normalizedCoordinate(value: unknown): number | null {
-  return boundedNumber(value, 0, 1);
+  const number = finiteNumber(value);
+  return number === null ? null : Math.min(1, Math.max(0, number));
 }
 
 export function isValidScreenFeedDataUrl(value: unknown): value is string {
@@ -60,8 +61,9 @@ export function sanitizeScreenFeedCursor(value: unknown, now = Date.now()): Scre
   const cursor = value as Record<string, unknown>;
   const x = normalizedCoordinate(cursor.x);
   const y = normalizedCoordinate(cursor.y);
-  const ts = finiteNumber(cursor.ts);
-  if (x === null || y === null || ts === null || now - ts > MAX_POINTER_AGE_MS) return null;
+  const suppliedTs = finiteNumber(cursor.ts);
+  const ts = suppliedTs !== null && Math.abs(now - suppliedTs) <= MAX_POINTER_AGE_MS ? suppliedTs : now;
+  if (x === null || y === null) return null;
 
   return {
     x,
