@@ -40,7 +40,9 @@ describe("frontend company-state isolation wiring", () => {
       "client/src/hooks/use-ws-invalidation.ts",
       "client/src/contexts/ConnectivityContext.tsx",
       "client/src/contexts/ApplicationLanguageContext.tsx",
-    ]) expect(source(path)).toContain("cancelRefetch: false");
+    ]) {
+      expect(source(path)).toContain("cancelRefetch: false");
+    }
   });
 
   it("blocks every authenticated workspace while the company session changes", () => {
