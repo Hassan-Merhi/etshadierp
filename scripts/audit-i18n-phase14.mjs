@@ -48,6 +48,8 @@ const reviewedTechnicalValues = new Set([
   // scanner, so the generic call's function name surfaces as translatable text. It is an
   // identifier, never rendered.
   "requestJson",
+  // State-enum value used by ErpAccessBoundary; never rendered as user-facing copy.
+  "error",
   "seg.isSkip ? (",
   "text-success",
   "text-warning",
