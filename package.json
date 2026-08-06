@@ -31,6 +31,8 @@
     "audit:program-6d:validate": "node scripts/validate-program6d-query-classifications.mjs",
     "audit:source-text-assertions": "node scripts/audit-source-text-assertions.mjs",
     "audit:god-files": "node scripts/audit-god-file-boundaries.mjs",
+    "audit:type-escapes": "node scripts/audit-type-escapes.mjs",
+    "audit:doc-index": "node scripts/audit-doc-index.mjs",
     "audit:coverage-ratchet": "node scripts/audit-coverage-ratchet.mjs",
     "start": "node --expose-gc --import ./server/factoryContainerSchemaBridge.mjs --import ./server/supplierCompanyScopeBridge.mjs --import ./server/exportBufferBridge.mjs --import ./server/scheduledAttachmentBridge.mjs --import ./server/apiPaginationBridge.mjs --import ./server/runtimeMemoryGuard.mjs dist/index.js",
     "check": "node node_modules/typescript/bin/tsc --noEmit",

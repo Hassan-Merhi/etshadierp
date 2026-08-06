@@ -80,6 +80,20 @@ jobs:
         if: always() && steps.install.outcome == 'success'
         run: npm run verify:env-docs
 
+      # Both are static ratchets, so they run before the database is touched and
+      # fail fast. The type-escape baseline may only fall; the doc index fails on
+      # an unclassified doc or on a documented figure that has drifted from the
+      # config it describes. Each is also asserted in the backend suite, but a
+      # dedicated step keeps "a baseline moved the wrong way" a distinct signal
+      # rather than one red line inside a two-thousand-test run.
+      - name: Type-escape ratchet
+        if: always() && steps.install.outcome == 'success'
+        run: npm run audit:type-escapes
+
+      - name: Documentation state index
+        if: always() && steps.install.outcome == 'success'
+        run: npm run audit:doc-index
+
       - name: Type-check
         id: typecheck
         if: always() && steps.install.outcome == 'success'

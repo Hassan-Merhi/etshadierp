@@ -1,0 +1,278 @@
+{
+  "version": 1,
+  "description": "State index for docs/. Every doc is classified as \"reference\" (describes current behaviour, must stay accurate) or \"record\" (describes finished work, correct as history) — an unclassified doc fails the audit, so the choice is made when the doc is written. The classification was seeded by filename heuristic and is reviewed in Phase 3a of docs/system-quality-program.md; it is data for that review, not an assertion. figures[] binds documented numbers to their live source so a doc that drifts from the config it describes fails instead of quietly misleading.",
+  "scan": {
+    "root": "docs",
+    "extensions": [
+      ".md"
+    ],
+    "excludeDirectories": [
+      "node_modules"
+    ]
+  },
+  "figures": [
+    {
+      "id": "godFileBacklogFiles",
+      "description": "Files still over the 900-line repository limit.",
+      "source": {
+        "kind": "auditSummary",
+        "audit": "god-files",
+        "field": "grandfatheredFiles"
+      },
+      "claims": [
+        {
+          "doc": "docs/god-file-split-program.md",
+          "pattern": "\\*\\*Backlog: ([\\d,]+) files"
+        },
+        {
+          "doc": "docs/system-quality-program.md",
+          "pattern": "God-file backlog \\| ([\\d,]+) files"
+        }
+      ]
+    },
+    {
+      "id": "godFileBacklogExcessLines",
+      "description": "Lines carried above the repository limit by grandfathered files.",
+      "source": {
+        "kind": "auditSummary",
+        "audit": "god-files",
+        "field": "grandfatheredExcessLines"
+      },
+      "claims": [
+        {
+          "doc": "docs/god-file-split-program.md",
+          "pattern": "\\*\\*Backlog: [\\d,]+ files, ([\\d,]+) lines over the limit\\*\\*"
+        },
+        {
+          "doc": "docs/system-quality-program.md",
+          "pattern": "God-file backlog \\| [\\d,]+ files, ([\\d,]+) excess lines"
+        }
+      ]
+    },
+    {
+      "id": "typeEscapeCeiling",
+      "description": "Repository-wide type-escape ceiling; may only fall.",
+      "source": {
+        "kind": "jsonValue",
+        "file": "config/type-escape-boundaries.json",
+        "path": "totals.typeEscapeCeiling"
+      },
+      "claims": [
+        {
+          "doc": "docs/system-quality-program.md",
+          "pattern": "Type escapes \\(AST\\) \\| ([\\d,]+) total"
+        }
+      ]
+    },
+    {
+      "id": "backendCoverageLinesFloor",
+      "description": "Global backend line-coverage floor enforced by vitest.config.ts.",
+      "source": {
+        "kind": "jsonValue",
+        "file": "config/coverage-thresholds.json",
+        "path": "backend.global.lines"
+      },
+      "claims": [
+        {
+          "doc": "docs/system-quality-program.md",
+          "pattern": "Backend coverage floor \\(lines\\) \\| ([\\d,]+)%"
+        }
+      ]
+    },
+    {
+      "id": "routeManifestRouteCount",
+      "description": "Registered Express routes in the committed manifest.",
+      "source": {
+        "kind": "jsonValue",
+        "file": "config/route-manifest.json",
+        "path": "routeCount"
+      },
+      "claims": [
+        {
+          "doc": "docs/system-quality-program.md",
+          "pattern": "Registered routes \\| ([\\d,]+)"
+        }
+      ]
+    }
+  ],
+  "classification": {
+    "docs/accounting-engine-audit.md": "reference",
+    "docs/accounting-flow.md": "reference",
+    "docs/api-quickstart.md": "reference",
+    "docs/architecture.md": "reference",
+    "docs/audit-framework.md": "reference",
+    "docs/bandwidth-cache-hardening.md": "reference",
+    "docs/bandwidth-phase-3-cache-etag.md": "record",
+    "docs/bandwidth-phase-4-heavy-pages.md": "record",
+    "docs/bandwidth-phase-5-diagnostics-verification.md": "record",
+    "docs/bandwidth-phase1-request-containment.md": "record",
+    "docs/bandwidth-phase2-payload-profiles.md": "record",
+    "docs/bandwidth-phase3-query-pressure.md": "record",
+    "docs/bandwidth-phase4-assets-and-verification.md": "record",
+    "docs/ci/branch-protection.md": "reference",
+    "docs/compatibility.md": "reference",
+    "docs/containers-flow.md": "reference",
+    "docs/contributing.md": "reference",
+    "docs/core-concepts.md": "reference",
+    "docs/deployment.md": "reference",
+    "docs/development-checklist.md": "reference",
+    "docs/engineering/phase1-legacy-route-baseline.md": "record",
+    "docs/engineering/phase10-final-god-file-audit.md": "record",
+    "docs/engineering/phase10-scheduled-export-memory.md": "record",
+    "docs/engineering/phase10-ui-consistency.md": "record",
+    "docs/engineering/phase11-factory-storage-split.md": "record",
+    "docs/engineering/phase11-heavy-api-pagination.md": "record",
+    "docs/engineering/phase11-operational-monitoring.md": "record",
+    "docs/engineering/phase12-business-regression-suite.md": "record",
+    "docs/engineering/phase12-final-validation.md": "record",
+    "docs/engineering/phase12-pos-storage-split.md": "record",
+    "docs/engineering/phase13-authenticated-app-orchestration.md": "record",
+    "docs/engineering/phase14-repository-god-file-guardrails.md": "record",
+    "docs/engineering/phase2-backend-module-separation.md": "record",
+    "docs/engineering/phase2-report-route-extraction.md": "record",
+    "docs/engineering/phase3-accounting-boundary-completion.md": "record",
+    "docs/engineering/phase3-auth-route-extraction.md": "record",
+    "docs/engineering/phase4-customer-route-extraction.md": "record",
+    "docs/engineering/phase4-frontend-company-state-isolation.md": "record",
+    "docs/engineering/phase5-costing-engine-consolidation.md": "record",
+    "docs/engineering/phase5-routes-legacy-extraction.md": "record",
+    "docs/engineering/phase6-chat-report-domains.md": "record",
+    "docs/engineering/phase6-historical-accounting-fx-repair-center.md": "record",
+    "docs/engineering/phase6-inventory-route-ownership.md": "record",
+    "docs/engineering/phase7-debug-route-extraction.md": "record",
+    "docs/engineering/phase7-operations-route-ownership.md": "record",
+    "docs/engineering/phase7-permission-company-isolation-completion.md": "record",
+    "docs/engineering/phase8-duplicate-route-cleanup.md": "record",
+    "docs/engineering/phase8-frontend-data-architecture.md": "record",
+    "docs/engineering/phase9-large-export-audit.md": "record",
+    "docs/engineering/phase9-legacy-compatibility-removal.md": "record",
+    "docs/engineering/phase9-type-safety-contracts.md": "record",
+    "docs/erp-navigation-phase-1-summary.md": "record",
+    "docs/erp-navigation-phase-status.md": "record",
+    "docs/erp-navigation-registry.md": "reference",
+    "docs/examples.md": "reference",
+    "docs/factory-bilingual-phase-1-audit.md": "record",
+    "docs/factory-bilingual-phase-2-schema.md": "record",
+    "docs/factory-bilingual-phase-3-resolver-api.md": "record",
+    "docs/factory-bilingual-phase-4-arabic-workbook.md": "record",
+    "docs/factory-bilingual-phase-6-snapshots.md": "record",
+    "docs/factory-bilingual-phase-7-documents.md": "record",
+    "docs/factory-bilingual-phase-8-surfaces.md": "record",
+    "docs/factory-flow.md": "reference",
+    "docs/factory-navigation-registry.md": "reference",
+    "docs/faq.md": "reference",
+    "docs/final-production-readiness.md": "reference",
+    "docs/financial-close-and-migrations.md": "reference",
+    "docs/fresh-db-bootstrap.md": "reference",
+    "docs/frontend-api-client-audit.md": "reference",
+    "docs/god-file-split-program.md": "reference",
+    "docs/historical-replay-phase-6-static-audit.md": "record",
+    "docs/historical-replay-phase-8-production-readiness.md": "record",
+    "docs/i18n/README.md": "reference",
+    "docs/i18n/phases-1-4-global-language-foundation.md": "record",
+    "docs/inventory-cost-memory-policy.md": "reference",
+    "docs/inventory-flow.md": "reference",
+    "docs/logging-phase-10-release.md": "record",
+    "docs/logging-phases-8-9.md": "record",
+    "docs/mobile-responsive-phase-status.md": "record",
+    "docs/mobile-responsive-phase10-status.md": "record",
+    "docs/mobile-responsive-phase9-status.md": "record",
+    "docs/mobile-tablet-web-regression.md": "reference",
+    "docs/monitoring/health-metrics.md": "reference",
+    "docs/observability/render-log-readability-phases-1-5.md": "record",
+    "docs/onboarding.md": "reference",
+    "docs/operations/database-backup-rollback-recovery.md": "reference",
+    "docs/operations/external-alerting-checklist.md": "reference",
+    "docs/permissions-security.md": "reference",
+    "docs/phase-8d-domain-auditing.md": "record",
+    "docs/pos-flow.md": "reference",
+    "docs/production-deployment-checklist.md": "reference",
+    "docs/program-1-incident-response-runbook.md": "reference",
+    "docs/program-1-observability-roadmap.md": "reference",
+    "docs/program-1-phase2-checkpoint.md": "record",
+    "docs/program-1-phase3-complete.md": "record",
+    "docs/program-1-phase4-complete.md": "record",
+    "docs/program-1-release-verification.md": "reference",
+    "docs/program-2-accounting-convergence.md": "reference",
+    "docs/program-2-complete.md": "record",
+    "docs/program-2-phase-1-accounting-foundation.md": "record",
+    "docs/program-2-phase-1-complete.md": "record",
+    "docs/program-2-phase-2-complete.md": "record",
+    "docs/program-2-phase-2-manual-journals-vouchers.md": "record",
+    "docs/program-2-phase-2b.md": "record",
+    "docs/program-2-phase-2c.md": "record",
+    "docs/program-2-phase-3-complete.md": "record",
+    "docs/program-2-phase-3-payments-receipts.md": "record",
+    "docs/program-2-phase-4-complete.md": "record",
+    "docs/program-2-phase-4-pos-stock-transfers.md": "record",
+    "docs/program-2-phase-5-complete.md": "record",
+    "docs/program-2-phase-5-containers-freight.md": "record",
+    "docs/program-2-phase-6-complete.md": "record",
+    "docs/program-2-phase-6-supplier-partner.md": "record",
+    "docs/program-2-phase-7-complete.md": "record",
+    "docs/program-2-phase-7-payroll.md": "record",
+    "docs/program-2-phase-8-complete.md": "record",
+    "docs/program-2-phase-8-rentals.md": "record",
+    "docs/program-2-phase-9-final-reconciliation.md": "record",
+    "docs/program-2d-special-workflows.md": "reference",
+    "docs/program-3a-admin-scope-continuation.md": "reference",
+    "docs/program-3a-company-isolation.md": "reference",
+    "docs/program-3b-operational-permissions.md": "reference",
+    "docs/program-3c-database-tenant-guards.md": "reference",
+    "docs/program-4-database-deployment-safety.md": "reference",
+    "docs/program-6d-database-query-optimization.md": "reference",
+    "docs/program-8b-approval-exception-workflows.md": "reference",
+    "docs/program-8c-reporting-traceability.md": "reference",
+    "docs/programs-6-8-completion.md": "reference",
+    "docs/properties-navigation-phase-status.md": "record",
+    "docs/properties-navigation-registry.md": "reference",
+    "docs/releases.md": "reference",
+    "docs/remote-support-phase-1.md": "record",
+    "docs/remote-support-phase-2.md": "record",
+    "docs/remote-support-phase-3.md": "record",
+    "docs/remote-support-phase-4.md": "record",
+    "docs/remote-support-phase-5.md": "record",
+    "docs/remote-support-phase-6.md": "record",
+    "docs/remote-support-phase-7-viewport-accuracy.md": "record",
+    "docs/remote-support-phase-7.md": "record",
+    "docs/remote-support-phase-8-connection-recovery.md": "record",
+    "docs/remote-support-phase-8.md": "record",
+    "docs/render-production-logging.md": "reference",
+    "docs/screen-watch-phase-5-release-gate.md": "record",
+    "docs/security-privacy.md": "reference",
+    "docs/smart-transfer-known-issues.md": "reference",
+    "docs/sp-migration-phase-4-runbook.md": "record",
+    "docs/stock-items-bandwidth-light-callers.md": "reference",
+    "docs/stock-transfer-smart-generator-phase-7-audit.md": "record",
+    "docs/supplier-partner-finalization-phases-1-2.md": "record",
+    "docs/supplier-partner-finalization-phases-11-12.md": "record",
+    "docs/supplier-partner-finalization-phases-3-4.md": "record",
+    "docs/supplier-partner-finalization-phases-5-6.md": "record",
+    "docs/supplier-partner-finalization-phases-9-10.md": "record",
+    "docs/supplier-partner-navigation-phase-status.md": "record",
+    "docs/supplier-partner-navigation-registry.md": "reference",
+    "docs/supplier-partner-phases-7-8.md": "record",
+    "docs/system-quality-program.md": "reference",
+    "docs/testing.md": "reference",
+    "docs/translation/phase-1-language-menu-placement.md": "record",
+    "docs/translation/phase-14-final-release-gate.md": "record",
+    "docs/translation/phase-2-i18n-audit-report.md": "record",
+    "docs/translation/phase-3-shared-interface-conversion.md": "record",
+    "docs/translation/phase-4-supplier-partner-conversion.md": "record",
+    "docs/translation/phase-5-properties-rentals-conversion.md": "record",
+    "docs/translation/phase-6-reports-exports-conversion.md": "record",
+    "docs/translation/phase-7-backend-message-conversion.md": "record",
+    "docs/translation/phase-8-current-main-reconciliation.md": "record",
+    "docs/translation/phase-8-rtl-responsive-accessibility.md": "record",
+    "docs/translation/phase-9-current-main-release.md": "record",
+    "docs/translation/phase-9-final-verification-release.md": "record",
+    "docs/translation/phase-9-integration-report.md": "record",
+    "docs/translation/phases-10-7-13.md": "record",
+    "docs/translation/phases-4-7-current-main-reconciliation.md": "record",
+    "docs/translation/phases-8-5-6-plan.md": "record",
+    "docs/troubleshooting.md": "reference",
+    "docs/use-cases.md": "reference",
+    "docs/vouchers-flow.md": "reference",
+    "docs/what-is-this.md": "reference"
+  }
+}

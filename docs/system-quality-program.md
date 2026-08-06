@@ -15,14 +15,18 @@ so it can be re-derived rather than trusted.
 
 | Signal | Now | Command |
 |---|---|---|
-| `: any` annotations | 6,388 | `grep -rn ": any\b" --include=*.ts --include=*.tsx server client/src shared \| wc -l` |
-| `as any` casts | 3,115 | `grep -rn "as any" ... \| wc -l` |
-| Files containing either | 1,287 of 2,526 (51%) | — |
+| Type escapes (AST) | 11,814 total — 8,669 `: any`, 3,143 `as any`, 2 suppressions | `npm run audit:type-escapes` |
+| Files carrying escapes | 1,329 of 2,523 (53%) | `npm run audit:type-escapes` |
+| Drizzle result casts | 344 | `npm run audit:type-escapes` |
 | Backend coverage floor (lines) | 17% | `config/coverage-thresholds.json` |
 | Test files | 363 (330 `tests/`, 33 colocated) | `find tests server client/src shared -name '*.test.ts*'` |
-| Registered routes | 1,787 | `config/route-manifest.json` |
-| Docs | 177 files, 116 phase-named (65%) | `find docs -name '*.md'` |
-| God-file backlog | 66 files, 35,729 excess lines | `npm run audit:god-files` |
+| Registered routes | 1,871 | `config/route-manifest.json` |
+| Docs | 177 files, 116 phase-named (65%) | `npm run audit:doc-index` |
+| God-file backlog | 64 files, 33,432 excess lines | `npm run audit:god-files` |
+
+Every figure above is bound to its source in `config/doc-index.json` and checked
+by `npm run audit:doc-index`, so this table fails the build rather than going
+stale.
 
 Two of these deserve comment before the phases begin.
 
@@ -32,11 +36,17 @@ where a type that *was* known got discarded downstream, not a place where the
 type was never available. That makes the problem tractable: this is erosion, not
 absence.
 
-**The god-file backlog is smaller than its own documentation claims.** That doc
-opens with "139 files, 74,858 lines over the limit" and later says "82 files and
-45,684". The config says 66 files and 35,729. Both prose figures are stale. This
-is exactly the failure this program's Phase 3 exists to prevent, and it is the
-reason every table above cites a command instead of a number written by hand.
+**The god-file backlog is much smaller than its own documentation claims.** That
+doc opened with "139 files, 74,858 lines over the limit" and later said "82 files
+and 45,684". The audit reports **64 and 33,432** — the program is 67% cleared,
+not 45%. Three separate figures, all wrong, in a document whose entire purpose is
+tracking one number. The first draft of *this* document then repeated the
+mistake, citing 66 and 35,729 because those were derived from the frozen
+baselines rather than from the files as they are now.
+
+That is the whole argument for Phase 0.3 in one example: a number written by hand
+is wrong the moment the code moves, and nobody notices, because nothing checks.
+Every figure in the table above is now bound to its source and asserted.
 
 ## Why a harness comes first
 
@@ -90,57 +100,81 @@ npm run audit:type-escapes
 ```
 
 The audit reports two extras that make the phases below schedulable: the
-distribution by directory (server 6,033 vs client 3,773 on the combined
-pattern), and the reverse index of **files where an `as any` sits on a value
-that came from a Drizzle query** — those are the ones actively discarding
-schema types, and they are the highest-value targets.
+distribution by directory (server 7,845 against client 3,969), and the reverse
+index of **files where an `as any` sits on a value that came from a Drizzle
+query** — 344 of them, the ones actively discarding schema types, and the
+highest-value targets. They cluster hard: the ten worst files hold 158 of the
+344, most under `server/routes/sp/`.
 
-### 0.2 Money-endpoint characterization pins (`config/response-pins/`)
+### 0.2 Money-endpoint characterization pins (`config/report-characterization.json`)
 
-The god-file program already identified the blocking problem, in its own words:
-`GET /api/reports/net-profit-excel`, `GET /api/factory/suppliers/:id/statement`
-and `PATCH /api/purchase-orders/:id` have **no test referencing them at all**,
-and the smoke sweep asserts only "not a 5xx" — not that the figures are
-unchanged.
+**This already existed.** `tests/report-endpoint-characterization.test.ts` was
+written before this program and does exactly what was specified here: it seeds
+an ERP and a factory fixture, calls each endpoint with a pinned client date, and
+hashes the normalized response against a committed snapshot. The plan's claim
+that this was the highest-value unbuilt item was wrong — it was built.
 
-`tests/response-pins.test.ts` seeds a fixture company, calls each pinned
-endpoint, and compares the response against a committed JSON snapshot.
+What was missing was **two of the six route files**. The suite's own header said
+"the six route files whose bulk is a single handler" while its endpoint list
+covered four: both *write* handlers were absent, because a mutating endpoint
+cannot share a fixture with the read pins — the rows it writes move the figures
+the other pins hash.
+
+Phase 0.2 closed that gap:
+
+- `PATCH /api/purchase-orders/:id` (`containerFreightWriteRoutes.ts`, the
+  1,156-line handler the god-file program flagged as having no test referencing
+  it at all) — charge totals recomputed against a seeded PO and line item.
+- `POST /api/factory/raw-stock/offload` (`rawStockOffloadRoutes.ts`, 972 lines)
+  — landed-cost calculation for a container receipt.
+
+Each write endpoint gets its own seed-and-release cycle, so pins stay
+independent of the order the suite runs in. Two further guards were added: the
+six Phase 3 modules are now asserted against the pin list, so "six" is checked
+rather than claimed, and a pin that captured a 5xx fails instead of freezing a
+broken endpoint in as correct.
+
+```bash
+UPDATE_REPORT_CHARACTERIZATION=1 npm run test:backend -- report-endpoint
+```
 
 This is the same instrument as the route manifest, one level deeper: the
 manifest proves a route is *registered*, the smoke sweep proves it *responds*,
-the pin proves it **still computes the same numbers**. Splitting or refactoring
-a net-profit handler without that is trading a readability win for an
-unverifiable risk to money figures.
+the pin proves it **still computes the same numbers**.
 
-```bash
-UPDATE_RESPONSE_PINS=1 npm run test:backend -- response-pins   # intentional changes only
-```
-
-Scope for Phase 0 is the six handlers Phase 3 of the god-file program stalled
-on, plus the posting engines already carrying per-file coverage floors. Not
-every endpoint — pins are expensive and only earn their cost where a silent
-arithmetic change is the worst failure mode.
+One lesson from building it, worth keeping: the offload response carries an
+`offloadedAt` set to `now()`, so its first pin was flaky. The fix was to add
+that one key to the volatile list rather than strip every `*At` field — the
+broad rule would also have dropped stable date fields from the other three
+pins' hashes, and these hashes are the only thing standing between an
+extraction and a silent change to a money figure.
 
 ### 0.3 Documentation state index (`config/doc-index.json`)
 
-`scripts/audit-doc-index.mjs` classifies every file in `docs/` as:
+`scripts/audit-doc-index.mjs` classifies every file in `docs/` as **reference**
+(describes current behaviour, must stay accurate) or **record** (describes work
+that finished, correct as history). All 178 are now classified — 61 reference,
+117 record — seeded by filename heuristic and reviewed in Phase 3a. An
+unclassified doc fails, so the choice is made when a doc is written.
 
-- **reference** — describes current behaviour, must stay accurate;
-- **record** — describes work that finished, correct as a historical artifact;
-- **stale** — describes current behaviour and disagrees with the code.
+The audit cannot detect staleness in general; that is a judgment call. What it
+*can* do is check the numbers, and that is the enforced half: `figures[]` binds
+a documented figure to its live source — a value in a `config/*.json`, or a
+field from one of the audits — and a doc that drifts fails the build. Seven
+claims are bound today, across the two program documents.
 
-The audit cannot detect staleness in general. What it *can* do, and what makes
-it worth writing, is check the numbers: any doc citing a figure that a
-`config/*.json` file also states must agree with it. That single rule catches
-the god-file header drift described above, and it is the only kind of doc rot
-that recurs mechanically here.
+The first thing it caught was the drift it was written for. It also found that
+both programs cited **1,787** registered routes while `config/route-manifest.json`
+says **1,871**.
 
 ```bash
 npm run audit:doc-index
 ```
 
-**Exit criteria for Phase 0:** three audits green in CI, three baselines
-committed, no source file changed.
+**Exit criteria for Phase 0:** met. Three audits green in CI, three baselines
+committed, and the response pins extended from four route files to six. No
+production source file was changed — the only edits outside `config/`,
+`scripts/` and `tests/` are the corrected figures in the two program docs.
 
 ---
 
