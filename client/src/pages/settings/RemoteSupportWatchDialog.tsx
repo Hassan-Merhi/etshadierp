@@ -64,7 +64,13 @@ function FastScreenFeedDialog({
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const stateRef = useRef<FastPollState>({ etag: null, frame: null });
+  const connectedRef = useRef(false);
   const pollAbortRef = useRef<AbortController | null>(null);
+
+  const setConnectionState = useCallback((value: boolean) => {
+    connectedRef.current = value;
+    setConnected(value);
+  }, []);
 
   const pollOnce = useCallback(async () => {
     pollAbortRef.current?.abort();
@@ -90,7 +96,7 @@ function FastScreenFeedDialog({
   useEffect(() => {
     stateRef.current = { etag: null, frame: null };
     setFrame(null);
-    setConnected(false);
+    setConnectionState(false);
     setError(null);
 
     let closed = false;
@@ -100,7 +106,7 @@ function FastScreenFeedDialog({
 
     eventSource.addEventListener("ready", () => {
       if (closed) return;
-      setConnected(true);
+      setConnectionState(true);
       setError(null);
     });
     eventSource.addEventListener("frame", (event) => {
@@ -110,7 +116,7 @@ function FastScreenFeedDialog({
         if (!nextFrame?.dataUrl) return;
         stateRef.current = { etag: null, frame: nextFrame };
         setFrame(nextFrame);
-        setConnected(true);
+        setConnectionState(true);
         setError(null);
       } catch {
         setError("A live frame arrived in an invalid format.");
@@ -118,14 +124,14 @@ function FastScreenFeedDialog({
     });
     eventSource.onerror = () => {
       if (closed) return;
-      setConnected(false);
+      setConnectionState(false);
       setError("Live stream disconnected. Polling recovery is active.");
       void pollOnce();
     };
 
     void pollOnce();
     const intervalId = window.setInterval(() => {
-      if (!connected) void pollOnce();
+      if (!connectedRef.current) void pollOnce();
     }, FALLBACK_POLL_MS);
 
     return () => {
@@ -134,9 +140,10 @@ function FastScreenFeedDialog({
       eventSource.close();
       pollAbortRef.current?.abort();
       pollAbortRef.current = null;
+      connectedRef.current = false;
       stateRef.current = { etag: null, frame: null };
     };
-  }, [connected, pollOnce, userId]);
+  }, [pollOnce, setConnectionState, userId]);
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -195,14 +202,13 @@ export function RemoteSupportWatchDialog(props: {
   username: string;
   onClose: () => void;
 }) {
-  const { data: runtime, isLoading } = useQuery<RemoteSupportRuntime>({
+  const { data: runtime } = useQuery<RemoteSupportRuntime>({
     queryKey: ["/api/screen-feed/admin/runtime"],
     queryFn: () => apiRequest("GET", "/api/screen-feed/admin/runtime").then((response) => response.json()),
     staleTime: 15000,
     retry: 1,
   });
 
-  if (isLoading) return null;
   if (!runtime?.flags?.screenFeedEnabled || !runtime.flags.fastScreenFeed) {
     return <WatchUserDialog {...props} />;
   }
