@@ -8,7 +8,8 @@ describe("Factory refresh route preservation", () => {
   it("waits for company restoration before evaluating Factory route redirects", () => {
     expect(app).toContain("isLoading: companyLoading");
     expect(app).toContain("if (companyLoading) return <AppLoadingState />;");
-    expect(app).toContain("if (companyError || !selectedCompany) return <AppLoadingState forceRecovery");
+    expect(app).toContain("if (companyError || !selectedCompany)");
+    expect(app).toContain("retryCompanyBootstrap");
     const companyGuard = app.indexOf("if (companyLoading) return <AppLoadingState />;");
     const routeResolution = app.indexOf("resolveAuthenticatedAppRoute({");
     expect(companyGuard).toBeGreaterThan(-1);
