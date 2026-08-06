@@ -14,7 +14,9 @@ describe("POS negative-stock permission wiring", () => {
   });
 
   it("uses the refreshed session permission as the frontend source of truth", () => {
-    const calculations = source("client/src/pages/pos/hooks/usePosRowCalculations.ts");
+    const calculations = source(
+      "client/src/pages/pos/hooks/usePosRowCalculations.ts"
+    );
 
     expect(calculations).toContain(
       "authUser?.canSellNegativeStock ?? posUser?.canSellNegativeStock ?? false"
@@ -28,7 +30,9 @@ describe("POS negative-stock permission wiring", () => {
     const inventory = source("server/services/pos/deductSaleInventory.ts");
 
     expect(routes).toContain("enforcePosOperationalPermissionScope");
-    expect(inventory).toContain("lockedQuantity.lessThan(requestedQuantity) && !canSellNegativeStock");
+    expect(inventory).toContain(
+      "lockedQuantity.lessThan(requestedQuantity) && !canSellNegativeStock"
+    );
     expect(inventory).toContain("FOR UPDATE OF i");
   });
 });
