@@ -4,19 +4,6 @@ orbs:
   node: circleci/node@7.1.0
 
 executors:
-  node22:
-    docker:
-      - image: cimg/node:22.14
-    resource_class: medium+
-    working_directory: ~/project
-    environment:
-      NODE_ENV: test
-      SESSION_SECRET: circleci-session-secret
-      CSRF_ENFORCE: "0"
-      ENABLE_SCHEDULERS: "false"
-      NODE_OPTIONS: --max-old-space-size=4096
-      PORT: "5000"
-
   node22-postgres:
     docker:
       - image: cimg/node:22.14
@@ -65,43 +52,13 @@ commands:
             done
             exit 1
 
-  format_files:
+  run_backend_shard:
     parameters:
-      files:
-        type: string
-    steps:
-      - install_dependencies
-      - run:
-          name: Check formatting group
-          command: node node_modules/prettier/bin/prettier.cjs --check << parameters.files >>
-
-jobs:
-  format-group-1:
-    executor: node22
-    steps:
-      - format_files:
-          files: server/lib/databaseSsl.test.ts server/lib/inventoryMath.test.ts server/lib/inventoryMath.ts server/lib/reportPrecision.test.ts server/routes/admin/repair/rebuild-inventory.ts server/routes/containers/offload/create.ts server/routes/containers/offload/update.ts server/routes/creditNoteRoutes.ts
-
-  format-group-2:
-    executor: node22
-    steps:
-      - format_files:
-          files: server/routes/factory/bale-exports/daily-report.ts server/routes/posImportRoutes.ts server/routes/stats/netProfitRentalSection.ts server/routes/stats/netProfitStockSection.ts server/routes/stats/statsDataRoutes.ts server/routes/stats/statsReportsRoutes.ts server/routes/stats/statsSalesRoutes.ts server/routes/stock/merge/bulk-merge.ts
-
-  format-group-3:
-    executor: node22
-    steps:
-      - format_files:
-          files: server/routes/stock/merge/merge.ts server/services/pos/createSaleService.ts server/services/pos/deductSaleInventory.ts server/services/pos/edit/rebuildSaleItems.ts server/services/pos/edit/reverseOriginalSaleInventory.ts server/services/syncSalesItemCosts.ts server/storage/containers-store/offload.ts server/storage/stock-ops/transfers-create.ts
-
-  format-group-4:
-    executor: node22
-    steps:
-      - format_files:
-          files: server/storage/stock-ops/transfers-update.ts tests/god-file-boundaries.test.ts tests/phase14-i18n-release-gate.test.ts tests/ui/pos-negative-stock-permission.test.ts server/db.ts server/index.ts
-
-  postgres-backend-tests:
-    executor: node22-postgres
+      shard:
+        type: integer
+      total:
+        type: integer
+        default: 8
     steps:
       - install_dependencies
       - wait_for_postgres
@@ -109,14 +66,72 @@ jobs:
           name: Prepare disposable database schema
           command: node node_modules/drizzle-kit/bin.cjs push --force
       - run:
-          name: Backend tests
-          command: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
+          name: Run backend test shard << parameters.shard >>
+          command: |
+            mapfile -t all_tests < <(
+              find server tests shared -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' \) | sort
+            )
+            selected=()
+            for index in "${!all_tests[@]}"; do
+              if (( index % << parameters.total >> == << parameters.shard >> )); then
+                selected+=("${all_tests[$index]}")
+              fi
+            done
+            printf 'Running %s test file(s) in shard << parameters.shard >>:\n' "${#selected[@]}"
+            printf ' - %s\n' "${selected[@]}"
+            test "${#selected[@]}" -gt 0
+            node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism "${selected[@]}"
+
+jobs:
+  backend-shard-0:
+    executor: node22-postgres
+    steps:
+      - run_backend_shard:
+          shard: 0
+  backend-shard-1:
+    executor: node22-postgres
+    steps:
+      - run_backend_shard:
+          shard: 1
+  backend-shard-2:
+    executor: node22-postgres
+    steps:
+      - run_backend_shard:
+          shard: 2
+  backend-shard-3:
+    executor: node22-postgres
+    steps:
+      - run_backend_shard:
+          shard: 3
+  backend-shard-4:
+    executor: node22-postgres
+    steps:
+      - run_backend_shard:
+          shard: 4
+  backend-shard-5:
+    executor: node22-postgres
+    steps:
+      - run_backend_shard:
+          shard: 5
+  backend-shard-6:
+    executor: node22-postgres
+    steps:
+      - run_backend_shard:
+          shard: 6
+  backend-shard-7:
+    executor: node22-postgres
+    steps:
+      - run_backend_shard:
+          shard: 7
 
 workflows:
-  diagnose-remaining-failures:
+  isolate-backend-failure:
     jobs:
-      - format-group-1
-      - format-group-2
-      - format-group-3
-      - format-group-4
-      - postgres-backend-tests
+      - backend-shard-0
+      - backend-shard-1
+      - backend-shard-2
+      - backend-shard-3
+      - backend-shard-4
+      - backend-shard-5
+      - backend-shard-6
+      - backend-shard-7
