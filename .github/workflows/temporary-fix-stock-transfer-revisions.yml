@@ -1,0 +1,74 @@
+name: Temporary stock transfer revision repair
+
+on:
+  push:
+    branches:
+      - agent/fix-stock-transfer-revision-history
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/fix-stock-transfer-revision-history
+          fetch-depth: 0
+
+      - name: Repair revision save sequencing
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('client/src/pages/vouchers/StockTransferForm.tsx')
+          text = path.read_text()
+
+          replacements = [
+              (
+                  '  const lastKnownTransferIdRef = useRef<number | null>(null);\n',
+                  '  const lastKnownTransferIdRef = useRef<number | null>(null);\n  const savingTransferRevisionRef = useRef(false);\n',
+              ),
+              (
+                  '      if (isEditMode) {\n        setLocation(`${modePrefix}/daybook`);\n',
+                  '      if (isEditMode && !savingTransferRevisionRef.current) {\n        setLocation(`${modePrefix}/daybook`);\n',
+              ),
+              (
+                  '    setIsTransferSavingRevision(true);\n    try {\n',
+                  '    setIsTransferSavingRevision(true);\n    savingTransferRevisionRef.current = true;\n    try {\n',
+              ),
+              (
+                  '      queryClient.invalidateQueries({\n        queryKey: ["/api/stock-transfers", lastKnownTransferIdRef.current, "revisions"],\n      });\n',
+                  '      await queryClient.invalidateQueries({\n        queryKey: ["/api/stock-transfers", lastKnownTransferIdRef.current, "revisions"],\n      });\n',
+              ),
+              (
+                  '    } finally {\n      setIsTransferSavingRevision(false);\n    }\n',
+                  '    } finally {\n      savingTransferRevisionRef.current = false;\n      setIsTransferSavingRevision(false);\n    }\n',
+              ),
+              (
+                  '    stockTransferMutation.mutate(data);\n',
+                  '    await stockTransferMutation.mutateAsync(data);\n',
+              ),
+          ]
+
+          for old, new in replacements:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected exactly one match, found {count}: {old[:80]!r}')
+              text = text.replace(old, new, 1)
+
+          path.write_text(text)
+          PY
+
+      - name: Remove temporary workflow
+        run: rm .github/workflows/temporary-fix-stock-transfer-revisions.yml
+
+      - name: Commit repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/src/pages/vouchers/StockTransferForm.tsx .github/workflows/temporary-fix-stock-transfer-revisions.yml
+          git commit -m "fix: persist stock transfer revisions before navigation"
+          git push origin HEAD:agent/fix-stock-transfer-revision-history
