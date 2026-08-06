@@ -31,7 +31,8 @@ describe("POS negative-stock permission wiring", () => {
 
     expect(routes).toContain("enforcePosOperationalPermissionScope");
     expect(inventory).toContain(
-      "lockedQty < saleQty && !canSellNegativeStock",
+      "lockedQuantity.lessThan(requestedQuantity) && !canSellNegativeStock",
     );
+    expect(inventory).toContain("FOR UPDATE OF i");
   });
 });
