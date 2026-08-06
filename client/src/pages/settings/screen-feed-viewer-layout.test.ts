@@ -44,28 +44,23 @@ describe("screen feed viewer layout", () => {
   });
 
   it("uses bounded exponential recovery delays", () => {
-    expect([0, 1, 2, 3, 4, 5, 99].map(getScreenFeedRecoveryDelay)).toEqual([
-      1000,
-      2000,
-      4000,
-      8000,
-      15000,
-      15000,
-      15000,
-    ]);
+    const attempts = [0, 1, 2, 3, 4, 5, 99];
+    const delays = attempts.map(getScreenFeedRecoveryDelay);
+
+    expect(delays).toEqual([1000, 2000, 4000, 8000, 15000, 15000, 15000]);
     expect(getScreenFeedRecoveryDelay(Number.NaN)).toBe(1000);
     expect(getScreenFeedRecoveryDelay(-5)).toBe(1000);
   });
 
   it("reconnects while waiting for the first frame when transport is unavailable", () => {
-    expect(
-      decideScreenFeedRecovery({
-        hasFrame: false,
-        liveConnected: false,
-        frameAgeMs: Number.POSITIVE_INFINITY,
-        recoveryAttempt: 2,
-      })
-    ).toEqual({
+    const decision = decideScreenFeedRecovery({
+      hasFrame: false,
+      liveConnected: false,
+      frameAgeMs: Number.POSITIVE_INFINITY,
+      recoveryAttempt: 2,
+    });
+
+    expect(decision).toEqual({
       quality: "waiting",
       action: "reconnect",
       retryAfterMs: 4000,
@@ -74,52 +69,66 @@ describe("screen feed viewer layout", () => {
   });
 
   it("polls for the first frame when the transport is connected", () => {
-    expect(
-      decideScreenFeedRecovery({
-        hasFrame: false,
-        liveConnected: true,
-        frameAgeMs: Number.POSITIVE_INFINITY,
-        recoveryAttempt: 0,
-      })
-    ).toMatchObject({ quality: "waiting", action: "poll", retryAfterMs: 1000 });
+    const decision = decideScreenFeedRecovery({
+      hasFrame: false,
+      liveConnected: true,
+      frameAgeMs: Number.POSITIVE_INFINITY,
+      recoveryAttempt: 0,
+    });
+
+    expect(decision).toMatchObject({
+      quality: "waiting",
+      action: "poll",
+      retryAfterMs: 1000,
+    });
   });
 
   it("polls delayed connected feeds but reconnects disconnected or stale feeds", () => {
-    expect(
-      decideScreenFeedRecovery({
-        hasFrame: true,
-        liveConnected: true,
-        frameAgeMs: 7000,
-        recoveryAttempt: 1,
-      })
-    ).toMatchObject({ quality: "delayed", action: "poll", reason: "frame-delayed" });
-    expect(
-      decideScreenFeedRecovery({
-        hasFrame: true,
-        liveConnected: false,
-        frameAgeMs: 7000,
-        recoveryAttempt: 1,
-      })
-    ).toMatchObject({ quality: "delayed", action: "reconnect", reason: "transport-disconnected" });
-    expect(
-      decideScreenFeedRecovery({
-        hasFrame: true,
-        liveConnected: true,
-        frameAgeMs: 16000,
-        recoveryAttempt: 1,
-      })
-    ).toMatchObject({ quality: "stale", action: "reconnect", reason: "frame-stale" });
+    const delayed = decideScreenFeedRecovery({
+      hasFrame: true,
+      liveConnected: true,
+      frameAgeMs: 7000,
+      recoveryAttempt: 1,
+    });
+    const disconnected = decideScreenFeedRecovery({
+      hasFrame: true,
+      liveConnected: false,
+      frameAgeMs: 7000,
+      recoveryAttempt: 1,
+    });
+    const stale = decideScreenFeedRecovery({
+      hasFrame: true,
+      liveConnected: true,
+      frameAgeMs: 16000,
+      recoveryAttempt: 1,
+    });
+
+    expect(delayed).toMatchObject({
+      quality: "delayed",
+      action: "poll",
+      reason: "frame-delayed",
+    });
+    expect(disconnected).toMatchObject({
+      quality: "delayed",
+      action: "reconnect",
+      reason: "transport-disconnected",
+    });
+    expect(stale).toMatchObject({
+      quality: "stale",
+      action: "reconnect",
+      reason: "frame-stale",
+    });
   });
 
   it("does not schedule recovery for a healthy feed", () => {
-    expect(
-      decideScreenFeedRecovery({
-        hasFrame: true,
-        liveConnected: true,
-        frameAgeMs: 1200,
-        recoveryAttempt: 4,
-      })
-    ).toEqual({
+    const decision = decideScreenFeedRecovery({
+      hasFrame: true,
+      liveConnected: true,
+      frameAgeMs: 1200,
+      recoveryAttempt: 4,
+    });
+
+    expect(decision).toEqual({
       quality: "excellent",
       action: "none",
       retryAfterMs: null,
