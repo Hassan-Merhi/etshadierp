@@ -39,7 +39,7 @@ function buildVoucherValues(voucher: VoucherInsertFields) {
     description: voucher.description ?? null,
     locationId: voucher.locationId ?? null,
     optional: voucher.optional ?? false,
-    currency: voucher.currency ?? null,
+    currency: voucher.currency ?? "USD",
     exchangeRate: voucher.exchangeRate ?? null,
     effectiveDate: voucher.effectiveDate ?? null,
     sourceModule: voucher.sourceModule ?? null,
