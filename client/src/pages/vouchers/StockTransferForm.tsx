@@ -69,6 +69,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
   const posLocationId = posUser?.assignedLocationId;
   const hydratedVoucherIdRef = useRef<number | null>(null);
   const lastKnownTransferIdRef = useRef<number | null>(null);
+  const savingTransferRevisionRef = useRef(false);
 
   const { data: stockItems = [] } = useQuery<StockItem[]>({
     queryKey: ["/api/stock-items/light", selectedCompany?.id],
@@ -468,7 +469,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
       queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers/list"] });
-      if (isEditMode) {
+      if (isEditMode && !savingTransferRevisionRef.current) {
         setLocation(`${modePrefix}/daybook`);
       } else {
         stockTransferForm.reset({
@@ -573,6 +574,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       return;
     }
     setIsTransferSavingRevision(true);
+    savingTransferRevisionRef.current = true;
     try {
       await stockTransferForm.handleSubmit(async (data) => {
         await onStockTransferSubmit(data);
@@ -592,6 +594,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Failed to save revision", variant: "destructive" });
     } finally {
+      savingTransferRevisionRef.current = false;
       setIsTransferSavingRevision(false);
     }
   };
@@ -657,7 +660,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       }
       if (st?.items) originalItems = st.items;
     }
-    stockTransferMutation.mutate(data);
+    await stockTransferMutation.mutateAsync(data);
   };
 
   const handleExportStockTransfer = async (detailed: boolean) => {
