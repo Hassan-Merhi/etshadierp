@@ -25,9 +25,6 @@ const PREFETCH_KEYS = [
   "/api/stock-grades",
 ] as const;
 
-const MAX_INITIAL_SYNC_FAILURES = 3;
-const COMPANY_SYNC_FAILURE_CODE = "COMPANY_SYNC_FAILED";
-
 function prefetchReferenceData(companyId: number, role?: string) {
   if (role === "POS") return;
   for (const url of PREFETCH_KEYS) {
@@ -65,7 +62,6 @@ interface CompanyContextType {
   companies: Company[];
   isLoading: boolean;
   error: Error | null;
-  retry: () => Promise<void>;
   selectCompany: (company: Company, options?: CompanySelectionOptions) => Promise<boolean>;
 }
 
@@ -102,10 +98,6 @@ function parseSavedCompanyId(value: string | null): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-function normalizeCompanyError(error: unknown): Error {
-  return error instanceof Error ? error : new Error(String(error));
-}
-
 async function switchCompanyOnServer(companyId: number): Promise<boolean> {
   try {
     const response = await apiRequest("POST", "/api/auth/set-company", { companyId });
@@ -119,11 +111,9 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [isSyncingCompany, setIsSyncingCompany] = useState(false);
   const [initialSyncAttempt, setInitialSyncAttempt] = useState(0);
-  const [initialSyncError, setInitialSyncError] = useState<Error | null>(null);
   const selectedCompanyRef = useRef<Company | null>(null);
   const lastSyncedCompanyId = useRef<number | null>(null);
   const initialSyncStarted = useRef(false);
-  const initialSyncFailures = useRef(0);
   const initialRetryTimer = useRef<number | null>(null);
   const switchQueueRef = useRef<CompanySwitchQueue | null>(null);
 
@@ -135,7 +125,6 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     data: userCompanyAssignments = [],
     isLoading,
     error: companyAssignmentsError,
-    refetch: refetchCompanies,
   } = useQuery(userCompaniesQueryOptions());
 
   const companies: Company[] = userCompanyAssignments
@@ -143,11 +132,6 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     .filter(
       (company, index, allCompanies) => index === allCompanies.findIndex((candidate) => candidate.id === company.id)
     );
-
-  const clearInitialSyncFailure = useCallback(() => {
-    initialSyncFailures.current = 0;
-    setInitialSyncError(null);
-  }, []);
 
   const commitCompanySelection = useCallback((company: Company, options: CompanyCommitOptions) => {
     setAppTimezone(null);
@@ -226,12 +210,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     [performCompanySelection]
   );
 
-  const scheduleInitialSyncRetry = useCallback((error: unknown) => {
-    initialSyncFailures.current += 1;
-    if (initialSyncFailures.current >= MAX_INITIAL_SYNC_FAILURES) {
-      setInitialSyncError(normalizeCompanyError(error));
-      return;
-    }
+  const scheduleInitialSyncRetry = useCallback(() => {
     if (initialRetryTimer.current !== null) return;
     initialRetryTimer.current = window.setTimeout(() => {
       initialRetryTimer.current = null;
@@ -239,18 +218,6 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       setInitialSyncAttempt((attempt) => attempt + 1);
     }, 2000);
   }, []);
-
-  const retry = useCallback(async (): Promise<void> => {
-    if (initialRetryTimer.current !== null) {
-      window.clearTimeout(initialRetryTimer.current);
-      initialRetryTimer.current = null;
-    }
-    initialSyncFailures.current = 0;
-    initialSyncStarted.current = false;
-    setInitialSyncError(null);
-    setInitialSyncAttempt((attempt) => attempt + 1);
-    await refetchCompanies();
-  }, [refetchCompanies]);
 
   useEffect(
     () => () => {
@@ -260,7 +227,7 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    if (companies.length === 0 || selectedCompany || initialSyncStarted.current || initialSyncError) return;
+    if (companies.length === 0 || selectedCompany || initialSyncStarted.current) return;
 
     const savedCompanyId = parseSavedCompanyId(localStorage.getItem("selectedCompanyId"));
     const savedCompany = savedCompanyId ? companies.find((company) => company.id === savedCompanyId) : undefined;
@@ -270,12 +237,10 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     initialSyncStarted.current = true;
 
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      void selectCompany(target, { offline: true })
-        .then((ok) => {
-          if (ok) clearInitialSyncFailure();
-          else scheduleInitialSyncRetry(new Error(COMPANY_SYNC_FAILURE_CODE));
-        })
-        .catch(scheduleInitialSyncRetry);
+      void selectCompany(target, { offline: true }).catch((error: unknown) => {
+        console.error("[Company] Failed to activate the offline company selection.", error);
+        scheduleInitialSyncRetry();
+      });
       return;
     }
 
@@ -286,15 +251,11 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
           await switchQueueRef.current!.enqueue(async () => {
             adoptServerCompany(target);
           });
-          clearInitialSyncFailure();
           return;
         }
 
         const ok = await selectCompany(target);
-        if (ok) {
-          clearInitialSyncFailure();
-          return;
-        }
+        if (ok) return;
 
         const serverCompany = companies.find((company) => company.id === sessionCompanyId);
         if (serverCompany) {
@@ -303,38 +264,25 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
           await switchQueueRef.current!.enqueue(async () => {
             adoptServerCompany(serverCompany);
           });
-          clearInitialSyncFailure();
           return;
         }
 
         console.error("[Company] Failed to synchronize the initial company selection; retrying.");
-        scheduleInitialSyncRetry(new Error(COMPANY_SYNC_FAILURE_CODE));
+        scheduleInitialSyncRetry();
       })
       .catch((error: unknown) => {
         console.error("[Company] Initial company synchronization failed; retrying.", error);
-        scheduleInitialSyncRetry(error);
+        scheduleInitialSyncRetry();
       });
-  }, [
-    adoptServerCompany,
-    clearInitialSyncFailure,
-    companies,
-    initialSyncAttempt,
-    initialSyncError,
-    scheduleInitialSyncRetry,
-    selectCompany,
-    selectedCompany,
-  ]);
-
-  const companyError = initialSyncError ?? (companyAssignmentsError instanceof Error ? companyAssignmentsError : null);
+  }, [adoptServerCompany, companies, initialSyncAttempt, scheduleInitialSyncRetry, selectCompany, selectedCompany]);
 
   return (
     <CompanyContext.Provider
       value={{
         selectedCompany,
         companies,
-        isLoading: isLoading || isSyncingCompany || (companies.length > 0 && !selectedCompany && companyError === null),
-        error: companyError,
-        retry,
+        isLoading: isLoading || isSyncingCompany || (companies.length > 0 && !selectedCompany),
+        error: companyAssignmentsError instanceof Error ? companyAssignmentsError : null,
         selectCompany,
       }}
     >

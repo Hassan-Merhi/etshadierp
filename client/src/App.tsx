@@ -18,7 +18,6 @@ import { ApplicationLanguageProvider } from "@/contexts/ApplicationLanguageConte
 import { DateJumpDialog } from "@/components/DateJumpDialog";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { UserNotesPanel } from "@/components/UserNotesPanel";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useUserPreferences } from "@/hooks/use-user-preferences";
 import { useServerRestart } from "@/hooks/use-server-restart";
 import { Button } from "@/components/ui/button";
@@ -116,15 +115,10 @@ function ServerRestartWatcher() {
 }
 
 function AuthenticatedRoot() {
-  const { user, isSuccess, error, loadingTimedOut, retryAuthentication, handleLogout } = useAuthenticatedUser();
+  const { user, isLoading, error, loadingTimedOut, handleLogout } = useAuthenticatedUser();
 
-  if (isSuccess && user === null) return <Redirect to="/login" />;
-  if (!user) {
-    if (error || loadingTimedOut) {
-      return <AppLoadingState forceRecovery onRecover={() => void retryAuthentication()} />;
-    }
-    return <AppLoadingState />;
-  }
+  if (loadingTimedOut || (!isLoading && (error || !user))) return <Redirect to="/login" />;
+  if (isLoading || !user) return <AppLoadingState />;
 
   return (
     <ApplicationLanguageProvider>
@@ -157,9 +151,7 @@ export default function App() {
             <Switch>
               <Route path="/login" component={Login} />
               <Route>
-                <ErrorBoundary>
-                  <AuthenticatedRoot />
-                </ErrorBoundary>
+                <AuthenticatedRoot />
               </Route>
             </Switch>
             <Toaster />

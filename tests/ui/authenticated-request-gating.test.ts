@@ -11,17 +11,14 @@ describe("authenticated request gating", () => {
     const app = source("client/src/App.tsx");
     const authenticatedRoot = app.indexOf("function AuthenticatedRoot()");
     const authQuery = app.indexOf("useAuthenticatedUser()", authenticatedRoot);
-    const authLoadingGuard = app.indexOf("if (!user) {", authQuery);
+    const authLoadingGuard = app.indexOf("if (isLoading || !user) return <AppLoadingState />;", authQuery);
     const companyProvider = app.indexOf("<CompanyProvider>", authLoadingGuard);
 
     expect(authenticatedRoot).toBeGreaterThan(-1);
     expect(authQuery).toBeGreaterThan(authenticatedRoot);
     expect(authLoadingGuard).toBeGreaterThan(authQuery);
     expect(companyProvider).toBeGreaterThan(authLoadingGuard);
-    expect(app).toContain('if (isSuccess && user === null) return <Redirect to="/login" />;');
-    expect(app).toContain("if (error || loadingTimedOut)");
-    expect(app).toContain("<AppLoadingState forceRecovery");
-    expect(app).not.toContain("loadingTimedOut || (!isLoading && (error || !user))");
+    expect(app).toContain('if (loadingTimedOut || (!isLoading && (error || !user))) return <Redirect to="/login" />;');
 
     const publicAppTree = app.slice(app.indexOf("export default function App()"));
     expect(publicAppTree).not.toContain("<CompanyProvider>");
@@ -34,9 +31,7 @@ describe("authenticated request gating", () => {
     const authenticatedApp = source("client/src/app/AuthenticatedApp.tsx");
 
     expect(authenticatedApp).toContain("interface AuthenticatedAppProps");
-    expect(authenticatedApp).toContain(
-      "export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps)"
-    );
+    expect(authenticatedApp).toContain("export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps)");
     expect(authenticatedApp).not.toContain("useAuthenticatedUser(");
     expect(authenticatedApp).toContain("userPresent: true");
   });
