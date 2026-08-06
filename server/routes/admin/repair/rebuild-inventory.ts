@@ -79,24 +79,29 @@ export function registerAdminRebuildInventoryRoutes(app: Express) {
           await db
             .update(stockTransferVouchers)
             .set({ inventoryApplied: false })
-            .where(inArray(stockTransferVouchers.id, staleOptionalTrue.map((f) => f.stId)));
+            .where(
+              inArray(
+                stockTransferVouchers.id,
+                staleOptionalTrue.map((f) => f.stId)
+              )
+            );
         }
         if (staleNonOptionalFalse.length > 0) {
           await db
             .update(stockTransferVouchers)
             .set({ inventoryApplied: true })
-            .where(inArray(stockTransferVouchers.id, staleNonOptionalFalse.map((f) => f.stId)));
+            .where(
+              inArray(
+                stockTransferVouchers.id,
+                staleNonOptionalFalse.map((f) => f.stId)
+              )
+            );
         }
       }
 
       const expectedInv = new Map<string, { quantity: Decimal; totalValue: Decimal }>();
 
-      function addToExpected(
-        locationId: number,
-        stockItemId: number,
-        qty: Decimal.Value,
-        value: Decimal.Value
-      ) {
+      function addToExpected(locationId: number, stockItemId: number, qty: Decimal.Value, value: Decimal.Value) {
         const key = `${locationId}-${stockItemId}`;
         const existing = expectedInv.get(key) || {
           quantity: toInventoryDecimal(0),
@@ -152,7 +157,10 @@ export function registerAdminRebuildInventoryRoutes(app: Express) {
         .where(and(eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)));
 
       for (const transfer of activeTransfers) {
-        const items = await db.select().from(stockTransferItems).where(eq(stockTransferItems.transferId, transfer.stId));
+        const items = await db
+          .select()
+          .from(stockTransferItems)
+          .where(eq(stockTransferItems.transferId, transfer.stId));
         for (const item of items) {
           const qty = toInventoryDecimal(item.quantity);
           if (qty.isZero()) continue;
@@ -182,7 +190,8 @@ export function registerAdminRebuildInventoryRoutes(app: Express) {
           let qty = toInventoryDecimal(item.quantity);
           if (adj.adjustmentType === "Consumption") qty = qty.abs().negated();
           else if (adj.adjustmentType === "Production") qty = qty.abs();
-          if (!qty.isZero()) addToExpected(adj.locationId, item.stockItemId, qty, multiplyInventoryValues(qty, item.rate));
+          if (!qty.isZero())
+            addToExpected(adj.locationId, item.stockItemId, qty, multiplyInventoryValues(qty, item.rate));
         }
       }
 
@@ -281,7 +290,9 @@ export function registerAdminRebuildInventoryRoutes(app: Express) {
             stockItemId,
             currentQty: current.quantity,
             expectedQty: toInventoryDecimal(inventoryQuantity(expected.quantity)),
-            difference: toInventoryDecimal(inventoryQuantity(subtractInventoryValues(expected.quantity, current.quantity))),
+            difference: toInventoryDecimal(
+              inventoryQuantity(subtractInventoryValues(expected.quantity, current.quantity))
+            ),
             currentValue: current.totalValue,
             expectedValue: toInventoryDecimal(inventoryMoney(expected.totalValue)),
           });

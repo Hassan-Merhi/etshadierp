@@ -111,7 +111,9 @@ export function registerCreditNoteRoutes(app: Express) {
           return res.status(400).json({ message: `Invalid stockItemId: ${item.stockItemId}` });
         }
         if (!item.locationId || isNaN(Number(item.locationId))) {
-          return res.status(400).json({ message: `Invalid locationId for item ${item.stockItemId}: ${item.locationId}` });
+          return res
+            .status(400)
+            .json({ message: `Invalid locationId for item ${item.stockItemId}: ${item.locationId}` });
         }
         const qty = toInventoryDecimal(item.quantity);
         if (!qty.isFinite() || !qty.isPositive()) {
@@ -167,7 +169,13 @@ export function registerCreditNoteRoutes(app: Express) {
         }
 
         for (const item of items) {
-          const { stockItemId, locationId, quantity, refundRate: itemRefundRate, inventoryCost: itemInventoryCost } = item;
+          const {
+            stockItemId,
+            locationId,
+            quantity,
+            refundRate: itemRefundRate,
+            inventoryCost: itemInventoryCost,
+          } = item;
           const qty = toInventoryDecimal(quantity);
           const refundRateVal = toInventoryDecimal(itemRefundRate);
           const inventoryCostVal = toInventoryDecimal(itemInventoryCost);
@@ -220,12 +228,22 @@ export function registerCreditNoteRoutes(app: Express) {
         if (variance.abs().greaterThan("0.01")) {
           const salesReturnsAccountId = await getOrCreateSalesReturnsAccount(companyId, tx);
           if (salesReturnsAccountId) {
-            const debit = noteType === "Credit Note"
-              ? (variance.isPositive() ? variance : toInventoryDecimal(0))
-              : (variance.isNegative() ? variance.abs() : toInventoryDecimal(0));
-            const credit = noteType === "Credit Note"
-              ? (variance.isNegative() ? variance.abs() : toInventoryDecimal(0))
-              : (variance.isPositive() ? variance : toInventoryDecimal(0));
+            const debit =
+              noteType === "Credit Note"
+                ? variance.isPositive()
+                  ? variance
+                  : toInventoryDecimal(0)
+                : variance.isNegative()
+                  ? variance.abs()
+                  : toInventoryDecimal(0);
+            const credit =
+              noteType === "Credit Note"
+                ? variance.isNegative()
+                  ? variance.abs()
+                  : toInventoryDecimal(0)
+                : variance.isPositive()
+                  ? variance
+                  : toInventoryDecimal(0);
             await tx.insert(voucherEntries).values({
               voucherId: createdVoucher.id,
               ledgerAccountId: salesReturnsAccountId,
@@ -417,7 +435,9 @@ export function registerCreditNoteRoutes(app: Express) {
             return res.status(400).json({ message: `Invalid stockItemId: ${item.stockItemId}` });
           }
           if (!item.locationId || isNaN(Number(item.locationId))) {
-            return res.status(400).json({ message: `Invalid locationId for item ${item.stockItemId}: ${item.locationId}` });
+            return res
+              .status(400)
+              .json({ message: `Invalid locationId for item ${item.stockItemId}: ${item.locationId}` });
           }
           const qty = toInventoryDecimal(item.quantity);
           if (!qty.isFinite() || !qty.isPositive()) {
@@ -482,7 +502,13 @@ export function registerCreditNoteRoutes(app: Express) {
         }
 
         for (const item of items) {
-          const { stockItemId, locationId, quantity, refundRate: itemRefundRate, inventoryCost: itemInventoryCost } = item;
+          const {
+            stockItemId,
+            locationId,
+            quantity,
+            refundRate: itemRefundRate,
+            inventoryCost: itemInventoryCost,
+          } = item;
           const qty = toInventoryDecimal(quantity);
           const refundRateVal = toInventoryDecimal(itemRefundRate);
           const inventoryCostVal = toInventoryDecimal(itemInventoryCost);
@@ -537,12 +563,22 @@ export function registerCreditNoteRoutes(app: Express) {
         if (variance.abs().greaterThan("0.01")) {
           const salesReturnsAccountId = await getOrCreateSalesReturnsAccount(companyId, tx);
           if (salesReturnsAccountId) {
-            const debit = noteType === "Credit Note"
-              ? (variance.isPositive() ? variance : toInventoryDecimal(0))
-              : (variance.isNegative() ? variance.abs() : toInventoryDecimal(0));
-            const credit = noteType === "Credit Note"
-              ? (variance.isNegative() ? variance.abs() : toInventoryDecimal(0))
-              : (variance.isPositive() ? variance : toInventoryDecimal(0));
+            const debit =
+              noteType === "Credit Note"
+                ? variance.isPositive()
+                  ? variance
+                  : toInventoryDecimal(0)
+                : variance.isNegative()
+                  ? variance.abs()
+                  : toInventoryDecimal(0);
+            const credit =
+              noteType === "Credit Note"
+                ? variance.isNegative()
+                  ? variance.abs()
+                  : toInventoryDecimal(0)
+                : variance.isPositive()
+                  ? variance
+                  : toInventoryDecimal(0);
             await tx.insert(voucherEntries).values({
               voucherId,
               ledgerAccountId: salesReturnsAccountId,
@@ -558,8 +594,10 @@ export function registerCreditNoteRoutes(app: Express) {
 
       try {
         const changes: Record<string, any> = {};
-        if (voucherDate && voucher.voucherDate !== voucherDate) changes.date = { old: voucher.voucherDate, new: voucherDate };
-        if (cashAccountId !== undefined) changes.cashAccount = { old: oldItems[0]?.voucherId ?? null, new: cashAccountId };
+        if (voucherDate && voucher.voucherDate !== voucherDate)
+          changes.date = { old: voucher.voucherDate, new: voucherDate };
+        if (cashAccountId !== undefined)
+          changes.cashAccount = { old: oldItems[0]?.voucherId ?? null, new: cashAccountId };
         const resolveName = async (id: number) => (await storage.getStockItemById(id))?.name ?? `Item #${id}`;
         const itemDiff = items?.length
           ? await buildItemLevelChanges(

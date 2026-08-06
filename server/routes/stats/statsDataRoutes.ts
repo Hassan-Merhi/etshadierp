@@ -16,13 +16,15 @@ import { eq, and, sql, isNull } from "drizzle-orm";
 
 import { getMonthlyData, getStockSummary, getExpenseBreakdown } from "../../services/stats/dashboardStatsService";
 
-function enhanceSalesReportItem<T extends {
-  configuredSellingPrice: string | null;
-  actualSellingPrice: string;
-  totalSales: string;
-  costProfit: string;
-  quantity: string;
-}>(item: T) {
+function enhanceSalesReportItem<
+  T extends {
+    configuredSellingPrice: string | null;
+    actualSellingPrice: string;
+    totalSales: string;
+    costProfit: string;
+    quantity: string;
+  },
+>(item: T) {
   const locationPrice = toInventoryDecimal(item.configuredSellingPrice);
   const actualPrice = toInventoryDecimal(item.actualSellingPrice);
   const configuredPrice = locationPrice.isPositive() ? locationPrice : actualPrice;

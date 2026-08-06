@@ -7,9 +7,7 @@ import type { resolveDatabaseSsl as ResolveDatabaseSsl } from "./databaseSsl.mjs
 
 // The module keeps a one-time "verification disabled" warning flag in module
 // scope, so each test re-imports it fresh to get a clean flag and a clean env.
-async function loadResolver(
-  env: Record<string, string | undefined>,
-): Promise<typeof ResolveDatabaseSsl> {
+async function loadResolver(env: Record<string, string | undefined>): Promise<typeof ResolveDatabaseSsl> {
   vi.resetModules();
   for (const key of ["PGHOST", "PGSSLMODE", "PGSSLROOTCERT", "PGSSL_REJECT_UNAUTHORIZED"]) {
     delete process.env[key];

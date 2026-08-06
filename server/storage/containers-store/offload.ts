@@ -56,10 +56,7 @@ export async function offloadContainer(
   const expectedChargesApplied = multiplyInventoryValues(additionalCostPerBale, totalBales);
   const roundingDifference = subtractInventoryValues(totalCharges, expectedChargesApplied).toDecimalPlaces(2);
 
-  const itemsMap = new Map<
-    number,
-    { stockItemId: number; totalQuantity: Decimal; weightedRateSum: Decimal }
-  >();
+  const itemsMap = new Map<number, { stockItemId: number; totalQuantity: Decimal; weightedRateSum: Decimal }>();
   for (const item of allLineItems) {
     const stockItemId = item.stockItemId;
     if (!stockItemId || stockItemId === 0) {
@@ -201,7 +198,9 @@ export async function offloadContainer(
       let [parentAccount] = await tx
         .select()
         .from(schema.ledgerAccounts)
-        .where(and(eq(schema.ledgerAccounts.companyId, location.companyId), eq(schema.ledgerAccounts.code, "IMPORT_CHARGES")))
+        .where(
+          and(eq(schema.ledgerAccounts.companyId, location.companyId), eq(schema.ledgerAccounts.code, "IMPORT_CHARGES"))
+        )
         .limit(1);
       if (!parentAccount) {
         [parentAccount] = await tx
@@ -338,7 +337,11 @@ export async function offloadContainer(
     }
 
     if (toInventoryDecimal(transportFees).isPositive()) {
-      const transportExpenseAccountId = await findOrCreateExpenseAccount("TRANSPORT", "Transport Charges", importChargesParentId);
+      const transportExpenseAccountId = await findOrCreateExpenseAccount(
+        "TRANSPORT",
+        "Transport Charges",
+        importChargesParentId
+      );
       const expenseTypes = ["Expense", "Direct Expense", "Indirect Expense"];
       const getTransportPayableAccount = async () => {
         let accounts = await tx

@@ -41,13 +41,7 @@ export async function lockAndDeductInventoryForSaleItem(
     );
   }
 
-  await adjustInventory(
-    tx,
-    locationId,
-    item.stockItemId,
-    requestedQuantity.negated().toNumber(),
-    companyId
-  );
+  await adjustInventory(tx, locationId, item.stockItemId, requestedQuantity.negated().toNumber(), companyId);
 
   const costPrice = toInventoryDecimal(lockedRow?.average_rate ?? currentRate);
   return {

@@ -32,8 +32,7 @@ export const FACTORY_BILINGUAL_COLUMNS = Object.freeze([
   ["bale_recode_items", "product_name_ar", "TEXT", false],
 ]);
 
-export const FACTORY_BILINGUAL_ARTICLE_INDEX =
-  "factory_bale_products_company_article_code_normalized_idx";
+export const FACTORY_BILINGUAL_ARTICLE_INDEX = "factory_bale_products_company_article_code_normalized_idx";
 
 function quoteIdentifier(value) {
   return `"${String(value).replaceAll('"', '""')}"`;

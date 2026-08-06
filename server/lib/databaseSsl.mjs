@@ -34,8 +34,7 @@ let warned = false;
  */
 export function isLocalReplitDatabase(connectionString = "") {
   return (
-    process.env.PGHOST === "helium" ||
-    (typeof connectionString === "string" && connectionString.includes("@helium:"))
+    process.env.PGHOST === "helium" || (typeof connectionString === "string" && connectionString.includes("@helium:"))
   );
 }
 
@@ -81,7 +80,7 @@ export function resolveDatabaseSsl(connectionString = "") {
         "DISABLED (rejectUnauthorized: false). This accepts any server certificate " +
         "and is vulnerable to man-in-the-middle interception. Set PGSSLROOTCERT to " +
         "your deployment's CA bundle to verify the certificate chain, or " +
-        "PGSSL_REJECT_UNAUTHORIZED=true if the platform already provides a trusted chain.",
+        "PGSSL_REJECT_UNAUTHORIZED=true if the platform already provides a trusted chain."
     );
   }
 

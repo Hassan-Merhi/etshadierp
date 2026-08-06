@@ -5,14 +5,8 @@ import * as schema from "@shared/schema";
 import { logger } from "./lib/logger";
 import { readDatabaseRuntimeConfig } from "./lib/databaseConfig";
 import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
-import {
-  logDatabasePoolSnapshot,
-  logSlowDatabaseQuery,
-} from "./lib/databaseTelemetry";
-import {
-  isRequestPerformanceContextActive,
-  recordDatabaseQuery,
-} from "./lib/requestPerformanceContext";
+import { logDatabasePoolSnapshot, logSlowDatabaseQuery } from "./lib/databaseTelemetry";
+import { isRequestPerformanceContextActive, recordDatabaseQuery } from "./lib/requestPerformanceContext";
 
 let connectionString: string;
 let databaseSource: "DATABASE_URL" | "PG_ENV";

@@ -2,7 +2,12 @@ import { and, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
 
 import { propertyContracts, propertyMonthlyLedger, propertyPayments } from "@shared/schema";
 import { db } from "../../db";
-import { divideInventoryValues, inventoryMoney, subtractInventoryValues, toInventoryDecimal } from "../../lib/inventoryMath";
+import {
+  divideInventoryValues,
+  inventoryMoney,
+  subtractInventoryValues,
+  toInventoryDecimal,
+} from "../../lib/inventoryMath";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 

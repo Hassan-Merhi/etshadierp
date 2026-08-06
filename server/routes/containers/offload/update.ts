@@ -171,10 +171,7 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
       Promise.resolve().then(async () => {
         try {
           const companyId = req.session.currentCompanyId!;
-          const delta = subtractInventoryValues(
-            newAdditionalCostPerBale,
-            currentOffload.additionalCostPerBale
-          );
+          const delta = subtractInventoryValues(newAdditionalCostPerBale, currentOffload.additionalCostPerBale);
 
           const offloadItems = await db
             .select({ stockItemId: containerOffloadItems.stockItemId })

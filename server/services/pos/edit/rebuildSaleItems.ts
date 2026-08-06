@@ -70,7 +70,10 @@ export async function rebuildSaleItems(
       .select()
       .from(stockItemLocationPrices)
       .where(
-        and(eq(stockItemLocationPrices.stockItemId, stockItemId), eq(stockItemLocationPrices.locationId, targetLocationId))
+        and(
+          eq(stockItemLocationPrices.stockItemId, stockItemId),
+          eq(stockItemLocationPrices.locationId, targetLocationId)
+        )
       )
       .limit(1);
     const configuredPrice = toInventoryDecimal(editLocPrice?.sellingPrice);

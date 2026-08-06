@@ -46,9 +46,7 @@ async function ensureCriticalSecuritySchema() {
     await client.query("SET LOCAL lock_timeout = '15s'");
     await client.query("SET LOCAL statement_timeout = '60s'");
 
-    const tableLookup = await client.query(
-      `SELECT to_regclass('public.user_security_permissions') AS table_name`
-    );
+    const tableLookup = await client.query(`SELECT to_regclass('public.user_security_permissions') AS table_name`);
 
     if (!tableLookup.rows[0]?.table_name) {
       await client.query(`
@@ -83,9 +81,7 @@ async function ensureCriticalSecuritySchema() {
 
       for (const [columnName, definition] of requiredColumns) {
         if (existingColumns.has(columnName)) continue;
-        await client.query(
-          `ALTER TABLE user_security_permissions ADD COLUMN ${columnName} ${definition}`
-        );
+        await client.query(`ALTER TABLE user_security_permissions ADD COLUMN ${columnName} ${definition}`);
         columnsAdded.push(columnName);
       }
     }

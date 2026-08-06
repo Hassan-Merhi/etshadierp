@@ -23,14 +23,7 @@ import { generateInvoicePdf } from "../helpers/generateInvoicePdf";
 import { generateStockPdf } from "../helpers/generateStockPdf";
 import { getErpExportVisibility } from "../helpers/exportVisibility";
 import { sendWhatsAppFileByUploadPos, sendWhatsAppFileToChatIdPos } from "../services/whatsappService";
-import {
-  vouchers,
-  voucherEntries,
-  salesItems,
-  companies,
-  inventory,
-  stockItemLocationPrices,
-} from "@shared/schema";
+import { vouchers, voucherEntries, salesItems, companies, inventory, stockItemLocationPrices } from "@shared/schema";
 
 export function registerPosImportRoutes(app: Express) {
   app.post("/api/pos-import/parse", requireAuth, upload.single("file"), async (req, res) => {
@@ -332,9 +325,7 @@ export function registerPosImportRoutes(app: Express) {
                 hour: "2-digit",
                 minute: "2-digit",
               });
-              const stockName = `${locationName} STK ${companyName} ${dateString}`
-                .replace(/[^\w\s.()\-]/g, "_")
-                .trim();
+              const stockName = `${locationName} STK ${companyName} ${dateString}`.replace(/[^\w\s.()\-]/g, "_").trim();
               const stockResult = await sendWhatsAppFileToChatIdPos(
                 chatId,
                 buffer,

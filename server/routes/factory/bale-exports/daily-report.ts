@@ -7,7 +7,12 @@
 import type { Express } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
-import { addInventoryValues, inventoryQuantity, inventoryUnitCost, toInventoryDecimal } from "../../../lib/inventoryMath";
+import {
+  addInventoryValues,
+  inventoryQuantity,
+  inventoryUnitCost,
+  toInventoryDecimal,
+} from "../../../lib/inventoryMath";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { getUserHideAllCosts } from "../_helpers";
@@ -161,7 +166,10 @@ export function registerFactoryDailyReportRoutes(app: Express) {
             doc.moveDown(0.4);
           } catch {}
         }
-        doc.fontSize(16).font("Helvetica-Bold").text(allTime ? "Raw Production Report — All Time" : "Raw Production Report", { align: "center" });
+        doc
+          .fontSize(16)
+          .font("Helvetica-Bold")
+          .text(allTime ? "Raw Production Report — All Time" : "Raw Production Report", { align: "center" });
         if (!allTime) doc.fontSize(11).font("Helvetica").text(`Date: ${dateParam}`, { align: "center" });
         doc.moveDown();
 
@@ -169,7 +177,9 @@ export function registerFactoryDailyReportRoutes(app: Express) {
         const columnWidth = [75, 105, 145, 85, 70, 70, 120];
         const headers = ["Date", "Batch Code", "Batch Name", "Operator", "KG Used", "Cost/KG", "Notes"];
         doc.fontSize(9).font("Helvetica-Bold");
-        headers.forEach((header, index) => doc.text(header, columnX[index], doc.y, { continued: index < headers.length - 1, width: columnWidth[index] }));
+        headers.forEach((header, index) =>
+          doc.text(header, columnX[index], doc.y, { continued: index < headers.length - 1, width: columnWidth[index] })
+        );
         doc.moveDown(0.3);
         doc.moveTo(40, doc.y).lineTo(752, doc.y).stroke();
         doc.moveDown(0.3);
@@ -186,7 +196,9 @@ export function registerFactoryDailyReportRoutes(app: Express) {
             `$${inventoryUnitCost(usage.costPerKg)}`,
             usage.notes || "—",
           ];
-          values.forEach((value, index) => doc.text(String(value), columnX[index], y, { width: columnWidth[index], lineBreak: false }));
+          values.forEach((value, index) =>
+            doc.text(String(value), columnX[index], y, { width: columnWidth[index], lineBreak: false })
+          );
           doc.moveDown(1);
           if (doc.y > doc.page.height - 80) doc.addPage({ layout: "landscape" });
         }
@@ -194,7 +206,10 @@ export function registerFactoryDailyReportRoutes(app: Express) {
         doc.moveDown(0.5);
         doc.moveTo(40, doc.y).lineTo(752, doc.y).stroke();
         doc.moveDown(0.3);
-        doc.font("Helvetica-Bold").fontSize(10).text(`Total KG Consumed: ${inventoryQuantity(totalKgUsed)} kg`, { align: "right" });
+        doc
+          .font("Helvetica-Bold")
+          .fontSize(10)
+          .text(`Total KG Consumed: ${inventoryQuantity(totalKgUsed)} kg`, { align: "right" });
         doc.end();
         return;
       }

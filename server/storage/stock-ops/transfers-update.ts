@@ -223,7 +223,10 @@ export async function updateStockAdjustment(
       .where(eq(schema.stockAdjustmentVouchers.id, id));
     if (!existingAdjustment) throw new Error(`Stock adjustment ${id} not found`);
 
-    const [voucher] = await tx.select().from(schema.vouchers).where(eq(schema.vouchers.id, existingAdjustment.voucherId));
+    const [voucher] = await tx
+      .select()
+      .from(schema.vouchers)
+      .where(eq(schema.vouchers.id, existingAdjustment.voucherId));
     if (!voucher) throw new Error(`Voucher ${existingAdjustment.voucherId} not found`);
     const isOptional = voucher.optional;
 
@@ -246,7 +249,8 @@ export async function updateStockAdjustment(
         const rate = toInventoryDecimal(oldItem.rate);
         const totalAmount = multiplyInventoryValues(absoluteQuantity, rate);
         const oldAdjustmentType = existingAdjustment.adjustmentType;
-        const wasProduction = oldAdjustmentType === "Production" || (oldAdjustmentType === "Mixed" && quantity.isPositive());
+        const wasProduction =
+          oldAdjustmentType === "Production" || (oldAdjustmentType === "Mixed" && quantity.isPositive());
 
         const currentInventoryRows = await (tx as any).execute(
           sql`SELECT * FROM inventory WHERE location_id = ${existingAdjustment.locationId} AND stock_item_id = ${oldItem.stockItemId} FOR UPDATE`

@@ -210,9 +210,7 @@ export function registerStockItemMergeRoutes(app: Express) {
         .from(inventory)
         .where(and(eq(inventory.stockItemId, duplicateId), eq(inventory.companyId, companyId)));
 
-      const totalValueBefore = addInventoryValues(
-        ...[...keptInvBefore, ...dupInvBefore].map((row) => row.totalValue)
-      );
+      const totalValueBefore = addInventoryValues(...[...keptInvBefore, ...dupInvBefore].map((row) => row.totalValue));
 
       const snapshotBefore: Record<string, unknown> = {};
       for (const r of [...keptInvBefore, ...dupInvBefore]) {

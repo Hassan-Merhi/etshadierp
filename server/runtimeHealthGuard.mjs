@@ -13,15 +13,17 @@ import {
 const hasDatabaseConfig = deploymentRuntimeConfig.databaseSource !== "missing-development-database";
 const startedAt = Date.now();
 const configuredSchemaCacheMs = Number.parseInt(process.env.READINESS_SCHEMA_CACHE_MS || "30000", 10);
-const schemaCacheTtlMs = Number.isFinite(configuredSchemaCacheMs)
-  ? Math.max(5_000, configuredSchemaCacheMs)
-  : 30_000;
+const schemaCacheTtlMs = Number.isFinite(configuredSchemaCacheMs) ? Math.max(5_000, configuredSchemaCacheMs) : 30_000;
 let listening = false;
 let shuttingDown = false;
 let schemaCache = null;
 
-process.once("SIGTERM", () => { shuttingDown = true; });
-process.once("SIGINT", () => { shuttingDown = true; });
+process.once("SIGTERM", () => {
+  shuttingDown = true;
+});
+process.once("SIGINT", () => {
+  shuttingDown = true;
+});
 
 async function probeCriticalSchema(client) {
   const now = Date.now();
@@ -35,20 +37,20 @@ async function probeCriticalSchema(client) {
       `SELECT table_name
        FROM information_schema.tables
        WHERE table_schema = 'public' AND table_name = ANY($1::text[])`,
-      [criticalTables],
+      [criticalTables]
     ),
     client.query(
       `SELECT table_name AS "tableName", column_name AS "columnName"
        FROM information_schema.columns
        WHERE table_schema = 'public'
          AND (table_name || '.' || column_name) = ANY($1::text[])`,
-      [qualifiedColumns],
+      [qualifiedColumns]
     ),
     client.query(
       `SELECT indexname
        FROM pg_indexes
        WHERE schemaname = 'public' AND indexname = ANY($1::text[])`,
-      [criticalIndexes],
+      [criticalIndexes]
     ),
   ]);
 
@@ -95,8 +97,12 @@ function sendJson(res, statusCode, body) {
 
 const originalListen = Server.prototype.listen;
 Server.prototype.listen = function healthAwareListen(...args) {
-  this.once("listening", () => { listening = true; });
-  this.once("close", () => { listening = false; });
+  this.once("listening", () => {
+    listening = true;
+  });
+  this.once("close", () => {
+    listening = false;
+  });
   return originalListen.apply(this, args);
 };
 
@@ -105,7 +111,9 @@ Server.prototype.emit = function healthAwareEmit(event, ...args) {
   if (event !== "request") return originalEmit.call(this, event, ...args);
   const [req, res] = args;
   let pathname = "/";
-  try { pathname = new URL(req.url || "/", "http://localhost").pathname; } catch {}
+  try {
+    pathname = new URL(req.url || "/", "http://localhost").pathname;
+  } catch {}
 
   if (pathname === "/api/health/live") {
     sendJson(res, 200, {

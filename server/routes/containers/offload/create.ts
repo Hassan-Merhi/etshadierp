@@ -108,10 +108,7 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
               }
 
               const legacyAdditionalCost = toInventoryDecimal(existingOffload.additionalCostPerBale);
-              const legacyItemsMap = new Map<
-                number,
-                { totalQuantity: Decimal; weightedRateSum: Decimal }
-              >();
+              const legacyItemsMap = new Map<number, { totalQuantity: Decimal; weightedRateSum: Decimal }>();
 
               for (const item of allLineItems) {
                 const stockItemId = item.stockItemId;
@@ -218,8 +215,7 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
       const spCompanyRow = await db.execute(
         sql`SELECT company_type FROM companies WHERE id = ${container.companyId} LIMIT 1`
       );
-      const spCompanyType =
-        (spCompanyRow as any).rows?.[0]?.company_type ?? (spCompanyRow as any)[0]?.company_type;
+      const spCompanyType = (spCompanyRow as any).rows?.[0]?.company_type ?? (spCompanyRow as any)[0]?.company_type;
       const isSpCompany = spCompanyType === "supplier_partner";
 
       if (isSpCompany) {
@@ -228,92 +224,99 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
         const totalAgentAmount = addInventoryValues(...validAgentLines.map((line) => line.amountUsd));
         const totalOtw = toInventoryDecimal(container.grandTotal);
 
-        const [otwAccount, otwClearingAccount, spStockAccount, spCostClearingAccount, hadiSpInterco, spHadiIcAccount, spPrepaidExpenseAccount] =
-          await Promise.all([
-            db
-              .select()
-              .from(ledgerAccounts)
-              .where(
-                and(
-                  eq(ledgerAccounts.companyId, container.companyId),
-                  eq(ledgerAccounts.subType, "sp_goods_otw"),
-                  isNull(ledgerAccounts.deletedAt)
-                )
+        const [
+          otwAccount,
+          otwClearingAccount,
+          spStockAccount,
+          spCostClearingAccount,
+          hadiSpInterco,
+          spHadiIcAccount,
+          spPrepaidExpenseAccount,
+        ] = await Promise.all([
+          db
+            .select()
+            .from(ledgerAccounts)
+            .where(
+              and(
+                eq(ledgerAccounts.companyId, container.companyId),
+                eq(ledgerAccounts.subType, "sp_goods_otw"),
+                isNull(ledgerAccounts.deletedAt)
               )
-              .then((rows) => rows[0]),
-            db
-              .select()
-              .from(ledgerAccounts)
-              .where(
-                and(
-                  eq(ledgerAccounts.companyId, container.companyId),
-                  eq(ledgerAccounts.subType, "sp_otw_clearing"),
-                  isNull(ledgerAccounts.deletedAt)
-                )
+            )
+            .then((rows) => rows[0]),
+          db
+            .select()
+            .from(ledgerAccounts)
+            .where(
+              and(
+                eq(ledgerAccounts.companyId, container.companyId),
+                eq(ledgerAccounts.subType, "sp_otw_clearing"),
+                isNull(ledgerAccounts.deletedAt)
               )
-              .then((rows) => rows[0]),
-            db
-              .select()
-              .from(ledgerAccounts)
-              .where(
-                and(
-                  eq(ledgerAccounts.companyId, container.companyId),
-                  eq(ledgerAccounts.subType, "sp_stock"),
-                  isNull(ledgerAccounts.deletedAt)
-                )
+            )
+            .then((rows) => rows[0]),
+          db
+            .select()
+            .from(ledgerAccounts)
+            .where(
+              and(
+                eq(ledgerAccounts.companyId, container.companyId),
+                eq(ledgerAccounts.subType, "sp_stock"),
+                isNull(ledgerAccounts.deletedAt)
               )
-              .then((rows) => rows[0]),
-            db
-              .select()
-              .from(ledgerAccounts)
-              .where(
-                and(
-                  eq(ledgerAccounts.companyId, container.companyId),
-                  eq(ledgerAccounts.subType, "sp_cost_clearing"),
-                  isNull(ledgerAccounts.deletedAt)
-                )
+            )
+            .then((rows) => rows[0]),
+          db
+            .select()
+            .from(ledgerAccounts)
+            .where(
+              and(
+                eq(ledgerAccounts.companyId, container.companyId),
+                eq(ledgerAccounts.subType, "sp_cost_clearing"),
+                isNull(ledgerAccounts.deletedAt)
               )
-              .then((rows) => rows[0]),
-            validAgentLines.length > 0
-              ? db
-                  .select()
-                  .from(ledgerAccounts)
-                  .where(
-                    and(
-                      eq(ledgerAccounts.companyId, 1),
-                      eq(ledgerAccounts.subType, "hadi_sp_intercompany"),
-                      isNull(ledgerAccounts.deletedAt)
-                    )
+            )
+            .then((rows) => rows[0]),
+          validAgentLines.length > 0
+            ? db
+                .select()
+                .from(ledgerAccounts)
+                .where(
+                  and(
+                    eq(ledgerAccounts.companyId, 1),
+                    eq(ledgerAccounts.subType, "hadi_sp_intercompany"),
+                    isNull(ledgerAccounts.deletedAt)
                   )
-                  .then((rows) => rows[0])
-              : Promise.resolve(undefined),
-            validAgentLines.length > 0
-              ? db
-                  .select()
-                  .from(ledgerAccounts)
-                  .where(
-                    and(
-                      eq(ledgerAccounts.companyId, container.companyId),
-                      eq(ledgerAccounts.subType, "sp_hadi_intercompany"),
-                      isNull(ledgerAccounts.deletedAt)
-                    )
+                )
+                .then((rows) => rows[0])
+            : Promise.resolve(undefined),
+          validAgentLines.length > 0
+            ? db
+                .select()
+                .from(ledgerAccounts)
+                .where(
+                  and(
+                    eq(ledgerAccounts.companyId, container.companyId),
+                    eq(ledgerAccounts.subType, "sp_hadi_intercompany"),
+                    isNull(ledgerAccounts.deletedAt)
                   )
-                  .then((rows) => rows[0])
-              : Promise.resolve(undefined),
-            validAgentLines.length > 0
-              ? db
-                  .select()
-                  .from(ledgerAccounts)
-                  .where(
-                    and(
-                      eq(ledgerAccounts.companyId, container.companyId),
-                      eq(ledgerAccounts.subType, "sp_prepaid_expenses"),
-                      isNull(ledgerAccounts.deletedAt)
-                    )
+                )
+                .then((rows) => rows[0])
+            : Promise.resolve(undefined),
+          validAgentLines.length > 0
+            ? db
+                .select()
+                .from(ledgerAccounts)
+                .where(
+                  and(
+                    eq(ledgerAccounts.companyId, container.companyId),
+                    eq(ledgerAccounts.subType, "sp_prepaid_expenses"),
+                    isNull(ledgerAccounts.deletedAt)
                   )
-                  .then((rows) => rows[0])
-              : Promise.resolve(undefined),
-          ]);
+                )
+                .then((rows) => rows[0])
+            : Promise.resolve(undefined),
+        ]);
 
         if (!otwAccount || !otwClearingAccount) {
           throw new Error("SP OTW accounts not found. Run SP Setup first.");
@@ -426,12 +429,7 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
             });
           }
 
-          if (
-            validAgentLines.length > 0 &&
-            spHadiIcAccount &&
-            spPrepaidExpenseAccount &&
-            hadiSpInterco
-          ) {
+          if (validAgentLines.length > 0 && spHadiIcAccount && spPrepaidExpenseAccount && hadiSpInterco) {
             const totalAgentAmountString = inventoryMoney(totalAgentAmount);
             const [settlementVoucher] = await tx
               .insert(vouchers)
@@ -519,11 +517,7 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
           const stockItemIds = [...new Set(offloadItems.map((item) => item.stockItemId))];
           if (stockItemIds.length === 0) return;
 
-          const result = await syncSalesItemCostsForStockItems(
-            container.companyId,
-            offload.locationId,
-            stockItemIds
-          );
+          const result = await syncSalesItemCostsForStockItems(container.companyId, offload.locationId, stockItemIds);
           if (result.updatedCount > 0) {
             logger.info("Sales item costs synced after container offload", {
               module: "containers",
