@@ -39,7 +39,10 @@ function currentWatchTarget(): WatchTarget | null {
   };
 }
 
-async function requestPayload(url: string, init?: RequestInit): Promise<{ response: Response; payload: SessionPayload }> {
+async function requestPayload(
+  url: string,
+  init?: RequestInit
+): Promise<{ response: Response; payload: SessionPayload }> {
   const headers = new Headers(init?.headers);
   if (init?.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   const response = await fetch(url, {
