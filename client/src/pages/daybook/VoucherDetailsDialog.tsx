@@ -27,6 +27,9 @@ export function VoucherDetailsDialog({
   isStockTransferVoucher,
   voucherRevisions,
   revisionsLoading,
+  revisionsError,
+  revisionsErrorMessage,
+  retryVoucherRevisions,
   formatAmount,
   formatDisplayDate,
   formatDisplayTime,
@@ -865,13 +868,28 @@ export function VoucherDetailsDialog({
               </div>
             )}
 
-            {isStockTransferVoucher && (revisionsLoading || voucherRevisions.length > 0) && (
-              <div className="space-y-4">
+            {isStockTransferVoucher && (
+              <div className="space-y-4" data-testid="stock-transfer-revision-history">
                 <h3 className="font-semibold text-lg">Revision History</h3>
                 {revisionsLoading ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2" role="status" aria-live="polite">
+                    <p className="text-sm text-muted-foreground">Loading revision history…</p>
                     <Skeleton className="h-16 w-full" />
                     <Skeleton className="h-16 w-full" />
+                  </div>
+                ) : revisionsError ? (
+                  <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 space-y-3">
+                    <p className="text-sm font-medium">Could not load revision history</p>
+                    {revisionsErrorMessage && (
+                      <p className="text-xs text-muted-foreground">{revisionsErrorMessage}</p>
+                    )}
+                    <Button type="button" variant="outline" size="sm" onClick={retryVoucherRevisions}>
+                      Retry
+                    </Button>
+                  </div>
+                ) : voucherRevisions.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-6 text-center">
+                    <p className="text-sm text-muted-foreground">No revisions recorded for this transfer</p>
                   </div>
                 ) : (
                   <div className="space-y-3">

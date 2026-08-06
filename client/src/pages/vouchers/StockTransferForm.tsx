@@ -462,7 +462,9 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
     },
     onSuccess: () => {
       const isEditMode = !!voucherIdToEdit;
-      toast({ title: "Success", description: `Stock transfer ${isEditMode ? "updated" : "created"} successfully` });
+      if (!savingTransferRevisionRef.current) {
+        toast({ title: "Success", description: `Stock transfer ${isEditMode ? "updated" : "created"} successfully` });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
@@ -565,36 +567,57 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
   };
 
   const confirmTransferSaveAsRevision = async () => {
+    const transferId = stockTransferToEdit?.id ?? lastKnownTransferIdRef.current;
+    if (!voucherIdToEdit || !transferId) {
+      toast({ title: "Revision Not Saved", description: "The saved stock transfer could not be identified. Reload the transfer and try again.", variant: "destructive" });
+      return;
+    }
     const revisionItems = computeTransferRevisionItems();
     if (revisionItems.length === 0) {
-      toast({
-        title: "No Changes",
-        description: "No differences found compared to the saved order",
-        variant: "destructive",
-      });
+      toast({ title: "No Changes", description: "No differences found compared to the saved order", variant: "destructive" });
       setTransferRevisionDialogOpen(false);
       return;
     }
     setIsTransferSavingRevision(true);
     savingTransferRevisionRef.current = true;
     try {
+      let submitted = false;
       await stockTransferForm.handleSubmit(async (data) => {
+        submitted = true;
         await onStockTransferSubmit(data);
       })();
-      await modeApiRequest("POST", `/api/stock-transfers/${stockTransferToEdit!.id}/revisions`, {
+      if (!submitted) return;
+      const revisionResponse = await modeApiRequest("POST", `/api/stock-transfers/${transferId}/revisions`, {
         note: transferRevisionNote.trim() || null,
         items: revisionItems,
       });
-      queryClient.invalidateQueries({
-        queryKey: ["/api/stock-transfers", lastKnownTransferIdRef.current, "revisions"],
-      });
+      if (!revisionResponse.ok) {
+        let message = "The transfer was updated, but its revision record could not be saved.";
+        try {
+          const body = await revisionResponse.json();
+          message = body?.message || body?.error || message;
+        } catch {}
+        throw new Error(message);
+      }
+      const transferRevisionPath = `/api/stock-transfers/${transferId}/revisions`;
+      const voucherRevisionPath = `/api/stock-transfers/by-voucher/${voucherIdToEdit}/revisions`;
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ["/api/stock-transfers", transferId, "revisions"] }),
+        queryClient.refetchQueries({ queryKey: [transferRevisionPath] }),
+        queryClient.refetchQueries({ queryKey: [voucherRevisionPath] }),
+      ]);
       setTransferRevisionNote("");
       setTransferRevisionDialogOpen(false);
       setTransferRevisionsExpanded(true);
-      const nextRevNum = transferRevisions.length + 1;
+      const refreshedRevisions = queryClient.getQueryData<any[]>(["/api/stock-transfers", transferId, "revisions"]);
+      const nextRevNum = refreshedRevisions?.length ?? transferRevisions.length + 1;
       toast({ title: "Revision Saved", description: `Rev ${nextRevNum} recorded and transfer updated` });
     } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to save revision", variant: "destructive" });
+      toast({
+        title: "Revision Not Saved",
+        description: error.message || "The transfer was updated, but the revision record failed to save. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       savingTransferRevisionRef.current = false;
       setIsTransferSavingRevision(false);

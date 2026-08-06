@@ -14,6 +14,9 @@ export interface VoucherDetailsDialogProps {
   isStockTransferVoucher: boolean;
   voucherRevisions: any[];
   revisionsLoading: boolean;
+  revisionsError: boolean;
+  revisionsErrorMessage?: string;
+  retryVoucherRevisions: () => void;
   formatAmount: (amt: any) => string;
   formatDisplayDate: (date: any) => string;
   formatDisplayTime: (date: string) => string;
