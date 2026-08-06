@@ -83,48 +83,8 @@ commands:
             echo "PostgreSQL did not become ready."
             exit 1
 
-  format_file:
-    parameters:
-      file:
-        type: string
-    steps:
-      - install_dependencies
-      - run:
-          name: Check << parameters.file >>
-          command: node node_modules/prettier/bin/prettier.cjs --check "<< parameters.file >>"
-
 jobs:
-  format-inventory-math:
-    executor: node22
-    steps:
-      - format_file:
-          file: server/lib/inventoryMath.ts
-
-  format-pos-import:
-    executor: node22
-    steps:
-      - format_file:
-          file: server/routes/posImportRoutes.ts
-
-  format-pos-negative-stock-test:
-    executor: node22
-    steps:
-      - format_file:
-          file: tests/ui/pos-negative-stock-permission.test.ts
-
-  format-god-file-test:
-    executor: node22
-    steps:
-      - format_file:
-          file: tests/god-file-boundaries.test.ts
-
-  format-report-precision-test:
-    executor: node22
-    steps:
-      - format_file:
-          file: server/lib/reportPrecision.test.ts
-
-  static-build:
+  verify-dependencies:
     executor: node22
     steps:
       - install_dependencies
@@ -133,6 +93,11 @@ jobs:
           command: |
             npm run verify:lockfile
             npm run verify:production-dependencies
+
+  verify-formatting:
+    executor: node22
+    steps:
+      - install_dependencies
       - run:
           name: Check formatting for changed source files
           command: |
@@ -148,27 +113,55 @@ jobs:
             printf 'Checking formatting for %s changed source file(s):\n' "${#changed_files[@]}"
             printf ' - %s\n' "${changed_files[@]}"
             node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
+
+  verify-lint:
+    executor: node22
+    steps:
+      - install_dependencies
       - run:
           name: Lint
           command: npm run lint
+
+  verify-typescript:
+    executor: node22
+    steps:
+      - install_dependencies
       - run:
           name: TypeScript
           command: npm run check
+
+  verify-build:
+    executor: node22
+    steps:
+      - install_dependencies
+      - run:
+          name: Production build
+          command: npm run build
+      - store_artifacts:
+          path: dist
+          destination: production-build
+
+  verify-server-bundle:
+    executor: node22
+    steps:
+      - install_dependencies
       - run:
           name: Production build
           command: npm run build
       - run:
           name: Verify server bundle
           command: npm run verify:server-bundle
+
+  verify-safety-contracts:
+    executor: node22
+    steps:
+      - install_dependencies
       - run:
           name: Repository safety contracts
           command: |
             npm run verify:program1-observability
             npm run verify:final-production-readiness
             npm run verify:bandwidth
-      - store_artifacts:
-          path: dist
-          destination: production-build
 
   postgres-regression:
     executor: node22-postgres
@@ -215,13 +208,14 @@ jobs:
 workflows:
   full-erp-verification:
     jobs:
-      - format-inventory-math
-      - format-pos-import
-      - format-pos-negative-stock-test
-      - format-god-file-test
-      - format-report-precision-test
-      - static-build
+      - verify-dependencies
+      - verify-formatting
+      - verify-lint
+      - verify-typescript
+      - verify-build
+      - verify-server-bundle
+      - verify-safety-contracts
       - postgres-regression
       - security-readiness:
           requires:
-            - static-build
+            - verify-build
