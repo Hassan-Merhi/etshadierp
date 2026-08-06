@@ -13,7 +13,6 @@ import {
   inventoryMoney,
   inventoryQuantity,
   inventoryUnitCost,
-  toInventoryDecimal,
 } from "../../../lib/inventoryMath";
 import { db } from "../../../db";
 import { requireAuth, requireNonPOS } from "../../../auth";
