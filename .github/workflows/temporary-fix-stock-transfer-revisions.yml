@@ -40,10 +40,6 @@ jobs:
                   '    setIsTransferSavingRevision(true);\n    savingTransferRevisionRef.current = true;\n    try {\n',
               ),
               (
-                  '      queryClient.invalidateQueries({\n        queryKey: ["/api/stock-transfers", lastKnownTransferIdRef.current, "revisions"],\n      });\n',
-                  '      await queryClient.invalidateQueries({\n        queryKey: ["/api/stock-transfers", lastKnownTransferIdRef.current, "revisions"],\n      });\n',
-              ),
-              (
                   '    } finally {\n      setIsTransferSavingRevision(false);\n    }\n',
                   '    } finally {\n      savingTransferRevisionRef.current = false;\n      setIsTransferSavingRevision(false);\n    }\n',
               ),
