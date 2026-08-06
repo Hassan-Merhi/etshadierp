@@ -1,5 +1,4 @@
-import { Suspense, useEffect } from "react";
-import { lazyRetry as lazy } from "@/lib/lazyRetry";
+import { useEffect } from "react";
 import { useDialogScrollFix } from "@/hooks/use-dialog-scroll-fix";
 import { useMobilePerformanceLifecycle } from "@/hooks/use-mobile-performance-lifecycle";
 import { useLocation, Redirect } from "wouter";
@@ -7,19 +6,13 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { usePresence } from "@/hooks/use-presence";
 import { useScreenFeed } from "@/hooks/use-screen-feed";
 import { useWsInvalidation } from "@/hooks/use-ws-invalidation";
-import { LanguageOnboardingDialog } from "@/components/LanguageOnboardingDialog";
 import type { AuthenticatedUser } from "@/contracts/sessionContracts";
 import { useAppNavigation } from "./useAppNavigation";
 import { useAuthenticatedAppData } from "./useAuthenticatedAppData";
 import { resolveAuthenticatedAppRoute } from "./authenticatedAppRouteGuard";
 import { AppLeaveConfirmDialog } from "./AppLeaveConfirmDialog";
 import { AppLoadingState } from "./AppLoadingState";
-
-const PosShell = lazy(() => import("./PosShell").then((module) => ({ default: module.PosShell })));
-const PropertiesShell = lazy(() => import("./PropertiesShell").then((module) => ({ default: module.PropertiesShell })));
-const FactoryShell = lazy(() => import("./FactoryShell").then((module) => ({ default: module.FactoryShell })));
-const ErpShell = lazy(() => import("./ErpShell").then((module) => ({ default: module.ErpShell })));
-const RemoteSupportIndicator = lazy(() => import("@/components/RemoteSupportIndicator").then((module) => ({ default: module.RemoteSupportIndicator })));
+import { AuthenticatedWorkspace } from "./AuthenticatedWorkspace";
 
 interface AuthenticatedAppProps {
   user: AuthenticatedUser;
@@ -27,12 +20,18 @@ interface AuthenticatedAppProps {
 }
 
 export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) {
-  const { selectedCompany, isLoading: companyLoading, error: companyError, retry: retryCompanyBootstrap } = useCompany();
+  const {
+    selectedCompany,
+    isLoading: companyLoading,
+    error: companyError,
+    retry: retryCompanyBootstrap,
+  } = useCompany();
   useMobilePerformanceLifecycle();
   usePresence(true);
   useScreenFeed();
   useWsInvalidation();
   useDialogScrollFix();
+
   const [currentLocation] = useLocation();
   const { showLeaveConfirm, setShowLeaveConfirm, handleGoBack, handleConfirmLeave } = useAppNavigation();
   const isPOS = user.role === "POS";
@@ -46,20 +45,38 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
   }, [currentLocation]);
 
   const {
-    chatUnread, posImportEnabled, myAccess, myAccessLoading, myAccessError, retryMyAccess,
-    factorySettings, factorySettingsLoading, factorySettingsError, retryFactorySettings,
+    chatUnread,
+    posImportEnabled,
+    myAccess,
+    myAccessLoading,
+    myAccessError,
+    retryMyAccess,
+    factorySettings,
+    factorySettingsLoading,
+    factorySettingsError,
+    retryFactorySettings,
   } = useAuthenticatedAppData({ selectedCompanyId: selectedCompany?.id, userPresent: true, isPOS });
 
   if (companyLoading) return <AppLoadingState />;
-  if (companyError || !selectedCompany) return <AppLoadingState forceRecovery onRecover={() => void retryCompanyBootstrap()} />;
+  if (companyError || !selectedCompany) {
+    return <AppLoadingState forceRecovery onRecover={() => void retryCompanyBootstrap()} />;
+  }
 
-  const usesAccessContract = !isPOS && selectedCompany.companyType !== "properties" && selectedCompany.companyType !== "supplier_partner";
+  const usesAccessContract =
+    !isPOS && selectedCompany.companyType !== "properties" && selectedCompany.companyType !== "supplier_partner";
   if (usesAccessContract && myAccessLoading) return <AppLoadingState />;
-  if (usesAccessContract && (myAccessError || !myAccess)) return <AppLoadingState forceRecovery onRecover={() => void retryMyAccess()} />;
+  if (usesAccessContract && (myAccessError || !myAccess)) {
+    return <AppLoadingState forceRecovery onRecover={() => void retryMyAccess()} />;
+  }
 
-  const isFactoryContext = selectedCompany.companyType === "factory" || selectedCompany.companyType === "factory_v2" || currentLocation.startsWith("/factory/");
+  const isFactoryContext =
+    selectedCompany.companyType === "factory" ||
+    selectedCompany.companyType === "factory_v2" ||
+    currentLocation.startsWith("/factory/");
   if (isFactoryContext && factorySettingsLoading) return <AppLoadingState />;
-  if (isFactoryContext && factorySettingsError) return <AppLoadingState forceRecovery onRecover={() => void retryFactorySettings()} />;
+  if (isFactoryContext && factorySettingsError) {
+    return <AppLoadingState forceRecovery onRecover={() => void retryFactorySettings()} />;
+  }
 
   const routeState = resolveAuthenticatedAppRoute({
     currentLocation,
@@ -70,15 +87,29 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
     myAccessError,
     factorySettings,
   });
+
   if (routeState.decision.kind === "loading") return <AppLoadingState />;
-  if (routeState.decision.kind === "recovery") return <AppLoadingState forceRecovery onRecover={() => void retryMyAccess()} />;
+  if (routeState.decision.kind === "recovery") {
+    return <AppLoadingState forceRecovery onRecover={() => void retryMyAccess()} />;
+  }
   if (routeState.decision.kind === "redirect") return <Redirect replace to={routeState.decision.to} />;
 
-  const leaveConfirmDialog = <AppLeaveConfirmDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm} onConfirm={handleConfirmLeave} />;
-  const appOverlays = <>{user.id === undefined ? null : <LanguageOnboardingDialog userId={user.id} />}<Suspense fallback={null}><RemoteSupportIndicator /></Suspense></>;
+  const leaveConfirmDialog = (
+    <AppLeaveConfirmDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm} onConfirm={handleConfirmLeave} />
+  );
 
-  if (isPOS) return <><Suspense fallback={<AppLoadingState />}><PosShell user={user} posImportEnabled={posImportEnabled} chatUnread={chatUnread} handleGoBack={handleGoBack} handleLogout={handleLogout} leaveConfirmDialog={leaveConfirmDialog} /></Suspense>{appOverlays}</>;
-  if (routeState.isPropertiesCompany && routeState.isPropertiesRoute) return <><Suspense fallback={<AppLoadingState />}><PropertiesShell user={user} currentLocation={currentLocation} handleLogout={handleLogout} leaveConfirmDialog={leaveConfirmDialog} /></Suspense>{appOverlays}</>;
-  if (routeState.isFactoryRoute || routeState.isFactoryCompany) return <><Suspense fallback={<AppLoadingState />}><FactoryShell user={user} myAccess={myAccess} factoryDefaultPage={routeState.factoryDefaultPage} handleLogout={handleLogout} leaveConfirmDialog={leaveConfirmDialog} /></Suspense>{appOverlays}</>;
-  return <><Suspense fallback={<AppLoadingState />}><ErpShell user={user} hasErpAccess={routeState.hasErpAccess} handleLogout={handleLogout} leaveConfirmDialog={leaveConfirmDialog} /></Suspense>{appOverlays}</>;
+  return (
+    <AuthenticatedWorkspace
+      user={user}
+      isPOS={isPOS}
+      currentLocation={currentLocation}
+      routeState={routeState}
+      myAccess={myAccess}
+      posImportEnabled={posImportEnabled}
+      chatUnread={chatUnread}
+      handleGoBack={handleGoBack}
+      handleLogout={handleLogout}
+      leaveConfirmDialog={leaveConfirmDialog}
+    />
+  );
 }
