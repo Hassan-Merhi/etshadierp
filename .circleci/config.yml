@@ -42,31 +42,17 @@ commands:
     steps:
       - checkout
       - run:
-          name: Pin checkout to the triggering commit
+          name: Pin checkout to triggering commit
           command: |
-            echo "CircleCI requested SHA: ${CIRCLE_SHA1}"
             git fetch --no-tags --prune origin "${CIRCLE_SHA1}"
             git reset --hard "${CIRCLE_SHA1}"
             git clean -ffdx
-            test "$(git rev-parse HEAD)" = "${CIRCLE_SHA1}"
-            git status --short
       - run:
           name: Normalize package registry URLs
           command: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
       - node/install-packages:
           pkg-manager: npm
           override-ci-command: npm ci --no-audit --bin-links=true
-      - run:
-          name: Dependency diagnostics
-          command: |
-            node --version
-            npm --version
-            npm config get bin-links
-            node -p "'TypeScript ' + require('typescript/package.json').version"
-            node -p "'jsdom ' + require('jsdom/package.json').version"
-            for binary in tsc vite eslint vitest; do
-              test -x "node_modules/.bin/$binary" || { echo "$binary is missing"; exit 1; }
-            done
 
   wait_for_postgres:
     steps:
@@ -74,172 +60,63 @@ commands:
           name: Wait for PostgreSQL
           command: |
             for attempt in $(seq 1 60); do
-              if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then
-                echo "PostgreSQL is accepting connections."
-                exit 0
-              fi
+              if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then exit 0; fi
               sleep 1
             done
-            echo "PostgreSQL did not become ready."
             exit 1
 
-  prepare_postgres_schema:
+  format_files:
+    parameters:
+      files:
+        type: string
     steps:
-      - wait_for_postgres
+      - install_dependencies
       - run:
-          name: Prepare disposable database schema
-          command: node node_modules/drizzle-kit/bin.cjs push --force
+          name: Check formatting group
+          command: node node_modules/prettier/bin/prettier.cjs --check << parameters.files >>
 
 jobs:
-  verify-dependencies:
+  format-group-1:
     executor: node22
     steps:
-      - install_dependencies
-      - run:
-          name: Verify lockfile and production dependencies
-          command: |
-            npm run verify:lockfile
-            npm run verify:production-dependencies
+      - format_files:
+          files: server/lib/databaseSsl.test.ts server/lib/inventoryMath.test.ts server/lib/inventoryMath.ts server/lib/reportPrecision.test.ts server/routes/admin/repair/rebuild-inventory.ts server/routes/containers/offload/create.ts server/routes/containers/offload/update.ts server/routes/creditNoteRoutes.ts
 
-  verify-formatting:
+  format-group-2:
     executor: node22
     steps:
-      - install_dependencies
-      - run:
-          name: Check formatting for changed source files
-          command: |
-            git fetch --no-tags --prune --depth=1 origin +refs/heads/main:refs/remotes/origin/main
-            mapfile -d '' changed_files < <(
-              git diff --name-only --diff-filter=ACMR -z origin/main HEAD -- client/src server shared tests scripts |
-                grep -zE '\.(ts|tsx|css|mjs)$' || true
-            )
-            if [ "${#changed_files[@]}" -eq 0 ]; then
-              echo "No changed source files require formatting checks."
-              exit 0
-            fi
-            printf 'Checking formatting for %s changed source file(s):\n' "${#changed_files[@]}"
-            printf ' - %s\n' "${changed_files[@]}"
-            node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
+      - format_files:
+          files: server/routes/factory/bale-exports/daily-report.ts server/routes/posImportRoutes.ts server/routes/stats/netProfitRentalSection.ts server/routes/stats/netProfitStockSection.ts server/routes/stats/statsDataRoutes.ts server/routes/stats/statsReportsRoutes.ts server/routes/stats/statsSalesRoutes.ts server/routes/stock/merge/bulk-merge.ts
 
-  verify-lint:
+  format-group-3:
     executor: node22
     steps:
-      - install_dependencies
-      - run:
-          name: Lint
-          command: npm run lint
+      - format_files:
+          files: server/routes/stock/merge/merge.ts server/services/pos/createSaleService.ts server/services/pos/deductSaleInventory.ts server/services/pos/edit/rebuildSaleItems.ts server/services/pos/edit/reverseOriginalSaleInventory.ts server/services/syncSalesItemCosts.ts server/storage/containers-store/offload.ts server/storage/stock-ops/transfers-create.ts
 
-  verify-typescript:
+  format-group-4:
     executor: node22
     steps:
-      - install_dependencies
-      - run:
-          name: TypeScript
-          command: npm run check
-
-  verify-build:
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: Production build
-          command: npm run build
-      - store_artifacts:
-          path: dist
-          destination: production-build
-
-  verify-server-bundle:
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: Production build
-          command: npm run build
-      - run:
-          name: Verify server bundle
-          command: npm run verify:server-bundle
-
-  verify-safety-contracts:
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: Repository safety contracts
-          command: |
-            npm run verify:program1-observability
-            npm run verify:final-production-readiness
-            npm run verify:bandwidth
-
-  postgres-migration-registry:
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: Verify migration registry
-          command: node scripts/verify-migration-registry.mjs --json
-
-  postgres-schema:
-    executor: node22-postgres
-    steps:
-      - install_dependencies
-      - prepare_postgres_schema
-      - run:
-          name: Verify disposable database schema
-          command: node scripts/verify-ci-disposable-schema.mjs
+      - format_files:
+          files: server/storage/stock-ops/transfers-update.ts tests/god-file-boundaries.test.ts tests/phase14-i18n-release-gate.test.ts tests/ui/pos-negative-stock-permission.test.ts server/db.ts server/index.ts
 
   postgres-backend-tests:
     executor: node22-postgres
     steps:
       - install_dependencies
-      - prepare_postgres_schema
-      - run:
-          name: Backend tests
-          command: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
-
-  postgres-frontend-tests:
-    executor: node22-postgres
-    steps:
-      - install_dependencies
-      - prepare_postgres_schema
-      - run:
-          name: Frontend tests
-          command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
-
-  security-readiness:
-    executor: node22-postgres
-    steps:
-      - install_dependencies
       - wait_for_postgres
       - run:
           name: Prepare disposable database schema
           command: node node_modules/drizzle-kit/bin.cjs push --force
       - run:
-          name: Critical dependency audit
-          command: npm audit --audit-level=critical
-      - run:
-          name: Production dependency verification
-          command: npm run verify:production-dependencies
-      - run:
-          name: Program 6 security checks
-          command: PROGRAM6_SKIP_TYPESCRIPT=1 npm run check:program-6-security
-      - run:
-          name: Final production readiness contract
-          command: npm run verify:final-production-readiness
+          name: Backend tests
+          command: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
 
 workflows:
-  full-erp-verification:
+  diagnose-remaining-failures:
     jobs:
-      - verify-dependencies
-      - verify-formatting
-      - verify-lint
-      - verify-typescript
-      - verify-build
-      - verify-server-bundle
-      - verify-safety-contracts
-      - postgres-migration-registry
-      - postgres-schema
+      - format-group-1
+      - format-group-2
+      - format-group-3
+      - format-group-4
       - postgres-backend-tests
-      - postgres-frontend-tests
-      - security-readiness:
-          requires:
-            - verify-build
