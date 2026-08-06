@@ -25,9 +25,20 @@ for (const [name, command, args] of checks) {
 }
 
 if (failures.length > 0) {
-  console.error("\nPhase 4 final responsive regression verification failed:");
+  console.error("\nPhase 11 responsive regression verification failed:");
   for (const failure of failures) console.error(`- ${failure}`);
   process.exit(1);
 }
 
-console.log(JSON.stringify({ phase: 4, status: "complete", checks: checks.length, sqlRequired: false }, null, 2));
+console.log(
+  JSON.stringify(
+    {
+      phase: 11,
+      status: "complete",
+      checks: checks.length,
+      sqlRequired: false,
+    },
+    null,
+    2,
+  ),
+);
