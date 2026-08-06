@@ -54,22 +54,19 @@ export function useAuthenticatedAppData({ selectedCompanyId, userPresent, isPOS 
     setAppTimezone(companySettings?.timezone);
   }, [companySettings?.timezone]);
 
-  const {
-    data: myAccess,
-    isLoading: myAccessLoading,
-    isError: myAccessError,
-  } = useQuery<FactoryAccess>({
+  const myAccessQuery = useQuery<FactoryAccess>({
     queryKey: companyQueryKey("/api/factory/my-access", selectedCompanyId),
     ...accessQueryPolicy,
     enabled: userPresent && !isPOS && !!selectedCompanyId,
     retry: 2,
   });
 
-  const { data: factorySettings } = useQuery<Record<string, any>>({
+  const factorySettingsQuery = useQuery<Record<string, any>>({
     queryKey: companyQueryKey("/api/factory/settings", selectedCompanyId),
     queryFn: async () => {
       const response = await fetch("/api/factory/settings");
-      return response.ok ? response.json() : {};
+      if (!response.ok) throw new Error(String(response.status));
+      return response.json();
     },
     ...stableSettingsQueryPolicy,
     enabled: userPresent && !isPOS && !!selectedCompanyId,
@@ -78,9 +75,13 @@ export function useAuthenticatedAppData({ selectedCompanyId, userPresent, isPOS 
   return {
     chatUnread,
     posImportEnabled: companySettings?.posExcelImportEnabled === true,
-    myAccess,
-    myAccessLoading,
-    myAccessError,
-    factorySettings,
+    myAccess: myAccessQuery.data,
+    myAccessLoading: myAccessQuery.isLoading,
+    myAccessError: myAccessQuery.isError,
+    retryMyAccess: myAccessQuery.refetch,
+    factorySettings: factorySettingsQuery.data,
+    factorySettingsLoading: factorySettingsQuery.isLoading,
+    factorySettingsError: factorySettingsQuery.isError,
+    retryFactorySettings: factorySettingsQuery.refetch,
   };
 }

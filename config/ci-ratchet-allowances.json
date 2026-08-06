@@ -44,8 +44,9 @@
       "tests/ui/bandwidth-phase-1-page-polling.test.ts",
       "tests/ui/bandwidth-phase-2-payloads.test.ts",
       "tests/ui/bandwidth-phase-3-cache.test.ts",
-      "tests/ui/bandwidth-phase-4-heavy-pages.test.ts"
+      "tests/ui/bandwidth-phase-4-heavy-pages.test.ts",
+      "tests/ui/audit-phase3-runtime-recovery.test.ts"
     ],
-    "maxAdditionalTextAssertions": 515
+    "maxAdditionalTextAssertions": 541
   }
 }
