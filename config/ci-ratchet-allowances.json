@@ -46,8 +46,9 @@
       "tests/ui/bandwidth-phase-2-payloads.test.ts",
       "tests/ui/bandwidth-phase-3-cache.test.ts",
       "tests/ui/bandwidth-phase-4-heavy-pages.test.ts",
-      "tests/stock-transfer-revision-lifecycle-policy.test.ts"
+      "tests/stock-transfer-revision-lifecycle-policy.test.ts",
+      "tests/ui/remote-support-fast-viewer.test.ts"
     ],
-    "maxAdditionalTextAssertions": 526
+    "maxAdditionalTextAssertions": 538
   }
 }
