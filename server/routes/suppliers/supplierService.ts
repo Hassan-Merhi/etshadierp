@@ -1,5 +1,5 @@
 import { logAudit } from "../_helpers";
-import { getSupplierBalanceForContext } from "../helpers/supplierBalanceHelpers";
+import { getSupplierBalanceForContext, resolveParentCompanyId } from "../helpers/supplierBalanceHelpers";
 import { SupplierRouteError } from "./supplierErrors";
 import type { SupplierAuditActor } from "./supplierRequestContext";
 import { supplierRepository } from "./supplierRepository";
@@ -56,8 +56,22 @@ function supplierAuditChanges(existing: any, updated: any) {
 }
 
 export const supplierService = {
-  list(companyId: number, search: string) {
-    return supplierRepository.list(companyId, search);
+  async list(companyId: number, search: string) {
+    const suppliers = await supplierRepository.list(companyId, search);
+    if (suppliers.length > 0) return suppliers;
+
+    // A newly created non-parent company can legitimately have no company-owned
+    // supplier rows yet. PO Import still needs access to the configured parent
+    // company's supplier master list so the first container can be imported.
+    // Only fall back when the active company has no suppliers at all; an empty
+    // search result in a populated company must remain empty.
+    const companySuppliers = search ? await supplierRepository.listAll(companyId) : suppliers;
+    if (companySuppliers.length > 0) return suppliers;
+
+    const parentCompanyId = await resolveParentCompanyId();
+    if (parentCompanyId === companyId) return suppliers;
+
+    return supplierRepository.list(parentCompanyId, search);
   },
 
   async stats(companyId: number) {
