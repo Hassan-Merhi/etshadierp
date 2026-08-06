@@ -12,14 +12,8 @@ import {
   startRemoteControlSession,
   stopRemoteControlSession,
 } from "../server/services/remoteControlSessionService";
-import {
-  restoreRemoteSupportBootDefaults,
-  updateRemoteSupportFlags,
-} from "../server/services/remoteSupportRuntime";
-import {
-  resetRemoteSupportRolloutForTests,
-  updateRemoteSupportRollout,
-} from "../server/services/remoteSupportRollout";
+import { restoreRemoteSupportBootDefaults, updateRemoteSupportFlags } from "../server/services/remoteSupportRuntime";
+import { resetRemoteSupportRolloutForTests, updateRemoteSupportRollout } from "../server/services/remoteSupportRollout";
 
 const now = Date.now();
 const companyId = 7;
@@ -129,9 +123,7 @@ describe("remote control session safety", () => {
     });
 
     expect(getActiveRemoteControlSession("22")).toBeNull();
-    expect(stopRemoteControlSession(session.id, "again")?.stopReason).toBe(
-      "target-company-changed"
-    );
+    expect(stopRemoteControlSession(session.id, "again")?.stopReason).toBe("target-company-changed");
   });
 
   it("enforces mouse before keyboard and disables keyboard with mouse", () => {
@@ -140,10 +132,7 @@ describe("remote control session safety", () => {
     expect(setRemoteControlKeyboardCapability(session.id, true)).toBeNull();
     expect(setRemoteControlMouseCapability(session.id, true)?.capabilities.mouse).toBe(true);
     expect(setRemoteControlKeyboardCapability(session.id, true)?.capabilities.keyboard).toBe(true);
-    expect(getActiveRemoteControlSession("22")?.capabilities).toMatchObject({
-      mouse: true,
-      keyboard: true,
-    });
+    expect(getActiveRemoteControlSession("22")?.capabilities).toMatchObject({ mouse: true, keyboard: true });
     expect(setRemoteControlMouseCapability(session.id, false)?.capabilities).toMatchObject({
       mouse: false,
       keyboard: false,
@@ -157,10 +146,7 @@ describe("remote control session safety", () => {
     setRemoteControlKeyboardCapability(session.id, true);
     updateRemoteSupportFlags({ keyboardControl: false }, "test-disable-keyboard");
     cleanupRemoteControlState(now + 1000);
-    expect(getActiveRemoteControlSession("22")?.capabilities).toMatchObject({
-      mouse: true,
-      keyboard: false,
-    });
+    expect(getActiveRemoteControlSession("22")?.capabilities).toMatchObject({ mouse: true, keyboard: false });
   });
 
   it("prevents two different controllers from controlling the same user", () => {
