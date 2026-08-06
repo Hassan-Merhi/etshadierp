@@ -69,10 +69,7 @@ commands:
           name: Run backend test shard << parameters.shard >>
           command: |
             mapfile -t all_tests < <(
-              {
-                find tests -type f -name '*.test.ts' ! -path 'tests/ui/*' ! -path 'tests/api-smoke-sweep.test.ts'
-                find server shared -type f -name '*.test.ts'
-              } | sort
+              find server tests shared -type f -name '*.test.ts' | sort | grep -v '^tests/ui/' | grep -v '^tests/api-smoke-sweep.test.ts$'
             )
             selected=()
             for index in "${!all_tests[@]}"; do
