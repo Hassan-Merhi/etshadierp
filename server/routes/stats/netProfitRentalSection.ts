@@ -2,10 +2,9 @@ import { and, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
 
 import { propertyContracts, propertyMonthlyLedger, propertyPayments } from "@shared/schema";
 import { db } from "../../db";
+import { divideInventoryValues, inventoryMoney, subtractInventoryValues, toInventoryDecimal } from "../../lib/inventoryMath";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-
-const round2 = (n: number) => Math.round(n * 100) / 100;
 
 export interface RentalOutstanding {
   /** We overpaid rent: a prepaid-rent asset. */
@@ -14,23 +13,7 @@ export interface RentalOutstanding {
   rentPayable: number;
 }
 
-/**
- * Rental outstanding for the net-profit report.
- *
- * For every ACTIVE rental contract under this company (any module), outstanding
- * is SUM(expected for past and current months) - SUM(paid). The company is the
- * TENANT paying rent to landlords, so paid > expected means we overpaid and the
- * difference is a prepaid-rent asset; expected > paid means we still owe.
- *
- * Extracted from the /api/stats/net-profit handler. It returns the two figures
- * rather than mutating the caller's accumulators, which is the only change -
- * the queries and the arithmetic are verbatim, and
- * config/report-characterization.json pins the endpoint's output across the move.
- *
- * Errors are swallowed on purpose: if the property tables are missing columns
- * (for example `currency` on a pre-migration deployment) the dashboard should
- * still load with rent figures omitted rather than fail the whole response.
- */
+/** Rental outstanding for the net-profit report. */
 export async function computeRentalOutstanding(
   companyId: number,
   toDate: string | null | undefined,
@@ -45,10 +28,8 @@ export async function computeRentalOutstanding(
       .where(and(eq(propertyContracts.companyId, companyId), eq(propertyContracts.status, "ACTIVE")));
     if (activeContracts.length === 0) return empty;
 
-    const contractIds = activeContracts.map((c) => c.id);
+    const contractIds = activeContracts.map((contract) => contract.id);
     const asOfExpr = toDate ? sql`${toDate}::date` : sql`CURRENT_DATE`;
-
-    // Expected: months on or before the asOf date
     const expectedRows = await db
       .select({
         contractId: propertyMonthlyLedger.contractId,
@@ -66,9 +47,6 @@ export async function computeRentalOutstanding(
       .where(inArray(propertyMonthlyLedger.contractId, contractIds))
       .groupBy(propertyMonthlyLedger.contractId);
 
-    // Paid: only rent-linked payments (ledgerRowId IS NOT NULL) made on or before the asOf date.
-    // Payments with ledgerRowId=null are guarantee-release/refund log entries — they are NOT
-    // rent payments and must not inflate the "paid" total (which would falsely produce prepaid rent).
     const paidConditions: any[] = [
       inArray(propertyPayments.contractId, contractIds),
       isNotNull(propertyPayments.ledgerRowId),
@@ -82,27 +60,27 @@ export async function computeRentalOutstanding(
       .from(propertyPayments)
       .where(and(...paidConditions))
       .groupBy(propertyPayments.contractId);
-    const paidMap = new Map(paidRows.map((r) => [r.contractId, parseFloat(r.paid)]));
+    const paidMap = new Map(paidRows.map((row) => [row.contractId, toInventoryDecimal(row.paid)]));
 
-    let prepaidRent = 0;
-    let rentPayable = 0;
+    let prepaidRent = toInventoryDecimal(0);
+    let rentPayable = toInventoryDecimal(0);
+    const cfaRate = toInventoryDecimal(currentCfaRate);
     for (const row of expectedRows) {
-      const expected = parseFloat(row.expected);
-      const paid = paidMap.get(row.contractId) ?? 0;
-      const net = paid - expected; // positive = overpaid
-      const contract = activeContracts.find((c) => c.id === row.contractId);
-      const isCfa = contract?.currency === "CFA";
-      const usd = isCfa && currentCfaRate > 0 ? net / currentCfaRate : net;
-      if (usd > 0) prepaidRent += usd;
-      else if (usd < 0) rentPayable += -usd;
+      const net = subtractInventoryValues(paidMap.get(row.contractId), row.expected);
+      const contract = activeContracts.find((candidate) => candidate.id === row.contractId);
+      const usd = contract?.currency === "CFA" && cfaRate.isPositive() ? divideInventoryValues(net, cfaRate) : net;
+      if (usd.isPositive()) prepaidRent = prepaidRent.plus(usd);
+      else if (usd.isNegative()) rentPayable = rentPayable.plus(usd.abs());
     }
 
-    return { prepaidRent: round2(prepaidRent), rentPayable: round2(rentPayable) };
-  } catch (rentalErr: unknown) {
+    return {
+      prepaidRent: Number(inventoryMoney(prepaidRent)),
+      rentPayable: Number(inventoryMoney(rentPayable)),
+    };
+  } catch (rentalError: unknown) {
     logger.warn("[/api/stats/net-profit] Rental section skipped (schema or data error):", {
-      error: getErrorMessage(rentalErr),
+      error: getErrorMessage(rentalError),
     });
-    // Non-fatal: dashboard continues without rent figures
     return empty;
   }
 }
