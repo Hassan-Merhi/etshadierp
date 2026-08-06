@@ -83,7 +83,47 @@ commands:
             echo "PostgreSQL did not become ready."
             exit 1
 
+  format_file:
+    parameters:
+      file:
+        type: string
+    steps:
+      - install_dependencies
+      - run:
+          name: Check << parameters.file >>
+          command: node node_modules/prettier/bin/prettier.cjs --check "<< parameters.file >>"
+
 jobs:
+  format-inventory-math:
+    executor: node22
+    steps:
+      - format_file:
+          file: server/lib/inventoryMath.ts
+
+  format-pos-import:
+    executor: node22
+    steps:
+      - format_file:
+          file: server/routes/posImportRoutes.ts
+
+  format-pos-negative-stock-test:
+    executor: node22
+    steps:
+      - format_file:
+          file: tests/ui/pos-negative-stock-permission.test.ts
+
+  format-god-file-test:
+    executor: node22
+    steps:
+      - format_file:
+          file: tests/god-file-boundaries.test.ts
+
+  format-report-precision-test:
+    executor: node22
+    steps:
+      - format_file:
+          file: server/lib/reportPrecision.test.ts
+
   static-build:
     executor: node22
     steps:
@@ -175,6 +215,11 @@ jobs:
 workflows:
   full-erp-verification:
     jobs:
+      - format-inventory-math
+      - format-pos-import
+      - format-pos-negative-stock-test
+      - format-god-file-test
+      - format-report-precision-test
       - static-build
       - postgres-regression
       - security-readiness:
