@@ -13,7 +13,8 @@ describe("Supplier Partner route boundary", () => {
   it("waits for company initialization before rejecting Supplier Partner routes", () => {
     expect(authenticatedApp).toContain("isLoading: companyLoading");
     expect(authenticatedApp).toContain("if (companyLoading) return <AppLoadingState />;");
-    expect(authenticatedApp).toContain("if (companyError || !selectedCompany) return <AppLoadingState forceRecovery");
+    expect(authenticatedApp).toContain("if (companyError || !selectedCompany)");
+    expect(authenticatedApp).toContain("retryCompanyBootstrap");
     const companyGuard = authenticatedApp.indexOf("if (companyLoading) return <AppLoadingState />;");
     const routeResolution = authenticatedApp.indexOf("resolveAuthenticatedAppRoute({");
     expect(companyGuard).toBeGreaterThan(-1);
