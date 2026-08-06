@@ -1,0 +1,80 @@
+name: Temporary add Arabic product name column
+
+on:
+  push:
+    branches:
+      - agent/add-arabic-product-name-column
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/add-arabic-product-name-column
+          fetch-depth: 0
+
+      - name: Add Arabic name column
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('client/src/pages/BaleProducts.tsx')
+          text = path.read_text()
+
+          header_old = '''                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Name
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Category
+                  </TableHead>
+'''
+          header_new = '''                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Name
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Arabic Name
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Category
+                  </TableHead>
+'''
+
+          row_old = '''                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {product.categoryId ? categoryMap.get(product.categoryId) || "Uncategorized" : "Uncategorized"}
+                    </TableCell>
+'''
+          row_new = '''                    </TableCell>
+                    <TableCell className="font-medium text-right" dir="rtl" lang="ar">
+                      {product.nameAr || "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {product.categoryId ? categoryMap.get(product.categoryId) || "Uncategorized" : "Uncategorized"}
+                    </TableCell>
+'''
+
+          if text.count(header_old) != 1:
+              raise SystemExit(f'Expected one regular product-table header, found {text.count(header_old)}')
+          if text.count(row_old) != 1:
+              raise SystemExit(f'Expected one regular product-table row anchor, found {text.count(row_old)}')
+
+          text = text.replace(header_old, header_new, 1)
+          text = text.replace(row_old, row_new, 1)
+          path.write_text(text)
+          PY
+
+      - name: Remove temporary workflow
+        run: rm .github/workflows/temporary-add-arabic-name-column.yml
+
+      - name: Commit change
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/src/pages/BaleProducts.tsx .github/workflows/temporary-add-arabic-name-column.yml
+          git commit -m "feat: show Arabic names in bale product list"
+          git push origin HEAD:agent/add-arabic-product-name-column
