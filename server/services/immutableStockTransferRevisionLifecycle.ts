@@ -28,6 +28,7 @@ export interface CreateImmutableRevisionInput {
   userId: string;
   note?: string | null;
   pending: boolean;
+  baseline?: "before" | "after";
   sourceLocationIdLimit?: number | null;
   items: ImmutableRevisionItemInput[];
 }
@@ -154,7 +155,12 @@ async function assertCompanyScope(
   }
 }
 
-async function assertSubmittedBaseline(tx: any, transferId: number, items: NormalizedImmutableRevisionItem[]) {
+async function assertSubmittedBaseline(
+  tx: any,
+  transferId: number,
+  items: NormalizedImmutableRevisionItem[],
+  baseline: "before" | "after" = "before"
+) {
   const current = await tx.select().from(stockTransferItems).where(eq(stockTransferItems.transferId, transferId));
   for (const item of items) {
     const row = current.find(
@@ -162,9 +168,10 @@ async function assertSubmittedBaseline(tx: any, transferId: number, items: Norma
         candidate.stockItemId === item.stockItemId && candidate.sourceLocationId === item.sourceLocationId
     );
     const currentQuantity = Number(row?.quantity ?? 0);
-    if (Math.abs(currentQuantity - item.originalQuantity) > 0.001) {
+    const expectedQuantity = baseline === "after" ? item.newQuantity : item.originalQuantity;
+    if (Math.abs(currentQuantity - expectedQuantity) > 0.001) {
       const error: any = lifecycleError(
-        `Revision is stale for item ${item.stockItemId} at source ${item.sourceLocationId}. Expected ${item.originalQuantity}, current transfer quantity is ${currentQuantity}.`,
+        `Revision is stale for item ${item.stockItemId} at source ${item.sourceLocationId}. Expected ${expectedQuantity}, current transfer quantity is ${currentQuantity}.`,
         "STOCK_TRANSFER_REVISION_STALE"
       );
       error.stockItemId = item.stockItemId;
@@ -202,7 +209,7 @@ export async function createImmutableStockTransferRevision(
       }
     }
     await assertCompanyScope(tx, companyId, destinationLocationId, normalized);
-    await assertSubmittedBaseline(tx, transferId, normalized);
+    await assertSubmittedBaseline(tx, transferId, normalized, input.baseline);
 
     const previousPending = input.pending
       ? rows<any>(

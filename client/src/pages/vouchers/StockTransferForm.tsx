@@ -462,7 +462,9 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
     },
     onSuccess: () => {
       const isEditMode = !!voucherIdToEdit;
-      toast({ title: "Success", description: `Stock transfer ${isEditMode ? "updated" : "created"} successfully` });
+      if (!savingTransferRevisionRef.current) {
+        toast({ title: "Success", description: `Stock transfer ${isEditMode ? "updated" : "created"} successfully` });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/daybook"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
@@ -575,26 +577,47 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       setTransferRevisionDialogOpen(false);
       return;
     }
+    const transferId = stableTransferId;
+    if (!transferId || !voucherIdToEdit) {
+      toast({ title: "Error", description: "Stock transfer is not ready yet. Please reopen it and try again.", variant: "destructive" });
+      return;
+    }
     setIsTransferSavingRevision(true);
     savingTransferRevisionRef.current = true;
+    let transferUpdated = false;
     try {
-      await stockTransferForm.handleSubmit(async (data) => {
-        await onStockTransferSubmit(data);
-      })();
-      await modeApiRequest("POST", `/api/stock-transfers/${stockTransferToEdit!.id}/revisions`, {
+      const isValid = await stockTransferForm.trigger();
+      if (!isValid) return;
+      await onStockTransferSubmit(stockTransferForm.getValues());
+      transferUpdated = true;
+      const revisionResponse = await modeApiRequest("POST", `/api/stock-transfers/${transferId}/revisions`, {
         note: transferRevisionNote.trim() || null,
+        baseline: "after",
         items: revisionItems,
       });
-      queryClient.invalidateQueries({
-        queryKey: ["/api/stock-transfers", lastKnownTransferIdRef.current, "revisions"],
-      });
+      const savedRevision = await revisionResponse.json();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", transferId, "revisions"] }),
+        queryClient.invalidateQueries({
+          queryKey: [`/api/stock-transfers/by-voucher/${voucherIdToEdit}/revisions`],
+        }),
+        queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", voucherIdToEdit] }),
+      ]);
       setTransferRevisionNote("");
       setTransferRevisionDialogOpen(false);
       setTransferRevisionsExpanded(true);
-      const nextRevNum = transferRevisions.length + 1;
-      toast({ title: "Revision Saved", description: `Rev ${nextRevNum} recorded and transfer updated` });
+      toast({
+        title: "Revision Saved",
+        description: `Rev ${savedRevision.revisionNumber ?? transferRevisions.length + 1} recorded and transfer updated`,
+      });
     } catch (error: any) {
-      toast({ title: "Error", description: error.message || "Failed to save revision", variant: "destructive" });
+      toast({
+        title: transferUpdated ? "Revision history was not saved" : "Transfer was not updated",
+        description: transferUpdated
+          ? `The transfer update succeeded, but the revision record failed: ${error.message || "Unknown error"}. Keep this dialog open and try Save as Revision again.`
+          : error.message || "Failed to save revision",
+        variant: "destructive",
+      });
     } finally {
       savingTransferRevisionRef.current = false;
       setIsTransferSavingRevision(false);
