@@ -259,7 +259,13 @@ export default function Daybook({ user }: { user?: any } = {}) {
     selectedVoucher &&
     (selectedVoucher.voucherType === "Stock Transfer" || selectedVoucher.voucherType === "StockTransfer" || selectedVoucher.voucherType === "Transfer")
   );
-  const { data: voucherRevisions = [], isLoading: revisionsLoading } = useQuery<any[]>({
+  const {
+    data: voucherRevisions = [],
+    isLoading: revisionsLoading,
+    isError: revisionsError,
+    error: revisionsErrorDetail,
+    refetch: retryVoucherRevisions,
+  } = useQuery<any[]>({
     queryKey:
       selectedVoucher && isStockTransferVoucher && viewDialogOpen
         ? companyDataKey(
@@ -268,7 +274,17 @@ export default function Daybook({ user }: { user?: any } = {}) {
             "daybook-transfer-revisions",
           )
         : [],
+    queryFn: async () => {
+      const response = await apiRequest(
+        "GET",
+        `/api/stock-transfers/by-voucher/${selectedVoucher!.id}/revisions`,
+      );
+      if (!response.ok) throw new Error("Could not load revision history");
+      const data = await response.json();
+      return Array.isArray(data) ? data : data?.revisions ?? [];
+    },
     enabled: !!selectedVoucher && isStockTransferVoucher && viewDialogOpen,
+    retry: 1,
   });
 
   useEffect(() => {
@@ -807,6 +823,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
         isStockTransferVoucher={isStockTransferVoucher}
         voucherRevisions={voucherRevisions}
         revisionsLoading={revisionsLoading}
+        revisionsError={revisionsError}
+        revisionsErrorMessage={revisionsErrorDetail instanceof Error ? revisionsErrorDetail.message : undefined}
+        retryVoucherRevisions={() => void retryVoucherRevisions()}
         formatAmount={formatAmount}
         formatDisplayDate={formatDisplayDate}
         formatDisplayTime={formatDisplayTime}
