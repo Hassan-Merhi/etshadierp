@@ -30,7 +30,8 @@ type UserFormData = z.infer<typeof userFormSchema>;
 type CompanyFormData = z.infer<typeof companyFormSchema>;
 type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
 
-import { getPageLabel, WatchUserDialog } from "./WatchUserDialog";
+import { getPageLabel } from "./WatchUserDialog";
+import { RemoteSupportWatchDialog } from "./RemoteSupportWatchDialog";
 
 export function ActiveUsersSection() {
   const [watchingUser, setWatchingUser] = useState<{ userId: string; username: string } | null>(null);
@@ -199,7 +200,7 @@ export function ActiveUsersSection() {
       )}
 
       {watchingUser && (
-        <WatchUserDialog
+        <RemoteSupportWatchDialog
           userId={watchingUser.userId}
           username={watchingUser.username}
           onClose={() => setWatchingUser(null)}

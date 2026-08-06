@@ -59,7 +59,9 @@ interface RateWindow {
 }
 
 const PASSWORD_CONFIRMATION_MAX_AGE_MS = 5 * 60 * 1000;
+const COMMAND_TIMEOUT_MS = 15 * 1000;
 const COMMAND_RETENTION_MS = 2 * 60 * 1000;
+const RESULT_RETENTION_MS = 2 * 60 * 1000;
 const RATE_WINDOW_MS = 1000;
 const RATE_LIMITS: Record<RemoteMouseCommandType, number> = {
   "pointer-move": 20,
@@ -71,6 +73,7 @@ const commandListeners = new Map<string, Set<CommandListener>>();
 const resultListeners = new Map<string, Set<ResultListener>>();
 const authorizations = new Map<string, RemoteMouseAuthorization>();
 const commandHistory = new Map<string, RemoteMouseCommand>();
+const completedResults = new Map<string, RemoteMouseCommandResult>();
 const sequenceBySession = new Map<string, number>();
 const rateWindows = new Map<string, RateWindow>();
 
@@ -164,6 +167,21 @@ function notify<T>(listeners: Set<(value: T) => void> | undefined, value: T): nu
   return delivered;
 }
 
+function notifySingle<T>(listener: (value: T) => void, value: T): boolean {
+  try {
+    listener(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function pendingCommandsForSession(sessionId: string): RemoteMouseCommand[] {
+  return [...commandHistory.values()]
+    .filter((command) => command.sessionId === sessionId)
+    .sort((left, right) => left.sequence - right.sequence);
+}
+
 function clearSessionMouseState(sessionId: string, disableCapability: boolean): void {
   authorizations.delete(sessionId);
   rateWindows.delete(sessionId);
@@ -172,6 +190,9 @@ function clearSessionMouseState(sessionId: string, disableCapability: boolean): 
   resultListeners.delete(sessionId);
   for (const [commandId, command] of commandHistory) {
     if (command.sessionId === sessionId) commandHistory.delete(commandId);
+  }
+  for (const [commandId, result] of completedResults) {
+    if (result.sessionId === sessionId) completedResults.delete(commandId);
   }
   if (disableCapability) setRemoteControlMouseCapability(sessionId, false);
 }
@@ -312,15 +333,7 @@ export function publishRemoteMouseCommand(input: {
   };
 
   commandHistory.set(command.id, command);
-  const delivered = notify(commandListeners.get(session.id), command);
-  if (delivered === 0) {
-    commandHistory.delete(command.id);
-    throw new RemoteMouseControlError(
-      "TARGET_COMMAND_CHANNEL_UNAVAILABLE",
-      409,
-      "The employee ERP tab is not ready to receive mouse commands."
-    );
-  }
+  notify(commandListeners.get(session.id), command);
   return { ...command };
 }
 
@@ -337,6 +350,11 @@ export function subscribeRemoteMouseCommands(input: {
     commandListeners.set(session.id, listeners);
   }
   listeners.add(input.listener);
+
+  for (const command of pendingCommandsForSession(session.id)) {
+    notifySingle(input.listener, command);
+  }
+
   return () => {
     listeners?.delete(input.listener);
     if (listeners?.size === 0) commandListeners.delete(session.id);
@@ -355,6 +373,14 @@ export function publishRemoteMouseCommandResult(input: {
   const now = input.now ?? Date.now();
   const session = activeSessionForTarget(input.sessionId, input.targetUserId, input.targetTabId, false);
   const commandId = cleanIdentifier(input.commandId);
+  const completed = completedResults.get(commandId);
+  if (completed) {
+    if (completed.sessionId !== session.id) {
+      throw new RemoteMouseControlError("COMMAND_NOT_FOUND", 404, "Mouse command not found.");
+    }
+    return { ...completed };
+  }
+
   const command = commandHistory.get(commandId);
   if (!command || command.sessionId !== session.id) {
     throw new RemoteMouseControlError("COMMAND_NOT_FOUND", 404, "Mouse command not found.");
@@ -371,6 +397,7 @@ export function publishRemoteMouseCommandResult(input: {
     completedAt: now,
   };
   commandHistory.delete(commandId);
+  completedResults.set(commandId, result);
   notify(resultListeners.get(session.id), result);
   return { ...result };
 }
@@ -410,6 +437,24 @@ export function cleanupRemoteMouseCommandState(now = Date.now()): void {
   }
 
   for (const [commandId, command] of commandHistory) {
+    if (now - command.createdAt <= COMMAND_TIMEOUT_MS) continue;
+    commandHistory.delete(commandId);
+    const result: RemoteMouseCommandResult = {
+      commandId,
+      sessionId: command.sessionId,
+      status: "ignored",
+      reason: "command-timeout",
+      completedAt: now,
+    };
+    completedResults.set(commandId, result);
+    notify(resultListeners.get(command.sessionId), result);
+  }
+
+  for (const [commandId, result] of completedResults) {
+    if (now - result.completedAt > RESULT_RETENTION_MS) completedResults.delete(commandId);
+  }
+
+  for (const [commandId, command] of commandHistory) {
     if (now - command.createdAt > COMMAND_RETENTION_MS) commandHistory.delete(commandId);
   }
 }
@@ -419,6 +464,7 @@ export function resetRemoteMouseCommandStateForTests(): void {
   resultListeners.clear();
   authorizations.clear();
   commandHistory.clear();
+  completedResults.clear();
   sequenceBySession.clear();
   rateWindows.clear();
 }
