@@ -1,6 +1,12 @@
 import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
+import {
+  divideInventoryValues,
+  multiplyInventoryValues,
+  subtractInventoryValues,
+  toInventoryDecimal,
+} from "../../lib/inventoryMath";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { getAccessibleCompanyIds } from "../../security/companyAccessBoundary";
@@ -10,78 +16,81 @@ import { eq, and, sql, isNull } from "drizzle-orm";
 
 import { getMonthlyData, getStockSummary, getExpenseBreakdown } from "../../services/stats/dashboardStatsService";
 
+function enhanceSalesReportItem<T extends {
+  configuredSellingPrice: string | null;
+  actualSellingPrice: string;
+  totalSales: string;
+  costProfit: string;
+  quantity: string;
+}>(item: T) {
+  const locationPrice = toInventoryDecimal(item.configuredSellingPrice);
+  const actualPrice = toInventoryDecimal(item.actualSellingPrice);
+  const configuredPrice = locationPrice.isPositive() ? locationPrice : actualPrice;
+  const quantity = toInventoryDecimal(item.quantity);
+  const configuredProfit = multiplyInventoryValues(subtractInventoryValues(actualPrice, configuredPrice), quantity);
+  const totalConfiguredCost = multiplyInventoryValues(configuredPrice, quantity);
+  const totalSales = toInventoryDecimal(item.totalSales);
+  const costProfit = toInventoryDecimal(item.costProfit);
+  const costProfitPercentage = totalSales.isPositive()
+    ? multiplyInventoryValues(divideInventoryValues(costProfit, totalSales), 100)
+    : toInventoryDecimal(0);
+  const configuredProfitPercentage = totalConfiguredCost.isPositive()
+    ? multiplyInventoryValues(divideInventoryValues(configuredProfit, totalConfiguredCost), 100)
+    : toInventoryDecimal(0);
+
+  return {
+    ...item,
+    configuredSellingPrice: configuredPrice.toString(),
+    configuredProfit: configuredProfit.toNumber(),
+    totalConfiguredCost: totalConfiguredCost.toNumber(),
+    costProfitPercentage: costProfitPercentage.toNumber(),
+    configuredProfitPercentage: configuredProfitPercentage.toNumber(),
+  };
+}
+
 export function registerStatsDataRoutes(app: Express) {
   app.get("/api/stats/monthly-data", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
-      if (!companyId) {
-        return res.status(400).json({ message: "No company selected" });
-      }
-      const result = await getMonthlyData(companyId);
-      res.json(result);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      res.json(await getMonthlyData(companyId));
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
-  // Get stock summary stats for Dashboard
   app.get("/api/stats/stock-summary", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
-      if (!companyId) {
-        return res.status(400).json({ message: "No company selected" });
-      }
-      const result = await getStockSummary(companyId);
-      res.json(result);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      res.json(await getStockSummary(companyId));
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
-  // Get expense breakdown by account type for Dashboard donut chart
   app.get("/api/stats/expense-breakdown", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
-      if (!companyId) {
-        return res.status(400).json({ message: "No company selected" });
-      }
-
-      const result = await getExpenseBreakdown(companyId);
-      res.json(result);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      res.json(await getExpenseBreakdown(companyId));
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
-  // Import Cycle Balance - tracks the full import/offload cycle to ensure it balances to zero
-  // Formula: Supplier Balance (credit/liability) + Stock OTW (debit/asset) + Loan accounts + Expense charges - Stock Value on Floor
   app.get("/api/sales-report", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
-      if (!companyId) {
-        return res.status(400).json({ message: "No company selected" });
-      }
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { startDate, endDate, locationId, stockItemId, stockGroupId } = req.query;
-
-      // Apply filters
       const conditions = [eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)];
-
-      if (startDate) {
-        conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
-      }
-      if (endDate) {
-        conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
-      }
-      if (locationId) {
-        conditions.push(eq(vouchers.locationId, parseInt(locationId as string)));
-      }
-      if (stockItemId) {
-        conditions.push(eq(salesItems.stockItemId, parseInt(stockItemId as string)));
-      }
-      if (stockGroupId) {
-        conditions.push(eq(stockItems.stockGroupId, parseInt(stockGroupId as string)));
-      }
+      if (startDate) conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
+      if (endDate) conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
+      if (locationId) conditions.push(eq(vouchers.locationId, parseInt(locationId as string)));
+      if (stockItemId) conditions.push(eq(salesItems.stockItemId, parseInt(stockItemId as string)));
+      if (stockGroupId) conditions.push(eq(stockItems.stockGroupId, parseInt(stockGroupId as string)));
 
       const salesData = await db
         .select({
@@ -96,12 +105,12 @@ export function registerStatsDataRoutes(app: Express) {
           stockItemName: stockItems.name,
           stockGroupId: stockItems.stockGroupId,
           quantity: salesItems.quantity,
-          actualSellingPrice: salesItems.sellingPrice, // Price item was actually sold at
-          configuredSellingPrice: stockItemLocationPrices.sellingPrice, // Location-specific price
+          actualSellingPrice: salesItems.sellingPrice,
+          configuredSellingPrice: stockItemLocationPrices.sellingPrice,
           costPrice: salesItems.costPrice,
           totalSales: salesItems.totalSales,
           totalCost: salesItems.totalCost,
-          costProfit: salesItems.profit, // Actual selling price - cost price
+          costProfit: salesItems.profit,
           isCreditSale: vouchers.isCreditSale,
           createdAt: salesItems.createdAt,
           customerName: sql<string | null>`(
@@ -128,65 +137,25 @@ export function registerStatsDataRoutes(app: Express) {
         .where(and(...conditions))
         .orderBy(vouchers.voucherDate);
 
-      // Calculate configured profit for each item (configured selling price - actual selling price) * quantity
-      const enhancedSalesData = salesData.map((item) => {
-        // Use location price if available, otherwise use actual selling price
-        const configuredPrice =
-          parseFloat(item.configuredSellingPrice || "0") > 0
-            ? parseFloat(item.configuredSellingPrice || "0")
-            : parseFloat(item.actualSellingPrice || "0");
-
-        const actualPrice = parseFloat(item.actualSellingPrice || "0");
-        const totalSales = parseFloat(item.totalSales || "0");
-        const costProfit = parseFloat(item.costProfit || "0");
-        const quantity = parseFloat(item.quantity || "0");
-
-        const configuredProfit = (actualPrice - configuredPrice) * quantity;
-        const totalConfiguredCost = configuredPrice * quantity;
-
-        // Calculate percentages
-        const costProfitPercentage = totalSales > 0 ? (costProfit / totalSales) * 100 : 0;
-        const configuredProfitPercentage = totalConfiguredCost > 0 ? (configuredProfit / totalConfiguredCost) * 100 : 0;
-
-        return {
-          ...item,
-          configuredSellingPrice: configuredPrice.toString(),
-          configuredProfit,
-          totalConfiguredCost,
-          costProfitPercentage,
-          configuredProfitPercentage,
-        };
-      });
-
-      res.json(enhancedSalesData);
+      res.json(salesData.map(enhanceSalesReportItem));
     } catch (error: unknown) {
-      logger.error("Sales report error:", { error: error });
+      logger.error("Sales report error:", { error });
       res.status(500).json({ message: getErrorMessage(error), details: String(error) });
     }
   });
 
-  // Sales Report - All Companies (cross-company view like container tracking)
   app.get("/api/dashboard/sales-report-all", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const userId = req.session.userId;
-      if (!userId) {
-        return res.status(401).json({ message: "Not authenticated" });
-      }
+      if (!userId) return res.status(401).json({ message: "Not authenticated" });
 
-      // Get all companies the user has access to
       const companyIds = Array.from(await getAccessibleCompanyIds(userId));
+      if (companyIds.length === 0) return res.json([]);
 
-      if (companyIds.length === 0) {
-        return res.json([]);
-      }
-
-      // Get all companies for names
       const allCompanies = await storage.getAllCompanies();
-      const companyMap = new Map(allCompanies.map((c) => [c.id, c]));
-
+      const companyMap = new Map(allCompanies.map((company) => [company.id, company]));
       const { startDate, endDate, locationId, stockItemId, companyFilter, stockGroupName } = req.query;
 
-      // Parse company filter if provided
       let filteredCompanyIds = companyIds;
       if (companyFilter && typeof companyFilter === "string" && companyFilter.length > 0) {
         const filterCodes = companyFilter.split(",");
@@ -197,29 +166,17 @@ export function registerStatsDataRoutes(app: Express) {
       }
 
       const allSalesData: any[] = [];
-
       for (const companyId of filteredCompanyIds) {
         const company = companyMap.get(companyId);
-
-        // Apply filters
         const conditions = [
           eq(vouchers.companyId, companyId),
           eq(vouchers.optional, false),
           isNull(vouchers.deletedAt),
         ];
-
-        if (startDate) {
-          conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
-        }
-        if (endDate) {
-          conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
-        }
-        if (locationId) {
-          conditions.push(eq(vouchers.locationId, parseInt(locationId as string)));
-        }
-        if (stockItemId) {
-          conditions.push(eq(salesItems.stockItemId, parseInt(stockItemId as string)));
-        }
+        if (startDate) conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
+        if (endDate) conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
+        if (locationId) conditions.push(eq(vouchers.locationId, parseInt(locationId as string)));
+        if (stockItemId) conditions.push(eq(salesItems.stockItemId, parseInt(stockItemId as string)));
 
         const salesData = await db
           .select({
@@ -258,45 +215,20 @@ export function registerStatsDataRoutes(app: Express) {
           .where(and(...conditions, ...(stockGroupName ? [eq(stockGroups.name, stockGroupName as string)] : [])))
           .orderBy(vouchers.voucherDate);
 
-        // Enhance with computed values and company info
         for (const item of salesData) {
-          const configuredPrice =
-            parseFloat(item.configuredSellingPrice || "0") > 0
-              ? parseFloat(item.configuredSellingPrice || "0")
-              : parseFloat(item.actualSellingPrice || "0");
-
-          const actualPrice = parseFloat(item.actualSellingPrice || "0");
-          const totalSales = parseFloat(item.totalSales || "0");
-          const costProfit = parseFloat(item.costProfit || "0");
-          const quantity = parseFloat(item.quantity || "0");
-
-          const configuredProfit = (actualPrice - configuredPrice) * quantity;
-          const totalConfiguredCost = configuredPrice * quantity;
-
-          const costProfitPercentage = totalSales > 0 ? (costProfit / totalSales) * 100 : 0;
-          const configuredProfitPercentage =
-            totalConfiguredCost > 0 ? (configuredProfit / totalConfiguredCost) * 100 : 0;
-
           allSalesData.push({
-            ...item,
+            ...enhanceSalesReportItem(item),
             companyId,
             companyCode: company?.code || "",
             companyName: company?.name || "Unknown",
-            configuredSellingPrice: configuredPrice.toString(),
-            configuredProfit,
-            totalConfiguredCost,
-            costProfitPercentage,
-            configuredProfitPercentage,
           });
         }
       }
 
       res.json(allSalesData);
     } catch (error: unknown) {
-      logger.error("All companies sales report error:", { error: error });
+      logger.error("All companies sales report error:", { error });
       res.status(500).json({ message: getErrorMessage(error), details: String(error) });
     }
   });
-
-  // Recalculate cost prices for sales items using current inventory rates
 }
