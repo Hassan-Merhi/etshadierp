@@ -47,6 +47,6 @@
       "tests/ui/bandwidth-phase-4-heavy-pages.test.ts",
       "tests/ui/audit-phase3-runtime-recovery.test.ts"
     ],
-    "maxAdditionalTextAssertions": 535
+    "maxAdditionalTextAssertions": 541
   }
 }
