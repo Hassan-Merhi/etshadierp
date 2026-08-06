@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { describe, expect, it } from "vitest";
 
+// Keep this contract synchronized with config/i18n-phase14-baseline.json.
 describe("Phase 14 trilingual release gate", () => {
   it("loads RTL hardening globally", () => {
     const app = fs.readFileSync("client/src/App.tsx", "utf8");
