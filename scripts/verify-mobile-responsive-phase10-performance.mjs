@@ -49,7 +49,7 @@ for (const token of [
   "schedulePoll",
   "scheduleCounts",
   "isDocumentVisible",
-  'queryClient.invalidateQueries({ refetchType: "active" })',
+  'queryClient.invalidateQueries({ refetchType: "active" }, { cancelRefetch: false })',
 ]) {
   if (!connectivity.includes(token)) failures.push(`Adaptive connectivity contract missing: ${token}`);
 }
