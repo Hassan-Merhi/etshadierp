@@ -26,8 +26,7 @@ function boundedNumber(value: unknown, minimum: number, maximum: number): number
 }
 
 function normalizedCoordinate(value: unknown): number | null {
-  const number = finiteNumber(value);
-  return number === null ? null : Math.min(1, Math.max(0, number));
+  return boundedNumber(value, 0, 1);
 }
 
 export function isValidScreenFeedDataUrl(value: unknown): value is string {
@@ -49,8 +48,8 @@ export function sanitizeScreenFeedClicks(value: unknown, now = Date.now()): Scre
     )
     .slice(-MAX_CLICKS_PER_FRAME)
     .map((click) => ({
-      x: Math.min(1, Math.max(0, click.x)),
-      y: Math.min(1, Math.max(0, click.y)),
+      x: click.x,
+      y: click.y,
       ...(typeof click.label === "string" ? { label: click.label.slice(0, 60) } : {}),
       ts: click.ts,
     }));
