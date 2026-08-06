@@ -1610,6 +1610,9 @@ export default function BaleProducts() {
                     Name
                   </TableHead>
                   <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Arabic Name
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     Category
                   </TableHead>
                   <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -1677,6 +1680,9 @@ export default function BaleProducts() {
                           </div>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell className="font-medium text-right" dir="rtl" lang="ar">
+                      {product.nameAr || "—"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {product.categoryId ? categoryMap.get(product.categoryId) || "Uncategorized" : "Uncategorized"}
