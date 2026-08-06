@@ -11,14 +11,7 @@ import { authenticatedUserQueryOptions } from "@/contracts/sessionQueryContracts
  *   - handleLogout — clears cache, clears biometric credentials, redirects
  */
 export function useAuthenticatedUser() {
-  const {
-    data: user,
-    isLoading,
-    isSuccess,
-    isFetching,
-    error,
-    refetch,
-  } = useQuery(authenticatedUserQueryOptions());
+  const { data: user, isLoading, isSuccess, isFetching, error, refetch } = useQuery(authenticatedUserQueryOptions());
 
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
   useEffect(() => {

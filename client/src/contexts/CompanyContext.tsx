@@ -325,16 +325,14 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
     selectedCompany,
   ]);
 
-  const companyError =
-    initialSyncError ?? (companyAssignmentsError instanceof Error ? companyAssignmentsError : null);
+  const companyError = initialSyncError ?? (companyAssignmentsError instanceof Error ? companyAssignmentsError : null);
 
   return (
     <CompanyContext.Provider
       value={{
         selectedCompany,
         companies,
-        isLoading:
-          isLoading || isSyncingCompany || (companies.length > 0 && !selectedCompany && companyError === null),
+        isLoading: isLoading || isSyncingCompany || (companies.length > 0 && !selectedCompany && companyError === null),
         error: companyError,
         retry,
         selectCompany,

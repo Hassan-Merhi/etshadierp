@@ -34,7 +34,9 @@ describe("authenticated request gating", () => {
     const authenticatedApp = source("client/src/app/AuthenticatedApp.tsx");
 
     expect(authenticatedApp).toContain("interface AuthenticatedAppProps");
-    expect(authenticatedApp).toContain("export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps)");
+    expect(authenticatedApp).toContain(
+      "export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps)"
+    );
     expect(authenticatedApp).not.toContain("useAuthenticatedUser(");
     expect(authenticatedApp).toContain("userPresent: true");
   });

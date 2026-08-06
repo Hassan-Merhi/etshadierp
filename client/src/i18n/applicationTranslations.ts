@@ -21,6 +21,11 @@ export const applicationTranslations = {
     ar: "الانتقال إلى المحتوى الرئيسي",
     fr: "Aller au contenu principal",
   },
+  "accessibility.erpWorkspace": {
+    en: "ERP workspace",
+    ar: "مساحة عمل نظام تخطيط موارد المؤسسة",
+    fr: "Espace de travail ERP",
+  },
   "accessibility.openSearch": { en: "Open search", ar: "فتح البحث", fr: "Ouvrir la recherche" },
   "accessibility.openWorkspaceControls": {
     en: "Open account and display controls",

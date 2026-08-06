@@ -17,19 +17,13 @@ afterEach(() => {
 
 describe("Audit Phase 3 runtime recovery", () => {
   it("treats only a confirmed 401 session response as unauthenticated", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValueOnce(new Response(null, { status: 401 }))
-    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(new Response(null, { status: 401 })));
 
     await expect(fetchAuthenticatedUser()).resolves.toBeNull();
   });
 
   it("keeps transient auth failures recoverable instead of converting them to logout", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValueOnce(new Response(null, { status: 503 }))
-    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(new Response(null, { status: 503 })));
 
     await expect(fetchAuthenticatedUser()).rejects.toThrow("503");
 
