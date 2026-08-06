@@ -27,6 +27,7 @@ interface FastPollState {
 
 const FALLBACK_POLL_MS = 3000;
 
+// prettier-ignore
 async function fetchConditionalFrame(userId: string, state: FastPollState, signal: AbortSignal): Promise<FastPollState> {
   const response = await fetch(`/api/screen-feed/${encodeURIComponent(userId)}`, {
     method: "GET",
@@ -46,6 +47,7 @@ async function fetchConditionalFrame(userId: string, state: FastPollState, signa
   };
 }
 
+// prettier-ignore
 function FastScreenFeedDialog({
   userId,
   username,
@@ -193,6 +195,7 @@ function FastScreenFeedDialog({
   );
 }
 
+// prettier-ignore
 export function RemoteSupportWatchDialog(props: {
   userId: string;
   username: string;
