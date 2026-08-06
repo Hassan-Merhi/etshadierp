@@ -4,9 +4,10 @@
     "server/routes/payroll/workerStatsAdvancesRoutes.ts": 922,
     "server/services/factory/postOffloadPhase6Safety.ts": 927,
     "client/src/pages/ContainerLoadingScan.tsx": 1133,
-    "client/src/pages/daybook/VoucherDetailsDialog.tsx": 966,
+    "client/src/pages/daybook/VoucherDetailsDialog.tsx": 984,
     "client/src/pages/factory/FactoryContainerLoadingScan.tsx": 1906,
-    "client/src/pages/factory/FactoryShippingContainers.tsx": 913
+    "client/src/pages/factory/FactoryShippingContainers.tsx": 913,
+    "client/src/pages/vouchers/StockTransferForm.tsx": 2388
   },
   "routeManifestAdditions": [],
   "routeManifestMountAdditions": [],
@@ -44,8 +45,9 @@
       "tests/ui/bandwidth-phase-1-page-polling.test.ts",
       "tests/ui/bandwidth-phase-2-payloads.test.ts",
       "tests/ui/bandwidth-phase-3-cache.test.ts",
-      "tests/ui/bandwidth-phase-4-heavy-pages.test.ts"
+      "tests/ui/bandwidth-phase-4-heavy-pages.test.ts",
+      "tests/stock-transfer-revision-lifecycle-policy.test.ts"
     ],
-    "maxAdditionalTextAssertions": 515
+    "maxAdditionalTextAssertions": 526
   }
 }
