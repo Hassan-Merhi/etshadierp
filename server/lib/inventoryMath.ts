@@ -21,10 +21,7 @@ function useStrictPositiveSemantics(decimal: Decimal): Decimal {
  * Decimal.js considers positive zero to be positive, while inventory validation
  * requires a quantity or rate to be strictly greater than zero.
  */
-export function toInventoryDecimal(
-  value: InventoryNumericInput,
-  fallback: InventoryNumericInput = 0
-): Decimal {
+export function toInventoryDecimal(value: InventoryNumericInput, fallback: InventoryNumericInput = 0): Decimal {
   const parse = (candidate: InventoryNumericInput): Decimal | null => {
     if (candidate === null || candidate === undefined || candidate === "") {
       return null;
@@ -42,16 +39,10 @@ export function toInventoryDecimal(
 }
 
 export function addInventoryValues(...values: InventoryNumericInput[]): Decimal {
-  return values.reduce<Decimal>(
-    (total, value) => total.plus(toInventoryDecimal(value)),
-    new Decimal(0)
-  );
+  return values.reduce<Decimal>((total, value) => total.plus(toInventoryDecimal(value)), new Decimal(0));
 }
 
-export function subtractInventoryValues(
-  minuend: InventoryNumericInput,
-  subtrahend: InventoryNumericInput
-): Decimal {
+export function subtractInventoryValues(minuend: InventoryNumericInput, subtrahend: InventoryNumericInput): Decimal {
   return toInventoryDecimal(minuend).minus(toInventoryDecimal(subtrahend));
 }
 
@@ -60,10 +51,7 @@ export function multiplyInventoryValues(...values: InventoryNumericInput[]): Dec
     return new Decimal(0);
   }
 
-  return values.reduce<Decimal>(
-    (product, value) => product.times(toInventoryDecimal(value)),
-    new Decimal(1)
-  );
+  return values.reduce<Decimal>((product, value) => product.times(toInventoryDecimal(value)), new Decimal(1));
 }
 
 export function divideInventoryValues(
@@ -105,10 +93,7 @@ export function weightedAverageInventoryCost(
   return existingValue.plus(incomingValue).dividedBy(combinedQty);
 }
 
-export function roundInventoryValue(
-  value: InventoryNumericInput,
-  decimalPlaces: number
-): Decimal {
+export function roundInventoryValue(value: InventoryNumericInput, decimalPlaces: number): Decimal {
   if (!Number.isInteger(decimalPlaces) || decimalPlaces < 0) {
     throw new RangeError("decimalPlaces must be a non-negative integer");
   }
@@ -117,19 +102,13 @@ export function roundInventoryValue(
 }
 
 export function inventoryQuantity(value: InventoryNumericInput): string {
-  return roundInventoryValue(value, INVENTORY_QUANTITY_DECIMAL_PLACES).toFixed(
-    INVENTORY_QUANTITY_DECIMAL_PLACES
-  );
+  return roundInventoryValue(value, INVENTORY_QUANTITY_DECIMAL_PLACES).toFixed(INVENTORY_QUANTITY_DECIMAL_PLACES);
 }
 
 export function inventoryUnitCost(value: InventoryNumericInput): string {
-  return roundInventoryValue(value, INVENTORY_COST_DECIMAL_PLACES).toFixed(
-    INVENTORY_COST_DECIMAL_PLACES
-  );
+  return roundInventoryValue(value, INVENTORY_COST_DECIMAL_PLACES).toFixed(INVENTORY_COST_DECIMAL_PLACES);
 }
 
 export function inventoryMoney(value: InventoryNumericInput): string {
-  return roundInventoryValue(value, INVENTORY_MONEY_DECIMAL_PLACES).toFixed(
-    INVENTORY_MONEY_DECIMAL_PLACES
-  );
+  return roundInventoryValue(value, INVENTORY_MONEY_DECIMAL_PLACES).toFixed(INVENTORY_MONEY_DECIMAL_PLACES);
 }
