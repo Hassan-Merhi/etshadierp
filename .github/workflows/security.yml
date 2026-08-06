@@ -10,37 +10,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: security-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  daybook-revision-states:
-    name: Apply Daybook revision history states
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          ref: agent/fix-daybook-revision-history-states
-          fetch-depth: 0
-      - uses: actions/setup-node@v6
-        with:
-          node-version: "22"
-          cache: npm
-      - run: python scripts/temporary-fix-daybook-revision-states.py
-      - run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
-      - run: npm ci --no-audit --bin-links=true
-      - run: npm run check
-      - run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add client/src/pages/Daybook.tsx client/src/pages/daybook/VoucherDetailsDialog.tsx client/src/pages/daybook/voucherdetailsdialog/types.ts
-          git commit -m "Fix Daybook stock transfer revision history states"
-          git push origin HEAD:agent/fix-daybook-revision-history-states
-
   dependency-audit:
     name: Dependency audit
     runs-on: ubuntu-latest
@@ -48,23 +24,29 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+
       - name: Set up Node.js 22
         uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
+
       - name: Normalize Replit registry URLs for CI
         run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
       - name: Install dependencies
         run: npm ci --no-audit --bin-links=true
+
       - name: Capture production dependency audit
         id: production_audit_report
         if: always()
         run: |
           npm audit --omit=dev --json > production-audit.json || true
           npm audit --omit=dev --audit-level=high || true
+
       - name: Block unreviewed high and critical production vulnerabilities
         run: npm run verify:dependency-audit
+
       - name: Upload production dependency audit
         if: always()
         uses: actions/upload-artifact@v7
@@ -73,6 +55,7 @@ jobs:
           path: production-audit.json
           if-no-files-found: error
           retention-days: 14
+
       - name: Audit all dependencies
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: npm run verify:dependency-audit -- --include-dev
@@ -86,6 +69,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
       - name: Scan repository for verified secrets
         uses: trufflesecurity/trufflehog@v3.90.4
         with:
