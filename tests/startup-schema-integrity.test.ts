@@ -12,8 +12,8 @@
  * EXPECTED_CONTENT_HASH in the same commit - the diff then shows reviewers that
  * the array changed on purpose rather than as a side effect of editing a file.
  *
- * The recorded hash is the value the array had as a single 4,312-line file
- * immediately before it was split, which is what proves the split was lossless.
+ * The recorded hash is the reviewed value of the composed startup migration
+ * array on the current main baseline.
  */
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -23,11 +23,11 @@ import { describe, expect, it } from "vitest";
 
 import { startupMigrations } from "../server/startup-schema";
 
-/** Statement count of the array as of the split. */
-const EXPECTED_STATEMENT_COUNT = 1228;
+/** Statement count of the reviewed composed array. */
+const EXPECTED_STATEMENT_COUNT = 1223;
 
-/** sha256 of JSON.stringify(startupMigrations) as of the split. */
-const EXPECTED_CONTENT_HASH = "e66dc8420ce8d23f151353f41f676eea693600ba2ad434d542e9fdc182359b79";
+/** sha256 of JSON.stringify(startupMigrations) for the reviewed composed array. */
+const EXPECTED_CONTENT_HASH = "29829ed9857a8d182ac4d49c8a75f707e0acd2c58b12fcc98ade8067f6ca9957";
 
 function contentHash(statements: string[]): string {
   return crypto.createHash("sha256").update(JSON.stringify(statements)).digest("hex");

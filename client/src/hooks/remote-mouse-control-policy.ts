@@ -26,6 +26,15 @@ export interface RemoteMouseExecutionOptions {
   keyboardEnabled?: boolean;
 }
 
+// prettier-ignore
+export interface RemoteMouseViewportMetrics {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  scale: number;
+}
+
 const BLOCKED_SELECTOR = [
   "input",
   "textarea",
@@ -131,6 +140,16 @@ function finiteCoordinate(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
 }
 
+// prettier-ignore
+function finitePositive(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+// prettier-ignore
+function finiteOffset(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
 function elementDescriptor(element: Element): string {
   const htmlElement = element as HTMLElement;
   const href = element instanceof HTMLAnchorElement ? (element.getAttribute("href") ?? "") : "";
@@ -174,6 +193,36 @@ export function normalizeRemoteMousePoint(
   return { x, y };
 }
 
+// prettier-ignore
+export function getRemoteMouseViewportMetrics(view: Window = window): RemoteMouseViewportMetrics {
+  const visualViewport = view.visualViewport;
+  const width = finitePositive(visualViewport?.width, finitePositive(view.innerWidth, 1));
+  const height = finitePositive(visualViewport?.height, finitePositive(view.innerHeight, 1));
+  return {
+    left: finiteOffset(visualViewport?.offsetLeft),
+    top: finiteOffset(visualViewport?.offsetTop),
+    width,
+    height,
+    scale: finitePositive(visualViewport?.scale, 1),
+  };
+}
+
+// prettier-ignore
+export function mapRemoteMousePoint(
+  x: number,
+  y: number,
+  view: Window = window
+): { clientX: number; clientY: number } | null {
+  if (!finiteCoordinate(x) || !finiteCoordinate(y)) return null;
+  const viewport = getRemoteMouseViewportMetrics(view);
+  const right = viewport.left + viewport.width;
+  const bottom = viewport.top + viewport.height;
+  return {
+    clientX: Math.max(viewport.left, Math.min(right - 1, viewport.left + x * viewport.width)),
+    clientY: Math.max(viewport.top, Math.min(bottom - 1, viewport.top + y * viewport.height)),
+  };
+}
+
 export function isRemoteMouseBlockedElement(element: Element | null): boolean {
   if (!element) return true;
   const blocked = element.closest(BLOCKED_SELECTOR);
@@ -201,13 +250,32 @@ export function isAllowedRemoteClickElement(
   return !!descriptor && SAFE_ACTION_TEXT.test(descriptor) && !DANGEROUS_TEXT.test(descriptor);
 }
 
-function nearestScrollableElement(element: Element | null, view: Window): HTMLElement | null {
+// prettier-ignore
+function canScrollInDirection(element: HTMLElement, deltaX: number, deltaY: number): boolean {
+  const canScrollX =
+    deltaX < 0
+      ? element.scrollLeft > 0
+      : deltaX > 0 && element.scrollLeft + element.clientWidth < element.scrollWidth;
+  const canScrollY =
+    deltaY < 0
+      ? element.scrollTop > 0
+      : deltaY > 0 && element.scrollTop + element.clientHeight < element.scrollHeight;
+  return canScrollX || canScrollY;
+}
+
+// prettier-ignore
+function nearestScrollableElement(
+  element: Element | null,
+  view: Window,
+  deltaX: number,
+  deltaY: number
+): HTMLElement | null {
   let current = element instanceof HTMLElement ? element : null;
   while (current && current !== view.document.body) {
     const style = view.getComputedStyle(current);
     const scrollableX = /(auto|scroll)/.test(style.overflowX) && current.scrollWidth > current.clientWidth;
     const scrollableY = /(auto|scroll)/.test(style.overflowY) && current.scrollHeight > current.clientHeight;
-    if (scrollableX || scrollableY) return current;
+    if ((scrollableX || scrollableY) && canScrollInDirection(current, deltaX, deltaY)) return current;
     current = current.parentElement;
   }
   return null;
@@ -219,12 +287,12 @@ export function applyRemoteMouseCommand(
   view: Window = window,
   options: RemoteMouseExecutionOptions = {}
 ): RemoteMouseExecutionResult {
-  if (!finiteCoordinate(command.x) || !finiteCoordinate(command.y)) {
+  const mappedPoint = mapRemoteMousePoint(command.x, command.y, view);
+  if (!mappedPoint) {
     return { status: "ignored", reason: "invalid-coordinates", clientX: 0, clientY: 0 };
   }
 
-  const clientX = Math.max(0, Math.min(view.innerWidth - 1, command.x * view.innerWidth));
-  const clientY = Math.max(0, Math.min(view.innerHeight - 1, command.y * view.innerHeight));
+  const { clientX, clientY } = mappedPoint;
   const target = documentRef.elementFromPoint(clientX, clientY);
 
   if (command.type === "pointer-move") {
@@ -242,7 +310,7 @@ export function applyRemoteMouseCommand(
       return { status: "ignored", reason: "empty-scroll", clientX, clientY };
     }
 
-    const scrollTarget = nearestScrollableElement(target, view);
+    const scrollTarget = nearestScrollableElement(target, view, deltaX, deltaY);
     if (scrollTarget) {
       scrollTarget.scrollBy({ left: deltaX, top: deltaY, behavior: "auto" });
     } else {

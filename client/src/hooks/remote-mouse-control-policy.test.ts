@@ -3,8 +3,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   applyRemoteMouseCommand,
+  getRemoteMouseViewportMetrics,
   isAllowedRemoteClickElement,
   isRemoteMouseBlockedElement,
+  mapRemoteMousePoint,
   normalizeRemoteMousePoint,
   type RemoteMouseCommandType,
   type RemoteMouseCommandView,
@@ -30,6 +32,7 @@ describe("remote mouse execution policy", () => {
     document.body.innerHTML = "";
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1000 });
     Object.defineProperty(window, "innerHeight", { configurable: true, value: 600 });
+    Object.defineProperty(window, "visualViewport", { configurable: true, value: undefined });
   });
 
   it("normalizes points only inside the displayed screen image", () => {
@@ -39,6 +42,44 @@ describe("remote mouse execution policy", () => {
     });
     expect(normalizeRemoteMousePoint(501, 150, { left: 0, top: 0, width: 500, height: 300 })).toBeNull();
     expect(normalizeRemoteMousePoint(10, 10, { left: 0, top: 0, width: 0, height: 300 })).toBeNull();
+  });
+
+  it("maps normalized points through the active visual viewport", () => {
+    Object.defineProperty(window, "visualViewport", {
+      configurable: true,
+      value: { offsetLeft: 120, offsetTop: 80, width: 500, height: 300, scale: 2 },
+    });
+
+    expect(getRemoteMouseViewportMetrics()).toEqual({
+      left: 120,
+      top: 80,
+      width: 500,
+      height: 300,
+      scale: 2,
+    });
+    expect(mapRemoteMousePoint(0.5, 0.5)).toEqual({ clientX: 370, clientY: 230 });
+    expect(mapRemoteMousePoint(1, 1)).toEqual({ clientX: 619, clientY: 379 });
+  });
+
+  it("uses the same viewport transform for pointer display and hit testing", () => {
+    Object.defineProperty(window, "visualViewport", {
+      configurable: true,
+      value: { offsetLeft: 40, offsetTop: 25, width: 800, height: 400, scale: 1.25 },
+    });
+    const viewButton = document.createElement("button");
+    viewButton.textContent = "View details";
+    const viewClick = vi.spyOn(viewButton, "click").mockImplementation(() => {});
+    document.body.appendChild(viewButton);
+    document.elementFromPoint = vi.fn(() => viewButton);
+
+    expect(applyRemoteMouseCommand(command("click", { x: 0.25, y: 0.75 }))).toEqual({
+      status: "executed",
+      reason: null,
+      clientX: 240,
+      clientY: 325,
+    });
+    expect(document.elementFromPoint).toHaveBeenCalledWith(240, 325);
+    expect(viewClick).toHaveBeenCalledTimes(1);
   });
 
   it("blocks fields, forms, disabled controls, and protected surfaces", () => {
@@ -159,6 +200,8 @@ describe("remote mouse execution policy", () => {
       scrollHeight: { configurable: true, value: 500 },
       clientWidth: { configurable: true, value: 100 },
       scrollWidth: { configurable: true, value: 100 },
+      scrollTop: { configurable: true, writable: true, value: 0 },
+      scrollLeft: { configurable: true, writable: true, value: 0 },
     });
     const scrollBy = vi.fn();
     container.scrollBy = scrollBy;
@@ -179,6 +222,46 @@ describe("remote mouse execution policy", () => {
       reason: null,
     });
     expect(windowScrollBy).toHaveBeenCalledWith({ left: 10, top: 40, behavior: "auto" });
+  });
+
+  it("bubbles scroll past an exhausted inner panel to a scrollable parent", () => {
+    const outer = document.createElement("div");
+    outer.style.overflowY = "auto";
+    const inner = document.createElement("div");
+    inner.style.overflowY = "auto";
+    const child = document.createElement("span");
+    inner.appendChild(child);
+    outer.appendChild(inner);
+    document.body.appendChild(outer);
+
+    Object.defineProperties(inner, {
+      clientHeight: { configurable: true, value: 100 },
+      scrollHeight: { configurable: true, value: 500 },
+      clientWidth: { configurable: true, value: 100 },
+      scrollWidth: { configurable: true, value: 100 },
+      scrollTop: { configurable: true, writable: true, value: 400 },
+      scrollLeft: { configurable: true, writable: true, value: 0 },
+    });
+    Object.defineProperties(outer, {
+      clientHeight: { configurable: true, value: 300 },
+      scrollHeight: { configurable: true, value: 900 },
+      clientWidth: { configurable: true, value: 300 },
+      scrollWidth: { configurable: true, value: 300 },
+      scrollTop: { configurable: true, writable: true, value: 100 },
+      scrollLeft: { configurable: true, writable: true, value: 0 },
+    });
+    const innerScrollBy = vi.fn();
+    const outerScrollBy = vi.fn();
+    inner.scrollBy = innerScrollBy;
+    outer.scrollBy = outerScrollBy;
+    document.elementFromPoint = vi.fn(() => child);
+
+    expect(applyRemoteMouseCommand(command("scroll", { deltaX: 0, deltaY: 120 }))).toMatchObject({
+      status: "executed",
+      reason: null,
+    });
+    expect(innerScrollBy).not.toHaveBeenCalled();
+    expect(outerScrollBy).toHaveBeenCalledWith({ left: 0, top: 120, behavior: "auto" });
   });
 
   it("ignores malformed coordinates, empty scrolls, and missing targets", () => {
