@@ -10,6 +10,7 @@ import { db } from "../../../db";
 import { requireAuth, requireNonPOS } from "../../../auth";
 import { stockItems, stockItemCodeAliases, stockItemMergeLogs, poLineItems } from "@shared/schema";
 import { eq, and, sql, isNull } from "drizzle-orm";
+import { resultRows } from "../../../lib/queryResult";
 
 export function registerStockItemReconcileRoutes(app: Express) {
   // ── Reconcile OTW Names: POST /api/stock-items/reconcile-otw-names ──────────
@@ -54,8 +55,7 @@ export function registerStockItemReconcileRoutes(app: Express) {
             WHERE si.company_id = ${companyId}
               AND si.deleted_at IS NOT NULL`
       );
-      const deletedRefs: { stockItemId: number; code: string }[] =
-        (deletedRefsRaw as any).rows ?? (deletedRefsRaw as unknown as any[]);
+      const deletedRefs: { stockItemId: number; code: string }[] = resultRows(deletedRefsRaw);
 
       // Only process those NOT already handled by a merge log
       const uncovered = deletedRefs.filter((r) => !coveredByLog.has(r.stockItemId));

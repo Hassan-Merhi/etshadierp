@@ -11,6 +11,7 @@ import { db } from "../../../../db";
 import { requireAuth } from "../../../../auth";
 import { employees } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { firstRow, resultRows } from "../../../../lib/queryResult";
 
 export function registerFactoryEmployeeRecalculateRoutes(app: Express) {
   // POST /api/factory/employees/recalculate-balances
@@ -59,7 +60,9 @@ export function registerFactoryEmployeeRecalculateRoutes(app: Express) {
 
       // Build a map: empId → { totalCredits, totalDebits }
       const sumMap = new Map<number, { credits: number; debits: number }>();
-      for (const row of (entrySums as any).rows || (entrySums as any)) {
+      for (const row of resultRows<{ employee_id: number; total_credits: string | null; total_debits: string | null }>(
+        entrySums
+      )) {
         const empId = Number(row.employee_id);
         sumMap.set(empId, {
           credits: parseFloat(row.total_credits || "0"),
@@ -125,9 +128,9 @@ export function registerFactoryEmployeeRecalculateRoutes(app: Express) {
           AND v.deleted_at IS NULL
       `);
 
-      const row = ((entrySums as any).rows || (entrySums as any))[0] || {};
-      const credits = parseFloat(row.total_credits || "0");
-      const debits = parseFloat(row.total_debits || "0");
+      const row = firstRow<{ total_credits: string | null; total_debits: string | null }>(entrySums);
+      const credits = parseFloat(row?.total_credits || "0");
+      const debits = parseFloat(row?.total_debits || "0");
       const openingBal = parseFloat(emp.openingBalance || "0");
       const newBalance = openingBal + credits - debits;
       const newDeposits = credits;

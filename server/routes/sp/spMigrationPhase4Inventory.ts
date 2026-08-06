@@ -4,6 +4,7 @@ import { loadStockItemMap, pn } from "./spMigrationPhase2Common";
 import { resolveTargetLocation } from "./spMigrationCutoverReadiness";
 import { ensureCutoverSchema } from "./spMigrationCutoverState";
 import { exactInventoryValue, numbersDiffer, type VerificationIssue } from "./spMigrationPhase4Policy";
+import { resultRows } from "../../lib/queryResult";
 
 export type InventoryPlanEntry = {
   key: string;
@@ -39,36 +40,46 @@ export function ensurePhase4CutoverSchema(): Promise<void> {
   if (!phase4SchemaPromise) {
     phase4SchemaPromise = (async () => {
       await ensureCutoverSchema();
-      await db.execute(sql.raw(`
+      await db.execute(
+        sql.raw(`
         ALTER TABLE sp_migration_cutovers
           ADD COLUMN IF NOT EXISTS target_write_hold BOOLEAN NOT NULL DEFAULT false,
           ADD COLUMN IF NOT EXISTS verification_snapshot JSONB,
           ADD COLUMN IF NOT EXISTS recovery_summary JSONB
-      `));
-      await db.execute(sql.raw(`
+      `)
+      );
+      await db.execute(
+        sql.raw(`
         ALTER TABLE sp_migration_cutover_stock_deltas
           ALTER COLUMN source_inventory_id DROP NOT NULL,
           ALTER COLUMN source_stock_item_id DROP NOT NULL,
           ADD COLUMN IF NOT EXISTS delta_key TEXT,
           ADD COLUMN IF NOT EXISTS created_target_inventory BOOLEAN NOT NULL DEFAULT false
-      `));
-      await db.execute(sql.raw(`
+      `)
+      );
+      await db.execute(
+        sql.raw(`
         UPDATE sp_migration_cutover_stock_deltas
         SET delta_key = COALESCE(delta_key, 'source:' || source_inventory_id::text)
         WHERE delta_key IS NULL
-      `));
-      await db.execute(sql.raw(`
+      `)
+      );
+      await db.execute(
+        sql.raw(`
         CREATE UNIQUE INDEX IF NOT EXISTS sp_migration_cutover_stock_delta_key_unique
         ON sp_migration_cutover_stock_deltas(cutover_id, delta_key)
         WHERE delta_key IS NOT NULL
-      `));
-      await db.execute(sql.raw(`
+      `)
+      );
+      await db.execute(
+        sql.raw(`
         ALTER TABLE sp_migration_cutover_role_changes
           ADD COLUMN IF NOT EXISTS source_locations_snapshot JSONB,
           ADD COLUMN IF NOT EXISTS source_cash_mappings_snapshot JSONB,
           ADD COLUMN IF NOT EXISTS target_locations_snapshot_before JSONB,
           ADD COLUMN IF NOT EXISTS target_cash_mappings_snapshot_before JSONB
-      `));
+      `)
+      );
     })().catch((error) => {
       phase4SchemaPromise = null;
       throw error;
@@ -86,7 +97,7 @@ async function loadTargetInventoryRows(targetId: number, targetItemIds: number[]
       AND stock_item_id = ANY(${targetItemIds})
     ORDER BY id ASC
   `);
-  return (result as any).rows ?? [];
+  return resultRows(result);
 }
 
 export async function buildExactInventoryPlan(sourceId: number, targetId: number): Promise<InventoryPlan> {
@@ -98,7 +109,7 @@ export async function buildExactInventoryPlan(sourceId: number, targetId: number
     WHERE company_id = ${sourceId}
     ORDER BY id ASC
   `);
-  const sourceRows = (sourceResult as any).rows ?? [];
+  const sourceRows = resultRows(sourceResult);
   const blockers: VerificationIssue[] = [];
   const targetLocationBySource = new Map<number | null, number>();
   const sourceLocationsByTarget = new Map<number, Array<number | null>>();
@@ -185,10 +196,7 @@ export async function buildExactInventoryPlan(sourceId: number, targetId: number
     });
   }
 
-  const targetRows = await loadTargetInventoryRows(
-    targetId,
-    Array.from(new Set(Array.from(stockItemMap.values())))
-  );
+  const targetRows = await loadTargetInventoryRows(targetId, Array.from(new Set(Array.from(stockItemMap.values()))));
   const targetByKey = new Map<string, any>();
   for (const targetRow of targetRows) {
     const key = `${pn(targetRow.stock_item_id)}:${pn(targetRow.location_id)}`;
@@ -271,10 +279,19 @@ async function snapshotDelta(tx: any, cutoverId: number, entry: InventoryPlanEnt
   `);
 }
 
-export async function synchronizeExactCutoverStock(cutoverId: number, sourceId: number, targetId: number): Promise<any> {
+export async function synchronizeExactCutoverStock(
+  cutoverId: number,
+  sourceId: number,
+  targetId: number
+): Promise<any> {
   const plan = await buildExactInventoryPlan(sourceId, targetId);
   if (plan.blockers.length > 0) {
-    throw new Error(plan.blockers.map((blocker) => blocker.message).slice(0, 10).join(" "));
+    throw new Error(
+      plan.blockers
+        .map((blocker) => blocker.message)
+        .slice(0, 10)
+        .join(" ")
+    );
   }
 
   let updated = 0;
@@ -296,7 +313,7 @@ export async function synchronizeExactCutoverStock(cutoverId: number, sourceId: 
                   ${entry.afterQuantity.toFixed(4)}, ${entry.afterAverageRate.toFixed(6)}, ${entry.afterTotalValue.toFixed(2)})
           RETURNING id
         `);
-        entry.targetInventoryId = pn((insertedResult as any).rows[0].id);
+        entry.targetInventoryId = pn(resultRows(insertedResult)[0].id);
         entry.createdTargetInventory = true;
         await snapshotDelta(tx, cutoverId, entry);
         inserted++;
@@ -319,7 +336,10 @@ export async function synchronizeExactCutoverStock(cutoverId: number, sourceId: 
   return { updated, inserted, zeroed, unchanged, plan };
 }
 
-export async function restoreExactCutoverStock(cutoverId: number, targetId: number): Promise<{ restored: number; deleted: number }> {
+export async function restoreExactCutoverStock(
+  cutoverId: number,
+  targetId: number
+): Promise<{ restored: number; deleted: number }> {
   await ensurePhase4CutoverSchema();
   const result = await db.execute(sql`
     SELECT * FROM sp_migration_cutover_stock_deltas
@@ -329,9 +349,11 @@ export async function restoreExactCutoverStock(cutoverId: number, targetId: numb
   let restored = 0;
   let deleted = 0;
   await db.transaction(async (tx: any) => {
-    for (const row of (result as any).rows ?? []) {
+    for (const row of resultRows(result)) {
       if (row.created_target_inventory) {
-        await tx.execute(sql`DELETE FROM inventory WHERE id = ${pn(row.target_inventory_id)} AND company_id = ${targetId}`);
+        await tx.execute(
+          sql`DELETE FROM inventory WHERE id = ${pn(row.target_inventory_id)} AND company_id = ${targetId}`
+        );
         deleted++;
       } else if (row.target_inventory_id) {
         await tx.execute(sql`

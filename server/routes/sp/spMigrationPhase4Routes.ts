@@ -6,10 +6,7 @@ import { requireAuth, requireRole } from "../../auth";
 import { validateMigrationPair, pn } from "./spMigrationPhase2Common";
 import { importHistoricalSales } from "./spMigrationPhase2Sales";
 import { importContainers } from "./spMigrationPhase2Containers";
-import {
-  getLiveCutover,
-  invalidateCutoverLockCache,
-} from "./spMigrationCutoverState";
+import { getLiveCutover, invalidateCutoverLockCache } from "./spMigrationCutoverState";
 import { ensureCutoverHardening } from "./spMigrationCutoverHardening";
 import {
   ensurePhase4CutoverSchema,
@@ -25,6 +22,7 @@ import {
   latestCutoverBlocksCompany,
 } from "./spMigrationPhase4Policy";
 import { repairSpSupplierVoucherLinks } from "./spSupplierVoucherSync";
+import { resultRows, firstRow } from "../../lib/queryResult";
 
 const installedApps = new WeakSet<object>();
 let holdCache: { expiresAt: number; byCompany: Map<number, any> } | null = null;
@@ -39,11 +37,13 @@ function ensurePhase4Schema(): Promise<void> {
   if (!phase4RouteSchemaPromise) {
     phase4RouteSchemaPromise = (async () => {
       await Promise.all([ensurePhase4CutoverSchema(), ensureCutoverHardening()]);
-      await db.execute(sql.raw(`
+      await db.execute(
+        sql.raw(`
         ALTER TABLE sp_migration_cutovers
           ADD COLUMN IF NOT EXISTS rollback_window_hours INTEGER NOT NULL DEFAULT 72,
           ADD COLUMN IF NOT EXISTS finalize_started_at TIMESTAMPTZ
-      `));
+      `)
+      );
     })().catch((error) => {
       phase4RouteSchemaPromise = null;
       throw error;
@@ -86,7 +86,7 @@ async function loadLatestCutoversForCompanies(companyIds: number[]): Promise<Map
       ORDER BY id DESC
       LIMIT 1
     `);
-    byCompany.set(companyId, (result as any).rows?.[0] ?? null);
+    byCompany.set(companyId, firstRow(result) ?? null);
   }
   holdCache = { expiresAt: Date.now() + 3000, byCompany };
   return byCompany;
@@ -97,11 +97,7 @@ async function phase4WriteGuard(req: Request, res: Response, next: NextFunction)
     const method = req.method.toUpperCase();
     if (["GET", "HEAD", "OPTIONS"].includes(method)) return next();
     if (!req.path.startsWith("/api")) return next();
-    if (
-      req.path.startsWith("/api/auth/") ||
-      req.path.startsWith("/api/health") ||
-      req.path === "/api/csrf-token"
-    ) {
+    if (req.path.startsWith("/api/auth/") || req.path.startsWith("/api/health") || req.path === "/api/csrf-token") {
       return next();
     }
 
@@ -121,7 +117,7 @@ async function phase4WriteGuard(req: Request, res: Response, next: NextFunction)
           WHERE id = ${runId}
           LIMIT 1
         `);
-        const row = (run as any).rows?.[0];
+        const row = firstRow(run);
         if (row) {
           migrationCompanyIds.push(pn(row.source_company_id), pn(row.target_company_id));
         }
@@ -139,10 +135,11 @@ async function phase4WriteGuard(req: Request, res: Response, next: NextFunction)
           ORDER BY id DESC
           LIMIT 1
         `);
-        const cutover = (active as any).rows?.[0];
+        const cutover = firstRow(active);
         if (cutover) {
           return void res.status(423).json({
-            message: "This migration step is blocked while production cutover is prepared or active. Use only cutover controls and review mappings.",
+            message:
+              "This migration step is blocked while production cutover is prepared or active. Use only cutover controls and review mappings.",
             code: "SP_MIGRATION_WRITE_LOCKED",
             cutoverId: pn(cutover.id),
             status: cutover.status,
@@ -232,7 +229,9 @@ async function invokeMigrationHandler(
 }
 
 async function targetLiveActivity(targetId: number, activatedAt?: string | null): Promise<any> {
-  const vouchers = await db.execute(activatedAt ? sql`
+  const vouchers = await db.execute(
+    activatedAt
+      ? sql`
     SELECT COUNT(*)::int AS count FROM vouchers v
     WHERE v.company_id = ${targetId}
       AND v.deleted_at IS NULL
@@ -240,42 +239,60 @@ async function targetLiveActivity(targetId: number, activatedAt?: string | null)
       AND COALESCE(v.source_module, 'ERP') NOT IN ('SP_MIGRATION', 'SP_MIGRATION_READONLY')
       AND v.voucher_number NOT LIKE ${`OB-${targetId}-%`}
       AND v.voucher_number NOT LIKE 'GC-PROFIT-OPN-%'
-  ` : sql`
+  `
+      : sql`
     SELECT COUNT(*)::int AS count FROM vouchers v
     WHERE v.company_id = ${targetId}
       AND v.deleted_at IS NULL
       AND COALESCE(v.source_module, 'ERP') NOT IN ('SP_MIGRATION', 'SP_MIGRATION_READONLY')
       AND v.voucher_number NOT LIKE ${`OB-${targetId}-%`}
       AND v.voucher_number NOT LIKE 'GC-PROFIT-OPN-%'
-  `);
-  const sales = await db.execute(activatedAt ? sql`
+  `
+  );
+  const sales = await db.execute(
+    activatedAt
+      ? sql`
     SELECT COUNT(*)::int AS count FROM sp_sales s
     WHERE s.company_id = ${targetId} AND s.created_at > ${activatedAt}
-  ` : sql`SELECT COUNT(*)::int AS count FROM sp_sales s WHERE s.company_id = ${targetId}`);
-  const offloads = await db.execute(activatedAt ? sql`
+  `
+      : sql`SELECT COUNT(*)::int AS count FROM sp_sales s WHERE s.company_id = ${targetId}`
+  );
+  const offloads = await db.execute(
+    activatedAt
+      ? sql`
     SELECT COUNT(*)::int AS count FROM sp_offloads o
     WHERE o.company_id = ${targetId} AND o.created_at > ${activatedAt}
-  ` : sql`SELECT COUNT(*)::int AS count FROM sp_offloads o WHERE o.company_id = ${targetId}`);
-  const prepaid = await db.execute(activatedAt ? sql`
+  `
+      : sql`SELECT COUNT(*)::int AS count FROM sp_offloads o WHERE o.company_id = ${targetId}`
+  );
+  const prepaid = await db.execute(
+    activatedAt
+      ? sql`
     SELECT COUNT(*)::int AS count FROM sp_prepaid_charges p
     WHERE p.company_id = ${targetId} AND p.created_at > ${activatedAt}
-  ` : sql`SELECT COUNT(*)::int AS count FROM sp_prepaid_charges p WHERE p.company_id = ${targetId}`);
-  const containers = await db.execute(activatedAt ? sql`
+  `
+      : sql`SELECT COUNT(*)::int AS count FROM sp_prepaid_charges p WHERE p.company_id = ${targetId}`
+  );
+  const containers = await db.execute(
+    activatedAt
+      ? sql`
     SELECT COUNT(*)::int AS count FROM sp_containers c
     WHERE c.company_id = ${targetId}
       AND c.created_at > ${activatedAt}
       AND COALESCE(c.notes, '') NOT ILIKE '%migrated from%erp container%'
-  ` : sql`
+  `
+      : sql`
     SELECT COUNT(*)::int AS count FROM sp_containers c
     WHERE c.company_id = ${targetId}
       AND COALESCE(c.notes, '') NOT ILIKE '%migrated from%erp container%'
-  `);
+  `
+  );
   const counts = {
-    vouchers: pn((vouchers as any).rows?.[0]?.count),
-    sales: pn((sales as any).rows?.[0]?.count),
-    offloads: pn((offloads as any).rows?.[0]?.count),
-    prepaid: pn((prepaid as any).rows?.[0]?.count),
-    containers: pn((containers as any).rows?.[0]?.count),
+    vouchers: pn(firstRow(vouchers)?.count),
+    sales: pn(firstRow(sales)?.count),
+    offloads: pn(firstRow(offloads)?.count),
+    prepaid: pn(firstRow(prepaid)?.count),
+    containers: pn(firstRow(containers)?.count),
   };
   return { ...counts, total: Object.values(counts).reduce((sum, value) => sum + value, 0) };
 }
@@ -301,7 +318,7 @@ async function normalizedVerification(sourceId: number, targetId: number, requir
 
 async function loadCutover(cutoverId: number): Promise<any | null> {
   const result = await db.execute(sql`SELECT * FROM sp_migration_cutovers WHERE id = ${cutoverId} LIMIT 1`);
-  return (result as any).rows?.[0] ?? null;
+  return firstRow(result) ?? null;
 }
 
 async function prepareCutover(req: any, res: any): Promise<any> {
@@ -316,10 +333,15 @@ async function prepareCutover(req: any, res: any): Promise<any> {
   if (error) return res.status(400).json({ message: error });
   await ensurePhase4Schema();
   const existing = await getLiveCutover(pair.sourceId, pair.targetId);
-  if (existing) return res.status(409).json({ message: `Cutover ${existing.id} is already ${existing.status}.`, cutover: existing });
+  if (existing)
+    return res
+      .status(409)
+      .json({ message: `Cutover ${existing.id} is already ${existing.status}.`, cutover: existing });
   const verification = await normalizedVerification(pair.sourceId, pair.targetId);
   if (!verification.canPrepare) {
-    return res.status(409).json({ message: "Cutover preparation is blocked. Resolve all FAIL items first.", verification });
+    return res
+      .status(409)
+      .json({ message: "Cutover preparation is blocked. Resolve all FAIL items first.", verification });
   }
   const rollbackWindowHours = Math.min(168, Math.max(1, pn(req.body?.rollbackWindowHours) || 72));
   const inserted = await db.execute(sql`
@@ -337,7 +359,7 @@ async function prepareCutover(req: any, res: any): Promise<any> {
   return res.json({
     success: true,
     message: "Source and target are locked. Review WARN deltas, then finalize to synchronize them.",
-    cutover: (inserted as any).rows[0],
+    cutover: resultRows(inserted)[0],
     verification,
   });
 }
@@ -364,7 +386,7 @@ async function finalizeCutover(req: any, res: any): Promise<any> {
     WHERE id = ${cutoverId} AND status = 'prepared' AND finalize_started_at IS NULL
     RETURNING id
   `);
-  if (!(claimed as any).rows?.[0]) {
+  if (!firstRow(claimed)) {
     return res.status(409).json({ message: "Cutover finalization is already running or awaiting recovery." });
   }
 
@@ -404,9 +426,11 @@ async function finalizeCutover(req: any, res: any): Promise<any> {
       await db.execute(sql`
         UPDATE sp_migration_cutovers
         SET finalize_started_at = NULL,
-            failure_message = ${repairBlockers.length
-              ? `Phase 4 repair blockers: ${repairBlockers.slice(0, 5).join(" | ")}`
-              : "Final verification did not pass after delta synchronization"},
+            failure_message = ${
+              repairBlockers.length
+                ? `Phase 4 repair blockers: ${repairBlockers.slice(0, 5).join(" | ")}`
+                : "Final verification did not pass after delta synchronization"
+            },
             delta_summary = ${JSON.stringify({ salesDelta, salesRepair, containerDelta, containerRepair, stockDelta, supplierLinksRepaired })}::jsonb,
             final_readiness_snapshot = ${JSON.stringify(verification)}::jsonb,
             verification_snapshot = ${JSON.stringify(verification)}::jsonb,
@@ -422,12 +446,7 @@ async function finalizeCutover(req: any, res: any): Promise<any> {
       });
     }
 
-    const roleSummary = await moveUsersToTargetExact(
-      cutoverId,
-      pair.sourceId,
-      pair.targetId,
-      pair.targetCompany.name
-    );
+    const roleSummary = await moveUsersToTargetExact(cutoverId, pair.sourceId, pair.targetId, pair.targetCompany.name);
     const rollbackWindowHours = pn(live.rollback_window_hours) || 72;
     const activated = await db.execute(sql`
       UPDATE sp_migration_cutovers
@@ -441,12 +460,12 @@ async function finalizeCutover(req: any, res: any): Promise<any> {
       WHERE id = ${cutoverId} AND status = 'prepared'
       RETURNING *
     `);
-    if (!(activated as any).rows?.[0]) throw new Error("Cutover activation state changed before the final commit.");
+    if (!firstRow(activated)) throw new Error("Cutover activation state changed before the final commit.");
     invalidatePhase4HoldCache();
     return res.json({
       success: true,
       message: "Supplier Partner cutover is active and final verification is PASS.",
-      cutover: (activated as any).rows[0],
+      cutover: resultRows(activated)[0],
       deltaSummary: { salesDelta, salesRepair, containerDelta, containerRepair, stockDelta, supplierLinksRepaired },
       roleSummary,
       verification,
@@ -470,15 +489,23 @@ async function finalizeCutover(req: any, res: any): Promise<any> {
     } catch (restoreError) {
       recovery.stockRestoreError = restoreError instanceof Error ? restoreError.message : String(restoreError);
     }
-    await db.execute(sql`
+    await db
+      .execute(
+        sql`
       UPDATE sp_migration_cutovers
       SET finalize_started_at = NULL, failure_message = ${message},
           delta_summary = ${JSON.stringify(partialDeltaSummary)}::jsonb,
           recovery_summary = ${JSON.stringify(recovery)}::jsonb, updated_at = now()
       WHERE id = ${cutoverId}
-    `).catch(() => undefined);
+    `
+      )
+      .catch(() => undefined);
     invalidatePhase4HoldCache();
-    logger.error("[SP Phase 4] Cutover finalization failed and recovery was attempted", { error: caught, cutoverId, recovery });
+    logger.error("[SP Phase 4] Cutover finalization failed and recovery was attempted", {
+      error: caught,
+      cutoverId,
+      recovery,
+    });
     return res.status(500).json({
       message: `Cutover finalization failed: ${message}`,
       cutoverId,
@@ -493,7 +520,8 @@ async function rollbackCutover(req: any, res: any): Promise<any> {
   await ensurePhase4Schema();
   const cutover = await loadCutover(cutoverId);
   if (!cutover) return res.status(404).json({ message: "Cutover not found" });
-  if (cutover.status !== "active") return res.status(409).json({ message: "Only an active cutover can be rolled back." });
+  if (cutover.status !== "active")
+    return res.status(409).json({ message: "Only an active cutover can be rolled back." });
   const error = exactCutoverConfirmation(
     req.body?.confirmation,
     "ROLLBACK CUTOVER",
@@ -530,7 +558,7 @@ async function rollbackCutover(req: any, res: any): Promise<any> {
   return res.json({
     success: true,
     message: "Cutover rolled back. The source is writable again; the target copy remains read-only for safety.",
-    cutover: (rolledBack as any).rows[0],
+    cutover: resultRows(rolledBack)[0],
     users,
     stock,
   });
@@ -542,7 +570,8 @@ async function cancelPreparedCutover(req: any, res: any): Promise<any> {
   await ensurePhase4Schema();
   const cutover = await loadCutover(cutoverId);
   if (!cutover) return res.status(404).json({ message: "Cutover not found" });
-  if (cutover.status !== "prepared") return res.status(409).json({ message: "Only a prepared cutover can be cancelled." });
+  if (cutover.status !== "prepared")
+    return res.status(409).json({ message: "Only a prepared cutover can be cancelled." });
   const error = exactCutoverConfirmation(
     req.body?.confirmation,
     "CANCEL CUTOVER",
@@ -556,8 +585,9 @@ async function cancelPreparedCutover(req: any, res: any): Promise<any> {
       (SELECT COUNT(*) FROM sp_migration_cutover_stock_deltas WHERE cutover_id = ${cutoverId})::int AS stock_count,
       (SELECT COUNT(*) FROM sp_migration_cutover_role_changes WHERE cutover_id = ${cutoverId})::int AS role_count
   `);
-  const changed = (changedResult as any).rows?.[0] ?? {};
-  const hadFinalizationChanges = pn(changed.stock_count) > 0 || pn(changed.role_count) > 0 || Boolean(cutover.delta_summary);
+  const changed = firstRow(changedResult) ?? {};
+  const hadFinalizationChanges =
+    pn(changed.stock_count) > 0 || pn(changed.role_count) > 0 || Boolean(cutover.delta_summary);
   const users = await restoreUsersToSourceExact(
     cutoverId,
     pn(cutover.source_company_id),
@@ -581,7 +611,7 @@ async function cancelPreparedCutover(req: any, res: any): Promise<any> {
     message: hadFinalizationChanges
       ? "Prepared cutover cancelled. The target remains read-only because finalization had already changed its migration copy."
       : "Prepared cutover cancelled and both temporary locks were removed.",
-    cutover: (cancelled as any).rows[0],
+    cutover: resultRows(cancelled)[0],
     users,
     stock,
   });
@@ -608,12 +638,16 @@ async function releaseTargetHold(req: any, res: any): Promise<any> {
     WHERE target_company_id = ${pn(cutover.target_company_id)}
     ORDER BY id DESC LIMIT 1
   `);
-  if (pn((latest as any).rows?.[0]?.id) !== cutoverId) {
-    return res.status(409).json({ message: "A newer cutover exists for this target; its state controls the write lock." });
+  if (pn(firstRow(latest)?.id) !== cutoverId) {
+    return res
+      .status(409)
+      .json({ message: "A newer cutover exists for this target; its state controls the write lock." });
   }
   const activity = await targetLiveActivity(pn(cutover.target_company_id));
   if (activity.total > 0) {
-    return res.status(409).json({ message: "Target hold cannot be released while genuine target transactions exist.", activity });
+    return res
+      .status(409)
+      .json({ message: "Target hold cannot be released while genuine target transactions exist.", activity });
   }
   const released = await db.execute(sql`
     UPDATE sp_migration_cutovers
@@ -622,7 +656,7 @@ async function releaseTargetHold(req: any, res: any): Promise<any> {
     RETURNING *
   `);
   invalidatePhase4HoldCache();
-  return res.json({ success: true, cutover: (released as any).rows[0] });
+  return res.json({ success: true, cutover: resultRows(released)[0] });
 }
 
 async function statusCutover(req: any, res: any): Promise<any> {
@@ -637,7 +671,7 @@ async function statusCutover(req: any, res: any): Promise<any> {
   `);
   return res.json({
     liveCutover: live,
-    latestCutover: (latestResult as any).rows?.[0] ?? null,
+    latestCutover: firstRow(latestResult) ?? null,
     verification: await normalizedVerification(pair.sourceId, pair.targetId, !live || live.status === "prepared"),
   });
 }
@@ -652,7 +686,9 @@ async function finalVerification(req: any, res: any): Promise<any> {
 export function registerSpMigrationPhase4Routes(app: Express): void {
   installPhase4WriteGuard(app);
   void ensurePhase4Schema().catch((error) => {
-    logger.warn("[SP Phase 4] Schema setup deferred", { error: error instanceof Error ? error.message : String(error) });
+    logger.warn("[SP Phase 4] Schema setup deferred", {
+      error: error instanceof Error ? error.message : String(error),
+    });
   });
   const developer = [requireAuth, requireRole("Developer")] as const;
 
@@ -670,6 +706,8 @@ export function registerSpMigrationPhase4Routes(app: Express): void {
     if (req.body?.action === "rollback") return rollbackCutover(req, res);
     if (req.body?.action === "cancel") return cancelPreparedCutover(req, res);
     if (req.body?.action === "release-target-hold") return releaseTargetHold(req, res);
-    return res.status(400).json({ message: "action must be prepare, finalize, rollback, cancel, or release-target-hold" });
+    return res
+      .status(400)
+      .json({ message: "action must be prepare, finalize, rollback, cancel, or release-target-hold" });
   });
 }

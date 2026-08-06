@@ -1,6 +1,7 @@
 import { db } from "../../db";
 import { sql, eq, and, isNull } from "drizzle-orm";
 import { ledgerAccounts } from "@shared/schema";
+import { firstRow } from "../../lib/queryResult";
 
 // ── Shared SP (Supplier Partner) route helpers ────────────────────────────────
 // Structural-only extraction from the former monolithic spRoutes.ts — logic is
@@ -17,7 +18,7 @@ export async function requireSpCompany(req: any, res: any): Promise<number | nul
     return null;
   }
   const rows = await db.execute(sql`SELECT company_type FROM companies WHERE id = ${companyId} LIMIT 1`);
-  const row = (rows as any).rows?.[0] ?? (rows as any)[0];
+  const row = firstRow(rows) ?? (rows as any)[0];
   if (!row || row.company_type !== "supplier_partner") {
     res.status(403).json({ message: "Not a supplier_partner company" });
     return null;

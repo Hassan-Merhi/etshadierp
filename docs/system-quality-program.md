@@ -15,14 +15,14 @@ so it can be re-derived rather than trusted.
 
 | Signal | Now | Command |
 |---|---|---|
-| Type escapes (AST) | 11,814 total — 8,669 `: any`, 3,143 `as any`, 2 suppressions | `npm run audit:type-escapes` |
-| Files carrying escapes | 1,329 of 2,523 (53%) | `npm run audit:type-escapes` |
-| Drizzle result casts | 344 | `npm run audit:type-escapes` |
+| Type escapes (AST) | 11,408 total — 8,627 `: any`, 2,779 `as any`, 2 suppressions | `npm run audit:type-escapes` |
+| Files carrying escapes | 1,328 of 2,524 (53%) | `npm run audit:type-escapes` |
+| Drizzle result casts | 0 (was 344 — Phase 1b) | `npm run audit:type-escapes` |
 | Backend coverage floor (lines) | 17% | `config/coverage-thresholds.json` |
 | Test files | 363 (330 `tests/`, 33 colocated) | `find tests server client/src shared -name '*.test.ts*'` |
 | Registered routes | 1,871 | `config/route-manifest.json` |
 | Docs | 177 files, 116 phase-named (65%) | `npm run audit:doc-index` |
-| God-file backlog | 64 files, 33,432 excess lines | `npm run audit:god-files` |
+| God-file backlog | 64 files, 33,431 excess lines | `npm run audit:god-files` |
 
 Every figure above is bound to its source in `config/doc-index.json` and checked
 by `npm run audit:doc-index`, so this table fails the build rather than going
@@ -38,7 +38,7 @@ absence.
 
 **The god-file backlog is much smaller than its own documentation claims.** That
 doc opened with "139 files, 74,858 lines over the limit" and later said "82 files
-and 45,684". The audit reports **64 and 33,432** — the program is 67% cleared,
+and 45,684". The audit reports **64 and 33,431** — the program is 67% cleared,
 not 45%. Three separate figures, all wrong, in a document whose entire purpose is
 tracking one number. The first draft of *this* document then repeated the
 mistake, citing 66 and 35,729 because those were derived from the frozen
@@ -102,9 +102,9 @@ npm run audit:type-escapes
 The audit reports two extras that make the phases below schedulable: the
 distribution by directory (server 7,845 against client 3,969), and the reverse
 index of **files where an `as any` sits on a value that came from a Drizzle
-query** — 344 of them, the ones actively discarding schema types, and the
-highest-value targets. They cluster hard: the ten worst files hold 158 of the
-344, most under `server/routes/sp/`.
+query** — 344 of them when the census was taken, the ones actively discarding
+schema types. They clustered hard: the ten worst files held 158 of the 344, most
+under `server/routes/sp/`. Phase 1b took them to zero.
 
 ### 0.2 Money-endpoint characterization pins (`config/report-characterization.json`)
 
@@ -180,32 +180,75 @@ production source file was changed — the only edits outside `config/`,
 
 ## Phase 1 — type-safety ratchet
 
-Depends on 0.1.
+Depends on 0.1. **1a, 1b and 1c are done; 1d is ongoing by design.**
 
-The goal is not zero. It is **a number that only falls**, and a rule that stops
-the schema's guarantees being discarded in new code.
+The goal was never zero. It is **a number that only falls**, and a rule that
+stops the schema's guarantees being discarded in new code.
 
-**1a. Freeze and enable.** Turn on `@typescript-eslint/no-explicit-any` as
-`warn` and `no-unused-vars` back on, with the baseline absorbing every existing
-violation. CI fails on new ones only. This is the whole point of the phase; the
-rest is drawdown.
+**1a. Freeze and enable — done.** `@typescript-eslint/no-explicit-any` is on as
+a warning, so `any` is visible in the editor as it is written. The rule is the
+feedback loop, not the gate: enforcement stays with the per-file ratchet in
+`config/type-escape-boundaries.json`, which is exact and fails CI when a single
+file gains an escape. A warning cannot do that.
 
-**1b. Drizzle result casts.** Work the 0.1 reverse index: `(result as any).rows`
-appears throughout the storage and route layers, discarding a type the query
-already knew. These are mechanical, high-count, and low-risk — a typed
-`execute()` helper in `server/lib/` fixes them in bulk rather than one at a time.
+`npm run lint` now carries `--max-warnings`, frozen at the current total. It is
+a coarse ratchet — a warning removed here offsets one added there — but it
+covers the ~870 warnings (mostly `react-hooks/exhaustive-deps` and unused vars)
+that had no gate of any kind.
 
-**1c. Per-file disable lists.** `eslint.config.js` carries two blocks disabling
-`unused-imports/no-unused-imports` for 14 named files. Each is a deferred
-cleanup with no owner and no expiry. Clear the list; delete the blocks.
+The plan also called for turning `no-unused-vars` back on. That was wrong:
+`unused-imports/no-unused-vars` already replaces it, and the plugin requires the
+base rule disabled to avoid double-reporting. The existing setup was correct.
 
-**1d. Drawdown by ownership.** Remaining escapes, worked per domain alongside
-whatever else touches that domain. No dedicated sweep — a 6,000-item mechanical
-pass produces an unreviewable diff, and the ratchet means untouched code is no
-longer getting worse.
+**1b. Drizzle result casts — done, 344 → 0.** `server/lib/queryResult.ts` adds
+`resultRows<TRow>()` / `firstRow<TRow>()`, which return the rows without the
+`any` and let a caller name its columns. Both tolerate a result that is itself
+an array, because older drizzle releases resolved `execute()` to the rows
+directly and many call sites still carried a defensive fallback for it —
+preserving that is what makes the replacement behaviour-preserving.
 
-**Exit criteria:** lint rules on, baseline falling for three consecutive months,
-`eslint.config.js` free of per-file exemptions.
+The conversion was a codemod with one rule per expression shape, each chosen to
+keep runtime behaviour identical (`.rows?.[0]` became `firstRow(x)`, but
+`.rows[0]` became `resultRows(x)[0]`, so an absent row still throws where it
+threw before). 260 of the 344 sites compiled untouched; the remaining 84 were
+type errors, and **that was the point** — each one was a column value flowing
+into a typed slot with nothing checking it. They were fixed by declaring the
+query's row shape at the call site, which is the durable artifact: the shape of
+a raw SQL result is now written down next to the SQL.
+
+Total escapes fell 11,814 → 11,408. The drop is smaller than 344 because
+declaring row types removed some `any`s and the codemod also deleted dead
+`?? (x as unknown as any[])` fallbacks that had been unreachable.
+
+**1c. Per-file disable lists — done for 10 of 14.** 39 unused imports removed;
+four of the fourteen exemptions were stale (those files had no unused imports at
+all).
+
+Four files could not be touched, and the reason generalises to every future PR:
+**CI format-checks each changed file, and Prettier reflow pushes each of these
+past a size gate.** `FactoryBaleProductHistory` goes 849 → 915 and becomes a new
+god file; `FactoryPayrollTab` 1573 → 1610 against a frozen 1575;
+`DailyProductionReport` 1328 → 1366 against 1350; `workerStatsAdvancesRoutes`
+921 → 928 against 922. Deleting one unused import from any of them fails either
+the format gate or the size gate, so they are effectively unmodifiable until
+they are split.
+
+Raising a frozen baseline to absorb formatting churn would leave headroom that
+silently refills — working rule 4 of the god-file program exists to prevent
+exactly that — so the exemption was kept, narrowed to those four, and annotated
+in `eslint.config.js` with the numbers and what unblocks it. **This is now the
+strongest argument for that program's Phase 4:** the size backlog is not just a
+readability debt, it is a set of files nobody can edit.
+
+**1d. Drawdown by ownership — ongoing.** The remaining ~11,400 escapes are
+worked per domain alongside whatever else touches that domain. No dedicated
+sweep: a mechanical pass at that scale produces an unreviewable diff, and the
+ratchet means untouched code is no longer getting worse.
+
+**Exit criteria:** lint rules on ✓, `eslint.config.js` exemptions cleared except
+the four blocked by file size ✓, baseline falling ✓ (11,814 → 11,408 in this
+change). The "falling for three consecutive months" criterion is calendar-bound
+and cannot be closed by a single change; the ratchet is what makes it hold.
 
 ---
 

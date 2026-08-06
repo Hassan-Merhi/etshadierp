@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { db } from "../../db";
 import { ensurePhase2Schema, getSuspenseReview, loadStockItemMap, pn } from "./spMigrationPhase2Common";
 import { ensureCutoverSchema } from "./spMigrationCutoverState";
+import { resultRows, firstRow } from "../../lib/queryResult";
 
 const REQUIRED_SP_SUBTYPES = [
   "sp_goods_otw",
@@ -41,7 +42,7 @@ export async function resolveTargetLocation(
       WHERE company_id = ${targetId} AND code = 'UNASSIGNED' AND deleted_at IS NULL
       LIMIT 1
     `);
-    const row = (unassigned as any).rows?.[0];
+    const row = firstRow(unassigned);
     return row
       ? {
           sourceLocationId: null,
@@ -59,7 +60,7 @@ export async function resolveTargetLocation(
     WHERE id = ${sourceLocationId} AND company_id = ${sourceId} AND deleted_at IS NULL
     LIMIT 1
   `);
-  const source = (sourceResult as any).rows?.[0];
+  const source = firstRow<{ code: string | null; name: string | null }>(sourceResult);
   if (!source) return null;
 
   if (source.code) {
@@ -68,10 +69,10 @@ export async function resolveTargetLocation(
       WHERE company_id = ${targetId} AND code = ${source.code} AND deleted_at IS NULL
       LIMIT 1
     `);
-    if ((byCode as any).rows?.[0]) {
+    if (firstRow(byCode)) {
       return {
         sourceLocationId,
-        targetLocationId: pn((byCode as any).rows[0].id),
+        targetLocationId: pn(firstRow(byCode)?.id),
         sourceCode: source.code,
         sourceName: source.name,
         method: "code",
@@ -85,7 +86,7 @@ export async function resolveTargetLocation(
     ORDER BY id ASC
     LIMIT 2
   `);
-  const rows = (byName as any).rows ?? [];
+  const rows = resultRows(byName);
   if (rows.length === 1) {
     return {
       sourceLocationId,
@@ -109,7 +110,12 @@ export async function resolveTargetLedgerAccount(
     WHERE id = ${sourceAccountId} AND deleted_at IS NULL
     LIMIT 1
   `);
-  const source = (sourceResult as any).rows?.[0];
+  const source = firstRow<{
+    code: string | null;
+    name: string | null;
+    account_type: string | null;
+    sub_type: string | null;
+  }>(sourceResult);
   if (!source) return null;
 
   if (source.sub_type) {
@@ -118,7 +124,7 @@ export async function resolveTargetLedgerAccount(
       WHERE company_id = ${targetId} AND sub_type = ${source.sub_type} AND deleted_at IS NULL
       LIMIT 1
     `);
-    if ((bySubtype as any).rows?.[0]) return pn((bySubtype as any).rows[0].id);
+    if (firstRow(bySubtype)) return pn(resultRows(bySubtype)[0].id);
   }
   if (source.code) {
     const byCode = await db.execute(sql`
@@ -126,7 +132,7 @@ export async function resolveTargetLedgerAccount(
       WHERE company_id = ${targetId} AND lower(code) = lower(${source.code}) AND deleted_at IS NULL
       LIMIT 1
     `);
-    if ((byCode as any).rows?.[0]) return pn((byCode as any).rows[0].id);
+    if (firstRow(byCode)) return pn(resultRows(byCode)[0].id);
   }
   const byName = await db.execute(sql`
     SELECT id FROM ledger_accounts
@@ -137,7 +143,7 @@ export async function resolveTargetLedgerAccount(
     ORDER BY id ASC
     LIMIT 2
   `);
-  const rows = (byName as any).rows ?? [];
+  const rows = resultRows(byName);
   return rows.length === 1 ? pn(rows[0].id) : null;
 }
 
@@ -149,7 +155,7 @@ async function getCompletedActions(sourceId: number, targetId: number): Promise<
       AND target_company_id = ${targetId}
       AND status = 'completed'
   `);
-  return new Set(((result as any).rows ?? []).map((row: any) => String(row.action)));
+  return new Set(resultRows(result).map((row: any) => String(row.action)));
 }
 
 export async function buildCutoverReadiness(sourceId: number, targetId: number): Promise<any> {
@@ -160,7 +166,10 @@ export async function buildCutoverReadiness(sourceId: number, targetId: number):
   const completed = await getCompletedActions(sourceId, targetId);
   for (const action of ["gc_stock_master", "gc_stock_opening", "gc_sales_readonly", "gc_containers"]) {
     if (!completed.has(action)) {
-      blockers.push({ code: `MISSING_${action.toUpperCase()}`, message: `Required migration action ${action} is not complete.` });
+      blockers.push({
+        code: `MISSING_${action.toUpperCase()}`,
+        message: `Required migration action ${action} is not complete.`,
+      });
     }
   }
 
@@ -174,7 +183,7 @@ export async function buildCutoverReadiness(sourceId: number, targetId: number):
         AND a.deleted_at IS NULL
     )
   `);
-  const missingAccounts = (missingAccountsResult as any).rows ?? [];
+  const missingAccounts = resultRows(missingAccountsResult);
   if (missingAccounts.length) {
     blockers.push({
       code: "MISSING_TARGET_ACCOUNTS",
@@ -190,7 +199,7 @@ export async function buildCutoverReadiness(sourceId: number, targetId: number):
     WHERE company_id = ${sourceId}
     ORDER BY id ASC
   `);
-  const sourceInventory = (sourceInventoryResult as any).rows ?? [];
+  const sourceInventory = resultRows(sourceInventoryResult);
   const stockDiffs: any[] = [];
   const unmappedInventory: any[] = [];
 
@@ -219,7 +228,7 @@ export async function buildCutoverReadiness(sourceId: number, targetId: number):
         AND location_id = ${locationMap.targetLocationId}
       LIMIT 1
     `);
-    const targetRow = (targetResult as any).rows?.[0];
+    const targetRow = firstRow(targetResult);
     const sourceQty = pn(sourceRow.quantity);
     const sourceRate = pn(sourceRow.average_rate);
     const targetQty = pn(targetRow?.quantity);
@@ -278,9 +287,13 @@ export async function buildCutoverReadiness(sourceId: number, targetId: number):
           AND tv.voucher_number = LEFT('MIG-GC-' || v.voucher_number, 100)
       )
   `);
-  const salesDeltaCount = pn((salesDeltaResult as any).rows?.[0]?.count);
+  const salesDeltaCount = pn(firstRow(salesDeltaResult)?.count);
   if (salesDeltaCount) {
-    deltas.push({ code: "SALES_DELTA", message: `${salesDeltaCount} sale voucher(s) require final migration.`, count: salesDeltaCount });
+    deltas.push({
+      code: "SALES_DELTA",
+      message: `${salesDeltaCount} sale voucher(s) require final migration.`,
+      count: salesDeltaCount,
+    });
   }
 
   const containerDeltaResult = await db.execute(sql`
@@ -299,7 +312,7 @@ export async function buildCutoverReadiness(sourceId: number, targetId: number):
           AND l.target_table = 'sp_containers'
       )
   `);
-  const containerDeltaCount = pn((containerDeltaResult as any).rows?.[0]?.count);
+  const containerDeltaCount = pn(firstRow(containerDeltaResult)?.count);
   if (containerDeltaCount) {
     deltas.push({
       code: "CONTAINER_DELTA",
@@ -327,8 +340,8 @@ export async function buildCutoverReadiness(sourceId: number, targetId: number):
       AND m.target_company_id = ${targetId}
       AND r.status <> 'rolled_back'
   `);
-  const chargeReview = pn((chargeReviewResult as any).rows?.[0]?.review_count);
-  const chargeUnmapped = pn((chargeReviewResult as any).rows?.[0]?.unmapped_count);
+  const chargeReview = pn(firstRow(chargeReviewResult)?.review_count);
+  const chargeUnmapped = pn(firstRow(chargeReviewResult)?.unmapped_count);
   if (chargeReview || chargeUnmapped) {
     blockers.push({
       code: "CONTAINER_CHARGE_REVIEW_REQUIRED",
@@ -350,7 +363,7 @@ export async function buildCutoverReadiness(sourceId: number, targetId: number):
       HAVING ABS(SUM(e.debit_amount::numeric) - SUM(e.credit_amount::numeric)) > 0.01
     ) unbalanced
   `);
-  const unbalancedCount = pn((unbalancedResult as any).rows?.[0]?.count);
+  const unbalancedCount = pn(firstRow(unbalancedResult)?.count);
   if (unbalancedCount) {
     blockers.push({
       code: "UNBALANCED_MIGRATION_VOUCHERS",
@@ -366,7 +379,7 @@ export async function buildCutoverReadiness(sourceId: number, targetId: number):
       AND voucher_number LIKE 'GC-PROFIT-OPN-%'
       AND deleted_at IS NULL
   `);
-  const profitOpeningCount = pn((profitOpeningResult as any).rows?.[0]?.count);
+  const profitOpeningCount = pn(firstRow(profitOpeningResult)?.count);
   if (!profitOpeningCount) {
     blockers.push({ code: "PROFIT_OPENING_MISSING", message: "Profit-share opening balance has not been posted." });
   }
@@ -380,7 +393,7 @@ export async function buildCutoverReadiness(sourceId: number, targetId: number):
       (SELECT COUNT(*) FROM sp_sales WHERE company_id = ${targetId})::int AS sale_count,
       (SELECT COUNT(*) FROM sp_offloads WHERE company_id = ${targetId})::int AS offload_count
   `);
-  const targetLive = (targetLiveActivityResult as any).rows?.[0] ?? {};
+  const targetLive = firstRow(targetLiveActivityResult) ?? {};
   const targetLiveCount = pn(targetLive.voucher_count) + pn(targetLive.sale_count) + pn(targetLive.offload_count);
   if (targetLiveCount) {
     blockers.push({
@@ -396,7 +409,7 @@ export async function buildCutoverReadiness(sourceId: number, targetId: number):
     WHERE company_id = ${sourceId} AND role = 'POS'
   `);
   const unmappablePosUsers: string[] = [];
-  for (const role of (posRoleResult as any).rows ?? []) {
+  for (const role of resultRows(posRoleResult)) {
     const location = await resolveTargetLocation(
       sourceId,
       targetId,
@@ -457,7 +470,7 @@ export async function synchronizeCutoverStock(cutoverId: number, sourceId: numbe
   const errors: string[] = [];
 
   await db.transaction(async (tx: any) => {
-    for (const sourceRow of (sourceResult as any).rows ?? []) {
+    for (const sourceRow of resultRows(sourceResult)) {
       const targetStockItemId = stockItemMap.get(pn(sourceRow.stock_item_id));
       const location = await resolveTargetLocation(
         sourceId,
@@ -477,7 +490,7 @@ export async function synchronizeCutoverStock(cutoverId: number, sourceId: numbe
           AND location_id = ${location.targetLocationId}
         LIMIT 1
       `);
-      let target = (targetRows as any).rows?.[0] ?? null;
+      let target = firstRow(targetRows) ?? null;
       const beforeQty = pn(target?.quantity);
       const beforeRate = pn(target?.average_rate);
       const beforeValue = pn(target?.total_value);
@@ -501,7 +514,7 @@ export async function synchronizeCutoverStock(cutoverId: number, sourceId: numbe
                   ${afterQty.toFixed(4)}, ${afterRate.toFixed(6)}, ${afterValue.toFixed(2)})
           RETURNING id
         `);
-        target = { id: pn((insertedRow as any).rows[0].id) };
+        target = { id: pn(resultRows(insertedRow)[0].id) };
         createdTargetInventory = true;
         inserted++;
       } else {
@@ -535,7 +548,10 @@ export async function synchronizeCutoverStock(cutoverId: number, sourceId: numbe
   return { updated, inserted, unchanged };
 }
 
-export async function restoreCutoverStock(cutoverId: number, targetId: number): Promise<{ restored: number; deleted: number }> {
+export async function restoreCutoverStock(
+  cutoverId: number,
+  targetId: number
+): Promise<{ restored: number; deleted: number }> {
   await ensureCutoverSchema();
   const result = await db.execute(sql`
     SELECT * FROM sp_migration_cutover_stock_deltas
@@ -545,9 +561,11 @@ export async function restoreCutoverStock(cutoverId: number, targetId: number): 
   let restored = 0;
   let deleted = 0;
   await db.transaction(async (tx: any) => {
-    for (const row of (result as any).rows ?? []) {
+    for (const row of resultRows(result)) {
       if (row.created_target_inventory) {
-        await tx.execute(sql`DELETE FROM inventory WHERE id = ${pn(row.target_inventory_id)} AND company_id = ${targetId}`);
+        await tx.execute(
+          sql`DELETE FROM inventory WHERE id = ${pn(row.target_inventory_id)} AND company_id = ${targetId}`
+        );
         deleted++;
       } else {
         await tx.execute(sql`

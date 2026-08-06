@@ -44,7 +44,7 @@
     "cap:ios": "npm run cap:sync && npx cap open ios",
     "test": "node node_modules/vitest/vitest.mjs run && node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts",
     "test:watch": "node node_modules/vitest/vitest.mjs",
-    "lint": "node node_modules/eslint/bin/eslint.js --max-warnings 12682 \"client/src/**/*.{ts,tsx}\" \"server/**/*.ts\" \"shared/**/*.ts\"",
+    "lint": "node node_modules/eslint/bin/eslint.js --max-warnings 12276 \"client/src/**/*.{ts,tsx}\" \"server/**/*.ts\" \"shared/**/*.ts\"",
     "lint:fix": "node node_modules/eslint/bin/eslint.js \"client/src/**/*.{ts,tsx}\" \"server/**/*.ts\" \"shared/**/*.ts\" --fix",
     "format": "node node_modules/prettier/bin/prettier.cjs --write \"client/src/**/*.{ts,tsx,css}\" \"server/**/*.ts\" \"shared/**/*.ts\"",
     "format:check": "node node_modules/prettier/bin/prettier.cjs --check \"client/src/**/*.{ts,tsx,css}\" \"server/**/*.ts\" \"shared/**/*.ts\"",

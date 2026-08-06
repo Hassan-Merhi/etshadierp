@@ -5,6 +5,7 @@ import { requireAuth } from "../../auth";
 import { sql } from "drizzle-orm";
 import { stockItemCodeAliases } from "@shared/schema";
 import { requireSpCompany } from "./spHelpers";
+import { resultRows } from "../../lib/queryResult";
 
 // ── Aliases (article code → stock item mapping) ───────────────────────────
 
@@ -21,7 +22,7 @@ export function registerSpAliasRoutes(app: Express) {
         WHERE a.company_id = ${companyId}
         ORDER BY a.alias_code ASC
       `);
-      res.json((rows as any).rows ?? (rows as any));
+      res.json(resultRows(rows));
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }

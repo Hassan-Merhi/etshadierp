@@ -21,6 +21,7 @@ import {
   customerOrderCharges,
 } from "@shared/schema";
 import { eq, and, or, sql, inArray, ilike } from "drizzle-orm";
+import { firstRow } from "../../../../lib/queryResult";
 
 export function registerOrderBaleScanRoutes(app: Express) {
   app.post("/api/factory/customer-orders/:id/bales", requireAuth, async (req: any, res: any) => {
@@ -174,7 +175,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
                 AND cob.order_id != ${orderId}
               LIMIT 1`
         );
-        const crossOrderDupRow = (crossOrderDupCheck as any).rows?.[0];
+        const crossOrderDupRow = firstRow(crossOrderDupCheck);
         if (crossOrderDupRow) {
           const orderRef = crossOrderDupRow.invoice_number
             ? `invoice ${crossOrderDupRow.invoice_number}`

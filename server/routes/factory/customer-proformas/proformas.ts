@@ -19,6 +19,7 @@ import {
   proformaStockReservations,
 } from "@shared/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
+import { resultRows } from "../../../lib/queryResult";
 
 export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
   /* Single proforma by ID — used by EditProformaV5Drawer */
@@ -31,7 +32,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
       const rawProformaRes = await db.execute(
         sql`SELECT * FROM customer_proformas WHERE id = ${id} AND company_id = ${companyId} AND deleted_at IS NULL LIMIT 1`
       );
-      const rawProformaRows: any[] = (rawProformaRes as any).rows ?? (rawProformaRes as unknown as any[]);
+      const rawProformaRows: any[] = resultRows(rawProformaRes);
       if (!rawProformaRows.length) return res.status(404).json({ message: "Proforma not found" });
       const pr = rawProformaRows[0];
       const proforma = {
@@ -45,7 +46,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
         updatedAt: pr.updated_at ?? pr.created_at,
       };
       const rawLinesRes = await db.execute(sql`SELECT * FROM customer_proforma_lines WHERE proforma_id = ${id}`);
-      const lines: any[] = ((rawLinesRes as any).rows ?? (rawLinesRes as unknown as any[])).map((l: any) => ({
+      const lines: any[] = resultRows(rawLinesRes).map((l: any) => ({
         id: l.id,
         proformaId: l.proforma_id,
         articleCode: l.article_code ?? "",
@@ -115,21 +116,21 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
           AND cp.deleted_at IS NULL
         ORDER BY cp.name ASC
       `);
-        const summaryRows = (rawSummary as any).rows ?? (rawSummary as unknown as any[]);
+        const summaryRows = resultRows(rawSummary);
         const proformaIds = summaryRows.map((row: any) => Number(row.id)).filter((id: number) => Number.isInteger(id));
         let linesByProforma = new Map<number, any[]>();
 
         if (proformaIds.length > 0) {
           const idList = sql.join(
             proformaIds.map((id: number) => sql`${id}`),
-            sql`,`,
+            sql`,`
           );
           const rawLines = await db.execute(
             sql`SELECT id, proforma_id, article_code, product_name, quantity, price_per_bale, created_at
                 FROM customer_proforma_lines
                 WHERE proforma_id IN (${idList})`
           );
-          const rows: any[] = (rawLines as any).rows ?? (rawLines as unknown as any[]);
+          const rows: any[] = resultRows(rawLines);
           linesByProforma = rows.reduce((map: Map<number, any[]>, line: any) => {
             const proformaId = Number(line.proforma_id);
             const current = map.get(proformaId) || [];
@@ -169,28 +170,26 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
               AND deleted_at IS NULL
             ORDER BY name ASC`
       );
-      const proformas: any[] = ((rawProformasRes as any).rows ?? (rawProformasRes as unknown as any[])).map(
-        (r: any) => ({
-          id: r.id,
-          companyId: r.company_id,
-          customerId: r.customer_id,
-          name: r.name ?? "",
-          isActive: r.is_active ?? false,
-          deletedAt: r.deleted_at ?? null,
-          createdAt: r.created_at,
-          updatedAt: r.updated_at ?? r.created_at,
-        })
-      );
+      const proformas: any[] = resultRows(rawProformasRes).map((r: any) => ({
+        id: r.id,
+        companyId: r.company_id,
+        customerId: r.customer_id,
+        name: r.name ?? "",
+        isActive: r.is_active ?? false,
+        deletedAt: r.deleted_at ?? null,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at ?? r.created_at,
+      }));
 
       const proformaIds = proformas.map((p: any) => p.id);
       let lines: any[] = [];
       if (proformaIds.length > 0) {
         const idList = sql.join(
           proformaIds.map((id: number) => sql`${id}`),
-          sql`,`,
+          sql`,`
         );
         const rawLines = await db.execute(sql`SELECT * FROM customer_proforma_lines WHERE proforma_id IN (${idList})`);
-        const rawRows: any[] = (rawLines as any).rows ?? (rawLines as unknown as any[]);
+        const rawRows: any[] = resultRows(rawLines);
         lines = rawRows.map((l: any) => ({
           id: l.id,
           proformaId: l.proforma_id,

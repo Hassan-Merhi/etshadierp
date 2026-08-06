@@ -11,6 +11,7 @@ import { requireAuth, requireNonPOS } from "../../../auth";
 import { logAudit } from "../../_helpers";
 import { inventory, stockItems, stockItemCodeAliases, stockItemMergeLogs } from "@shared/schema";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
+import { resultRows } from "../../../lib/queryResult";
 
 export function registerStockMergeLogRoutes(app: Express) {
   // ── Merge Logs: GET /api/stock-items/merge-logs ──────────────────────────
@@ -66,7 +67,7 @@ export function registerStockMergeLogRoutes(app: Express) {
         LIMIT 200
       `);
 
-      const data = ((rows as any).rows ?? (rows as any)).map((r: any) => ({
+      const data = resultRows(rows).map((r: any) => ({
         ...r,
         id: null,
         source: "historical",

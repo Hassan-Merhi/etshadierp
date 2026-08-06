@@ -12,6 +12,7 @@ import { requireAuth } from "../../../auth";
 import { getClientDate } from "../../../lib/dateUtils";
 import { customerProformas, customerProformaLines, customerOrders, customerOrderExpectedLines } from "@shared/schema";
 import { eq, sql, and } from "drizzle-orm";
+import { resultRows } from "../../../lib/queryResult";
 
 export function registerV5ProformaCreateRoutes(app: Express) {
   // ── POST /api/factory/v5/proforma-with-loading ──────────────────────────
@@ -156,7 +157,7 @@ export function registerV5ProformaCreateRoutes(app: Express) {
               AND container_number IS NOT NULL`
       );
       const existingNames = new Set(
-        ((existingOrdersRaw as any).rows ?? []).map((r: any) => String(r.container_number ?? "").trim())
+        resultRows(existingOrdersRaw).map((r: any) => String(r.container_number ?? "").trim())
       );
       const conflicting = containerNames.filter((n: string) => existingNames.has(n));
       if (conflicting.length > 0) {

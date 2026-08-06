@@ -24,6 +24,7 @@ import { db } from "../../db";
 import { sql } from "drizzle-orm";
 import { ledgerAccounts } from "@shared/schema";
 import { eq, and, isNull } from "drizzle-orm";
+import { firstRow } from "../../lib/queryResult";
 
 export const pn = (v: any) => {
   const n = parseFloat(String(v ?? "0"));
@@ -72,7 +73,7 @@ export async function getCompanyRow(companyId: number) {
   const rows = await db.execute(
     sql`SELECT id, code, name, company_type FROM companies WHERE id = ${companyId} LIMIT 1`
   );
-  return (rows as any).rows?.[0] ?? (rows as any)[0] ?? null;
+  return firstRow(rows) ?? (rows as any)[0] ?? null;
 }
 
 export async function logRun(

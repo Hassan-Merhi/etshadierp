@@ -15,6 +15,7 @@ import {
   loadSourceAccounts,
   getSuspenseReview,
 } from "./spMigrationPhase2Common";
+import { resultRows, firstRow } from "../../lib/queryResult";
 
 export async function importHistoricalSales(req: any, res: any): Promise<any> {
   const pair = await validateMigrationPair(req, res, true);
@@ -45,7 +46,7 @@ export async function importHistoricalSales(req: any, res: any): Promise<any> {
         VALUES (${pair.targetId}, 'GC-SUSP', 'Migration Suspense', 'Equity', 'gc_mig_suspense', true, true)
         RETURNING id, code, name, account_type, sub_type
       `);
-      suspense = (created as any).rows[0];
+      suspense = resultRows(created)[0];
       targetAccounts.bySubType.set("gc_mig_suspense", suspense);
       targetAccounts.byCode.set("gc-susp", suspense);
       await trackRow(runId, "ledger_accounts", pn(suspense.id));
@@ -101,14 +102,14 @@ export async function importHistoricalSales(req: any, res: any): Promise<any> {
     let saleItemsCreated = 0;
     let saleItemsSkipped = 0;
 
-    for (const sourceVoucher of (vouchersResult as any).rows ?? []) {
-      const targetVoucherNumber = (`MIG-GC-${sourceVoucher.voucher_number}`).slice(0, 100);
+    for (const sourceVoucher of resultRows(vouchersResult)) {
+      const targetVoucherNumber = `MIG-GC-${sourceVoucher.voucher_number}`.slice(0, 100);
       const existingResult = await db.execute(sql`
         SELECT id FROM vouchers
         WHERE company_id = ${pair.targetId} AND voucher_number = ${targetVoucherNumber}
         LIMIT 1
       `);
-      let targetVoucherId = pn((existingResult as any).rows?.[0]?.id);
+      let targetVoucherId = pn(firstRow(existingResult)?.id);
       let newlyCreated = false;
 
       if (!targetVoucherId) {
@@ -122,7 +123,7 @@ export async function importHistoricalSales(req: any, res: any): Promise<any> {
              ${sourceVoucher.currency ?? "USD"}, ${sourceVoucher.exchange_rate ?? null}, 'SP_MIGRATION_READONLY')
           RETURNING id
         `);
-        targetVoucherId = pn((createdVoucher as any).rows[0].id);
+        targetVoucherId = pn(resultRows(createdVoucher)[0].id);
         await trackRow(runId, "vouchers", targetVoucherId);
         rowsCreated++;
         vouchersCreated++;
@@ -140,11 +141,13 @@ export async function importHistoricalSales(req: any, res: any): Promise<any> {
           WHERE voucher_id = ${pn(sourceVoucher.id)}
           ORDER BY id ASC
         `);
-        for (const sourceItem of (sourceItemsResult as any).rows ?? []) {
+        for (const sourceItem of resultRows(sourceItemsResult)) {
           const targetStockItemId = stockItemMap.get(pn(sourceItem.stock_item_id));
           if (!targetStockItemId) {
             saleItemsSkipped++;
-            warnings.push(`Voucher ${sourceVoucher.voucher_number}: stock item ${sourceItem.stock_item_id} has no target mapping.`);
+            warnings.push(
+              `Voucher ${sourceVoucher.voucher_number}: stock item ${sourceItem.stock_item_id} has no target mapping.`
+            );
             continue;
           }
           const inserted = await db.execute(sql`
@@ -155,7 +158,7 @@ export async function importHistoricalSales(req: any, res: any): Promise<any> {
                ${sourceItem.total_sales}, ${sourceItem.total_cost}, ${sourceItem.profit ?? "0"}, ${sourceItem.configured_price ?? null})
             RETURNING id
           `);
-          const targetItemId = pn((inserted as any).rows[0].id);
+          const targetItemId = pn(resultRows(inserted)[0].id);
           await trackRow(runId, "sales_items", targetItemId);
           await linkSourceRow(runId, "sales_items", pn(sourceItem.id), "sales_items", targetItemId);
           rowsCreated++;
@@ -168,9 +171,9 @@ export async function importHistoricalSales(req: any, res: any): Promise<any> {
           WHERE voucher_id = ${pn(sourceVoucher.id)}
           ORDER BY id ASC
         `);
-        for (const sourceEntry of (sourceEntriesResult as any).rows ?? []) {
+        for (const sourceEntry of resultRows(sourceEntriesResult)) {
           const mapping = sourceEntry.ledger_account_id
-            ? accountMap.get(pn(sourceEntry.ledger_account_id)) ?? { targetId: pn(suspense.id), method: "suspense" }
+            ? (accountMap.get(pn(sourceEntry.ledger_account_id)) ?? { targetId: pn(suspense.id), method: "suspense" })
             : { targetId: pn(suspense.id), method: "suspense" };
           const inserted = await db.execute(sql`
             INSERT INTO voucher_entries (voucher_id, ledger_account_id, debit_amount, credit_amount, narration)
@@ -178,7 +181,7 @@ export async function importHistoricalSales(req: any, res: any): Promise<any> {
                     ${sourceEntry.narration ?? null})
             RETURNING id
           `);
-          const targetEntryId = pn((inserted as any).rows[0].id);
+          const targetEntryId = pn(resultRows(inserted)[0].id);
           await trackRow(runId, "voucher_entries", targetEntryId);
           await linkSourceRow(runId, "voucher_entries", pn(sourceEntry.id), "voucher_entries", targetEntryId);
           rowsCreated++;
@@ -191,8 +194,8 @@ export async function importHistoricalSales(req: any, res: any): Promise<any> {
         const targetEntriesResult = await db.execute(sql`
           SELECT id FROM voucher_entries WHERE voucher_id = ${targetVoucherId} ORDER BY id ASC
         `);
-        const sourceEntries = (sourceEntriesResult as any).rows ?? [];
-        const targetEntries = (targetEntriesResult as any).rows ?? [];
+        const sourceEntries = resultRows(sourceEntriesResult);
+        const targetEntries = resultRows(targetEntriesResult);
         if (sourceEntries.length === targetEntries.length) {
           for (let index = 0; index < sourceEntries.length; index++) {
             await linkSourceRow(

@@ -1,6 +1,7 @@
 import { sql, and, eq } from "drizzle-orm";
 import { db } from "../../db";
 import { customerProformas, customerProformaLines, proformaStockReservations, companies } from "@shared/schema";
+import { firstRow, resultRows } from "../../lib/queryResult";
 
 type DbOrTx = typeof db;
 
@@ -67,10 +68,7 @@ export async function syncProformaReservations(tx: DbOrTx, companyId: number, pr
         GROUP BY fb.article_code`
   );
   const loadedMap = new Map<string, number>(
-    ((loadedRaw as any).rows ?? (loadedRaw as unknown as any[])).map((r: any) => [
-      r.articleCode as string,
-      Number(r.loaded),
-    ])
+    resultRows(loadedRaw).map((r: any) => [r.articleCode as string, Number(r.loaded)])
   );
 
   // 4. Upsert reservations for every current line
@@ -129,27 +127,25 @@ export async function isFactoryV2Company(companyId: number): Promise<boolean> {
  * Intended for use in proforma line creation guards (factory_v2 only).
  */
 export async function computeFreeToPromise(companyId: number, articleCode: string): Promise<number> {
-  const [inStockRow] =
-    (
-      (await db.execute(
-        sql`SELECT COUNT(*)::int AS count
+  const inStockRow = firstRow<{ count: number | null }>(
+    await db.execute(
+      sql`SELECT COUNT(*)::int AS count
         FROM factory_bales
         WHERE company_id = ${companyId}
           AND article_code = ${articleCode}
           AND status = 'IN_STOCK'`
-      )) as any
-    ).rows ?? [];
+    )
+  );
   const inStock = Number(inStockRow?.count ?? 0);
 
-  const [reservedRow] =
-    (
-      (await db.execute(
-        sql`SELECT COALESCE(SUM(reserved_qty),0)::int AS total
+  const reservedRow = firstRow<{ total: number | null }>(
+    await db.execute(
+      sql`SELECT COALESCE(SUM(reserved_qty),0)::int AS total
         FROM proforma_stock_reservations
         WHERE company_id = ${companyId}
           AND article_code = ${articleCode}`
-      )) as any
-    ).rows ?? [];
+    )
+  );
   const reservedNotYetLoaded = Number(reservedRow?.total ?? 0);
 
   return Math.max(0, inStock - reservedNotYetLoaded);

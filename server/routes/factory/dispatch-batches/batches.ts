@@ -20,6 +20,7 @@ import {
 } from "@shared/schema";
 
 import { getCompanyId, getUsername } from "./_helpers";
+import { resultRows, firstRow } from "../../../lib/queryResult";
 
 export function registerDispatchBatchCrudRoutes(app: Express) {
   // ── GET /api/factory/dispatch-batches ─────────────────────────────────────
@@ -68,7 +69,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
         ORDER BY b.created_at DESC
       `);
 
-      res.json((rows as any).rows || rows);
+      res.json(resultRows(rows));
     } catch (err: unknown) {
       res.status(500).json({ message: getErrorMessage(err) });
     }
@@ -116,7 +117,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
         let seqRows = await tx.execute(
           sql`SELECT next_number FROM customer_dispatch_batch_sequences WHERE company_id = ${companyId} FOR UPDATE`
         );
-        let seqRow = (seqRows as any).rows?.[0];
+        let seqRow = firstRow<{ next_number?: number; nextNumber?: number }>(seqRows);
         if (!seqRow) {
           await tx.execute(
             sql`INSERT INTO customer_dispatch_batch_sequences (company_id, next_number) VALUES (${companyId}, 1) ON CONFLICT (company_id) DO NOTHING`
@@ -124,9 +125,9 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
           seqRows = await tx.execute(
             sql`SELECT next_number FROM customer_dispatch_batch_sequences WHERE company_id = ${companyId} FOR UPDATE`
           );
-          seqRow = (seqRows as any).rows?.[0];
+          seqRow = firstRow<{ next_number?: number; nextNumber?: number }>(seqRows);
         }
-        const nextNum = seqRow.next_number || seqRow.nextNumber || 1;
+        const nextNum = Number(seqRow?.next_number ?? seqRow?.nextNumber ?? 1);
         await tx.execute(
           sql`UPDATE customer_dispatch_batch_sequences SET next_number = ${nextNum + 1} WHERE company_id = ${companyId}`
         );
@@ -255,8 +256,8 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
         customerName: customer?.legalName || null,
         proforma,
         proformaLines,
-        rides: (rides as any).rows || rides,
-        articleTotals: (articleTotals as any).rows || articleTotals,
+        rides: resultRows(rides),
+        articleTotals: resultRows(articleTotals),
         finalInvoice,
       });
     } catch (err: unknown) {
@@ -321,7 +322,7 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
           SELECT bale_id FROM customer_dispatch_bale_scans
           WHERE batch_id = ${batchId} AND company_id = ${companyId} AND removed_at IS NULL
         `);
-        const ids = ((activeBaleIds as any).rows || activeBaleIds).map((r: any) => r.bale_id);
+        const ids = resultRows(activeBaleIds).map((r: any) => r.bale_id);
         if (ids.length > 0) {
           await tx.execute(sql`
             UPDATE factory_bales SET status = 'IN_STOCK', updated_at = now()

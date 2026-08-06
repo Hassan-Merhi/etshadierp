@@ -33,6 +33,7 @@ import {
 import { eq, and, desc, sql, inArray, isNull, lte } from "drizzle-orm";
 import { type BrokerCalcContext } from "./netPositionBrokerCalc";
 import { computeNetPositionInventory } from "./netPositionInventory";
+import { resultRows } from "../../../lib/queryResult";
 
 export function registerEmployeeNetPositionRoutes(app: Express) {
   app.get("/api/factory/net-position", requireAuth, async (req: any, res: any) => {
@@ -704,7 +705,7 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
         WHERE  company_id = ${companyId}
           AND  remaining_balance > 0
       `);
-      const workerAdvRow = ((workerAdvRes as any).rows ?? (workerAdvRes as any))[0] ?? {};
+      const workerAdvRow = resultRows(workerAdvRes)[0] ?? {};
       const workerAdvancesValue = round2(parseFloat(String(workerAdvRow.total ?? "0")) || 0);
 
       // ── Split customer items into DR (asset) and CR (liability) ──────────────

@@ -5,6 +5,7 @@ import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { requireSpCompany } from "./spHelpers";
 import { ensureSpOffloadReversalStorage } from "./spOffloadLifecycleRoutes";
+import { resultRows, firstRow } from "../../lib/queryResult";
 
 /**
  * The legacy offload concurrency guard treats every historical sp_offloads row
@@ -31,7 +32,7 @@ async function prepareCorrectedReoffload(req: Request, res: Response, next: Next
         WHERE id = ${containerId} AND company_id = ${companyId}
         FOR UPDATE
       `);
-      const container = (containerResult as any).rows?.[0] ?? (containerResult as any)[0];
+      const container = firstRow(containerResult) ?? (containerResult as any)[0];
       if (!container || container.status !== "open") return;
 
       const reversedRows = await tx.execute(sql`
@@ -44,7 +45,7 @@ async function prepareCorrectedReoffload(req: Request, res: Response, next: Next
         ORDER BY r.id
         FOR UPDATE OF o
       `);
-      const reversedOffloadIds = ((reversedRows as any).rows ?? reversedRows ?? []).map((row: any) => Number(row.offload_id));
+      const reversedOffloadIds = (resultRows(reversedRows) ?? []).map((row: any) => Number(row.offload_id));
       if (reversedOffloadIds.length === 0) return;
 
       await tx.execute(sql`
