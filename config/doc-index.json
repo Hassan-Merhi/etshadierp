@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "State index for docs/. Every doc is classified as \"reference\" (describes current behaviour, must stay accurate) or \"record\" (describes finished work, correct as history) — an unclassified doc fails the audit, so the choice is made when the doc is written. The classification was seeded by filename heuristic and is reviewed in Phase 3a of docs/system-quality-program.md; it is data for that review, not an assertion. figures[] binds documented numbers to their live source so a doc that drifts from the config it describes fails instead of quietly misleading.",
+  "description": "State index for docs/. Every doc is classified as \"reference\" (describes current behaviour, must stay accurate) or \"record\" (describes finished work, correct as history) \u2014 an unclassified doc fails the audit, so the choice is made when the doc is written. The classification was seeded by filename heuristic and is reviewed in Phase 3a of docs/system-quality-program.md; it is data for that review, not an assertion. figures[] binds documented numbers to their live source so a doc that drifts from the config it describes fails instead of quietly misleading.",
   "scan": {
     "root": "docs",
     "extensions": [
@@ -91,6 +91,21 @@
         {
           "doc": "docs/system-quality-program.md",
           "pattern": "Registered routes \\| ([\\d,]+)"
+        }
+      ]
+    },
+    {
+      "id": "uncoveredSensitiveWriteRoutes",
+      "description": "Write routes touching the ledger or stock ledger with no test referencing them.",
+      "source": {
+        "kind": "jsonValue",
+        "file": "config/write-route-coverage.json",
+        "path": "uncoveredSensitiveCeiling"
+      },
+      "claims": [
+        {
+          "doc": "docs/system-quality-program.md",
+          "pattern": "Untested ledger/stock write routes \\| ([\\d,]+)"
         }
       ]
     }

@@ -94,6 +94,13 @@ jobs:
         if: always() && steps.install.outcome == 'success'
         run: npm run audit:doc-index
 
+      # Mutating endpoints are excluded from the smoke sweep by design, so this
+      # is the only measure of how much of the ledger and stock write surface
+      # has a test naming it. The ceiling may only fall.
+      - name: Write-route coverage ratchet
+        if: always() && steps.install.outcome == 'success'
+        run: npm run audit:write-routes
+
       - name: Type-check
         id: typecheck
         if: always() && steps.install.outcome == 'success'

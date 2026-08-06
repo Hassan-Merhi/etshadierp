@@ -18,7 +18,9 @@ so it can be re-derived rather than trusted.
 | Type escapes (AST) | 11,408 total — 8,627 `: any`, 2,779 `as any`, 2 suppressions | `npm run audit:type-escapes` |
 | Files carrying escapes | 1,328 of 2,524 (53%) | `npm run audit:type-escapes` |
 | Drizzle result casts | 0 (was 344 — Phase 1b) | `npm run audit:type-escapes` |
-| Backend coverage floor (lines) | 17% | `config/coverage-thresholds.json` |
+| Backend coverage floor (lines) | 18% (measured 20.5%) | `config/coverage-thresholds.json` |
+| Untested ledger/stock write routes | 282 of 324 | `npm run audit:write-routes` |
+| Swept endpoints with a pinned contract | 384 | `npm run test:smoke-sweep` |
 | Test files | 363 (330 `tests/`, 33 colocated) | `find tests server client/src shared -name '*.test.ts*'` |
 | Registered routes | 1,871 | `config/route-manifest.json` |
 | Docs | 177 files, 116 phase-named (65%) | `npm run audit:doc-index` |
@@ -254,34 +256,93 @@ and cannot be closed by a single change; the ratchet is what makes it hold.
 
 ## Phase 2 — coverage breadth
 
-Depends on 0.2.
+Depends on 0.2. **2a, 2b and 2c are done. The 35–40% target in the original
+plan was wrong and is corrected below.**
 
-Per-file floors are already correct: 63–97% on the posting engines, inventory
-costing, and tenant isolation — the modules where a regression costs real money.
-That allocation is right and this phase does not touch it.
+Per-file floors were already right: 63–97% on the posting engines, inventory
+costing, and tenant isolation. That allocation is correct and this phase did not
+touch it.
 
-The gap is the long tail. A 17% global floor against 1,787 routes means most of
-the surface is defended only by "does not return 5xx".
+**2a. Floors raised to measured — done.** Backend measured 20.5% lines, and the
+floors were sitting at 17/16/22/11. They are now 18/17/23/12, using the margin
+rule the config already documents (10% of measured, capped at 2 points).
+Frontend measured 7.5% lines against floors of 5/4/2/3, now 6/6/3/4, plus two
+per-file floors on `frontendDataArchitecture.ts` that had drifted 8 and 15
+points below measured.
 
-**2a. Raise the global floor to what is already true.** `audit:coverage-ratchet`
-reports the headroom; the floor was written under measured coverage by design.
-Lock in what the suite already covers before writing a single new test.
+**The plan's exit criterion of "global backend floor ≥35%" was written without
+measuring first, and it is not reachable by raising a floor: measured coverage
+is 20.5%.** Setting the gate to 35% would fail CI on the first run. Getting
+there needs several hundred new tests, which is 2c's work, not 2a's — so the
+criterion is corrected to "floors track measured coverage, and measured coverage
+rises".
 
-**2b. Extend the smoke sweep's assertion.** It currently calls 380 parameterless
-`GET` endpoints and checks for non-5xx. Adding response-shape assertions — top
-level keys and types, not values — turns it from a liveness check into a
-contract check across a third of the API, for far less effort than per-endpoint
-tests.
+One caveat on the backend number. It was measured in an environment where 15
+endpoints 5xx for want of tables the runtime migrations create, so 64 tests
+fail that pass in CI. Coverage there is therefore a **lower bound**, which is
+what makes raising the floor to it safe — CI executes strictly more. The same
+caveat is why the per-file backend floors were left alone: several report below
+their floor here purely because their tests could not run.
 
-**2c. Close the mutating-endpoint gap.** The sweep deliberately excludes
-mutating endpoints, which is correct for a sweep and leaves them uncovered.
-Prioritise by blast radius: anything that writes to `vouchers`, `inventory`, or
-`voucher_entries` first.
+**2b. The sweep asserts a contract, not just liveness — done.** It called 401
+parameterless GETs and checked only for a non-5xx. It now also records each
+route's status and response *structure* in `config/api-smoke-shapes.json` and
+fails when either changes. 384 routes are pinned.
 
-**2d. Raise the global floor toward 35–40%** as 2b and 2c land.
+Scalar leaves collapse to `scalar` and an empty array matches a populated one,
+deliberately: a nullable column that is null in one run and a string in the next
+would otherwise fail for no reason, and a check that cries wolf gets regenerated
+without being read. Key sets, nesting, and object-versus-array stay exact.
 
-**Exit criteria:** global backend floor ≥35%, smoke sweep asserting shape,
-no `vouchers`/`inventory` write path without a test.
+This was worth doing for one number: **169 of the 401 swept endpoints answer
+403** under the sweep's admin fixture. The old check could not see any of them
+change. A route that silently starts refusing permission, or quietly drops a
+field, breaks a client exactly as thoroughly as a crash.
+
+Two rules keep the baseline honest across machines. Routes that 5xx are never
+pinned — freezing one environment's missing table into a contract would fail
+every other environment — and two workbook endpoints are marked unstable
+because their bodies parse into an object keyed by byte offset that shifts with
+the zip's timestamps. Verified stable across three consecutive runs.
+
+```bash
+UPDATE_API_SMOKE_SHAPES=1 npm run test:smoke-sweep
+```
+
+**2c. The write surface is measured and ratcheted — done; closing it is
+ongoing.** The sweep excludes mutating endpoints by design, so nothing measured
+them at all. `npm run audit:write-routes` now does:
+
+> **953 write routes. 324 touch the ledger or the stock ledger. 42 are
+> referenced by any test. 282 are not.**
+
+"Referenced" means a test mentions the path — deliberately weak, because a
+mention is not an assertion, but exact and unarguable. The 282 is a frozen
+ceiling that may only fall.
+
+The first tests written against that list cover stock-item merge, which rewrites
+`inventory` rows for two items and soft-deletes one. They assert conservation:
+a merge must move quantity and value onto the kept item without creating or
+destroying any.
+
+**Writing them found a live defect.** `stock_item_merge_logs.merged_by_user_id`
+is `integer NOT NULL`, but `users.id` is a varchar UUID, so every audit-log
+insert fails with `invalid input syntax for type integer` — and the handler
+catches it as "non-fatal, merge already committed". The merge commits, the log
+row is never written, and `POST /api/stock-items/merge-logs/:logId/unmerge`,
+which restores both items from that row's `snapshotBefore`, has nothing to read.
+**Every stock-item merge in production is unaudited and irreversible, and
+nothing surfaces it.**
+
+That is characterized in a test rather than fixed here, because the fix alters a
+column type in a live table and belongs in its own reviewed change. The test
+will fail the day the type is corrected, which is the intent — the fix should
+replace it with the unmerge-conservation assertions the file was written to make.
+
+**Exit criteria:** floors track measured coverage ✓; sweep asserts shape ✓;
+write surface measured and ratcheted ✓. "No vouchers/inventory write path
+without a test" remains open at 282 — that is a program, not a change, and the
+ratchet is what stops it growing meanwhile.
 
 ---
 
