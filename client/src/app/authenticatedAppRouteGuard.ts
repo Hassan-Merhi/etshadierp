@@ -14,7 +14,6 @@ const SUPPLIER_PARTNER_PATHS = new Set([
 export type AuthenticatedAppRouteDecision =
   | { kind: "continue" }
   | { kind: "loading" }
-  | { kind: "empty" }
   | { kind: "redirect"; to: string };
 
 interface ResolveAuthenticatedAppRouteOptions {
@@ -71,8 +70,12 @@ export function resolveAuthenticatedAppRoute({
     currentLocation !== "/my-settings" &&
     currentLocation !== "/intercompany-requests"
   ) {
-    if (myAccessLoading) decision = { kind: "loading" };
-    else if (myAccess === undefined && !myAccessError) decision = { kind: "empty" };
+    // While the Factory access contract is genuinely resolving (loading, or
+    // settled-but-not-yet-populated without an error) show a spinner rather than
+    // an empty React tree. A resolved contract — successful or failed — redirects
+    // to the computed default page; a failed contract degrades to the fallback
+    // default instead of blanking the page.
+    if (myAccessLoading || (myAccess === undefined && !myAccessError)) decision = { kind: "loading" };
     else decision = { kind: "redirect", to: factoryDefaultPage };
   } else if (isFactoryRoute && !hasFactoryAccess) {
     decision = { kind: "redirect", to: "/" };

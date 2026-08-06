@@ -6,13 +6,11 @@ const guard = readFileSync("client/src/app/authenticatedAppRouteGuard.ts", "utf8
 
 describe("Factory refresh route preservation", () => {
   it("waits for company restoration before evaluating Factory route redirects", () => {
-    // Authentication is resolved by App.tsx before this shell mounts. This shell
-    // must still block on company loading before it resolves any route decision,
-    // so a hard refresh on a Factory URL never redirects mid-restoration.
-    expect(app).toContain("const { selectedCompany, isLoading: companyLoading } = useCompany();");
-    expect(app).toContain("if (companyLoading || !selectedCompany) return <AppLoadingState />;");
-
-    const companyGuard = app.indexOf("companyLoading || !selectedCompany");
+    expect(app).toContain("isLoading: companyLoading");
+    expect(app).toContain("if (companyLoading) return <AppLoadingState />;");
+    expect(app).toContain("if (companyError || !selectedCompany)");
+    expect(app).toContain("retryCompanyBootstrap");
+    const companyGuard = app.indexOf("if (companyLoading) return <AppLoadingState />;");
     const routeResolution = app.indexOf("resolveAuthenticatedAppRoute({");
     expect(companyGuard).toBeGreaterThan(-1);
     expect(routeResolution).toBeGreaterThan(companyGuard);

@@ -29,7 +29,12 @@ interface AuthenticatedAppProps {
 }
 
 export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) {
-  const { selectedCompany, isLoading: companyLoading } = useCompany();
+  const {
+    selectedCompany,
+    isLoading: companyLoading,
+    error: companyError,
+    retry: retryCompanyBootstrap,
+  } = useCompany();
   useMobilePerformanceLifecycle();
   usePresence(true);
   useScreenFeed();
@@ -48,10 +53,27 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
     }
   }, [currentLocation]);
 
-  const { chatUnread, posImportEnabled, myAccess, myAccessLoading, myAccessError, factorySettings } =
-    useAuthenticatedAppData({ selectedCompanyId: selectedCompany?.id, userPresent: true, isPOS });
+  const {
+    chatUnread,
+    posImportEnabled,
+    myAccess,
+    myAccessLoading,
+    myAccessError,
+    retryMyAccess,
+    factorySettings,
+    factorySettingsLoading,
+    factorySettingsError,
+    retryFactorySettings,
+  } = useAuthenticatedAppData({ selectedCompanyId: selectedCompany?.id, userPresent: true, isPOS });
 
-  if (companyLoading || !selectedCompany) return <AppLoadingState />;
+  // Company bootstrap must resolve before any route decision. A still-loading
+  // bootstrap shows a spinner; a confirmed, terminal bootstrap failure shows a
+  // recoverable error with a retry action instead of loading forever. A valid
+  // selected company always falls through and mounts the workspace.
+  if (companyLoading) return <AppLoadingState />;
+  if (companyError || !selectedCompany) {
+    return <AppLoadingState forceRecovery onRecover={() => void retryCompanyBootstrap()} />;
+  }
 
   const isAdminOwner = user.role === "Admin" || user.role === "Owner" || user.role === "Developer";
   const routeState = resolveAuthenticatedAppRoute({
@@ -65,7 +87,6 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
   });
 
   if (routeState.decision.kind === "loading") return <AppLoadingState />;
-  if (routeState.decision.kind === "empty") return null;
   if (routeState.decision.kind === "redirect") return <Redirect replace to={routeState.decision.to} />;
 
   const leaveConfirmDialog = (
@@ -116,6 +137,17 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
   }
 
   if (routeState.isFactoryRoute || routeState.isFactoryCompany) {
+    // The Factory access and settings contracts gate the Factory workspace
+    // ONLY. Non-Factory companies (ERP, POS, Properties, Supplier Partner) never
+    // wait on or fail because of /api/factory/*, so a failure of those Factory
+    // endpoints can never blank or block a non-Factory startup.
+    if (myAccessLoading || factorySettingsLoading) return <AppLoadingState />;
+    if (myAccessError) {
+      return <AppLoadingState forceRecovery onRecover={() => void retryMyAccess()} />;
+    }
+    if (factorySettingsError) {
+      return <AppLoadingState forceRecovery onRecover={() => void retryFactorySettings()} />;
+    }
     return (
       <>
         <Suspense fallback={<AppLoadingState />}>

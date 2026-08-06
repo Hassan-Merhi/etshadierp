@@ -8,7 +8,6 @@ function source(path: string): string {
 describe("frontend company-state isolation wiring", () => {
   it("routes every selector change through CompanyContext without reloading", () => {
     const selector = source("client/src/components/CompanySelector.tsx");
-
     expect(selector).toContain("await selectCompany(company");
     expect(selector).toContain("{ offline: true }");
     expect(selector).not.toContain("window.location.reload");
@@ -17,7 +16,6 @@ describe("frontend company-state isolation wiring", () => {
 
   it("serializes switches and clears previous-company requests and caches", () => {
     const context = source("client/src/contexts/CompanyContext.tsx");
-
     expect(context).toContain("createCompanySwitchQueue");
     expect(context).toContain("cancelCompanySessionQueries(queryClient)");
     expect(context).toContain("removeCompanySessionQueries(queryClient, {");
@@ -30,11 +28,6 @@ describe("frontend company-state isolation wiring", () => {
 
   it("adopts the session's own company without cancelling the requests already in flight", () => {
     const context = source("client/src/contexts/CompanyContext.tsx");
-
-    // Adopting the company the server session already points at is not a
-    // switch: nothing stale exists to clear. Cancelling there aborted the
-    // queries the page had just started and dropped their cache entries, so
-    // every page loaded twice on entry.
     expect(context).toContain("adoptServerCompany");
     const adoption = context.slice(context.indexOf("const adoptServerCompany"));
     const adoptionBody = adoption.slice(0, adoption.indexOf("const performCompanySelection"));
@@ -43,9 +36,6 @@ describe("frontend company-state isolation wiring", () => {
   });
 
   it("does not abort in-flight requests on blanket invalidation", () => {
-    // These fire on every write anywhere in the system. React Query defaults
-    // cancelRefetch to true, which aborts and restarts every request already
-    // on its way — doubling the load and surfacing the aborts as failures.
     for (const path of [
       "client/src/hooks/use-ws-invalidation.ts",
       "client/src/contexts/ConnectivityContext.tsx",
@@ -58,8 +48,9 @@ describe("frontend company-state isolation wiring", () => {
   it("blocks every authenticated workspace while the company session changes", () => {
     const app = source("client/src/app/AuthenticatedApp.tsx");
     const appData = source("client/src/app/useAuthenticatedAppData.ts");
-
-    expect(app).toContain("if (companyLoading || !selectedCompany) return <AppLoadingState />;");
+    expect(app).toContain("if (companyLoading) return <AppLoadingState />;");
+    expect(app).toContain("if (companyError || !selectedCompany)");
+    expect(app).toContain("retryCompanyBootstrap");
     expect(appData).toContain('companyQueryKey("/api/company-settings", selectedCompanyId)');
     expect(appData).toContain('companyQueryKey("/api/factory/my-access", selectedCompanyId)');
     expect(appData).toContain('companyQueryKey("/api/factory/settings", selectedCompanyId)');
@@ -67,7 +58,6 @@ describe("frontend company-state isolation wiring", () => {
 
   it("scopes company-transfer history, account options, and rules", () => {
     const transfers = source("client/src/pages/CompanyTransfer.tsx");
-
     expect(transfers).toContain("companyKeys.simpleTransfers(fromCompanyId)");
     expect(transfers).toContain("companyKeys.companyAccounts(fromCompanyId, fromCompanyId)");
     expect(transfers).toContain("companyKeys.companyAccounts(fromCompanyId, ruleDestCompanyId || null)");
