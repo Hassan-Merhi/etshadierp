@@ -469,8 +469,10 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
       queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers/list"] });
-      if (isEditMode && !savingTransferRevisionRef.current) {
-        setLocation(`${modePrefix}/daybook`);
+      if (isEditMode) {
+        if (!savingTransferRevisionRef.current) {
+          setLocation(`${modePrefix}/daybook`);
+        }
       } else {
         stockTransferForm.reset({
           voucherDate: new Date(),
