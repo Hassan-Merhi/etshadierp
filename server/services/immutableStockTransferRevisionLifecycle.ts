@@ -566,6 +566,18 @@ export async function approveImmutableStockTransferRevision(
       SET status = 'approved', optional = false, reviewed_at = now(), reviewed_by = ${reviewerId}
       WHERE id = ${revisionId} AND status = 'pending'
     `);
+    await tx.execute(sql`
+      UPDATE stock_transfer_revisions
+      SET
+        status = 'superseded',
+        optional = false,
+        reviewed_at = now(),
+        reviewed_by = ${reviewerId},
+        superseded_by_revision_id = ${revisionId}
+      WHERE transfer_id = ${transferId}
+        AND id <> ${revisionId}
+        AND status = 'pending'
+    `);
 
     return {
       revisionId,
