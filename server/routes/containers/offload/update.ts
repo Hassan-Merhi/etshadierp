@@ -12,7 +12,6 @@ import {
   addInventoryValues,
   divideInventoryValues,
   inventoryMoney,
-  inventoryQuantity,
   inventoryUnitCost,
   subtractInventoryValues,
   toInventoryDecimal,
