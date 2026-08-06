@@ -83,6 +83,13 @@ commands:
             echo "PostgreSQL did not become ready."
             exit 1
 
+  prepare_postgres_schema:
+    steps:
+      - wait_for_postgres
+      - run:
+          name: Prepare disposable database schema
+          command: node node_modules/drizzle-kit/bin.cjs push --force
+
 jobs:
   verify-dependencies:
     executor: node22
@@ -163,23 +170,37 @@ jobs:
             npm run verify:final-production-readiness
             npm run verify:bandwidth
 
-  postgres-regression:
-    executor: node22-postgres
+  postgres-migration-registry:
+    executor: node22
     steps:
       - install_dependencies
-      - wait_for_postgres
       - run:
           name: Verify migration registry
           command: node scripts/verify-migration-registry.mjs --json
-      - run:
-          name: Prepare disposable database schema
-          command: node node_modules/drizzle-kit/bin.cjs push --force
+
+  postgres-schema:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - prepare_postgres_schema
       - run:
           name: Verify disposable database schema
           command: node scripts/verify-ci-disposable-schema.mjs
+
+  postgres-backend-tests:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - prepare_postgres_schema
       - run:
           name: Backend tests
           command: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
+
+  postgres-frontend-tests:
+    executor: node22-postgres
+    steps:
+      - install_dependencies
+      - prepare_postgres_schema
       - run:
           name: Frontend tests
           command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
@@ -215,7 +236,10 @@ workflows:
       - verify-build
       - verify-server-bundle
       - verify-safety-contracts
-      - postgres-regression
+      - postgres-migration-registry
+      - postgres-schema
+      - postgres-backend-tests
+      - postgres-frontend-tests
       - security-readiness:
           requires:
             - verify-build
