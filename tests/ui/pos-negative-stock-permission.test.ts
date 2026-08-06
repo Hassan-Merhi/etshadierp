@@ -16,9 +16,7 @@ describe("POS negative-stock permission wiring", () => {
   it("uses the refreshed session permission as the frontend source of truth", () => {
     const calculations = source("client/src/pages/pos/hooks/usePosRowCalculations.ts");
 
-    expect(calculations).toContain(
-      "authUser?.canSellNegativeStock ?? posUser?.canSellNegativeStock ?? false"
-    );
+    expect(calculations).toContain("authUser?.canSellNegativeStock ?? posUser?.canSellNegativeStock ?? false");
     expect(calculations).toContain("availableStock <= 0");
     expect(calculations).toContain("!canSellNegativeStock");
   });
