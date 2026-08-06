@@ -30,7 +30,7 @@ const FALLBACK_POLL_MS = 3000;
 async function fetchConditionalFrame(
   userId: string,
   state: FastPollState,
-  signal: AbortSignal,
+  signal: AbortSignal
 ): Promise<FastPollState> {
   const response = await fetch(`/api/screen-feed/${encodeURIComponent(userId)}`, {
     method: "GET",
@@ -159,18 +159,11 @@ function FastScreenFeedDialog({
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               {connected ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
               <span>{connected ? "Fast live feed" : "Polling fallback"}</span>
-              {frame?.capturedAt ? (
-                <span>· {new Date(frame.capturedAt).toLocaleTimeString()}</span>
-              ) : null}
+              {frame?.capturedAt ? <span>· {new Date(frame.capturedAt).toLocaleTimeString()}</span> : null}
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void pollOnce()}
-              disabled={refreshing}
-            >
+            <Button variant="outline" size="sm" onClick={() => void pollOnce()} disabled={refreshing}>
               <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
               Refresh
             </Button>
@@ -211,8 +204,7 @@ export function RemoteSupportWatchDialog(props: {
 }) {
   const { data: runtime } = useQuery<RemoteSupportRuntime>({
     queryKey: ["/api/screen-feed/admin/runtime"],
-    queryFn: () =>
-      apiRequest("GET", "/api/screen-feed/admin/runtime").then((response) => response.json()),
+    queryFn: () => apiRequest("GET", "/api/screen-feed/admin/runtime").then((response) => response.json()),
     staleTime: 15000,
     retry: 1,
   });
