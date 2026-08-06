@@ -10,6 +10,8 @@ export const INVENTORY_MONEY_DECIMAL_PLACES = 2;
  * Convert database, request, or calculated numeric input into a finite Decimal.
  * Invalid, empty, or non-finite values use the supplied fallback instead of
  * allowing Decimal constructor errors or NaN/Infinity to enter costing writes.
+ * Zero is normalized to negative zero so Decimal's positivity predicates keep
+ * inventory validation strict: quantities and rates must be greater than zero.
  */
 export function toInventoryDecimal(value: InventoryNumericInput, fallback: InventoryNumericInput = 0): Decimal {
   const parse = (candidate: InventoryNumericInput): Decimal | null => {
@@ -19,13 +21,14 @@ export function toInventoryDecimal(value: InventoryNumericInput, fallback: Inven
 
     try {
       const decimal = new Decimal(candidate);
-      return decimal.isFinite() ? decimal : null;
+      if (!decimal.isFinite()) return null;
+      return decimal.isZero() ? new Decimal(-0) : decimal;
     } catch {
       return null;
     }
   };
 
-  return parse(value) ?? parse(fallback) ?? new Decimal(0);
+  return parse(value) ?? parse(fallback) ?? new Decimal(-0);
 }
 
 export function addInventoryValues(...values: InventoryNumericInput[]): Decimal {
