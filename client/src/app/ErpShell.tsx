@@ -56,7 +56,7 @@ export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog 
               <main
                 id="main-content"
                 tabIndex={-1}
-                aria-label={t("accessibility.erpMainWorkspace")}
+                aria-label={t("workspace.controls")}
                 className="flex-1 overflow-y-auto overscroll-y-contain p-3 outline-none sm:p-6"
               >
                 <div className="w-full min-w-0 max-w-full [&_form]:min-w-0 [&_table]:w-full [&_[role=table]]:w-full [&_.overflow-x-auto]:overscroll-x-contain">
