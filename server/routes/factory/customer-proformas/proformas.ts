@@ -28,8 +28,6 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      // Use SELECT * to avoid "column does not exist" errors when the Drizzle schema
-      // has columns not yet migrated to production.
       const rawProformaRes = await db.execute(
         sql`SELECT * FROM customer_proformas WHERE id = ${id} AND company_id = ${companyId} AND deleted_at IS NULL LIMIT 1`
       );
@@ -46,8 +44,6 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
         createdAt: pr.created_at,
         updatedAt: pr.updated_at ?? pr.created_at,
       };
-      // Raw SQL to avoid "column does not exist" when price_fixed / production_price_per_bale
-      // are absent from the production DB.
       const rawLinesRes = await db.execute(sql`SELECT * FROM customer_proforma_lines WHERE proforma_id = ${id}`);
       const lines: any[] = ((rawLinesRes as any).rows ?? (rawLinesRes as unknown as any[])).map((l: any) => ({
         id: l.id,
@@ -119,13 +115,46 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
           AND cp.deleted_at IS NULL
         ORDER BY cp.name ASC
       `);
-        const summaries = ((rawSummary as any).rows ?? (rawSummary as unknown as any[])).map((row: any) => ({
+        const summaryRows = (rawSummary as any).rows ?? (rawSummary as unknown as any[]);
+        const proformaIds = summaryRows.map((row: any) => Number(row.id)).filter((id: number) => Number.isInteger(id));
+        let linesByProforma = new Map<number, any[]>();
+
+        if (proformaIds.length > 0) {
+          const idList = sql.join(
+            proformaIds.map((id: number) => sql`${id}`),
+            sql`,`,
+          );
+          const rawLines = await db.execute(
+            sql`SELECT id, proforma_id, article_code, product_name, quantity, price_per_bale, created_at
+                FROM customer_proforma_lines
+                WHERE proforma_id IN (${idList})`
+          );
+          const rows: any[] = (rawLines as any).rows ?? (rawLines as unknown as any[]);
+          linesByProforma = rows.reduce((map: Map<number, any[]>, line: any) => {
+            const proformaId = Number(line.proforma_id);
+            const current = map.get(proformaId) || [];
+            current.push({
+              id: line.id,
+              proformaId,
+              articleCode: line.article_code ?? "",
+              productName: line.product_name ?? "",
+              quantity: Number(line.quantity) || 0,
+              pricePerBale: line.price_per_bale ?? "0",
+              createdAt: line.created_at,
+            });
+            map.set(proformaId, current);
+            return map;
+          }, new Map<number, any[]>());
+        }
+
+        const summaries = summaryRows.map((row: any) => ({
           id: row.id,
           companyId: row.company_id,
           customerId: row.customer_id,
           name: row.name ?? "",
           isActive: row.is_active ?? false,
           lineCount: Number(row.line_count) || 0,
+          lines: linesByProforma.get(Number(row.id)) || [],
           createdAt: row.created_at,
           updatedAt: row.updated_at ?? row.created_at,
         }));
@@ -133,8 +162,6 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
         return res.json(summaries);
       }
 
-      // SELECT * to avoid explicit-column failures when the Drizzle schema has
-      // columns not yet migrated to production (e.g. is_active added later).
       const rawProformasRes = await db.execute(
         sql`SELECT * FROM customer_proformas
             WHERE company_id = ${companyId}
@@ -158,11 +185,9 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
       const proformaIds = proformas.map((p: any) => p.id);
       let lines: any[] = [];
       if (proformaIds.length > 0) {
-        // ANY(${jsArray}) generates tuple syntax ANY(($1,$2,...)) which PostgreSQL
-        // rejects.  Use IN (${sql.join(...)}) which produces valid IN ($1,$2,...).
         const idList = sql.join(
           proformaIds.map((id: number) => sql`${id}`),
-          sql`,`
+          sql`,`,
         );
         const rawLines = await db.execute(sql`SELECT * FROM customer_proforma_lines WHERE proforma_id IN (${idList})`);
         const rawRows: any[] = (rawLines as any).rows ?? (rawLines as unknown as any[]);
@@ -179,7 +204,6 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
         }));
       }
 
-      // Enrich lines with weightPerBaleKg and correct productName from factoryBaleProducts
       const articleCodes = [...new Set(lines.map((l: any) => l.articleCode).filter(Boolean))];
       const weightMap = new Map<string, string>();
       const nameMap = new Map<string, string>();
@@ -247,7 +271,6 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
       }
 
       const [proforma] = await db.insert(customerProformas).values(parsed).returning();
-      // Sync reservations — no lines yet, but initialises a clean slate
       await syncProformaReservations(db, companyId, proforma.id);
       res.json(proforma);
     } catch (error: unknown) {
@@ -294,7 +317,6 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
         .where(and(eq(customerProformas.id, id), eq(customerProformas.companyId, companyId)))
         .returning();
 
-      // Sync reservations — critical when isActive toggled (releases/restores reservation)
       await syncProformaReservations(db, companyId, id);
       res.json(updated);
     } catch (error: unknown) {
@@ -312,7 +334,6 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
 
       if (id === null) return res.status(400).json({ message: "Invalid id" });
 
-      // Fetch proforma before deleting so we can log which customer it belongs to
       const [proformaBefore] = await db
         .select()
         .from(customerProformas)
@@ -327,8 +348,6 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
         );
       }
 
-      // Soft-delete: release reservations so stock returns to freeToPromise,
-      // but keep proforma + lines intact for restore from Settings → Deleted Items.
       await db
         .update(customerProformas)
         .set({ isActive: false, deletedAt: new Date(), updatedAt: new Date() })
@@ -344,7 +363,6 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
 
       if (!deleted) return res.status(404).json({ message: "Proforma not found" });
 
-      // Verify customer still exists after proforma deletion
       if (proformaBefore) {
         const [custAfter] = await db
           .select({ id: customers.id, legalName: customers.legalName, deletedAt: customers.deletedAt })
