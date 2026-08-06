@@ -584,12 +584,10 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
     }
     setIsTransferSavingRevision(true);
     savingTransferRevisionRef.current = true;
-    let transferUpdated = false;
     try {
       const isValid = await stockTransferForm.trigger();
       if (!isValid) return;
       await onStockTransferSubmit(stockTransferForm.getValues());
-      transferUpdated = true;
       const revisionResponse = await modeApiRequest("POST", `/api/stock-transfers/${transferId}/revisions`, {
         note: transferRevisionNote.trim() || null,
         baseline: "after",
