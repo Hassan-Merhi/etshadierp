@@ -23,7 +23,7 @@ interface AuthenticatedWorkspaceProps {
   routeState: RouteState;
   myAccess?: FactoryAccess;
   posImportEnabled: boolean;
-  chatUnread: number;
+  chatUnread: { count: number } | undefined;
   handleGoBack: () => void;
   handleLogout: () => Promise<void>;
   leaveConfirmDialog: ReactNode;
