@@ -247,13 +247,22 @@ export function isAllowedRemoteClickElement(
 
 function canScrollInDirection(element: HTMLElement, deltaX: number, deltaY: number): boolean {
   const canScrollX =
-    deltaX < 0 ? element.scrollLeft > 0 : deltaX > 0 && element.scrollLeft + element.clientWidth < element.scrollWidth;
+    deltaX < 0
+      ? element.scrollLeft > 0
+      : deltaX > 0 && element.scrollLeft + element.clientWidth < element.scrollWidth;
   const canScrollY =
-    deltaY < 0 ? element.scrollTop > 0 : deltaY > 0 && element.scrollTop + element.clientHeight < element.scrollHeight;
+    deltaY < 0
+      ? element.scrollTop > 0
+      : deltaY > 0 && element.scrollTop + element.clientHeight < element.scrollHeight;
   return canScrollX || canScrollY;
 }
 
-function nearestScrollableElement(element: Element | null, view: Window, deltaX: number, deltaY: number): HTMLElement | null {
+function nearestScrollableElement(
+  element: Element | null,
+  view: Window,
+  deltaX: number,
+  deltaY: number
+): HTMLElement | null {
   let current = element instanceof HTMLElement ? element : null;
   while (current && current !== view.document.body) {
     const style = view.getComputedStyle(current);
@@ -288,8 +297,10 @@ export function applyRemoteMouseCommand(
   }
 
   if (command.type === "scroll") {
-    const deltaX = typeof command.deltaX === "number" && Number.isFinite(command.deltaX) ? command.deltaX : 0;
-    const deltaY = typeof command.deltaY === "number" && Number.isFinite(command.deltaY) ? command.deltaY : 0;
+    const deltaX =
+      typeof command.deltaX === "number" && Number.isFinite(command.deltaX) ? command.deltaX : 0;
+    const deltaY =
+      typeof command.deltaY === "number" && Number.isFinite(command.deltaY) ? command.deltaY : 0;
     if (deltaX === 0 && deltaY === 0) {
       return { status: "ignored", reason: "empty-scroll", clientX, clientY };
     }
