@@ -1,4 +1,5 @@
 import type { ApplicationLanguage } from "@shared/applicationLanguageContract";
+import { canonicalEnglishLabels } from "./canonicalEnglishLabels";
 
 export const applicationTranslations = {
   "language.label": { en: "Language", ar: "اللغة", fr: "Langue" },
@@ -212,18 +213,37 @@ export function translateApplicationText(key: ApplicationTranslationKey, languag
   return entry[language] || entry.en || key;
 }
 
+type ApplicationTranslationEntry = Record<ApplicationLanguage, string>;
+
+const applicationEntryByVisibleText = new Map<string, ApplicationTranslationEntry>();
+
+// Canonical English labels must win over translated aliases that happen to use
+// the same visible spelling. For example, the French text for "Inventory" is
+// "Stock", which previously matched the English "Stock" nav item first and
+// rendered it as "Inventory" — showing two "Inventory" entries in the sidebar.
+{
+  const entries = Object.values(applicationTranslations) as readonly ApplicationTranslationEntry[];
+  for (const entry of entries) {
+    if (!applicationEntryByVisibleText.has(entry.en)) applicationEntryByVisibleText.set(entry.en, entry);
+  }
+  const registerAlias = (alias: string, entry: ApplicationTranslationEntry) => {
+    if (applicationEntryByVisibleText.has(alias)) return;
+    // Never let an alias shadow an English label another dictionary owns.
+    if (alias !== entry.en && canonicalEnglishLabels.has(alias)) return;
+    applicationEntryByVisibleText.set(alias, entry);
+  };
+  for (const entry of entries) {
+    registerAlias(entry.ar, entry);
+    registerAlias(entry.fr, entry);
+  }
+}
+
 export function translateApplicationLiteral(value: string, language: ApplicationLanguage): string | null {
   const leading = value.match(/^\s*/)?.[0] ?? "";
   const trailing = value.match(/\s*$/)?.[0] ?? "";
   const normalized = value.trim();
   if (!normalized) return null;
 
-  const entries = Object.values(applicationTranslations) as readonly Record<ApplicationLanguage, string>[];
-  for (const entry of entries) {
-    if (entry.en === normalized || entry.ar === normalized || entry.fr === normalized) {
-      return `${leading}${entry[language]}${trailing}`;
-    }
-  }
-
-  return null;
+  const entry = applicationEntryByVisibleText.get(normalized);
+  return entry ? `${leading}${entry[language]}${trailing}` : null;
 }
