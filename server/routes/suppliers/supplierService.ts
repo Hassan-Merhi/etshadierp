@@ -77,7 +77,7 @@ export const supplierService = {
           openingBalance: balanceResult.openingBalance,
           hasActivity: containerCount > 0 || balanceResult.hasActivity || purchaseOrders.length > 0,
         };
-      }),
+      })
     );
   },
 
@@ -168,12 +168,7 @@ export const supplierService = {
     });
   },
 
-  async assignStockGroup(
-    supplierId: number,
-    companyId: number,
-    input: unknown,
-    actor: SupplierAuditActor,
-  ) {
+  async assignStockGroup(supplierId: number, companyId: number, input: unknown, actor: SupplierAuditActor) {
     const supplier = await requireSupplier(supplierId, companyId);
     const stockGroupId = parseSupplierStockGroupId(input);
     if (stockGroupId !== null && !(await supplierRepository.stockGroupExists(stockGroupId, companyId))) {
