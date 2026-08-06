@@ -26,6 +26,7 @@ export interface RemoteMouseExecutionOptions {
   keyboardEnabled?: boolean;
 }
 
+// prettier-ignore
 export interface RemoteMouseViewportMetrics {
   left: number;
   top: number;
@@ -139,10 +140,12 @@ function finiteCoordinate(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1;
 }
 
+// prettier-ignore
 function finitePositive(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
+// prettier-ignore
 function finiteOffset(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
@@ -190,6 +193,7 @@ export function normalizeRemoteMousePoint(
   return { x, y };
 }
 
+// prettier-ignore
 export function getRemoteMouseViewportMetrics(view: Window = window): RemoteMouseViewportMetrics {
   const visualViewport = view.visualViewport;
   const width = finitePositive(visualViewport?.width, finitePositive(view.innerWidth, 1));
@@ -203,6 +207,7 @@ export function getRemoteMouseViewportMetrics(view: Window = window): RemoteMous
   };
 }
 
+// prettier-ignore
 export function mapRemoteMousePoint(
   x: number,
   y: number,
@@ -245,6 +250,7 @@ export function isAllowedRemoteClickElement(
   return !!descriptor && SAFE_ACTION_TEXT.test(descriptor) && !DANGEROUS_TEXT.test(descriptor);
 }
 
+// prettier-ignore
 function canScrollInDirection(element: HTMLElement, deltaX: number, deltaY: number): boolean {
   const canScrollX =
     deltaX < 0
@@ -257,6 +263,7 @@ function canScrollInDirection(element: HTMLElement, deltaX: number, deltaY: numb
   return canScrollX || canScrollY;
 }
 
+// prettier-ignore
 function nearestScrollableElement(
   element: Element | null,
   view: Window,
