@@ -47,7 +47,8 @@ describe("frontend company-state isolation wiring", () => {
     const app = source("client/src/app/AuthenticatedApp.tsx");
     const appData = source("client/src/app/useAuthenticatedAppData.ts");
     expect(app).toContain("if (companyLoading) return <AppLoadingState />;");
-    expect(app).toContain("if (companyError || !selectedCompany) return <AppLoadingState forceRecovery");
+    expect(app).toContain("if (companyError || !selectedCompany)");
+    expect(app).toContain("retryCompanyBootstrap");
     expect(appData).toContain('companyQueryKey("/api/company-settings", selectedCompanyId)');
     expect(appData).toContain('companyQueryKey("/api/factory/my-access", selectedCompanyId)');
     expect(appData).toContain('companyQueryKey("/api/factory/settings", selectedCompanyId)');
