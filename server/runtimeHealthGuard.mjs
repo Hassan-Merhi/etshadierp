@@ -2,6 +2,7 @@ import { Server } from "node:http";
 import { Client } from "pg";
 import { deploymentRuntimeConfig } from "./deploymentPreflight.mjs";
 import { runtimeReleaseState } from "./runtimeReleaseState.mjs";
+import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 import {
   criticalColumns,
   criticalIndexes,
@@ -70,7 +71,7 @@ async function probeDatabase() {
     password: process.env.DATABASE_URL ? undefined : process.env.PGPASSWORD,
     database: process.env.DATABASE_URL ? undefined : process.env.PGDATABASE,
     connectionTimeoutMillis: 3000,
-    ssl: process.env.PGSSLMODE === "disable" || process.env.PGHOST === "helium" ? false : { rejectUnauthorized: false },
+    ssl: resolveDatabaseSsl(process.env.DATABASE_URL),
   });
   try {
     await client.connect();

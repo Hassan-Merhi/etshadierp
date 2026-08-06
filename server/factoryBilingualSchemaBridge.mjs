@@ -1,5 +1,6 @@
 import process from "node:process";
 import pg from "pg";
+import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 
 const { Client } = pg;
 const INSTALL_KEY = Symbol.for("erp.factory-bilingual-schema.applied");
@@ -58,11 +59,9 @@ export async function ensureFactoryBilingualSchema() {
     return { columnsAdded: [], missingOptionalTables: [] };
   }
 
-  const isLocalReplitDb = process.env.PGHOST === "helium" || connectionString.includes("@helium:");
-  const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
   const client = new Client({
     connectionString,
-    ssl: !isLocalReplitDb && !sslExplicitlyDisabled ? { rejectUnauthorized: false } : false,
+    ssl: resolveDatabaseSsl(connectionString),
     connectionTimeoutMillis: 8_000,
   });
 

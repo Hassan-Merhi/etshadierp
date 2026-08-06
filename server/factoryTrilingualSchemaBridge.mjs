@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import process from "node:process";
 import pg from "pg";
+import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 
 const INSTALL_KEY = Symbol.for("erp.factory-trilingual-schema.applied");
 
@@ -25,12 +26,10 @@ async function ensureFactoryTrilingualSchema() {
     throw new Error("Factory trilingual schema could not start because no PostgreSQL configuration is available.");
   }
 
-  const isLocalReplitDB = process.env.PGHOST === "helium" || connectionString.includes("@helium:");
-  const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
   const { Client } = pg;
   const client = new Client({
     connectionString,
-    ssl: !isLocalReplitDB && !sslExplicitlyDisabled ? { rejectUnauthorized: false } : false,
+    ssl: resolveDatabaseSsl(connectionString),
     connectionTimeoutMillis: 15_000,
   });
 

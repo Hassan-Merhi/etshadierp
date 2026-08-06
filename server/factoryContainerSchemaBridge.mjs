@@ -1,6 +1,7 @@
 import "./fxFetchTimeoutBridge.mjs";
 import process from "node:process";
 import pg from "pg";
+import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 
 const { Client } = pg;
 
@@ -120,14 +121,9 @@ async function ensureFactoryContainerSchema() {
     return;
   }
 
-  const isLocalReplitDb =
-    process.env.PGHOST === "helium" || connectionString.includes("@helium:");
-  const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
-  const requiresSsl = !isLocalReplitDb && !sslExplicitlyDisabled;
-
   const client = new Client({
     connectionString,
-    ssl: requiresSsl ? { rejectUnauthorized: false } : false,
+    ssl: resolveDatabaseSsl(connectionString),
     connectionTimeoutMillis: 8_000,
   });
 

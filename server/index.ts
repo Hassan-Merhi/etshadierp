@@ -15,6 +15,7 @@ import { setupVite, log } from "./vite";
 import type { User } from "@shared/schema";
 import { pool } from "./db";
 import { Client } from "pg";
+import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 import { requestLogger } from "./middleware/requestLogger";
 import { bandwidthDebugMiddleware } from "./middleware/bandwidthDebug";
 import { logger } from "./lib/logger";
@@ -210,7 +211,7 @@ if (process.env.DATABASE_URL || process.env.PGHOST) {
   sessionConfig.store = new PgSession({
     conObject: {
       connectionString,
-      ssl: requiresSSL ? { rejectUnauthorized: false } : false,
+      ssl: resolveDatabaseSsl(connectionString),
       // Allow a small pool so concurrent session reads don't serialize behind one connection.
       max: Number(process.env.PG_SESSION_POOL_MAX || 3),
       connectionTimeoutMillis: 8000,
@@ -517,13 +518,9 @@ let migrationsDone = false;
     const connectionString =
       process.env.DATABASE_URL ||
       `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT}/${process.env.PGDATABASE}`;
-    const isLocalReplitDB = process.env.PGHOST === "helium" || connectionString.includes("@helium:");
-    const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
-    const requiresSSL = !isLocalReplitDB && !sslExplicitlyDisabled;
-
     let migrationClient = new Client({
       connectionString,
-      ssl: requiresSSL ? { rejectUnauthorized: false } : false,
+      ssl: resolveDatabaseSsl(connectionString),
     });
 
     try {
@@ -577,7 +574,7 @@ END $mig$`;
               await migrationClient.end().catch(() => {});
               migrationClient = new Client({
                 connectionString,
-                ssl: requiresSSL ? { rejectUnauthorized: false } : false,
+                ssl: resolveDatabaseSsl(connectionString),
               });
               await migrationClient.connect();
               await migrationClient.query(`SET lock_timeout = '30s'`);

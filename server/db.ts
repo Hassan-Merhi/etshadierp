@@ -4,6 +4,7 @@ import { Pool } from "pg";
 import * as schema from "@shared/schema";
 import { logger } from "./lib/logger";
 import { readDatabaseRuntimeConfig } from "./lib/databaseConfig";
+import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 import {
   logDatabasePoolSnapshot,
   logSlowDatabaseQuery,
@@ -66,7 +67,7 @@ logger.info("Database pool configured", {
 
 export const pool = new Pool({
   connectionString,
-  ssl: requiresSSL ? { rejectUnauthorized: false } : false,
+  ssl: resolveDatabaseSsl(connectionString),
   max: databaseRuntimeConfig.poolMax,
   min: databaseRuntimeConfig.poolMin,
   connectionTimeoutMillis: databaseRuntimeConfig.connectionTimeoutMillis,

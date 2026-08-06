@@ -1,4 +1,5 @@
 import { Client } from "pg";
+import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 
 const REPAIR_LOCK_KEY = "erp-startup-warning-repair-v1";
 
@@ -53,12 +54,9 @@ function connectionOptions() {
 
   if (!connectionString) return null;
 
-  const isLocalReplitDb = process.env.PGHOST === "helium" || connectionString.includes("@helium:");
-  const sslDisabled = process.env.PGSSLMODE === "disable";
-
   return {
     connectionString,
-    ssl: !isLocalReplitDb && !sslDisabled ? { rejectUnauthorized: false } : false,
+    ssl: resolveDatabaseSsl(connectionString),
   };
 }
 

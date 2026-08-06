@@ -3,6 +3,7 @@ import "./factoryTrilingualSchemaBridge.mjs";
 import { readFile } from "node:fs/promises";
 import process from "node:process";
 import pg from "pg";
+import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -58,9 +59,6 @@ if (!globalThis[INSTALL_KEY]) {
     );
   }
 
-  const isLocalReplitDB = process.env.PGHOST === "helium" || connectionString.includes("@helium:");
-  const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
-  const requiresSSL = !isLocalReplitDB && !sslExplicitlyDisabled;
   const migrationSql = await readFile(
     new URL("../migrations/20260728_001_supplier_company_scope.sql", import.meta.url),
     "utf8"
@@ -68,7 +66,7 @@ if (!globalThis[INSTALL_KEY]) {
 
   const pool = new Pool({
     connectionString,
-    ssl: requiresSSL ? { rejectUnauthorized: false } : false,
+    ssl: resolveDatabaseSsl(connectionString),
     max: 1,
     connectionTimeoutMillis: 15_000,
     idleTimeoutMillis: 1_000,
