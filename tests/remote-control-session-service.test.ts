@@ -15,6 +15,7 @@ import {
 import { restoreRemoteSupportBootDefaults, updateRemoteSupportFlags } from "../server/services/remoteSupportRuntime";
 import { resetRemoteSupportRolloutForTests, updateRemoteSupportRollout } from "../server/services/remoteSupportRollout";
 
+// Keep controller-company and target-company safety behavior covered together.
 const now = Date.now();
 const companyId = 7;
 
@@ -29,13 +30,18 @@ function registerTab(userId = "22", tabId = "erp-tab-1", selectedCompanyId = com
   });
 }
 
-function startSession(controllerUserId = "1", targetUserId = "22", selectedCompanyId = companyId) {
+function startSession(
+  controllerUserId = "1",
+  targetUserId = "22",
+  selectedCompanyId = companyId,
+  controllerRole = "Developer"
+) {
   return startRemoteControlSession({
     targetUserId,
     targetUsername: `user-${targetUserId}`,
     controllerUserId,
     controllerUsername: `developer-${controllerUserId}`,
-    controllerRole: "Developer",
+    controllerRole,
     controllerCompanyId: selectedCompanyId,
     durationMs: 5 * 60 * 1000,
   });
@@ -92,9 +98,15 @@ describe("remote control session safety", () => {
     expect(getActiveRemoteControlSession("22", "erp-tab-1")).toBeNull();
   });
 
-  it("refuses to bind a controller to a tab in another company", () => {
+  it("allows Developers to bind across companies while keeping other roles company-scoped", () => {
     registerTab("22", "erp-tab-1", 8);
-    expect(() => startSession("1", "22", 7)).toThrowError(
+
+    const developerSession = startSession("1", "22", 7, "Developer");
+    expect(developerSession.companyId).toBe(7);
+    expect(developerSession.targetCompanyId).toBe(8);
+
+    stopRemoteControlSession(developerSession.id, "test-complete");
+    expect(() => startSession("2", "22", 7, "Admin")).toThrowError(
       expect.objectContaining({ code: "TARGET_TAB_UNAVAILABLE", statusCode: 409 })
     );
   });
