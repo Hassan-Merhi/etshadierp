@@ -26,15 +26,16 @@ jobs:
           old = '''      if (isEditMode && !savingTransferRevisionRef.current) {
         setLocation(`${modePrefix}/daybook`);
       } else {
-        stockTransferForm.reset({
-'''
+        stockTransferForm.reset({'''
           new = '''      if (isEditMode) {
-        if (!savingTransferRevisionRef.current) setLocation(`${modePrefix}/daybook`);
+        if (!savingTransferRevisionRef.current) {
+          setLocation(`${modePrefix}/daybook`);
+        }
       } else {
-        stockTransferForm.reset({
-'''
-          if text.count(old) != 1:
-              raise SystemExit(f'Expected one navigation block, found {text.count(old)}')
+        stockTransferForm.reset({'''
+          count = text.count(old)
+          if count != 1:
+              raise SystemExit(f'Expected one navigation block, found {count}')
           path.write_text(text.replace(old, new, 1))
           PY
       - name: Remove temporary workflow
