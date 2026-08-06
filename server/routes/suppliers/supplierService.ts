@@ -55,6 +55,7 @@ function supplierAuditChanges(existing: any, updated: any) {
   return changes;
 }
 
+// prettier-ignore
 export const supplierService = {
   list(companyId: number, search: string) {
     return supplierRepository.list(companyId, search);
