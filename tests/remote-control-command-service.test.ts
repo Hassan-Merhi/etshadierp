@@ -190,7 +190,7 @@ describe("remote mouse command safety", () => {
     expect(listener).toHaveBeenCalledTimes(3);
   });
 
-  it("fails closed for invalid coordinates, empty scrolls, and missing target streams", () => {
+  it("fails closed for invalid coordinates and empty scrolls while queueing a temporarily offline target", () => {
     const session = buildSession();
     const now = Date.now();
     authorizeRemoteMouseControl({
@@ -224,16 +224,15 @@ describe("remote mouse command safety", () => {
       })
     ).toThrowError(expect.objectContaining({ code: "INVALID_SCROLL", statusCode: 400 }));
 
-    expect(() =>
-      publishRemoteMouseCommand({
-        sessionId: session.id,
-        controllerUserId: "1",
-        type: "click",
-        x: 0.5,
-        y: 0.5,
-        now: now + 3,
-      })
-    ).toThrowError(expect.objectContaining({ code: "TARGET_COMMAND_CHANNEL_UNAVAILABLE", statusCode: 409 }));
+    const queued = publishRemoteMouseCommand({
+      sessionId: session.id,
+      controllerUserId: "1",
+      type: "click",
+      x: 0.5,
+      y: 0.5,
+      now: now + 3,
+    });
+    expect(queued.sequence).toBe(1);
   });
 
   it("rejects command subscriptions from a different user or browser tab", () => {
