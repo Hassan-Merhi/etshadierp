@@ -1,0 +1,242 @@
+name: CircleCI Parity
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: circleci-parity-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_ENV: test
+  SESSION_SECRET: github-actions-session-secret
+  CSRF_ENFORCE: "0"
+  ENABLE_SCHEDULERS: "false"
+  PORT: "5000"
+
+jobs:
+  static-build:
+    name: Static Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js 22.14
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.14"
+          cache: npm
+
+      - name: Normalize package registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Dependency diagnostics
+        run: |
+          node --version
+          npm --version
+          npm config get bin-links
+          node -p "'TypeScript ' + require('typescript/package.json').version"
+          node -p "'jsdom ' + require('jsdom/package.json').version"
+          for binary in tsc vite eslint vitest; do
+            test -x "node_modules/.bin/$binary" || { echo "$binary is missing"; exit 1; }
+          done
+
+      - name: Verify lockfile and production dependencies
+        run: |
+          npm run verify:lockfile
+          npm run verify:production-dependencies
+
+      - name: Check formatting for changed source files
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base_sha="$PR_BASE_SHA"
+          else
+            base_sha="$PUSH_BEFORE_SHA"
+            if [ -z "$base_sha" ] || [ "$base_sha" = "0000000000000000000000000000000000000000" ]; then
+              base_sha="HEAD^"
+            fi
+          fi
+
+          mapfile -d '' changed_files < <(
+            git diff --name-only --diff-filter=ACMR -z "$base_sha" "$GITHUB_SHA" -- client/src server shared tests scripts |
+              grep -zE '\.(ts|tsx|css|mjs)$' || true
+          )
+
+          if [ "${#changed_files[@]}" -eq 0 ]; then
+            echo "No changed source files require formatting checks."
+            exit 0
+          fi
+
+          printf 'Checking formatting for %s changed source file(s):\n' "${#changed_files[@]}"
+          printf ' - %s\n' "${changed_files[@]}"
+          node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
+
+      - name: Lint
+        run: npm run lint
+
+      - name: TypeScript
+        run: npm run check
+
+      - name: Production build
+        run: npm run build
+
+      - name: Verify server bundle
+        run: npm run verify:server-bundle
+
+      - name: Repository safety contracts
+        run: |
+          npm run verify:program1-observability
+          npm run verify:final-production-readiness
+          npm run verify:bandwidth
+
+      - name: Upload production build
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: production-build
+          path: dist
+          if-no-files-found: warn
+          retention-days: 7
+
+  postgres-regression:
+    name: PostgreSQL Regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      NODE_OPTIONS: --max-old-space-size=2048
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
+
+    services:
+      postgres:
+        image: postgres:15.13
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d heliumdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js 22.14
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.14"
+          cache: npm
+
+      - name: Normalize package registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Verify PostgreSQL readiness
+        run: |
+          for attempt in $(seq 1 60); do
+            if pg_isready -h 127.0.0.1 -p 5432 -U postgres -d heliumdb; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "PostgreSQL did not become ready."
+          exit 1
+
+      - name: Verify migration registry
+        run: node scripts/verify-migration-registry.mjs --json
+
+      - name: Prepare disposable database schema
+        run: node node_modules/drizzle-kit/bin.cjs push --force
+
+      - name: Verify disposable database schema
+        run: node scripts/verify-ci-disposable-schema.mjs
+
+      - name: Backend tests
+        run: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
+
+      - name: Frontend tests
+        run: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
+
+  security-readiness:
+    name: Security Readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: static-build
+    env:
+      NODE_OPTIONS: --max-old-space-size=2048
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
+
+    services:
+      postgres:
+        image: postgres:15.13
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d heliumdb"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js 22.14
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22.14"
+          cache: npm
+
+      - name: Normalize package registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Prepare disposable database schema
+        run: node node_modules/drizzle-kit/bin.cjs push --force
+
+      - name: Critical dependency audit
+        run: npm audit --audit-level=critical
+
+      - name: Production dependency verification
+        run: npm run verify:production-dependencies
+
+      - name: Program 6 security checks
+        run: PROGRAM6_SKIP_TYPESCRIPT=1 npm run check:program-6-security
+
+      - name: Final production readiness contract
+        run: npm run verify:final-production-readiness
