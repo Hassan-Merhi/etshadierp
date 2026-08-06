@@ -15,6 +15,7 @@ import {
 const revisionSchema = z.object({
   note: z.string().optional().nullable(),
   optional: z.boolean().optional().default(false),
+  baseline: z.enum(["before", "after"]).optional().default("before"),
   items: z
     .array(
       z.object({
@@ -120,6 +121,7 @@ export function registerImmutableStockTransferRevisionRoutes(app: Express) {
         userId: actorId,
         note: parsed.note,
         pending: parsed.optional,
+        baseline: parsed.baseline,
         sourceLocationIdLimit: assignedLocationId,
         items: parsed.items.map((item) => ({
           stockItemId: item.stockItemId,
