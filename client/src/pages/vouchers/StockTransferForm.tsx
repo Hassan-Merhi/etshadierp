@@ -579,7 +579,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
     }
     const transferId = stableTransferId;
     if (!transferId || !voucherIdToEdit) {
-      toast({ title: "Error", description: "Stock transfer is not ready yet. Please reopen it and try again.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to save revision", variant: "destructive" });
       return;
     }
     setIsTransferSavingRevision(true);
@@ -612,10 +612,8 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       });
     } catch (error: any) {
       toast({
-        title: transferUpdated ? "Revision history was not saved" : "Transfer was not updated",
-        description: transferUpdated
-          ? `The transfer update succeeded, but the revision record failed: ${error.message || "Unknown error"}. Keep this dialog open and try Save as Revision again.`
-          : error.message || "Failed to save revision",
+        title: "Error",
+        description: error.message || "Failed to save revision",
         variant: "destructive",
       });
     } finally {
