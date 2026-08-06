@@ -6,20 +6,10 @@ export const INVENTORY_QUANTITY_DECIMAL_PLACES = 3;
 export const INVENTORY_COST_DECIMAL_PLACES = 6;
 export const INVENTORY_MONEY_DECIMAL_PLACES = 2;
 
-function useStrictPositiveSemantics(decimal: Decimal): Decimal {
-  Object.defineProperty(decimal, "isPositive", {
-    configurable: true,
-    value: () => decimal.greaterThan(0),
-  });
-  return decimal;
-}
-
 /**
  * Convert database, request, or calculated numeric input into a finite Decimal.
  * Invalid, empty, or non-finite values use the supplied fallback instead of
  * allowing Decimal constructor errors or NaN/Infinity to enter costing writes.
- * Decimal.js considers positive zero to be positive, while inventory validation
- * requires a quantity or rate to be strictly greater than zero.
  */
 export function toInventoryDecimal(value: InventoryNumericInput, fallback: InventoryNumericInput = 0): Decimal {
   const parse = (candidate: InventoryNumericInput): Decimal | null => {
@@ -29,13 +19,13 @@ export function toInventoryDecimal(value: InventoryNumericInput, fallback: Inven
 
     try {
       const decimal = new Decimal(candidate);
-      return decimal.isFinite() ? useStrictPositiveSemantics(decimal) : null;
+      return decimal.isFinite() ? decimal : null;
     } catch {
       return null;
     }
   };
 
-  return parse(value) ?? parse(fallback) ?? useStrictPositiveSemantics(new Decimal(0));
+  return parse(value) ?? parse(fallback) ?? new Decimal(0);
 }
 
 export function addInventoryValues(...values: InventoryNumericInput[]): Decimal {
