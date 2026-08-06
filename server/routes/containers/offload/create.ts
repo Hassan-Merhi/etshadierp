@@ -5,10 +5,18 @@
  * first-match, so that order is behaviour.
  */
 import type { Express } from "express";
+import type Decimal from "decimal.js";
 import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { getClientDate } from "../../../lib/dateUtils";
 import { logger } from "../../../lib/logger";
+import {
+  addInventoryValues,
+  inventoryMoney,
+  multiplyInventoryValues,
+  subtractInventoryValues,
+  toInventoryDecimal,
+} from "../../../lib/inventoryMath";
 import { db } from "../../../db";
 import { storage } from "../../../storage";
 import { requireAuth, requireNonPOS } from "../../../auth";
@@ -27,27 +35,24 @@ import { syncSalesItemCostsForStockItems } from "../../../services/syncSalesItem
 
 export function registerContainerOffloadCreateRoutes(app: Express) {
   app.post("/api/containers/:id/offload", requireAuth, requireNonPOS, async (req, res) => {
-    const _t = Date.now();
-    const _uid = (req as any).user?.id;
-    const _cid = req.session.currentCompanyId;
+    const startedAt = Date.now();
+    const userId = (req as any).user?.id;
+    const sessionCompanyId = req.session.currentCompanyId;
     logger.info("Container offload started", {
       module: "containers",
       action: "offload",
-      userId: _uid,
-      companyId: _cid,
+      userId,
+      companyId: sessionCompanyId,
       containerId: req.params.id,
     });
+
     try {
       const containerId = parseId(req.params.id);
       if (containerId === null) return res.status(400).json({ message: "Invalid id" });
 
-      // Validate request body
       const validation = offloadRequestSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({
-          message: "Validation failed",
-          errors: validation.error.issues,
-        });
+        return res.status(400).json({ message: "Validation failed", errors: validation.error.issues });
       }
 
       const {
@@ -66,17 +71,11 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
         agentChargeLines = [],
       } = validation.data;
 
-      // Validate container exists
       const container = await storage.getContainerById(containerId);
-      if (!container) {
-        return res.status(404).json({ message: "Container not found" });
-      }
+      if (!container) return res.status(404).json({ message: "Container not found" });
 
-      // Check if this is an edit (container already offloaded)
       const isEdit = container.status === "OFFLOADED";
-
       if (isEdit) {
-        // For edits, first reverse the existing offload
         const [existingOffload] = await db
           .select()
           .from(containerOffloads)
@@ -84,9 +83,6 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
           .limit(1);
 
         if (existingOffload) {
-          // Reverse inventory changes + delete old records atomically.
-          // Prefer stored containerOffloadItems (exact quantities that were actually offloaded)
-          // to avoid discrepancies when PO line items were edited after the original offload.
           const storedOffloadItems = await db
             .select()
             .from(containerOffloadItems)
@@ -99,8 +95,8 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
                   tx,
                   existingOffload.locationId,
                   offloadItem.stockItemId,
-                  parseFloat(offloadItem.quantity),
-                  parseFloat(offloadItem.totalValue)
+                  toInventoryDecimal(offloadItem.quantity).toNumber(),
+                  toInventoryDecimal(offloadItem.totalValue).toNumber()
                 );
               }
             } else {
@@ -110,34 +106,46 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
                 const lineItems = await storage.getLineItemsByPO(po.id);
                 allLineItems.push(...lineItems);
               }
-              const legacyAdditionalCost = parseFloat(existingOffload.additionalCostPerBale || "0");
-              const legacyItemsMap = new Map<number, { totalQuantity: number; weightedRateSum: number }>();
+
+              const legacyAdditionalCost = toInventoryDecimal(existingOffload.additionalCostPerBale);
+              const legacyItemsMap = new Map<
+                number,
+                { totalQuantity: Decimal; weightedRateSum: Decimal }
+              >();
+
               for (const item of allLineItems) {
                 const stockItemId = item.stockItemId;
                 if (!stockItemId || stockItemId === 0) continue;
-                const quantity = parseFloat(item.quantity);
-                const rate = parseFloat(item.rate || "0");
-                if (legacyItemsMap.has(stockItemId)) {
-                  const existing = legacyItemsMap.get(stockItemId)!;
-                  existing.totalQuantity += quantity;
-                  existing.weightedRateSum += rate * quantity;
+                const quantity = toInventoryDecimal(item.quantity);
+                const rate = toInventoryDecimal(item.rate);
+                const weightedValue = multiplyInventoryValues(rate, quantity);
+                const existing = legacyItemsMap.get(stockItemId);
+                if (existing) {
+                  existing.totalQuantity = addInventoryValues(existing.totalQuantity, quantity);
+                  existing.weightedRateSum = addInventoryValues(existing.weightedRateSum, weightedValue);
                 } else {
-                  legacyItemsMap.set(stockItemId, { totalQuantity: quantity, weightedRateSum: rate * quantity });
+                  legacyItemsMap.set(stockItemId, {
+                    totalQuantity: quantity,
+                    weightedRateSum: weightedValue,
+                  });
                 }
               }
-              for (const [stockItemId, data] of Array.from(legacyItemsMap)) {
-                const estimatedValue = data.weightedRateSum + data.totalQuantity * legacyAdditionalCost;
+
+              for (const [stockItemId, data] of legacyItemsMap) {
+                const estimatedValue = addInventoryValues(
+                  data.weightedRateSum,
+                  multiplyInventoryValues(data.totalQuantity, legacyAdditionalCost)
+                );
                 await reverseInventoryByExactValue(
                   tx,
                   existingOffload.locationId,
                   stockItemId,
-                  data.totalQuantity,
-                  estimatedValue
+                  data.totalQuantity.toNumber(),
+                  estimatedValue.toNumber()
                 );
               }
             }
 
-            // Delete stored offload items so they don't persist after reversal
             await tx.delete(containerOffloadItems).where(eq(containerOffloadItems.offloadId, existingOffload.id));
 
             const containerDescPattern = `%container ${container.containerNumber}%`;
@@ -148,20 +156,20 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
                 and(
                   eq(vouchers.companyId, container.companyId),
                   sql`(
-                      (
-                        LOWER(${vouchers.description}) LIKE LOWER(${containerDescPattern})
-                        AND (
-                          ${vouchers.voucherNumber} LIKE 'DUTY-%' OR
-                          ${vouchers.voucherNumber} LIKE 'OFFICE-%' OR
-                          ${vouchers.voucherNumber} LIKE 'TRANS-%' OR
-                          ${vouchers.voucherNumber} LIKE 'CHG-%' OR
-                          ${vouchers.voucherNumber} LIKE 'XFER-%'
-                        )
+                    (
+                      LOWER(${vouchers.description}) LIKE LOWER(${containerDescPattern})
+                      AND (
+                        ${vouchers.voucherNumber} LIKE 'DUTY-%' OR
+                        ${vouchers.voucherNumber} LIKE 'OFFICE-%' OR
+                        ${vouchers.voucherNumber} LIKE 'TRANS-%' OR
+                        ${vouchers.voucherNumber} LIKE 'CHG-%' OR
+                        ${vouchers.voucherNumber} LIKE 'XFER-%'
                       )
-                      OR ${vouchers.voucherNumber} LIKE ${"SP-OTW-REV-ERP-" + containerId + "-%"}
-                      OR ${vouchers.voucherNumber} LIKE ${"SP-STOCK-ERP-" + containerId + "-%"}
-                      OR ${vouchers.voucherNumber} LIKE ${"SP-AGENT-SETTLE-" + containerId + "-%"}
-                    )`
+                    )
+                    OR ${vouchers.voucherNumber} LIKE ${"SP-OTW-REV-ERP-" + containerId + "-%"}
+                    OR ${vouchers.voucherNumber} LIKE ${"SP-STOCK-ERP-" + containerId + "-%"}
+                    OR ${vouchers.voucherNumber} LIKE ${"SP-AGENT-SETTLE-" + containerId + "-%"}
+                  )`
                 )
               );
 
@@ -170,7 +178,6 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
               await tx.delete(vouchers).where(eq(vouchers.id, voucher.id));
             }
 
-            // Also delete HADI L'SHI side SP agent vouchers (companyId=1) for this container
             const hadiAgentVouchers = await tx
               .select()
               .from(vouchers)
@@ -180,20 +187,18 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
                   sql`${vouchers.voucherNumber} LIKE ${"SP-AGENT-ERP-" + containerId + "-%"}`
                 )
               );
-            for (const v of hadiAgentVouchers) {
-              await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, v.id));
-              await tx.delete(vouchers).where(eq(vouchers.id, v.id));
+            for (const voucher of hadiAgentVouchers) {
+              await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucher.id));
+              await tx.delete(vouchers).where(eq(vouchers.id, voucher.id));
             }
 
             await tx.delete(containerOffloads).where(eq(containerOffloads.id, existingOffload.id));
           });
         }
 
-        // Set status back to OTW so offloadContainer can proceed
         await storage.updateContainer(containerId, { status: "OTW" });
       }
 
-      // Perform offload
       const offload = await storage.offloadContainer(
         containerId,
         locationId,
@@ -210,24 +215,20 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
         inventoryCostCorrections
       );
 
-      // ── SP company: all SP-specific journals in one atomic transaction ──
-      // Detect company type first (outside the tx — read-only, no side effects)
       const spCompanyRow = await db.execute(
         sql`SELECT company_type FROM companies WHERE id = ${container.companyId} LIMIT 1`
       );
-      const spCompanyType = (spCompanyRow as any).rows?.[0]?.company_type ?? (spCompanyRow as any)[0]?.company_type;
+      const spCompanyType =
+        (spCompanyRow as any).rows?.[0]?.company_type ?? (spCompanyRow as any)[0]?.company_type;
       const isSpCompany = spCompanyType === "supplier_partner";
 
       if (isSpCompany) {
-        const vDate = offloadDate || getClientDate(req);
-        const validAgentLines = agentChargeLines.filter((l) => l.amountUsd > 0);
-        const totalAgentAmt = validAgentLines.reduce((s, l) => s + l.amountUsd, 0);
-        // Use the container's stored grand total as the authoritative OTW amount.
-        // Avoids computing from PO columns (which had issues with closure capture inside tx).
-        const totalOtw = parseFloat(container.grandTotal || "0");
+        const voucherDate = offloadDate || getClientDate(req);
+        const validAgentLines = agentChargeLines.filter((line) => toInventoryDecimal(line.amountUsd).isPositive());
+        const totalAgentAmount = addInventoryValues(...validAgentLines.map((line) => line.amountUsd));
+        const totalOtw = toInventoryDecimal(container.grandTotal);
 
-        // Pre-fetch all required ledger accounts in parallel (outside tx)
-        const [otwAcct, otwClrAcct, spStockAcct, spCostClrAcct, hadiSpInterco, spHadiIcAcct, spPrepaidExpAcct] =
+        const [otwAccount, otwClearingAccount, spStockAccount, spCostClearingAccount, hadiSpInterco, spHadiIcAccount, spPrepaidExpenseAccount] =
           await Promise.all([
             db
               .select()
@@ -239,7 +240,7 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
                   isNull(ledgerAccounts.deletedAt)
                 )
               )
-              .then((r) => r[0]),
+              .then((rows) => rows[0]),
             db
               .select()
               .from(ledgerAccounts)
@@ -250,7 +251,7 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
                   isNull(ledgerAccounts.deletedAt)
                 )
               )
-              .then((r) => r[0]),
+              .then((rows) => rows[0]),
             db
               .select()
               .from(ledgerAccounts)
@@ -261,7 +262,7 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
                   isNull(ledgerAccounts.deletedAt)
                 )
               )
-              .then((r) => r[0]),
+              .then((rows) => rows[0]),
             db
               .select()
               .from(ledgerAccounts)
@@ -272,7 +273,7 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
                   isNull(ledgerAccounts.deletedAt)
                 )
               )
-              .then((r) => r[0]),
+              .then((rows) => rows[0]),
             validAgentLines.length > 0
               ? db
                   .select()
@@ -284,7 +285,7 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
                       isNull(ledgerAccounts.deletedAt)
                     )
                   )
-                  .then((r) => r[0])
+                  .then((rows) => rows[0])
               : Promise.resolve(undefined),
             validAgentLines.length > 0
               ? db
@@ -297,7 +298,7 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
                       isNull(ledgerAccounts.deletedAt)
                     )
                   )
-                  .then((r) => r[0])
+                  .then((rows) => rows[0])
               : Promise.resolve(undefined),
             validAgentLines.length > 0
               ? db
@@ -310,192 +311,187 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
                       isNull(ledgerAccounts.deletedAt)
                     )
                   )
-                  .then((r) => r[0])
+                  .then((rows) => rows[0])
               : Promise.resolve(undefined),
           ]);
 
-        if (!otwAcct || !otwClrAcct) {
+        if (!otwAccount || !otwClearingAccount) {
           throw new Error("SP OTW accounts not found. Run SP Setup first.");
         }
-        if (!spStockAcct || !spCostClrAcct) {
+        if (!spStockAccount || !spCostClearingAccount) {
           throw new Error("SP Stock / Cost Clearing accounts not found. Run SP Setup first.");
         }
         if (validAgentLines.length > 0) {
           if (!hadiSpInterco) throw new Error("HADI L'SHI intercompany account not found. Contact admin.");
-          if (!spHadiIcAcct) throw new Error("SP intercompany account (SP-HADI-IC) not found. Run SP Setup first.");
-          if (!spPrepaidExpAcct) throw new Error("SP Prepaid Expenses account not found. Run SP Setup first.");
+          if (!spHadiIcAccount) throw new Error("SP intercompany account (SP-HADI-IC) not found. Run SP Setup first.");
+          if (!spPrepaidExpenseAccount) throw new Error("SP Prepaid Expenses account not found. Run SP Setup first.");
         }
 
-        // ── Single transaction: Voucher A + agent journals ──
-        // Note: Voucher B (Dr sp_stock / Cr sp_cost_clearing) in the native SP offload
-        // creates a stock asset. For ERP containers, inventory is managed through
-        // storage.offloadContainer (bales/products tables), so no separate stock ledger
-        // entry is needed — sp_goods_otw and sp_otw_clearing are fully cleared by Voucher A.
         await db.transaction(async (tx) => {
-          // ── Voucher A: Reverse Goods OTW (clears OTW asset + OTW Clearing liability) ──
-          // OTW Clearing Dr lines carry supplierId → zeroes the supplier sub-ledger balance.
-          // Mirrors the same step in POST /api/sp/offload for native SP containers.
-          if (totalOtw > 0) {
+          if (totalOtw.isPositive()) {
+            const totalOtwAmount = inventoryMoney(totalOtw);
             const [voucherA] = await tx
               .insert(vouchers)
               .values({
                 companyId: container.companyId,
                 voucherType: "Journal",
                 voucherNumber: `SP-OTW-REV-ERP-${containerId}-${Date.now()}`,
-                voucherDate: vDate,
+                voucherDate,
                 description: `Goods OTW Reversal — ERP container #${containerId}`,
-                totalAmount: String(totalOtw),
+                totalAmount: totalOtwAmount,
                 currency: "USD",
                 exchangeRate: "1",
                 sourceModule: "SP",
               })
               .returning();
 
-            // Dr OTW Clearing per PO (with supplierId — zeroes supplier sub-ledger balance).
-            // Re-query POs INSIDE the transaction to avoid closure-capture issues with the
-            // outer pos variable that caused the loop to silently produce zero rows.
-            const txPos = await tx.select().from(purchaseOrders).where(eq(purchaseOrders.containerId, containerId));
+            const transactionPurchaseOrders = await tx
+              .select()
+              .from(purchaseOrders)
+              .where(eq(purchaseOrders.containerId, containerId));
 
-            const calcPoTotal = (po: any): number =>
-              parseFloat(po.itemsTotal || "0") +
-              parseFloat(po.freight || "0") +
-              parseFloat(po.otherCharges || "0") +
-              parseFloat(po.surcharge || "0") +
-              parseFloat(po.fumigation || "0") +
-              parseFloat(po.documentCharges || "0") -
-              parseFloat(po.discount || "0");
+            const calculatePurchaseOrderTotal = (purchaseOrder: any) =>
+              subtractInventoryValues(
+                addInventoryValues(
+                  purchaseOrder.itemsTotal,
+                  purchaseOrder.freight,
+                  purchaseOrder.otherCharges,
+                  purchaseOrder.surcharge,
+                  purchaseOrder.fumigation,
+                  purchaseOrder.documentCharges
+                ),
+                purchaseOrder.discount
+              );
 
-            if (txPos.length === 0) {
-              // Fallback: single Dr entry for full totalOtw with no supplierId
+            if (transactionPurchaseOrders.length === 0) {
               await tx.insert(voucherEntries).values({
                 voucherId: voucherA.id,
-                ledgerAccountId: otwClrAcct.id,
+                ledgerAccountId: otwClearingAccount.id,
                 supplierId: null,
-                debitAmount: String(totalOtw),
+                debitAmount: totalOtwAmount,
                 creditAmount: "0",
                 narration: `OTW Clearing reversal — ERP container #${containerId}`,
               });
             } else {
-              for (const po of txPos) {
-                const poTotal = calcPoTotal(po);
-                if (poTotal <= 0) continue;
+              for (const purchaseOrder of transactionPurchaseOrders) {
+                const purchaseOrderTotal = calculatePurchaseOrderTotal(purchaseOrder);
+                if (!purchaseOrderTotal.isPositive()) continue;
                 await tx.insert(voucherEntries).values({
                   voucherId: voucherA.id,
-                  ledgerAccountId: otwClrAcct.id,
-                  supplierId: po.supplierId || null,
-                  debitAmount: String(poTotal),
+                  ledgerAccountId: otwClearingAccount.id,
+                  supplierId: purchaseOrder.supplierId || null,
+                  debitAmount: inventoryMoney(purchaseOrderTotal),
                   creditAmount: "0",
                   narration: `OTW Clearing reversal — ERP container #${containerId}`,
                 });
               }
             }
 
-            // Cr Goods OTW (full total — reduces the OTW asset to zero)
             await tx.insert(voucherEntries).values({
               voucherId: voucherA.id,
-              ledgerAccountId: otwAcct.id,
+              ledgerAccountId: otwAccount.id,
               debitAmount: "0",
-              creditAmount: String(totalOtw),
+              creditAmount: totalOtwAmount,
               narration: `Goods OTW reversal — ERP container #${containerId}`,
             });
 
-            // ── Voucher B: Recognise goods cost (Dr sp_stock / Cr sp_cost_clearing) ──
-            // Mirrors the exact same step in POST /api/sp/offload.
-            // Dr sp_stock: marks the base goods value as stock on floor.
-            // Cr sp_cost_clearing: records the corresponding cost payable to HADI.
-            // (Inventory quantity is also tracked in bales via storage.offloadContainer.)
             const [voucherB] = await tx
               .insert(vouchers)
               .values({
                 companyId: container.companyId,
                 voucherType: "Journal",
                 voucherNumber: `SP-STOCK-ERP-${containerId}-${Date.now()}`,
-                voucherDate: vDate,
+                voucherDate,
                 description: `Stock cost recognition — ERP container #${containerId}`,
-                totalAmount: String(totalOtw),
+                totalAmount: totalOtwAmount,
                 currency: "USD",
                 exchangeRate: "1",
                 sourceModule: "SP",
               })
               .returning();
-            // Dr sp_stock (goods now on floor)
+
             await tx.insert(voucherEntries).values({
               voucherId: voucherB.id,
-              ledgerAccountId: spStockAcct.id,
-              debitAmount: String(totalOtw),
+              ledgerAccountId: spStockAccount.id,
+              debitAmount: totalOtwAmount,
               creditAmount: "0",
               narration: `Stock on floor — ERP container #${containerId}`,
             });
-            // Cr sp_cost_clearing (base cost payable to HADI)
             await tx.insert(voucherEntries).values({
               voucherId: voucherB.id,
-              ledgerAccountId: spCostClrAcct.id,
+              ledgerAccountId: spCostClearingAccount.id,
               debitAmount: "0",
-              creditAmount: String(totalOtw),
+              creditAmount: totalOtwAmount,
               narration: `Base goods cost payable — ERP container #${containerId}`,
             });
           }
 
-          // ── Agent settlement journals (only when agent charges exist) ──
-          if (validAgentLines.length > 0 && spHadiIcAcct && spPrepaidExpAcct && hadiSpInterco) {
-            // Journal in SP Test Co: Dr SP-HADI-IC / Cr SP-PREEXP
+          if (
+            validAgentLines.length > 0 &&
+            spHadiIcAccount &&
+            spPrepaidExpenseAccount &&
+            hadiSpInterco
+          ) {
+            const totalAgentAmountString = inventoryMoney(totalAgentAmount);
             const [settlementVoucher] = await tx
               .insert(vouchers)
               .values({
                 companyId: container.companyId,
                 voucherType: "Journal",
                 voucherNumber: `SP-AGENT-SETTLE-${containerId}-${Date.now()}`,
-                voucherDate: vDate,
+                voucherDate,
                 description: `Agent charge settlement via HADI L'SHI — container #${containerId}`,
-                totalAmount: String(totalAgentAmt),
+                totalAmount: totalAgentAmountString,
                 currency: "USD",
                 exchangeRate: "1",
                 sourceModule: "SP",
               })
               .returning();
+
             await tx.insert(voucherEntries).values({
               voucherId: settlementVoucher.id,
-              ledgerAccountId: spHadiIcAcct.id,
-              debitAmount: String(totalAgentAmt),
+              ledgerAccountId: spHadiIcAccount.id,
+              debitAmount: totalAgentAmountString,
               creditAmount: "0",
               narration: `Agent charges via HADI L'SHI — ERP container #${containerId}`,
             });
             await tx.insert(voucherEntries).values({
               voucherId: settlementVoucher.id,
-              ledgerAccountId: spPrepaidExpAcct.id,
+              ledgerAccountId: spPrepaidExpenseAccount.id,
               debitAmount: "0",
-              creditAmount: String(totalAgentAmt),
+              creditAmount: totalAgentAmountString,
               narration: `Prepaid expenses used for agent charges — ERP container #${containerId}`,
             });
 
-            // Voucher C in HADI L'SHI: Dr HADI-SP-IC / Cr Agent (per line)
             const [voucherC] = await tx
               .insert(vouchers)
               .values({
                 companyId: 1,
                 voucherType: "Journal",
                 voucherNumber: `SP-AGENT-ERP-${containerId}-${Date.now()}`,
-                voucherDate: vDate,
+                voucherDate,
                 description: `Agent charges for ERP offload — container #${containerId}`,
-                totalAmount: String(totalAgentAmt),
+                totalAmount: totalAgentAmountString,
                 currency: "USD",
                 exchangeRate: "1",
                 sourceModule: "SP",
               })
               .returning();
+
             await tx.insert(voucherEntries).values({
               voucherId: voucherC.id,
               ledgerAccountId: hadiSpInterco.id,
-              debitAmount: String(totalAgentAmt),
+              debitAmount: totalAgentAmountString,
               creditAmount: "0",
               narration: `ERP container offload agent charges — container #${containerId}`,
             });
+
             for (const line of validAgentLines) {
               await tx.insert(voucherEntries).values({
                 voucherId: voucherC.id,
                 ledgerAccountId: line.parentAgentAccountId,
                 debitAmount: "0",
-                creditAmount: String(line.amountUsd),
+                creditAmount: inventoryMoney(line.amountUsd),
                 narration: `Agent credit for ERP container #${containerId}${line.description ? ` — ${line.description}` : ""}`,
               });
             }
@@ -506,17 +502,13 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
       logger.info("Container offload succeeded", {
         module: "containers",
         action: "offload",
-        userId: _uid,
-        companyId: _cid,
+        userId,
+        companyId: sessionCompanyId,
         containerId: req.params.id,
-        durationMs: Date.now() - _t,
+        durationMs: Date.now() - startedAt,
       });
       res.json(offload);
 
-      // ── Part A: sync sales_items costs after offload (fire-and-forget) ──
-      // The offload transaction just updated inventory.averageRate for all
-      // affected stock items. Propagate those updated rates into existing
-      // sales_items so the Sales Report reflects the correct landed cost.
       Promise.resolve().then(async () => {
         try {
           const offloadItems = await db
@@ -524,10 +516,14 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
             .from(containerOffloadItems)
             .where(eq(containerOffloadItems.offloadId, offload.id));
 
-          const stockItemIds = [...new Set(offloadItems.map((i) => i.stockItemId))];
+          const stockItemIds = [...new Set(offloadItems.map((item) => item.stockItemId))];
           if (stockItemIds.length === 0) return;
 
-          const result = await syncSalesItemCostsForStockItems(container.companyId, offload.locationId, stockItemIds);
+          const result = await syncSalesItemCostsForStockItems(
+            container.companyId,
+            offload.locationId,
+            stockItemIds
+          );
           if (result.updatedCount > 0) {
             logger.info("Sales item costs synced after container offload", {
               module: "containers",
@@ -538,13 +534,12 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
               updatedSalesItems: result.updatedCount,
             });
           }
-        } catch (syncErr: unknown) {
-          // Non-fatal — the offload itself succeeded; log and move on.
+        } catch (syncError: unknown) {
           logger.error("Failed to sync sales item costs after offload (non-fatal)", {
             module: "containers",
             action: "sync-sales-costs",
             containerId,
-            error: getErrorMessage(syncErr),
+            error: getErrorMessage(syncError),
           });
         }
       });
@@ -552,13 +547,13 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
       logger.error("Container offload failed", {
         module: "containers",
         action: "offload",
-        userId: _uid,
-        companyId: _cid,
+        userId,
+        companyId: sessionCompanyId,
         containerId: req.params.id,
-        durationMs: Date.now() - _t,
+        durationMs: Date.now() - startedAt,
         error,
       });
-      logger.error("Container offload error:", { error: error });
+      logger.error("Container offload error:", { error });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
