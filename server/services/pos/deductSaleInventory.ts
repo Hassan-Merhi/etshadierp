@@ -1,11 +1,12 @@
 /**
  * server/services/pos/deductSaleInventory.ts
  *
- * PHASE 19 structural split — moved (unchanged) from server/routes/pos/posSalesRoutes.ts:
- * authoritative in-transaction stock check + row lock + inventory deduction for one sale item.
+ * Authoritative in-transaction stock check, row lock, and inventory deduction
+ * for one POS sale item.
  */
 import { sql } from "drizzle-orm";
 import { adjustInventory } from "../../inventoryHelper";
+import { toInventoryDecimal } from "../../lib/inventoryMath";
 import type { ValidatedInventoryItem } from "./posSaleTypes";
 
 export interface LockedInventoryResult {
@@ -13,14 +14,6 @@ export interface LockedInventoryResult {
   costPrice: number;
 }
 
-/**
- * Fix 3: Authoritative stock check inside the transaction with row lock.
- * Catches race conditions where two cashiers sell the last unit concurrently.
- * Use FOR UPDATE OF i (not the whole JOIN) because PostgreSQL rejects
- * FOR UPDATE on the nullable side of a LEFT JOIN.
- *
- * Throws Error (same messages as before) on insufficient stock.
- */
 export async function lockAndDeductInventoryForSaleItem(
   tx: any,
   parsedLocationId: number,
@@ -39,18 +32,26 @@ export async function lockAndDeductInventoryForSaleItem(
     FOR UPDATE OF i
   `);
   const lockedRow = stockLockResult.rows?.[0] ?? stockLockResult[0];
-  const lockedQty = lockedRow ? parseFloat(lockedRow.quantity ?? "0") : 0;
-  if (lockedQty < saleQty && !canSellNegativeStock) {
+  const lockedQuantity = toInventoryDecimal(lockedRow?.quantity);
+  const requestedQuantity = toInventoryDecimal(saleQty);
+
+  if (lockedQuantity.lessThan(requestedQuantity) && !canSellNegativeStock) {
     throw new Error(
-      `Not enough stock for "${lockedRow?.item_name || inventoryRecord?.itemName || item.stockItemId}". Available: ${lockedQty}, requested: ${saleQty}.`
+      `Not enough stock for "${lockedRow?.item_name || inventoryRecord?.itemName || item.stockItemId}". Available: ${lockedQuantity.toString()}, requested: ${requestedQuantity.toString()}.`
     );
   }
 
-  await adjustInventory(tx, locationId, item.stockItemId, -saleQty, companyId);
+  await adjustInventory(
+    tx,
+    locationId,
+    item.stockItemId,
+    requestedQuantity.negated().toNumber(),
+    companyId
+  );
 
-  // Use the freshly-locked average_rate so two concurrent cashiers both
-  // record the correct cost basis rather than a stale pre-read value.
-  const costPrice = lockedRow ? parseFloat(lockedRow.average_rate ?? "0") : currentRate;
-
-  return { lockedQty, costPrice };
+  const costPrice = toInventoryDecimal(lockedRow?.average_rate ?? currentRate);
+  return {
+    lockedQty: lockedQuantity.toNumber(),
+    costPrice: costPrice.toNumber(),
+  };
 }
