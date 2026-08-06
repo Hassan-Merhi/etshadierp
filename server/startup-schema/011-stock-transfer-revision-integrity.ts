@@ -1,17 +1,53 @@
 /** Group A Phase 3 — immutable stock-transfer revision lifecycle. */
 export const stockTransferRevisionIntegrity: string[] = [
-  `ALTER TABLE stock_transfer_revisions ADD COLUMN IF NOT EXISTS status text`,
-  `ALTER TABLE stock_transfer_revisions ADD COLUMN IF NOT EXISTS reviewed_at timestamp`,
-  `ALTER TABLE stock_transfer_revisions ADD COLUMN IF NOT EXISTS reviewed_by varchar`,
-  `ALTER TABLE stock_transfer_revisions ADD COLUMN IF NOT EXISTS rejection_reason text`,
-  `ALTER TABLE stock_transfer_revisions ADD COLUMN IF NOT EXISTS superseded_by_revision_id integer`,
-  `ALTER TABLE stock_transfer_revisions ADD COLUMN IF NOT EXISTS payload_hash varchar(64)`,
+  // Keep the runtime read path compatible with databases that were deployed
+  // before the immutable lifecycle columns were introduced. This block is
+  // intentionally first and idempotent so a redeploy repairs partial schemas.
+  `DO $revision_schema$ BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'stock_transfer_revisions' AND column_name = 'status'
+      ) THEN
+        ALTER TABLE stock_transfer_revisions ADD COLUMN status text;
+      END IF;
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'stock_transfer_revisions' AND column_name = 'reviewed_at'
+      ) THEN
+        ALTER TABLE stock_transfer_revisions ADD COLUMN reviewed_at timestamp;
+      END IF;
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'stock_transfer_revisions' AND column_name = 'reviewed_by'
+      ) THEN
+        ALTER TABLE stock_transfer_revisions ADD COLUMN reviewed_by varchar;
+      END IF;
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'stock_transfer_revisions' AND column_name = 'rejection_reason'
+      ) THEN
+        ALTER TABLE stock_transfer_revisions ADD COLUMN rejection_reason text;
+      END IF;
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'stock_transfer_revisions' AND column_name = 'superseded_by_revision_id'
+      ) THEN
+        ALTER TABLE stock_transfer_revisions ADD COLUMN superseded_by_revision_id integer;
+      END IF;
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'stock_transfer_revisions' AND column_name = 'payload_hash'
+      ) THEN
+        ALTER TABLE stock_transfer_revisions ADD COLUMN payload_hash varchar(64);
+      END IF;
+    END $revision_schema$`,
+  `UPDATE stock_transfer_revisions
+     SET status = CASE WHEN optional = true THEN 'pending' ELSE 'approved' END
+     WHERE status IS NULL`,
+  `ALTER TABLE stock_transfer_revisions ALTER COLUMN status SET DEFAULT 'pending'`,
+  `ALTER TABLE stock_transfer_revisions ALTER COLUMN status SET NOT NULL`,
   `DO $$ BEGIN
       IF NOT EXISTS (SELECT 1 FROM migrations_log WHERE key = 'stock-transfer-revision-status-v1') THEN
-        UPDATE stock_transfer_revisions
-        SET status = CASE WHEN optional = true THEN 'pending' ELSE 'approved' END
-        WHERE status IS NULL;
-
         WITH ranked AS (
           SELECT
             id,
@@ -53,11 +89,6 @@ export const stockTransferRevisionIntegrity: string[] = [
         INSERT INTO migrations_log(key) VALUES ('stock-transfer-revision-status-v1');
       END IF;
     END $$`,
-  `UPDATE stock_transfer_revisions
-     SET status = CASE WHEN optional = true THEN 'pending' ELSE 'approved' END
-     WHERE status IS NULL`,
-  `ALTER TABLE stock_transfer_revisions ALTER COLUMN status SET DEFAULT 'pending'`,
-  `ALTER TABLE stock_transfer_revisions ALTER COLUMN status SET NOT NULL`,
   `DO $$ BEGIN
       IF NOT EXISTS (
         SELECT 1 FROM pg_constraint WHERE conname = 'stock_transfer_revisions_status_check'
