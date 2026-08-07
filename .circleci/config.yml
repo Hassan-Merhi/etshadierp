@@ -68,19 +68,9 @@ commands:
       - run:
           name: Run backend test shard << parameters.shard >>
           command: |
-            mapfile -t all_tests < <(
-              find server tests shared -type f -name '*.test.ts' | sort | grep -v '^tests/ui/' | grep -v '^tests/api-smoke-sweep.test.ts$'
-            )
-            selected=()
-            for index in "${!all_tests[@]}"; do
-              if (( index % << parameters.total >> == << parameters.shard >> )); then
-                selected+=("${all_tests[$index]}")
-              fi
-            done
-            printf 'Running %s test file(s) in shard << parameters.shard >>:\n' "${#selected[@]}"
-            printf ' - %s\n' "${selected[@]}"
-            test "${#selected[@]}" -gt 0
-            node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism "${selected[@]}"
+            shard_index=$((<< parameters.shard >> + 1))
+            echo "Running Vitest shard ${shard_index}/<< parameters.total >>"
+            node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism --shard=${shard_index}/<< parameters.total >>
 
 jobs:
   backend-shard-0:
