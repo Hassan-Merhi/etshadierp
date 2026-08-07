@@ -4,7 +4,6 @@ import { useDialogScrollFix } from "@/hooks/use-dialog-scroll-fix";
 import { useMobilePerformanceLifecycle } from "@/hooks/use-mobile-performance-lifecycle";
 import { useLocation, Redirect } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
-import { usePresence } from "@/hooks/use-presence";
 import { useWsInvalidation } from "@/hooks/use-ws-invalidation";
 import { LanguageOnboardingDialog } from "@/components/LanguageOnboardingDialog";
 import { RemoteSupportRuntime } from "@/components/RemoteSupportRuntime";
@@ -28,7 +27,6 @@ interface AuthenticatedAppProps {
 export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) {
   const { selectedCompany, isLoading: companyLoading } = useCompany();
   useMobilePerformanceLifecycle();
-  usePresence(true);
   useWsInvalidation();
   useDialogScrollFix();
 
