@@ -233,6 +233,6 @@ export function RemoteControllerSessionProvider({ children }: { children: ReactN
 
 export function useRemoteControllerSession(): RemoteControllerSessionContextValue {
   const value = useContext(RemoteControllerSessionContext);
-  if (!value) throw new Error("REMOTE_CONTROLLER_SESSION_PROVIDER_REQUIRED");
+  if (!value) throw new Error();
   return value;
 }
