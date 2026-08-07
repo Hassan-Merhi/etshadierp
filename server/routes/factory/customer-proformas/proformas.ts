@@ -21,7 +21,7 @@ import {
 import { eq, and, sql, inArray } from "drizzle-orm";
 
 export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
-  /* Single proforma by ID — used by EditProformaV5Drawer */
+  /* Single proforma by ID — used by EditProformaV5Drawer and lazy detail readers. */
   app.get("/api/factory/customer-proformas/:id", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
@@ -79,6 +79,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
         });
       }
       const enrichedLines = lines.map((l: any) => ({ ...l, weightPerBaleKg: weightMap.get(l.articleCode) || "0" }));
+      res.set("Cache-Control", "private, max-age=60");
       res.json({ ...proforma, lines: enrichedLines });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
@@ -95,58 +96,48 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
 
       const profile = String(req.query.profile || "full");
       if (profile === "summary") {
+        // Phase 3: summary means summary. Older code fetched every line for every
+        // proforma after the metadata query, making the supposedly compact profile
+        // almost as large as the full detail list. Aggregate the card/list metrics
+        // in SQL and leave line arrays empty; screens that need line detail already
+        // have the /:id contract available for lazy reads.
         const rawSummary = await db.execute(sql`
-        SELECT
-          cp.id,
-          cp.company_id,
-          cp.customer_id,
-          cp.name,
-          cp.is_active,
-          cp.created_at,
-          COALESCE(NULLIF(to_jsonb(cp)->>'updated_at', '')::timestamptz, cp.created_at) AS updated_at,
-          (
-            SELECT COUNT(*)::int
-            FROM customer_proforma_lines cpl
-            WHERE cpl.proforma_id = cp.id
-          ) AS line_count
-        FROM customer_proformas cp
-        WHERE cp.company_id = ${companyId}
-          AND cp.customer_id = ${customerId}
-          AND cp.deleted_at IS NULL
-        ORDER BY cp.name ASC
-      `);
-        const summaryRows = (rawSummary as any).rows ?? (rawSummary as unknown as any[]);
-        const proformaIds = summaryRows.map((row: any) => Number(row.id)).filter((id: number) => Number.isInteger(id));
-        let linesByProforma = new Map<number, any[]>();
-
-        if (proformaIds.length > 0) {
-          const idList = sql.join(
-            proformaIds.map((id: number) => sql`${id}`),
-            sql`,`,
-          );
-          const rawLines = await db.execute(
-            sql`SELECT id, proforma_id, article_code, product_name, quantity, price_per_bale, created_at
-                FROM customer_proforma_lines
-                WHERE proforma_id IN (${idList})`
-          );
-          const rows: any[] = (rawLines as any).rows ?? (rawLines as unknown as any[]);
-          linesByProforma = rows.reduce((map: Map<number, any[]>, line: any) => {
-            const proformaId = Number(line.proforma_id);
-            const current = map.get(proformaId) || [];
-            current.push({
-              id: line.id,
-              proformaId,
-              articleCode: line.article_code ?? "",
-              productName: line.product_name ?? "",
-              quantity: Number(line.quantity) || 0,
-              pricePerBale: line.price_per_bale ?? "0",
-              createdAt: line.created_at,
-            });
-            map.set(proformaId, current);
-            return map;
-          }, new Map<number, any[]>());
-        }
-
+          SELECT
+            cp.id,
+            cp.company_id,
+            cp.customer_id,
+            cp.name,
+            cp.is_active,
+            cp.created_at,
+            COALESCE(NULLIF(to_jsonb(cp)->>'updated_at', '')::timestamptz, cp.created_at) AS updated_at,
+            COUNT(cpl.id)::int AS line_count,
+            COALESCE(SUM(cpl.quantity), 0)::int AS total_qty,
+            COALESCE(SUM(
+              cpl.quantity::numeric * COALESCE(fbp.weight_per_bale_kg::numeric, 0)
+            ), 0)::float AS total_weight_kg,
+            COALESCE(SUM(
+              cpl.quantity::numeric *
+              CASE
+                WHEN COALESCE(cpl.pricing_mode, 'per_bale') = 'per_kg'
+                  AND COALESCE(cpl.price_per_kg::numeric, 0) > 0
+                  AND COALESCE(fbp.weight_per_bale_kg::numeric, 0) > 0
+                THEN cpl.price_per_kg::numeric * fbp.weight_per_bale_kg::numeric
+                ELSE COALESCE(cpl.price_per_bale::numeric, 0)
+              END
+            ), 0)::float AS total_amount
+          FROM customer_proformas cp
+          LEFT JOIN customer_proforma_lines cpl ON cpl.proforma_id = cp.id
+          LEFT JOIN factory_bale_products fbp
+            ON fbp.company_id = cp.company_id
+           AND fbp.article_code = cpl.article_code
+           AND fbp.deleted_at IS NULL
+          WHERE cp.company_id = ${companyId}
+            AND cp.customer_id = ${customerId}
+            AND cp.deleted_at IS NULL
+          GROUP BY cp.id, cp.company_id, cp.customer_id, cp.name, cp.is_active, cp.created_at
+          ORDER BY cp.name ASC
+        `);
+        const summaryRows: any[] = (rawSummary as any).rows ?? (rawSummary as unknown as any[]);
         const summaries = summaryRows.map((row: any) => ({
           id: row.id,
           companyId: row.company_id,
@@ -154,16 +145,22 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
           name: row.name ?? "",
           isActive: row.is_active ?? false,
           lineCount: Number(row.line_count) || 0,
-          lines: linesByProforma.get(Number(row.id)) || [],
+          totalQty: Number(row.total_qty) || 0,
+          totalWeightKg: Number(row.total_weight_kg) || 0,
+          totalAmount: Number(row.total_amount) || 0,
+          lines: [],
           createdAt: row.created_at,
           updatedAt: row.updated_at ?? row.created_at,
         }));
+        res.set("X-ERP-Payload-Profile", "customer-proforma-summary-v2");
         res.set("Cache-Control", "private, max-age=60");
         return res.json(summaries);
       }
 
       const rawProformasRes = await db.execute(
-        sql`SELECT * FROM customer_proformas
+        sql`SELECT id, company_id, customer_id, name, is_active, deleted_at, created_at,
+                   COALESCE(NULLIF(to_jsonb(customer_proformas)->>'updated_at', '')::timestamptz, created_at) AS updated_at
+            FROM customer_proformas
             WHERE company_id = ${companyId}
               AND customer_id = ${customerId}
               AND deleted_at IS NULL
@@ -189,7 +186,15 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
           proformaIds.map((id: number) => sql`${id}`),
           sql`,`,
         );
-        const rawLines = await db.execute(sql`SELECT * FROM customer_proforma_lines WHERE proforma_id IN (${idList})`);
+        // Select only fields rendered/edited by the proforma UI. This removes
+        // unused row metadata while preserving the existing full-list contract.
+        const rawLines = await db.execute(sql`
+          SELECT id, proforma_id, article_code, product_name, quantity,
+                 price_per_bale, production_price_per_bale, price_fixed,
+                 pricing_mode, price_per_kg
+          FROM customer_proforma_lines
+          WHERE proforma_id IN (${idList})
+        `);
         const rawRows: any[] = (rawLines as any).rows ?? (rawLines as unknown as any[]);
         lines = rawRows.map((l: any) => ({
           id: l.id,
@@ -200,7 +205,8 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
           pricePerBale: l.price_per_bale ?? "0",
           productionPricePerBale: l.production_price_per_bale ?? "0",
           priceFixed: l.price_fixed ?? false,
-          createdAt: l.created_at,
+          pricingMode: l.pricing_mode ?? "per_bale",
+          pricePerKg: l.price_per_kg ?? null,
         }));
       }
 
@@ -235,11 +241,18 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
         productName: nameMap.get(l.articleCode) || l.productName,
       }));
 
+      const linesByProforma = new Map<number, any[]>();
+      for (const line of enrichedLines) {
+        const current = linesByProforma.get(line.proformaId) || [];
+        current.push(line);
+        linesByProforma.set(line.proformaId, current);
+      }
       const result = proformas.map((p: any) => ({
         ...p,
-        lines: enrichedLines.filter((l: any) => l.proformaId === p.id),
+        lines: linesByProforma.get(p.id) || [],
       }));
 
+      res.set("X-ERP-Payload-Profile", "customer-proforma-full-v2");
       res.json(result);
     } catch (error: unknown) {
       logger.error("Error fetching customer proformas:", { error: error });
