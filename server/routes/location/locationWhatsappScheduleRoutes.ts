@@ -234,9 +234,9 @@ export function registerLocationWhatsappScheduleRoutes(app: Express) {
           `INSERT INTO location_whatsapp_stock_schedules (
               location_id, company_id, enabled, frequency, days_of_week, send_time, timezone,
               include_cost, include_zero_stock, include_negative_stock,
-              stock_group_id, category_id, updated_by_user_id, updated_at, last_scheduled_for
+              stock_group_id, category_id, updated_by_user_id, updated_at
             )
-            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now(),NULL)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now())
             ON CONFLICT (location_id) DO UPDATE SET
               company_id = EXCLUDED.company_id,
               enabled = EXCLUDED.enabled,
@@ -250,10 +250,7 @@ export function registerLocationWhatsappScheduleRoutes(app: Express) {
               stock_group_id = EXCLUDED.stock_group_id,
               category_id = EXCLUDED.category_id,
               updated_by_user_id = EXCLUDED.updated_by_user_id,
-              updated_at = now(),
-              last_scheduled_for = NULL,
-              last_status = NULL,
-              last_error = NULL
+              updated_at = now()
             RETURNING enabled, frequency, days_of_week, send_time, timezone,
                       include_cost, include_zero_stock, include_negative_stock,
                       stock_group_id, category_id, last_sent_at, last_status, last_error`,
