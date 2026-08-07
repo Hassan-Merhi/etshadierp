@@ -2,11 +2,14 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 describe("factory customer proforma summary payload", () => {
-  it("includes line data required by the loading progress screen", () => {
-    const source = readFileSync("server/routes/factory/customer-proformas/proformas.ts", "utf8");
+  it("keeps summaries line-free and preserves the lazy detail route", () => {
+    const server = readFileSync("server/routes/factory/customer-proformas/proformas.ts", "utf8");
+    const client = readFileSync("client/src/pages/factory/FactoryPendingLoadings.tsx", "utf8");
 
-    expect(source).toContain('lines: linesByProforma.get(Number(row.id)) || []');
-    expect(source).toContain("articleCode: line.article_code");
-    expect(source).toContain("quantity: Number(line.quantity) || 0");
+    expect(server).toContain('payloadProfile === "summary"');
+    expect(server).toContain("lines: []");
+    expect(server).toContain('app.get("/api/factory/customer-proformas/:id"');
+    expect(server).toContain("lines: enrichedLines");
+    expect(client).toContain("/api/factory/customer-proformas?profile=summary");
   });
 });
