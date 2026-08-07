@@ -46,7 +46,7 @@ function stableTestCompanyCode(prefix: string): string {
  * company is not of type "factory", so any suite exercising it has to seed one.
  * Ordinary ERP/POS tests stay on "erp".
  */
-const FACTORY_COMPANY_PREFIXES = new Set(["xlsexp", "charfact", "supcrud", "balecrud", "transwr"]);
+const FACTORY_COMPANY_PREFIXES = new Set(["xlsexp", "charfact", "supcrud", "balecrud", "transwr", "ordchg"]);
 
 function testCompanyType(prefix: string): "erp" | "factory" {
   return FACTORY_COMPANY_PREFIXES.has(prefix) ? "factory" : "erp";
