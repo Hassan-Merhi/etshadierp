@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Keyboard, Loader2, LockKeyhole, MousePointer2, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  acquireRemoteControlPanelHost,
+  findRemoteSupportWatchDialog,
+  releaseRemoteControlPanelHost,
+} from "@/components/remote-control-panel-portal";
 import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import type { RemoteControlSessionView } from "@/hooks/use-remote-control-session";
 import type { RemoteKeyboardKey } from "@/hooks/remote-keyboard-control-policy";
@@ -66,12 +72,8 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   return payload as T;
 }
 
-function findWatchDialog(): HTMLElement | null {
-  return document.querySelector<HTMLElement>("[data-testid='dialog-watch-user']");
-}
-
 function matchingSession(sessions: RemoteControlSessionView[]): RemoteControlSessionView | null {
-  const dialog = findWatchDialog();
+  const dialog = findRemoteSupportWatchDialog();
   const watchedUserId = dialog?.dataset.watchedUserId;
   const dialogText = dialog?.textContent ?? "";
   return (
@@ -84,7 +86,8 @@ function matchingSession(sessions: RemoteControlSessionView[]): RemoteControlSes
 
 export function RemoteKeyboardControllerOverlay() {
   const { language } = useApplicationLanguage();
-  const [watchDialogOpen, setWatchDialogOpen] = useState(() => !!findWatchDialog());
+  const [watchDialogOpen, setWatchDialogOpen] = useState(() => !!findRemoteSupportWatchDialog());
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -94,7 +97,7 @@ export function RemoteKeyboardControllerOverlay() {
   const t = useCallback((value: string) => translateRemoteSupportPhase6Text(value, language), [language]);
 
   useEffect(() => {
-    const update = () => setWatchDialogOpen(!!findWatchDialog());
+    const update = () => setWatchDialogOpen(!!findRemoteSupportWatchDialog());
     update();
     const observer = new MutationObserver(update);
     observer.observe(document.body, { childList: true, subtree: true });
@@ -115,6 +118,23 @@ export function RemoteKeyboardControllerOverlay() {
   );
   const keyboardActive = !!session?.capabilities.keyboard;
   const mouseActive = !!session?.capabilities.mouse;
+
+  useEffect(() => {
+    if (!watchDialogOpen || !session) {
+      setPortalHost(null);
+      return;
+    }
+    const dialog = findRemoteSupportWatchDialog();
+    if (!dialog) {
+      setPortalHost(null);
+      return;
+    }
+    const host = acquireRemoteControlPanelHost(dialog);
+    setPortalHost(host);
+    return () => {
+      releaseRemoteControlPanelHost(host);
+    };
+  }, [session?.id, watchDialogOpen]);
 
   useEffect(() => {
     setError(null);
@@ -243,7 +263,7 @@ export function RemoteKeyboardControllerOverlay() {
     return () => eventSource.close();
   }, [keyboardActive, session, t]);
 
-  if (!watchDialogOpen || !session) return null;
+  if (!watchDialogOpen || !session || !portalHost) return null;
 
   const statusLabel = lastResult
     ? translateRemoteSupportPhase5Text(
@@ -252,11 +272,12 @@ export function RemoteKeyboardControllerOverlay() {
       )
     : null;
 
-  return (
-    <div
-      className="fixed right-3 top-[13.5rem] z-[2147483644] w-[min(92vw,360px)] rounded-xl border bg-background/95 p-3 shadow-xl backdrop-blur"
+  return createPortal(
+    <section
+      className="w-full rounded-xl border bg-background/95 p-3 shadow-sm"
       data-screenfeed-ignore="true"
       data-testid="remote-keyboard-controller-overlay"
+      data-remote-control-panel-section="keyboard"
     >
       <div className="flex items-start gap-2">
         <div className="rounded-md bg-primary/10 p-1.5 text-primary">
@@ -311,6 +332,7 @@ export function RemoteKeyboardControllerOverlay() {
           </p>
           <div className="flex gap-2">
             <Input
+              autoFocus
               type="password"
               autoComplete="current-password"
               value={password}
@@ -377,6 +399,7 @@ export function RemoteKeyboardControllerOverlay() {
           {error}
         </p>
       )}
-    </div>
+    </section>,
+    portalHost
   );
 }
