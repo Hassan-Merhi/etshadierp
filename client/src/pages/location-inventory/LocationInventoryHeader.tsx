@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, ChevronDown, Loader2, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,7 @@ export function LocationInventoryHeader({
   const { selectedCompany } = useCompany();
   const { toast } = useToast();
   const [sendMode, setSendMode] = useState<SendMode>(null);
+  const sendLockRef = useRef(false);
   const companyId = selectedCompany?.id;
 
   const { data: whatsappCapability } = useQuery<{ canManage: boolean }>({
@@ -73,7 +74,7 @@ export function LocationInventoryHeader({
   );
 
   const handleSendStock = async (includeCost: boolean) => {
-    if (!selectedLocation || sendMode) return;
+    if (!selectedLocation || sendMode || sendLockRef.current) return;
     if (includeCost && !canSendWithCost) {
       toast({
         title: "Cost report restricted",
@@ -83,13 +84,15 @@ export function LocationInventoryHeader({
       return;
     }
 
+    sendLockRef.current = true;
     const mode: SendMode = includeCost ? "with_cost" : "no_cost";
+    const idempotencyKey = newIdempotencyToken();
     setSendMode(mode);
     try {
       const response = await apiRequest(
         "POST",
         `/api/locations/${selectedLocation.id}/send-stock-whatsapp`,
-        { includeCost, idempotencyKey: newIdempotencyToken() }
+        { includeCost, idempotencyKey }
       );
       const result = await response.json();
       toast({
@@ -103,6 +106,7 @@ export function LocationInventoryHeader({
         variant: "destructive",
       });
     } finally {
+      sendLockRef.current = false;
       setSendMode(null);
       await queryClient.invalidateQueries({ queryKey: ["/api/locations", selectedLocation.id, "whatsapp-deliveries"] });
     }
