@@ -201,6 +201,60 @@ async function updateGeneratedMetadata(
   );
 }
 
+export async function recordLocationStockDeliveryFailure(
+  request: LocationStockDeliveryRequest,
+  error: string
+): Promise<LocationStockDeliveryResult> {
+  const context = await loadDeliveryContext(request.companyId, request.locationId);
+  const claimed = await claimDelivery(request, context);
+  if (claimed.duplicate && claimed.existing) return claimed.existing;
+  await completeDelivery(claimed.id, "failed", { error });
+  return {
+    deliveryId: claimed.id,
+    status: "failed",
+    duplicate: false,
+    itemCount: null,
+    pageCount: null,
+    fileName: null,
+    error,
+    destinationGroupName: context.groupName,
+  };
+}
+
+/**
+ * A process can disappear after claiming a delivery but before recording the
+ * external result. Re-sending automatically is unsafe because WhatsApp may have
+ * accepted the file before the crash. Mark stale attempts failed instead; the UI
+ * exposes an explicit retry so duplicates remain a user-controlled decision.
+ */
+export async function recoverStaleLocationStockDeliveries(): Promise<number> {
+  const result = await pool.query<{ id: string | number; location_id: number }>(
+    `UPDATE location_whatsapp_stock_deliveries
+        SET status = 'failed',
+            error = COALESCE(error, 'Delivery interrupted before completion; retry manually if needed'),
+            completed_at = now()
+      WHERE status = 'running'
+        AND started_at < now() - interval '20 minutes'
+      RETURNING id, location_id`
+  );
+  for (const row of result.rows) {
+    await pool.query(
+      `UPDATE location_whatsapp_stock_schedules
+          SET last_status = 'failed',
+              last_error = 'Delivery interrupted before completion; retry manually if needed',
+              updated_at = now()
+        WHERE location_id = $1 AND last_status = 'running'`,
+      [row.location_id]
+    ).catch(() => undefined);
+  }
+  if (result.rowCount) {
+    logger.warn("[LocationStockWhatsAppDelivery] recovered stale running deliveries", {
+      count: result.rowCount,
+    });
+  }
+  return result.rowCount ?? 0;
+}
+
 export async function deliverLocationStockWhatsApp(
   request: LocationStockDeliveryRequest
 ): Promise<LocationStockDeliveryResult> {
