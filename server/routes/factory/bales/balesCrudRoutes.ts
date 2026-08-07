@@ -664,8 +664,34 @@ export function registerBalesCrudRoutes(app: Express) {
             costPerKg: originalBale.costPerKg,
             totalCost: originalBale.totalCost,
             status: "IN_STOCK",
+            finalizedBy: originalBale.finalizedBy,
+            workerName: originalBale.workerName,
+            finalizedAt: originalBale.finalizedAt,
+            stockEntryDate: originalBale.stockEntryDate,
           })
           .returning();
+
+        const [productionAttribution] = await tx
+          .select()
+          .from(factoryBaleProductionAttributions)
+          .where(
+            and(
+              eq(factoryBaleProductionAttributions.companyId, companyId),
+              eq(factoryBaleProductionAttributions.baleId, id)
+            )
+          )
+          .limit(1);
+        if (productionAttribution) {
+          await tx.insert(factoryBaleProductionAttributions).values({
+            companyId,
+            baleId: newBale.id,
+            workerId: productionAttribution.workerId,
+            workerNameSnapshot: productionAttribution.workerNameSnapshot,
+            productionPositionId: productionAttribution.productionPositionId,
+            productionPositionNameSnapshot: productionAttribution.productionPositionNameSnapshot,
+            stockEntryDate: productionAttribution.stockEntryDate,
+          });
+        }
 
         await tx.update(factoryBales).set({ status: "REPACKED", updatedAt: new Date() }).where(eq(factoryBales.id, id));
 
