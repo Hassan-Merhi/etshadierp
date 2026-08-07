@@ -77,6 +77,11 @@ export function RemoteMouseControlTarget({
   const targetTabId = session?.targetTabId ?? null;
   const mouseEnabled = !!session?.capabilities.mouse;
   const keyboardEnabled = !!session?.capabilities.keyboard;
+  const keyboardEnabledRef = useRef(keyboardEnabled);
+
+  useEffect(() => {
+    keyboardEnabledRef.current = keyboardEnabled;
+  }, [keyboardEnabled]);
 
   useEffect(() => {
     seenCommandIdsRef.current.clear();
@@ -133,7 +138,9 @@ export function RemoteMouseControlTarget({
         return;
       }
 
-      const result = applyRemoteMouseCommand(command, document, window, { keyboardEnabled });
+      const result = applyRemoteMouseCommand(command, document, window, {
+        keyboardEnabled: keyboardEnabledRef.current,
+      });
       setPointer((current) => ({
         x: result.clientX,
         y: result.clientY,
@@ -152,7 +159,7 @@ export function RemoteMouseControlTarget({
       eventSource.close();
       setPointer((current) => ({ ...current, visible: false }));
     };
-  }, [keyboardEnabled, mouseEnabled, sessionId, tabId, targetTabId]);
+  }, [mouseEnabled, sessionId, tabId, targetTabId]);
 
   if (!sessionId || !mouseEnabled || !pointer.visible) return null;
 
