@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import {
+  ACTIVE_CAPTURE_DELAY_MS,
+  ACTIVE_CAPTURE_MIN_GAP_MS,
+  FAILED_CAPTURE_BACKOFF_MS,
+  IDLE_REFRESH_MS,
+} from "../client/src/hooks/screen-feed-capture-policy";
 
 const read = (file: string) => fs.readFileSync(path.join(process.cwd(), file), "utf8");
 
@@ -46,10 +52,17 @@ describe("Phase 5 faster remote viewing contracts", () => {
     expect(viewerSource).toContain("setLiveCursor(null)");
   });
 
-  it("keeps client-side upload serialization and failed-upload backoff", () => {
+  it("keeps full-frame capture serialized, dirty-driven, and hidden-tab aware", () => {
     expect(captureSource).toContain("busyRef.current");
-    expect(captureSource).toContain("nextScreenFeedCaptureDelay(unchangedFramesRef.current, result.failed)");
-    expect(captureSource).toContain("startFallbackPolling()");
-    expect(captureSource).toContain("eventSource?.close()");
+    expect(captureSource).toContain("new MutationObserver");
+    expect(captureSource).toContain('document.visibilityState !== "visible"');
+    expect(captureSource).toContain("markDirty(");
+  });
+
+  it("uses a low-impact capture cadence instead of the old 150ms loop", () => {
+    expect(ACTIVE_CAPTURE_MIN_GAP_MS).toBeGreaterThanOrEqual(850);
+    expect(ACTIVE_CAPTURE_DELAY_MS).toBe(ACTIVE_CAPTURE_MIN_GAP_MS);
+    expect(IDLE_REFRESH_MS).toBeGreaterThanOrEqual(60_000);
+    expect(FAILED_CAPTURE_BACKOFF_MS).toBeGreaterThanOrEqual(3_000);
   });
 });

@@ -5,10 +5,10 @@ const viewer = readFileSync("client/src/pages/settings/RemoteSupportWatchDialog.
 const activeUsers = readFileSync("client/src/pages/settings/ActiveUsersSection.tsx", "utf8");
 
 describe("remote support fast viewer", () => {
-  it("uses the runtime flag to choose fast transport without removing the legacy viewer", () => {
+  it("uses the runtime flag to choose live transport in the unified viewer", () => {
     expect(viewer).toContain('queryKey: ["/api/screen-feed/admin/runtime"]');
-    expect(viewer).toContain("runtime.flags.fastScreenFeed");
-    expect(viewer).toContain("return <WatchUserDialog {...props} />");
+    expect(viewer).toContain("runtime?.flags?.fastScreenFeed === true");
+    expect(viewer).toContain("<ScreenFeedDialog");
     expect(activeUsers).toContain("<RemoteSupportWatchDialog");
   });
 
@@ -21,7 +21,7 @@ describe("remote support fast viewer", () => {
   it("uses SSE with abortable polling fallback and complete watched-user cleanup", () => {
     expect(viewer).toContain("new EventSource");
     expect(viewer).toContain("pollAbortRef.current?.abort()");
-    expect(viewer).toContain("eventSource.close()");
+    expect(viewer).toContain("eventSource?.close()");
     expect(viewer).toContain("window.clearInterval(intervalId)");
     expect(viewer).toContain("stateRef.current = { etag: null, frame: null }");
   });

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
+import { markRemoteSupportAuthLost } from "@/components/remote-support-auth-lifecycle";
 
 const HEARTBEAT_INTERVAL = 90000; // 90 seconds (well within the 3-minute presence expiry window)
 const ROUTE_DEBOUNCE_MS = 10000; // 10 seconds
@@ -19,15 +20,21 @@ export function usePresence(enabled = true) {
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ route, type }),
-    }).then((res) => {
-      // Session expired — stop the heartbeat interval so we don't flood the
-      // server with unauthenticated PATCHes. The global fetch interceptor will
-      // also fire scheduleSessionExpiredRedirect(), unmounting everything.
-      if (res.status === 401 && intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    }).catch(() => {});
+    })
+      .then((res) => {
+        // Session expired — stop all remote-support browser work immediately.
+        // The global fetch interceptor will also confirm the session loss and
+        // redirect to login, but the local lifecycle prevents request churn while
+        // that confirmation/redirect is happening.
+        if (res.status === 401) {
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+          markRemoteSupportAuthLost();
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {

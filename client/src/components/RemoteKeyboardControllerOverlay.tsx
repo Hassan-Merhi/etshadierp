@@ -1,17 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Keyboard, Loader2, LockKeyhole, MousePointer2, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  RemoteControllerRequestError,
+  remoteControllerRequestJson,
+  useRemoteControllerSession,
+} from "@/components/RemoteControllerSessionContext";
 import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
-import type { RemoteControlSessionView } from "@/hooks/use-remote-control-session";
 import type { RemoteKeyboardKey } from "@/hooks/remote-keyboard-control-policy";
 import { translateRemoteSupportPhase5Text } from "@/i18n/remoteSupportPhase5Translations";
 import { translateRemoteSupportPhase6Text } from "@/i18n/remoteSupportPhase6Translations";
-
-interface ControllerSessionsResponse {
-  sessions: RemoteControlSessionView[];
-}
 
 interface KeyboardResultView {
   commandId: string;
@@ -21,16 +21,9 @@ interface KeyboardResultView {
   completedAt: string;
 }
 
-class RemoteKeyboardRequestError extends Error {
-  constructor(
-    readonly status: number,
-    readonly code: string | null,
-    message: string
-  ) {
-    super(message);
-    this.name = "RemoteKeyboardRequestError";
-  }
-}
+type KeyboardPayload =
+  | { type: "insert-text"; text: string }
+  | { type: "key"; key: RemoteKeyboardKey; shiftKey: boolean };
 
 const ALLOWED_SPECIAL_KEYS = new Map<string, RemoteKeyboardKey>([
   ["Backspace", "Backspace"],
@@ -47,107 +40,71 @@ const ALLOWED_SPECIAL_KEYS = new Map<string, RemoteKeyboardKey>([
   [" ", "Space"],
 ]);
 
-async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const headers = new Headers(init?.headers);
-  if (init?.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-  const response = await fetch(url, {
-    credentials: "include",
-    ...init,
-    headers,
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new RemoteKeyboardRequestError(
-      response.status,
-      typeof payload?.code === "string" ? payload.code : null,
-      typeof payload?.message === "string" ? payload.message : "Keyboard command failed."
-    );
-  }
-  return payload as T;
-}
+const TEXT_BATCH_DELAY_MS = 45;
+const MAX_TEXT_BATCH_CODE_POINTS = 32;
 
-function findWatchDialog(): HTMLElement | null {
-  return document.querySelector<HTMLElement>("[data-testid='dialog-watch-user']");
-}
-
-function matchingSession(sessions: RemoteControlSessionView[]): RemoteControlSessionView | null {
-  const dialog = findWatchDialog();
-  const watchedUserId = dialog?.dataset.watchedUserId;
-  const dialogText = dialog?.textContent ?? "";
-  return (
-    sessions.find((session) => watchedUserId && session.targetUserId === watchedUserId) ??
-    sessions.find((session) => dialogText.includes(session.targetUsername)) ??
-    sessions[0] ??
-    null
-  );
+function authorizationIsFresh(expiresAt: string | null | undefined): boolean {
+  if (!expiresAt) return false;
+  const value = new Date(expiresAt).getTime();
+  return Number.isFinite(value) && value > Date.now();
 }
 
 export function RemoteKeyboardControllerOverlay() {
   const { language } = useApplicationLanguage();
-  const [watchDialogOpen, setWatchDialogOpen] = useState(() => !!findWatchDialog());
+  const { target, session, portalHost, refreshSession } = useRemoteControllerSession();
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<KeyboardResultView | null>(null);
   const captureRef = useRef<HTMLInputElement>(null);
+  const commandTailRef = useRef<Promise<void>>(Promise.resolve());
+  const activeSessionIdRef = useRef<string | null>(null);
+  const textBufferRef = useRef("");
+  const textTimerRef = useRef<number | null>(null);
   const t = useCallback((value: string) => translateRemoteSupportPhase6Text(value, language), [language]);
 
-  useEffect(() => {
-    const update = () => setWatchDialogOpen(!!findWatchDialog());
-    update();
-    const observer = new MutationObserver(update);
-    observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, []);
-
-  const sessionsQuery = useQuery<ControllerSessionsResponse>({
-    queryKey: ["/api/screen-feed/control/sessions/controller-active"],
-    queryFn: () => requestJson<ControllerSessionsResponse>("/api/screen-feed/control/sessions/controller-active"),
-    enabled: watchDialogOpen,
-    refetchInterval: watchDialogOpen ? 1200 : false,
-    retry: false,
-  });
-
-  const session = useMemo(
-    () => matchingSession(Array.isArray(sessionsQuery.data?.sessions) ? sessionsQuery.data.sessions : []),
-    [sessionsQuery.data?.sessions]
-  );
-  const keyboardActive = !!session?.capabilities.keyboard;
-  const mouseActive = !!session?.capabilities.mouse;
+  const sessionId = session?.id ?? null;
+  const mouseActive = !!session?.capabilities.mouse && authorizationIsFresh(session.mouseAuthorization?.expiresAt);
+  const keyboardActive =
+    !!session?.capabilities.keyboard && authorizationIsFresh(session.keyboardAuthorization?.expiresAt);
 
   useEffect(() => {
+    activeSessionIdRef.current = sessionId;
     setError(null);
     setLastResult(null);
     setPasswordOpen(false);
     setPassword("");
-  }, [session?.id]);
+    textBufferRef.current = "";
+    if (textTimerRef.current !== null) window.clearTimeout(textTimerRef.current);
+    textTimerRef.current = null;
+  }, [sessionId]);
 
   useEffect(() => {
     if (keyboardActive) captureRef.current?.focus({ preventScroll: true });
   }, [keyboardActive]);
 
   const requestKeyboardAuthorization = useCallback(async () => {
-    if (!session) return;
-    await requestJson(`/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/keyboard-authorization`, {
-      method: "POST",
-      body: JSON.stringify({}),
-    });
-    await sessionsQuery.refetch();
+    if (!sessionId) return;
+    await remoteControllerRequestJson(
+      `/api/screen-feed/control/sessions/${encodeURIComponent(sessionId)}/keyboard-authorization`,
+      { method: "POST", body: JSON.stringify({}) }
+    );
+    await refreshSession();
     setPasswordOpen(false);
     setPassword("");
     window.setTimeout(() => captureRef.current?.focus({ preventScroll: true }), 0);
-  }, [session, sessionsQuery]);
+  }, [refreshSession, sessionId]);
 
   const enableKeyboard = useCallback(async () => {
-    if (!session || !mouseActive || busy) return;
+    if (!sessionId || !mouseActive || busy) return;
     setBusy(true);
     setError(null);
     try {
       await requestKeyboardAuthorization();
     } catch (requestError) {
       if (
-        requestError instanceof RemoteKeyboardRequestError &&
+        requestError instanceof RemoteControllerRequestError &&
         (requestError.status === 428 || requestError.code === "PASSWORD_CONFIRMATION_REQUIRED")
       ) {
         setPasswordOpen(true);
@@ -157,14 +114,14 @@ export function RemoteKeyboardControllerOverlay() {
     } finally {
       setBusy(false);
     }
-  }, [busy, mouseActive, requestKeyboardAuthorization, session, t]);
+  }, [busy, mouseActive, requestKeyboardAuthorization, sessionId, t]);
 
   const confirmPasswordAndEnable = useCallback(async () => {
-    if (!password || !session || busy) return;
+    if (!password || !sessionId || busy) return;
     setBusy(true);
     setError(null);
     try {
-      await requestJson("/api/auth/confirm-password", {
+      await remoteControllerRequestJson("/api/auth/confirm-password", {
         method: "POST",
         body: JSON.stringify({ password }),
       });
@@ -178,60 +135,99 @@ export function RemoteKeyboardControllerOverlay() {
     } finally {
       setBusy(false);
     }
-  }, [busy, language, password, requestKeyboardAuthorization, session]);
+  }, [busy, language, password, requestKeyboardAuthorization, sessionId]);
 
   const stopKeyboard = useCallback(async () => {
-    if (!session || busy) return;
+    if (!sessionId || busy) return;
     setBusy(true);
     setError(null);
     try {
-      await requestJson(
-        `/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/keyboard-authorization/revoke`,
+      await remoteControllerRequestJson(
+        `/api/screen-feed/control/sessions/${encodeURIComponent(sessionId)}/keyboard-authorization/revoke`,
         { method: "POST", body: JSON.stringify({}) }
       );
       setLastResult(null);
-      await sessionsQuery.refetch();
+      await refreshSession();
     } catch (requestError) {
       setError(requestError instanceof Error ? t(requestError.message) : t("Keyboard command failed."));
     } finally {
       setBusy(false);
     }
-  }, [busy, session, sessionsQuery, t]);
+  }, [busy, refreshSession, sessionId, t]);
 
-  const sendCommand = useCallback(
-    async (
-      payload: { type: "insert-text"; text: string } | { type: "key"; key: RemoteKeyboardKey; shiftKey: boolean }
-    ) => {
-      if (!session || !keyboardActive) return;
-      try {
-        await requestJson(`/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/keyboard-commands`, {
-          method: "POST",
-          body: JSON.stringify(payload),
-        });
-      } catch (requestError) {
-        if (
-          requestError instanceof RemoteKeyboardRequestError &&
-          (requestError.status === 428 || requestError.code === "KEYBOARD_AUTHORIZATION_REQUIRED")
-        ) {
-          setPasswordOpen(true);
-          await sessionsQuery.refetch();
+  const enqueueCommand = useCallback(
+    (payload: KeyboardPayload) => {
+      if (!sessionId || !keyboardActive) return;
+      const run = async () => {
+        if (activeSessionIdRef.current !== sessionId) return;
+        try {
+          await remoteControllerRequestJson(
+            `/api/screen-feed/control/sessions/${encodeURIComponent(sessionId)}/keyboard-commands`,
+            { method: "POST", body: JSON.stringify(payload) }
+          );
+        } catch (requestError) {
+          if (activeSessionIdRef.current !== sessionId) return;
+          if (
+            requestError instanceof RemoteControllerRequestError &&
+            (requestError.status === 428 || requestError.code === "KEYBOARD_AUTHORIZATION_REQUIRED")
+          ) {
+            setPasswordOpen(true);
+            void refreshSession().catch(() => undefined);
+          }
+          setError(requestError instanceof Error ? t(requestError.message) : t("Keyboard command failed."));
         }
-        setError(requestError instanceof Error ? t(requestError.message) : t("Keyboard command failed."));
+      };
+      commandTailRef.current = commandTailRef.current.catch(() => undefined).then(run);
+    },
+    [keyboardActive, refreshSession, sessionId, t]
+  );
+
+  const flushTextBuffer = useCallback(() => {
+    if (textTimerRef.current !== null) window.clearTimeout(textTimerRef.current);
+    textTimerRef.current = null;
+    const text = textBufferRef.current;
+    textBufferRef.current = "";
+    if (text) enqueueCommand({ type: "insert-text", text });
+  }, [enqueueCommand]);
+
+  const queueText = useCallback(
+    (text: string) => {
+      textBufferRef.current += text;
+      if (Array.from(textBufferRef.current).length >= MAX_TEXT_BATCH_CODE_POINTS) {
+        flushTextBuffer();
+        return;
+      }
+      if (textTimerRef.current === null) {
+        textTimerRef.current = window.setTimeout(flushTextBuffer, TEXT_BATCH_DELAY_MS);
       }
     },
-    [keyboardActive, session, sessionsQuery, t]
+    [flushTextBuffer]
   );
 
   useEffect(() => {
-    if (!session || !keyboardActive) return;
+    if (!keyboardActive) {
+      textBufferRef.current = "";
+      if (textTimerRef.current !== null) window.clearTimeout(textTimerRef.current);
+      textTimerRef.current = null;
+      return;
+    }
+    return () => {
+      textBufferRef.current = "";
+      if (textTimerRef.current !== null) window.clearTimeout(textTimerRef.current);
+      textTimerRef.current = null;
+    };
+  }, [keyboardActive]);
+
+  useEffect(() => {
+    if (!sessionId || !keyboardActive) return;
     const eventSource = new EventSource(
-      `/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/keyboard-results`,
+      `/api/screen-feed/control/sessions/${encodeURIComponent(sessionId)}/keyboard-results`,
       { withCredentials: true }
     );
     eventSource.addEventListener("result", (event) => {
       try {
         const result = JSON.parse((event as MessageEvent<string>).data) as KeyboardResultView;
-        if (result?.sessionId !== session.id) return;
+        if (result?.sessionId !== sessionId) return;
         setLastResult(result);
         if (result.status === "blocked") {
           setError(t("That field is protected and cannot be edited remotely."));
@@ -241,9 +237,9 @@ export function RemoteKeyboardControllerOverlay() {
       }
     });
     return () => eventSource.close();
-  }, [keyboardActive, session, t]);
+  }, [keyboardActive, sessionId, t]);
 
-  if (!watchDialogOpen || !session) return null;
+  if (!target || !session || !portalHost) return null;
 
   const statusLabel = lastResult
     ? translateRemoteSupportPhase5Text(
@@ -252,11 +248,12 @@ export function RemoteKeyboardControllerOverlay() {
       )
     : null;
 
-  return (
-    <div
-      className="fixed right-3 top-[13.5rem] z-[2147483644] w-[min(92vw,360px)] rounded-xl border bg-background/95 p-3 shadow-xl backdrop-blur"
+  return createPortal(
+    <section
+      className="w-full rounded-xl border bg-background/95 p-3 shadow-sm"
       data-screenfeed-ignore="true"
       data-testid="remote-keyboard-controller-overlay"
+      data-remote-control-panel-section="keyboard"
     >
       <div className="flex items-start gap-2">
         <div className="rounded-md bg-primary/10 p-1.5 text-primary">
@@ -311,6 +308,7 @@ export function RemoteKeyboardControllerOverlay() {
           </p>
           <div className="flex gap-2">
             <Input
+              autoFocus
               type="password"
               autoComplete="current-password"
               value={password}
@@ -353,12 +351,13 @@ export function RemoteKeyboardControllerOverlay() {
               const special = ALLOWED_SPECIAL_KEYS.get(event.key);
               if (special) {
                 event.preventDefault();
-                void sendCommand({ type: "key", key: special, shiftKey: event.shiftKey });
+                flushTextBuffer();
+                enqueueCommand({ type: "key", key: special, shiftKey: event.shiftKey });
                 return;
               }
               if (Array.from(event.key).length === 1) {
                 event.preventDefault();
-                void sendCommand({ type: "insert-text", text: event.key });
+                queueText(event.key);
               }
             }}
           />
@@ -377,6 +376,7 @@ export function RemoteKeyboardControllerOverlay() {
           {error}
         </p>
       )}
-    </div>
+    </section>,
+    portalHost
   );
 }

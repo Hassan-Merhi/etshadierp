@@ -56,7 +56,7 @@ export function sanitizeScreenFeedClicks(value: unknown, now = Date.now()): Scre
 }
 
 export function sanitizeScreenFeedCursor(value: unknown, now = Date.now()): ScreenFeedCursor | null {
-  if (!value || typeof value !== "object") return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const cursor = value as Record<string, unknown>;
   const x = normalizedCoordinate(cursor.x);
   const y = normalizedCoordinate(cursor.y);

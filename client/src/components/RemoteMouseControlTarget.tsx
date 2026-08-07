@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { RemoteControlSessionView } from "@/hooks/use-remote-control-session";
 import {
   applyRemoteMouseCommand,
@@ -14,6 +14,7 @@ interface RemotePointerState {
 }
 
 const MAX_COMMAND_AGE_MS = 8000;
+const MAX_SEEN_COMMANDS = 256;
 
 function parseCommand(value: unknown): RemoteMouseCommandView | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -69,64 +70,98 @@ export function RemoteMouseControlTarget({
     visible: false,
     clickPulse: 0,
   });
+  const seenCommandIdsRef = useRef(new Set<string>());
+  const lastSequenceRef = useRef(0);
+
+  const sessionId = session?.id ?? null;
+  const targetTabId = session?.targetTabId ?? null;
+  const mouseEnabled = !!session?.capabilities.mouse;
+  const keyboardEnabled = !!session?.capabilities.keyboard;
+  const keyboardEnabledRef = useRef(keyboardEnabled);
 
   useEffect(() => {
-    if (!session || !session.capabilities.mouse || session.targetTabId !== tabId) {
+    keyboardEnabledRef.current = keyboardEnabled;
+  }, [keyboardEnabled]);
+
+  useEffect(() => {
+    seenCommandIdsRef.current.clear();
+    lastSequenceRef.current = 0;
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!sessionId || !mouseEnabled || targetTabId !== tabId) {
       setPointer((current) => ({ ...current, visible: false }));
       return;
     }
 
-    let eventSource: EventSource | null = null;
-    try {
-      const params = new URLSearchParams({ sessionId: session.id, tabId });
-      eventSource = new EventSource(`/api/screen-feed/control/commands?${params.toString()}`, {
-        withCredentials: true,
-      });
-      eventSource.addEventListener("command", (event) => {
-        let command: RemoteMouseCommandView | null = null;
-        try {
-          command = parseCommand(JSON.parse((event as MessageEvent<string>).data));
-        } catch {
-          command = null;
-        }
-        if (!command || command.sessionId !== session.id) return;
+    let closed = false;
+    const params = new URLSearchParams({ sessionId, tabId });
+    const eventSource = new EventSource(`/api/screen-feed/control/commands?${params.toString()}`, {
+      withCredentials: true,
+    });
 
-        const createdAt = command.createdAt ? new Date(command.createdAt).getTime() : Date.now();
-        if (!Number.isFinite(createdAt) || Date.now() - createdAt > MAX_COMMAND_AGE_MS) {
-          void reportCommandResult(session.id, tabId, command.id, {
-            status: "ignored",
-            reason: "stale-command",
-            clientX: 0,
-            clientY: 0,
-          });
-          return;
-        }
+    eventSource.addEventListener("command", (event) => {
+      if (closed) return;
+      let command: RemoteMouseCommandView | null = null;
+      try {
+        command = parseCommand(JSON.parse((event as MessageEvent<string>).data));
+      } catch {
+        command = null;
+      }
+      if (!command || command.sessionId !== sessionId) return;
 
-        const result = applyRemoteMouseCommand(command, document, window, {
-          keyboardEnabled: session.capabilities.keyboard,
+      if (seenCommandIdsRef.current.has(command.id) || command.sequence <= lastSequenceRef.current) {
+        void reportCommandResult(sessionId, tabId, command.id, {
+          status: "ignored",
+          reason: "duplicate-command",
+          clientX: 0,
+          clientY: 0,
         });
-        setPointer((current) => ({
-          x: result.clientX,
-          y: result.clientY,
-          visible: true,
-          clickPulse: command.type === "click" ? current.clickPulse + 1 : current.clickPulse,
-        }));
-        void reportCommandResult(session.id, tabId, command.id, result);
+        return;
+      }
+
+      seenCommandIdsRef.current.add(command.id);
+      lastSequenceRef.current = Math.max(lastSequenceRef.current, command.sequence);
+      if (seenCommandIdsRef.current.size > MAX_SEEN_COMMANDS) {
+        const first = seenCommandIdsRef.current.values().next().value;
+        if (first) seenCommandIdsRef.current.delete(first);
+      }
+
+      const createdAt = command.createdAt ? new Date(command.createdAt).getTime() : Date.now();
+      if (!Number.isFinite(createdAt) || Date.now() - createdAt > MAX_COMMAND_AGE_MS) {
+        void reportCommandResult(sessionId, tabId, command.id, {
+          status: "ignored",
+          reason: "stale-command",
+          clientX: 0,
+          clientY: 0,
+        });
+        return;
+      }
+
+      const result = applyRemoteMouseCommand(command, document, window, {
+        keyboardEnabled: keyboardEnabledRef.current,
       });
-      eventSource.onerror = () => {
-        setPointer((current) => ({ ...current, visible: false }));
-      };
-    } catch {
-      eventSource = null;
-    }
+      setPointer((current) => ({
+        x: result.clientX,
+        y: result.clientY,
+        visible: true,
+        clickPulse: command.type === "click" ? current.clickPulse + 1 : current.clickPulse,
+      }));
+      void reportCommandResult(sessionId, tabId, command.id, result);
+    });
+
+    eventSource.onerror = () => {
+      if (!closed) setPointer((current) => ({ ...current, visible: false }));
+    };
 
     return () => {
-      eventSource?.close();
+      closed = true;
+      eventSource.close();
       setPointer((current) => ({ ...current, visible: false }));
     };
-  }, [session, tabId]);
+  }, [mouseEnabled, sessionId, tabId, targetTabId]);
 
-  if (!session || !session.capabilities.mouse || !pointer.visible) return null;
+  if (!sessionId || !mouseEnabled || !pointer.visible) return null;
 
   return (
     <div
