@@ -28,6 +28,9 @@ describe("remote support Phase 4 control reliability contracts", () => {
   it("coalesces high-volume controller input while keeping actions ordered", () => {
     expect(mouseController).toContain("POINTER_COALESCE_MS = 125");
     expect(mouseController).toContain("SCROLL_COALESCE_MS = 100");
+    expect(mouseController).toContain("pointerLatestRef");
+    expect(mouseController).toContain("pointerQueueActiveRef");
+    expect(mouseController).toContain("schedulePointerDrain");
     expect(mouseController).toContain("commandTailRef.current");
     expect(keyboardController).toContain("TEXT_BATCH_DELAY_MS = 45");
     expect(keyboardController).toContain("MAX_TEXT_BATCH_CODE_POINTS = 32");
@@ -37,6 +40,7 @@ describe("remote support Phase 4 control reliability contracts", () => {
   it("keeps target command streams stable and rejects replayed commands", () => {
     expect(mouseTarget).toContain("duplicate-command");
     expect(mouseTarget).toContain("lastSequenceRef");
+    expect(mouseTarget).toContain("keyboardEnabledRef");
     expect(keyboardTarget).toContain("duplicate-command");
     expect(keyboardTarget).toContain("lastSequenceRef");
     expect(mouseTarget).not.toContain("[session, tabId]");
