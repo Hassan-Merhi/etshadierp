@@ -9,9 +9,9 @@ import { db } from "../../db";
 /**
  * Lightweight stock-item selector endpoint.
  *
- * This route intentionally excludes opening balances, rates, values, prices,
- * timestamps, and other management-only fields. It is safe for dropdowns and
- * identity lookups that only need stable stock-item metadata.
+ * The default contract stays backwards compatible for selectors that need
+ * group/category/grade/activity metadata. Phase 4 adds profile=identity for the
+ * high-frequency voucher and lookup callers that only need id/code/name/uom.
  */
 export function registerStockLightRoutes(app: Express) {
   app.get("/api/stock-items/light", requireAuth, async (req: any, res) => {
@@ -19,6 +19,23 @@ export function registerStockLightRoutes(app: Express) {
       const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
+      }
+
+      const profile = String(req.query.profile || "light").toLowerCase();
+      if (profile === "identity") {
+        const rows = await db
+          .select({
+            id: stockItems.id,
+            code: stockItems.code,
+            name: stockItems.name,
+            uom: stockItems.uom,
+          })
+          .from(stockItems)
+          .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)))
+          .orderBy(asc(stockItems.name), asc(stockItems.id));
+
+        res.set("X-ERP-Payload-Profile", "stock-items-identity-v1");
+        return res.json(rows);
       }
 
       const rows = await db
@@ -36,6 +53,7 @@ export function registerStockLightRoutes(app: Express) {
         .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)))
         .orderBy(asc(stockItems.name), asc(stockItems.id));
 
+      res.set("X-ERP-Payload-Profile", "stock-items-light-v1");
       return res.json(rows);
     } catch (error: unknown) {
       logger.error("[stock-items/light] Failed to load lightweight stock items", {
