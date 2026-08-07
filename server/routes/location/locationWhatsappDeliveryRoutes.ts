@@ -220,7 +220,10 @@ export function registerLocationWhatsappDeliveryRoutes(app: Express) {
 
         const blockedRetryParents = new Set(
           result.rows
-            .filter((row) => row.source === "retry" && row.retry_of_id != null && (row.status === "running" || row.status === "sent"))
+            .filter(
+              (row) =>
+                row.source === "retry" && row.retry_of_id != null && (row.status === "running" || row.status === "sent")
+            )
             .map((row) => Number(row.retry_of_id))
         );
         const deliveries = result.rows.map((row) => ({
@@ -247,8 +250,7 @@ export function registerLocationWhatsappDeliveryRoutes(app: Express) {
           startedAt: isoOrNull(row.started_at),
           completedAt: isoOrNull(row.completed_at),
           canRetry:
-            (row.status === "failed" || row.status === "skipped_empty") &&
-            !blockedRetryParents.has(Number(row.id)),
+            (row.status === "failed" || row.status === "skipped_empty") && !blockedRetryParents.has(Number(row.id)),
         }));
         const summary = summaryResult.rows[0];
         res.json({
@@ -268,7 +270,14 @@ export function registerLocationWhatsappDeliveryRoutes(app: Express) {
           return res.json({
             locationId: Number.parseInt(req.params.locationId, 10),
             deliveries: [],
-            summary: { latestStatus: null, latestError: null, latestAt: null, lastSentAt: null, lastSentSource: null, lastSentIncludeCost: null },
+            summary: {
+              latestStatus: null,
+              latestError: null,
+              latestAt: null,
+              lastSentAt: null,
+              lastSentSource: null,
+              lastSentIncludeCost: null,
+            },
           });
         }
         logger.error("[LocationStockDelivery] History failed", { error });
@@ -311,9 +320,14 @@ export function registerLocationWhatsappDeliveryRoutes(app: Express) {
           idempotencyKey: retryIdempotencyKey(req, original.company_id, original.location_id, original.id),
         });
 
-        if (result.status === "running") return res.status(202).json({ message: "This retry is already in progress", ...result });
-        if (result.status === "skipped_empty") return res.status(400).json({ message: "The retry found no stock matching the original report filters", ...result });
-        if (result.status === "failed") return res.status(502).json({ message: result.error || "WhatsApp retry failed", ...result });
+        if (result.status === "running")
+          return res.status(202).json({ message: "This retry is already in progress", ...result });
+        if (result.status === "skipped_empty")
+          return res
+            .status(400)
+            .json({ message: "The retry found no stock matching the original report filters", ...result });
+        if (result.status === "failed")
+          return res.status(502).json({ message: result.error || "WhatsApp retry failed", ...result });
 
         try {
           await logAudit({
@@ -339,7 +353,9 @@ export function registerLocationWhatsappDeliveryRoutes(app: Express) {
         res.json({ message: "Stock report retry sent successfully", ...result });
       } catch (error: unknown) {
         if ((error as any)?.code === "23505") {
-          return res.status(409).json({ message: "A retry for this delivery is already in progress or has already succeeded" });
+          return res
+            .status(409)
+            .json({ message: "A retry for this delivery is already in progress or has already succeeded" });
         }
         logger.error("[LocationStockDelivery] Retry failed", { error });
         res.status(500).json({ message: getErrorMessage(error) });

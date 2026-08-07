@@ -108,9 +108,7 @@ async function scheduleAuthorStillAuthorized(row: ScheduleRow): Promise<boolean>
   if (!user?.active || !user.role || user.role === "POS" || user.role === "View Only") return false;
   if (user.role === "Developer" || user.role === "Admin") return true;
 
-  const keys = row.include_cost
-    ? ["exp_whatsapp_send", "fld_cost_price", "fld_total_value"]
-    : ["exp_whatsapp_send"];
+  const keys = row.include_cost ? ["exp_whatsapp_send", "fld_cost_price", "fld_total_value"] : ["exp_whatsapp_send"];
   const permissions = await pool.query<{ feature_key: string; enabled: boolean }>(
     `SELECT feature_key, enabled
        FROM role_feature_permissions
@@ -121,12 +119,7 @@ async function scheduleAuthorStillAuthorized(row: ScheduleRow): Promise<boolean>
   return keys.every((key) => permissionAllowed(user.role, permissionMap.get(key)));
 }
 
-async function finishSchedule(
-  locationId: number,
-  status: string,
-  error: string | null,
-  sent: boolean
-): Promise<void> {
+async function finishSchedule(locationId: number, status: string, error: string | null, sent: boolean): Promise<void> {
   await pool.query(
     `UPDATE location_whatsapp_stock_schedules
         SET last_status = $2,
@@ -238,12 +231,7 @@ async function runOneLocationSchedule(row: ScheduleRow, localDate: string): Prom
       reportDate: localDate,
     });
 
-    await finishSchedule(
-      row.location_id,
-      delivery.status,
-      delivery.error,
-      delivery.status === "sent"
-    );
+    await finishSchedule(row.location_id, delivery.status, delivery.error, delivery.status === "sent");
   } catch (error: unknown) {
     const message = getErrorMessage(error) || "Scheduled WhatsApp stock report failed";
     await finishSchedule(row.location_id, "failed", message, false).catch(() => undefined);

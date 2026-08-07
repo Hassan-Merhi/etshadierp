@@ -238,14 +238,16 @@ export async function recoverStaleLocationStockDeliveries(): Promise<number> {
       RETURNING id, location_id`
   );
   for (const row of result.rows) {
-    await pool.query(
-      `UPDATE location_whatsapp_stock_schedules
+    await pool
+      .query(
+        `UPDATE location_whatsapp_stock_schedules
           SET last_status = 'failed',
               last_error = 'Delivery interrupted before completion; retry manually if needed',
               updated_at = now()
         WHERE location_id = $1 AND last_status = 'running'`,
-      [row.location_id]
-    ).catch(() => undefined);
+        [row.location_id]
+      )
+      .catch(() => undefined);
   }
   if (result.rowCount) {
     logger.warn("[LocationStockWhatsAppDelivery] recovered stale running deliveries", {
@@ -267,17 +269,44 @@ export async function deliverLocationStockWhatsApp(
     if (!context.chatId) {
       const error = "No WhatsApp group is linked to this location";
       await completeDelivery(deliveryId, "failed", { error });
-      return { deliveryId, status: "failed", duplicate: false, itemCount: null, pageCount: null, fileName: null, error, destinationGroupName: context.groupName };
+      return {
+        deliveryId,
+        status: "failed",
+        duplicate: false,
+        itemCount: null,
+        pageCount: null,
+        fileName: null,
+        error,
+        destinationGroupName: context.groupName,
+      };
     }
     if (!context.chatId.endsWith("@g.us")) {
       const error = "The linked WhatsApp destination is not a valid group";
       await completeDelivery(deliveryId, "failed", { error });
-      return { deliveryId, status: "failed", duplicate: false, itemCount: null, pageCount: null, fileName: null, error, destinationGroupName: context.groupName };
+      return {
+        deliveryId,
+        status: "failed",
+        duplicate: false,
+        itemCount: null,
+        pageCount: null,
+        fileName: null,
+        error,
+        destinationGroupName: context.groupName,
+      };
     }
     if (!context.destinationEnabled) {
       const error = "WhatsApp stock reports are disabled for this location";
       await completeDelivery(deliveryId, "failed", { error });
-      return { deliveryId, status: "failed", duplicate: false, itemCount: null, pageCount: null, fileName: null, error, destinationGroupName: context.groupName };
+      return {
+        deliveryId,
+        status: "failed",
+        duplicate: false,
+        itemCount: null,
+        pageCount: null,
+        fileName: null,
+        error,
+        destinationGroupName: context.groupName,
+      };
     }
 
     const { buffer, pageCount, rowCount } = await generateStockPdf(

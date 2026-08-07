@@ -2,13 +2,7 @@ import { useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { CheckCircle2, Clock3, History, Loader2, RefreshCw, RotateCcw, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
@@ -81,7 +75,8 @@ function sourceLabel(source: DeliveryEntry["source"]): string {
 function statusPresentation(status: DeliveryEntry["status"]) {
   if (status === "sent") return { label: "Sent", Icon: CheckCircle2, className: "text-green-600 dark:text-green-400" };
   if (status === "failed") return { label: "Failed", Icon: XCircle, className: "text-destructive" };
-  if (status === "skipped_empty") return { label: "No matching stock", Icon: XCircle, className: "text-amber-600 dark:text-amber-400" };
+  if (status === "skipped_empty")
+    return { label: "No matching stock", Icon: XCircle, className: "text-amber-600 dark:text-amber-400" };
   return { label: "Sending", Icon: Clock3, className: "text-blue-600 dark:text-blue-400" };
 }
 
@@ -192,7 +187,11 @@ export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, can
                 disabled={historyQuery.isFetching}
                 data-testid="button-refresh-location-stock-history"
               >
-                {historyQuery.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                {historyQuery.isFetching ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
                 <span className="hidden sm:inline">Refresh</span>
               </Button>
             </div>
@@ -206,7 +205,9 @@ export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, can
             ) : historyQuery.isError ? (
               <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
                 <p className="font-medium">Could not load delivery history.</p>
-                <p className="mt-1">{historyQuery.error instanceof Error ? historyQuery.error.message : "Unknown error"}</p>
+                <p className="mt-1">
+                  {historyQuery.error instanceof Error ? historyQuery.error.message : "Unknown error"}
+                </p>
                 <Button variant="outline" size="sm" className="mt-3" onClick={() => historyQuery.refetch()}>
                   Retry loading
                 </Button>
@@ -220,7 +221,9 @@ export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, can
                     {summary?.lastSentAt && (
                       <p className="text-xs text-muted-foreground mt-1">
                         {summary.lastSentSource ? sourceLabel(summary.lastSentSource) : ""}
-                        {summary.lastSentIncludeCost == null ? "" : ` · ${summary.lastSentIncludeCost ? "WITH COST" : "WITHOUT COST"}`}
+                        {summary.lastSentIncludeCost == null
+                          ? ""
+                          : ` · ${summary.lastSentIncludeCost ? "WITH COST" : "WITHOUT COST"}`}
                       </p>
                     )}
                   </div>
@@ -244,19 +247,34 @@ export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, can
                       const StatusIcon = status.Icon;
                       const costRetryRestricted = delivery.includeCost && !canSendWithCost;
                       return (
-                        <div key={delivery.id} className="rounded-lg border p-3 sm:p-4 space-y-3" data-testid={`location-stock-delivery-${delivery.id}`}>
+                        <div
+                          key={delivery.id}
+                          className="rounded-lg border p-3 sm:p-4 space-y-3"
+                          data-testid={`location-stock-delivery-${delivery.id}`}
+                        >
                           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
-                                <span className={cn("inline-flex items-center gap-1.5 text-sm font-semibold", status.className)}>
-                                  <StatusIcon className={cn("h-4 w-4", delivery.status === "running" && "animate-pulse")} />
+                                <span
+                                  className={cn(
+                                    "inline-flex items-center gap-1.5 text-sm font-semibold",
+                                    status.className
+                                  )}
+                                >
+                                  <StatusIcon
+                                    className={cn("h-4 w-4", delivery.status === "running" && "animate-pulse")}
+                                  />
                                   {status.label}
                                 </span>
-                                <span className="text-xs rounded-full bg-muted px-2 py-0.5">{sourceLabel(delivery.source)}</span>
+                                <span className="text-xs rounded-full bg-muted px-2 py-0.5">
+                                  {sourceLabel(delivery.source)}
+                                </span>
                                 <span className="text-xs rounded-full bg-muted px-2 py-0.5 font-medium">
                                   {delivery.includeCost ? "WITH COST" : "WITHOUT COST"}
                                 </span>
-                                {delivery.retryOfId && <span className="text-xs text-muted-foreground">Retry of #{delivery.retryOfId}</span>}
+                                {delivery.retryOfId && (
+                                  <span className="text-xs text-muted-foreground">Retry of #{delivery.retryOfId}</span>
+                                )}
                               </div>
                               <p className="text-xs text-muted-foreground mt-1.5">
                                 Attempt #{delivery.id} · {formatDateTime(delivery.startedAt)}
@@ -269,26 +287,62 @@ export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, can
                                 size="sm"
                                 className="gap-2 shrink-0"
                                 disabled={retryMutation.isPending || costRetryRestricted}
-                                title={costRetryRestricted ? "Cost-price and total-value permission is required to retry this report" : "Retry using fresh live stock and the original report filters"}
+                                title={
+                                  costRetryRestricted
+                                    ? "Cost-price and total-value permission is required to retry this report"
+                                    : "Retry using fresh live stock and the original report filters"
+                                }
                                 onClick={() => handleRetry(delivery)}
                                 data-testid={`button-retry-location-stock-delivery-${delivery.id}`}
                               >
-                                {retryingId === delivery.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                                {retryingId === delivery.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <RotateCcw className="h-4 w-4" />
+                                )}
                                 Retry
                               </Button>
                             )}
                           </div>
 
                           <div className="grid gap-x-4 gap-y-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
-                            <div><span className="text-muted-foreground">Destination:</span> {delivery.destinationGroupName || "Linked WhatsApp group"}</div>
-                            <div><span className="text-muted-foreground">User:</span> {delivery.initiatedByUsername || delivery.initiatedByUserId || "System"}</div>
-                            <div><span className="text-muted-foreground">Generated:</span> {formatDateTime(delivery.reportGeneratedAt)}</div>
-                            <div><span className="text-muted-foreground">Items:</span> {delivery.itemCount ?? "—"}</div>
-                            <div><span className="text-muted-foreground">Pages:</span> {delivery.pageCount ?? "—"}</div>
-                            <div><span className="text-muted-foreground">Completed:</span> {formatDateTime(delivery.completedAt)}</div>
-                            {delivery.scheduledFor && <div><span className="text-muted-foreground">Scheduled day:</span> {delivery.scheduledFor}</div>}
-                            {delivery.stockGroupName && <div><span className="text-muted-foreground">Stock group:</span> {delivery.stockGroupName}</div>}
-                            {delivery.categoryName && <div><span className="text-muted-foreground">Category:</span> {delivery.categoryName}</div>}
+                            <div>
+                              <span className="text-muted-foreground">Destination:</span>{" "}
+                              {delivery.destinationGroupName || "Linked WhatsApp group"}
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">User:</span>{" "}
+                              {delivery.initiatedByUsername || delivery.initiatedByUserId || "System"}
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Generated:</span>{" "}
+                              {formatDateTime(delivery.reportGeneratedAt)}
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Items:</span> {delivery.itemCount ?? "—"}
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Pages:</span> {delivery.pageCount ?? "—"}
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Completed:</span>{" "}
+                              {formatDateTime(delivery.completedAt)}
+                            </div>
+                            {delivery.scheduledFor && (
+                              <div>
+                                <span className="text-muted-foreground">Scheduled day:</span> {delivery.scheduledFor}
+                              </div>
+                            )}
+                            {delivery.stockGroupName && (
+                              <div>
+                                <span className="text-muted-foreground">Stock group:</span> {delivery.stockGroupName}
+                              </div>
+                            )}
+                            {delivery.categoryName && (
+                              <div>
+                                <span className="text-muted-foreground">Category:</span> {delivery.categoryName}
+                              </div>
+                            )}
                           </div>
 
                           {delivery.fileName && (
@@ -298,7 +352,8 @@ export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, can
                           )}
 
                           <p className="text-xs text-muted-foreground">
-                            Filters: {delivery.includeZeroStock ? "include zero" : "exclude zero"} · {delivery.includeNegativeStock ? "include negative" : "exclude negative"}
+                            Filters: {delivery.includeZeroStock ? "include zero" : "exclude zero"} ·{" "}
+                            {delivery.includeNegativeStock ? "include negative" : "exclude negative"}
                           </p>
 
                           {delivery.error && (
@@ -307,7 +362,10 @@ export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, can
                             </div>
                           )}
                           {costRetryRestricted && delivery.canRetry && (
-                            <p className="text-xs text-muted-foreground">This WITH COST attempt can only be retried by a user with cost-price and total-value permission.</p>
+                            <p className="text-xs text-muted-foreground">
+                              This WITH COST attempt can only be retried by a user with cost-price and total-value
+                              permission.
+                            </p>
                           )}
                         </div>
                       );

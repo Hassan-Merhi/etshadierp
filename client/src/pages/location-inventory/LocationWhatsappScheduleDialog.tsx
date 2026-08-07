@@ -89,7 +89,8 @@ function formatDateTime(value: string | null): string {
 function scheduleStatus(status: string | null) {
   if (status === "sent") return { label: "Sent", Icon: CheckCircle2, className: "text-green-600 dark:text-green-400" };
   if (status === "failed") return { label: "Failed", Icon: XCircle, className: "text-destructive" };
-  if (status === "skipped_empty") return { label: "No matching stock", Icon: AlertTriangle, className: "text-amber-600 dark:text-amber-400" };
+  if (status === "skipped_empty")
+    return { label: "No matching stock", Icon: AlertTriangle, className: "text-amber-600 dark:text-amber-400" };
   if (status === "running") return { label: "Sending", Icon: Clock3, className: "text-blue-600 dark:text-blue-400" };
   return null;
 }
@@ -258,7 +259,9 @@ export function LocationWhatsappScheduleDialog({
             </div>
           ) : scheduleQuery.isError ? (
             <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-              <p>{scheduleQuery.error instanceof Error ? scheduleQuery.error.message : "Could not load this schedule."}</p>
+              <p>
+                {scheduleQuery.error instanceof Error ? scheduleQuery.error.message : "Could not load this schedule."}
+              </p>
               <Button variant="outline" size="sm" className="mt-3" onClick={() => scheduleQuery.refetch()}>
                 Retry loading
               </Button>
@@ -268,11 +271,13 @@ export function LocationWhatsappScheduleDialog({
               <div className="rounded-md border p-3 space-y-1">
                 <p className="text-xs text-muted-foreground">WhatsApp destination</p>
                 <p className="text-sm font-medium">
-                  {location.whatsappGroupName || (location.whatsappGroupChatId ? "Linked WhatsApp group" : "No group linked")}
+                  {location.whatsappGroupName ||
+                    (location.whatsappGroupChatId ? "Linked WhatsApp group" : "No group linked")}
                 </p>
                 {!whatsappReady && (
                   <p className="text-xs text-amber-600 dark:text-amber-400">
-                    Link and enable a WhatsApp group from the location WhatsApp settings before turning automatic sending on.
+                    Link and enable a WhatsApp group from the location WhatsApp settings before turning automatic
+                    sending on.
                   </p>
                 )}
               </div>
@@ -281,12 +286,16 @@ export function LocationWhatsappScheduleDialog({
                 <div className="rounded-md border p-3">
                   <p className="text-xs text-muted-foreground">Next automatic send</p>
                   <p className="text-sm font-medium mt-1">
-                    {scheduleQuery.data?.enabled ? formatDateTime(scheduleQuery.data.nextSendAt) : "Automatic sending off"}
+                    {scheduleQuery.data?.enabled
+                      ? formatDateTime(scheduleQuery.data.nextSendAt)
+                      : "Automatic sending off"}
                   </p>
                 </div>
                 <div className="rounded-md border p-3">
                   <p className="text-xs text-muted-foreground">Last attempt</p>
-                  <p className="text-sm font-medium mt-1">{formatDateTime(scheduleQuery.data?.lastAttemptAt ?? null)}</p>
+                  <p className="text-sm font-medium mt-1">
+                    {formatDateTime(scheduleQuery.data?.lastAttemptAt ?? null)}
+                  </p>
                   {operationalStatus && OperationalIcon && (
                     <p className={cn("text-xs mt-1 inline-flex items-center gap-1", operationalStatus.className)}>
                       <OperationalIcon className="h-3.5 w-3.5" /> {operationalStatus.label}
@@ -308,7 +317,9 @@ export function LocationWhatsappScheduleDialog({
               <div className="flex items-center justify-between gap-4 rounded-md border p-3">
                 <div>
                   <Label htmlFor="location-stock-auto-send">Automatic sending</Label>
-                  <p className="text-xs text-muted-foreground">Generate from live inventory when the scheduled time arrives.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Generate from live inventory when the scheduled time arrives.
+                  </p>
                 </div>
                 <Switch
                   id="location-stock-auto-send"
@@ -323,7 +334,9 @@ export function LocationWhatsappScheduleDialog({
                 <div className="space-y-2">
                   <Label>Frequency</Label>
                   <Select value={frequency} onValueChange={(value) => setFrequency(value as ScheduleFrequency)}>
-                    <SelectTrigger data-testid="select-location-stock-frequency"><SelectValue /></SelectTrigger>
+                    <SelectTrigger data-testid="select-location-stock-frequency">
+                      <SelectValue />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="daily">Every day</SelectItem>
                       <SelectItem value="selected_days">Selected days</SelectItem>
@@ -375,7 +388,9 @@ export function LocationWhatsappScheduleDialog({
                   data-testid="input-location-stock-timezone"
                 />
                 <datalist id="location-stock-timezones">
-                  {COMMON_TIMEZONES.map((value) => <option key={value} value={value} />)}
+                  {COMMON_TIMEZONES.map((value) => (
+                    <option key={value} value={value} />
+                  ))}
                 </datalist>
                 <p className="text-xs text-muted-foreground">Use an IANA timezone such as Africa/Lubumbashi.</p>
               </div>
@@ -386,7 +401,9 @@ export function LocationWhatsappScheduleDialog({
                   value={includeCost ? "with_cost" : "no_cost"}
                   onValueChange={(value) => setIncludeCost(value === "with_cost")}
                 >
-                  <SelectTrigger data-testid="select-location-stock-report-type"><SelectValue /></SelectTrigger>
+                  <SelectTrigger data-testid="select-location-stock-report-type">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="no_cost">WITHOUT COST</SelectItem>
                     <SelectItem value="with_cost" disabled={!canSendWithCost}>
@@ -396,7 +413,9 @@ export function LocationWhatsappScheduleDialog({
                 </Select>
                 {!canSendWithCost && (
                   <p className="text-xs text-muted-foreground">
-                    WITH COST requires both Cost Price / Avg Rate and Total Inventory Value permission. Existing WITH COST schedules remain visible but cannot be modified until changed to WITHOUT COST by an authorized user.
+                    WITH COST requires both Cost Price / Avg Rate and Total Inventory Value permission. Existing WITH
+                    COST schedules remain visible but cannot be modified until changed to WITHOUT COST by an authorized
+                    user.
                   </p>
                 )}
               </div>
@@ -407,14 +426,24 @@ export function LocationWhatsappScheduleDialog({
                     <Label htmlFor="location-stock-zero">Include zero stock</Label>
                     <p className="text-xs text-muted-foreground">Add items whose current quantity is zero.</p>
                   </div>
-                  <Switch id="location-stock-zero" checked={includeZeroStock} onCheckedChange={setIncludeZeroStock} data-testid="switch-location-stock-zero" />
+                  <Switch
+                    id="location-stock-zero"
+                    checked={includeZeroStock}
+                    onCheckedChange={setIncludeZeroStock}
+                    data-testid="switch-location-stock-zero"
+                  />
                 </div>
                 <div className="flex items-center justify-between gap-3 rounded-md border p-3">
                   <div>
                     <Label htmlFor="location-stock-negative">Include negative stock</Label>
                     <p className="text-xs text-muted-foreground">Include negative quantities in the PDF.</p>
                   </div>
-                  <Switch id="location-stock-negative" checked={includeNegativeStock} onCheckedChange={setIncludeNegativeStock} data-testid="switch-location-stock-negative" />
+                  <Switch
+                    id="location-stock-negative"
+                    checked={includeNegativeStock}
+                    onCheckedChange={setIncludeNegativeStock}
+                    data-testid="switch-location-stock-negative"
+                  />
                 </div>
               </div>
 
@@ -422,24 +451,36 @@ export function LocationWhatsappScheduleDialog({
                 <div className="space-y-2">
                   <Label>Stock group filter</Label>
                   <Select value={stockGroupId} onValueChange={setStockGroupId}>
-                    <SelectTrigger data-testid="select-location-stock-group-filter"><SelectValue placeholder="All stock groups" /></SelectTrigger>
+                    <SelectTrigger data-testid="select-location-stock-group-filter">
+                      <SelectValue placeholder="All stock groups" />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All stock groups</SelectItem>
-                      {(stockGroupsQuery.data ?? []).filter((row) => row.active !== false).map((row) => (
-                        <SelectItem key={row.id} value={String(row.id)}>{row.name}</SelectItem>
-                      ))}
+                      {(stockGroupsQuery.data ?? [])
+                        .filter((row) => row.active !== false)
+                        .map((row) => (
+                          <SelectItem key={row.id} value={String(row.id)}>
+                            {row.name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Category filter</Label>
                   <Select value={categoryId} onValueChange={setCategoryId}>
-                    <SelectTrigger data-testid="select-location-stock-category-filter"><SelectValue placeholder="All categories" /></SelectTrigger>
+                    <SelectTrigger data-testid="select-location-stock-category-filter">
+                      <SelectValue placeholder="All categories" />
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All categories</SelectItem>
-                      {(categoriesQuery.data ?? []).filter((row) => row.active !== false).map((row) => (
-                        <SelectItem key={row.id} value={String(row.id)}>{row.name}</SelectItem>
-                      ))}
+                      {(categoriesQuery.data ?? [])
+                        .filter((row) => row.active !== false)
+                        .map((row) => (
+                          <SelectItem key={row.id} value={String(row.id)}>
+                            {row.name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -449,7 +490,11 @@ export function LocationWhatsappScheduleDialog({
                 {enabled ? (
                   <>
                     <span className="font-medium text-foreground">Active schedule:</span>{" "}
-                    {frequency === "daily" ? "Every day" : DAYS.filter((day) => daysOfWeek.includes(day.value)).map((day) => day.label).join(", ")}
+                    {frequency === "daily"
+                      ? "Every day"
+                      : DAYS.filter((day) => daysOfWeek.includes(day.value))
+                          .map((day) => day.label)
+                          .join(", ")}
                     {` at ${sendTime || "--:--"} (${timezone || "timezone required"})`}. Report:{" "}
                     <span className="font-medium text-foreground">{includeCost ? "WITH COST" : "WITHOUT COST"}</span>.
                     {activeGroupName ? ` Group: ${activeGroupName}.` : " All stock groups."}
@@ -463,7 +508,9 @@ export function LocationWhatsappScheduleDialog({
           )}
 
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setOpen(false)} disabled={saveMutation.isPending}>Cancel</Button>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={saveMutation.isPending}>
+              Cancel
+            </Button>
             <Button
               onClick={() => saveMutation.mutate()}
               disabled={saveDisabled || scheduleQuery.isError}

@@ -187,10 +187,7 @@ export function StockGroupsView({
             <DropdownMenuItem onClick={() => handlePrintWithOption(true)} data-testid="menu-export-pdf-cost">
               <Printer className="h-4 w-4 mr-2" /> Export to PDF (with cost)
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handlePrintWithOption(false)}
-              data-testid="menu-export-pdf-nocost"
-            >
+            <DropdownMenuItem onClick={() => handlePrintWithOption(false)} data-testid="menu-export-pdf-nocost">
               <Printer className="h-4 w-4 mr-2" /> Export to PDF (without cost)
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -222,12 +219,7 @@ export function StockGroupsView({
         {!posUser && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 ml-auto"
-                data-testid="button-location-menu"
-              >
+              <Button variant="outline" size="sm" className="gap-1.5 ml-auto" data-testid="button-location-menu">
                 Location <ChevronDown className="h-3 w-3" />
               </Button>
             </DropdownMenuTrigger>
@@ -341,9 +333,7 @@ export function StockGroupsView({
                       <td className="px-4 py-3 text-right font-mono text-muted-foreground">
                         {formatAmount(g.averageRate)}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono font-semibold">
-                        {formatAmount(g.totalValue)}
-                      </td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold">{formatAmount(g.totalValue)}</td>
                     </>
                   )}
                   <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
@@ -381,9 +371,7 @@ export function StockGroupsView({
               <tr className="bg-muted/50 border-t-2 font-semibold">
                 <td className="px-4 py-3 font-bold">Total</td>
                 <td className="px-4 py-3 text-center">
-                  <Badge variant="secondary">
-                    {filteredStockGroups.reduce((s, g) => s + g.itemCount, 0)}
-                  </Badge>
+                  <Badge variant="secondary">{filteredStockGroups.reduce((s, g) => s + g.itemCount, 0)}</Badge>
                 </td>
                 <td className="px-4 py-3 text-right font-mono font-bold">
                   {Math.floor(filteredStockGroups.reduce((s, g) => s + g.totalQuantity, 0)).toLocaleString()}

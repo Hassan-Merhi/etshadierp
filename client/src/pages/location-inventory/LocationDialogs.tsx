@@ -146,15 +146,17 @@ export function LocationDialogs({
 
   useEffect(() => {
     if (!waGroupDialogOpen) return;
-    setWaEnabled(
-      Boolean(waGroupLocation?.whatsappStockReportsEnabled ?? waGroupLocation?.whatsappGroupChatId)
-    );
+    setWaEnabled(Boolean(waGroupLocation?.whatsappStockReportsEnabled ?? waGroupLocation?.whatsappGroupChatId));
   }, [waGroupDialogOpen, waGroupLocation]);
 
   const filteredWaChats = useMemo(() => {
     const search = waGroupSearch.trim().toLowerCase();
     if (!search) return waChats;
-    return waChats.filter((chat) => String(chat.name ?? "").toLowerCase().includes(search));
+    return waChats.filter((chat) =>
+      String(chat.name ?? "")
+        .toLowerCase()
+        .includes(search)
+    );
   }, [waChats, waGroupSearch]);
 
   const selectedWaGroup = useMemo(
@@ -338,7 +340,11 @@ export function LocationDialogs({
                     disabled={waChatsRefreshing}
                     data-testid="button-retry-location-wa-groups"
                   >
-                    {waChatsRefreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    {waChatsRefreshing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
                     Retry connection
                   </Button>
                 </div>

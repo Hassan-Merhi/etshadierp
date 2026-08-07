@@ -93,13 +93,7 @@ export function useLocationInventoryMutations({
   });
 
   const waTestMutation = useMutation({
-    mutationFn: async ({
-      id,
-      whatsappGroupChatId,
-    }: {
-      id: number;
-      whatsappGroupChatId: string | null;
-    }) => {
+    mutationFn: async ({ id, whatsappGroupChatId }: { id: number; whatsappGroupChatId: string | null }) => {
       const res = await apiRequest("POST", `/api/locations/${id}/whatsapp-test`, { whatsappGroupChatId });
       return res.json();
     },

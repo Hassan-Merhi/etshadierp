@@ -128,9 +128,7 @@ export function registerLocationWhatsappLegacyCompatibilityRoutes(app: Express) 
             recordId: locationId,
             recordIdentifier: updated.name,
             changes: {
-              ...(requestedName !== location.name
-                ? { name: { old: location.name, new: requestedName } }
-                : {}),
+              ...(requestedName !== location.name ? { name: { old: location.name, new: requestedName } } : {}),
               whatsappGroupChatId: {
                 old: previous?.whatsapp_group_chat_id ?? location.whatsappGroupChatId ?? null,
                 new: group?.id ?? null,

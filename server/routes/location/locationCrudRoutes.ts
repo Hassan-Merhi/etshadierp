@@ -56,8 +56,7 @@ function withLocationWhatsAppSettings(location: any, settings?: LocationWhatsApp
     ...location,
     whatsappGroupChatId: settings?.whatsappGroupChatId ?? legacyChatId,
     whatsappGroupName: settings?.whatsappGroupName ?? null,
-    whatsappStockReportsEnabled:
-      settings?.whatsappStockReportsEnabled ?? Boolean(legacyChatId),
+    whatsappStockReportsEnabled: settings?.whatsappStockReportsEnabled ?? Boolean(legacyChatId),
   };
 }
 
@@ -73,9 +72,7 @@ async function resolveVerifiedWhatsAppGroup(chatId: string): Promise<GreenChat> 
   }
 
   const chats = await fetchGreenApiChats(settings.instanceId, settings.apiToken);
-  const group = chats.find(
-    (chat) => chat.id === normalized && (chat.type === "group" || chat.id.endsWith("@g.us"))
-  );
+  const group = chats.find((chat) => chat.id === normalized && (chat.type === "group" || chat.id.endsWith("@g.us")));
   if (!group) {
     throw new Error("The selected WhatsApp group is no longer available on the connected account");
   }
@@ -95,7 +92,9 @@ export function registerLocationCrudRoutes(app: Express) {
         storage.getAllLocations(companyId),
         getLocationWhatsAppSettingsMap(companyId),
       ]);
-      res.json(companyLocations.map((location) => withLocationWhatsAppSettings(location, whatsappSettings.get(location.id))));
+      res.json(
+        companyLocations.map((location) => withLocationWhatsAppSettings(location, whatsappSettings.get(location.id)))
+      );
     } catch (error: unknown) {
       logger.error("[/api/locations] Error:", { error: error });
       res.status(500).json({ message: getErrorMessage(error) });
@@ -398,14 +397,12 @@ export function registerLocationCrudRoutes(app: Express) {
           /* non-fatal */
         }
 
-        res.json(withLocationWhatsAppSettings({ ...location, whatsappGroupChatId: group?.id ?? null }, updatedSettings));
+        res.json(
+          withLocationWhatsAppSettings({ ...location, whatsappGroupChatId: group?.id ?? null }, updatedSettings)
+        );
       } catch (error: unknown) {
         const message = getErrorMessage(error);
-        if (
-          message.includes("WhatsApp") ||
-          message.includes("selected") ||
-          message.includes("group")
-        ) {
+        if (message.includes("WhatsApp") || message.includes("selected") || message.includes("group")) {
           return res.status(400).json({ message });
         }
         logger.error("[location-whatsapp-settings] Error", { error });

@@ -147,9 +147,10 @@ function computeNextSendAt(row: any, now = new Date()): string | null {
   const [sendHour, sendMinute] = sendTime.split(":").map(Number);
   const current = localParts(now, timezone);
   const currentLocalTime = `${String(current.hour).padStart(2, "0")}:${String(current.minute).padStart(2, "0")}`;
-  const allowedDays = row.frequency === "selected_days"
-    ? new Set((Array.isArray(row.days_of_week) ? row.days_of_week : []).map(Number))
-    : new Set([0, 1, 2, 3, 4, 5, 6]);
+  const allowedDays =
+    row.frequency === "selected_days"
+      ? new Set((Array.isArray(row.days_of_week) ? row.days_of_week : []).map(Number))
+      : new Set([0, 1, 2, 3, 4, 5, 6]);
   const already = lastScheduledLocalDate(row.last_scheduled_for);
   const anchor = Date.UTC(current.year, current.month - 1, current.day);
 
@@ -269,7 +270,8 @@ export function registerLocationWhatsappScheduleRoutes(app: Express) {
         if (location.companyId !== companyId) return res.status(403).json({ message: "Access denied" });
 
         const enabled = parseBoolean(req.body?.enabled);
-        const frequency = req.body?.frequency === "selected_days" ? "selected_days" : req.body?.frequency === "daily" ? "daily" : null;
+        const frequency =
+          req.body?.frequency === "selected_days" ? "selected_days" : req.body?.frequency === "daily" ? "daily" : null;
         if (!frequency) return res.status(400).json({ message: "Frequency must be daily or selected_days" });
         const daysOfWeek = normalizeDays(req.body?.daysOfWeek, frequency);
         if (!daysOfWeek) return res.status(400).json({ message: "Select at least one day for this schedule" });
@@ -292,7 +294,9 @@ export function registerLocationWhatsappScheduleRoutes(app: Express) {
         );
         const destinationRow = destination.rows[0];
         if (enabled && (!destinationRow?.whatsapp_group_chat_id || destinationRow.enabled !== true)) {
-          return res.status(400).json({ message: "Link and enable the location WhatsApp group before enabling automatic stock reports" });
+          return res
+            .status(400)
+            .json({ message: "Link and enable the location WhatsApp group before enabling automatic stock reports" });
         }
         if (enabled && !destinationRow.whatsapp_group_chat_id!.endsWith("@g.us")) {
           return res.status(400).json({ message: "The linked WhatsApp destination is not a valid group" });
@@ -333,8 +337,21 @@ export function registerLocationWhatsappScheduleRoutes(app: Express) {
                       include_cost, include_zero_stock, include_negative_stock,
                       stock_group_id, category_id, last_attempt_at, last_sent_at,
                       last_scheduled_for, last_status, last_error`,
-          [locationId, companyId, enabled, frequency, daysOfWeek, sendTime, timezone, includeCost, includeZeroStock,
-            includeNegativeStock, stockGroupId, categoryId, req.session.userId!]
+          [
+            locationId,
+            companyId,
+            enabled,
+            frequency,
+            daysOfWeek,
+            sendTime,
+            timezone,
+            includeCost,
+            includeZeroStock,
+            includeNegativeStock,
+            stockGroupId,
+            categoryId,
+            req.session.userId!,
+          ]
         );
 
         try {
@@ -366,7 +383,8 @@ export function registerLocationWhatsappScheduleRoutes(app: Express) {
         res.json(serializeSchedule(result.rows[0], locationId));
       } catch (error: unknown) {
         const message = getErrorMessage(error);
-        if (message.startsWith("Invalid ") || message.includes("not found for this company")) return res.status(400).json({ message });
+        if (message.startsWith("Invalid ") || message.includes("not found for this company"))
+          return res.status(400).json({ message });
         logger.error("[LocationStockSchedule] PUT failed", { error });
         res.status(500).json({ message });
       }

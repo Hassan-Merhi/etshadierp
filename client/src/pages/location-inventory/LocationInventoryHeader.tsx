@@ -69,9 +69,7 @@ export function LocationInventoryHeader({
   });
 
   const canSendWithCost = costCapability?.canSendWithCost === true;
-  const whatsappReady = Boolean(
-    selectedLocation?.whatsappGroupChatId && selectedLocation?.whatsappStockReportsEnabled
-  );
+  const whatsappReady = Boolean(selectedLocation?.whatsappGroupChatId && selectedLocation?.whatsappStockReportsEnabled);
 
   const handleSendStock = async (includeCost: boolean) => {
     if (!selectedLocation || sendMode || sendLockRef.current) return;
@@ -89,11 +87,10 @@ export function LocationInventoryHeader({
     const idempotencyKey = newIdempotencyToken();
     setSendMode(mode);
     try {
-      const response = await apiRequest(
-        "POST",
-        `/api/locations/${selectedLocation.id}/send-stock-whatsapp`,
-        { includeCost, idempotencyKey }
-      );
+      const response = await apiRequest("POST", `/api/locations/${selectedLocation.id}/send-stock-whatsapp`, {
+        includeCost,
+        idempotencyKey,
+      });
       const result = await response.json();
       toast({
         title: result.duplicate ? "Stock report already sent" : "Stock sent to WhatsApp",
