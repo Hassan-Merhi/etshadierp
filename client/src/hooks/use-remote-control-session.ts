@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
+import { markRemoteSupportAuthLost } from "@/components/remote-support-auth-lifecycle";
 import { apiRequest } from "@/lib/queryClient";
 
 export interface RemoteControlSessionView {
@@ -63,13 +64,25 @@ function normalizeSession(value: unknown): RemoteControlSessionView | null {
   return session as RemoteControlSessionView;
 }
 
+function isUnauthorized(error: unknown): boolean {
+  return !!error && typeof error === "object" && "status" in error && Number((error as { status?: unknown }).status) === 401;
+}
+
 export function useRemoteControlSession() {
   const tabId = useMemo(() => getRemoteSupportTabId(), []);
   const [currentLocation] = useLocation();
   const [session, setSession] = useState<RemoteControlSessionView | null>(null);
   const [stopping, setStopping] = useState(false);
+  const [authAvailable, setAuthAvailable] = useState(true);
+
+  const handleUnauthorized = useCallback(() => {
+    setSession(null);
+    setAuthAvailable(false);
+    markRemoteSupportAuthLost();
+  }, []);
 
   const heartbeat = useCallback(async () => {
+    if (!authAvailable) return;
     try {
       const response = await apiRequest("POST", "/api/screen-feed/control/tab-heartbeat", {
         tabId,
@@ -77,12 +90,14 @@ export function useRemoteControlSession() {
       });
       const payload = await response.json();
       setSession(normalizeSession(payload?.session));
-    } catch {
-      // The event stream or next heartbeat will restore state.
+    } catch (error) {
+      if (isUnauthorized(error)) handleUnauthorized();
+      // The event stream or next heartbeat will restore non-auth failures.
     }
-  }, [currentLocation, tabId]);
+  }, [authAvailable, currentLocation, handleUnauthorized, tabId]);
 
   useEffect(() => {
+    if (!authAvailable) return;
     void heartbeat();
     const heartbeatId = window.setInterval(() => void heartbeat(), HEARTBEAT_MS);
     const onVisibilityChange = () => {
@@ -93,9 +108,10 @@ export function useRemoteControlSession() {
       window.clearInterval(heartbeatId);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [heartbeat]);
+  }, [authAvailable, heartbeat]);
 
   useEffect(() => {
+    if (!authAvailable) return;
     let eventSource: EventSource | null = null;
     try {
       const params = new URLSearchParams({
@@ -117,20 +133,23 @@ export function useRemoteControlSession() {
       eventSource = null;
     }
     return () => eventSource?.close();
-  }, [currentLocation, tabId]);
+  }, [authAvailable, currentLocation, tabId]);
 
   const stop = useCallback(async () => {
-    if (!session || stopping) return;
+    if (!session || stopping || !authAvailable) return;
     setStopping(true);
     try {
       await apiRequest("POST", `/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/stop`, {
         reason: "target-emergency-stop",
       });
       setSession(null);
+    } catch (error) {
+      if (isUnauthorized(error)) handleUnauthorized();
+      else throw error;
     } finally {
       setStopping(false);
     }
-  }, [session, stopping]);
+  }, [authAvailable, handleUnauthorized, session, stopping]);
 
   return { session, stopping, stop, tabId };
 }
