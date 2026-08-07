@@ -40,6 +40,7 @@ interface StockGroupSummary {
 interface StockGroupsViewProps {
   selectedLocationLocal: Location;
   posUser?: any;
+  canManageWhatsapp: boolean;
   openRenameDialog: (loc: Location, e?: any) => void;
   openWaGroupDialog: (loc: Location, e?: any) => void;
   activeInventoryLoading: boolean;
@@ -69,6 +70,7 @@ interface StockGroupsViewProps {
 export function StockGroupsView({
   selectedLocationLocal,
   posUser,
+  canManageWhatsapp,
   openRenameDialog,
   openWaGroupDialog,
   activeInventoryLoading,
@@ -94,6 +96,13 @@ export function StockGroupsView({
   setSelectedGroup,
   setItemCategoryFilter,
 }: StockGroupsViewProps) {
+  const whatsappTitle =
+    selectedLocationLocal.whatsappGroupChatId && selectedLocationLocal.whatsappStockReportsEnabled
+      ? `WhatsApp stock reports enabled${selectedLocationLocal.whatsappGroupName ? `: ${selectedLocationLocal.whatsappGroupName}` : ""}`
+      : selectedLocationLocal.whatsappGroupChatId
+        ? `WhatsApp group linked but stock reports disabled${selectedLocationLocal.whatsappGroupName ? `: ${selectedLocationLocal.whatsappGroupName}` : ""}`
+        : "Link WhatsApp group for stock reports";
+
   return (
     <>
       {/* Location title + action buttons */}
@@ -106,31 +115,34 @@ export function StockGroupsView({
             <div className="flex items-center gap-1.5 flex-wrap">
               <h2 className="text-2xl font-bold truncate">{selectedLocationLocal.name}</h2>
               {!posUser && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => openRenameDialog(selectedLocationLocal)}
-                    data-testid="button-rename-location"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => openWaGroupDialog(selectedLocationLocal)}
-                    data-testid="button-wa-location"
-                    title={
-                      (selectedLocationLocal as any)?.whatsappGroupChatId
-                        ? "WhatsApp group assigned"
-                        : "Assign WhatsApp group"
-                    }
-                  >
-                    <MessageCircle
-                      className={`h-4 w-4 ${(selectedLocationLocal as any)?.whatsappGroupChatId ? "text-green-500" : ""}`}
-                    />
-                  </Button>
-                </>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => openRenameDialog(selectedLocationLocal)}
+                  data-testid="button-rename-location"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              )}
+              {!posUser && canManageWhatsapp && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => openWaGroupDialog(selectedLocationLocal)}
+                  data-testid="button-wa-location"
+                  title={whatsappTitle}
+                  aria-label={`Configure WhatsApp stock reports for ${selectedLocationLocal.name}`}
+                >
+                  <MessageCircle
+                    className={`h-4 w-4 ${
+                      selectedLocationLocal.whatsappGroupChatId && selectedLocationLocal.whatsappStockReportsEnabled
+                        ? "text-green-500"
+                        : selectedLocationLocal.whatsappGroupChatId
+                          ? "text-amber-500"
+                          : ""
+                    }`}
+                  />
+                </Button>
               )}
             </div>
             <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Stock Groups</p>
@@ -223,9 +235,11 @@ export function StockGroupsView({
               <DropdownMenuItem onClick={() => openRenameDialog(selectedLocationLocal)}>
                 <Pencil className="h-4 w-4 mr-2" /> Edit / Rename
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => openWaGroupDialog(selectedLocationLocal)}>
-                <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp Group
-              </DropdownMenuItem>
+              {canManageWhatsapp && (
+                <DropdownMenuItem onClick={() => openWaGroupDialog(selectedLocationLocal)}>
+                  <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp Stock Reports
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
