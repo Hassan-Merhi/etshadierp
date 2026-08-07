@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useLocation } from "@/contexts/LocationContext";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 import { getDefaultPeriodValue } from "@/components/ui/period-filter";
@@ -10,6 +11,8 @@ interface UseLocationInventoryStateParams {
 }
 
 export function useLocationInventoryState({ companyId, toast }: UseLocationInventoryStateParams) {
+  const { setSelectedLocation } = useLocation();
+
   // ─── Main view state ──────────────────────────────────────────────────────
   const [selectedLocationLocal, setSelectedLocationLocal] = useState<Location | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<StockGroupSummary | null>(null);
@@ -37,6 +40,12 @@ export function useLocationInventoryState({ companyId, toast }: UseLocationInven
   const [stockMovementPeriod, setStockMovementPeriod] = useState<any>(() => getDefaultPeriodValue("this_month"));
   const [drillMonth, setDrillMonth] = useState<any>(null);
   const allStockTableRef = useRef<HTMLDivElement>(null);
+
+  // Keep the shared location context aligned with the Location Inventory page so
+  // header-level actions can safely target the exact location currently open.
+  useEffect(() => {
+    setSelectedLocation(selectedLocationLocal);
+  }, [selectedLocationLocal, setSelectedLocation]);
 
   // ─── Dialog state ─────────────────────────────────────────────────────────
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
