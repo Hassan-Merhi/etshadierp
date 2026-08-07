@@ -17,7 +17,7 @@ const LOCATION_WHATSAPP_PERMISSION = "exp_whatsapp_send";
  * The main CRUD route deliberately rejects WhatsApp fields so they cannot bypass
  * the dedicated permission boundary. This route is registered first, handles
  * only legacy WhatsApp writes, applies the same group validation + company scope,
- * and then mirrors the destination into the Phase-1 configuration table.
+ * and mirrors the destination into the location stock-report configuration.
  */
 export function registerLocationWhatsappLegacyCompatibilityRoutes(app: Express) {
   app.patch(
@@ -45,6 +45,8 @@ export function registerLocationWhatsappLegacyCompatibilityRoutes(app: Express) 
         if (!location) return res.status(404).json({ message: "Location not found" });
         if (location.companyId !== companyId) return res.status(403).json({ message: "Access denied" });
 
+        const requestedName =
+          typeof req.body.name === "string" && req.body.name.trim() ? req.body.name.trim() : location.name;
         const requestedChatId =
           typeof req.body.whatsappGroupChatId === "string" && req.body.whatsappGroupChatId.trim()
             ? req.body.whatsappGroupChatId.trim()
@@ -79,7 +81,7 @@ export function registerLocationWhatsappLegacyCompatibilityRoutes(app: Express) 
         );
         const previous = currentConfig.rows[0];
         // Legacy group assignment is not allowed to silently opt a new location
-        // into stock-report delivery. Existing Phase-1 enablement is preserved.
+        // into stock-report delivery. Existing enablement is preserved.
         const reportEnabled = group ? previous?.enabled === true : false;
 
         const client = await pool.connect();
@@ -87,9 +89,10 @@ export function registerLocationWhatsappLegacyCompatibilityRoutes(app: Express) 
           await client.query("BEGIN");
           await client.query(
             `UPDATE locations
-                SET whatsapp_group_chat_id = $1
-              WHERE id = $2 AND company_id = $3`,
-            [group?.id ?? null, locationId, companyId]
+                SET name = $1,
+                    whatsapp_group_chat_id = $2
+              WHERE id = $3 AND company_id = $4`,
+            [requestedName, group?.id ?? null, locationId, companyId]
           );
           await client.query(
             `INSERT INTO location_whatsapp_stock_reports (
@@ -125,6 +128,9 @@ export function registerLocationWhatsappLegacyCompatibilityRoutes(app: Express) 
             recordId: locationId,
             recordIdentifier: updated.name,
             changes: {
+              ...(requestedName !== location.name
+                ? { name: { old: location.name, new: requestedName } }
+                : {}),
               whatsappGroupChatId: {
                 old: previous?.whatsapp_group_chat_id ?? location.whatsappGroupChatId ?? null,
                 new: group?.id ?? null,
