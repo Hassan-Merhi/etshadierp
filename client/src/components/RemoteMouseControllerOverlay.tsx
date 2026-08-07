@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, LockKeyhole, MousePointer2, ShieldCheck, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  acquireRemoteControlPanelHost,
+  findRemoteSupportWatchDialog,
+  releaseRemoteControlPanelHost,
+} from "@/components/remote-control-panel-portal";
 import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
 import type { RemoteControlSessionView } from "@/hooks/use-remote-control-session";
 import { normalizeRemoteMousePoint, type RemoteMouseCommandType } from "@/hooks/remote-mouse-control-policy";
@@ -62,12 +68,8 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   return payload as T;
 }
 
-function findWatchDialog(): HTMLElement | null {
-  return document.querySelector<HTMLElement>("[data-testid='dialog-watch-user']");
-}
-
 function matchingSession(sessions: ControllerSessionView[]): ControllerSessionView | null {
-  const dialog = findWatchDialog();
+  const dialog = findRemoteSupportWatchDialog();
   const watchedUserId = dialog?.dataset.watchedUserId;
   const dialogText = dialog?.textContent ?? "";
   return (
@@ -86,7 +88,8 @@ function authorizationIsFresh(authorization: MouseAuthorizationView | null): boo
 
 export function RemoteMouseControllerOverlay() {
   const { language } = useApplicationLanguage();
-  const [watchDialogOpen, setWatchDialogOpen] = useState(() => !!findWatchDialog());
+  const [watchDialogOpen, setWatchDialogOpen] = useState(() => !!findRemoteSupportWatchDialog());
+  const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const [armedSessionId, setArmedSessionId] = useState<string | null>(null);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [password, setPassword] = useState("");
@@ -98,7 +101,7 @@ export function RemoteMouseControllerOverlay() {
   const t = useCallback((value: string) => translateRemoteSupportPhase5Text(value, language), [language]);
 
   useEffect(() => {
-    const update = () => setWatchDialogOpen(!!findWatchDialog());
+    const update = () => setWatchDialogOpen(!!findRemoteSupportWatchDialog());
     update();
     const observer = new MutationObserver(update);
     observer.observe(document.body, { childList: true, subtree: true });
@@ -119,6 +122,23 @@ export function RemoteMouseControllerOverlay() {
   );
   const authorized = authorizationIsFresh(session?.mouseAuthorization ?? null);
   const controlEnabled = !!session && session.capabilities.mouse && authorized && armedSessionId === session.id;
+
+  useEffect(() => {
+    if (!watchDialogOpen || !session) {
+      setPortalHost(null);
+      return;
+    }
+    const dialog = findRemoteSupportWatchDialog();
+    if (!dialog) {
+      setPortalHost(null);
+      return;
+    }
+    const host = acquireRemoteControlPanelHost(dialog);
+    setPortalHost(host);
+    return () => {
+      releaseRemoteControlPanelHost(host);
+    };
+  }, [session?.id, watchDialogOpen]);
 
   useEffect(() => {
     if (!session || !session.capabilities.mouse || !authorized || armedSessionId !== session.id) {
@@ -308,17 +328,18 @@ export function RemoteMouseControllerOverlay() {
     return () => eventSource.close();
   }, [controlEnabled, session, t]);
 
-  if (!watchDialogOpen || !session) return null;
+  if (!watchDialogOpen || !session || !portalHost) return null;
 
   const statusLabel = lastResult
     ? t(lastResult.status === "executed" ? "Executed" : lastResult.status === "blocked" ? "Blocked" : "Ignored")
     : null;
 
-  return (
-    <div
-      className="fixed right-3 top-14 z-[2147483645] w-[min(92vw,360px)] rounded-xl border bg-background/95 p-3 shadow-xl backdrop-blur"
+  return createPortal(
+    <section
+      className="w-full rounded-xl border bg-background/95 p-3 shadow-sm"
       data-screenfeed-ignore="true"
       data-testid="remote-mouse-controller-overlay"
+      data-remote-control-panel-section="mouse"
     >
       <div className="flex items-start gap-2">
         <div className="rounded-md bg-primary/10 p-1.5 text-primary">
@@ -372,6 +393,7 @@ export function RemoteMouseControllerOverlay() {
           </p>
           <div className="flex gap-2">
             <Input
+              autoFocus
               type="password"
               autoComplete="current-password"
               value={password}
@@ -400,6 +422,7 @@ export function RemoteMouseControllerOverlay() {
           {error}
         </p>
       )}
-    </div>
+    </section>,
+    portalHost
   );
 }
