@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueries } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -118,10 +118,57 @@ export default function FactoryProformas() {
     queryKey: ["/api/factory/customers"],
   });
 
+  // Phase 3: list cards use a genuinely compact summary contract. Individual
+  // line arrays are fetched only for cards the user explicitly expands.
   const { data: proformas = [], isLoading: proformasLoading } = useQuery<Proforma[]>({
-    queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+    queryKey: [`/api/factory/customer-proformas?customerId=${customerId}&profile=summary`, customerId],
+    queryFn: async () => {
+      if (!customerId) return [];
+      const response = await modeApiRequest(
+        "GET",
+        `/api/factory/customer-proformas?customerId=${customerId}&profile=summary`
+      );
+      if (!response.ok) throw new Error("Failed to load proformas");
+      return response.json();
+    },
     enabled: !!customerId,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
+
+  const expandedProformaIdList = Array.from(expandedProformaIds).sort((a, b) => a - b);
+  const expandedProformaQueries = useQueries({
+    queries: expandedProformaIdList.map((proformaId) => ({
+      queryKey: ["/api/factory/customer-proformas", proformaId] as const,
+      queryFn: async () => {
+        const response = await modeApiRequest("GET", `/api/factory/customer-proformas/${proformaId}`);
+        if (!response.ok) throw new Error("Failed to load proforma items");
+        return response.json() as Promise<Proforma>;
+      },
+      staleTime: 5 * 60_000,
+      gcTime: 15 * 60_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      refetchOnMount: false,
+    })),
+  });
+  const expandedProformaStateById = new Map<
+    number,
+    { data?: Proforma; isLoading: boolean; isError: boolean; refetch: () => unknown }
+  >();
+  expandedProformaIdList.forEach((proformaId, index) => {
+    const query = expandedProformaQueries[index];
+    expandedProformaStateById.set(proformaId, {
+      data: query?.data as Proforma | undefined,
+      isLoading: query?.isLoading ?? false,
+      isError: query?.isError ?? false,
+      refetch: () => query?.refetch(),
+    });
+  });
+
+  const invalidateCustomerProformas = () =>
+    queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-proformas") });
 
   const { data: allStockItems = [] } = useQuery<any[]>({
     queryKey: ["/api/stock-items/light", selectedCompany?.id],
@@ -179,9 +226,7 @@ export default function FactoryProformas() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Proforma created successfully" });
-      queryClient.invalidateQueries({
-        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
-      });
+      invalidateCustomerProformas();
       setIsCreateOpen(false);
       setNewProformaName("");
     },
@@ -197,9 +242,7 @@ export default function FactoryProformas() {
     },
     onSuccess: (_, vars) => {
       toast({ title: vars.isActive ? "Proforma activated" : "Proforma deactivated" });
-      queryClient.invalidateQueries({
-        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
-      });
+      invalidateCustomerProformas();
     },
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
@@ -221,9 +264,7 @@ export default function FactoryProformas() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Proforma deleted" });
-      queryClient.invalidateQueries({
-        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
-      });
+      invalidateCustomerProformas();
     },
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
@@ -237,9 +278,7 @@ export default function FactoryProformas() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Proforma renamed successfully" });
-      queryClient.invalidateQueries({
-        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
-      });
+      invalidateCustomerProformas();
       setRenamingProforma(null);
       setRenameValue("");
     },
@@ -255,9 +294,7 @@ export default function FactoryProformas() {
     },
     onSuccess: (data: any) => {
       toast({ title: "Proforma transferred", description: `Proforma moved to ${data.targetCustomerName}` });
-      queryClient.invalidateQueries({
-        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
-      });
+      invalidateCustomerProformas();
       setTransferProforma(null);
       setTransferTargetCustomerId("");
     },
@@ -279,9 +316,7 @@ export default function FactoryProformas() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Line added" });
-      queryClient.invalidateQueries({
-        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
-      });
+      invalidateCustomerProformas();
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-price-lists/${customerId}`, customerId] });
       setIsAddLineOpen(false);
       setAddLineProformaId(null);
@@ -312,9 +347,7 @@ export default function FactoryProformas() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Line updated" });
-      queryClient.invalidateQueries({
-        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
-      });
+      invalidateCustomerProformas();
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-price-lists/${customerId}`, customerId] });
       setEditingLine(null);
     },
@@ -330,9 +363,7 @@ export default function FactoryProformas() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Line deleted" });
-      queryClient.invalidateQueries({
-        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
-      });
+      invalidateCustomerProformas();
     },
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
@@ -349,9 +380,7 @@ export default function FactoryProformas() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
-      });
+      invalidateCustomerProformas();
       setInlineQtyLineId(null);
     },
     onError: (error: Error) => {
@@ -394,7 +423,7 @@ export default function FactoryProformas() {
     },
     onSuccess: () => {
       toast({ title: "Proforma created", description: "Excel data imported successfully" });
-      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-proformas") });
+      invalidateCustomerProformas();
       setIsExcelImportOpen(false);
       setExcelImportName("");
       setExcelImportLines([]);
@@ -514,9 +543,7 @@ export default function FactoryProformas() {
       return res.json();
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({
-        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
-      });
+      invalidateCustomerProformas();
       const backfillNote =
         result.backfilled > 0
           ? ` Updated ${result.backfilled} line${result.backfilled !== 1 ? "s" : ""} across all existing proformas.`
@@ -542,9 +569,7 @@ export default function FactoryProformas() {
       return res.json();
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({
-        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
-      });
+      invalidateCustomerProformas();
       const msg =
         result.skipped > 0
           ? `${result.updated} line(s) updated, ${result.skipped} skipped (no selling price)`
@@ -567,9 +592,7 @@ export default function FactoryProformas() {
       return res.json();
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({
-        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
-      });
+      invalidateCustomerProformas();
       const msg =
         result.skipped > 0
           ? `${result.updated} line(s) updated, ${result.skipped} skipped (no production price)`
@@ -808,11 +831,21 @@ export default function FactoryProformas() {
               .sort((a, b) => a.name.localeCompare(b.name))
               .map((proforma) => {
                 const isExpanded = expandedProformaIds.has(proforma.id);
-                const totalQty = proforma.lines?.reduce((s, l) => s + l.quantity, 0) ?? 0;
-                const totalWeight =
-                  proforma.lines?.reduce((s, l) => s + l.quantity * parseFloat(l.weightPerBaleKg || "0"), 0) ?? 0;
-                const totalAmount = proforma.lines?.reduce((s, l) => s + l.quantity * effectivePricePerBale(l), 0) ?? 0;
-                const lineCount = proforma.lines?.length ?? 0;
+                const detailState = expandedProformaStateById.get(proforma.id);
+                const detailProforma = detailState?.data;
+                const displayLines = detailProforma?.lines ?? [];
+                const totalQty = detailProforma
+                  ? displayLines.reduce((s, l) => s + l.quantity, 0)
+                  : Number(proforma.totalQty || 0);
+                const totalWeight = detailProforma
+                  ? displayLines.reduce((s, l) => s + l.quantity * parseFloat(l.weightPerBaleKg || "0"), 0)
+                  : Number(proforma.totalWeightKg || 0);
+                const totalAmount = detailProforma
+                  ? displayLines.reduce((s, l) => s + l.quantity * effectivePricePerBale(l), 0)
+                  : Number(proforma.totalAmount || 0);
+                const lineCount = detailProforma ? displayLines.length : Number(proforma.lineCount || 0);
+                const detailLoading = isExpanded && !detailProforma && (detailState?.isLoading ?? true);
+                const detailError = isExpanded && !detailProforma && (detailState?.isError ?? false);
                 const d = formatProformaDate(proforma.createdAt, proforma.updatedAt);
 
                 return (
@@ -1055,8 +1088,26 @@ export default function FactoryProformas() {
                           </Button>
                         </div>
 
-                        {/* Price lines table */}
-                        {proforma.lines && proforma.lines.length > 0 ? (
+                        {/* Price lines table — lazy detail only after expansion */}
+                        {detailLoading ? (
+                          <div className="space-y-2 px-4 py-5" data-testid={`loading-proforma-lines-${proforma.id}`}>
+                            <Skeleton className="h-8 w-full" />
+                            <Skeleton className="h-8 w-full" />
+                            <Skeleton className="h-8 w-3/4" />
+                          </div>
+                        ) : detailError ? (
+                          <div className="flex flex-col items-center py-8 text-center" data-testid={`error-proforma-lines-${proforma.id}`}>
+                            <p className="text-sm text-destructive">Could not load proforma items.</p>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="mt-3"
+                              onClick={() => detailState?.refetch()}
+                            >
+                              Retry
+                            </Button>
+                          </div>
+                        ) : displayLines.length > 0 ? (
                           <div>
                             <Table wrapperClassName="max-h-[400px] overflow-auto">
                               <TableHeader className="sticky top-0 z-30 bg-background">
@@ -1085,7 +1136,7 @@ export default function FactoryProformas() {
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {[...proforma.lines]
+                                {[...displayLines]
                                   .sort((a, b) =>
                                     (a.productName || a.articleCode || "").localeCompare(
                                       b.productName || b.articleCode || ""
