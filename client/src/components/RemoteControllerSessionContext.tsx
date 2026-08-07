@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { markRemoteSupportAuthLost } from "@/components/remote-support-auth-lifecycle";
 import {
   acquireRemoteControlPanelHost,
@@ -97,7 +97,7 @@ function sameTarget(left: RemoteWatchTarget | null, right: RemoteWatchTarget | n
   return left?.userId === right?.userId && left?.username === right?.username;
 }
 
-export function RemoteControllerSessionProvider({ children }: { children: React.ReactNode }) {
+export function RemoteControllerSessionProvider({ children }: { children: ReactNode }) {
   const [target, setTarget] = useState<RemoteWatchTarget | null>(() => currentWatchTarget());
   const [session, setSession] = useState<RemoteControllerSessionView | null>(null);
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
