@@ -20,22 +20,29 @@ type WatchdogState = "idle" | "waiting" | "starting" | "ready" | "error";
 
 const RECONCILE_INTERVAL_MS = 1500;
 const HEARTBEAT_INTERVAL_MS = 5000;
+const CONFLICT_RETRY_BASE_MS = 15000;
+const CONFLICT_RETRY_MAX_MS = 60000;
 
 function currentWatchTarget(): WatchTarget | null {
-  const dialog = document.querySelector<HTMLElement>("[data-testid='dialog-watch-user']");
+  const dialog = document.querySelector<HTMLElement>(
+    "[data-testid='dialog-watch-user'], [data-testid='dialog-watch-user-fast']"
+  );
   const userId = dialog?.dataset.watchedUserId?.trim() ?? "";
   if (!dialog || !userId) return null;
 
   const heading = dialog.querySelector<HTMLElement>("[data-watch-username]")?.dataset.watchUsername?.trim();
   const text = dialog.textContent ?? "";
-  const match = text.match(/Watching:\s*([^·\n]+)/i);
+  const match = text.match(/Watching:?\s*([^·\n]+)/i);
   return {
     userId,
     username: heading || match?.[1]?.trim() || userId,
   };
 }
 
-async function requestPayload(url: string, init?: RequestInit): Promise<{ response: Response; payload: SessionPayload }> {
+async function requestPayload(
+  url: string,
+  init?: RequestInit
+): Promise<{ response: Response; payload: SessionPayload }> {
   const headers = new Headers(init?.headers);
   if (init?.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   const response = await fetch(url, {
@@ -54,12 +61,14 @@ export function RemoteControlSessionWatchdog() {
   const [message, setMessage] = useState<string | null>(null);
   const runningRef = useRef(false);
   const lastHeartbeatRef = useRef(0);
+  const nextStartAttemptAtRef = useRef(0);
+  const conflictCountRef = useRef(0);
 
   useEffect(() => {
     const refresh = () => {
       const next = currentWatchTarget();
       setTarget((current) =>
-        current?.userId === next?.userId && current?.username === next?.username ? current : next,
+        current?.userId === next?.userId && current?.username === next?.username ? current : next
       );
     };
 
@@ -71,6 +80,8 @@ export function RemoteControlSessionWatchdog() {
 
   useEffect(() => {
     lastHeartbeatRef.current = 0;
+    nextStartAttemptAtRef.current = 0;
+    conflictCountRef.current = 0;
     setState(target ? "waiting" : "idle");
     setMessage(null);
   }, [target]);
@@ -84,12 +95,14 @@ export function RemoteControlSessionWatchdog() {
       runningRef.current = true;
       try {
         const active = await requestPayload(
-          `/api/screen-feed/control/sessions/active/${encodeURIComponent(target.userId)}`,
+          `/api/screen-feed/control/sessions/active/${encodeURIComponent(target.userId)}`
         );
         if (cancelled) return;
 
         const activeSession = active.response.ok ? active.payload.session : null;
         if (activeSession?.id && activeSession.status === "active") {
+          conflictCountRef.current = 0;
+          nextStartAttemptAtRef.current = 0;
           setState("ready");
           setMessage(null);
 
@@ -97,13 +110,18 @@ export function RemoteControlSessionWatchdog() {
             lastHeartbeatRef.current = Date.now();
             const heartbeat = await requestPayload(
               `/api/screen-feed/control/sessions/${encodeURIComponent(activeSession.id)}/heartbeat`,
-              { method: "POST", body: JSON.stringify({}) },
+              { method: "POST", body: JSON.stringify({}) }
             );
             if (!heartbeat.response.ok) {
               setState("waiting");
               setMessage(heartbeat.payload.message || "Reconnecting the support session.");
             }
           }
+          return;
+        }
+
+        if (Date.now() < nextStartAttemptAtRef.current) {
+          setState("waiting");
           return;
         }
 
@@ -119,6 +137,8 @@ export function RemoteControlSessionWatchdog() {
         if (cancelled) return;
 
         if (started.response.ok && started.payload.session?.id) {
+          conflictCountRef.current = 0;
+          nextStartAttemptAtRef.current = 0;
           lastHeartbeatRef.current = Date.now();
           setState("ready");
           setMessage(null);
@@ -130,19 +150,27 @@ export function RemoteControlSessionWatchdog() {
           started.response.status === 409 &&
           ["TARGET_TAB_UNAVAILABLE", "TARGET_ALREADY_CONTROLLED", "SESSION_INACTIVE"].includes(code)
         ) {
+          conflictCountRef.current += 1;
+          const retryDelay = Math.min(
+            CONFLICT_RETRY_MAX_MS,
+            CONFLICT_RETRY_BASE_MS * 2 ** Math.min(conflictCountRef.current - 1, 2)
+          );
+          nextStartAttemptAtRef.current = Date.now() + retryDelay;
           setState("waiting");
           setMessage(
             code === "TARGET_ALREADY_CONTROLLED"
               ? "Another controller already owns this support session."
-              : "Waiting for the employee ERP tab to register for control.",
+              : "Waiting for the employee ERP tab to register for control."
           );
           return;
         }
 
+        nextStartAttemptAtRef.current = Date.now() + CONFLICT_RETRY_BASE_MS;
         setState("error");
         setMessage(started.payload.message || `Remote control is unavailable (${started.response.status}).`);
       } catch (error) {
         if (cancelled) return;
+        nextStartAttemptAtRef.current = Date.now() + CONFLICT_RETRY_BASE_MS;
         setState("error");
         setMessage(error instanceof Error ? error.message : "Unable to prepare remote control.");
       } finally {
@@ -178,7 +206,11 @@ export function RemoteControlSessionWatchdog() {
       )}
       <div className="min-w-0">
         <p className="text-xs font-semibold">
-          {failed ? "Remote control unavailable" : state === "starting" ? "Preparing remote control" : "Control reconnecting"}
+          {failed
+            ? "Remote control unavailable"
+            : state === "starting"
+              ? "Preparing remote control"
+              : "Control reconnecting"}
         </p>
         <p className="text-[11px] text-muted-foreground">
           {message || `Preparing the ERP tab for ${target.username}.`}

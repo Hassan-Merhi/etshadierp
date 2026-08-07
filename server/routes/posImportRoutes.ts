@@ -1,13 +1,16 @@
-/**
- * POS Excel-import routes.
- *
- * Parse / validate / import for POS-sale spreadsheets, plus the template
- * download. Extracted from importRoutes.ts as a sub-registrar; behaviour is
- * unchanged.
- */
+/** POS Excel-import routes. */
 import type { Express } from "express";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
+import {
+  addInventoryValues,
+  inventoryMoney,
+  inventoryQuantity,
+  inventoryUnitCost,
+  multiplyInventoryValues,
+  subtractInventoryValues,
+  toInventoryDecimal,
+} from "../lib/inventoryMath";
 import { and, eq } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -20,91 +23,50 @@ import { generateInvoicePdf } from "../helpers/generateInvoicePdf";
 import { generateStockPdf } from "../helpers/generateStockPdf";
 import { getErpExportVisibility } from "../helpers/exportVisibility";
 import { sendWhatsAppFileByUploadPos, sendWhatsAppFileToChatIdPos } from "../services/whatsappService";
-import {
-  vouchers,
-  voucherEntries,
-  salesItems,
-  companies,
-  inventory,
-  stockItemLocationPrices,
-} from "@shared/schema";
+import { vouchers, voucherEntries, salesItems, companies, inventory, stockItemLocationPrices } from "@shared/schema";
 
 export function registerPosImportRoutes(app: Express) {
-  // POS Import - Parse and Preview Excel
   app.post("/api/pos-import/parse", requireAuth, upload.single("file"), async (req, res) => {
     try {
-      if (!req.session.currentCompanyId) {
-        return res.status(400).json({ message: "No company selected" });
-      }
-
-      if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
-      }
+      if (!req.session.currentCompanyId) return res.status(400).json({ message: "No company selected" });
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
       const workbook = await readExcel(req.file.buffer);
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const rawData = sheetToJson(worksheet);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = sheetToJson(worksheet) as any[];
+      if (rows.length === 0) return res.status(400).json({ message: "Excel file is empty" });
 
-      if (rawData.length === 0) {
-        return res.status(400).json({ message: "Excel file is empty" });
-      }
-
-      // Parse rows
-      const rows = rawData as any[];
       const items: any[] = [];
-      let totalValue = 0;
-
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        const rowNum = i + 2;
-
-        // Expected columns: Barcode, Quantity, Rate
+      let totalValue = toInventoryDecimal(0);
+      for (let index = 0; index < rows.length; index++) {
+        const row = rows[index];
         const barcode = row.Barcode || row.barcode || row.Code || row.code;
-        const quantity = parseFloat(row.Quantity || row.quantity || row.Qty || row.qty || "0");
-        const rate = parseFloat(row.Rate || row.rate || row.Price || row.price || "0");
+        const quantity = toInventoryDecimal(row.Quantity || row.quantity || row.Qty || row.qty);
+        const rate = toInventoryDecimal(row.Rate || row.rate || row.Price || row.price);
+        if (!barcode || !quantity.isPositive() || !rate.isPositive()) continue;
 
-        if (!barcode) {
-          continue; // Skip rows without barcode
-        }
-
-        if (quantity <= 0 || rate <= 0) {
-          continue; // Skip invalid quantities/rates
-        }
-
-        const itemValue = quantity * rate;
-        totalValue += itemValue;
-
+        const itemValue = multiplyInventoryValues(quantity, rate);
+        totalValue = addInventoryValues(totalValue, itemValue);
         items.push({
-          rowNum,
+          rowNum: index + 2,
           barcode: barcode.toString().trim(),
-          quantity,
-          rate,
-          value: itemValue,
+          quantity: quantity.toNumber(),
+          rate: rate.toNumber(),
+          value: itemValue.toNumber(),
         });
       }
 
-      res.json({
-        items,
-        totalValue,
-        fileName: req.file.originalname,
-      });
+      res.json({ items, totalValue: totalValue.toNumber(), fileName: req.file.originalname });
     } catch (error: unknown) {
-      logger.error("POS Import parse error:", { error: error });
-      // File-parse errors are client errors (bad/corrupt file) — return 400, not 500
+      logger.error("POS Import parse error:", { error });
       res.status(400).json({ message: getErrorMessage(error) || "Failed to parse Excel file" });
     }
   });
 
-  // POS Import - Validate data before import
   app.post("/api/pos-import/validate", requireAuth, async (req, res) => {
     try {
-      if (!req.session.currentCompanyId) {
-        return res.status(400).json({ message: "No company selected" });
-      }
-
+      if (!req.session.currentCompanyId) return res.status(400).json({ message: "No company selected" });
       const { locationId, items } = req.body;
-
       if (!locationId || !items || !Array.isArray(items)) {
         return res.status(400).json({ message: "Missing required fields" });
       }
@@ -112,24 +74,16 @@ export function registerPosImportRoutes(app: Express) {
       const errors: string[] = [];
       const warnings: string[] = [];
       const validatedItems: any[] = [];
-
-      // Validate location exists
       const location = await storage.getLocationById(locationId);
       if (!location) {
         errors.push("Selected location not found");
         return res.json({ errors, warnings, validatedItems });
       }
 
-      // Get all stock items for validation
-      const allStockItems = await storage.getAllStockItems(req.session.currentCompanyId!);
-
-      // Validate each item
+      await storage.getAllStockItems(req.session.currentCompanyId!);
       for (const item of items) {
         const validatedItem: any = { ...item };
-
-        // Find stock item by barcode (code or alias)
         const stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
-
         if (!stockItem) {
           validatedItem.error = `Barcode '${item.barcode}' not found in stock items`;
           errors.push(`Row ${item.rowNum}: Barcode '${item.barcode}' not found`);
@@ -138,84 +92,65 @@ export function registerPosImportRoutes(app: Express) {
           validatedItem.stockItemName = stockItem.name;
           validatedItem.stockItemUom = stockItem.uom;
 
-          // Check if location has this item in inventory for cost price calculation
           const inventoryItem = await db
             .select()
             .from(inventory)
             .where(and(eq(inventory.stockItemId, stockItem.id), eq(inventory.locationId, locationId)))
             .limit(1);
 
-          // Get cost price for profit calculation and check inventory levels
           if (inventoryItem.length > 0) {
-            validatedItem.costPrice = parseFloat(inventoryItem[0].averageRate || "0");
-            const currentQty = parseFloat(inventoryItem[0].quantity || "0");
-            const saleQty = parseFloat(item.quantity);
-            const remainingQty = currentQty - saleQty;
+            const costPrice = toInventoryDecimal(inventoryItem[0].averageRate);
+            const currentQty = toInventoryDecimal(inventoryItem[0].quantity);
+            const saleQty = toInventoryDecimal(item.quantity);
+            const remainingQty = subtractInventoryValues(currentQty, saleQty);
+            validatedItem.costPrice = costPrice.toNumber();
+            validatedItem.currentStock = currentQty.toNumber();
+            validatedItem.remainingStock = remainingQty.toNumber();
 
-            validatedItem.currentStock = currentQty;
-            validatedItem.remainingStock = remainingQty;
-
-            // Add warnings for low or negative stock
-            if (remainingQty < 0) {
+            if (remainingQty.isNegative()) {
               validatedItem.warning = `Stock will go negative (${remainingQty.toFixed(2)} ${stockItem.uom})`;
               warnings.push(
                 `${stockItem.name}: Stock will go negative (Current: ${currentQty.toFixed(2)}, Selling: ${saleQty.toFixed(2)}, Remaining: ${remainingQty.toFixed(2)} ${stockItem.uom})`
               );
-            } else if (remainingQty === 0) {
-              validatedItem.warning = `Stock will reach zero`;
+            } else if (remainingQty.isZero()) {
+              validatedItem.warning = "Stock will reach zero";
               warnings.push(
                 `${stockItem.name}: Stock will reach zero (Current: ${currentQty.toFixed(2)}, Selling: ${saleQty.toFixed(2)} ${stockItem.uom})`
               );
             }
           } else {
-            // No inventory at this location
             validatedItem.currentStock = 0;
-            validatedItem.remainingStock = -parseFloat(item.quantity);
-            validatedItem.warning = `No stock at this location, will go negative`;
+            validatedItem.remainingStock = toInventoryDecimal(item.quantity).negated().toNumber();
+            validatedItem.warning = "No stock at this location, will go negative";
             warnings.push(`${stockItem.name}: No stock at this location (Selling: ${item.quantity} ${stockItem.uom})`);
           }
         }
-
         validatedItems.push(validatedItem);
       }
 
-      res.json({
-        errors,
-        warnings,
-        validatedItems,
-      });
+      res.json({ errors, warnings, validatedItems });
     } catch (error: unknown) {
-      logger.error("POS Import validation error:", { error: error });
+      logger.error("POS Import validation error:", { error });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
-  // POS Import - Import sales transactions
   app.post("/api/pos-import/import", requireAuth, async (req, res) => {
     try {
-      if (!req.session.currentCompanyId) {
-        return res.status(400).json({ message: "No company selected" });
-      }
-
+      if (!req.session.currentCompanyId) return res.status(400).json({ message: "No company selected" });
       const { locationId, saleDate, items, cashAccountId } = req.body;
-
       if (!locationId || !saleDate || !items || !Array.isArray(items) || !cashAccountId) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
-      // Validate location
       const location = await storage.getLocationById(locationId);
-      if (!location) {
-        return res.status(400).json({ message: "Location not found" });
-      }
+      if (!location) return res.status(400).json({ message: "Location not found" });
 
-      // Validate cash account
       const cashAccount = await storage.getLedgerAccountById(cashAccountId);
       if (!cashAccount || cashAccount.companyId !== req.session.currentCompanyId) {
         return res.status(400).json({ message: "Invalid cash account" });
       }
 
-      // Get or create "Sales Revenue" ledger account (safe: handles soft-deleted rows)
       const salesRevenueAccount = await storage.getOrCreateLedgerAccount({
         companyId: req.session.currentCompanyId!,
         code: "SALES_REV",
@@ -227,8 +162,7 @@ export function registerPosImportRoutes(app: Express) {
         active: true,
       });
 
-      // Get or create "Cost of Goods Sold" ledger account (safe: handles soft-deleted rows)
-      const cogsAccount = await storage.getOrCreateLedgerAccount({
+      await storage.getOrCreateLedgerAccount({
         companyId: req.session.currentCompanyId!,
         code: "COGS",
         name: "Cost of Goods Sold",
@@ -239,13 +173,11 @@ export function registerPosImportRoutes(app: Express) {
         active: true,
       });
 
-      let totalSales = 0;
+      let totalSales = toInventoryDecimal(0);
       let createdVoucher: any = null;
 
       await db.transaction(async (tx) => {
-        // Create sales voucher
         const voucherNumber = `SALES-${Date.now()}`;
-
         const [voucher] = await tx
           .insert(vouchers)
           .values({
@@ -256,47 +188,33 @@ export function registerPosImportRoutes(app: Express) {
             voucherType: "Sales",
             voucherDate: saleDate,
             description: `POS Import - ${items.length} items`,
-            totalAmount: "0", // Will be updated with actual total
+            totalAmount: "0",
           })
           .returning();
 
-        // Create sales items and update inventory
         for (const item of items) {
-          // Get stock item
           const stockItem = await storage.getStockItemByCodeOrAlias(item.barcode, req.session.currentCompanyId!);
           if (!stockItem) {
-            // Bad user input (unknown barcode) → should be 400, not 500.
-            // Throw inside the transaction so the tx rolls back cleanly; the
-            // tagged httpStatus lets the outer catch return the right status code.
-            const inputErr: any = new Error(`Stock item not found for barcode: ${item.barcode}`);
-            inputErr.httpStatus = 400;
-            throw inputErr;
+            const inputError: any = new Error(`Stock item not found for barcode: ${item.barcode}`);
+            inputError.httpStatus = 400;
+            throw inputError;
           }
 
-          // Get current inventory (allow negative stock for historical sales import)
           const [inventoryRecord] = await tx
             .select()
             .from(inventory)
             .where(and(eq(inventory.stockItemId, stockItem.id), eq(inventory.locationId, locationId)))
             .limit(1);
 
-          // Get cost price and current quantity (allow imports with zero/negative stock)
-          let costPrice = 0;
-          let currentQty = 0;
+          const quantity = toInventoryDecimal(item.quantity);
+          const sellingPrice = toInventoryDecimal(item.rate);
+          const costPrice = toInventoryDecimal(inventoryRecord?.averageRate);
+          const itemSales = multiplyInventoryValues(quantity, sellingPrice);
+          const itemCost = multiplyInventoryValues(quantity, costPrice);
+          const profit = subtractInventoryValues(itemSales, itemCost);
+          totalSales = addInventoryValues(totalSales, itemSales);
 
-          if (inventoryRecord) {
-            costPrice = parseFloat(inventoryRecord.averageRate || "0");
-            currentQty = parseFloat(inventoryRecord.quantity);
-          }
-
-          const itemSales = item.quantity * item.rate;
-          const itemCost = item.quantity * costPrice;
-          const profit = itemSales - itemCost;
-
-          totalSales += itemSales;
-
-          // Look up configured price for this item/location
-          const [importCashLocPrice] = await tx
+          const [locationPrice] = await tx
             .select()
             .from(stockItemLocationPrices)
             .where(
@@ -306,60 +224,45 @@ export function registerPosImportRoutes(app: Express) {
               )
             )
             .limit(1);
-          const importCashConfiguredPrice = parseFloat(
-            importCashLocPrice?.sellingPrice || stockItem.sellingPrice || "0"
-          );
+          const configuredPrice = toInventoryDecimal(locationPrice?.sellingPrice || stockItem.sellingPrice);
 
-          // Create sales item record
           await tx.insert(salesItems).values({
             voucherId: voucher.id,
             stockItemId: stockItem.id,
-            quantity: item.quantity.toString(),
-            sellingPrice: item.rate.toString(),
-            costPrice: costPrice.toString(),
-            totalSales: itemSales.toString(),
-            totalCost: itemCost.toString(),
-            profit: profit.toString(),
-            configuredPrice: importCashConfiguredPrice > 0 ? importCashConfiguredPrice.toFixed(6) : null,
+            quantity: inventoryQuantity(quantity),
+            sellingPrice: inventoryMoney(sellingPrice),
+            costPrice: inventoryUnitCost(costPrice),
+            totalSales: inventoryMoney(itemSales),
+            totalCost: inventoryMoney(itemCost),
+            profit: inventoryMoney(profit),
+            configuredPrice: configuredPrice.isPositive() ? inventoryUnitCost(configuredPrice) : null,
           });
 
-          // Note: COGS is tracked in sales_items table but not posted to ledger
-          // because this system uses purchase-date expense recognition (not COGS method)
-
-          // Update or create inventory record - allow negative stock
-          await adjustInventory(tx, locationId, stockItem.id, -item.quantity, req.session.currentCompanyId!);
+          await adjustInventory(
+            tx,
+            locationId,
+            stockItem.id,
+            quantity.negated().toNumber(),
+            req.session.currentCompanyId!
+          );
         }
 
-        // Create BALANCED voucher entries for double-entry bookkeeping
-        // Periodic inventory system: Purchases are expensed when purchased
-        // Sales recognize revenue immediately; COGS calculated at period-end
-
-        // Entry 1: Debit Cash Account (Asset increases with debit)
+        const totalSalesAmount = inventoryMoney(totalSales);
         await tx.insert(voucherEntries).values({
           voucherId: voucher.id,
           ledgerAccountId: cashAccountId,
-          debitAmount: totalSales.toString(),
+          debitAmount: totalSalesAmount,
           creditAmount: "0",
           narration: `Cash from POS Sales - ${items.length} items`,
         });
-
-        // Entry 2: Credit Sales Revenue (Income increases with credit)
         await tx.insert(voucherEntries).values({
           voucherId: voucher.id,
           ledgerAccountId: salesRevenueAccount.id,
           debitAmount: "0",
-          creditAmount: totalSales.toString(),
+          creditAmount: totalSalesAmount,
           narration: `Sales Revenue - ${items.length} items`,
         });
-
-        // Update voucher with total amount
-        await tx
-          .update(vouchers)
-          .set({
-            totalAmount: totalSales.toString(),
-          })
-          .where(eq(vouchers.id, voucher.id));
-
+        await tx.update(vouchers).set({ totalAmount: totalSalesAmount }).where(eq(vouchers.id, voucher.id));
         createdVoucher = voucher;
       });
 
@@ -367,123 +270,100 @@ export function registerPosImportRoutes(app: Express) {
         success: true,
         voucher: createdVoucher,
         itemsCount: items.length,
-        totalSales: totalSales.toFixed(2),
+        totalSales: inventoryMoney(totalSales),
       });
 
-      // Background: send invoice + stock report after response is already sent
       if (createdVoucher && location.whatsappGroupChatId) {
-        const _companyId = req.session.currentCompanyId!;
-        const _chatId = location.whatsappGroupChatId;
-        const _locName = location.name;
-        const _locId = locationId;
-        const _saleDate = saleDate;
-        const _voucherDate = createdVoucher.voucherDate;
-        const _voucherId = createdVoucher.id;
-        const _senderName = (req as any).user?.username || "Import";
-        const _dateStr = getClientDate(req);
+        const companyId = req.session.currentCompanyId!;
+        const chatId = location.whatsappGroupChatId;
+        const locationName = location.name;
+        const importedLocationId = locationId;
+        const importedSaleDate = saleDate;
+        const voucherDate = createdVoucher.voucherDate;
+        const voucherId = createdVoucher.id;
+        const senderName = (req as any).user?.username || "Import";
+        const dateString = getClientDate(req);
         setImmediate(async () => {
-          // 1. Invoice PDF
           try {
-            const waVis = await getErpExportVisibility(req);
-            // P/L cols auto-hide in the PDF generator when no configured price exists — don't gate on hideSalesProfitCost
-            const hideProfitCols = waVis.hideSelling || waVis.hideCost;
-            const pdfBuffer = await generateInvoicePdf(_voucherId, _companyId, _senderName, { hideProfitCols });
-            const safeDate = (_voucherDate ?? _saleDate).replace(/[^0-9-]/g, "");
+            const visibility = await getErpExportVisibility(req);
+            const hideProfitCols = visibility.hideSelling || visibility.hideCost;
+            const pdfBuffer = await generateInvoicePdf(voucherId, companyId, senderName, { hideProfitCols });
+            const safeDate = (voucherDate ?? importedSaleDate).replace(/[^0-9-]/g, "");
             const fileName =
-              `${_locName} Invoice ${safeDate}`
+              `${locationName} Invoice ${safeDate}`
                 .replace(/[^\w\s.()\-]/g, "_")
                 .replace(/\s+/g, " ")
                 .trim() + ".pdf";
-            const invResult = await sendWhatsAppFileByUploadPos(_chatId, pdfBuffer, fileName, "");
-            if (!invResult.success) logger.error(`[POSImport-bg] Invoice send failed: ${invResult.error}`);
-            else logger.info(`[POSImport-bg] Invoice sent: ${fileName} → ${_chatId}`);
-          } catch (e: unknown) {
-            logger.error("[POSImport-bg] Invoice send error:", { error: getErrorMessage(e) });
+            const invoiceResult = await sendWhatsAppFileByUploadPos(chatId, pdfBuffer, fileName, "");
+            if (!invoiceResult.success) logger.error(`[POSImport-bg] Invoice send failed: ${invoiceResult.error}`);
+            else logger.info(`[POSImport-bg] Invoice sent: ${fileName} → ${chatId}`);
+          } catch (error: unknown) {
+            logger.error("[POSImport-bg] Invoice send error:", { error: getErrorMessage(error) });
           }
 
-          // 2. Stock report PDF
           try {
-            const [co] = await db
+            const [company] = await db
               .select({ name: companies.name })
               .from(companies)
-              .where(eq(companies.id, _companyId))
+              .where(eq(companies.id, companyId))
               .limit(1);
-            const companyName = co?.name || "Company";
-            const {
-              buffer: stockBuf,
-              pageCount,
-              rowCount,
-            } = await generateStockPdf(_companyId, companyName, _locId, _locName);
+            const companyName = company?.name || "Company";
+            const { buffer, pageCount, rowCount } = await generateStockPdf(
+              companyId,
+              companyName,
+              importedLocationId,
+              locationName
+            );
             const maxAllowedPages = Math.ceil(rowCount / 20) + 5;
             if (pageCount > maxAllowedPages) {
-              logger.error(
-                `[POSImport-bg] Stock PDF safety guard: ${pageCount} pages for ${rowCount} rows — not sent`
-              );
+              logger.error(`[POSImport-bg] Stock PDF safety guard: ${pageCount} pages for ${rowCount} rows — not sent`);
             } else {
-              const stampStr = new Date().toLocaleString("en-GB", {
+              const stampString = new Date().toLocaleString("en-GB", {
                 day: "2-digit",
                 month: "short",
                 year: "numeric",
                 hour: "2-digit",
                 minute: "2-digit",
               });
-              const stockName = `${_locName} STK ${companyName} ${_dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
-              const stockRes = await sendWhatsAppFileToChatIdPos(
-                _chatId,
-                stockBuf,
+              const stockName = `${locationName} STK ${companyName} ${dateString}`.replace(/[^\w\s.()\-]/g, "_").trim();
+              const stockResult = await sendWhatsAppFileToChatIdPos(
+                chatId,
+                buffer,
                 `${stockName}.pdf`,
-                `Stock Report — ${_locName}\n${stampStr}`
+                `Stock Report — ${locationName}\n${stampString}`
               );
-              if (!stockRes.success) logger.error(`[POSImport-bg] Stock send failed: ${stockRes.error}`);
-              else logger.info(`[POSImport-bg] Stock report sent: ${stockName}.pdf → ${_chatId}`);
+              if (!stockResult.success) logger.error(`[POSImport-bg] Stock send failed: ${stockResult.error}`);
+              else logger.info(`[POSImport-bg] Stock report sent: ${stockName}.pdf → ${chatId}`);
             }
-          } catch (e: unknown) {
-            logger.error("[POSImport-bg] Stock send error:", { error: getErrorMessage(e) });
+          } catch (error: unknown) {
+            logger.error("[POSImport-bg] Stock send error:", { error: getErrorMessage(error) });
           }
         });
       }
     } catch (error: unknown) {
-      // httpStatus=400 means bad user input (e.g. unknown barcode); transaction
-      // already rolled back at this point.
       if ((error as { httpStatus?: number }).httpStatus === 400) {
         return res.status(400).json({ message: getErrorMessage(error) });
       }
-      logger.error("POS Import error:", { error: error });
+      logger.error("POS Import error:", { error });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
-  // Download sample POS import template
   app.get("/api/pos-import/template", async (_req, res) => {
     try {
       const sampleData = [
-        {
-          Barcode: "BC001",
-          Quantity: 5,
-          Rate: 25.0,
-        },
-        {
-          Barcode: "BC002",
-          Quantity: 3,
-          Rate: 35.5,
-        },
-        {
-          Barcode: "BC003",
-          Quantity: 10,
-          Rate: 15.75,
-        },
+        { Barcode: "BC001", Quantity: 5, Rate: 25.0 },
+        { Barcode: "BC002", Quantity: 3, Rate: 35.5 },
+        { Barcode: "BC003", Quantity: 10, Rate: 15.75 },
       ];
-
       const workbook = createWorkbook();
       jsonToSheet(workbook, sampleData, "POS Import");
-
       const buffer = await writeWorkbook(workbook);
-
       res.setHeader("Content-Disposition", "attachment; filename=POS_Import_Template.xlsx");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.send(buffer);
     } catch (error: unknown) {
-      logger.error("Template generation error:", { error: error });
+      logger.error("Template generation error:", { error });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });

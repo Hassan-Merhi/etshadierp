@@ -17,6 +17,7 @@ import {
   factoryMixBatches,
   factoryMixBatchSources,
   factoryBales,
+  factoryWorkers,
 } from "@shared/schema";
 import { eq, and, sql, inArray, isNull } from "drizzle-orm";
 import { resultRows } from "../../../lib/queryResult";
@@ -32,7 +33,17 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
 
       const from = req.query.from as string | undefined;
       const to = req.query.to as string | undefined;
+      // Worker filter — accepts a single `workerId` (legacy) or a comma-separated
+      // `workerIds` list (multi-select filter on the Production Comparison page).
       const workerIdParam = req.query.workerId as string | undefined;
+      const workerIdsParam = req.query.workerIds as string | undefined;
+      const workerIdFilter = [
+        ...new Set(
+          [...(workerIdsParam ? workerIdsParam.split(",") : []), ...(workerIdParam ? [workerIdParam] : [])]
+            .map((v) => parseInt(String(v).trim(), 10))
+            .filter((n) => Number.isFinite(n))
+        ),
+      ];
 
       // ── Build date range conditions ──
       // Use COALESCE(stock_entry_date, DATE(created_at)) so bales without a stock_entry_date
@@ -53,8 +64,8 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
         baleConditions.push(
           sql`COALESCE(DATE(${factoryBales.stockEntryDate}), DATE(${factoryBales.createdAt})) <= ${to}`
         );
-      if (workerIdParam && !isNaN(parseInt(workerIdParam)))
-        baleConditions.push(eq(factoryBales.finalizedBy, parseInt(workerIdParam)));
+      if (workerIdFilter.length === 1) baleConditions.push(eq(factoryBales.finalizedBy, workerIdFilter[0]));
+      else if (workerIdFilter.length > 1) baleConditions.push(inArray(factoryBales.finalizedBy, workerIdFilter));
 
       // Exclude CARRY_FORWARD batches from the "Original Batches" total.
       // CARRY_FORWARD batches represent leftover material from a parent batch whose weight is
@@ -88,10 +99,14 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
           productId: factoryBales.productId,
           categoryId: factoryBaleProducts.categoryId,
           categoryName: factoryCategories.name,
+          finalizedBy: factoryBales.finalizedBy,
+          baleWorkerName: factoryBales.workerName,
+          workerFullName: factoryWorkers.fullName,
         })
         .from(factoryBales)
         .leftJoin(factoryBaleProducts, eq(factoryBales.productId, factoryBaleProducts.id))
         .leftJoin(factoryCategories, eq(factoryBaleProducts.categoryId, factoryCategories.id))
+        .leftJoin(factoryWorkers, eq(factoryBales.finalizedBy, factoryWorkers.id))
         .where(and(...baleConditions));
 
       // ── Helper: detect wipers/garbage by category name ──
@@ -111,6 +126,8 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
           totalWeightKg: number;
           costPricePerBale: number;
           totalValue: number;
+          // Distinct workers who finalized bales of this product in the period.
+          workers: Map<string, { id: number | null; name: string; qty: number }>;
         }
       >();
 
@@ -143,6 +160,9 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
         const wt = parseFloat(bale.weightKg || "0");
         const price = parseFloat(bale.productionPrice || "0");
         const value = price; // price is per bale (not per kg)
+        // Prefer the live worker record; fall back to the name snapshotted on the bale.
+        const workerName = (bale.workerFullName || bale.baleWorkerName || "").trim();
+        const workerId = bale.finalizedBy ?? null;
 
         if (isWiperOrGarbage(catName)) {
           // Route to wipers/garbage bucket
@@ -176,7 +196,16 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
               totalWeightKg: wt,
               costPricePerBale: price,
               totalValue: value,
+              workers: new Map(),
             });
+          }
+
+          if (workerName || workerId != null) {
+            const wMap = productMap.get(code)!.workers;
+            const wKey = workerId != null ? `id:${workerId}` : `name:${workerName.toLowerCase()}`;
+            const wEx = wMap.get(wKey);
+            if (wEx) wEx.qty += 1;
+            else wMap.set(wKey, { id: workerId, name: workerName || `Worker #${workerId}`, qty: 1 });
           }
 
           const catExisting = categoryMap.get(catName);
@@ -190,7 +219,12 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
         }
       }
 
-      const productRows = [...productMap.values()].sort((a, b) => a.articleCode.localeCompare(b.articleCode));
+      const productRows = [...productMap.values()]
+        .sort((a, b) => a.articleCode.localeCompare(b.articleCode))
+        .map(({ workers, ...rest }) => ({
+          ...rest,
+          workers: [...workers.values()].sort((a, b) => b.qty - a.qty || a.name.localeCompare(b.name)),
+        }));
       const categoryRows = [...categoryMap.values()].sort((a, b) => a.categoryName.localeCompare(b.categoryName));
 
       const totalBales = productRows.reduce((s, r) => s + r.qty, 0);

@@ -3,11 +3,14 @@
  *
  * Extracted from ProductionComparison.tsx during the Phase 4 god-file split.
  */
-import {useState} from "react";
-import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
-import {Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList} from "@/components/ui/command";
-import {Check, ChevronDown, X} from "lucide-react";
-import {cn} from "@/lib/utils";
+import { useState } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Check, ChevronDown, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+/** An option is either a plain string (value === label) or an explicit value/label pair. */
+export type MultiSelectOption = string | { value: string; label: string };
 
 export function MultiSelectFilter({
   options,
@@ -17,7 +20,7 @@ export function MultiSelectFilter({
   allLabel,
   className,
 }: {
-  options: string[];
+  options: MultiSelectOption[];
   selected: string[];
   onChange: (next: string[]) => void;
   placeholder: string;
@@ -25,6 +28,8 @@ export function MultiSelectFilter({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+
+  const normalized = options.map((o) => (typeof o === "string" ? { value: o, label: o } : o));
 
   const toggle = (value: string) => {
     if (selected.includes(value)) {
@@ -34,7 +39,12 @@ export function MultiSelectFilter({
     }
   };
 
-  const label = selected.length === 0 ? allLabel : selected.length === 1 ? selected[0] : `${selected.length} selected`;
+  const label =
+    selected.length === 0
+      ? allLabel
+      : selected.length === 1
+        ? (normalized.find((o) => o.value === selected[0])?.label ?? selected[0])
+        : `${selected.length} selected`;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -72,13 +82,13 @@ export function MultiSelectFilter({
           <CommandList>
             <CommandEmpty>No results.</CommandEmpty>
             <CommandGroup>
-              {options.map((opt) => {
-                const checked = selected.includes(opt);
+              {normalized.map((opt) => {
+                const checked = selected.includes(opt.value);
                 return (
                   <CommandItem
-                    key={opt}
-                    value={opt}
-                    onSelect={() => toggle(opt)}
+                    key={opt.value}
+                    value={opt.label}
+                    onSelect={() => toggle(opt.value)}
                     className="flex items-center gap-2 cursor-pointer"
                   >
                     <div
@@ -89,7 +99,7 @@ export function MultiSelectFilter({
                     >
                       {checked && <Check className="h-3 w-3" />}
                     </div>
-                    <span className="truncate">{opt}</span>
+                    <span className="truncate">{opt.label}</span>
                   </CommandItem>
                 );
               })}

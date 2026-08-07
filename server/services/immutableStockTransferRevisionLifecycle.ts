@@ -7,6 +7,7 @@ import {
   stockItems,
   stockTransferItems,
   stockTransferRevisionItems,
+  stockTransferRevisions,
   stockTransferVouchers,
   vouchers,
 } from "@shared/schema";
@@ -55,6 +56,8 @@ export interface ReviewImmutableRevisionResult {
   revisionNumber: number;
   transition: "approved" | "rejected" | "no-op";
   changedItemCount: number;
+  /** Pending revisions folded into this approval, including the requested one. */
+  appliedRevisionCount?: number;
   inventoryApplied: boolean;
   totalAmount: string;
 }
@@ -221,6 +224,22 @@ export async function createImmutableStockTransferRevision(
       throw lifecycleError("An identical pending revision already exists", "STOCK_TRANSFER_REVISION_DUPLICATE");
     }
 
+    const previousIds = input.pending ? previousPending.map((revision) => Number(revision.id)) : [];
+    if (previousIds.length > 0) {
+      // Free the partial unique index before inserting the replacement pending
+      // revision. The surrounding transaction restores these rows if the
+      // replacement insert fails for any reason.
+      await tx
+        .update(stockTransferRevisions)
+        .set({
+          status: "superseded",
+          optional: false,
+          reviewedAt: new Date(),
+          reviewedBy: userId,
+        })
+        .where(and(inArray(stockTransferRevisions.id, previousIds), eq(stockTransferRevisions.status, "pending")));
+    }
+
     const maxRow = firstRow<any>(
       await tx.execute(sql`
         SELECT COALESCE(MAX(revision_number), 0) AS max_revision
@@ -277,19 +296,14 @@ export async function createImmutableStockTransferRevision(
       )
       .returning();
 
-    if (input.pending && previousPending.length > 0) {
-      const previousIds = previousPending.map((revision) => Number(revision.id));
-      await tx.execute(sql`
-        UPDATE stock_transfer_revisions
-        SET
-          status = 'superseded',
-          optional = false,
-          reviewed_at = now(),
-          reviewed_by = ${userId},
-          superseded_by_revision_id = ${revisionId}
-        WHERE id = ANY(${previousIds}::int[])
-          AND status = 'pending'
-      `);
+    if (previousIds.length > 0) {
+      // The old rows were already superseded before the insert so the unique
+      // pending-per-user index could admit the replacement. Link them to the
+      // newly created revision now that its id is known.
+      await tx
+        .update(stockTransferRevisions)
+        .set({ supersededByRevisionId: revisionId })
+        .where(and(inArray(stockTransferRevisions.id, previousIds), eq(stockTransferRevisions.status, "superseded")));
     }
 
     const distinctSources = Array.from(
@@ -316,6 +330,25 @@ export async function createImmutableStockTransferRevision(
       items: savedItems,
     };
   });
+}
+
+/**
+ * All pending revisions for a transfer, oldest first, locked for update.
+ * Approval applies every one of them — a transfer fed by several POS locations
+ * collects one pending revision per submitter, and approving only the clicked
+ * row would silently discard the others.
+ */
+async function lockedPendingRevisions(tx: any, transferId: number) {
+  return rows<any>(
+    await tx.execute(sql`
+      SELECT id, revision_number
+      FROM stock_transfer_revisions
+      WHERE transfer_id = ${transferId}
+        AND status = 'pending'
+      ORDER BY revision_number ASC, id ASC
+      FOR UPDATE
+    `)
+  ).map((revision) => ({ id: Number(revision.id), revisionNumber: Number(revision.revision_number) }));
 }
 
 async function lockedRevision(tx: any, revisionId: number) {
@@ -390,13 +423,44 @@ export async function approveImmutableStockTransferRevision(
       );
     }
 
-    const revisionItems = await tx
+    // Approving one pending revision approves every pending revision on the
+    // transfer. Each POS location submits its own, and they are merged per
+    // (stockItemId, sourceLocationId) with the newest revision winning the key.
+    const pendingRevisions = await lockedPendingRevisions(tx, transferId);
+    const pendingIds = pendingRevisions.map((revision) => revision.id);
+    if (!pendingIds.includes(revisionId)) pendingIds.push(revisionId);
+    const revisionOrder = new Map(pendingRevisions.map((revision, index) => [revision.id, index]));
+
+    const pendingItems = await tx
       .select()
       .from(stockTransferRevisionItems)
-      .where(eq(stockTransferRevisionItems.revisionId, revisionId));
-    if (revisionItems.length === 0) throw new Error("Pending revision has no items");
+      .where(inArray(stockTransferRevisionItems.revisionId, pendingIds));
+    if (pendingItems.length === 0) throw new Error("Pending revision has no items");
 
-    const scopedItems = revisionItems.map((item) => ({
+    // Last writer wins per key; every contributing revision is still validated
+    // against the transfer's current quantities below.
+    const winningItems = new Map<string, (typeof pendingItems)[number]>();
+    for (const item of pendingItems) {
+      const key = `${item.stockItemId}:${item.sourceLocationId ?? ""}`;
+      const current = winningItems.get(key);
+      if (
+        !current ||
+        (revisionOrder.get(item.revisionId) ?? -1) > (revisionOrder.get(current.revisionId) ?? -1) ||
+        ((revisionOrder.get(item.revisionId) ?? -1) === (revisionOrder.get(current.revisionId) ?? -1) &&
+          item.id > current.id)
+      ) {
+        winningItems.set(key, item);
+      }
+    }
+    const revisionItems = Array.from(winningItems.values());
+
+    // A pending revision every one of whose items lost its key contributed
+    // nothing and is recorded as superseded rather than approved.
+    const contributingRevisionIds = new Set(revisionItems.map((item) => item.revisionId));
+    contributingRevisionIds.add(revisionId);
+    const overriddenRevisionIds = pendingIds.filter((id) => !contributingRevisionIds.has(id));
+
+    const scopedItems = pendingItems.map((item) => ({
       sourceLocationId: positiveInteger(item.sourceLocationId, "Source location ID"),
       stockItemId: item.stockItemId,
     }));
@@ -417,6 +481,29 @@ export async function approveImmutableStockTransferRevision(
       rate: number;
     }> = [];
 
+    // Every pending item — winners and overridden alike — was authored against
+    // the transfer's current quantities, so all of them must still agree with
+    // them before any of the merged changes are applied.
+    const revisionNumbersById = new Map(pendingRevisions.map((revision) => [revision.id, revision.revisionNumber]));
+    for (const item of pendingItems) {
+      const sourceLocationId = positiveInteger(item.sourceLocationId, "Source location ID");
+      const existing = existingItems.find(
+        (candidate: (typeof existingItems)[number]) =>
+          candidate.stockItemId === item.stockItemId && candidate.sourceLocationId === sourceLocationId
+      );
+      const oldQuantity = Number(existing?.quantity ?? 0);
+      const expectedQuantity = Number(item.originalQuantity);
+      if (Math.abs(oldQuantity - expectedQuantity) > 0.001) {
+        const error: any = lifecycleError(
+          `Revision #${revisionNumbersById.get(item.revisionId) ?? revisionNumber} is stale for ${item.stockItemName}. Expected ${expectedQuantity}, current transfer quantity is ${oldQuantity}.`,
+          "STOCK_TRANSFER_REVISION_STALE"
+        );
+        error.stockItemId = item.stockItemId;
+        error.sourceLocationId = sourceLocationId;
+        throw error;
+      }
+    }
+
     for (const item of revisionItems) {
       const sourceLocationId = positiveInteger(item.sourceLocationId, "Source location ID");
       const existing =
@@ -424,17 +511,7 @@ export async function approveImmutableStockTransferRevision(
           (candidate) => candidate.stockItemId === item.stockItemId && candidate.sourceLocationId === sourceLocationId
         ) || null;
       const oldQuantity = Number(existing?.quantity ?? 0);
-      const expectedQuantity = Number(item.originalQuantity);
       const newQuantity = Number(item.newQuantity);
-      if (Math.abs(oldQuantity - expectedQuantity) > 0.001) {
-        const error: any = lifecycleError(
-          `Revision #${revisionNumber} is stale for ${item.stockItemName}. Expected ${expectedQuantity}, current transfer quantity is ${oldQuantity}.`,
-          "STOCK_TRANSFER_REVISION_STALE"
-        );
-        error.stockItemId = item.stockItemId;
-        error.sourceLocationId = sourceLocationId;
-        throw error;
-      }
 
       let rate = Number(existing?.rate ?? 0);
       if (!existing) {
@@ -566,6 +643,17 @@ export async function approveImmutableStockTransferRevision(
       SET status = 'approved', optional = false, reviewed_at = now(), reviewed_by = ${reviewerId}
       WHERE id = ${revisionId} AND status = 'pending'
     `);
+    // Every other pending revision whose items landed in the merge is approved
+    // alongside it — their quantities are now part of the transfer.
+    const coApprovedIds = pendingIds.filter((id) => id !== revisionId && !overriddenRevisionIds.includes(id));
+    if (coApprovedIds.length > 0) {
+      await tx
+        .update(stockTransferRevisions)
+        .set({ status: "approved", optional: false, reviewedAt: new Date(), reviewedBy: reviewerId })
+        .where(and(inArray(stockTransferRevisions.id, coApprovedIds), eq(stockTransferRevisions.status, "pending")));
+    }
+    // Anything still pending contributed nothing to the merge (every key it
+    // touched was overridden by a newer revision), or arrived after the lock.
     await tx.execute(sql`
       UPDATE stock_transfer_revisions
       SET
@@ -586,6 +674,7 @@ export async function approveImmutableStockTransferRevision(
       revisionNumber,
       transition: "approved",
       changedItemCount: changes.filter((change) => Math.abs(change.delta) >= 0.0005).length,
+      appliedRevisionCount: pendingIds.length - overriddenRevisionIds.length,
       inventoryApplied,
       totalAmount,
     };

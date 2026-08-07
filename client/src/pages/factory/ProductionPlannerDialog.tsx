@@ -1,247 +1,259 @@
-import { useState, useEffect, useCallback } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  ClipboardList,
-  Plus,
-  Trash2,
-  CheckCircle2,
-  XCircle,
-  Copy,
-  Save,
-  Loader2,
-  Check,
-  ChevronsUpDown,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ClipboardList, Copy, Loader2, Save, Target, Users } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { cn } from "@/lib/utils";
 
-interface Worker {
-  id: number;
-  fullName: string;
-  position: string;
-  active: boolean;
-}
-interface WorkerCategory {
-  id: number;
-  name: string;
-  workerIds: number[];
-}
-interface PlanEntry {
-  id?: number;
+interface PlannerMember {
   workerId: number;
   workerName: string;
+}
+
+interface PlannerAllocation extends PlannerMember {
+  amount: number;
+}
+
+interface PlannerEntry {
+  positionId: number;
+  positionName: string;
   targetBales: number;
-  workerCount: number;
-}
-interface PlanData {
-  plan: { id: number; planDate: string; categoryIds: number[]; notes: string } | null;
-  entries: PlanEntry[];
-  actuals: Record<number, number>;
+  bonusPerExtraBale: number;
+  bonusEnabled: boolean;
+  members: PlannerMember[];
+  saved: boolean;
+  actualBales: number;
+  memberCount: number;
+  extraBales: number;
+  bonusPool: number;
+  perWorkerMin: number;
+  perWorkerMax: number;
+  allocations: PlannerAllocation[];
+  distributable: boolean;
+  targetMet: boolean;
 }
 
-function WorkerCombobox({
-  value,
-  onChange,
-  workers,
-  entryKey,
-}: {
-  value: number;
-  onChange: (workerId: number, workerName: string) => void;
-  workers: Worker[];
-  entryKey: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const selected = workers.find((w) => w.id === value);
-  const displayName = selected?.fullName ?? (value ? `Worker #${value}` : "Select worker…");
+interface PlannerData {
+  plan: { id: number | null; planDate: string; notes: string; saved: boolean };
+  entries: PlannerEntry[];
+  summary: {
+    totalTarget: number;
+    totalActual: number;
+    totalExtra: number;
+    totalBonusPool: number;
+    unattributedBales: number;
+  };
+}
 
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 w-full justify-between font-normal text-sm"
-          data-testid={`select-worker-${entryKey}`}
-        >
-          <span className="truncate">{displayName}</span>
-          <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground ml-1" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-64 p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Search worker…" className="h-9" />
-          <CommandList>
-            <CommandEmpty>No workers found.</CommandEmpty>
-            <CommandGroup>
-              {workers.map((w) => (
-                <CommandItem
-                  key={w.id}
-                  value={w.fullName}
-                  onSelect={() => {
-                    onChange(w.id, w.fullName);
-                    setOpen(false);
-                  }}
-                >
-                  <Check className={cn("mr-2 h-4 w-4", w.id === value ? "opacity-100" : "opacity-0")} />
-                  <span className={cn("truncate", !w.active && "text-muted-foreground")}>
-                    {w.fullName}
-                    {!w.active && <span className="ml-1 text-xs">(inactive)</span>}
-                  </span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
+interface CopyPreviousResponse {
+  fromDate: string | null;
+  notes: string;
+  entries: Array<{
+    positionId: number;
+    positionName: string;
+    targetBales: number;
+    bonusPerExtraBale: number;
+    bonusEnabled: boolean;
+    members: PlannerMember[];
+    saved: boolean;
+  }>;
+}
+
+function money(value: number): string {
+  return Number(value || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function previewEntry(entry: PlannerEntry): PlannerEntry {
+  const targetBales = Math.max(0, Math.trunc(Number(entry.targetBales) || 0));
+  const actualBales = Math.max(0, Math.trunc(Number(entry.actualBales) || 0));
+  const rate = Math.max(0, Number(entry.bonusPerExtraBale) || 0);
+  const extraBales = targetBales > 0 ? Math.max(actualBales - targetBales, 0) : 0;
+  const poolCents = entry.bonusEnabled ? Math.max(0, Math.round(extraBales * rate * 100 + Number.EPSILON)) : 0;
+  const bonusPool = Number((poolCents / 100).toFixed(2));
+  const members = [...(entry.members || [])].sort((a, b) => a.workerId - b.workerId);
+  let allocations: PlannerAllocation[] = members.map((member) => ({ ...member, amount: 0 }));
+
+  if (poolCents > 0 && members.length > 0) {
+    const baseCents = Math.floor(poolCents / members.length);
+    const remainder = poolCents % members.length;
+    const remainderStart = members.length - remainder;
+    allocations = members.map((member, index) => ({
+      ...member,
+      amount: Number(((baseCents + (remainder > 0 && index >= remainderStart ? 1 : 0)) / 100).toFixed(2)),
+    }));
+  }
+
+  const amounts = allocations.map((allocation) => allocation.amount);
+  return {
+    ...entry,
+    targetBales,
+    actualBales,
+    bonusPerExtraBale: rate,
+    memberCount: members.length,
+    extraBales,
+    bonusPool,
+    allocations,
+    perWorkerMin: amounts.length ? Math.min(...amounts) : 0,
+    perWorkerMax: amounts.length ? Math.max(...amounts) : 0,
+    distributable: poolCents === 0 || members.length > 0,
+    targetMet: targetBales > 0 && actualBales >= targetBales,
+  };
+}
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, { credentials: "include" });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(body?.message || `Request failed (${response.status})`);
+  return body as T;
 }
 
 export default function ProductionPlannerDialog() {
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(() => new Date().toLocaleDateString("en-CA"));
-  const [entries, setEntries] = useState<(PlanEntry & { _key: string })[]>([]);
+  const [entries, setEntries] = useState<PlannerEntry[]>([]);
   const [notes, setNotes] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: allWorkers = [] } = useQuery<Worker[]>({
-    queryKey: ["/api/factory/workers"],
-    enabled: open,
-  });
-
-  const { data: workerCategories = [] } = useQuery<WorkerCategory[]>({
-    queryKey: ["/api/factory/worker-categories"],
-    enabled: open,
-  });
-
-  // Only show workers who are assigned to at least one pressing category.
-  // If no categories exist yet, fall back to showing all workers so the planner isn't empty.
-  const categoryWorkerIdSet = new Set(workerCategories.flatMap((c) => c.workerIds ?? []));
-  const workers = categoryWorkerIdSet.size > 0 ? allWorkers.filter((w) => categoryWorkerIdSet.has(w.id)) : allWorkers;
-
   const {
-    data: planData,
-    isLoading: planLoading,
-    refetch: refetchPlan,
-  } = useQuery<PlanData>({
-    queryKey: ["/api/factory/production-planner", date],
-    queryFn: () => fetch(`/api/factory/production-planner/${date}`, { credentials: "include" }).then((r) => r.json()),
+    data: planner,
+    isLoading,
+    isError,
+    error,
+  } = useQuery<PlannerData>({
+    queryKey: ["/api/factory/production-position-planner", date],
+    queryFn: () => fetchJson<PlannerData>(`/api/factory/production-position-planner/${date}`),
     enabled: open,
+    staleTime: 0,
   });
 
   useEffect(() => {
-    if (!planData) return;
-    setNotes(planData.plan?.notes ?? "");
-    setEntries(
-      (planData.entries ?? []).map((e, i) => ({ ...e, workerCount: e.workerCount ?? 0, _key: `loaded-${i}` }))
-    );
-  }, [planData]);
+    if (!planner) return;
+    setEntries(planner.entries.map((entry) => previewEntry(entry)));
+    setNotes(planner.plan?.notes ?? "");
+  }, [planner]);
+
+  const previewEntries = useMemo(() => entries.map(previewEntry), [entries]);
+  const summary = useMemo(
+    () =>
+      previewEntries.reduce(
+        (acc, entry) => {
+          acc.totalTarget += entry.targetBales;
+          acc.totalActual += entry.actualBales;
+          acc.totalExtra += entry.extraBales;
+          acc.totalBonusPool = Number((acc.totalBonusPool + entry.bonusPool).toFixed(2));
+          return acc;
+        },
+        {
+          totalTarget: 0,
+          totalActual: 0,
+          totalExtra: 0,
+          totalBonusPool: 0,
+          unattributedBales: planner?.summary?.unattributedBales ?? 0,
+        }
+      ),
+    [previewEntries, planner?.summary?.unattributedBales]
+  );
 
   const saveMutation = useMutation({
-    mutationFn: () =>
-      apiRequest("POST", `/api/factory/production-planner/${date}`, {
+    mutationFn: async () => {
+      const response = await apiRequest("POST", `/api/factory/production-position-planner/${date}`, {
         notes,
-        categoryIds: [],
-        entries: entries.map((e) => ({
-          workerId: e.workerId,
-          targetBales: e.targetBales,
-          workerCount: e.workerCount,
+        entries: previewEntries.map((entry) => ({
+          positionId: entry.positionId,
+          targetBales: entry.targetBales,
+          bonusPerExtraBale: entry.bonusPerExtraBale,
+          bonusEnabled: entry.bonusEnabled,
         })),
-      }),
-    onSuccess: () => {
-      toast({ title: "Plan saved" });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/production-planner", date] });
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/production-planner", date, "worker-targets"] });
-      refetchPlan();
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(body?.message || "Failed to save production plan");
+      return body as PlannerData;
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onSuccess: async (data) => {
+      setEntries(data.entries.map((entry) => previewEntry(entry)));
+      setNotes(data.plan?.notes ?? "");
+      await queryClient.invalidateQueries({ queryKey: ["/api/factory/production-position-planner", date] });
+      toast({
+        title: "Production plan saved",
+        description: "Team, target and bonus-rule snapshots were frozen for this date.",
+      });
+    },
+    onError: (saveError: Error) =>
+      toast({ title: "Could not save production plan", description: saveError.message, variant: "destructive" }),
   });
 
   const copyPreviousMutation = useMutation({
-    mutationFn: (): Promise<{ entries: PlanEntry[]; categoryIds: number[]; notes: string; fromDate: string | null }> =>
-      fetch(`/api/factory/production-planner/${date}/copy-previous`, { credentials: "include" }).then((r) => r.json()),
+    mutationFn: () => fetchJson<CopyPreviousResponse>(`/api/factory/production-position-planner/${date}/copy-previous`),
     onSuccess: (data) => {
       if (!data.fromDate) {
-        toast({ title: "No previous plan found" });
+        toast({ title: "No previous position plan found" });
         return;
       }
+      const actualByPosition = new Map((planner?.entries ?? []).map((entry) => [entry.positionId, entry.actualBales]));
       setEntries(
-        data.entries.map((e, i) => ({
-          ...e,
-          workerCount: (e as any).workerCount ?? 0,
-          _key: `copied-${Date.now()}-${i}`,
-        }))
+        data.entries.map((entry) =>
+          previewEntry({
+            ...entry,
+            actualBales: actualByPosition.get(entry.positionId) ?? 0,
+            memberCount: entry.members?.length ?? 0,
+            extraBales: 0,
+            bonusPool: 0,
+            perWorkerMin: 0,
+            perWorkerMax: 0,
+            allocations: [],
+            distributable: true,
+            targetMet: false,
+          })
+        )
       );
       setNotes(data.notes ?? "");
-      toast({ title: `Copied plan from ${data.fromDate}` });
+      toast({
+        title: `Copied settings from ${data.fromDate}`,
+        description: "Current-date team membership is kept; target/rate settings were copied.",
+      });
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (copyError: Error) =>
+      toast({ title: "Could not copy previous plan", description: copyError.message, variant: "destructive" }),
   });
 
-  const addRow = useCallback(() => {
-    if (workers.length === 0) return;
-    const usedIds = new Set(entries.map((e) => e.workerId));
-    const available = workers.filter((w) => !usedIds.has(w.id));
-    const worker = available[0] ?? workers[0];
-    setEntries((prev) => [
-      ...prev,
-      {
-        workerId: worker.id,
-        workerName: worker.fullName,
-        targetBales: 0,
-        workerCount: 0,
-        _key: `new-${Date.now()}`,
-      },
-    ]);
-  }, [workers, entries]);
-
-  const removeRow = (key: string) => setEntries((prev) => prev.filter((e) => e._key !== key));
-
-  const updateWorker = (key: string, workerId: number, workerName: string) =>
-    setEntries((prev) => prev.map((e) => (e._key !== key ? e : { ...e, workerId, workerName })));
-
-  const updateEntry = (key: string, field: "targetBales" | "workerCount", value: string) =>
-    setEntries((prev) => prev.map((e) => (e._key !== key ? e : { ...e, [field]: parseInt(value) || 0 })));
-
-  const actuals = planData?.actuals ?? {};
-
-  const totalTarget = entries.reduce((s, e) => s + (e.targetBales || 0), 0);
-  const totalActual = entries.reduce((s, e) => s + (actuals[e.workerId] ?? 0), 0);
+  const updateEntry = (
+    positionId: number,
+    patch: Partial<Pick<PlannerEntry, "targetBales" | "bonusPerExtraBale" | "bonusEnabled">>
+  ) => {
+    setEntries((current) => current.map((entry) => (entry.positionId === positionId ? { ...entry, ...patch } : entry)));
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" data-testid="button-production-planner">
-          <ClipboardList className="h-4 w-4 mr-1" />
+          <ClipboardList className="mr-1 h-4 w-4" />
           Production Planner
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0">
-        <DialogHeader className="px-6 pt-5 pb-3 border-b shrink-0">
+
+      <DialogContent className="flex max-h-[92vh] max-w-[96vw] flex-col p-0 xl:max-w-7xl">
+        <DialogHeader className="shrink-0 border-b px-6 pb-3 pt-5">
           <DialogTitle className="flex items-center gap-2">
             <ClipboardList className="h-5 w-5" />
-            Production Planner
+            Position Production Planner
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-          {/* Controls row */}
+        <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Date</span>
               <Input
                 type="date"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-40 text-sm"
+                onChange={(event) => setDate(event.target.value)}
+                className="w-40"
                 data-testid="input-plan-date"
               />
             </div>
@@ -249,207 +261,245 @@ export default function ProductionPlannerDialog() {
               variant="outline"
               size="sm"
               onClick={() => copyPreviousMutation.mutate()}
-              disabled={copyPreviousMutation.isPending}
-              data-testid="button-copy-yesterday"
+              disabled={copyPreviousMutation.isPending || isLoading}
+              data-testid="button-copy-previous-position-plan"
             >
               {copyPreviousMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
               ) : (
-                <Copy className="h-4 w-4 mr-1" />
+                <Copy className="mr-1 h-4 w-4" />
               )}
               Copy Previous Plan
             </Button>
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
+              {planner?.plan?.saved ? (
+                <Badge variant="secondary">Saved snapshot</Badge>
+              ) : (
+                <Badge variant="outline">Preview / not saved</Badge>
+              )}
               <Button
                 size="sm"
                 onClick={() => saveMutation.mutate()}
-                disabled={saveMutation.isPending}
-                data-testid="button-save-plan"
+                disabled={saveMutation.isPending || isLoading || isError}
+                data-testid="button-save-position-plan"
               >
                 {saveMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                 ) : (
-                  <Save className="h-4 w-4 mr-1" />
+                  <Save className="mr-1 h-4 w-4" />
                 )}
                 Save Plan
               </Button>
             </div>
           </div>
 
-          {/* Summary strip */}
-          {entries.length > 0 && (
-            <div className="flex gap-4 p-3 rounded-md bg-muted/50 text-sm">
-              <div>
-                <span className="text-muted-foreground">Total Target: </span>
-                <span className="font-semibold">{totalTarget} bales</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Total Actual: </span>
-                <span
-                  className={`font-semibold ${totalActual >= totalTarget && totalTarget > 0 ? "text-green-600 dark:text-green-400" : ""}`}
-                >
-                  {totalActual} bales
-                </span>
-              </div>
-              {totalTarget > 0 && (
-                <div className="ml-auto">
-                  {totalActual >= totalTarget ? (
-                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                      Target Met
-                    </Badge>
-                  ) : (
-                    <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                      {totalTarget - totalActual} short
-                    </Badge>
-                  )}
+          {!isLoading && !isError && (
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Total Target
                 </div>
-              )}
+                <div className="mt-1 text-xl font-bold">{summary.totalTarget}</div>
+              </div>
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Total Actual
+                </div>
+                <div className="mt-1 text-xl font-bold">{summary.totalActual}</div>
+              </div>
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Extra Bales
+                </div>
+                <div className="mt-1 text-xl font-bold">{summary.totalExtra}</div>
+              </div>
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Suggested Bonus
+                </div>
+                <div className="mt-1 text-xl font-bold">${money(summary.totalBonusPool)}</div>
+              </div>
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Bonus-Ineligible
+                </div>
+                <div className="mt-1 text-xl font-bold">{summary.unattributedBales}</div>
+                <div className="text-[10px] text-muted-foreground">worker-assigned bales with no position</div>
+              </div>
             </div>
           )}
 
-          {/* Workers table */}
-          {planLoading ? (
-            <div className="flex items-center justify-center py-10 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading plan…
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Loading position production…
+            </div>
+          ) : isError ? (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+              Could not load the production planner: {(error as Error)?.message || "Unknown error"}
+            </div>
+          ) : previewEntries.length === 0 ? (
+            <div className="rounded-xl border p-10 text-center text-muted-foreground">
+              <Target className="mx-auto mb-2 h-8 w-8 opacity-50" />
+              No Production Positions are configured for this date. Create positions and teams in Bale Stock Entry →
+              Production Positions.
             </div>
           ) : (
-            <div className="border rounded-md overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 border-b">
+            <div className="overflow-x-auto rounded-xl border">
+              <table className="min-w-[1050px] w-full text-sm">
+                <thead className="border-b bg-muted/40">
                   <tr>
-                    <th className="text-left px-3 py-2 font-semibold">Worker</th>
-                    <th className="text-right px-3 py-2 font-semibold w-28">Workers</th>
-                    <th className="text-right px-3 py-2 font-semibold w-28">Target</th>
-                    <th className="text-right px-3 py-2 font-semibold w-24">Actual</th>
-                    <th className="text-center px-3 py-2 font-semibold w-20">Status</th>
-                    <th className="w-10 px-2" />
+                    <th className="px-3 py-2 text-left font-semibold">Position</th>
+                    <th className="px-3 py-2 text-left font-semibold">Team Members</th>
+                    <th className="w-24 px-3 py-2 text-right font-semibold">Target</th>
+                    <th className="w-20 px-3 py-2 text-right font-semibold">Actual</th>
+                    <th className="w-20 px-3 py-2 text-right font-semibold">Extra</th>
+                    <th className="w-28 px-3 py-2 text-right font-semibold">$/Extra Bale</th>
+                    <th className="w-28 px-3 py-2 text-right font-semibold">Bonus Pool</th>
+                    <th className="w-28 px-3 py-2 text-right font-semibold">Per Person</th>
+                    <th className="w-28 px-3 py-2 text-center font-semibold">Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {entries.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">
-                        No workers in plan. Add workers below or copy from a previous plan.
-                      </td>
-                    </tr>
-                  ) : (
-                    entries.map((entry) => {
-                      const actual = actuals[entry.workerId] ?? 0;
-                      const met = entry.targetBales > 0 && actual >= entry.targetBales;
-                      const notMet = entry.targetBales > 0 && actual < entry.targetBales;
-
-                      return (
-                        <tr key={entry._key} className="border-b last:border-0 hover:bg-muted/30">
-                          {/* Worker name */}
-                          <td className="px-3 py-2 min-w-[180px]">
-                            <WorkerCombobox
-                              value={entry.workerId}
-                              onChange={(id, name) => updateWorker(entry._key, id, name)}
-                              workers={workers}
-                              entryKey={entry._key}
-                            />
-                          </td>
-
-                          {/* Worker count */}
-                          <td className="px-3 py-2">
+                  {previewEntries.map((entry) => {
+                    const shortBy = Math.max(entry.targetBales - entry.actualBales, 0);
+                    const splitText =
+                      entry.memberCount === 0
+                        ? "—"
+                        : entry.perWorkerMin === entry.perWorkerMax
+                          ? `$${money(entry.perWorkerMin)}`
+                          : `$${money(entry.perWorkerMin)}–$${money(entry.perWorkerMax)}`;
+                    return (
+                      <tr key={entry.positionId} className="border-b last:border-0 align-top hover:bg-muted/20">
+                        <td className="px-3 py-3">
+                          <div className="font-bold">{entry.positionName}</div>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            <Badge variant={entry.bonusEnabled ? "default" : "outline"} className="text-[10px]">
+                              Bonus {entry.bonusEnabled ? "On" : "Off"}
+                            </Badge>
+                            {entry.saved && (
+                              <Badge variant="secondary" className="text-[10px]">
+                                Snapshotted
+                              </Badge>
+                            )}
+                          </div>
+                        </td>
+                        <td className="max-w-sm px-3 py-3">
+                          <div className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
+                            <Users className="h-3.5 w-3.5" /> {entry.memberCount} worker
+                            {entry.memberCount === 1 ? "" : "s"}
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {entry.members.length ? (
+                              entry.members.map((member) => {
+                                const allocation =
+                                  entry.allocations.find((item) => item.workerId === member.workerId)?.amount ?? 0;
+                                return (
+                                  <Badge
+                                    key={member.workerId}
+                                    variant="outline"
+                                    className="whitespace-normal text-[10px]"
+                                    title={`${member.workerName}: $${money(allocation)}`}
+                                  >
+                                    {member.workerName}
+                                    {entry.bonusPool > 0 ? ` · $${money(allocation)}` : ""}
+                                  </Badge>
+                                );
+                              })
+                            ) : (
+                              <span className="text-xs italic text-muted-foreground">No qualifying team members</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-3 py-3">
+                          <Input
+                            type="number"
+                            min={0}
+                            step={1}
+                            value={entry.targetBales}
+                            onChange={(event) =>
+                              updateEntry(entry.positionId, {
+                                targetBales: Math.max(0, parseInt(event.target.value) || 0),
+                              })
+                            }
+                            className="h-8 text-right font-mono"
+                            data-testid={`input-position-target-${entry.positionId}`}
+                          />
+                        </td>
+                        <td className="px-3 py-3 text-right font-mono font-bold">{entry.actualBales}</td>
+                        <td className="px-3 py-3 text-right font-mono font-bold">{entry.extraBales}</td>
+                        <td className="px-3 py-3">
+                          <div className="space-y-1">
                             <Input
                               type="number"
                               min={0}
-                              value={entry.workerCount}
-                              onChange={(e) => updateEntry(entry._key, "workerCount", e.target.value)}
-                              className="h-8 text-sm text-right"
-                              data-testid={`input-worker-count-${entry._key}`}
+                              step="0.01"
+                              value={entry.bonusPerExtraBale}
+                              onChange={(event) =>
+                                updateEntry(entry.positionId, {
+                                  bonusPerExtraBale: Math.max(0, Number(event.target.value) || 0),
+                                })
+                              }
+                              className="h-8 text-right font-mono"
+                              disabled={!entry.bonusEnabled}
+                              data-testid={`input-position-bonus-rate-${entry.positionId}`}
                             />
-                          </td>
-
-                          {/* Target */}
-                          <td className="px-3 py-2">
-                            <Input
-                              type="number"
-                              min={0}
-                              value={entry.targetBales}
-                              onChange={(e) => updateEntry(entry._key, "targetBales", e.target.value)}
-                              className="h-8 text-sm text-right"
-                              data-testid={`input-target-${entry._key}`}
-                            />
-                          </td>
-
-                          {/* Actual */}
-                          <td className="px-3 py-2 text-right font-mono font-semibold">{actual}</td>
-
-                          {/* Status */}
-                          <td className="px-3 py-2 text-center">
-                            {met && <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />}
-                            {notMet && <XCircle className="h-5 w-5 text-red-500 mx-auto" />}
-                            {!met && !notMet && <span className="text-muted-foreground text-xs">—</span>}
-                          </td>
-
-                          {/* Remove */}
-                          <td className="px-2 py-2 text-center">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => removeRow(entry._key)}
-                              data-testid={`button-remove-${entry._key}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
+                            <label className="flex cursor-pointer items-center justify-end gap-1.5 text-[10px] text-muted-foreground">
+                              <input
+                                type="checkbox"
+                                checked={entry.bonusEnabled}
+                                onChange={(event) =>
+                                  updateEntry(entry.positionId, { bonusEnabled: event.target.checked })
+                                }
+                              />
+                              Enabled
+                            </label>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 text-right font-mono font-bold">${money(entry.bonusPool)}</td>
+                        <td className="px-3 py-3 text-right">
+                          <div className="font-mono font-bold">{splitText}</div>
+                          {!entry.distributable && entry.bonusPool > 0 && (
+                            <div className="mt-1 text-[10px] font-medium text-destructive">
+                              No workers to divide pool
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-center">
+                          {entry.targetBales <= 0 ? (
+                            <Badge variant="outline">No target</Badge>
+                          ) : entry.targetMet ? (
+                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-200">
+                              Target met
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-900 dark:text-red-200">
+                              {shortBy} short
+                            </Badge>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
 
-          {/* Add worker + summary */}
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={addRow}
-              disabled={workers.length === 0}
-              data-testid="button-add-worker-row"
-            >
-              <Plus className="h-4 w-4 mr-1" /> Add Worker
-            </Button>
-            {entries.length > 0 && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="font-semibold">
-                  {entries.length} worker{entries.length !== 1 ? "s" : ""}
-                </span>
-                <span className="text-muted-foreground">·</span>
-                <span className="text-muted-foreground">{totalActual} bales made</span>
-                {totalTarget > 0 && (
-                  <>
-                    <span className="text-muted-foreground">·</span>
-                    {totalActual >= totalTarget ? (
-                      <span className="font-semibold text-green-600 dark:text-green-400">
-                        +{totalActual - totalTarget} exceeded
-                      </span>
-                    ) : (
-                      <span className="font-semibold text-red-600 dark:text-red-400">
-                        {totalTarget - totalActual} short
-                      </span>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Plan Notes</label>
+            <Textarea
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="Optional notes for this production day…"
+              rows={3}
+              maxLength={5000}
+            />
           </div>
 
-          {/* Notes */}
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Notes (optional)</label>
-            <Input
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g. short shift, holiday schedule…"
-              className="text-sm"
-              data-testid="input-plan-notes"
-            />
+          <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-xs text-muted-foreground">
+            <strong className="text-foreground">Preview only:</strong> Phase 3 calculates suggested production bonuses
+            but does not create payroll, accounting entries, cash payments, or payable transactions.
+            Acceptance/rejection and payroll application are Phase 4.
           </div>
         </div>
       </DialogContent>

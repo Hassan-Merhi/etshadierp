@@ -1,10 +1,4 @@
 import { toArrayBuffer } from "../../lib/bufferCompatibility";
-/**
- * factoryPayrollRoutes: FactoryPayrollExport endpoints.
- *
- * Registered by ./index.ts in the original order; Express resolves
- * first-match, so that order is behaviour.
- */
 import type { Express } from "express";
 import { logAudit } from "../helpers/auditHelpers";
 import { getErrorMessage } from "../../lib/httpHandlers";
@@ -15,18 +9,41 @@ import path from "path";
 import fs from "fs";
 import ExcelJS from "exceljs";
 import { factoryWorkers, factoryPayrolls, companies } from "@shared/schema";
+import { getProductionBonusTotalsForPayrollIds } from "../../services/payroll/productionBonusPayrollService";
+
+function money(value: string | number | null | undefined): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+async function auditExport(req: any, companyId: number, type: "PDF" | "Excel", startDate: string, endDate: string) {
+  try {
+    await logAudit({
+      userId: req.session.userId!,
+      username: req.session.username || req.session.userId!,
+      companyId,
+      action: "export",
+      tableName: "factory_payrolls",
+      recordId: null,
+      recordIdentifier: `${type} export — period ${startDate} to ${endDate}`,
+      changes: null,
+    });
+  } catch (auditErr) {
+    logger.error(`[payroll export-${type.toLowerCase()} audit] non-fatal`, { error: auditErr });
+  }
+}
 
 export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: any, db: any) {
   app.post("/api/factory/payroll/export-pdf", requireAuth, async (req: any, res: any) => {
     try {
-      const { companyId, startDate, endDate } = req.body;
-      if (!companyId || !startDate || !endDate) {
+      const companyId = Number(req.body?.companyId);
+      const startDate = String(req.body?.startDate ?? "");
+      const endDate = String(req.body?.endDate ?? "");
+      if (!Number.isInteger(companyId) || companyId <= 0 || !startDate || !endDate) {
         return res.status(400).json({ message: "companyId, startDate, and endDate are required" });
       }
 
       const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
-      const companyName = company?.name || "Company";
-
       const payrollData = await db
         .select({
           payroll: factoryPayrolls,
@@ -45,24 +62,15 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
         )
         .orderBy(factoryWorkers.fullName);
 
-      const doc = new PDFDocument({ margin: 30, size: "A4", layout: "landscape" });
+      const productionTotals = await getProductionBonusTotalsForPayrollIds(
+        db,
+        payrollData.map((row: any) => row.payroll.id)
+      );
 
+      const doc = new PDFDocument({ margin: 30, size: "A4", layout: "landscape" });
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename=payroll_${startDate}_${endDate}.pdf`);
-      try {
-        await logAudit({
-          userId: req.session.userId!,
-          username: (req.session as any).username || req.session.userId!,
-          companyId: parseInt(companyId),
-          action: "export",
-          tableName: "factory_payrolls",
-          recordId: null,
-          recordIdentifier: `PDF export — period ${startDate} to ${endDate}`,
-          changes: null,
-        });
-      } catch (auditErr) {
-        logger.error("[payroll export-pdf audit] non-fatal:", { error: auditErr });
-      }
+      await auditExport(req, companyId, "PDF", startDate, endDate);
       doc.pipe(res);
 
       const hmdLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
@@ -72,52 +80,67 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
           doc.moveDown(0.5);
         } catch {}
       }
-      doc.fontSize(12).font("Helvetica").text("Factory Payroll Report", { align: "center" });
-      doc.fontSize(10).text(`Period: ${startDate} to ${endDate}`, { align: "center" });
+      doc
+        .fontSize(12)
+        .font("Helvetica")
+        .text(company?.name || "HMD INTERNATIONAL GROUP", { align: "center" });
+      doc.fontSize(11).text("Factory Payroll Report", { align: "center" });
+      doc.fontSize(9).text(`Period: ${startDate} to ${endDate}`, { align: "center" });
       doc.moveDown(1);
 
-      // Columns: Code | Name | Days(P/T) | Absent | Base | Bale | KG | OT | Bonus | Deduct | Net
-      const headers = ["Code", "Name", "Days", "Absent", "Base", "Bale", "KG", "OT", "Bonus", "Deduct", "Net"];
-      const colWidths = [50, 110, 55, 50, 62, 55, 55, 50, 50, 52, 65];
+      const headers = [
+        "Code",
+        "Name",
+        "Days",
+        "Absent",
+        "Base",
+        "Bale",
+        "KG",
+        "OT",
+        "Prod Bonus",
+        "Other Bonus",
+        "Deduct",
+        "Net",
+      ];
+      const colWidths = [45, 105, 50, 45, 55, 50, 50, 45, 62, 62, 50, 60];
       const startX = 30;
       let y = doc.y;
 
-      doc.fontSize(8).font("Helvetica-Bold");
+      doc.fontSize(7).font("Helvetica-Bold");
       let x = startX;
-      headers.forEach((h, i) => {
-        doc.text(h, x, y, { width: colWidths[i], align: i >= 2 ? "right" : "left" });
-        x += colWidths[i];
+      headers.forEach((header, index) => {
+        doc.text(header, x, y, { width: colWidths[index], align: index >= 2 ? "right" : "left" });
+        x += colWidths[index];
       });
-
       y += 15;
       doc
         .moveTo(startX, y)
-        .lineTo(startX + colWidths.reduce((a, b) => a + b, 0), y)
+        .lineTo(startX + colWidths.reduce((sum, width) => sum + width, 0), y)
         .stroke();
       y += 5;
-
       doc.font("Helvetica").fontSize(7);
 
-      const totals = { base: 0, bale: 0, kg: 0, ot: 0, bonus: 0, deduct: 0, net: 0 };
-
+      const totals = { base: 0, bale: 0, kg: 0, ot: 0, prodBonus: 0, otherBonus: 0, deduct: 0, net: 0 };
       for (const row of payrollData) {
         const p = row.payroll;
-        const base = parseFloat(p.baseSalary || "0");
-        const bale = parseFloat(p.baleEarnings || "0");
-        const kg = parseFloat(p.kgEarnings || "0");
-        const ot = parseFloat(p.overtimePay || "0");
-        const bonus = parseFloat(p.bonuses || "0");
-        const deduct = parseFloat(p.deductions || "0");
-        const net = parseFloat(p.netSalary || "0");
+        const base = money(p.baseSalary);
+        const bale = money(p.baleEarnings);
+        const kg = money(p.kgEarnings);
+        const ot = money(p.overtimePay);
+        const prodBonus = productionTotals.get(p.id)?.approved ?? 0;
+        const otherBonus = Math.max(0, money(p.bonuses) - prodBonus);
+        const deduct = money(p.deductions);
+        const net = money(p.netSalary);
         const totalDays = p.totalWorkingDays || 0;
-        const present = parseFloat(p.presentDays || "0");
-        const absent = parseFloat(p.absentDays || "0");
+        const present = money(p.presentDays);
+        const absent = money(p.absentDays);
 
         totals.base += base;
         totals.bale += bale;
         totals.kg += kg;
         totals.ot += ot;
-        totals.bonus += bonus;
+        totals.prodBonus += prodBonus;
+        totals.otherBonus += otherBonus;
         totals.deduct += deduct;
         totals.net += net;
 
@@ -125,10 +148,8 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
           doc.addPage();
           y = 30;
         }
-
         const daysLabel = totalDays > 0 ? `${present % 1 === 0 ? present.toFixed(0) : present}/${totalDays}` : "—";
         const absentLabel = totalDays > 0 ? (absent % 1 === 0 ? absent.toFixed(0) : String(absent)) : "—";
-
         const values = [
           row.workerCode || "-",
           row.workerName || "-",
@@ -138,15 +159,15 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
           bale.toFixed(2),
           kg.toFixed(2),
           ot.toFixed(2),
-          bonus.toFixed(2),
+          prodBonus.toFixed(2),
+          otherBonus.toFixed(2),
           deduct.toFixed(2),
           net.toFixed(2),
         ];
-
         x = startX;
-        values.forEach((v, i) => {
-          doc.text(v, x, y, { width: colWidths[i], align: i >= 2 ? "right" : "left" });
-          x += colWidths[i];
+        values.forEach((value, index) => {
+          doc.text(value, x, y, { width: colWidths[index], align: index >= 2 ? "right" : "left" });
+          x += colWidths[index];
         });
         y += 12;
       }
@@ -154,11 +175,10 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
       y += 5;
       doc
         .moveTo(startX, y)
-        .lineTo(startX + colWidths.reduce((a, b) => a + b, 0), y)
+        .lineTo(startX + colWidths.reduce((sum, width) => sum + width, 0), y)
         .stroke();
       y += 5;
-
-      doc.font("Helvetica-Bold").fontSize(8);
+      doc.font("Helvetica-Bold").fontSize(7);
       const totalValues = [
         "",
         "TOTALS",
@@ -168,38 +188,35 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
         totals.bale.toFixed(2),
         totals.kg.toFixed(2),
         totals.ot.toFixed(2),
-        totals.bonus.toFixed(2),
+        totals.prodBonus.toFixed(2),
+        totals.otherBonus.toFixed(2),
         totals.deduct.toFixed(2),
         totals.net.toFixed(2),
       ];
       x = startX;
-      totalValues.forEach((v, i) => {
-        doc.text(v, x, y, { width: colWidths[i], align: i >= 2 ? "right" : "left" });
-        x += colWidths[i];
+      totalValues.forEach((value, index) => {
+        doc.text(value, x, y, { width: colWidths[index], align: index >= 2 ? "right" : "left" });
+        x += colWidths[index];
       });
-
       doc.end();
     } catch (error: unknown) {
-      logger.error("Error exporting payroll PDF:", { error: error });
-      res.status(500).json({ message: getErrorMessage(error) });
+      logger.error("Error exporting payroll PDF", { error });
+      if (!res.headersSent) res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
   app.post("/api/factory/payroll/export-excel", requireAuth, async (req: any, res: any) => {
     try {
-      const { companyId, startDate, endDate } = req.body;
-      if (!companyId || !startDate || !endDate) {
+      const companyId = Number(req.body?.companyId);
+      const startDate = String(req.body?.startDate ?? "");
+      const endDate = String(req.body?.endDate ?? "");
+      if (!Number.isInteger(companyId) || companyId <= 0 || !startDate || !endDate) {
         return res.status(400).json({ message: "companyId, startDate, and endDate are required" });
       }
 
       const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
-      const companyName = company?.name || "Company";
-
       const payrollData = await db
-        .select({
-          payroll: factoryPayrolls,
-          worker: factoryWorkers,
-        })
+        .select({ payroll: factoryPayrolls, worker: factoryWorkers })
         .from(factoryPayrolls)
         .leftJoin(factoryWorkers, eq(factoryPayrolls.workerId, factoryWorkers.id))
         .where(
@@ -211,36 +228,41 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
         )
         .orderBy(factoryWorkers.fullName);
 
+      const productionTotals = await getProductionBonusTotalsForPayrollIds(
+        db,
+        payrollData.map((row: any) => row.payroll.id)
+      );
+
       const workbook = new ExcelJS.Workbook();
-      const xlogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
-      let xlogoId: number | null = null;
+      const logoPath = path.join(process.cwd(), "server", "hmd-logo.png");
+      let logoId: number | null = null;
       try {
-        if (fs.existsSync(xlogoPath)) {
-          const buf = fs.readFileSync(xlogoPath);
-          xlogoId = workbook.addImage({ buffer: toArrayBuffer(buf), extension: "jpeg" });
+        if (fs.existsSync(logoPath)) {
+          const buffer = fs.readFileSync(logoPath);
+          logoId = workbook.addImage({ buffer: toArrayBuffer(buffer), extension: "jpeg" });
         }
       } catch {}
 
-      function addSheetHeader(sheet: ExcelJS.Worksheet, title: string, numCols: number, logoCenterCol: number = 0) {
+      function addSheetHeader(sheet: ExcelJS.Worksheet, title: string, numCols: number, logoCenterCol = 0) {
         const logoRow = sheet.addRow([]);
         logoRow.height = 90;
-        if (xlogoId !== null)
-          sheet.addImage(xlogoId, { tl: { col: logoCenterCol, row: 0 }, ext: { width: 300, height: 90 } });
-        const rName = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
-        rName.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } };
-        rName.getCell(1).alignment = { horizontal: "center" };
-        sheet.mergeCells(rName.number, 1, rName.number, numCols);
-        const rTitle = sheet.addRow([title]);
-        rTitle.getCell(1).font = { bold: true, size: 12 };
-        rTitle.getCell(1).alignment = { horizontal: "center" };
-        sheet.mergeCells(rTitle.number, 1, rTitle.number, numCols);
-        const rPeriod = sheet.addRow([`Period: ${startDate} to ${endDate}`]);
-        rPeriod.getCell(1).font = { size: 10, color: { argb: "FF555555" } };
-        sheet.mergeCells(rPeriod.number, 1, rPeriod.number, numCols);
+        if (logoId !== null)
+          sheet.addImage(logoId, { tl: { col: logoCenterCol, row: 0 }, ext: { width: 300, height: 90 } });
+        const nameRow = sheet.addRow([company?.name || "HMD INTERNATIONAL GROUP"]);
+        nameRow.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } };
+        nameRow.getCell(1).alignment = { horizontal: "center" };
+        sheet.mergeCells(nameRow.number, 1, nameRow.number, numCols);
+        const titleRow = sheet.addRow([title]);
+        titleRow.getCell(1).font = { bold: true, size: 12 };
+        titleRow.getCell(1).alignment = { horizontal: "center" };
+        sheet.mergeCells(titleRow.number, 1, titleRow.number, numCols);
+        const periodRow = sheet.addRow([`Period: ${startDate} to ${endDate}`]);
+        periodRow.getCell(1).font = { size: 10, color: { argb: "FF555555" } };
+        sheet.mergeCells(periodRow.number, 1, periodRow.number, numCols);
         sheet.addRow([]);
       }
 
-      const SUMMARY_COLS = 18;
+      const SUMMARY_COLS = 19;
       const summarySheet = workbook.addWorksheet("Payroll Summary");
       summarySheet.columns = [
         { key: "code", width: 15 },
@@ -254,7 +276,8 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
         { key: "bale", width: 14 },
         { key: "kg", width: 14 },
         { key: "ot", width: 14 },
-        { key: "bonus", width: 12 },
+        { key: "productionBonus", width: 16 },
+        { key: "otherBonus", width: 14 },
         { key: "deduct", width: 12 },
         { key: "advance", width: 12 },
         { key: "net", width: 14 },
@@ -262,7 +285,7 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
         { key: "kgProcessed", width: 14 },
         { key: "status", width: 12 },
       ];
-      addSheetHeader(summarySheet, "Payroll Summary", SUMMARY_COLS, 6.5);
+      addSheetHeader(summarySheet, "Payroll Summary", SUMMARY_COLS, 7);
       const headerRow = summarySheet.addRow([
         "Employee Code",
         "Name",
@@ -275,7 +298,8 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
         "Bale Earnings",
         "KG Earnings",
         "Overtime Pay",
-        "Bonuses",
+        "Production Bonus",
+        "Other Bonus",
         "Deductions",
         "Advances",
         "Net Salary",
@@ -283,7 +307,6 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
         "KG Processed",
         "Status",
       ]);
-      headerRow.font = { bold: true };
       headerRow.alignment = { horizontal: "center" };
       headerRow.eachCell((cell) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F3864" } };
@@ -293,34 +316,36 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
       for (const row of payrollData) {
         const p = row.payroll;
         const w = row.worker;
+        const productionBonus = productionTotals.get(p.id)?.approved ?? 0;
         summarySheet.addRow({
           code: w?.employeeCode || "-",
           name: w?.fullName || "-",
           position: w?.position || "-",
           salaryType: w?.salaryType || "-",
           totalDays: p.totalWorkingDays || 0,
-          presentDays: parseFloat(p.presentDays || "0"),
-          absentDays: parseFloat(p.absentDays || "0"),
-          base: parseFloat(p.baseSalary || "0"),
-          bale: parseFloat(p.baleEarnings || "0"),
-          kg: parseFloat(p.kgEarnings || "0"),
-          ot: parseFloat(p.overtimePay || "0"),
-          bonus: parseFloat(p.bonuses || "0"),
-          deduct: parseFloat(p.deductions || "0"),
-          advance: parseFloat(p.advances || "0"),
-          net: parseFloat(p.netSalary || "0"),
+          presentDays: money(p.presentDays),
+          absentDays: money(p.absentDays),
+          base: money(p.baseSalary),
+          bale: money(p.baleEarnings),
+          kg: money(p.kgEarnings),
+          ot: money(p.overtimePay),
+          productionBonus,
+          otherBonus: Math.max(0, money(p.bonuses) - productionBonus),
+          deduct: money(p.deductions),
+          advance: money(p.advances),
+          net: money(p.netSalary),
           balesCount: p.balesCount || 0,
-          kgProcessed: parseFloat(p.kgProcessed || "0"),
+          kgProcessed: money(p.kgProcessed),
           status: p.status,
         });
       }
-
       [
         "base",
         "bale",
         "kg",
         "ot",
-        "bonus",
+        "productionBonus",
+        "otherBonus",
         "deduct",
         "advance",
         "net",
@@ -328,8 +353,7 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
         "presentDays",
         "absentDays",
       ].forEach((key) => {
-        const col = summarySheet.getColumn(key);
-        col.numFmt = "#,##0.0";
+        summarySheet.getColumn(key).numFmt = "#,##0.00";
       });
 
       const DETAILS_COLS = 12;
@@ -363,7 +387,6 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
         "Date Joined",
         "Payment Method",
       ]);
-      detailsHeaderRow.font = { bold: true };
       detailsHeaderRow.alignment = { horizontal: "center" };
       detailsHeaderRow.eachCell((cell) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F3864" } };
@@ -372,51 +395,36 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
 
       const seenWorkers = new Set<number>();
       for (const row of payrollData) {
-        const w = row.worker;
-        if (!w || seenWorkers.has(w.id)) continue;
-        seenWorkers.add(w.id);
+        const worker = row.worker;
+        if (!worker || seenWorkers.has(worker.id)) continue;
+        seenWorkers.add(worker.id);
         detailsSheet.addRow({
-          code: w.employeeCode || "-",
-          name: w.fullName || "-",
-          position: w.position || "-",
-          department: w.department || "-",
-          salaryType: w.salaryType || "-",
-          baseSalary: parseFloat(w.baseSalary || "0"),
-          perBaleRate: parseFloat(w.perBaleRate || "0"),
-          perKgRate: parseFloat(w.perKgRate || "0"),
-          overtimeRate: parseFloat(w.overtimeRate || "0"),
-          phone: w.phone1 || "-",
-          dateJoined: w.dateJoined || "-",
-          paymentMethod: w.paymentMethod || "-",
+          code: worker.employeeCode || "-",
+          name: worker.fullName || "-",
+          position: worker.position || "-",
+          department: worker.department || "-",
+          salaryType: worker.salaryType || "-",
+          baseSalary: money(worker.baseSalary),
+          perBaleRate: money(worker.perBaleRate),
+          perKgRate: money(worker.perKgRate),
+          overtimeRate: money(worker.overtimeRate),
+          phone: worker.phone1 || "-",
+          dateJoined: worker.dateJoined || "-",
+          paymentMethod: worker.paymentMethod || "-",
         });
       }
-
       ["baseSalary", "perBaleRate", "perKgRate", "overtimeRate"].forEach((key) => {
-        const col = detailsSheet.getColumn(key);
-        col.numFmt = "#,##0.00";
+        detailsSheet.getColumn(key).numFmt = "#,##0.00";
       });
 
       const xlsBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
-      try {
-        await logAudit({
-          userId: req.session.userId!,
-          username: (req.session as any).username || req.session.userId!,
-          companyId: parseInt(companyId),
-          action: "export",
-          tableName: "factory_payrolls",
-          recordId: null,
-          recordIdentifier: `Excel export — period ${startDate} to ${endDate}`,
-          changes: null,
-        });
-      } catch (auditErr) {
-        logger.error("[payroll export-excel audit] non-fatal:", { error: auditErr });
-      }
+      await auditExport(req, companyId, "Excel", startDate, endDate);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename=payroll_${startDate}_${endDate}.xlsx`);
       res.setHeader("Content-Length", xlsBuffer.byteLength);
       res.end(xlsBuffer);
     } catch (error: unknown) {
-      logger.error("Error exporting payroll Excel:", { error: error });
+      logger.error("Error exporting payroll Excel", { error });
       if (!res.headersSent) res.status(500).json({ message: getErrorMessage(error) });
     }
   });

@@ -15,6 +15,14 @@ export interface PayrollRecord {
   kgEarnings: string;
   overtimePay: string;
   bonuses: string;
+  productionBonus: string;
+  pendingProductionBonus: string;
+  rejectedProductionBonus: string;
+  suggestedProductionBonus: string;
+  productionBonusPendingCount: number;
+  productionBonusApprovedCount: number;
+  productionBonusRejectedCount: number;
+  otherBonuses: string;
   deductions: string;
   advances: string;
   netSalary: string;

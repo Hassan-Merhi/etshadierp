@@ -42,6 +42,18 @@ const ACCEPTED = {
       "migrating off xlsx retires this permanently.",
     reviewOn: "2026-11-01",
   },
+  "js-yaml": {
+    reason:
+      "GHSA-5p4m-2wfm-xmqj (quadratic CPU consumption in !!omap resolution). " +
+      "The affected js-yaml 4.x instance is transitive through Puppeteer 24 -> " +
+      "cosmiconfig 9 and is only used to parse Puppeteer configuration files from " +
+      "the trusted deployment filesystem; application uploads and request bodies do " +
+      "not flow through this parser. The v4 line has no patched release. The clean " +
+      "exit is Puppeteer 25+, which replaces cosmiconfig, but that is a breaking " +
+      "major upgrade because executablePath/defaultArgs became async and the scraper " +
+      "call sites must be migrated together rather than forced through an override.",
+    reviewOn: "2026-09-01",
+  },
 };
 
 const BLOCKING = new Set(["high", "critical"]);

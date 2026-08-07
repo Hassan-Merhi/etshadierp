@@ -1,5 +1,15 @@
 import { eq, and, isNull, sql } from "drizzle-orm";
 import { db } from "../../db";
+import {
+  addInventoryValues,
+  inventoryMoney,
+  inventoryQuantity,
+  inventoryUnitCost,
+  multiplyInventoryValues,
+  subtractInventoryValues,
+  toInventoryDecimal,
+  weightedAverageInventoryCost,
+} from "../../lib/inventoryMath";
 import * as schema from "@shared/schema";
 import type { StockTransferItem, StockAdjustmentItem } from "@shared/schema";
 
@@ -16,8 +26,6 @@ export async function createStockTransfer(
 
     if (!items || items.length === 0) throw new Error("No items provided for stock transfer");
 
-    // Sort by stockItemId so concurrent transfers always lock rows in the same
-    // order — prevents deadlocks when two operations touch the same items.
     const sortedTransferItems = [...items].sort((a, b) => a.stockItemId - b.stockItemId);
 
     const [transfer] = await tx
@@ -33,9 +41,9 @@ export async function createStockTransfer(
 
     const transferItems: StockTransferItem[] = [];
     for (const item of sortedTransferItems) {
-      const quantity = parseFloat(item.quantity);
-      const rate = parseFloat(item.rate);
-      const totalAmount = quantity * rate;
+      const quantity = toInventoryDecimal(item.quantity);
+      const rate = toInventoryDecimal(item.rate);
+      const totalAmount = multiplyInventoryValues(quantity, rate);
 
       const [transferItem] = await tx
         .insert(schema.stockTransferItems)
@@ -43,9 +51,9 @@ export async function createStockTransfer(
           transferId: transfer.id,
           stockItemId: item.stockItemId,
           sourceLocationId: item.sourceLocationId,
-          quantity: item.quantity,
-          rate: item.rate,
-          totalAmount: totalAmount.toFixed(2),
+          quantity: inventoryQuantity(quantity),
+          rate: inventoryUnitCost(rate),
+          totalAmount: inventoryMoney(totalAmount),
         })
         .returning();
 
@@ -58,17 +66,17 @@ export async function createStockTransfer(
         const sourceInventory = sourceInventoryRows.rows?.[0] || sourceInventoryRows[0];
 
         if (sourceInventory) {
-          const currentQty = parseFloat(sourceInventory.quantity);
-          const currentRate = parseFloat(sourceInventory.average_rate);
-          const newQty = currentQty - quantity;
-          const newValue = newQty > 0 ? newQty * currentRate : 0;
+          const currentQty = toInventoryDecimal(sourceInventory.quantity);
+          const currentRate = toInventoryDecimal(sourceInventory.average_rate);
+          const newQty = subtractInventoryValues(currentQty, quantity);
+          const newValue = newQty.isPositive() ? multiplyInventoryValues(newQty, currentRate) : toInventoryDecimal(0);
 
           await tx
             .update(schema.inventory)
             .set({
-              quantity: newQty.toFixed(3),
-              averageRate: currentRate.toFixed(2),
-              totalValue: newValue.toFixed(2),
+              quantity: inventoryQuantity(newQty),
+              averageRate: inventoryUnitCost(currentRate),
+              totalValue: inventoryMoney(newValue),
               lastUpdated: new Date(),
             })
             .where(eq(schema.inventory.id, sourceInventory.id));
@@ -80,18 +88,18 @@ export async function createStockTransfer(
         const destInventory = destInventoryRows.rows?.[0] || destInventoryRows[0];
 
         if (destInventory) {
-          const currentQty = parseFloat(destInventory.quantity);
-          const currentRate = parseFloat(destInventory.average_rate || "0");
-          const newQty = currentQty + quantity;
-          const newRate = newQty > 0 ? (currentQty * currentRate + quantity * rate) / newQty : 0;
-          const newValue = newQty * newRate;
+          const currentQty = toInventoryDecimal(destInventory.quantity);
+          const currentRate = toInventoryDecimal(destInventory.average_rate);
+          const newQty = addInventoryValues(currentQty, quantity);
+          const newRate = weightedAverageInventoryCost(currentQty, currentRate, quantity, rate);
+          const newValue = multiplyInventoryValues(newQty, newRate);
 
           await tx
             .update(schema.inventory)
             .set({
-              quantity: newQty.toFixed(3),
-              averageRate: newRate.toFixed(2),
-              totalValue: newValue.toFixed(2),
+              quantity: inventoryQuantity(newQty),
+              averageRate: inventoryUnitCost(newRate),
+              totalValue: inventoryMoney(newValue),
               lastUpdated: new Date(),
             })
             .where(eq(schema.inventory.id, destInventory.id));
@@ -106,9 +114,9 @@ export async function createStockTransfer(
             companyId: destLocation.companyId,
             locationId: destinationLocationId,
             stockItemId: item.stockItemId,
-            quantity: item.quantity,
-            averageRate: item.rate,
-            totalValue: totalAmount.toFixed(2),
+            quantity: inventoryQuantity(quantity),
+            averageRate: inventoryUnitCost(rate),
+            totalValue: inventoryMoney(totalAmount),
             lastUpdated: new Date(),
           });
         }
@@ -118,10 +126,6 @@ export async function createStockTransfer(
     return { transfer, items: transferItems };
   });
 }
-
-// ---------------------------------------------------------------------------
-// Create Stock Adjustment
-// ---------------------------------------------------------------------------
 
 export async function createStockAdjustment(
   voucherId: number,
@@ -138,12 +142,7 @@ export async function createStockAdjustment(
 
     const [adjustment] = await tx
       .insert(schema.stockAdjustmentVouchers)
-      .values({
-        voucherId,
-        locationId,
-        adjustmentType,
-        notes,
-      })
+      .values({ voucherId, locationId, adjustmentType, notes })
       .returning();
 
     const [location] = await tx.select().from(schema.locations).where(eq(schema.locations.id, locationId));
@@ -197,18 +196,18 @@ export async function createStockAdjustment(
       consumptionAccountId = adjustmentAccountId;
     }
 
-    let totalProductionValue = 0;
-    let totalConsumptionValue = 0;
+    let totalProductionValue = toInventoryDecimal(0);
+    let totalConsumptionValue = toInventoryDecimal(0);
 
-    // Sort by stockItemId — consistent lock order prevents deadlocks with concurrent ops.
     const sortedAdjItems = [...items].sort((a, b) => a.stockItemId - b.stockItemId);
     const adjustmentItems: StockAdjustmentItem[] = [];
     for (const item of sortedAdjItems) {
-      const quantity = parseFloat(item.quantity);
-      const rate = parseFloat(item.rate);
-      const isProduction = adjustmentType === "Production" || (adjustmentType === "Mixed" && quantity > 0);
+      const quantity = toInventoryDecimal(item.quantity);
+      const absoluteQuantity = quantity.abs();
+      const rate = toInventoryDecimal(item.rate);
+      const isProduction = adjustmentType === "Production" || (adjustmentType === "Mixed" && quantity.isPositive());
       let actualRate = rate;
-      let actualTotalAmount = Math.abs(quantity) * rate;
+      let actualTotalAmount = multiplyInventoryValues(absoluteQuantity, rate);
 
       if (!isOptional) {
         const currentInventoryRows = await (tx as any).execute(
@@ -217,33 +216,32 @@ export async function createStockAdjustment(
         const currentInventory = currentInventoryRows.rows?.[0] || currentInventoryRows[0];
 
         if (currentInventory) {
-          const currentQty = parseFloat(currentInventory.quantity);
-          const currentValue = parseFloat(currentInventory.total_value);
-          const currentRate = parseFloat(currentInventory.average_rate);
-          let newQty: number, newValue: number, newRate: number, actualValueChange: number;
+          const currentQty = toInventoryDecimal(currentInventory.quantity);
+          const currentRate = toInventoryDecimal(currentInventory.average_rate);
+          let newQty;
+          let newValue;
+          let newRate;
 
           if (isProduction) {
-            newQty = currentQty + Math.abs(quantity);
-            newRate = newQty > 0 ? (currentQty * currentRate + Math.abs(quantity) * rate) / newQty : 0;
-            newValue = newQty * newRate;
-            actualValueChange = Math.abs(quantity) * rate;
-            totalProductionValue += actualValueChange;
+            newQty = addInventoryValues(currentQty, absoluteQuantity);
+            newRate = weightedAverageInventoryCost(currentQty, currentRate, absoluteQuantity, rate);
+            newValue = multiplyInventoryValues(newQty, newRate);
+            totalProductionValue = addInventoryValues(totalProductionValue, actualTotalAmount);
           } else {
-            newQty = currentQty - Math.abs(quantity);
-            newValue = newQty > 0 ? newQty * currentRate : 0;
+            newQty = subtractInventoryValues(currentQty, absoluteQuantity);
+            newValue = newQty.isPositive() ? multiplyInventoryValues(newQty, currentRate) : toInventoryDecimal(0);
             newRate = currentRate;
             actualRate = currentRate;
-            actualTotalAmount = Math.abs(quantity) * currentRate;
-            actualValueChange = actualTotalAmount;
-            totalConsumptionValue += actualValueChange;
+            actualTotalAmount = multiplyInventoryValues(absoluteQuantity, currentRate);
+            totalConsumptionValue = addInventoryValues(totalConsumptionValue, actualTotalAmount);
           }
 
           await tx
             .update(schema.inventory)
             .set({
-              quantity: newQty.toFixed(3),
-              averageRate: newRate.toFixed(2),
-              totalValue: newValue.toFixed(2),
+              quantity: inventoryQuantity(newQty),
+              averageRate: inventoryUnitCost(newRate),
+              totalValue: inventoryMoney(newValue),
               lastUpdated: new Date(),
             })
             .where(eq(schema.inventory.id, currentInventory.id));
@@ -252,30 +250,30 @@ export async function createStockAdjustment(
             companyId: location.companyId,
             locationId,
             stockItemId: item.stockItemId,
-            quantity: Math.abs(quantity).toFixed(3),
-            averageRate: item.rate,
-            totalValue: actualTotalAmount.toFixed(2),
+            quantity: inventoryQuantity(absoluteQuantity),
+            averageRate: inventoryUnitCost(rate),
+            totalValue: inventoryMoney(actualTotalAmount),
             lastUpdated: new Date(),
           });
-          totalProductionValue += actualTotalAmount;
+          totalProductionValue = addInventoryValues(totalProductionValue, actualTotalAmount);
         } else {
           const [stockItem] = await tx
             .select()
             .from(schema.stockItems)
             .where(eq(schema.stockItems.id, item.stockItemId));
           if (!stockItem) throw new Error(`Stock item ${item.stockItemId} not found.`);
-          const fallbackRate = parseFloat(stockItem.openingRate || "0");
-          if (fallbackRate <= 0) throw new Error(`Stock item "${stockItem.name}" has no opening rate set.`);
+          const fallbackRate = toInventoryDecimal(stockItem.openingRate);
+          if (!fallbackRate.isPositive()) throw new Error(`Stock item "${stockItem.name}" has no opening rate set.`);
           actualRate = fallbackRate;
-          actualTotalAmount = Math.abs(quantity) * fallbackRate;
-          totalConsumptionValue += actualTotalAmount;
+          actualTotalAmount = multiplyInventoryValues(absoluteQuantity, fallbackRate);
+          totalConsumptionValue = addInventoryValues(totalConsumptionValue, actualTotalAmount);
           await tx.insert(schema.inventory).values({
             companyId: location.companyId,
             locationId,
             stockItemId: item.stockItemId,
-            quantity: (-Math.abs(quantity)).toFixed(3),
-            averageRate: fallbackRate.toFixed(2),
-            totalValue: (-actualTotalAmount).toFixed(2),
+            quantity: inventoryQuantity(absoluteQuantity.negated()),
+            averageRate: inventoryUnitCost(fallbackRate),
+            totalValue: inventoryMoney(actualTotalAmount.negated()),
             lastUpdated: new Date(),
           });
         }
@@ -286,29 +284,29 @@ export async function createStockAdjustment(
         .values({
           adjustmentId: adjustment.id,
           stockItemId: item.stockItemId,
-          quantity: item.quantity,
-          rate: actualRate.toFixed(2),
-          totalAmount: actualTotalAmount.toFixed(2),
+          quantity: inventoryQuantity(quantity),
+          rate: inventoryUnitCost(actualRate),
+          totalAmount: inventoryMoney(actualTotalAmount),
         })
         .returning();
       adjustmentItems.push(adjustmentItem);
     }
 
     if (!isOptional) {
-      if (totalProductionValue > 0 && productionAccountId) {
+      if (totalProductionValue.isPositive() && productionAccountId) {
         await tx.insert(schema.voucherEntries).values({
           voucherId,
           ledgerAccountId: productionAccountId,
           debitAmount: "0",
-          creditAmount: totalProductionValue.toFixed(2),
+          creditAmount: inventoryMoney(totalProductionValue),
           narration: `Production adjustment - ${adjustmentType} voucher`,
         });
       }
-      if (totalConsumptionValue > 0 && consumptionAccountId) {
+      if (totalConsumptionValue.isPositive() && consumptionAccountId) {
         await tx.insert(schema.voucherEntries).values({
           voucherId,
           ledgerAccountId: consumptionAccountId,
-          debitAmount: totalConsumptionValue.toFixed(2),
+          debitAmount: inventoryMoney(totalConsumptionValue),
           creditAmount: "0",
           narration: `Consumption expense - ${adjustmentType} voucher`,
         });
@@ -318,7 +316,3 @@ export async function createStockAdjustment(
     return { adjustment, items: adjustmentItems };
   });
 }
-
-// ---------------------------------------------------------------------------
-// Get by Voucher ID
-// ---------------------------------------------------------------------------

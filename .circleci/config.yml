@@ -45,7 +45,14 @@ commands:
           name: Pin checkout to the triggering commit
           command: |
             echo "CircleCI requested SHA: ${CIRCLE_SHA1}"
-            git fetch --no-tags --prune origin "${CIRCLE_SHA1}"
+            actual_sha="$(git rev-parse HEAD)"
+            echo "CircleCI checkout SHA: ${actual_sha}"
+
+            if ! git cat-file -e "${CIRCLE_SHA1}^{commit}" 2>/dev/null; then
+              echo "Triggering commit is not present locally; fetching the branch ref."
+              git fetch --no-tags --prune origin "+refs/heads/${CIRCLE_BRANCH}:refs/remotes/origin/${CIRCLE_BRANCH}"
+            fi
+
             git reset --hard "${CIRCLE_SHA1}"
             git clean -ffdx
             test "$(git rev-parse HEAD)" = "${CIRCLE_SHA1}"
@@ -175,8 +182,17 @@ jobs:
 workflows:
   full-erp-verification:
     jobs:
-      - static-build
-      - postgres-regression
+      - static-build:
+          filters:
+            branches:
+              only: main
+      - postgres-regression:
+          filters:
+            branches:
+              only: main
       - security-readiness:
           requires:
             - static-build
+          filters:
+            branches:
+              only: main

@@ -7,8 +7,8 @@ import {
 
 describe("Phase 7 backend-message translations", () => {
   it("covers every reviewed backend phrase exactly once", () => {
-    expect(backendMessagesPhase7Translations).toHaveLength(444);
-    expect(new Set(backendMessagesPhase7Translations.map((entry) => entry.en)).size).toBe(444);
+    expect(backendMessagesPhase7Translations).toHaveLength(573);
+    expect(new Set(backendMessagesPhase7Translations.map((entry) => entry.en)).size).toBe(573);
 
     for (const entry of backendMessagesPhase7Translations) {
       expect(entry.en.trim()).not.toBe("");
@@ -28,6 +28,20 @@ describe("Phase 7 backend-message translations", () => {
     expect(translatePhase7BackendMessageText("Security audit unavailable", "fr")).toBe(
       "Audit de sécurité indisponible"
     );
+  });
+
+  it("translates factory production bonus labels and templates", () => {
+    expect(translatePhase7BackendMessageText("Production Bonus", "ar")).toBe("مكافأة الإنتاج");
+    expect(translatePhase7BackendMessageText("Other Bonus", "fr")).toBe("Autre prime");
+    expect(translatePhase7BackendMessageText("Copied settings from 2026-08-06", "fr")).toBe(
+      "Paramètres copiés depuis le 2026-08-06"
+    );
+    expect(
+      translatePhase7BackendMessageText(
+        "Nadia belongs to multiple production positions on 2026-08-07. Select a Production Position before saving Stock Entry.",
+        "ar"
+      )
+    ).toBe("العامل Nadia ينتمي إلى عدة مناصب إنتاج بتاريخ 2026-08-07. اختر منصب الإنتاج قبل حفظ إدخال المخزون.");
   });
 
   it("preserves business values while translating nested operational fragments", () => {
@@ -55,6 +69,7 @@ describe("Phase 7 backend-message translations", () => {
 
   it("recognizes reviewed messages without translating stored business values", () => {
     expect(isPhase7BackendMessageText("Request must be approved before it can be executed")).toBe(true);
+    expect(isPhase7BackendMessageText("Production Bonus")).toBe(true);
     expect(isPhase7BackendMessageText("HMD INTERNATIONAL GROUP")).toBe(false);
     expect(translatePhase7BackendMessageText("HMD INTERNATIONAL GROUP", "ar")).toBeNull();
     expect(translatePhase7BackendMessageText("MSKU1786517", "fr")).toBeNull();

@@ -6,6 +6,13 @@
  */
 import type { Express } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
+import {
+  addInventoryValues,
+  divideInventoryValues,
+  inventoryMoney,
+  inventoryQuantity,
+  inventoryUnitCost,
+} from "../../../lib/inventoryMath";
 import { db } from "../../../db";
 import { requireAuth, requireNonPOS } from "../../../auth";
 import {
@@ -19,11 +26,6 @@ import {
 import { eq, and, sql, isNull } from "drizzle-orm";
 
 export function registerStockItemBulkMergeRoutes(app: Express) {
-  // ── Bulk Merge: POST /api/stock-items/bulk-merge ─────────────────────────
-  // Accepts an array of { oldCode, keepCode } pairs.
-  // Resolves each code to an item ID (checking aliases too), then runs the
-  // same merge logic as the single-merge endpoint for each pair.
-  // Returns a per-pair results array — no pair failure aborts the others.
   app.post("/api/stock-items/bulk-merge", requireAuth, requireNonPOS, async (req: any, res: any) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -35,10 +37,8 @@ export function registerStockItemBulkMergeRoutes(app: Express) {
         return res.status(400).json({ message: "pairs array is required and must not be empty" });
       if (pairs.length > 500) return res.status(400).json({ message: "Maximum 500 pairs per request" });
 
-      // Helper: resolve a code to a stock item (checks direct code first, then aliases)
       async function resolveItem(code: string) {
         const trimmed = code.trim().toUpperCase();
-        // Direct match
         const [direct] = await db
           .select()
           .from(stockItems)
@@ -51,7 +51,6 @@ export function registerStockItemBulkMergeRoutes(app: Express) {
           )
           .limit(1);
         if (direct) return direct;
-        // Alias match
         const [aliasRow] = await db
           .select({ stockItemId: stockItemCodeAliases.stockItemId })
           .from(stockItemCodeAliases)
@@ -148,9 +147,8 @@ export function registerStockItemBulkMergeRoutes(app: Express) {
             .from(inventory)
             .where(and(eq(inventory.stockItemId, duplicateId), eq(inventory.companyId, companyId)));
 
-          const totalValueBefore = [...keptInvBefore, ...dupInvBefore].reduce(
-            (s, r) => s + parseFloat(r.totalValue),
-            0
+          const totalValueBefore = addInventoryValues(
+            ...[...keptInvBefore, ...dupInvBefore].map((row) => row.totalValue)
           );
 
           const snapshotBefore: Record<string, unknown> = {};
@@ -178,15 +176,15 @@ export function registerStockItemBulkMergeRoutes(app: Express) {
                   .set({ stockItemId: keptId, lastUpdated: new Date() })
                   .where(and(eq(inventory.stockItemId, duplicateId), eq(inventory.locationId, locId)));
               } else {
-                const combinedQty = parseFloat(keptRow.quantity) + parseFloat(dupRow.quantity);
-                const combinedValue = parseFloat(keptRow.totalValue) + parseFloat(dupRow.totalValue);
-                const combinedRate = combinedQty > 0 ? combinedValue / combinedQty : 0;
+                const combinedQty = addInventoryValues(keptRow.quantity, dupRow.quantity);
+                const combinedValue = addInventoryValues(keptRow.totalValue, dupRow.totalValue);
+                const combinedRate = divideInventoryValues(combinedValue, combinedQty);
                 await tx
                   .update(inventory)
                   .set({
-                    quantity: combinedQty.toFixed(3),
-                    totalValue: combinedValue.toFixed(2),
-                    averageRate: combinedRate.toFixed(2),
+                    quantity: inventoryQuantity(combinedQty),
+                    totalValue: inventoryMoney(combinedValue),
+                    averageRate: inventoryUnitCost(combinedRate),
                     lastUpdated: new Date(),
                   })
                   .where(and(eq(inventory.stockItemId, keptId), eq(inventory.locationId, locId)));
@@ -242,7 +240,6 @@ export function registerStockItemBulkMergeRoutes(app: Express) {
               }
             }
 
-            // Re-point all PO line items from the duplicate to the kept item
             await tx
               .update(poLineItems)
               .set({ stockItemId: keptId, itemName: keptItem.name })
@@ -257,10 +254,10 @@ export function registerStockItemBulkMergeRoutes(app: Express) {
               .select()
               .from(inventory)
               .where(and(eq(inventory.stockItemId, keptId), eq(inventory.companyId, companyId)));
-            const totalValueAfter = keptInvAfter.reduce((s, r) => s + parseFloat(r.totalValue), 0);
-            if (Math.abs(totalValueAfter - totalValueBefore) > 0.02) {
+            const totalValueAfter = addInventoryValues(...keptInvAfter.map((row) => row.totalValue));
+            if (totalValueAfter.minus(totalValueBefore).abs().greaterThan("0.02")) {
               throw new Error(
-                `Value integrity check failed — before: ${totalValueBefore.toFixed(2)}, after: ${totalValueAfter.toFixed(2)}`
+                `Value integrity check failed — before: ${inventoryMoney(totalValueBefore)}, after: ${inventoryMoney(totalValueAfter)}`
               );
             }
 
@@ -275,7 +272,6 @@ export function registerStockItemBulkMergeRoutes(app: Express) {
             }
           });
 
-          // Audit log (non-fatal)
           try {
             await db.insert(stockItemMergeLogs).values({
               companyId,

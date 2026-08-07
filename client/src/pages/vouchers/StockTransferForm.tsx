@@ -56,6 +56,11 @@ import {
 import type { Location, StockItem, StockTransferFormData, StockTransferFormProps } from "./stocktransferform/types";
 import { stockTransferFormSchema } from "./stocktransferform/utils";
 import { ApproveRevisionDialog } from "./stock-transfer-form/dialogs/ApproveRevisionDialog";
+import {
+  useFilteredTransferInventory,
+  usePendingTransferRevisions,
+  useTransferRateAutofill,
+} from "./stock-transfer-form/useTransferFormDerived";
 import { SaveAsRevisionDialog } from "./stock-transfer-form/dialogs/SaveAsRevisionDialog";
 import { ImportTransferExcelDialog } from "./stock-transfer-form/dialogs/ImportTransferExcelDialog";
 export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTransferFormProps) {
@@ -122,6 +127,8 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
     },
     enabled: !!stableTransferId,
   });
+
+  const pendingTransferRevisions = usePendingTransferRevisions(transferRevisions);
 
   const stockTransferForm = useForm<StockTransferFormData>({
     resolver: zodResolver(stockTransferFormSchema),
@@ -215,19 +222,9 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
     }
   }, [isPOS, posSelectedSourceId, posSelectedSourceName]); // eslint-disable-line
 
-  useEffect(() => {
-    transferEntries.forEach((entry, index) => {
-      if (entry.sourceLocationId > 0 && entry.stockItemId > 0 && !entry.rate) {
-        fetch(`/api/locations/${entry.sourceLocationId}/inventory`)
-          .then((res) => res.json())
-          .then((inventory) => {
-            const inv = inventory.find((item: any) => item.stockItemId === entry.stockItemId);
-            if (inv?.averageRate) stockTransferForm.setValue(`entries.${index}.rate`, inv.averageRate);
-          })
-          .catch(() => {});
-      }
-    });
-  }, [transferEntries.map((e) => `${e.sourceLocationId}-${e.stockItemId}`).join(",")]); // eslint-disable-line
+  const filteredTransferInventory = useFilteredTransferInventory(transferInventory, transferSearchTerm);
+
+  useTransferRateAutofill(transferEntries, stockTransferForm);
 
   useEffect(() => {
     if (
@@ -288,7 +285,11 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
       return modeApiRequest("POST", `/api/stock-transfer-revisions/${revisionId}/approve`, {});
     },
     onSuccess: () => {
-      toast({ title: "Revision approved", description: "Quantities have been updated." });
+      const applied = pendingTransferRevisions.length;
+      toast({
+        title: applied > 1 ? `${applied} revisions approved` : "Revision approved",
+        description: "Quantities have been updated.",
+      });
       setApproveRevisionTarget(null);
       setTransferRevisionsExpanded(true);
       hydratedVoucherIdRef.current = null;
@@ -569,12 +570,20 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
   const confirmTransferSaveAsRevision = async () => {
     const transferId = stockTransferToEdit?.id ?? lastKnownTransferIdRef.current;
     if (!voucherIdToEdit || !transferId) {
-      toast({ title: "Revision Not Saved", description: "The saved stock transfer could not be identified. Reload the transfer and try again.", variant: "destructive" });
+      toast({
+        title: "Revision Not Saved",
+        description: "The saved stock transfer could not be identified. Reload the transfer and try again.",
+        variant: "destructive",
+      });
       return;
     }
     const revisionItems = computeTransferRevisionItems();
     if (revisionItems.length === 0) {
-      toast({ title: "No Changes", description: "No differences found compared to the saved order", variant: "destructive" });
+      toast({
+        title: "No Changes",
+        description: "No differences found compared to the saved order",
+        variant: "destructive",
+      });
       setTransferRevisionDialogOpen(false);
       return;
     }
@@ -615,7 +624,8 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
     } catch (error: any) {
       toast({
         title: "Revision Not Saved",
-        description: error.message || "The transfer was updated, but the revision record failed to save. Please try again.",
+        description:
+          error.message || "The transfer was updated, but the revision record failed to save. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -1457,16 +1467,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                               }, 200);
                             }}
                             onKeyDown={(e) => {
-                              const filteredInventory = transferInventory
-                                .filter((item: any) => {
-                                  if (!transferSearchTerm.trim()) return true;
-                                  const term = transferSearchTerm.toLowerCase();
-                                  return (
-                                    item.stockItemName?.toLowerCase().includes(term) ||
-                                    item.stockItemCode?.toLowerCase().includes(term)
-                                  );
-                                })
-                                .sort((a: any, b: any) => (a.stockItemName || "").localeCompare(b.stockItemName || ""));
+                              const filteredInventory = filteredTransferInventory;
                               if (e.key === "ArrowUp" && !e.shiftKey) {
                                 e.preventDefault();
                                 if (showItemSidebar && filteredInventory.length > 0)
@@ -1905,16 +1906,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
                       </div>
                     ) : (
                       (() => {
-                        const filteredInventory = transferInventory
-                          .filter((item: any) => {
-                            if (!transferSearchTerm.trim()) return true;
-                            const term = transferSearchTerm.toLowerCase();
-                            return (
-                              item.stockItemName?.toLowerCase().includes(term) ||
-                              item.stockItemCode?.toLowerCase().includes(term)
-                            );
-                          })
-                          .sort((a: any, b: any) => (a.stockItemName || "").localeCompare(b.stockItemName || ""));
+                        const filteredInventory = filteredTransferInventory;
                         if (filteredInventory.length === 0)
                           return <div className="text-center py-8 text-sm text-muted-foreground">No items found</div>;
                         return filteredInventory.map((item: any, idx: number) => {
@@ -2184,6 +2176,7 @@ export function StockTransferForm({ voucherIdToEdit, isPOS, posUser }: StockTran
         approveRevisionMutation={approveRevisionMutation}
         approveRevisionTarget={approveRevisionTarget}
         setApproveRevisionTarget={setApproveRevisionTarget}
+        pendingRevisions={pendingTransferRevisions}
       />
 
       {/* Revision History Panel */}
