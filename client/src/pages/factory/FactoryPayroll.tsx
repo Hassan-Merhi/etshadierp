@@ -1,53 +1,63 @@
-import { useState, useMemo, useRef, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
-  Download,
-  FileText,
-  DollarSign,
-  Users,
-  Calendar,
-  Loader2,
-  Edit,
-  Upload,
-  Table2,
   CheckCircle2,
+  Download,
+  DollarSign,
+  Edit,
+  FileText,
   GitMerge,
+  Loader2,
+  Table2,
+  Upload,
+  Users,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { PageHeader } from "@/components/PageHeader";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PageHeader } from "@/components/PageHeader";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 
+import {
+  ProductionBonusDecisionPanel,
+  type ProductionBonusDecisionResult,
+} from "./factorypayroll/ProductionBonusDecisionPanel";
+import { PayrollSummaryCards } from "./factorypayroll/PayrollSummaryCards";
 import type { Company, PayrollRecord } from "./factorypayroll/types";
 import { getStatusBadge } from "./factorypayroll/utils";
+
+function amount(value: string | number | null | undefined): number {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 export default function FactoryPayrollPage() {
   const { toast } = useToast();
   const today = new Date().toLocaleDateString("en-CA");
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-CA");
+  const { formatDisplayDate } = useDateFormat();
+  const [, navigate] = useLocation();
 
   const { data: settings } = useQuery<any>({
     queryKey: ["/api/factory/settings"],
     queryFn: async () => {
-      const r = await fetch("/api/factory/settings");
-      return r.ok ? r.json() : {};
+      const response = await fetch("/api/factory/settings");
+      return response.ok ? response.json() : {};
     },
     staleTime: 60000,
   });
-
   const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 5 * 60000 });
   const hiddenTabs = myAccess?.hiddenCostFields ?? [];
-
   const showWorkerMaster =
     settings?.payrollTabWorkerMasterEnabled !== false && !hiddenTabs.includes("hide_tab_payroll_worker_master");
 
@@ -61,7 +71,7 @@ export default function FactoryPayrollPage() {
   const [genEndDate, setGenEndDate] = useState(today);
 
   const [editRecord, setEditRecord] = useState<PayrollRecord | null>(null);
-  const [editBonuses, setEditBonuses] = useState("");
+  const [editOtherBonuses, setEditOtherBonuses] = useState("");
   const [editDeductions, setEditDeductions] = useState("");
   const [editAdvances, setEditAdvances] = useState("");
   const [editOvertimeHours, setEditOvertimeHours] = useState("");
@@ -81,19 +91,13 @@ export default function FactoryPayrollPage() {
   const [workerSearch, setWorkerSearch] = useState("");
   const [workerImporting, setWorkerImporting] = useState(false);
   const workerFileInput = useRef<HTMLInputElement>(null);
-  const [, navigate] = useLocation();
 
-  const { data: companies = [] } = useQuery<Company[]>({
-    queryKey: ["/api/user/companies"],
-  });
-
+  const { data: companies = [] } = useQuery<Company[]>({ queryKey: ["/api/user/companies"] });
   const firstCompanyId = companies.length > 0 ? companies[0].id : null;
   const selectedCompanyId = companyId ?? firstCompanyId;
 
   useEffect(() => {
-    if (companies.length === 1 && companyId === null) {
-      setCompanyId(companies[0].id);
-    }
+    if (companies.length === 1 && companyId === null) setCompanyId(companies[0].id);
   }, [companies, companyId]);
 
   const payrollQueryParams = new URLSearchParams();
@@ -103,14 +107,12 @@ export default function FactoryPayrollPage() {
   if (statusFilter !== "ALL") payrollQueryParams.set("status", statusFilter);
   const payrollUrl = `/api/factory/payroll?${payrollQueryParams.toString()}`;
 
-  const { formatDisplayDate } = useDateFormat();
-
   const { data: allWorkers = [], isLoading: workersLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/workers", selectedCompanyId],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/workers?companyId=${selectedCompanyId}`, { credentials: "include" });
-      if (!res.ok) return [];
-      return res.json();
+      const response = await fetch(`/api/factory/workers?companyId=${selectedCompanyId}`, { credentials: "include" });
+      if (!response.ok) return [];
+      return response.json();
     },
     enabled: !!selectedCompanyId,
   });
@@ -119,42 +121,13 @@ export default function FactoryPayrollPage() {
     if (!workerSearch.trim()) return allWorkers;
     const q = workerSearch.toLowerCase();
     return allWorkers.filter(
-      (w: any) =>
-        (w.fullName || "").toLowerCase().includes(q) ||
-        (w.employeeCode || "").toLowerCase().includes(q) ||
-        (w.phone1 || "").toLowerCase().includes(q) ||
-        (w.position || "").toLowerCase().includes(q)
+      (worker: any) =>
+        (worker.fullName || "").toLowerCase().includes(q) ||
+        (worker.employeeCode || "").toLowerCase().includes(q) ||
+        (worker.phone1 || "").toLowerCase().includes(q) ||
+        (worker.position || "").toLowerCase().includes(q)
     );
   }, [allWorkers, workerSearch]);
-
-  const handleWorkerImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !selectedCompanyId) return;
-    setWorkerImporting(true);
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("companyId", String(selectedCompanyId));
-    try {
-      const res = await fetch("/api/factory/workers/import-excel", {
-        method: "POST",
-        body: fd,
-        credentials: "include",
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Import failed");
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", selectedCompanyId] });
-      toast({
-        title: "Import complete",
-        description: `Created: ${data.created}, Updated: ${data.updated}, Skipped: ${data.skipped}`,
-      });
-      if (data.errors?.length) console.warn("Import errors:", data.errors);
-    } catch (e: any) {
-      toast({ title: "Import failed", description: e.message, variant: "destructive" });
-    } finally {
-      setWorkerImporting(false);
-      if (workerFileInput.current) workerFileInput.current.value = "";
-    }
-  };
 
   const {
     data: payrollRecords = [],
@@ -163,33 +136,33 @@ export default function FactoryPayrollPage() {
   } = useQuery<PayrollRecord[]>({
     queryKey: ["/api/factory/payroll", selectedCompanyId, filterStartDate, filterEndDate, statusFilter],
     queryFn: async () => {
-      const res = await fetch(payrollUrl, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch payroll data");
-      return res.json();
+      const response = await fetch(payrollUrl, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch payroll data");
+      return response.json();
     },
     enabled: !!selectedCompanyId,
   });
 
   const generateMutation = useMutation({
     mutationFn: async (data: { companyId: number; startDate: string; endDate: string }) => {
-      const res = await factoryApiRequest("POST", "/api/factory/payroll/generate", data);
-      return res.json();
+      const response = await factoryApiRequest("POST", "/api/factory/payroll/generate", data);
+      return response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/payroll"] });
       setShowGenerateDialog(false);
-      toast({ title: "Payroll generated", description: `${data.length} payroll records created.` });
+      toast({ title: "Payroll generated", description: `${data.length} payroll records available.` });
     },
-    onError: (e: any) => {
-      if (e?._handledGlobally) return;
-      toast({ title: "Generation failed", description: e.message, variant: "destructive" });
+    onError: (error: any) => {
+      if (error?._handledGlobally) return;
+      toast({ title: "Generation failed", description: error.message, variant: "destructive" });
     },
   });
 
   const adjustMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      const res = await factoryApiRequest("PATCH", `/api/factory/payroll/${id}`, data);
-      return res.json();
+      const response = await factoryApiRequest("PATCH", `/api/factory/payroll/${id}`, data);
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/payroll"] });
@@ -197,20 +170,40 @@ export default function FactoryPayrollPage() {
       setShowPayDialog(false);
       toast({ title: "Payroll updated" });
     },
-    onError: (e: any) => {
-      if (e?._handledGlobally) return;
-      toast({ title: "Update failed", description: e.message, variant: "destructive" });
+    onError: (error: any) => {
+      if (error?._handledGlobally) return;
+      toast({ title: "Update failed", description: error.message, variant: "destructive" });
     },
   });
 
   const openEditDialog = (record: PayrollRecord) => {
     setEditRecord(record);
-    setEditBonuses(record.bonuses || "0");
+    setEditOtherBonuses(record.otherBonuses || "0");
     setEditDeductions(record.deductions || "0");
     setEditAdvances(record.advances || "0");
     setEditOvertimeHours(record.overtimeHours || "0");
     setEditNotes(record.notes || "");
     setEditStatus(record.status);
+  };
+
+  const handleProductionBonusChanged = (result: ProductionBonusDecisionResult) => {
+    setEditRecord((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        bonuses: result.totalBonus.toFixed(2),
+        productionBonus: result.details.totals.approved.toFixed(2),
+        pendingProductionBonus: result.details.totals.pending.toFixed(2),
+        rejectedProductionBonus: result.details.totals.rejected.toFixed(2),
+        suggestedProductionBonus: result.details.totals.totalSuggested.toFixed(2),
+        productionBonusPendingCount: result.details.totals.pendingCount,
+        productionBonusApprovedCount: result.details.totals.approvedCount,
+        productionBonusRejectedCount: result.details.totals.rejectedCount,
+        otherBonuses: result.otherBonus.toFixed(2),
+        netSalary: result.netSalary.toFixed(2),
+      };
+    });
+    setEditOtherBonuses(result.otherBonus.toFixed(2));
   };
 
   const handleAdjustSubmit = () => {
@@ -226,7 +219,7 @@ export default function FactoryPayrollPage() {
     adjustMutation.mutate({
       id: editRecord.id,
       data: {
-        bonuses: editBonuses,
+        otherBonuses: editOtherBonuses,
         deductions: editDeductions,
         advances: editAdvances,
         overtimeHours: editOvertimeHours,
@@ -241,7 +234,7 @@ export default function FactoryPayrollPage() {
     adjustMutation.mutate({
       id: editRecord.id,
       data: {
-        bonuses: editBonuses,
+        otherBonuses: editOtherBonuses,
         deductions: editDeductions,
         advances: editAdvances,
         overtimeHours: editOvertimeHours,
@@ -255,6 +248,35 @@ export default function FactoryPayrollPage() {
     });
   };
 
+  const handleWorkerImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedCompanyId) return;
+    setWorkerImporting(true);
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("companyId", String(selectedCompanyId));
+    try {
+      const response = await fetch("/api/factory/workers/import-excel", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Import failed");
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/workers", selectedCompanyId] });
+      toast({
+        title: "Import complete",
+        description: `Created: ${data.created}, Updated: ${data.updated}, Skipped: ${data.skipped}`,
+      });
+      if (data.errors?.length) console.warn("Import errors:", data.errors);
+    } catch (error: any) {
+      toast({ title: "Import failed", description: error.message, variant: "destructive" });
+    } finally {
+      setWorkerImporting(false);
+      if (workerFileInput.current) workerFileInput.current.value = "";
+    }
+  };
+
   const handleMigrateCitySplit = async () => {
     if (!selectedCompanyId) return;
     if (
@@ -265,20 +287,20 @@ export default function FactoryPayrollPage() {
       return;
     setMigrating(true);
     try {
-      const res = await fetch("/api/factory/payroll/migrate-city-split", {
+      const response = await fetch("/api/factory/payroll/migrate-city-split", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ companyId: selectedCompanyId }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Migration failed");
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Migration failed");
       toast({
         title: "Migration complete",
         description: `${data.vouchersUpdated} payroll vouchers split by city, ${data.bonusEntriesCreated} bonus entries created.`,
       });
-    } catch (e: any) {
-      toast({ title: "Migration failed", description: e.message, variant: "destructive" });
+    } catch (error: any) {
+      toast({ title: "Migration failed", description: error.message, variant: "destructive" });
     } finally {
       setMigrating(false);
     }
@@ -292,23 +314,23 @@ export default function FactoryPayrollPage() {
     }
     setExportingPdf(true);
     try {
-      const res = await fetch("/api/factory/payroll/export-pdf", {
+      const response = await fetch("/api/factory/payroll/export-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ companyId: selectedCompanyId, startDate: filterStartDate, endDate: filterEndDate }),
       });
-      if (!res.ok) throw new Error("Export failed");
-      const blob = await res.blob();
+      if (!response.ok) throw new Error("Export failed");
+      const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `payroll-${filterStartDate}-${filterEndDate}.pdf`;
-      a.click();
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `payroll-${filterStartDate}-${filterEndDate}.pdf`;
+      anchor.click();
       URL.revokeObjectURL(url);
       toast({ title: "PDF exported" });
-    } catch (e: any) {
-      toast({ title: "Export failed", description: e.message, variant: "destructive" });
+    } catch (error: any) {
+      toast({ title: "Export failed", description: error.message, variant: "destructive" });
     } finally {
       setExportingPdf(false);
     }
@@ -318,135 +340,133 @@ export default function FactoryPayrollPage() {
     if (!selectedCompanyId) return;
     setExportingExcel(true);
     try {
-      const res = await fetch("/api/factory/payroll/export-excel", {
+      const response = await fetch("/api/factory/payroll/export-excel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ companyId: selectedCompanyId, startDate: filterStartDate, endDate: filterEndDate }),
       });
-      if (!res.ok) throw new Error("Export failed");
-      const blob = await res.blob();
+      if (!response.ok) throw new Error("Export failed");
+      const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `payroll-${filterStartDate}-${filterEndDate}.xlsx`;
-      a.click();
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `payroll-${filterStartDate}-${filterEndDate}.xlsx`;
+      anchor.click();
       URL.revokeObjectURL(url);
       toast({ title: "Excel exported" });
-    } catch (e: any) {
-      toast({ title: "Export failed", description: e.message, variant: "destructive" });
+    } catch (error: any) {
+      toast({ title: "Export failed", description: error.message, variant: "destructive" });
     } finally {
       setExportingExcel(false);
     }
   };
 
-  const totals = useMemo(() => {
-    return payrollRecords.reduce(
-      (acc, r) => ({
-        baseSalary: acc.baseSalary + parseFloat(r.baseSalary || "0"),
-        baleEarnings: acc.baleEarnings + parseFloat(r.baleEarnings || "0"),
-        kgEarnings: acc.kgEarnings + parseFloat(r.kgEarnings || "0"),
-        overtimePay: acc.overtimePay + parseFloat(r.overtimePay || "0"),
-        bonuses: acc.bonuses + parseFloat(r.bonuses || "0"),
-        deductions: acc.deductions + parseFloat(r.deductions || "0"),
-        advances: acc.advances + parseFloat(r.advances || "0"),
-        netSalary: acc.netSalary + parseFloat(r.netSalary || "0"),
-      }),
-      {
-        baseSalary: 0,
-        baleEarnings: 0,
-        kgEarnings: 0,
-        overtimePay: 0,
-        bonuses: 0,
-        deductions: 0,
-        advances: 0,
-        netSalary: 0,
-      }
-    );
-  }, [payrollRecords]);
+  const totals = useMemo(
+    () =>
+      payrollRecords.reduce(
+        (acc, record) => ({
+          baseSalary: acc.baseSalary + amount(record.baseSalary),
+          baleEarnings: acc.baleEarnings + amount(record.baleEarnings),
+          kgEarnings: acc.kgEarnings + amount(record.kgEarnings),
+          overtimePay: acc.overtimePay + amount(record.overtimePay),
+          productionBonus: acc.productionBonus + amount(record.productionBonus),
+          pendingProductionBonus: acc.pendingProductionBonus + amount(record.pendingProductionBonus),
+          otherBonuses: acc.otherBonuses + amount(record.otherBonuses),
+          deductions: acc.deductions + amount(record.deductions),
+          advances: acc.advances + amount(record.advances),
+          netSalary: acc.netSalary + amount(record.netSalary),
+        }),
+        {
+          baseSalary: 0,
+          baleEarnings: 0,
+          kgEarnings: 0,
+          overtimePay: 0,
+          productionBonus: 0,
+          pendingProductionBonus: 0,
+          otherBonuses: 0,
+          deductions: 0,
+          advances: 0,
+          netSalary: 0,
+        }
+      ),
+    [payrollRecords]
+  );
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <PageHeader title="Factory Worker Payroll" subtitle="Generate and manage factory worker payroll" />
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <PageHeader
+          title="Factory Worker Payroll"
+          subtitle="Generate, review production bonuses, and manage factory worker payroll"
+        />
+        <div className="flex flex-wrap items-end gap-2">
           {companies.length > 1 && (
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Company</Label>
               <Select
                 value={selectedCompanyId ? String(selectedCompanyId) : ""}
-                onValueChange={(val) => setCompanyId(parseInt(val))}
+                onValueChange={(value) => setCompanyId(parseInt(value))}
               >
                 <SelectTrigger className="w-48" data-testid="select-company">
                   <SelectValue placeholder="Select company" />
                 </SelectTrigger>
                 <SelectContent>
-                  {companies.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.name}
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={String(company.id)}>
+                      {company.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           )}
-          <div className="flex items-end gap-2">
-            <Button
-              onClick={() => setShowGenerateDialog(true)}
-              disabled={!selectedCompanyId}
-              data-testid="button-generate-payroll"
-            >
-              <DollarSign className="h-4 w-4 mr-1" />
-              Generate Payroll
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleExportPdf}
-              disabled={!selectedCompanyId || exportingPdf}
-              data-testid="button-export-pdf"
-            >
-              {exportingPdf ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileText className="h-4 w-4 mr-1" />}
-              Export PDF
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleExportExcel}
-              disabled={!selectedCompanyId || exportingExcel}
-              data-testid="button-export-excel"
-            >
-              {exportingExcel ? (
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4 mr-1" />
-              )}
-              Export Excel
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleMigrateCitySplit}
-              disabled={!selectedCompanyId || migrating}
-              data-testid="button-migrate-city-split"
-              title="One-time: split historical salary/bonus by city"
-            >
-              {migrating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <GitMerge className="h-4 w-4 mr-1" />}
-              Split by City
-            </Button>
-          </div>
+          <Button
+            onClick={() => setShowGenerateDialog(true)}
+            disabled={!selectedCompanyId}
+            data-testid="button-generate-payroll"
+          >
+            <DollarSign className="mr-1 h-4 w-4" /> Generate Payroll
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleExportPdf}
+            disabled={!selectedCompanyId || exportingPdf}
+            data-testid="button-export-pdf"
+          >
+            {exportingPdf ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <FileText className="mr-1 h-4 w-4" />}{" "}
+            Export PDF
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleExportExcel}
+            disabled={!selectedCompanyId || exportingExcel}
+            data-testid="button-export-excel"
+          >
+            {exportingExcel ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}{" "}
+            Export Excel
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleMigrateCitySplit}
+            disabled={!selectedCompanyId || migrating}
+            data-testid="button-migrate-city-split"
+            title="One-time: split historical salary/bonus by city"
+          >
+            {migrating ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <GitMerge className="mr-1 h-4 w-4" />}{" "}
+            Split by City
+          </Button>
         </div>
       </div>
 
       <Tabs defaultValue="payroll" className="space-y-4">
         <TabsList variant="underline">
           <TabsTrigger value="payroll" data-testid="tab-payroll-records">
-            <FileText className="h-4 w-4 mr-1" />
-            Payroll Records
+            <FileText className="mr-1 h-4 w-4" /> Payroll Records
           </TabsTrigger>
           {showWorkerMaster && (
             <TabsTrigger value="workers" data-testid="tab-worker-master">
-              <Table2 className="h-4 w-4 mr-1" />
-              Worker Master Sheet
+              <Table2 className="mr-1 h-4 w-4" /> Worker Master Sheet
             </TabsTrigger>
           )}
         </TabsList>
@@ -454,13 +474,13 @@ export default function FactoryPayrollPage() {
         <TabsContent value="payroll" className="space-y-4">
           <Card>
             <CardContent className="pt-4">
-              <div className="flex items-end gap-4 flex-wrap">
+              <div className="flex flex-wrap items-end gap-4">
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">From</Label>
                   <Input
                     type="date"
                     value={filterStartDate}
-                    onChange={(e) => setFilterStartDate(e.target.value)}
+                    onChange={(event) => setFilterStartDate(event.target.value)}
                     className="w-40"
                     data-testid="input-filter-start-date"
                   />
@@ -470,7 +490,7 @@ export default function FactoryPayrollPage() {
                   <Input
                     type="date"
                     value={filterEndDate}
-                    onChange={(e) => setFilterEndDate(e.target.value)}
+                    onChange={(event) => setFilterEndDate(event.target.value)}
                     className="w-40"
                     data-testid="input-filter-end-date"
                   />
@@ -493,66 +513,20 @@ export default function FactoryPayrollPage() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Records</p>
-                </div>
-                <p className="text-2xl font-bold font-mono mt-1" data-testid="text-total-records">
-                  {payrollRecords.length}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Total Net Salary</p>
-                </div>
-                <p className="text-2xl font-bold font-mono mt-1" data-testid="text-total-net">
-                  ${totals.netSalary.toFixed(2)}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2">
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Total Base</p>
-                </div>
-                <p className="text-2xl font-bold font-mono mt-1" data-testid="text-total-base">
-                  ${totals.baseSalary.toFixed(2)}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Period</p>
-                </div>
-                <p className="text-sm font-mono mt-1" data-testid="text-period">
-                  {filterStartDate} - {filterEndDate}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
+          <PayrollSummaryCards recordCount={payrollRecords.length} totals={totals} />
 
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Payroll Records
+                <DollarSign className="h-5 w-5" /> Payroll Records
               </CardTitle>
             </CardHeader>
             <CardContent>
               {!selectedCompanyId ? (
-                <div className="text-center py-12">
+                <div className="py-12 text-center">
                   <Users className="mx-auto h-12 w-12 text-muted-foreground" />
                   <h3 className="mt-4 text-lg font-semibold">Select a company</h3>
-                  <p className="text-muted-foreground mt-2">Choose a company to view payroll records</p>
+                  <p className="mt-2 text-muted-foreground">Choose a company to view payroll records</p>
                 </div>
               ) : isLoading ? (
                 <div className="flex items-center justify-center py-12">
@@ -560,18 +534,18 @@ export default function FactoryPayrollPage() {
                   <span className="ml-2 text-muted-foreground">Loading payroll...</span>
                 </div>
               ) : isError ? (
-                <div className="text-center py-12">
+                <div className="py-12 text-center">
                   <p className="text-destructive">Failed to load payroll data. Please try again.</p>
                 </div>
               ) : payrollRecords.length === 0 ? (
-                <div className="text-center py-12">
+                <div className="py-12 text-center">
                   <DollarSign className="mx-auto h-12 w-12 text-muted-foreground" />
                   <h3 className="mt-4 text-lg font-semibold">No payroll records found</h3>
-                  <p className="text-muted-foreground mt-2">Generate payroll or adjust the filters to see records</p>
+                  <p className="mt-2 text-muted-foreground">Generate payroll or adjust the filters to see records</p>
                 </div>
               ) : (
                 <div className="table-responsive">
-                  <Table>
+                  <Table minimumWidth="92rem" scrollLabel="Factory payroll records">
                     <TableHeader className="sticky top-0 z-30 bg-background">
                       <TableRow>
                         <TableHead>Employee Code</TableHead>
@@ -581,12 +555,13 @@ export default function FactoryPayrollPage() {
                         <TableHead className="text-right">Bale Earnings</TableHead>
                         <TableHead className="text-right">KG Earnings</TableHead>
                         <TableHead className="text-right">Overtime</TableHead>
-                        <TableHead className="text-right">Bonuses</TableHead>
+                        <TableHead className="text-right">Production Bonus</TableHead>
+                        <TableHead className="text-right">Other Bonus</TableHead>
                         <TableHead className="text-right">Deductions</TableHead>
                         <TableHead className="text-right">Advances</TableHead>
                         <TableHead className="text-right">Net Salary</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead></TableHead>
+                        <TableHead />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -595,29 +570,31 @@ export default function FactoryPayrollPage() {
                           <TableCell className="font-mono text-sm">{record.workerCode || "-"}</TableCell>
                           <TableCell className="font-medium">{record.workerName || "-"}</TableCell>
                           <TableCell className="text-muted-foreground">{record.workerPosition || "-"}</TableCell>
+                          <TableCell className="text-right font-mono">{amount(record.baseSalary).toFixed(2)}</TableCell>
                           <TableCell className="text-right font-mono">
-                            {parseFloat(record.baseSalary || "0").toFixed(2)}
+                            {amount(record.baleEarnings).toFixed(2)}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {parseFloat(record.baleEarnings || "0").toFixed(2)}
+                            {amount(record.kgEarnings).toLocaleString()}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {parseFloat(record.kgEarnings || "0").toLocaleString()}
+                            {amount(record.overtimePay).toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="font-mono font-semibold">{amount(record.productionBonus).toFixed(2)}</div>
+                            {amount(record.pendingProductionBonus) > 0 && (
+                              <Badge variant="outline" className="mt-1 whitespace-nowrap text-[10px]">
+                                +{amount(record.pendingProductionBonus).toFixed(2)} pending
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell className="text-right font-mono">
-                            {parseFloat(record.overtimePay || "0").toFixed(2)}
+                            {amount(record.otherBonuses).toFixed(2)}
                           </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {parseFloat(record.bonuses || "0").toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {parseFloat(record.deductions || "0").toFixed(2)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {parseFloat(record.advances || "0").toFixed(2)}
-                          </TableCell>
+                          <TableCell className="text-right font-mono">{amount(record.deductions).toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-mono">{amount(record.advances).toFixed(2)}</TableCell>
                           <TableCell className="text-right font-mono font-bold">
-                            {parseFloat(record.netSalary || "0").toFixed(2)}
+                            {amount(record.netSalary).toFixed(2)}
                           </TableCell>
                           <TableCell>{getStatusBadge(record.status)}</TableCell>
                           <TableCell>
@@ -640,11 +617,12 @@ export default function FactoryPayrollPage() {
                         <TableCell className="text-right font-mono">{totals.baleEarnings.toFixed(2)}</TableCell>
                         <TableCell className="text-right font-mono">{totals.kgEarnings.toLocaleString()}</TableCell>
                         <TableCell className="text-right font-mono">{totals.overtimePay.toFixed(2)}</TableCell>
-                        <TableCell className="text-right font-mono">{totals.bonuses.toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-mono">{totals.productionBonus.toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-mono">{totals.otherBonuses.toFixed(2)}</TableCell>
                         <TableCell className="text-right font-mono">{totals.deductions.toFixed(2)}</TableCell>
                         <TableCell className="text-right font-mono">{totals.advances.toFixed(2)}</TableCell>
                         <TableCell className="text-right font-mono">{totals.netSalary.toFixed(2)}</TableCell>
-                        <TableCell colSpan={2}></TableCell>
+                        <TableCell colSpan={2} />
                       </TableRow>
                     </TableBody>
                   </Table>
@@ -664,7 +642,7 @@ export default function FactoryPayrollPage() {
                   <Input
                     type="date"
                     value={genStartDate}
-                    onChange={(e) => setGenStartDate(e.target.value)}
+                    onChange={(event) => setGenStartDate(event.target.value)}
                     data-testid="input-gen-start-date"
                   />
                 </div>
@@ -673,7 +651,7 @@ export default function FactoryPayrollPage() {
                   <Input
                     type="date"
                     value={genEndDate}
-                    onChange={(e) => setGenEndDate(e.target.value)}
+                    onChange={(event) => setGenEndDate(event.target.value)}
                     data-testid="input-gen-end-date"
                   />
                 </div>
@@ -687,21 +665,20 @@ export default function FactoryPayrollPage() {
                   Cancel
                 </Button>
                 <Button
-                  onClick={() => {
-                    if (selectedCompanyId) {
-                      generateMutation.mutate({
-                        companyId: selectedCompanyId,
-                        startDate: genStartDate,
-                        endDate: genEndDate,
-                      });
-                    }
-                  }}
+                  onClick={() =>
+                    selectedCompanyId &&
+                    generateMutation.mutate({
+                      companyId: selectedCompanyId,
+                      startDate: genStartDate,
+                      endDate: genEndDate,
+                    })
+                  }
                   disabled={generateMutation.isPending || !genStartDate || !genEndDate}
                   data-testid="button-submit-generate"
                 >
                   {generateMutation.isPending ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                       Generating...
                     </>
                   ) : (
@@ -712,12 +689,7 @@ export default function FactoryPayrollPage() {
             </DialogContent>
           </Dialog>
 
-          <Dialog
-            open={showPayDialog}
-            onOpenChange={(open) => {
-              if (!open) setShowPayDialog(false);
-            }}
-          >
+          <Dialog open={showPayDialog} onOpenChange={(open) => !open && setShowPayDialog(false)}>
             <DialogContent data-testid="dialog-confirm-payment">
               <DialogHeader>
                 <DialogTitle>Confirm Payment</DialogTitle>
@@ -728,7 +700,7 @@ export default function FactoryPayrollPage() {
                     Recording payment for <span className="font-medium text-foreground">{editRecord.workerName}</span> —
                     net salary{" "}
                     <span className="font-mono font-medium text-foreground">
-                      {parseFloat(editRecord.netSalary || "0").toFixed(2)}
+                      {amount(editRecord.netSalary).toFixed(2)}
                     </span>
                   </p>
                   <div className="space-y-1">
@@ -750,7 +722,7 @@ export default function FactoryPayrollPage() {
                     <Input
                       type="date"
                       value={payDate}
-                      onChange={(e) => setPayDate(e.target.value)}
+                      onChange={(event) => setPayDate(event.target.value)}
                       data-testid="input-pay-date"
                     />
                   </div>
@@ -760,7 +732,7 @@ export default function FactoryPayrollPage() {
                     </Label>
                     <Input
                       value={payReference}
-                      onChange={(e) => setPayReference(e.target.value)}
+                      onChange={(event) => setPayReference(event.target.value)}
                       placeholder="e.g. cheque no. or transfer ref"
                       data-testid="input-pay-reference"
                     />
@@ -773,7 +745,7 @@ export default function FactoryPayrollPage() {
                     <Input
                       type="date"
                       value={payEffectiveDate}
-                      onChange={(e) => setPayEffectiveDate(e.target.value)}
+                      onChange={(event) => setPayEffectiveDate(event.target.value)}
                       data-testid="input-pay-effective-date"
                     />
                   </div>
@@ -789,23 +761,18 @@ export default function FactoryPayrollPage() {
                   data-testid="button-confirm-payment"
                 >
                   {adjustMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                   ) : (
-                    <CheckCircle2 className="h-4 w-4 mr-1" />
-                  )}
+                    <CheckCircle2 className="mr-1 h-4 w-4" />
+                  )}{" "}
                   Mark as Paid
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
 
-          <Dialog
-            open={editRecord !== null}
-            onOpenChange={(open) => {
-              if (!open) setEditRecord(null);
-            }}
-          >
-            <DialogContent data-testid="dialog-adjust-payroll">
+          <Dialog open={editRecord !== null} onOpenChange={(open) => !open && setEditRecord(null)}>
+            <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-2xl" data-testid="dialog-adjust-payroll">
               <DialogHeader>
                 <DialogTitle>Adjust Payroll</DialogTitle>
               </DialogHeader>
@@ -815,15 +782,30 @@ export default function FactoryPayrollPage() {
                     Worker: <span className="font-medium text-foreground">{editRecord.workerName}</span> (
                     {editRecord.workerCode})
                   </p>
+                  <ProductionBonusDecisionPanel
+                    payrollId={editRecord.id}
+                    payrollStatus={editRecord.status}
+                    onChanged={handleProductionBonusChanged}
+                  />
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <Label>Bonuses</Label>
+                      <Label>Approved Production Bonus</Label>
+                      <Input
+                        value={amount(editRecord.productionBonus).toFixed(2)}
+                        readOnly
+                        className="bg-muted font-mono"
+                        data-testid="input-approved-production-bonus"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Other Bonus</Label>
                       <Input
                         type="number"
+                        min="0"
                         step="0.01"
-                        value={editBonuses}
-                        onChange={(e) => setEditBonuses(e.target.value)}
-                        data-testid="input-edit-bonuses"
+                        value={editOtherBonuses}
+                        onChange={(event) => setEditOtherBonuses(event.target.value)}
+                        data-testid="input-edit-other-bonuses"
                       />
                     </div>
                     <div className="space-y-1">
@@ -832,7 +814,7 @@ export default function FactoryPayrollPage() {
                         type="number"
                         step="0.01"
                         value={editDeductions}
-                        onChange={(e) => setEditDeductions(e.target.value)}
+                        onChange={(event) => setEditDeductions(event.target.value)}
                         data-testid="input-edit-deductions"
                       />
                     </div>
@@ -842,7 +824,7 @@ export default function FactoryPayrollPage() {
                         type="number"
                         step="0.01"
                         value={editAdvances}
-                        onChange={(e) => setEditAdvances(e.target.value)}
+                        onChange={(event) => setEditAdvances(event.target.value)}
                         data-testid="input-edit-advances"
                       />
                     </div>
@@ -852,8 +834,16 @@ export default function FactoryPayrollPage() {
                         type="number"
                         step="0.01"
                         value={editOvertimeHours}
-                        onChange={(e) => setEditOvertimeHours(e.target.value)}
+                        onChange={(event) => setEditOvertimeHours(event.target.value)}
                         data-testid="input-edit-overtime-hours"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Current Net Salary</Label>
+                      <Input
+                        value={amount(editRecord.netSalary).toFixed(2)}
+                        readOnly
+                        className="bg-muted font-mono font-semibold"
                       />
                     </div>
                   </div>
@@ -861,7 +851,7 @@ export default function FactoryPayrollPage() {
                     <Label>Notes</Label>
                     <Input
                       value={editNotes}
-                      onChange={(e) => setEditNotes(e.target.value)}
+                      onChange={(event) => setEditNotes(event.target.value)}
                       placeholder="Optional notes"
                       data-testid="input-edit-notes"
                     />
@@ -878,6 +868,11 @@ export default function FactoryPayrollPage() {
                         <SelectItem value="PAID">Paid</SelectItem>
                       </SelectContent>
                     </Select>
+                    {amount(editRecord.pendingProductionBonus) > 0 && (
+                      <p className="text-xs text-amber-600">
+                        Decide all pending production bonuses before approving or paying.
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -892,7 +887,7 @@ export default function FactoryPayrollPage() {
                 >
                   {adjustMutation.isPending ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                       Saving...
                     </>
                   ) : (
@@ -906,12 +901,12 @@ export default function FactoryPayrollPage() {
 
         {showWorkerMaster && (
           <TabsContent value="workers" className="space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
                 <Input
                   placeholder="Search by name, code or phone..."
                   value={workerSearch}
-                  onChange={(e) => setWorkerSearch(e.target.value)}
+                  onChange={(event) => setWorkerSearch(event.target.value)}
                   className="max-w-sm"
                   data-testid="input-worker-search"
                 />
@@ -932,30 +927,29 @@ export default function FactoryPayrollPage() {
                   data-testid="button-import-workers"
                 >
                   {workerImporting ? (
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
                   ) : (
-                    <Upload className="h-4 w-4 mr-1" />
-                  )}
+                    <Upload className="mr-1 h-4 w-4" />
+                  )}{" "}
                   Import Workers Excel
                 </Button>
                 <a
                   href={selectedCompanyId ? "/api/factory/workers/template.xlsx" : "#"}
                   download
-                  onClick={(e) => {
-                    if (!selectedCompanyId) e.preventDefault();
+                  onClick={(event) => {
+                    if (!selectedCompanyId) event.preventDefault();
                   }}
                 >
                   <Button variant="outline" disabled={!selectedCompanyId} data-testid="button-download-template">
-                    <Download className="h-4 w-4 mr-1" />
-                    Download Template
+                    <Download className="mr-1 h-4 w-4" /> Download Template
                   </Button>
                 </a>
               </div>
             </div>
 
             <Card>
-              <CardContent className="pt-0 overflow-x-auto">
-                <Table>
+              <CardContent className="overflow-x-auto pt-0">
+                <Table minimumWidth="94rem" scrollLabel="Factory worker master sheet">
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
                       <TableHead className="whitespace-nowrap">Code</TableHead>
@@ -979,55 +973,59 @@ export default function FactoryPayrollPage() {
                   <TableBody>
                     {workersLoading ? (
                       <TableRow>
-                        <TableCell colSpan={16} className="text-center py-8">
-                          <Loader2 className="h-5 w-5 animate-spin mx-auto" />
+                        <TableCell colSpan={16} className="py-8 text-center">
+                          <Loader2 className="mx-auto h-5 w-5 animate-spin" />
                         </TableCell>
                       </TableRow>
                     ) : filteredWorkers.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={16} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={16} className="py-8 text-center text-muted-foreground">
                           {workerSearch ? "No workers match your search" : "No workers found. Import or add workers."}
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredWorkers.map((w: any) => (
+                      filteredWorkers.map((worker: any) => (
                         <TableRow
-                          key={w.id}
+                          key={worker.id}
                           className="cursor-pointer hover-elevate"
-                          onClick={() => navigate(`/factory/workers/${w.id}`)}
-                          data-testid={`row-worker-${w.id}`}
+                          onClick={() => navigate(`/factory/workers/${worker.id}`)}
+                          data-testid={`row-worker-${worker.id}`}
                         >
-                          <TableCell className="whitespace-nowrap font-mono text-xs">{w.employeeCode || "—"}</TableCell>
-                          <TableCell className="whitespace-nowrap font-medium">{w.fullName}</TableCell>
+                          <TableCell className="whitespace-nowrap font-mono text-xs">
+                            {worker.employeeCode || "—"}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap font-medium">{worker.fullName}</TableCell>
                           <TableCell>
                             <Badge
-                              variant={w.active ? "secondary" : "outline"}
+                              variant={worker.active ? "secondary" : "outline"}
                               className={
-                                w.active ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400" : ""
+                                worker.active
+                                  ? "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                  : ""
                               }
                             >
-                              {w.active ? "Active" : "Inactive"}
+                              {worker.active ? "Active" : "Inactive"}
                             </Badge>
                           </TableCell>
-                          <TableCell className="whitespace-nowrap">{w.position || "—"}</TableCell>
-                          <TableCell className="whitespace-nowrap">{w.department || "—"}</TableCell>
-                          <TableCell className="whitespace-nowrap">{w.phone1 || "—"}</TableCell>
-                          <TableCell className="whitespace-nowrap">{w.phone2 || "—"}</TableCell>
-                          <TableCell className="whitespace-nowrap">{w.emergencyContactName || "—"}</TableCell>
+                          <TableCell className="whitespace-nowrap">{worker.position || "—"}</TableCell>
+                          <TableCell className="whitespace-nowrap">{worker.department || "—"}</TableCell>
+                          <TableCell className="whitespace-nowrap">{worker.phone1 || "—"}</TableCell>
+                          <TableCell className="whitespace-nowrap">{worker.phone2 || "—"}</TableCell>
+                          <TableCell className="whitespace-nowrap">{worker.emergencyContactName || "—"}</TableCell>
                           <TableCell className="whitespace-nowrap">
-                            {w.dateJoined ? formatDisplayDate(new Date(w.dateJoined)) : "—"}
+                            {worker.dateJoined ? formatDisplayDate(new Date(worker.dateJoined)) : "—"}
                           </TableCell>
                           <TableCell className="whitespace-nowrap">
-                            {w.contractStartDate ? formatDisplayDate(new Date(w.contractStartDate)) : "—"}
+                            {worker.contractStartDate ? formatDisplayDate(new Date(worker.contractStartDate)) : "—"}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap">{w.salaryType || "—"}</TableCell>
-                          <TableCell className="whitespace-nowrap">{w.payFrequency || "Monthly"}</TableCell>
+                          <TableCell className="whitespace-nowrap">{worker.salaryType || "—"}</TableCell>
+                          <TableCell className="whitespace-nowrap">{worker.payFrequency || "Monthly"}</TableCell>
                           <TableCell className="whitespace-nowrap text-right">
-                            {w.baseSalary ? parseFloat(w.baseSalary).toFixed(2) : "—"}
+                            {worker.baseSalary ? parseFloat(worker.baseSalary).toFixed(2) : "—"}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap">{w.visaNumber || "—"}</TableCell>
-                          <TableCell className="whitespace-nowrap">{w.workPermitNumber || "—"}</TableCell>
-                          <TableCell className="whitespace-nowrap">{w.residentialPermit || "—"}</TableCell>
+                          <TableCell className="whitespace-nowrap">{worker.visaNumber || "—"}</TableCell>
+                          <TableCell className="whitespace-nowrap">{worker.workPermitNumber || "—"}</TableCell>
+                          <TableCell className="whitespace-nowrap">{worker.residentialPermit || "—"}</TableCell>
                         </TableRow>
                       ))
                     )}

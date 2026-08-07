@@ -31,6 +31,11 @@ import {
 import { StockEntryScanner } from "./StockEntryScanner";
 import { StockEntrySidebar } from "./StockEntrySidebar";
 import { openBrowserPrint, printLabels } from "./StockEntryPrinting";
+import {
+  StockEntryProductionPositions,
+  eligibleProductionPositions,
+  type StockEntryProductionPosition,
+} from "./StockEntryProductionPositions";
 
 interface CartItem {
   productId: number;
@@ -51,6 +56,7 @@ export function StockEntryTab() {
   const [entryDate, setEntryDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("none");
   const [selectedLogoId, setSelectedLogoId] = useState<number | null>(null);
+  const [productionPositionByProduct, setProductionPositionByProduct] = useState<Record<number, number | null>>({});
   const scanRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const appMode = useAppMode();
@@ -78,11 +84,17 @@ export function StockEntryTab() {
           productName: i.product.name,
           qty: i.qty,
           weightPerBaleKg: i.weightPerBaleKg,
+          finalizedBy: i.finalizedBy,
+          overrideLogoId: i.overrideLogoId,
         })),
+        productionPositionByProduct,
         selectedLocationId,
+        entryDate,
+        selectedCustomerId,
+        selectedLogoId,
       });
     }
-  }, [cart, selectedLocationId]);
+  }, [cart, productionPositionByProduct, selectedLocationId, entryDate, selectedCustomerId, selectedLogoId]);
 
   const { data: baleProducts, isLoading: productsLoading } = useQuery<FactoryBaleProduct[]>({
     queryKey: ["/api/factory/bale-products"],
@@ -99,6 +111,21 @@ export function StockEntryTab() {
     queryKey: ["/api/factory/worker-categories"],
     queryFn: () => fetch("/api/factory/worker-categories", { credentials: "include" }).then((r) => r.json()),
     enabled: cart.length > 0,
+  });
+  const { data: productionPositions = [], isLoading: productionPositionsLoading } = useQuery<
+    StockEntryProductionPosition[]
+  >({
+    queryKey: ["/api/factory/production-positions", entryDate],
+    queryFn: async () => {
+      const response = await fetch(`/api/factory/production-positions?asOf=${encodeURIComponent(entryDate)}`, {
+        credentials: "include",
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.message || "Failed to load production positions");
+      return payload as StockEntryProductionPosition[];
+    },
+    enabled: cart.length > 0,
+    staleTime: 30000,
   });
   const { data: allCustomers = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/customers"],
@@ -126,6 +153,46 @@ export function StockEntryTab() {
           const ids = Array.isArray(cat.workerIds) ? (cat.workerIds as number[]) : [];
           return (workers as any[]).filter((w: any) => w.active !== false && ids.includes(w.id));
         })();
+
+  // Keep attribution valid when the entry date, membership configuration, cart,
+  // or selected worker changes. While a new date is loading we preserve the
+  // current choice; once its memberships arrive, invalid choices are cleared and
+  // a single eligible position is selected automatically.
+  useEffect(() => {
+    if (productionPositionsLoading) return;
+    setProductionPositionByProduct((current) => {
+      const next = { ...current };
+      let changed = false;
+      const productIds = new Set(cart.map((item) => item.productId));
+
+      for (const key of Object.keys(next)) {
+        const productId = Number(key);
+        if (!productIds.has(productId)) {
+          delete next[productId];
+          changed = true;
+        }
+      }
+
+      for (const item of cart) {
+        const eligible = eligibleProductionPositions(productionPositions, item.finalizedBy);
+        const existing = next[item.productId] ?? null;
+        const existingIsValid = existing != null && eligible.some((position) => position.id === existing);
+        const desired = !item.finalizedBy
+          ? null
+          : existingIsValid
+            ? existing
+            : eligible.length === 1
+              ? eligible[0].id
+              : null;
+        if (existing !== desired) {
+          next[item.productId] = desired;
+          changed = true;
+        }
+      }
+
+      return changed ? next : current;
+    });
+  }, [cart, productionPositions, productionPositionsLoading]);
 
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [quickCreateName, setQuickCreateName] = useState("");
@@ -288,6 +355,12 @@ export function StockEntryTab() {
   const setQty = (productId: number, qty: number) => {
     if (qty <= 0) {
       setCart((prev) => prev.filter((item) => item.productId !== productId));
+      setProductionPositionByProduct((prev) => {
+        if (!(productId in prev)) return prev;
+        const next = { ...prev };
+        delete next[productId];
+        return next;
+      });
     } else {
       setCart((prev) => prev.map((item) => (item.productId === productId ? { ...item, qty } : item)));
     }
@@ -299,10 +372,23 @@ export function StockEntryTab() {
 
   const removeItem = (productId: number) => {
     setCart((prev) => prev.filter((item) => item.productId !== productId));
+    setProductionPositionByProduct((prev) => {
+      if (!(productId in prev)) return prev;
+      const next = { ...prev };
+      delete next[productId];
+      return next;
+    });
   };
 
   const assignWorker = (productId: number, workerId: number | null) => {
+    const eligible = eligibleProductionPositions(productionPositions, workerId);
+    const autoPositionId = eligible.length === 1 ? eligible[0].id : null;
     setCart((prev) => prev.map((item) => (item.productId === productId ? { ...item, finalizedBy: workerId } : item)));
+    setProductionPositionByProduct((prev) => ({ ...prev, [productId]: autoPositionId }));
+  };
+
+  const assignProductionPosition = (productId: number, positionId: number | null) => {
+    setProductionPositionByProduct((prev) => ({ ...prev, [productId]: positionId }));
   };
 
   const setLogoOverride = (productId: number, logoId: number | null) => {
@@ -323,6 +409,36 @@ export function StockEntryTab() {
       toast({ title: "Error", description: "Please add items to the cart", variant: "destructive" });
       return;
     }
+    if (cart.some((item) => !!item.finalizedBy) && productionPositionsLoading) {
+      toast({
+        title: "Production positions are still loading",
+        description: "The worker-to-position assignments must be loaded before Stock Entry can be saved.",
+        variant: "destructive",
+      });
+      return;
+    }
+    for (const item of cart) {
+      if (!item.finalizedBy) continue;
+      const eligible = eligibleProductionPositions(productionPositions, item.finalizedBy);
+      const selectedId = productionPositionByProduct[item.productId] ?? null;
+      const selectedIsValid = selectedId != null && eligible.some((position) => position.id === selectedId);
+      if (eligible.length > 1 && !selectedIsValid) {
+        toast({
+          title: "Production Position required",
+          description: `${item.product.name} is assigned to a worker who belongs to multiple production positions. Choose the correct position first.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      if (selectedId != null && !selectedIsValid) {
+        toast({
+          title: "Production Position changed",
+          description: `The saved position for ${item.product.name} is no longer valid on ${entryDate}. Choose it again.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     setConfirmDialogOpen(true);
   };
 
@@ -339,6 +455,7 @@ export function StockEntryTab() {
           qty: item.qty,
           weightPerBaleKg: item.weightPerBaleKg,
           finalizedBy: item.finalizedBy,
+          productionPositionId: productionPositionByProduct[item.productId] ?? null,
         })),
         entryDate,
         customerId: selectedCustomerId !== "none" ? parseInt(selectedCustomerId) : null,
@@ -356,6 +473,7 @@ export function StockEntryTab() {
       toast({ title: "Stock Entry Recorded", description: `${totalQty} bale(s) added to inventory.` });
       printLabels(data.bales, cart, baleProducts, selectedLogoId, modeApiRequest, toast, preOpenedWindowsRef);
       setCart([]);
+      setProductionPositionByProduct({});
       setConfirmDialogOpen(false);
       discardCartDraft();
     },
@@ -394,17 +512,38 @@ export function StockEntryTab() {
                   <DraftRestorePrompt
                     draftAge={cartDraftAge ?? ""}
                     onRestore={() => {
-                      const draftData = cartDraft?.data as { cart?: any[]; selectedLocationId?: string } | undefined;
+                      const draftData = cartDraft?.data as
+                        | {
+                            cart?: any[];
+                            productionPositionByProduct?: Record<number, number | null>;
+                            selectedLocationId?: string;
+                            entryDate?: string;
+                            selectedCustomerId?: string;
+                            selectedLogoId?: number | null;
+                          }
+                        | undefined;
                       if (draftData?.cart) {
                         const restored = draftData.cart
                           .map((i: any) => {
                             const p = baleProducts?.find((bp) => bp.id === i.productId);
-                            return { ...i, product: p };
+                            return {
+                              ...i,
+                              finalizedBy: i.finalizedBy ?? null,
+                              overrideLogoId: i.overrideLogoId ?? null,
+                              product: p,
+                            };
                           })
                           .filter((i: any) => i.product);
                         setCart(restored);
                       }
+                      if (draftData?.productionPositionByProduct) {
+                        setProductionPositionByProduct(draftData.productionPositionByProduct);
+                      }
                       if (draftData?.selectedLocationId) setSelectedLocationId(draftData.selectedLocationId);
+                      if (draftData?.entryDate) setEntryDate(draftData.entryDate);
+                      if (draftData?.selectedCustomerId) setSelectedCustomerId(draftData.selectedCustomerId);
+                      if (draftData && "selectedLogoId" in draftData)
+                        setSelectedLogoId(draftData.selectedLogoId ?? null);
                       discardCartDraft();
                     }}
                     onDiscard={discardCartDraft}
@@ -442,6 +581,14 @@ export function StockEntryTab() {
               logoPickerOpen={logoPickerOpen}
               onLogoPickerOpenChange={setLogoPickerOpen}
               filteredWorkers={filteredWorkers}
+            />
+
+            <StockEntryProductionPositions
+              cart={cart}
+              workers={workers}
+              positions={productionPositions}
+              selectedByProduct={productionPositionByProduct}
+              onSelect={assignProductionPosition}
             />
           </CardContent>
         </Card>

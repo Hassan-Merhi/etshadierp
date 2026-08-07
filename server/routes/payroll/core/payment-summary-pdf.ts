@@ -1,8 +1,5 @@
 /**
  * payrollCoreRoutes: PayrollPaymentSummaryPdf endpoints.
- *
- * Registered by ./index.ts in the original order; Express resolves
- * first-match, so that order is behaviour.
  */
 import type { Express } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
@@ -13,9 +10,9 @@ import path from "path";
 import fs from "fs";
 import { factoryWorkers, factoryPayrolls, companies } from "@shared/schema";
 import { getFactoryCompanyId } from "./_helpers";
+import { getProductionBonusTotalsForPayrollIds } from "../../../services/payroll/productionBonusPayrollService";
 
 export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
-  // POST /api/factory/payrolls/payment-summary-pdf - Compact payment summary PDF
   app.post("/api/factory/payrolls/payment-summary-pdf", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
@@ -29,29 +26,28 @@ export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
         .where(and(eq(factoryPayrolls.companyId, companyId), inArray(factoryPayrolls.id, payrollIds)));
       if (!payrollRows.length) return res.status(404).json({ message: "No payroll records found" });
 
-      const workerIdList = [...new Set(payrollRows.map((p: any) => p.workerId))];
+      const productionTotals = await getProductionBonusTotalsForPayrollIds(
+        db,
+        payrollRows.map((payroll: any) => payroll.id)
+      );
+      const workerIdList = [...new Set(payrollRows.map((payroll: any) => payroll.workerId))];
       const workerRows = await db
         .select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
         .from(factoryWorkers)
         .where(inArray(factoryWorkers.id, workerIdList));
-      const workerMap = new Map(workerRows.map((w: any) => [w.id, w.fullName]));
-
+      const workerMap = new Map(workerRows.map((worker: any) => [worker.id, worker.fullName]));
       const [companyRow] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, companyId));
-      const companyName = companyRow?.name || "Company";
 
       const PDFDocument = (await import("pdfkit")).default;
       const pathMod = await import("path");
-
-      // Arabic / Unicode font setup
-      const psumFontDir = pathMod.join(process.cwd(), "server", "fonts");
-      const psumArabicFontPath = pathMod.join(psumFontDir, "Amiri-Regular.ttf");
-      const psumHasArabicFont = fs.existsSync(psumArabicFontPath);
-
+      const fontDir = pathMod.join(process.cwd(), "server", "fonts");
+      const arabicFontPath = pathMod.join(fontDir, "Amiri-Regular.ttf");
+      const hasArabicFont = fs.existsSync(arabicFontPath);
       const doc = new PDFDocument({ margin: 40, size: "A4" });
-      if (psumHasArabicFont) doc.registerFont("Arabic", psumArabicFontPath);
+      if (hasArabicFont) doc.registerFont("Arabic", arabicFontPath);
 
       const chunks: Buffer[] = [];
-      doc.on("data", (c: Buffer) => chunks.push(c));
+      doc.on("data", (chunk: Buffer) => chunks.push(chunk));
       doc.on("end", () => {
         const pdf = Buffer.concat(chunks);
         res.setHeader("Content-Type", "application/pdf");
@@ -59,139 +55,134 @@ export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
         res.send(pdf);
       });
 
-      // Arabic reshaping helpers
-      let psumConvertArabic: ((t: string) => string) | null = null;
-      let psumBidi: {
-        getEmbeddingLevels: (t: string, d: string) => any;
-        getReorderedString: (t: string, l: any) => string;
+      let convertArabic: ((text: string) => string) | null = null;
+      let bidi: {
+        getEmbeddingLevels: (text: string, direction: string) => any;
+        getReorderedString: (text: string, levels: any) => string;
       } | null = null;
       try {
-        psumConvertArabic = (require("arabic-reshaper") as any).convertArabic;
-        psumBidi = (require("bidi-js") as any)();
+        convertArabic = (require("arabic-reshaper") as any).convertArabic;
+        bidi = (require("bidi-js") as any)();
       } catch {}
 
-      const psumContainsArabic = (text: string) => /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
-      const psumShapeText = (text: string): string => {
-        if (!text || !psumConvertArabic) return text;
+      const containsArabic = (text: string) => /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(text);
+      const shapeText = (text: string): string => {
+        if (!text || !convertArabic) return text;
         try {
-          const reshaped = psumConvertArabic(text);
-          if (psumBidi) {
-            const levels = psumBidi.getEmbeddingLevels(reshaped, "rtl");
-            return psumBidi.getReorderedString(reshaped, levels);
+          const reshaped = convertArabic(text);
+          if (bidi) {
+            const levels = bidi.getEmbeddingLevels(reshaped, "rtl");
+            return bidi.getReorderedString(reshaped, levels);
           }
           return reshaped;
         } catch {
           return text;
         }
       };
-
-      // Render text with automatic Arabic/Unicode font switching
-      const psumRenderText = (
+      const renderText = (
         text: string,
         x: number,
-        yPos: number,
-        w: number,
+        y: number,
+        width: number,
         align: "left" | "right" | "center",
         size = 8
       ) => {
-        const hasAr = psumHasArabicFont && psumContainsArabic(text);
+        const arabic = hasArabicFont && containsArabic(text);
         doc
-          .font(hasAr ? "Arabic" : "Helvetica")
+          .font(arabic ? "Arabic" : "Helvetica")
           .fontSize(size)
-          .text(hasAr ? psumShapeText(text) : text, x, yPos, { width: w, align: hasAr ? "right" : align });
+          .text(arabic ? shapeText(text) : text, x, y, { width, align: arabic ? "right" : align });
       };
 
-      // Header logo
-      const hmdLogoPathPay = path.join(process.cwd(), "server", "hmd-logo.png");
-      if (fs.existsSync(hmdLogoPathPay)) {
+      const logoPath = path.join(process.cwd(), "server", "hmd-logo.png");
+      if (fs.existsSync(logoPath)) {
         try {
-          doc.image(hmdLogoPathPay, (doc.page.width - 220) / 2, doc.y, { width: 220 });
+          doc.image(logoPath, (doc.page.width - 220) / 2, doc.y, { width: 220 });
           doc.moveDown(0.5);
         } catch {}
       }
-      doc.fontSize(10).font("Helvetica").text("Payment Summary", { align: "center" });
+      doc
+        .fontSize(11)
+        .font("Helvetica")
+        .text(companyRow?.name || "Company", { align: "center" });
+      doc.fontSize(10).text("Payroll Payment Summary", { align: "center" });
       doc.moveDown(0.3);
       doc.fontSize(8).fillColor("#666666").text(`Generated: ${new Date().toLocaleDateString()}`, { align: "center" });
       doc.moveDown(0.8);
 
-      // Period range
-      const periods = [...new Set(payrollRows.map((p: any) => `${p.periodStart} – ${p.periodEnd}`))];
+      const periods = [...new Set(payrollRows.map((payroll: any) => `${payroll.periodStart} – ${payroll.periodEnd}`))];
       doc
         .fontSize(8)
         .fillColor("#333333")
         .text(`Period: ${periods.join(", ")}`);
       doc.moveDown(0.5);
 
-      // Table layout — 5 columns: Name | Present | Absent | Amount | Signature
-      // Total table: x=40 to x=555 = 515px wide
-      const COL = { name: 40, present: 265, absent: 313, amount: 368, signature: 445 };
-      const COL_W = { name: 215, present: 40, absent: 40, amount: 70, signature: 110 };
+      // Name | Present | Absent | Production Bonus | Other Bonus | Net | Signature
+      const COL = { name: 40, present: 210, absent: 247, prod: 284, other: 345, amount: 406, signature: 474 };
+      const COL_W = { name: 162, present: 32, absent: 32, prod: 56, other: 56, amount: 62, signature: 81 };
       const rowH = 20;
       const tableTop = doc.y;
-
-      // Table header row
       doc.rect(40, tableTop, 515, rowH).fill("#1F3864");
-      doc.fillColor("#ffffff").fontSize(8).font("Helvetica-Bold");
+      doc.fillColor("#ffffff").fontSize(7).font("Helvetica-Bold");
       doc.text("Worker Name", COL.name, tableTop + 6, { width: COL_W.name });
-      doc.text("Present", COL.present, tableTop + 6, { width: COL_W.present, align: "center" });
-      doc.text("Absent", COL.absent, tableTop + 6, { width: COL_W.absent, align: "center" });
-      doc.text("Amount", COL.amount, tableTop + 6, { width: COL_W.amount, align: "right" });
+      doc.text("Pres.", COL.present, tableTop + 6, { width: COL_W.present, align: "center" });
+      doc.text("Abs.", COL.absent, tableTop + 6, { width: COL_W.absent, align: "center" });
+      doc.text("Prod Bonus", COL.prod, tableTop + 6, { width: COL_W.prod, align: "right" });
+      doc.text("Other Bonus", COL.other, tableTop + 6, { width: COL_W.other, align: "right" });
+      doc.text("Net", COL.amount, tableTop + 6, { width: COL_W.amount, align: "right" });
       doc.text("Signature", COL.signature, tableTop + 6, { width: COL_W.signature, align: "center" });
 
       let y = tableTop + rowH;
-      let totalAmt = 0;
+      let totalNet = 0;
+      let totalProduction = 0;
+      let totalOther = 0;
+      payrollRows.forEach((payroll: any, index: number) => {
+        const name = (workerMap.get(payroll.workerId) as string) || `Worker #${payroll.workerId}`;
+        const present = payroll.presentDays != null ? Number(payroll.presentDays) : null;
+        const absent = payroll.absentDays != null ? Number(payroll.absentDays) : null;
+        const net = parseFloat(payroll.netSalary || "0");
+        const production = productionTotals.get(payroll.id)?.approved ?? 0;
+        const other = Math.max(0, parseFloat(payroll.bonuses || "0") - production);
+        totalNet += net;
+        totalProduction += production;
+        totalOther += other;
 
-      payrollRows.forEach((p: any, i: number) => {
-        const name = (workerMap.get(p.workerId) as string) || `Worker #${p.workerId}`;
-        const present = p.presentDays != null ? Number(p.presentDays) : "—";
-        const absent = p.absentDays != null ? Number(p.absentDays) : "—";
-        const net = parseFloat(p.netSalary || "0");
-        totalAmt += net;
-
-        if (i % 2 === 1) doc.rect(40, y, 515, rowH).fill("#f5f7fa");
+        if (index % 2 === 1) doc.rect(40, y, 515, rowH).fill("#f5f7fa");
         doc.fillColor("#000000");
-
-        // Worker name — supports Arabic/Unicode
-        psumRenderText(name, COL.name, y + 6, COL_W.name, "left");
-
-        doc.font("Helvetica").fontSize(8);
+        renderText(name, COL.name, y + 6, COL_W.name, "left", 7);
+        doc.font("Helvetica").fontSize(7);
         doc.text(
-          typeof present === "number" ? (present % 1 === 0 ? present.toFixed(0) : present.toFixed(1)) : "—",
+          present == null ? "—" : present % 1 === 0 ? present.toFixed(0) : present.toFixed(1),
           COL.present,
           y + 6,
           { width: COL_W.present, align: "center" }
         );
-        doc.text(
-          typeof absent === "number" ? (absent % 1 === 0 ? absent.toFixed(0) : absent.toFixed(1)) : "—",
-          COL.absent,
-          y + 6,
-          { width: COL_W.absent, align: "center" }
-        );
+        doc.text(absent == null ? "—" : absent % 1 === 0 ? absent.toFixed(0) : absent.toFixed(1), COL.absent, y + 6, {
+          width: COL_W.absent,
+          align: "center",
+        });
+        doc.text(production.toFixed(2), COL.prod, y + 6, { width: COL_W.prod, align: "right" });
+        doc.text(other.toFixed(2), COL.other, y + 6, { width: COL_W.other, align: "right" });
         doc.text(net.toFixed(2), COL.amount, y + 6, { width: COL_W.amount, align: "right" });
-
-        // Signature box — a horizontal line for the worker to sign
-        const sigLineY = y + rowH - 5;
+        const sigY = y + rowH - 5;
         doc
-          .moveTo(COL.signature + 8, sigLineY)
-          .lineTo(COL.signature + COL_W.signature - 8, sigLineY)
+          .moveTo(COL.signature + 5, sigY)
+          .lineTo(COL.signature + COL_W.signature - 5, sigY)
           .strokeColor("#aaaaaa")
           .lineWidth(0.5)
           .stroke();
-
         y += rowH;
       });
 
-      // Footer total row
       doc.rect(40, y + 2, 515, rowH).fill("#1F3864");
-      doc.fillColor("#ffffff").fontSize(9).font("Helvetica-Bold");
-      doc.text("Total Amount Paid", COL.name, y + 7, { width: COL_W.name + COL_W.present + COL_W.absent + 8 });
-      doc.text(totalAmt.toFixed(2), COL.amount, y + 7, { width: COL_W.amount, align: "right" });
-
+      doc.fillColor("#ffffff").fontSize(7).font("Helvetica-Bold");
+      doc.text("TOTAL", COL.name, y + 7, { width: COL_W.name });
+      doc.text(totalProduction.toFixed(2), COL.prod, y + 7, { width: COL_W.prod, align: "right" });
+      doc.text(totalOther.toFixed(2), COL.other, y + 7, { width: COL_W.other, align: "right" });
+      doc.text(totalNet.toFixed(2), COL.amount, y + 7, { width: COL_W.amount, align: "right" });
       doc.end();
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
-
-  // GET /api/factory/workers/:id/stats - Get worker productivity stats
 }

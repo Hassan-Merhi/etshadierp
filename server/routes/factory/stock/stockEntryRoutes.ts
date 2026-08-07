@@ -11,6 +11,7 @@ import { getClientDate } from "../../../lib/dateUtils";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { adjustInventory } from "../../../inventoryHelper";
+import { resolveStockEntryProductionAttributions } from "../../../services/factory/stockEntryProductionAttribution";
 import { writeDaybookEntry } from "../_helpers";
 import {
   factoryCategories,
@@ -18,9 +19,9 @@ import {
   factoryMixBatches,
   factoryBales,
   factoryBaleSequences,
+  factoryBaleProductionAttributions,
   stockItems,
   stockGroups,
-  factoryWorkers,
 } from "@shared/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
 
@@ -119,25 +120,23 @@ export function registerFactoryStockEntryRoutes(app: Express) {
             : [];
         const categoryMap = new Map<number, any>(factoryCats.map((c: any) => [c.id, c]));
 
-        // Pre-resolve worker names for items that have finalizedBy set
-        const workerIdSet = new Set<number>();
-        for (const item of items) {
-          if (item.finalizedBy) workerIdSet.add(Number(item.finalizedBy));
-        }
-        const workerNameMap = new Map<number, string>();
-        if (workerIdSet.size > 0) {
-          const wkRows = await tx
-            .select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
-            .from(factoryWorkers)
-            .where(inArray(factoryWorkers.id, Array.from(workerIdSet)));
-          for (const w of wkRows) workerNameMap.set(w.id, w.fullName);
-        }
+        // Resolve worker and production-position attribution against the exact
+        // stock-entry date. This validates company scope and effective-dated
+        // membership, auto-selects a single eligible position, and requires an
+        // explicit choice when a worker belongs to multiple positions.
+        const productionAttributions = await resolveStockEntryProductionAttributions(
+          tx,
+          companyId,
+          effectiveDateStr,
+          items
+        );
 
-        // ── Build all bale rows in memory, track per-item product for later ──
+        // ── Build all bale rows in memory, track per-bale metadata for later ──
         const baleValues: any[] = [];
         const baleProductRefs: any[] = [];
+        const baleAttributionRefs: any[] = [];
 
-        for (const item of items) {
+        for (const [itemIndex, item] of items.entries()) {
           const qty = parseInt(item.quantity || item.qty || "1");
           const rawWeight = item.weightPerBale ?? item.weightPerBaleKg ?? "25";
           const weight = parseFloat(String(rawWeight)) || 25;
@@ -146,9 +145,7 @@ export function registerFactoryStockEntryRoutes(app: Express) {
           const categoryName: string | null = product.categoryId
             ? categoryMap.get(product.categoryId)?.name || null
             : null;
-          const resolvedWorkerName: string | null = item.finalizedBy
-            ? (workerNameMap.get(Number(item.finalizedBy)) ?? null)
-            : null;
+          const attribution = productionAttributions[itemIndex];
           const isGarbage = product.articleCode?.startsWith("HMD16");
           const productionCostPerKg = parseFloat(product.productionPrice || "0");
           const effectiveCostPerKg = isGarbage ? 0 : productionCostPerKg;
@@ -171,11 +168,12 @@ export function registerFactoryStockEntryRoutes(app: Express) {
               totalCost: String(baleTotalCost),
               status: "IN_STOCK",
               finalizedAt: finalizedAtTs,
-              finalizedBy: item.finalizedBy ?? null,
-              workerName: resolvedWorkerName,
+              finalizedBy: attribution.workerId,
+              workerName: attribution.workerName,
               stockEntryDate: effectiveDateStr,
             });
             baleProductRefs.push(product);
+            baleAttributionRefs.push(attribution);
             totalWeight += weight;
             baleIndex++;
           }
@@ -183,7 +181,36 @@ export function registerFactoryStockEntryRoutes(app: Express) {
 
         // ── Single bulk INSERT for all bales ──
         const insertedBales = await tx.insert(factoryBales).values(baleValues).returning();
-        const bales: any[] = insertedBales.map((b: any, idx: number) => ({ ...b, _product: baleProductRefs[idx] }));
+
+        // Keep the worker + production-position snapshot atomically attached to
+        // every new Stock Entry bale. Null position is intentional for workers
+        // with no configured production position and for unassigned bales.
+        if (insertedBales.length > 0) {
+          await tx.insert(factoryBaleProductionAttributions).values(
+            insertedBales.map((bale: any, idx: number) => {
+              const attribution = baleAttributionRefs[idx];
+              return {
+                companyId,
+                baleId: bale.id,
+                workerId: attribution.workerId,
+                workerNameSnapshot: attribution.workerName,
+                productionPositionId: attribution.productionPositionId,
+                productionPositionNameSnapshot: attribution.productionPositionName,
+                stockEntryDate: effectiveDateStr,
+              };
+            })
+          );
+        }
+
+        const bales: any[] = insertedBales.map((b: any, idx: number) => {
+          const attribution = baleAttributionRefs[idx];
+          return {
+            ...b,
+            _product: baleProductRefs[idx],
+            productionPositionId: attribution.productionPositionId,
+            productionPositionName: attribution.productionPositionName,
+          };
+        });
 
         if (mixBatch) {
           const mixRemaining = parseFloat(mixBatch.totalWeightKg) - parseFloat(mixBatch.usedKg || "0");
@@ -325,6 +352,10 @@ export function registerFactoryStockEntryRoutes(app: Express) {
           productName: b.productName || b.articleCode || "Unknown",
           weightKg: b.weightKg,
           status: b.status || "IN_STOCK",
+          workerId: b.finalizedBy ?? null,
+          workerName: b.workerName ?? null,
+          productionPositionId: b.productionPositionId ?? null,
+          productionPositionName: b.productionPositionName ?? null,
         })),
       });
       await writeDaybookEntry(db, {
