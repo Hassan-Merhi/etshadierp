@@ -1,0 +1,45 @@
+name: Bandwidth PR format repair
+
+on:
+  push:
+    branches:
+      - agent/bandwidth-phase4-global-request-pressure
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: agent/bandwidth-phase4-global-request-pressure
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.14
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Format affected files
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            server/routes/factory/factoryDailyScanRoutes.ts \
+            tests/loading-proforma-summary-lines.test.ts \
+            tests/ui/bandwidth-phase-2-payloads.test.ts \
+            tests/ui/bandwidth-phase-4-heavy-pages.test.ts
+      - name: Commit formatting
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/routes/factory/factoryDailyScanRoutes.ts \
+            tests/loading-proforma-summary-lines.test.ts \
+            tests/ui/bandwidth-phase-2-payloads.test.ts \
+            tests/ui/bandwidth-phase-4-heavy-pages.test.ts
+          if git diff --cached --quiet; then
+            echo "No formatting changes required."
+            exit 0
+          fi
+          git commit -m "Format bandwidth Phase 5 integration files"
+          git push origin HEAD:agent/bandwidth-phase4-global-request-pressure
