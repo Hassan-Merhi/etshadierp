@@ -84,6 +84,7 @@ export function useScreenFeed() {
   const lastInteractionAtRef = useRef(0);
   const dirtyRef = useRef(false);
   const dirtySinceRef = useRef(0);
+  const pendingMinGapRef = useRef(ACTIVE_CAPTURE_MIN_GAP_MS);
 
   useEffect(() => {
     busyRef.current = false;
@@ -126,14 +127,22 @@ export function useScreenFeed() {
         urgent = true;
       }
 
-      if (!dirtyRef.current) dirtySinceRef.current = now;
+      const requestedMinGap = options?.minGapMs ?? ACTIVE_CAPTURE_MIN_GAP_MS;
+      if (!dirtyRef.current) {
+        dirtySinceRef.current = now;
+        pendingMinGapRef.current = requestedMinGap;
+      } else {
+        // Any real user interaction is allowed to accelerate a pending
+        // background-only refresh, while repeated background mutations keep
+        // their wider spacing even if they happen during an in-flight capture.
+        pendingMinGapRef.current = Math.min(pendingMinGapRef.current, requestedMinGap);
+      }
       dirtyRef.current = true;
 
       if (!watchedRef.current || document.visibilityState !== "visible" || busyRef.current || disposed) return;
 
       const settleAt = urgent ? now : now + DIRTY_SETTLE_MS;
-      const minGapMs = options?.minGapMs ?? ACTIVE_CAPTURE_MIN_GAP_MS;
-      const minGapAt = lastCaptureAtRef.current + minGapMs;
+      const minGapAt = lastCaptureAtRef.current + pendingMinGapRef.current;
       const maxLatencyAt = (dirtySinceRef.current || now) + MAX_DIRTY_LATENCY_MS;
       const dueAt = Math.max(minGapAt, Math.min(settleAt, maxLatencyAt));
       scheduleAt(dueAt);
@@ -151,7 +160,10 @@ export function useScreenFeed() {
 
       if (result.cancelled) {
         if (watchedRef.current && document.visibilityState === "visible") {
-          if (!dirtyRef.current) dirtySinceRef.current = Date.now();
+          if (!dirtyRef.current) {
+            dirtySinceRef.current = Date.now();
+            pendingMinGapRef.current = ACTIVE_CAPTURE_MIN_GAP_MS;
+          }
           dirtyRef.current = true;
         }
         return;
@@ -165,7 +177,10 @@ export function useScreenFeed() {
       }
 
       if (result.failed) {
-        if (!dirtyRef.current) dirtySinceRef.current = Date.now();
+        if (!dirtyRef.current) {
+          dirtySinceRef.current = Date.now();
+          pendingMinGapRef.current = ACTIVE_CAPTURE_MIN_GAP_MS;
+        }
         dirtyRef.current = true;
       }
     }
@@ -174,10 +189,10 @@ export function useScreenFeed() {
       if (!watchedRef.current || document.visibilityState !== "visible" || disposed) return;
       if (failed) {
         scheduleAt(
-          Math.max(lastCaptureAtRef.current + ACTIVE_CAPTURE_MIN_GAP_MS, Date.now() + FAILED_CAPTURE_BACKOFF_MS)
+          Math.max(lastCaptureAtRef.current + pendingMinGapRef.current, Date.now() + FAILED_CAPTURE_BACKOFF_MS)
         );
       } else if (dirtyRef.current) {
-        markDirty();
+        markDirty({ minGapMs: pendingMinGapRef.current });
       } else {
         scheduleIdleRefresh();
       }
@@ -192,7 +207,7 @@ export function useScreenFeed() {
         return;
       }
 
-      const minGapAt = lastCaptureAtRef.current + ACTIVE_CAPTURE_MIN_GAP_MS;
+      const minGapAt = lastCaptureAtRef.current + pendingMinGapRef.current;
       if (dirtyRef.current && lastCaptureAtRef.current && now < minGapAt) {
         scheduleAt(minGapAt);
         return;
@@ -213,6 +228,7 @@ export function useScreenFeed() {
         // frame, which prevents a duplicate heavy render after every keystroke.
         dirtyRef.current = false;
         dirtySinceRef.current = 0;
+        pendingMinGapRef.current = ACTIVE_CAPTURE_MIN_GAP_MS;
         const expectedPath = window.location.href;
 
         captureAndUploadScreenFrame({
@@ -233,7 +249,10 @@ export function useScreenFeed() {
           .catch(() => {
             failed = true;
             lastCaptureAtRef.current = Date.now();
-            if (!dirtyRef.current) dirtySinceRef.current = Date.now();
+            if (!dirtyRef.current) {
+              dirtySinceRef.current = Date.now();
+              pendingMinGapRef.current = ACTIVE_CAPTURE_MIN_GAP_MS;
+            }
             dirtyRef.current = true;
           })
           .finally(() => {
@@ -352,6 +371,7 @@ export function useScreenFeed() {
       lastInteractionAtRef.current = 0;
       dirtyRef.current = false;
       dirtySinceRef.current = 0;
+      pendingMinGapRef.current = ACTIVE_CAPTURE_MIN_GAP_MS;
       clickBuffer.length = 0;
       trackedScrollElements.clear();
     };
