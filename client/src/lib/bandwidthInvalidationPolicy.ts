@@ -25,16 +25,18 @@ const FULL_INVALIDATION_WRITE_PATHS: readonly RegExp[] = [
   /^\/api\/factory\/(?:employees|workers|users)(?:\/|$)/,
   /^\/api\/(?:customers|suppliers)(?:\/|$)/,
   /^\/api\/factory\/(?:customers|suppliers)(?:\/|$)/,
-  /^\/api\/factory\/customer-proforma(?:s|-lines)(?:\/|$)/,
   /(?:^|\/)(?:set|switch|select|current)[-_]?(?:company|location)(?:\/|$)/i,
   /(?:^|\/)(?:company|location)[-_]?(?:switch|selection)(?:\/|$)/i,
 ];
 
 /**
- * Ordinary vouchers, scans, transfers and order writes invalidate live balances
- * and workflow snapshots but preserve unrelated reference/catalog responses.
+ * Ordinary vouchers, scans, transfers, order writes and customer-proforma
+ * edits invalidate live balances/workflow snapshots only. Proforma writes used
+ * to clear every reference cache, which repeatedly evicted large unrelated
+ * catalogs such as /api/stock-items/light and /api/factory/bale-products.
+ *
  * Authentication, company/location changes, settings/access changes and edits
- * to the reference data itself must clear every client read snapshot.
+ * to the reference data itself still clear every client read snapshot.
  */
 export function getBandwidthInvalidationScope(pathname: string): BandwidthInvalidationScope {
   return FULL_INVALIDATION_WRITE_PATHS.some((pattern) => pattern.test(pathname)) ? "all" : "live";

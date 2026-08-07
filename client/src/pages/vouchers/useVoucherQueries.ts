@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { stockItemKeys } from "@/lib/queryKeys";
 import type {
   BankAccount,
   LedgerAccount,
@@ -77,12 +78,14 @@ export function useVoucherQueries({
   });
 
   // Voucher transfer/adjustment/POS pickers only use id, code, name and uom.
-  // Share the lightweight endpoint/cache across all of those screens instead of
-  // downloading the ~634 KB full stock-item payload on every mount.
+  // Use the explicit identity profile and keep it warm across voucher screens;
+  // unrelated voucher/proforma writes no longer evict this reference cache.
   const { data: stockItems = [] } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items/light", selectedCompany?.id],
+    queryKey: stockItemKeys.identity(selectedCompany?.id),
     enabled: needsStockData && !!selectedCompany?.id,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 2 * 60 * 60 * 1000,
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });

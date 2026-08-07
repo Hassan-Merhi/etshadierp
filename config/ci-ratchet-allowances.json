@@ -45,7 +45,6 @@
       "tests/ui/bandwidth-phase-1-page-polling.test.ts",
       "tests/ui/bandwidth-phase-2-payloads.test.ts",
       "tests/ui/bandwidth-phase-3-cache.test.ts",
-      "tests/ui/bandwidth-phase-4-heavy-pages.test.ts",
       "tests/stock-transfer-revision-lifecycle-policy.test.ts",
       "tests/loading-proforma-summary-lines.test.ts",
       "tests/pos-revision-whatsapp-routing.test.ts",

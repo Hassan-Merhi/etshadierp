@@ -2,6 +2,7 @@ import { useState, useEffect, Fragment, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
+import { useLocationSummaryBandwidth } from "@/hooks/use-location-summary-bandwidth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -134,25 +135,9 @@ export default function LocationSummary() {
     queryKey: ["/api/locations"],
   });
 
-  const { data: summaryData, isLoading } = useQuery<LocationSummaryResponse>({
-    queryKey: [
-      "/api/location-summary",
-      { locationIds: selectedLocationIds.join(","), startDate: periodFilter.fromDate, endDate: periodFilter.toDate },
-    ],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (selectedLocationIds.length > 0) {
-        params.append("locationIds", selectedLocationIds.join(","));
-      }
-      params.append("startDate", periodFilter.fromDate);
-      params.append("endDate", periodFilter.toDate);
-      const res = await fetch(`/api/location-summary?${params.toString()}`, {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to fetch location summary");
-      return res.json();
-    },
-    enabled: selectedLocationIds.length > 0,
+  const { data: summaryData, isLoading } = useLocationSummaryBandwidth({
+    selectedLocationIds,
+    expandedGroups,
   });
 
   // Keep locations in the order they were selected
@@ -360,7 +345,7 @@ export default function LocationSummary() {
     const headerHeight = thead ? thead.offsetHeight : 60;
     const scrollMargin = 8;
 
-    // Use absolute positions (offsetTop) instead of relative getBoundingClientRect
+    // Uses absolute positions (offsetTop) instead of relative getBoundingClientRect
     // This prevents stacking issues when multiple scroll animations overlap
     const rowTop = rowElement.offsetTop;
     const rowBottom = rowTop + rowElement.offsetHeight;

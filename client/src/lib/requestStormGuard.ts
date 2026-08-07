@@ -42,7 +42,17 @@ const inFlightGets = new Map<string, Promise<Response>>();
 const inFlightLifetimes = new Map<string, SharedRequestLifetime>();
 const getQueue: QueueEntry[] = [];
 let activeGets = 0;
-let writeGeneration = 0;
+let liveWriteGeneration = 0;
+let referenceWriteGeneration = 0;
+
+function generationForScope(scope: BandwidthCacheScope): number {
+  return scope === "reference" ? referenceWriteGeneration : liveWriteGeneration;
+}
+
+function bumpWriteGeneration(scope: BandwidthInvalidationScope): void {
+  liveWriteGeneration += 1;
+  if (scope === "all") referenceWriteGeneration += 1;
+}
 
 const BYPASS_PATHS = [
   /\/export(?:\/|$)/i,
@@ -61,10 +71,11 @@ const CACHE_RULES: readonly CacheRule[] = [
   { pattern: /^\/api\/factory\/customer-orders\/\d+\/bale-removals$/, ttlMs: 5 * 60_000, scope: "live" },
   { pattern: /^\/api\/factory\/bale-stock-count$/, ttlMs: 60_000, scope: "live" },
   { pattern: /^\/api\/factory\/customer-orders$/, ttlMs: 30_000, scope: "live" },
-  { pattern: /^\/api\/factory\/customer-proformas$/, ttlMs: 2 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/customer-proformas$/, ttlMs: 2 * 60_000, scope: "live" },
   { pattern: /^\/api\/factory\/customers$/, ttlMs: 30 * 60_000, scope: "reference" },
   { pattern: /^\/api\/factory\/suppliers$/, ttlMs: 30 * 60_000, scope: "reference" },
   { pattern: /^\/api\/factory\/bale-products$/, ttlMs: 30 * 60_000, scope: "reference" },
+  { pattern: /^\/api\/factory\/categories$/, ttlMs: 30 * 60_000, scope: "reference" },
   { pattern: /^\/api\/factory\/workers$/, ttlMs: 30 * 60_000, scope: "reference" },
   { pattern: /^\/api\/factory\/employees$/, ttlMs: 30 * 60_000, scope: "reference" },
   { pattern: /^\/api\/factory\/cash-accounts$/, ttlMs: 30 * 60_000, scope: "reference" },
@@ -208,7 +219,7 @@ function refreshRevalidatedEntry(cached: CachedApiResponse, rule: CacheRule): Re
 }
 
 function cacheResponse(key: string, response: Response, rule: CacheRule, generationAtStart: number): void {
-  if (rule.ttlMs <= 0 || !response.ok || generationAtStart !== writeGeneration) return;
+  if (rule.ttlMs <= 0 || !response.ok || generationAtStart !== generationForScope(rule.scope)) return;
 
   const rawLength = response.headers.get("content-length");
   const responseBytes = rawLength ? Number(rawLength) : 0;
@@ -417,12 +428,12 @@ export function installRequestStormGuard(): void {
 
   invalidationChannel?.addEventListener("message", (event: MessageEvent<BandwidthInvalidationMessage>) => {
     if (event.data?.type !== "invalidate") return;
-    writeGeneration += 1;
+    bumpWriteGeneration(event.data.scope);
     clearReadCache(event.data.scope);
   });
 
   const invalidate = (scope: BandwidthInvalidationScope) => {
-    writeGeneration += 1;
+    bumpWriteGeneration(scope);
     clearReadCache(scope);
     invalidationChannel?.postMessage({ type: "invalidate", scope } satisfies BandwidthInvalidationMessage);
   };
@@ -485,7 +496,7 @@ export function installRequestStormGuard(): void {
     const revalidationEntry = rule ? getRevalidationEntry(key) : null;
     const lifetime = new SharedRequestLifetime();
     lifetime.acquire();
-    const generationAtStart = writeGeneration;
+    const generationAtStart = rule ? generationForScope(rule.scope) : 0;
     const requestPromise = (async () => {
       if (shouldDeferUntilVisible(url.pathname, ttlMs)) await waitUntilVisible(lifetime.controller.signal);
       const release = await acquireGetSlot(lifetime.controller.signal);
@@ -499,7 +510,7 @@ export function installRequestStormGuard(): void {
         lifetime.disarm();
         if (response.status === 304 && rule && revalidationEntry) {
           const cached = refreshRevalidatedEntry(revalidationEntry, rule);
-          if (generationAtStart !== writeGeneration) {
+          if (generationAtStart !== generationForScope(rule.scope)) {
             revalidationEntry.expiresAt = 0;
             revalidationEntry.staleUntil = 0;
           }

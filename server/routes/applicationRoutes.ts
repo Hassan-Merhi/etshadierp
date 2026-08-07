@@ -13,6 +13,7 @@ import { registerApprovalRoutes } from "./approvalRoutes";
 import { registerAuthRoutes } from "./authRoutes";
 import { registerBalanceRepairRoutes } from "./balance-repair";
 import { registerBaleRoutes } from "./baleRoutes";
+import { registerBarcodeImageBandwidthMiddleware } from "./barcodeImageBandwidthMiddleware";
 import { registerBankAssetRoutes } from "./bankAssetRoutes";
 import { registerBusinessAlertRoutes } from "./businessAlertsRoutes";
 import { registerChatbotRoutes } from "./chatbot";
@@ -85,6 +86,7 @@ import { registerSalaryAdvanceRoutes } from "./employees/salaryAdvanceRoutes";
 import { registerLegacyHealthRoutes } from "./core/healthRoutes";
 import { registerPermissionBoundaryRoutes } from "./core/permissionBoundaryRoutes";
 import { registerIntercompanyPosConfigRoutes } from "./pos/intercompanyPosConfigRoutes";
+import { registerBandwidthPhase3FactoryReads } from "./performance/bandwidthPhase3FactoryReads";
 
 function registerWriteInvalidationSignal(app: Express): void {
   app.use((req, res, next) => {
@@ -110,6 +112,9 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerWriteInvalidationSignal(app);
   registerPermissionBoundaryRoutes(app);
 
+  // The Bale Ledger aggregation accelerator must precede the legacy Factory
+  // registrar. Other Phase 3 fixes live in their owned route modules directly.
+  registerBandwidthPhase3FactoryReads(app);
   registerFactoryRoutes(app, requireAuth, db);
   registerFactoryWorkerRoutes(app, requireAuth, db);
   registerFactoryPayrollRoutes(app, requireAuth, db);
@@ -168,6 +173,10 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerImportCycleRoutes(app);
   registerDebugRoutes(app);
   registerReportsRoutes(app);
+  // Must precede registerBaleRoutes: the legacy /api/barcode/:code handler is
+  // retained as a PNG fallback, while browser image requests are intercepted
+  // here and served as compact immutable SVG when supported.
+  registerBarcodeImageBandwidthMiddleware(app);
   registerBaleRoutes(app);
   registerAdminRoutes(app);
   registerBalanceRepairRoutes(app);

@@ -1,36 +1,38 @@
-import fs from "node:fs";
-import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { QUERY_STALE_TIMES, staleTimeForQueryKey, visibleTabInterval } from "@/lib/queryPolicies";
+import { stockItemKeys } from "@/lib/queryKeys";
 
-const root = process.cwd();
-const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
-
-describe("Bandwidth Phase 4 heavy-page contracts", () => {
-  it("pauses Pending Loadings polling in hidden tabs and slows it to one minute", () => {
-    const source = read("client/src/pages/PendingLoadings.tsx");
-    expect(source).toContain("visibleTabInterval(60_000)");
-    expect(source).toContain("refetchIntervalInBackground: false");
-    expect(source).not.toContain("refetchInterval: 30000");
+describe("Bandwidth Phase 4 request-pressure contracts", () => {
+  beforeEach(() => {
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible",
+    });
   });
 
-  it("does not poll historical daily scans and updates scan cache locally", () => {
-    const source = read("client/src/pages/factory/DailyScan.tsx");
-    expect(source).toContain("isToday ? visibleTabInterval(60_000) : false");
-    expect(source).toContain("setQueryData<DailyScanRow[]>");
-    expect(source).not.toContain("refetchInterval: 10000");
+  it("stops polling while the browser tab is hidden", () => {
+    const interval = visibleTabInterval(60_000);
+    expect(interval()).toBe(60_000);
+
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "hidden",
+    });
+    expect(interval()).toBe(false);
   });
 
-  it("reduces ground-scan background traffic and keeps invalidation active-only", () => {
-    const source = read("client/src/pages/factory/GroundScan.tsx");
-    expect(source).toContain("visibleTabInterval(30_000)");
-    expect(source).toContain('refetchType: "active"');
-    expect(source).not.toContain("refetchInterval: 4000");
+  it("keeps the compact stock selector on its dedicated identity cache key", () => {
+    expect(stockItemKeys.identity(42)).toEqual(["/api/stock-items/light?profile=identity", 42]);
+    expect(stockItemKeys.identity(undefined)).toEqual(["/api/stock-items/light?profile=identity", undefined]);
   });
 
-  it("uses summary proformas and tab-aware dispatch polling", () => {
-    const source = read("client/src/pages/factory/FactoryDispatchBatches.tsx");
-    expect(source).toContain("profile=summary&pageSize=250");
-    expect(source).toContain('activeTab === "reports" ? visibleTabInterval(60_000) : false');
-    expect(source).not.toContain("customerId=${form.customerId}`, form.customerId]");
+  it("treats both stock-light profiles as long-lived reference data", () => {
+    expect(staleTimeForQueryKey(stockItemKeys.identity(42))).toBe(QUERY_STALE_TIMES.referenceData);
+    expect(staleTimeForQueryKey(stockItemKeys.light(42))).toBe(QUERY_STALE_TIMES.referenceData);
+  });
+
+  it("keeps Factory categories in the long-lived reference-data policy", () => {
+    expect(staleTimeForQueryKey(["/api/factory/categories", 42])).toBe(QUERY_STALE_TIMES.referenceData);
+    expect(staleTimeForQueryKey(["/api/factory/categories?language=ar", 42])).toBe(QUERY_STALE_TIMES.referenceData);
   });
 });

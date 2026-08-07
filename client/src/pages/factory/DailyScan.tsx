@@ -49,6 +49,15 @@ interface DayBale {
   is_deleted: boolean;
   date_bale_produced: string | null;
   worker_name: string | null;
+  scan_id: number | null;
+  scanned_at: string | null;
+}
+
+interface SavedScan {
+  id: number;
+  scan_date: string;
+  reference_number: string;
+  scanned_at: string;
 }
 
 function StatusBadge({
@@ -68,16 +77,6 @@ function StatusBadge({
   if (s === "SOLD") return <Badge className="bg-red-600 text-white border-0">Sold</Badge>;
   if (s === "RESERVED_FOR_ORDER") return <Badge className="bg-blue-600 text-white border-0">Reserved</Badge>;
   return <Badge variant="outline">{status || "—"}</Badge>;
-}
-
-interface DailyScanRow {
-  id: number;
-  scan_date: string;
-  reference_number: string;
-  article_code: string | null;
-  product_name: string | null;
-  weight_kg: string | null;
-  scanned_at: string;
 }
 
 interface ScanFeedback {
@@ -111,35 +110,34 @@ export default function DailyScan() {
   }, [selectedDate]);
 
   const isToday = selectedDate === today;
+  const dailyQueryKey = ["/api/factory/daily-bale-scans", "day", selectedDate] as const;
 
-  const { data: dayBales = [], isLoading: loadingBales } = useQuery<DayBale[]>({
-    queryKey: ["/api/factory/daily-bale-scans/produced", selectedDate],
-    queryFn: () =>
-      fetch(`/api/factory/daily-bale-scans/produced?date=${selectedDate}&pageSize=1000`, {
-        credentials: "include",
-      }).then((r) => r.json()),
-    staleTime: isToday ? 15_000 : 5 * 60_000,
-    refetchInterval: isToday ? visibleTabInterval(60_000) : false,
+  // One compact request replaces the old pair of 1,000-row produced + scan-log
+  // requests. Local scan/remove mutations patch this cache directly, while a
+  // slower visible-tab poll still picks up scans made by another workstation.
+  const { data: dayBales = [], isLoading } = useQuery<DayBale[]>({
+    queryKey: dailyQueryKey,
+    queryFn: async () => {
+      const params = new URLSearchParams({ date: selectedDate, profile: "day" });
+      const response = await fetch(`/api/factory/daily-bale-scans?${params.toString()}`, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to load daily bale scan");
+      return response.json();
+    },
+    staleTime: isToday ? 30_000 : 10 * 60_000,
+    refetchInterval: isToday ? visibleTabInterval(90_000) : false,
     refetchIntervalInBackground: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
-  const { data: scans = [], isLoading: loadingScans } = useQuery<DailyScanRow[]>({
-    queryKey: ["/api/factory/daily-bale-scans", selectedDate],
-    queryFn: () =>
-      fetch(`/api/factory/daily-bale-scans?date=${selectedDate}&pageSize=1000`, { credentials: "include" }).then((r) =>
-        r.json()
-      ),
-    staleTime: isToday ? 15_000 : 5 * 60_000,
-    refetchInterval: isToday ? visibleTabInterval(60_000) : false,
-    refetchIntervalInBackground: false,
-  });
-
-  const isLoading = loadingBales || loadingScans;
-
-  // Build lookup structures
-  const scannedRefMap = new Map<string, DailyScanRow>(scans.map((s) => [s.reference_number, s]));
-  const unscanned = dayBales.filter((b) => !scannedRefMap.has(b.reference_number));
-  const scanned = dayBales.filter((b) => scannedRefMap.has(b.reference_number));
+  const scannedRefMap = new Map<string, { id: number; scanned_at: string }>();
+  for (const bale of dayBales) {
+    if (bale.scan_id != null && bale.scanned_at) {
+      scannedRefMap.set(bale.reference_number, { id: bale.scan_id, scanned_at: bale.scanned_at });
+    }
+  }
+  const unscanned = dayBales.filter((b) => b.scan_id == null);
+  const scanned = dayBales.filter((b) => b.scan_id != null);
 
   const totalBales = dayBales.length;
   const totalKg = dayBales.reduce((s, b) => s + parseFloat(b.weight_kg || "0"), 0);
@@ -164,7 +162,7 @@ export default function DailyScan() {
     }
 
     // Already scanned?
-    if (scannedRefMap.has(ref)) {
+    if (bale.scan_id != null) {
       showFeedback({
         type: "warn",
         refCode: ref,
@@ -181,29 +179,20 @@ export default function DailyScan() {
     setScanInput("");
 
     try {
+      // The server resolves article/name/weight from the authoritative bale row,
+      // so the scan request only sends the two identifiers it actually needs.
       const saveRes = await apiRequest("POST", "/api/factory/daily-bale-scans", {
         scanDate: selectedDate,
         referenceNumber: ref,
-        articleCode: bale.article_code,
-        productName: bale.product_name,
-        weightKg: bale.weight_kg ? parseFloat(bale.weight_kg) : null,
       });
+      const savedScan = (await saveRes.json()) as SavedScan;
 
-      if (!saveRes.ok) {
-        const err = await saveRes.json();
-        showFeedback({
-          type: "error",
-          refCode: ref,
-          productName: bale.product_name,
-          articleCode: bale.article_code,
-          message: err.message || "Scan failed",
-        });
-        return;
-      }
-
-      const savedScan = (await saveRes.json()) as DailyScanRow;
-      queryClient.setQueryData<DailyScanRow[]>(["/api/factory/daily-bale-scans", selectedDate], (current = []) =>
-        current.some((scan) => scan.id === savedScan.id) ? current : [...current, savedScan]
+      queryClient.setQueryData<DayBale[]>(dailyQueryKey, (current = []) =>
+        current.map((row) =>
+          row.reference_number === savedScan.reference_number
+            ? { ...row, scan_id: savedScan.id, scanned_at: savedScan.scanned_at }
+            : row
+        )
       );
 
       showFeedback({
@@ -213,8 +202,8 @@ export default function DailyScan() {
         articleCode: bale.article_code,
         message: `${bale.weight_kg ? formatNumber(parseFloat(bale.weight_kg)) + " kg · " : ""}Verified`,
       });
-    } catch {
-      showFeedback({ type: "error", refCode: ref, message: "Failed to record scan" });
+    } catch (error: any) {
+      showFeedback({ type: "error", refCode: ref, message: error?.message || "Failed to record scan" });
     } finally {
       setScanning(false);
       setTimeout(() => scanRef.current?.focus(), 50);
@@ -223,13 +212,12 @@ export default function DailyScan() {
 
   const removeMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest("DELETE", `/api/factory/daily-bale-scans/${id}`);
-      if (!res.ok) throw new Error("Failed to remove");
+      await apiRequest("DELETE", `/api/factory/daily-bale-scans/${id}`);
       return id;
     },
     onSuccess: (id) =>
-      queryClient.setQueryData<DailyScanRow[]>(["/api/factory/daily-bale-scans", selectedDate], (current = []) =>
-        current.filter((scan) => scan.id !== id)
+      queryClient.setQueryData<DayBale[]>(dailyQueryKey, (current = []) =>
+        current.map((row) => (row.scan_id === id ? { ...row, scan_id: null, scanned_at: null } : row))
       ),
     onError: () => toast({ title: "Error", description: "Could not remove scan.", variant: "destructive" }),
   });

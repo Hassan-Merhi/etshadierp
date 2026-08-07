@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { stockItemKeys } from "@/lib/queryKeys";
 import { VoucherData, BankAccount, LedgerAccount, Supplier, StockItem, Location } from "./VoucherEditHelpers";
 import { AccountWithBalance } from "./VoucherAccountHelpers";
 
@@ -29,13 +30,15 @@ export function useVoucherEditQueries({ id, selectedCompanyId }: UseVoucherEditQ
     queryKey: ["/api/suppliers"],
   });
 
-  // Voucher edit forms only require the lightweight identity fields exposed by
-  // /api/stock-items/light. Reuse the same cache key as voucher creation screens
-  // so opening edit/create flows does not download the ~634 KB full list twice.
+  // Voucher edit only consumes id/code/name/uom. Keep the real profile URL as
+  // queryKey[0] so the shared queryFn fetches the compact contract and all
+  // voucher edit instances reuse the same company-scoped cache entry.
   const { data: stockItems = [] } = useQuery<StockItem[]>({
-    queryKey: ["/api/stock-items/light", selectedCompanyId],
+    queryKey: stockItemKeys.identity(selectedCompanyId),
     enabled: !!selectedCompanyId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 2 * 60 * 60 * 1000,
+    refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });

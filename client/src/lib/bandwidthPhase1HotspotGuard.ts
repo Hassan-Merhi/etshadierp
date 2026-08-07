@@ -43,7 +43,6 @@ const HOTSPOT_RULES: HotspotCacheRule[] = [
   { pattern: /^\/api\/factory\/shipping-container-rows$/, ttlMs: 30_000, scope: "live" },
   { pattern: /^\/api\/factory\/invoice-container-tracking$/, ttlMs: 30_000, scope: "live" },
   { pattern: /^\/api\/factory\/bale-products$/, ttlMs: 2 * 60_000, scope: "reference" },
-  { pattern: /^\/api\/factory\/api\/factory\/bale-products$/, ttlMs: 2 * 60_000, scope: "reference" },
   { pattern: /^\/api\/factory\/workers$/, ttlMs: 5 * 60_000, scope: "reference" },
   { pattern: /^\/api\/factory\/workers\/attendance-report$/, ttlMs: 30_000, scope: "live" },
   { pattern: /^\/api\/factory\/monthly-salary-summary$/, ttlMs: 60_000, scope: "live" },
@@ -84,18 +83,23 @@ const HOTSPOT_RULES: HotspotCacheRule[] = [
 const responseCache = new Map<string, CachedHotspotResponse>();
 const inFlightRequests = new Map<string, Promise<Response>>();
 const inFlightLifetimes = new Map<string, SharedRequestLifetime>();
-let writeGeneration = 0;
+let liveWriteGeneration = 0;
+let referenceWriteGeneration = 0;
+
+function generationForScope(scope: BandwidthCacheScope): number {
+  return scope === "reference" ? referenceWriteGeneration : liveWriteGeneration;
+}
+
+function bumpWriteGeneration(scope: BandwidthInvalidationScope): void {
+  liveWriteGeneration += 1;
+  if (scope === "all") referenceWriteGeneration += 1;
+}
 
 /**
  * Keeps a deduplicated request alive for every caller that is still waiting on
  * it. The network fetch runs on this controller instead of the first caller's
- * signal, so one caller cancelling (a React Query key change, a company switch,
- * an unmount) no longer aborts the request that later callers are sharing and
- * leaves them with an AbortError they never asked for. The request is aborted
- * only when every caller has abandoned it, and never once a response exists —
- * aborting after the headers arrive tears down the body stream the caller is
- * about to read.
-
+ * signal, so one caller cancelling does not abort a request shared by another
+ * caller. The real request is aborted only after every waiter abandons it.
  */
 class SharedRequestLifetime {
   readonly controller = new AbortController();
@@ -107,12 +111,10 @@ class SharedRequestLifetime {
     this.waiters += 1;
   }
 
-  /** True once the shared request has been abandoned; it can no longer be joined. */
   get isAbandoned(): boolean {
     return this.controller.signal.aborted;
   }
 
-  /** A caller cancelled. Only a fully abandoned request is aborted. */
   abandon(): void {
     this.abandoned += 1;
     if (this.disarmed || this.abandoned < this.waiters) return;
@@ -120,7 +122,6 @@ class SharedRequestLifetime {
     this.controller.abort();
   }
 
-  /** The request produced a response (or failed on its own); never abort it now. */
   disarm(): void {
     this.disarmed = true;
   }
@@ -217,7 +218,7 @@ function getCachedResponse(key: string): Response | null {
 }
 
 function cacheResponse(key: string, response: Response, rule: HotspotCacheRule, generationAtStart: number): void {
-  if (!response.ok || generationAtStart !== writeGeneration) return;
+  if (!response.ok || generationAtStart !== generationForScope(rule.scope)) return;
   const rawLength = response.headers.get("content-length");
   const responseBytes = rawLength ? Number(rawLength) : 0;
   const maxResponseBytes = rule.maxResponseBytes ?? DEFAULT_MAX_RESPONSE_BYTES;
@@ -303,15 +304,13 @@ export function installBandwidthPhase1HotspotGuard(): void {
 
   invalidationChannel?.addEventListener("message", (event: MessageEvent<BandwidthInvalidationMessage>) => {
     if (event.data?.type !== "invalidate") return;
-    writeGeneration += 1;
-    if (event.data.scope === "all") clearCache();
-    else clearCache("live");
+    bumpWriteGeneration(event.data.scope);
+    clearCache(event.data.scope);
   });
 
   const invalidate = (scope: BandwidthInvalidationScope) => {
-    writeGeneration += 1;
-    if (scope === "all") clearCache();
-    else clearCache("live");
+    bumpWriteGeneration(scope);
+    clearCache(scope);
     invalidationChannel?.postMessage({ type: "invalidate", scope } satisfies BandwidthInvalidationMessage);
   };
 
@@ -344,9 +343,6 @@ export function installBandwidthPhase1HotspotGuard(): void {
     const signal = requestSignal(input, init);
     await waitUntilVisible(signal);
 
-    // An internal abort belongs to whoever cancelled, never to this caller. If a
-    // shared request dies for any reason other than this caller's own signal,
-    // issue a fresh request rather than reporting a failure nobody asked for.
     const runUnshared = () => originalFetch(input, init);
     const shareOrRetry = async (
       promise: Promise<Response>,
@@ -362,23 +358,18 @@ export function installBandwidthPhase1HotspotGuard(): void {
 
     const existing = inFlightRequests.get(key);
     const existingLifetime = inFlightLifetimes.get(key);
-    // A request that has already been abandoned is doomed: its controller is
-    // aborted and only the rejection is still in flight. Joining it would hand
-    // this caller that abort, so start over instead.
     if (existing && !existingLifetime?.isAbandoned) {
       existingLifetime?.acquire();
       return shareOrRetry(existing, existingLifetime);
     }
     if (existing) return runUnshared();
 
-    const generationAtStart = writeGeneration;
+    const generationAtStart = generationForScope(rule.scope);
     const lifetime = new SharedRequestLifetime();
     lifetime.acquire();
     const request = (async () => {
       await waitUntilVisible(lifetime.controller.signal);
       const response = await originalFetch(input, forwardRequestInit(init, lifetime.controller.signal));
-      // The response exists; its body is still unread. Any later abort would
-      // tear that stream down under the caller, so disarm before handing over.
       lifetime.disarm();
       cacheResponse(key, response, rule, generationAtStart);
       return response;
