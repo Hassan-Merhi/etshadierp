@@ -6,15 +6,18 @@ const root = process.cwd();
 const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
 
 describe("Bandwidth Phase 2 payload contracts", () => {
-  it("returns proforma summaries without lines and preserves a detail route", () => {
+  it("returns compact proforma summaries and preserves a detail route", () => {
     const source = read("server/routes/factory/customer-proformas/proformas.ts");
     const summaryStart = source.indexOf('if (profile === "summary")');
     const fullStart = source.indexOf("const rawProformasRes", summaryStart);
     const summary = source.slice(summaryStart, fullStart);
 
-    expect(summary).toContain("SELECT COUNT(*)::int");
+    expect(summary).toContain("COUNT(cpl.id)::int AS line_count");
+    expect(summary).toContain("AS total_qty");
+    expect(summary).toContain("AS total_weight_kg");
+    expect(summary).toContain("AS total_amount");
     expect(summary).not.toContain("rawLines");
-    expect(summary).not.toMatch(/\blines\s*:/);
+    expect(summary).toContain("lines: []");
     expect(source).toContain('app.get("/api/factory/customer-proformas/:id"');
   });
 
@@ -70,7 +73,7 @@ describe("Bandwidth Phase 2 payload contracts", () => {
     }
   });
 
-  it("keeps loading screens compatible with line-free summaries", () => {
+  it("keeps loading screens compatible with compact summaries", () => {
     const client = read("client/src/lib/phase4BandwidthFetch.ts");
 
     expect(client).toContain("getProformaDetail(originalFetch, id, init)");
