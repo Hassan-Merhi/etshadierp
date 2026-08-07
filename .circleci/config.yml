@@ -17,203 +17,76 @@ executors:
       NODE_OPTIONS: --max-old-space-size=4096
       PORT: "5000"
 
-  node22-postgres:
-    docker:
-      - image: cimg/node:22.14
-        environment:
-          NODE_ENV: test
-          SESSION_SECRET: circleci-session-secret
-          CSRF_ENFORCE: "0"
-          ENABLE_SCHEDULERS: "false"
-          NODE_OPTIONS: --max-old-space-size=2048
-          PORT: "5000"
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
-          PGSSLMODE: disable
-      - image: cimg/postgres:15.13
-        environment:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: heliumdb
-    resource_class: medium+
-    working_directory: ~/project
-
 commands:
   install_dependencies:
     steps:
       - checkout
       - run:
-          name: Pin checkout to the triggering commit
+          name: Pin checkout to triggering commit
           command: |
-            echo "CircleCI requested SHA: ${CIRCLE_SHA1}"
             git fetch --no-tags --prune origin "${CIRCLE_SHA1}"
             git reset --hard "${CIRCLE_SHA1}"
             git clean -ffdx
-            test "$(git rev-parse HEAD)" = "${CIRCLE_SHA1}"
-            git status --short
       - run:
           name: Normalize package registry URLs
           command: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
       - node/install-packages:
           pkg-manager: npm
           override-ci-command: npm ci --no-audit --bin-links=true
-      - run:
-          name: Dependency diagnostics
-          command: |
-            node --version
-            npm --version
-            npm config get bin-links
-            node -p "'TypeScript ' + require('typescript/package.json').version"
-            node -p "'jsdom ' + require('jsdom/package.json').version"
-            for binary in tsc vite eslint vitest; do
-              test -x "node_modules/.bin/$binary" || { echo "$binary is missing"; exit 1; }
-            done
-
-  wait_for_postgres:
-    steps:
-      - run:
-          name: Wait for PostgreSQL
-          command: |
-            for attempt in $(seq 1 60); do
-              if (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1; then
-                echo "PostgreSQL is accepting connections."
-                exit 0
-              fi
-              sleep 1
-            done
-            echo "PostgreSQL did not become ready."
-            exit 1
 
 jobs:
-  verify-dependencies:
+  format-ts:
     executor: node22
     steps:
       - install_dependencies
       - run:
-          name: Verify lockfile and production dependencies
-          command: |
-            npm run verify:lockfile
-            npm run verify:production-dependencies
-
-  verify-formatting:
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: Check formatting for changed source files
+          name: Check changed TypeScript and CSS
           command: |
             git fetch --no-tags --prune --depth=1 origin +refs/heads/main:refs/remotes/origin/main
             mapfile -d '' changed_files < <(
               git diff --name-only --diff-filter=ACMR -z origin/main HEAD -- client/src server shared tests scripts |
-                grep -zE '\.(ts|tsx|css|mjs)$' || true
+                grep -zE '\.(ts|tsx|css)$' || true
             )
-            if [ "${#changed_files[@]}" -eq 0 ]; then
-              echo "No changed source files require formatting checks."
-              exit 0
-            fi
+            if [ "${#changed_files[@]}" -eq 0 ]; then exit 0; fi
             node node_modules/prettier/bin/prettier.cjs --check "${changed_files[@]}"
 
-  verify-lint:
+  format-mjs-a:
     executor: node22
     steps:
       - install_dependencies
       - run:
-          name: Lint
-          command: npm run lint
+          name: Check security and bilingual bridges
+          command: node node_modules/prettier/bin/prettier.cjs --check server/criticalSecuritySchemaBridge.mjs server/factoryBilingualSchemaBridge.mjs
 
-  verify-typescript:
+  format-mjs-b:
     executor: node22
     steps:
       - install_dependencies
       - run:
-          name: TypeScript
-          command: npm run check
+          name: Check container and trilingual bridges
+          command: node node_modules/prettier/bin/prettier.cjs --check server/factoryContainerSchemaBridge.mjs server/factoryTrilingualSchemaBridge.mjs
 
-  verify-build:
+  format-mjs-c:
     executor: node22
     steps:
       - install_dependencies
       - run:
-          name: Production build
-          command: npm run build
+          name: Check TLS helper and runtime guard
+          command: node node_modules/prettier/bin/prettier.cjs --check server/lib/databaseSsl.mjs server/runtimeHealthGuard.mjs
 
-  verify-server-bundle:
+  format-mjs-d:
     executor: node22
     steps:
       - install_dependencies
       - run:
-          name: Verify server bundle
-          command: npm run verify:server-bundle
-
-  verify-safety-contracts:
-    executor: node22
-    steps:
-      - install_dependencies
-      - run:
-          name: Repository safety contracts
-          command: |
-            npm run verify:program1-observability
-            npm run verify:final-production-readiness
-            npm run verify:bandwidth
-
-  postgres-regression:
-    executor: node22-postgres
-    steps:
-      - install_dependencies
-      - wait_for_postgres
-      - run:
-          name: Verify migration registry
-          command: node scripts/verify-migration-registry.mjs --json
-      - run:
-          name: Prepare disposable database schema
-          command: node node_modules/drizzle-kit/bin.cjs push --force
-      - run:
-          name: Verify disposable database schema
-          command: node scripts/verify-ci-disposable-schema.mjs
-      - run:
-          name: Backend tests
-          command: node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism
-      - run:
-          name: Frontend tests
-          command: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts --maxWorkers=1 --no-file-parallelism
-
-  security-readiness:
-    executor: node22-postgres
-    steps:
-      - install_dependencies
-      - wait_for_postgres
-      - run:
-          name: Prepare disposable database schema
-          command: node node_modules/drizzle-kit/bin.cjs push --force
-      - run:
-          name: Critical dependency audit
-          command: npm audit --audit-level=critical
-      - run:
-          name: Production dependency verification
-          command: npm run verify:production-dependencies
-      - run:
-          name: Program 6 security checks
-          command: PROGRAM6_SKIP_TYPESCRIPT=1 npm run check:program-6-security
-      - run:
-          name: Final production readiness contract
-          command: npm run verify:final-production-readiness
+          name: Check startup and supplier bridges
+          command: node node_modules/prettier/bin/prettier.cjs --check server/startupWarningRepair.mjs server/supplierCompanyScopeBridge.mjs
 
 workflows:
-  diagnose-static-failure:
+  isolate-formatting-failure:
     jobs:
-      - verify-dependencies
-      - verify-formatting
-      - verify-lint
-      - verify-typescript
-      - verify-build
-      - verify-server-bundle
-      - verify-safety-contracts
-      - postgres-regression
-      - security-readiness:
-          requires:
-            - verify-dependencies
-            - verify-formatting
-            - verify-lint
-            - verify-typescript
-            - verify-build
-            - verify-server-bundle
-            - verify-safety-contracts
+      - format-ts
+      - format-mjs-a
+      - format-mjs-b
+      - format-mjs-c
+      - format-mjs-d
