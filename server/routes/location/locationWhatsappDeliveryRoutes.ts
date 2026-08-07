@@ -5,7 +5,10 @@ import { requireAuth, requireNonPOS } from "../../auth";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { requireExportAccess, requireSensitiveAccess } from "../../lib/permissionMiddleware";
-import { deliverLocationStockWhatsApp } from "../../services/locationStockWhatsAppDelivery";
+import {
+  deliverLocationStockWhatsApp,
+  recoverStaleLocationStockDeliveries,
+} from "../../services/locationStockWhatsAppDelivery";
 import { storage } from "../../storage";
 import { logAudit } from "../_helpers";
 
@@ -14,7 +17,7 @@ const requireCostPriceAccess = requireSensitiveAccess("fld_cost_price");
 const requireTotalValueAccess = requireSensitiveAccess("fld_total_value");
 
 interface RetryDeliveryRow {
-  id: number;
+  id: string | number;
   company_id: number;
   location_id: number;
   status: string;
@@ -29,7 +32,7 @@ interface RetryDeliveryRow {
 
 declare module "express-serve-static-core" {
   interface Request {
-    _locationStockRetryDelivery?: RetryDeliveryRow;
+    _locationStockRetryDelivery?: RetryDeliveryRow & { id: number };
   }
 }
 
@@ -43,6 +46,7 @@ function retryIdempotencyKey(req: Request, companyId: number, locationId: number
 
 async function loadRetryDelivery(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    await recoverStaleLocationStockDeliveries();
     const locationId = Number.parseInt(req.params.locationId, 10);
     const deliveryId = Number.parseInt(req.params.deliveryId, 10);
     const companyId = req.session.currentCompanyId;
@@ -56,7 +60,7 @@ async function loadRetryDelivery(req: Request, res: Response, next: NextFunction
     }
 
     const result = await pool.query<RetryDeliveryRow>(
-      `SELECT id::bigint::text::bigint AS id, company_id, location_id, status,
+      `SELECT id, company_id, location_id, status,
               include_cost, include_zero_stock, include_negative_stock,
               stock_group_id, stock_group_unassigned, category_id, scheduled_for
          FROM location_whatsapp_stock_deliveries
@@ -109,6 +113,7 @@ export function registerLocationWhatsappDeliveryRoutes(app: Express) {
     requireExportAccess(LOCATION_WHATSAPP_PERMISSION),
     async (req, res) => {
       try {
+        await recoverStaleLocationStockDeliveries();
         const locationId = Number.parseInt(req.params.locationId, 10);
         if (!Number.isFinite(locationId)) return res.status(400).json({ message: "Invalid location ID" });
         const companyId = req.session.currentCompanyId;
@@ -250,15 +255,9 @@ export function registerLocationWhatsappDeliveryRoutes(app: Express) {
           idempotencyKey: retryIdempotencyKey(req, original.company_id, original.location_id, original.id),
         });
 
-        if (result.status === "running") {
-          return res.status(202).json({ message: "This retry is already in progress", ...result });
-        }
-        if (result.status === "skipped_empty") {
-          return res.status(400).json({ message: "The retry found no stock matching the original report filters", ...result });
-        }
-        if (result.status === "failed") {
-          return res.status(502).json({ message: result.error || "WhatsApp retry failed", ...result });
-        }
+        if (result.status === "running") return res.status(202).json({ message: "This retry is already in progress", ...result });
+        if (result.status === "skipped_empty") return res.status(400).json({ message: "The retry found no stock matching the original report filters", ...result });
+        if (result.status === "failed") return res.status(502).json({ message: result.error || "WhatsApp retry failed", ...result });
 
         try {
           await logAudit({
