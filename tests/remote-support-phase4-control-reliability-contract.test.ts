@@ -10,9 +10,8 @@ const keyboardController = read("client/src/components/RemoteKeyboardControllerO
 const mouseTarget = read("client/src/components/RemoteMouseControlTarget.tsx");
 const keyboardTarget = read("client/src/components/RemoteKeyboardControlTarget.tsx");
 const controllerTargetRoute = read("server/routes/remoteControllerTargetRoute.ts");
-const pointerRoute = read("server/routes/screenFeedPointerRoute.ts");
+const screenFeedRoutes = read("server/routes/screenFeedRoutes.ts");
 const screenFeedService = read("server/services/screenFeedService.ts");
-const applicationRoutes = read("server/routes/applicationRoutes.ts");
 
 describe("remote support Phase 4 control reliability contracts", () => {
   it("binds the controller to the exact watched user with one shared session source", () => {
@@ -47,11 +46,9 @@ describe("remote support Phase 4 control reliability contracts", () => {
   it("treats pointer telemetry as recoverable and tolerates browser clock skew", () => {
     expect(screenFeedService).toContain("MAX_POINTER_CLOCK_SKEW_MS = 5 * 60 * 1000");
     expect(screenFeedService).toContain("clampedNormalizedCoordinate");
-    expect(pointerRoute).toContain("if (!cursor) return res.status(204).end()");
-    const pointerIndex = applicationRoutes.indexOf("registerScreenFeedPointerRoute(app)");
-    const legacyIndex = applicationRoutes.indexOf("registerScreenFeedRoutes(app)");
-    expect(pointerIndex).toBeGreaterThan(-1);
-    expect(legacyIndex).toBeGreaterThan(pointerIndex);
+    expect(screenFeedRoutes).toContain('app.post("/api/screen-feed/pointer"');
+    expect(screenFeedRoutes).toContain("if (!cursor) return res.status(204).end()");
+    expect(screenFeedRoutes).not.toContain('res.status(400).json({ message: "Invalid pointer update." })');
   });
 
   it("cleans up the owned support session when the watched target changes or closes", () => {
