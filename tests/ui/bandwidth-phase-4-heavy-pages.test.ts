@@ -1,9 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  QUERY_STALE_TIMES,
-  staleTimeForQueryKey,
-  visibleTabInterval,
-} from "@/lib/queryPolicies";
+import { QUERY_STALE_TIMES, staleTimeForQueryKey, visibleTabInterval } from "@/lib/queryPolicies";
 import { stockItemKeys } from "@/lib/queryKeys";
 
 describe("Bandwidth Phase 4 request-pressure contracts", () => {
@@ -26,31 +22,17 @@ describe("Bandwidth Phase 4 request-pressure contracts", () => {
   });
 
   it("keeps the compact stock selector on its dedicated identity cache key", () => {
-    expect(stockItemKeys.identity(42)).toEqual([
-      "/api/stock-items/light?profile=identity",
-      42,
-    ]);
-    expect(stockItemKeys.identity(undefined)).toEqual([
-      "/api/stock-items/light?profile=identity",
-      undefined,
-    ]);
+    expect(stockItemKeys.identity(42)).toEqual(["/api/stock-items/light?profile=identity", 42]);
+    expect(stockItemKeys.identity(undefined)).toEqual(["/api/stock-items/light?profile=identity", undefined]);
   });
 
   it("treats both stock-light profiles as long-lived reference data", () => {
-    expect(staleTimeForQueryKey(stockItemKeys.identity(42))).toBe(
-      QUERY_STALE_TIMES.referenceData,
-    );
-    expect(staleTimeForQueryKey(stockItemKeys.light(42))).toBe(
-      QUERY_STALE_TIMES.referenceData,
-    );
+    expect(staleTimeForQueryKey(stockItemKeys.identity(42))).toBe(QUERY_STALE_TIMES.referenceData);
+    expect(staleTimeForQueryKey(stockItemKeys.light(42))).toBe(QUERY_STALE_TIMES.referenceData);
   });
 
   it("keeps Factory categories in the long-lived reference-data policy", () => {
-    expect(staleTimeForQueryKey(["/api/factory/categories", 42])).toBe(
-      QUERY_STALE_TIMES.referenceData,
-    );
-    expect(staleTimeForQueryKey(["/api/factory/categories?language=ar", 42])).toBe(
-      QUERY_STALE_TIMES.referenceData,
-    );
+    expect(staleTimeForQueryKey(["/api/factory/categories", 42])).toBe(QUERY_STALE_TIMES.referenceData);
+    expect(staleTimeForQueryKey(["/api/factory/categories?language=ar", 42])).toBe(QUERY_STALE_TIMES.referenceData);
   });
 });
