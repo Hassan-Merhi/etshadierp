@@ -21,6 +21,10 @@ import { posExportsAndDispatch } from "./008-pos-exports-and-dispatch";
 import { supplierPartnerAndAi } from "./009-supplier-partner-and-ai";
 import { securityNotificationsAndPrecision } from "./010-security-notifications-and-precision";
 import { stockTransferRevisionIntegrity } from "./011-stock-transfer-revision-integrity";
+import { productionPositions } from "./012-production-positions";
+import { baleProductionAttribution } from "./013-bale-production-attribution";
+import { productionPositionPlanner } from "./014-production-position-planner";
+import { productionBonusPayroll } from "./015-production-bonus-payroll";
 import { locationWhatsAppStockReports } from "./016-location-whatsapp-stock-reports";
 import { locationWhatsAppStockSchedules } from "./017-location-whatsapp-stock-schedules";
 import { locationWhatsAppDeliveryHistory } from "./018-location-whatsapp-delivery-history";
@@ -37,6 +41,10 @@ export const startupMigrations: string[] = [
   ...supplierPartnerAndAi,
   ...securityNotificationsAndPrecision,
   ...stockTransferRevisionIntegrity,
+  ...productionPositions,
+  ...baleProductionAttribution,
+  ...productionPositionPlanner,
+  ...productionBonusPayroll,
   ...locationWhatsAppStockReports,
   ...locationWhatsAppStockSchedules,
   ...locationWhatsAppDeliveryHistory,
