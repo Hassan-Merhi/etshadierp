@@ -1,6 +1,7 @@
 import "./lib/requestStormGuard";
 import "./lib/accountingRequestFetchGuard";
 import "./lib/v5AllocationPaginationClient";
+import "./lib/phase4BandwidthFetch";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
@@ -211,14 +212,12 @@ if ("serviceWorker" in navigator) {
       window.dispatchEvent(
         new CustomEvent("erp:service-worker-updated", {
           detail: { version: String(event.data.version || "unknown") },
-        }),
+        })
       );
     } else if (event?.data?.type === "TRIGGER_SYNC") {
       import("./lib/featureFlags").then(({ OFFLINE_MODE_ENABLED }) => {
         if (OFFLINE_MODE_ENABLED) {
-          import("./lib/syncEngine")
-            .then(({ runSync }) => runSync())
-            .catch(() => {});
+          import("./lib/syncEngine").then(({ runSync }) => runSync()).catch(() => {});
         }
       });
     }
@@ -230,6 +229,6 @@ installClientObservability();
 createRoot(document.getElementById("root")!).render(
   <ObservabilityErrorBoundary>
     <App />
-  </ObservabilityErrorBoundary>,
+  </ObservabilityErrorBoundary>
 );
 removeRecoveryMarkersAfterStableLoad();

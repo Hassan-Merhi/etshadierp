@@ -48,6 +48,7 @@ describe("requestLogger health metrics", () => {
       active: 0,
       completed: 0,
       success: 0,
+      expectedClientResponse: 0,
       clientError: 0,
       serverError: 0,
       slow: 0,

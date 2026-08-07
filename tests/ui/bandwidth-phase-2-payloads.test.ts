@@ -8,12 +8,14 @@ const read = (file: string) => fs.readFileSync(path.join(root, file), "utf8");
 describe("Bandwidth Phase 2 payload contracts", () => {
   it("returns proforma summaries without lines and preserves a detail route", () => {
     const source = read("server/routes/factory/customer-proformas/proformas.ts");
-    expect(source).toContain('profile === "summary"');
-    expect(source).toContain("SELECT COUNT(*)::int");
-    expect(source).toContain(") AS line_count");
-    expect(source).toContain("to_jsonb(cp)->>'updated_at'");
+    const summaryStart = source.indexOf('if (profile === "summary")');
+    const fullStart = source.indexOf("const rawProformasRes", summaryStart);
+    const summary = source.slice(summaryStart, fullStart);
+
+    expect(summary).toContain("SELECT COUNT(*)::int");
+    expect(summary).not.toContain("rawLines");
+    expect(summary).not.toMatch(/\blines\s*:/);
     expect(source).toContain('app.get("/api/factory/customer-proformas/:id"');
-    expect(source).toContain("lines: enrichedLines");
   });
 
   it("paginates customer orders, workers, daily scans and shipping rows in the database", () => {
@@ -21,13 +23,22 @@ describe("Bandwidth Phase 2 payload contracts", () => {
     const workers = read("server/routes/factory-workers/lists.ts");
     const scans = read("server/routes/factory/factoryDailyScanRoutes.ts");
     const shipping = read("server/routes/factory/shipping-containers/rows.ts");
-    expect(orders).toContain("parseListPagination");
     expect(orders).toContain("ordersQuery.limit(pagination.pageSize).offset(pagination.offset)");
     expect(workers).toContain('req.query.profile === "summary"');
     expect(workers).not.toContain("photoUrl: factoryWorkers.photoUrl");
-    expect(scans).toContain("LIMIT $3 OFFSET $4");
-    expect(shipping).toContain('req.query.isDone === "true"');
+    expect(scans).toMatch(/parseListPagination[\s\S]*pagination\.pageSize, pagination\.offset/);
     expect(shipping).toContain("LIMIT $${limitParam} OFFSET $${offsetParam}");
+  });
+
+  it("uses cursor deltas for Daily Scan while retaining periodic full reconciliation", () => {
+    const server = read("server/routes/factory/factoryDailyScanRoutes.ts");
+    const client = read("client/src/lib/phase4BandwidthFetch.ts");
+    const main = read("client/src/main.tsx");
+
+    expect((server.match(/readAfterId\(req\.query\.afterId\)/g) || []).length).toBeGreaterThanOrEqual(2);
+    expect(client).toContain("fetchAllPages(originalFetch, url, init, maxId || undefined)");
+    expect(client).toContain("const DAILY_RECONCILE_MS = 10 * 60_000");
+    expect(main).toContain('import "./lib/phase4BandwidthFetch"');
   });
 
   it("keeps audit list changes compact and loads full changes on demand", () => {
@@ -57,6 +68,12 @@ describe("Bandwidth Phase 2 payload contracts", () => {
       expect(source).toContain("activeProformaSummary?.id");
       expect(source).toContain("/api/factory/customer-proformas/${activeProformaSummary?.id}");
     }
+  });
+
+  it("keeps loading screens compatible with line-free summaries", () => {
+    const client = read("client/src/lib/phase4BandwidthFetch.ts");
+
+    expect(client).toContain("getProformaDetail(originalFetch, id, init)");
   });
 
   it("retains existing compact Bale Ledger and container detail profiles", () => {
