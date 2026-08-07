@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from "react";
+import { usePresence } from "@/hooks/use-presence";
 import { useScreenFeed } from "@/hooks/use-screen-feed";
 import {
   resetRemoteSupportAuthLifecycle,
@@ -10,14 +11,16 @@ const RemoteSupportIndicator = lazy(() =>
 );
 
 function ScreenFeedCaptureRuntime() {
+  usePresence(true);
   useScreenFeed();
   return null;
 }
 
 /**
  * Owns all authenticated remote-support browser work. A confirmed 401 from the
- * control heartbeat tears this subtree down, which closes screen-feed timers,
- * EventSource connections, controller polling and command listeners together.
+ * control heartbeat tears this subtree down, which closes presence and screen-
+ * feed timers, EventSource connections, controller polling and command listeners
+ * together.
  */
 export function RemoteSupportRuntime() {
   const [authAvailable, setAuthAvailable] = useState(true);
