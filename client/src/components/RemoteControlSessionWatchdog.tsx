@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Loader2, ShieldCheck } from "lucide-react";
 import {
   RemoteControllerRequestError,
@@ -6,6 +6,8 @@ import {
   useRemoteControllerSession,
   type RemoteControllerSessionView,
 } from "@/components/RemoteControllerSessionContext";
+import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
+import { translateRemoteSupportPhase5Text } from "@/i18n/remoteSupportPhase5Translations";
 
 interface SessionPayload {
   session?: RemoteControllerSessionView | null;
@@ -21,6 +23,7 @@ const CONFLICT_RETRY_BASE_MS = 15000;
 const CONFLICT_RETRY_MAX_MS = 60000;
 
 export function RemoteControlSessionWatchdog() {
+  const { language } = useApplicationLanguage();
   const { target, session, adoptSession, refreshSession } = useRemoteControllerSession();
   const [state, setState] = useState<WatchdogState>("idle");
   const [message, setMessage] = useState<string | null>(null);
@@ -28,6 +31,7 @@ export function RemoteControlSessionWatchdog() {
   const lastHeartbeatRef = useRef(0);
   const nextStartAttemptAtRef = useRef(0);
   const conflictCountRef = useRef(0);
+  const t = useCallback((value: string) => translateRemoteSupportPhase5Text(value, language), [language]);
 
   useEffect(() => {
     lastHeartbeatRef.current = 0;
@@ -63,7 +67,7 @@ export function RemoteControlSessionWatchdog() {
               if (cancelled) return;
               adoptSession(null);
               setState("waiting");
-              setMessage(error instanceof Error ? error.message : "Reconnecting the support session.");
+              setMessage(error instanceof Error ? t(error.message) : t("Reconnecting the support session."));
               void refreshSession().catch(() => undefined);
             }
           }
@@ -95,7 +99,7 @@ export function RemoteControlSessionWatchdog() {
             setMessage(null);
             return;
           }
-          throw new Error("Remote control session did not bind to the watched user.");
+          throw new Error(t("Remote control session did not bind to the watched user."));
         } catch (error) {
           if (cancelled) return;
           const code = error instanceof RemoteControllerRequestError ? error.code ?? "" : "";
@@ -113,15 +117,15 @@ export function RemoteControlSessionWatchdog() {
             setState("waiting");
             setMessage(
               code === "TARGET_ALREADY_CONTROLLED"
-                ? "Another controller already owns this support session."
-                : "Waiting for the employee ERP tab to register for control."
+                ? t("Another controller already owns this support session.")
+                : t("Waiting for the employee ERP tab to register for control.")
             );
             void refreshSession().catch(() => undefined);
             return;
           }
           nextStartAttemptAtRef.current = Date.now() + CONFLICT_RETRY_BASE_MS;
           setState("error");
-          setMessage(error instanceof Error ? error.message : "Unable to prepare remote control.");
+          setMessage(error instanceof Error ? t(error.message) : t("Unable to prepare remote control."));
         }
       } finally {
         runningRef.current = false;
@@ -140,7 +144,7 @@ export function RemoteControlSessionWatchdog() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       runningRef.current = false;
     };
-  }, [adoptSession, refreshSession, session?.id, session?.status, target?.userId, target?.username]);
+  }, [adoptSession, refreshSession, session?.id, session?.status, t, target?.userId, target?.username]);
 
   if (!target || state === "idle" || state === "ready") return null;
 
@@ -162,13 +166,13 @@ export function RemoteControlSessionWatchdog() {
       <div className="min-w-0">
         <p className="text-xs font-semibold">
           {failed
-            ? "Remote control unavailable"
+            ? t("Remote control unavailable")
             : state === "starting"
-              ? "Preparing remote control"
-              : "Control reconnecting"}
+              ? t("Preparing remote control")
+              : t("Control reconnecting")}
         </p>
         <p className="text-[11px] text-muted-foreground">
-          {message || `Preparing the ERP tab for ${target.username}.`}
+          {message || `${t("Preparing the ERP tab for")} ${target.username}.`}
         </p>
       </div>
     </div>
