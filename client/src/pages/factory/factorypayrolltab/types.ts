@@ -1,9 +1,7 @@
 /**
  * Types for the FactoryPayrollTab page.
- *
- * Extracted from FactoryPayrollTab.tsx during the Phase 4 god-file split.
  */
-import {type Dispatch, type SetStateAction} from "react";
+import { type Dispatch, type SetStateAction } from "react";
 
 export interface PayrollRecord {
   id: number;
@@ -12,6 +10,14 @@ export interface PayrollRecord {
   periodEnd: string;
   baseSalary: string;
   bonuses: string;
+  productionBonus: string;
+  pendingProductionBonus: string;
+  rejectedProductionBonus: string;
+  suggestedProductionBonus: string;
+  productionBonusPendingCount: number;
+  productionBonusApprovedCount: number;
+  productionBonusRejectedCount: number;
+  otherBonuses: string;
   deductions: string;
   advances: string;
   netSalary: string;

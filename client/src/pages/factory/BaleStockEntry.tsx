@@ -1,12 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ScanLine, List, CalendarDays, Tag, Factory } from "lucide-react";
+import { ScanLine, List, CalendarDays, Tag, Factory, Users } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  FactoryMobileHeader,
-  FactoryMobileHeaderActions,
-  FactoryMobilePage,
-} from "@/components/ui/factory-mobile";
+import { FactoryMobileHeader, FactoryMobileHeaderActions, FactoryMobilePage } from "@/components/ui/factory-mobile";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { LabelPrintSettings } from "@/components/LabelPrintSettings";
@@ -18,6 +14,7 @@ import DailyScan from "./DailyScan";
 import { StockEntryTab } from "./bale-stock-entry/StockEntryTab";
 import { DailyStockSummary } from "./bale-stock-entry/DailyStockSummary";
 import { WorkerCategoriesTab } from "./bale-stock-entry/WorkerCategoriesTab";
+import { ProductionPositionsTab } from "./bale-stock-entry/ProductionPositionsTab";
 
 export default function BaleStockEntry() {
   const todayStr = new Date().toLocaleDateString("en-CA");
@@ -131,6 +128,10 @@ export default function BaleStockEntry() {
             <Tag className="mr-1 h-4 w-4" />
             Worker Categories
           </TabsTrigger>
+          <TabsTrigger value="production-positions" data-testid="tab-production-positions">
+            <Users className="mr-1 h-4 w-4" />
+            Production Positions
+          </TabsTrigger>
         </TabsList>
         {showEntry && (
           <TabsContent value="entry" className="mt-4 min-w-0">
@@ -154,6 +155,9 @@ export default function BaleStockEntry() {
         )}
         <TabsContent value="worker-categories" className="mt-4 min-w-0">
           {mountedTabs.has("worker-categories") && <WorkerCategoriesTab />}
+        </TabsContent>
+        <TabsContent value="production-positions" className="mt-4 min-w-0">
+          {mountedTabs.has("production-positions") && <ProductionPositionsTab />}
         </TabsContent>
       </Tabs>
     </FactoryMobilePage>

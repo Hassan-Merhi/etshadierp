@@ -21,6 +21,10 @@ import { posExportsAndDispatch } from "./008-pos-exports-and-dispatch";
 import { supplierPartnerAndAi } from "./009-supplier-partner-and-ai";
 import { securityNotificationsAndPrecision } from "./010-security-notifications-and-precision";
 import { stockTransferRevisionIntegrity } from "./011-stock-transfer-revision-integrity";
+import { productionPositions } from "./012-production-positions";
+import { baleProductionAttribution } from "./013-bale-production-attribution";
+import { productionPositionPlanner } from "./014-production-position-planner";
+import { productionBonusPayroll } from "./015-production-bonus-payroll";
 
 export const startupMigrations: string[] = [
   ...coreTablesAndColumns,
@@ -34,4 +38,8 @@ export const startupMigrations: string[] = [
   ...supplierPartnerAndAi,
   ...securityNotificationsAndPrecision,
   ...stockTransferRevisionIntegrity,
+  ...productionPositions,
+  ...baleProductionAttribution,
+  ...productionPositionPlanner,
+  ...productionBonusPayroll,
 ];

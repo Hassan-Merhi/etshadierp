@@ -14,6 +14,10 @@ import {
   calculateFactoryPayroll,
   validateFactoryPayrollGenerationDates,
 } from "./factoryPayrollGenerationPolicy";
+import {
+  attachProductionBonusesToPayroll,
+  syncProductionBonusProposalsForPeriod,
+} from "./productionBonusPayrollService";
 
 export interface FactoryPayrollGenerationInput {
   companyId: number;
@@ -65,6 +69,10 @@ export async function generateFactoryPayrollBatch(
     if (missingWorkers.length === 0) {
       return { payrolls: existingPayrolls, createdCount: 0, replayed: true };
     }
+
+    // Ensure saved daily plans have proposal records. attachProductionBonusesToPayroll
+    // will restore any already-approved orphan allocation by delta after insert.
+    await syncProductionBonusProposalsForPeriod(tx, companyId, input.startDate, input.endDate);
 
     const missingWorkerIds = missingWorkers.map((worker) => worker.id);
     const bales = await tx
@@ -123,9 +131,9 @@ export async function generateFactoryPayrollBatch(
 
     const advancesByWorker = new Map<number, typeof advances>();
     for (const advance of advances) {
-      const rows = advancesByWorker.get(advance.workerId) ?? [];
-      rows.push(advance);
-      advancesByWorker.set(advance.workerId, rows);
+      const workerRows = advancesByWorker.get(advance.workerId) ?? [];
+      workerRows.push(advance);
+      advancesByWorker.set(advance.workerId, workerRows);
     }
 
     const createdPayrolls: Array<typeof factoryPayrolls.$inferSelect> = [];
@@ -173,6 +181,10 @@ export async function generateFactoryPayrollBatch(
         })
         .returning();
 
+      await attachProductionBonusesToPayroll(tx, record.id);
+      const [finalRecord] = await tx.select().from(factoryPayrolls).where(eq(factoryPayrolls.id, record.id));
+      const finalNetSalary = Number(finalRecord?.netSalary ?? calculation.netSalary);
+
       let toSettle = calculation.advances;
       for (const advance of workerAdvances) {
         if (toSettle <= 0) break;
@@ -201,13 +213,13 @@ export async function generateFactoryPayrollBatch(
         txType: "PAYROLL_GENERATED",
         referenceId: record.id,
         referenceTable: "factory_payrolls",
-        description: `Payroll generated — Worker #${worker.id} (${worker.fullName || worker.employeeCode || ""}). Period: ${input.startDate} to ${input.endDate}. Net: $${calculation.netSalary.toFixed(2)}`,
-        amountCurrency: calculation.netSalary,
-        amountUsd: calculation.netSalary,
+        description: `Payroll generated — Worker #${worker.id} (${worker.fullName || worker.employeeCode || ""}). Period: ${input.startDate} to ${input.endDate}. Net: $${finalNetSalary.toFixed(2)}`,
+        amountCurrency: finalNetSalary,
+        amountUsd: finalNetSalary,
         createdBy: input.createdBy ?? null,
       });
 
-      createdPayrolls.push(record);
+      createdPayrolls.push(finalRecord ?? record);
     }
 
     const payrolls = [...existingPayrolls, ...createdPayrolls].sort((a, b) => a.workerId - b.workerId);

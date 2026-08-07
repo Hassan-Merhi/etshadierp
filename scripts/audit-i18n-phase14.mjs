@@ -37,6 +37,7 @@ const compatibilityTranslationFiles = [
   "client/src/i18n/backendMessagesPhase7Translations.part7.ts",
   "client/src/i18n/backendMessagesPhase7Translations.part8.ts",
   "client/src/i18n/backendMessagesPhase7Translations.part9.ts",
+  "client/src/i18n/backendMessagesPhase7Translations.part10.ts",
   "client/src/i18n/currentMainSupplierPartnerTranslations.ts",
   "client/src/i18n/remoteSupportPhase4Translations.ts",
   "client/src/i18n/remoteSupportPhase5Translations.ts",
@@ -48,6 +49,8 @@ const reviewedTechnicalValues = new Set([
   // scanner, so the generic call's function name surfaces as translatable text. It is an
   // identifier, never rendered.
   "requestJson",
+  // Factory production code uses fetchJson as a local typed-request helper; it is never rendered.
+  "fetchJson",
   // State-enum value used by ErpAccessBoundary; never rendered as user-facing copy.
   "error",
   "seg.isSkip ? (",

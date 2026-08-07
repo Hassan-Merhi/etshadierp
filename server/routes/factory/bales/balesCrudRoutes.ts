@@ -23,6 +23,7 @@ import {
   factoryWorkers,
   factoryV3LoadBales,
   factoryInvoiceLoadingBales,
+  factoryBaleProductionAttributions,
 } from "@shared/schema";
 import { eq, and, desc, sql, inArray, not } from "drizzle-orm";
 
@@ -405,22 +406,47 @@ export function registerBalesCrudRoutes(app: Express) {
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { workerId } = req.body;
       if (!workerId) return res.status(400).json({ message: "workerId is required" });
-      const [bale] = await db
-        .select()
-        .from(factoryBales)
-        .where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)));
-      if (!bale) return res.status(404).json({ message: "Bale not found" });
-      const numericWorkerId = parseInt(workerId);
+      const numericWorkerId = Number(workerId);
+      if (!Number.isInteger(numericWorkerId) || numericWorkerId <= 0) {
+        return res.status(400).json({ message: "Invalid workerId" });
+      }
       const [worker] = await db
         .select({ fullName: factoryWorkers.fullName })
         .from(factoryWorkers)
-        .where(eq(factoryWorkers.id, numericWorkerId))
+        .where(
+          and(
+            eq(factoryWorkers.id, numericWorkerId),
+            eq(factoryWorkers.companyId, companyId),
+            eq(factoryWorkers.active, true)
+          )
+        )
         .limit(1);
-      const [updated] = await db
-        .update(factoryBales)
-        .set({ finalizedBy: numericWorkerId, workerName: worker?.fullName ?? null, updatedAt: new Date() })
-        .where(eq(factoryBales.id, id))
-        .returning();
+      if (!worker) return res.status(400).json({ message: "Worker is inactive or belongs to another company" });
+
+      const updated = await db.transaction(async (tx: any) => {
+        const [updatedBale] = await tx
+          .update(factoryBales)
+          .set({ finalizedBy: numericWorkerId, workerName: worker.fullName, updatedAt: new Date() })
+          .where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)))
+          .returning();
+        if (!updatedBale) return null;
+
+        // A worker-only correction must not silently move production between
+        // teams. Preserve the position snapshot, but keep the worker snapshot
+        // synchronized for Stock Entry bales that have attribution records.
+        await tx
+          .update(factoryBaleProductionAttributions)
+          .set({ workerId: numericWorkerId, workerNameSnapshot: worker.fullName })
+          .where(
+            and(
+              eq(factoryBaleProductionAttributions.companyId, companyId),
+              eq(factoryBaleProductionAttributions.baleId, id)
+            )
+          );
+        return updatedBale;
+      });
+
+      if (!updated) return res.status(404).json({ message: "Bale not found" });
       res.json(updated);
     } catch (error: unknown) {
       logger.error("Error assigning worker to bale:", { error: error });
@@ -437,18 +463,47 @@ export function registerBalesCrudRoutes(app: Express) {
       if (!Array.isArray(baleIds) || baleIds.length === 0)
         return res.status(400).json({ message: "baleIds array is required" });
       if (!workerId) return res.status(400).json({ message: "workerId is required" });
-      const numericIds = baleIds.map(Number).filter((n) => !isNaN(n));
-      const numericWorkerId = parseInt(workerId);
+      const numericIds = [...new Set(baleIds.map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+      if (numericIds.length === 0) return res.status(400).json({ message: "No valid bale IDs supplied" });
+      const numericWorkerId = Number(workerId);
+      if (!Number.isInteger(numericWorkerId) || numericWorkerId <= 0) {
+        return res.status(400).json({ message: "Invalid workerId" });
+      }
       const [worker] = await db
         .select({ fullName: factoryWorkers.fullName })
         .from(factoryWorkers)
-        .where(eq(factoryWorkers.id, numericWorkerId))
+        .where(
+          and(
+            eq(factoryWorkers.id, numericWorkerId),
+            eq(factoryWorkers.companyId, companyId),
+            eq(factoryWorkers.active, true)
+          )
+        )
         .limit(1);
-      await db
-        .update(factoryBales)
-        .set({ finalizedBy: numericWorkerId, workerName: worker?.fullName ?? null, updatedAt: new Date() })
-        .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, numericIds)));
-      res.json({ updated: numericIds.length, workerId: numericWorkerId });
+      if (!worker) return res.status(400).json({ message: "Worker is inactive or belongs to another company" });
+
+      const updatedIds = await db.transaction(async (tx: any) => {
+        const updatedBales = await tx
+          .update(factoryBales)
+          .set({ finalizedBy: numericWorkerId, workerName: worker.fullName, updatedAt: new Date() })
+          .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, numericIds)))
+          .returning({ id: factoryBales.id });
+        const ids = updatedBales.map((bale: any) => bale.id);
+        if (ids.length > 0) {
+          await tx
+            .update(factoryBaleProductionAttributions)
+            .set({ workerId: numericWorkerId, workerNameSnapshot: worker.fullName })
+            .where(
+              and(
+                eq(factoryBaleProductionAttributions.companyId, companyId),
+                inArray(factoryBaleProductionAttributions.baleId, ids)
+              )
+            );
+        }
+        return ids;
+      });
+
+      res.json({ updated: updatedIds.length, workerId: numericWorkerId });
     } catch (error: unknown) {
       logger.error("Error bulk-assigning worker:", { error: error });
       res.status(500).json({ message: getErrorMessage(error) });
@@ -609,8 +664,34 @@ export function registerBalesCrudRoutes(app: Express) {
             costPerKg: originalBale.costPerKg,
             totalCost: originalBale.totalCost,
             status: "IN_STOCK",
+            finalizedBy: originalBale.finalizedBy,
+            workerName: originalBale.workerName,
+            finalizedAt: originalBale.finalizedAt,
+            stockEntryDate: originalBale.stockEntryDate,
           })
           .returning();
+
+        const [productionAttribution] = await tx
+          .select()
+          .from(factoryBaleProductionAttributions)
+          .where(
+            and(
+              eq(factoryBaleProductionAttributions.companyId, companyId),
+              eq(factoryBaleProductionAttributions.baleId, id)
+            )
+          )
+          .limit(1);
+        if (productionAttribution) {
+          await tx.insert(factoryBaleProductionAttributions).values({
+            companyId,
+            baleId: newBale.id,
+            workerId: productionAttribution.workerId,
+            workerNameSnapshot: productionAttribution.workerNameSnapshot,
+            productionPositionId: productionAttribution.productionPositionId,
+            productionPositionNameSnapshot: productionAttribution.productionPositionNameSnapshot,
+            stockEntryDate: productionAttribution.stockEntryDate,
+          });
+        }
 
         await tx.update(factoryBales).set({ status: "REPACKED", updatedAt: new Date() }).where(eq(factoryBales.id, id));
 
