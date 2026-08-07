@@ -157,7 +157,8 @@ export function registerScreenFeedRoutes(app: Express) {
 
   app.get("/api/screen-feed/live/status", requireLogin, (req, res) => {
     if (!isRemoteSupportEnabled("screenFeedEnabled") || !isRemoteSupportEnabled("fastScreenFeed")) {
-      return res.status(409).json({ live: false });
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(204).end();
     }
     const userId = String(getSessionUserId(req));
     openEventStream(res);
@@ -186,7 +187,8 @@ export function registerScreenFeedRoutes(app: Express) {
   app.get("/api/screen-feed/live/:userId", requireAuth, viewPermission, (req, res) => {
     if (!requireSupportController(req, res)) return;
     if (!isRemoteSupportEnabled("screenFeedEnabled") || !isRemoteSupportEnabled("fastScreenFeed")) {
-      return res.status(409).json({ live: false });
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(204).end();
     }
 
     const watchedUserId = req.params.userId;
