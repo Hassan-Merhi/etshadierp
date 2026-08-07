@@ -184,7 +184,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
       if (proformaIds.length > 0) {
         const idList = sql.join(
           proformaIds.map((id: number) => sql`${id}`),
-          sql`,`,
+          sql`,`
         );
         // Select only fields rendered/edited by the proforma UI. This removes
         // unused row metadata while preserving the existing full-list contract.

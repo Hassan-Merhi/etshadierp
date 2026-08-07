@@ -15,15 +15,9 @@ import { getStableSupplierCost } from "./rawStockStableCost";
 export async function getLockedSupplierRatesReadOnlyBulk(
   tx: any,
   companyId: number,
-  supplierIds: readonly number[],
+  supplierIds: readonly number[]
 ): Promise<Map<number, number>> {
-  const ids = Array.from(
-    new Set(
-      supplierIds
-        .map((id) => Number(id))
-        .filter((id) => Number.isInteger(id) && id > 0),
-    ),
-  );
+  const ids = Array.from(new Set(supplierIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)));
   const rates = new Map<number, number>();
   if (ids.length === 0) return rates;
 
@@ -51,7 +45,7 @@ export async function getLockedSupplierRatesReadOnlyBulk(
       legacyNullSupplierIds.map(async (supplierId) => {
         const { costPerKgUsd } = await getStableSupplierCost(tx, companyId, supplierId);
         return [supplierId, costPerKgUsd] as const;
-      }),
+      })
     );
     for (const [supplierId, rate] of derived) rates.set(supplierId, rate);
   }

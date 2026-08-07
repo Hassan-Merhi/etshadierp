@@ -89,8 +89,7 @@ function CatalogFetchBoundary({
 
         const products = (await response.clone().json()) as BilingualProduct[];
         const filtered = products.filter(
-          (product) =>
-            matchesCatalogSearch(product, search) && matchesTranslationFilter(product, translationFilter)
+          (product) => matchesCatalogSearch(product, search) && matchesTranslationFilter(product, translationFilter)
         );
         const headers = new Headers(response.headers);
         headers.set("content-type", "application/json; charset=utf-8");

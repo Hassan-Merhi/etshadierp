@@ -125,7 +125,11 @@ export async function handleLocationSummaryBandwidthProfile(req: Request, res: R
         )
         .leftJoin(
           stockGroups,
-          and(eq(stockGroups.id, stockItems.stockGroupId), eq(stockGroups.companyId, companyId), eq(stockGroups.active, true))
+          and(
+            eq(stockGroups.id, stockItems.stockGroupId),
+            eq(stockGroups.companyId, companyId),
+            eq(stockGroups.active, true)
+          )
         )
         .where(
           and(
@@ -286,7 +290,11 @@ export async function handleLocationSummaryBandwidthProfile(req: Request, res: R
       )
       .leftJoin(
         stockGroups,
-        and(eq(stockGroups.id, stockItems.stockGroupId), eq(stockGroups.companyId, companyId), eq(stockGroups.active, true))
+        and(
+          eq(stockGroups.id, stockItems.stockGroupId),
+          eq(stockGroups.companyId, companyId),
+          eq(stockGroups.active, true)
+        )
       )
       .where(
         and(

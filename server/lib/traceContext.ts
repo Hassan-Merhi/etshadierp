@@ -58,7 +58,7 @@ export function normaliseRouteTemplate(path: string, routePath?: unknown, baseUr
 export async function withTraceSpan<T>(
   name: string,
   operation: () => Promise<T>,
-  onComplete?: (result: { name: string; durationMs: number; failed: boolean }) => void,
+  onComplete?: (result: { name: string; durationMs: number; failed: boolean }) => void
 ): Promise<T> {
   const startedAt = performance.now();
   let failed = false;

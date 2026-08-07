@@ -5,10 +5,7 @@ import { requireAuth } from "../../../auth";
 import { db } from "../../../db";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
-import {
-  isCompanyIsolationError,
-  resolveRequestCompanyId,
-} from "../../../services/security/requestCompanyScope";
+import { isCompanyIsolationError, resolveRequestCompanyId } from "../../../services/security/requestCompanyScope";
 
 /**
  * Available containers for first or continuation raw-stock receipt.
@@ -56,7 +53,7 @@ export function registerRawStockAvailableContainerRoutes(app: Express): void {
         .from(factoryContainers)
         .leftJoin(
           factorySuppliers,
-          and(eq(factorySuppliers.id, factoryContainers.supplierId), eq(factorySuppliers.companyId, companyId)),
+          and(eq(factorySuppliers.id, factoryContainers.supplierId), eq(factorySuppliers.companyId, companyId))
         )
         .where(
           and(
@@ -69,8 +66,8 @@ export function registerRawStockAvailableContainerRoutes(app: Express): void {
               ${factoryContainers.status} <> 'PARTIALLY_RECEIVED'
               OR COALESCE(${factoryContainers.totalKg}, ${factoryContainers.declaredKg}, 0) <= 0
               OR COALESCE(${factoryContainers.actualReceivedKg}, 0) < COALESCE(${factoryContainers.totalKg}, ${factoryContainers.declaredKg}, 0)
-            )`,
-          ),
+            )`
+          )
         )
         .orderBy(desc(factoryContainers.id));
 
@@ -92,8 +89,8 @@ export function registerRawStockAvailableContainerRoutes(app: Express): void {
             and(
               eq(factoryRawStock.companyId, companyId),
               inArray(factoryRawStock.containerId, partialIds),
-              isNull(factoryRawStock.deletedAt),
-            ),
+              isNull(factoryRawStock.deletedAt)
+            )
           )
           .orderBy(desc(factoryRawStock.id));
 
@@ -120,7 +117,7 @@ export function registerRawStockAvailableContainerRoutes(app: Express): void {
             fixedCostPerKg: cost?.costPerKg ?? null,
             fixedCostPerKgUsd: cost?.costPerKgUsd ?? null,
           };
-        }),
+        })
       );
     } catch (error: unknown) {
       logger.error("Error fetching available raw-stock containers", { error });

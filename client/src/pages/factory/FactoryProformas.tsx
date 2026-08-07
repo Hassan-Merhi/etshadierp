@@ -1100,14 +1100,12 @@ export default function FactoryProformas() {
                             <Skeleton className="h-8 w-3/4" />
                           </div>
                         ) : detailError ? (
-                          <div className="flex flex-col items-center py-8 text-center" data-testid={`error-proforma-lines-${proforma.id}`}>
+                          <div
+                            className="flex flex-col items-center py-8 text-center"
+                            data-testid={`error-proforma-lines-${proforma.id}`}
+                          >
                             <p className="text-sm text-destructive">Could not load proforma items.</p>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="mt-3"
-                              onClick={() => detailState?.refetch()}
-                            >
+                            <Button size="sm" variant="outline" className="mt-3" onClick={() => detailState?.refetch()}>
                               Retry
                             </Button>
                           </div>

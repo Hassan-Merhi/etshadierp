@@ -21,7 +21,7 @@ function ledgerTotals(rows: any[]) {
       totalWeightKg: total.totalWeightKg + Number(row.totalWeightKg || 0),
       totalCost: total.totalCost + Number(row.totalCost || 0),
     }),
-    { baleCount: 0, totalWeightKg: 0, totalCost: 0 },
+    { baleCount: 0, totalWeightKg: 0, totalCost: 0 }
   );
 }
 
@@ -109,7 +109,7 @@ async function sendLedgerSummary(companyId: number, res: any): Promise<void> {
      WHERE section IS NOT NULL
      GROUP BY section, product_id, product_name, article_code, category_name
      ORDER BY section, category_name, product_name, product_id NULLS LAST`,
-    [companyId],
+    [companyId]
   );
 
   const buckets: Record<string, any[]> = {
@@ -196,7 +196,7 @@ async function sendLedgerDetails(companyId: number, req: any, res: any): Promise
      FROM classified
      WHERE section = $2
      ORDER BY id ASC`,
-    params,
+    params
   );
 
   res.set("X-ERP-Payload-Profile", "bale-ledger-detail-sql");
@@ -213,29 +213,25 @@ async function sendLedgerDetails(companyId: number, req: any, res: any): Promise
  * existing Factory route module unchanged.
  */
 export function registerBandwidthPhase3FactoryReads(app: Express): void {
-  app.use(
-    "/api/factory/bale-ledger",
-    requireAuth,
-    (async (req: any, res: any, next: any) => {
-      if (req.method !== "GET") return next();
+  app.use("/api/factory/bale-ledger", requireAuth, (async (req: any, res: any, next: any) => {
+    if (req.method !== "GET") return next();
 
-      try {
-        const companyId = requestCompanyId(req);
-        if (!companyId) return res.status(400).json({ message: "No company selected" });
+    try {
+      const companyId = requestCompanyId(req);
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-        if (req.path === "/" || req.path === "") {
-          await sendLedgerSummary(companyId, res);
-          return;
-        }
-        if (req.path === "/details") {
-          await sendLedgerDetails(companyId, req, res);
-          return;
-        }
-        return next();
-      } catch (error: unknown) {
-        logger.error("Error fetching bandwidth-optimized bale ledger", { error });
-        return res.status(500).json({ message: getErrorMessage(error) });
+      if (req.path === "/" || req.path === "") {
+        await sendLedgerSummary(companyId, res);
+        return;
       }
-    }) as RequestHandler,
-  );
+      if (req.path === "/details") {
+        await sendLedgerDetails(companyId, req, res);
+        return;
+      }
+      return next();
+    } catch (error: unknown) {
+      logger.error("Error fetching bandwidth-optimized bale ledger", { error });
+      return res.status(500).json({ message: getErrorMessage(error) });
+    }
+  }) as RequestHandler);
 }
