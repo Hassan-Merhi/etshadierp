@@ -6,6 +6,9 @@ on:
       - agent/bandwidth-phase4-global-request-pressure
     paths:
       - .github/workflows/bandwidth-phase5-repair.yml
+      - config/ci-ratchet-allowances.json
+      - tests/god-file-boundaries.test.ts
+      - tests/ui/bandwidth-phase-4-heavy-pages.test.ts
 
 permissions:
   contents: write
