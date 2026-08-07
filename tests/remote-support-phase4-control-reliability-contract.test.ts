@@ -51,7 +51,9 @@ describe("remote support Phase 4 control reliability contracts", () => {
     expect(screenFeedRoutes).not.toContain('res.status(400).json({ message: "Invalid pointer update." })');
   });
 
-  it("cleans up the owned support session when the watched target changes or closes", () => {
+  it("owns controller sessions only in the shared controller lifecycle", () => {
+    expect(screenFeedRoutes).not.toContain("tryStartControlSession");
+    expect(screenFeedRoutes).not.toContain("heartbeatRemoteControlController");
     expect(controllerContext).toContain('reason: "controller-viewer-closed"');
     expect(controllerContext).toContain('document.visibilityState !== "visible"');
     expect(watchdog).toContain("HEARTBEAT_INTERVAL_MS = 5000");
