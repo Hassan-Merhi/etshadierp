@@ -5,9 +5,9 @@ import { useMobilePerformanceLifecycle } from "@/hooks/use-mobile-performance-li
 import { useLocation, Redirect } from "wouter";
 import { useCompany } from "@/contexts/CompanyContext";
 import { usePresence } from "@/hooks/use-presence";
-import { useScreenFeed } from "@/hooks/use-screen-feed";
 import { useWsInvalidation } from "@/hooks/use-ws-invalidation";
 import { LanguageOnboardingDialog } from "@/components/LanguageOnboardingDialog";
+import { RemoteSupportRuntime } from "@/components/RemoteSupportRuntime";
 import type { AuthenticatedUser } from "@/contracts/sessionContracts";
 import { useAppNavigation } from "./useAppNavigation";
 import { useAuthenticatedAppData } from "./useAuthenticatedAppData";
@@ -19,9 +19,6 @@ const PosShell = lazy(() => import("./PosShell").then((module) => ({ default: mo
 const PropertiesShell = lazy(() => import("./PropertiesShell").then((module) => ({ default: module.PropertiesShell })));
 const FactoryShell = lazy(() => import("./FactoryShell").then((module) => ({ default: module.FactoryShell })));
 const ErpShell = lazy(() => import("./ErpShell").then((module) => ({ default: module.ErpShell })));
-const RemoteSupportIndicator = lazy(() =>
-  import("@/components/RemoteSupportIndicator").then((module) => ({ default: module.RemoteSupportIndicator }))
-);
 
 interface AuthenticatedAppProps {
   user: AuthenticatedUser;
@@ -32,7 +29,6 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
   const { selectedCompany, isLoading: companyLoading } = useCompany();
   useMobilePerformanceLifecycle();
   usePresence(true);
-  useScreenFeed();
   useWsInvalidation();
   useDialogScrollFix();
 
@@ -75,9 +71,7 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
   const appOverlays = (
     <>
       {languageOnboarding}
-      <Suspense fallback={null}>
-        <RemoteSupportIndicator />
-      </Suspense>
+      <RemoteSupportRuntime />
     </>
   );
 
