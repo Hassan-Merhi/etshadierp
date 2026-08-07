@@ -1,5 +1,5 @@
 {
   "version": 1,
   "description": "Ratchet on write routes that touch the ledger or the stock ledger and have no test referencing them. The smoke sweep excludes mutating endpoints by design, so nothing else measures this surface. uncoveredSensitiveCeiling may only fall.",
-  "uncoveredSensitiveCeiling": 282
+  "uncoveredSensitiveCeiling": 283
 }

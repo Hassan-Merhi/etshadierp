@@ -20,16 +20,16 @@ so it can be re-derived rather than trusted.
 
 | Signal | Now | Command |
 |---|---|---|
-| Type escapes (AST) | 11,408 total — 8,627 `: any`, 2,779 `as any`, 2 suppressions | `npm run audit:type-escapes` |
+| Type escapes (AST) | 11,491 total — 8,701 `: any`, 2,788 `as any`, 2 suppressions | `npm run audit:type-escapes` |
 | Files carrying escapes | 1,328 of 2,524 (53%) | `npm run audit:type-escapes` |
 | Drizzle result casts | 0 (was 344 — Phase 1b) | `npm run audit:type-escapes` |
-| Backend coverage floor (lines) | 18% (measured 20.5%) | `config/coverage-thresholds.json` |
-| Untested ledger/stock write routes | 282 of 324 | `npm run audit:write-routes` |
-| Swept endpoints with a pinned contract | 384 | `npm run test:smoke-sweep` |
+| Backend coverage floor (lines) | 18% (measured 21.0%) | `config/coverage-thresholds.json` |
+| Untested ledger/stock write routes | 283 of 325 | `npm run audit:write-routes` |
+| Swept endpoints with a pinned contract | 397 | `npm run test:smoke-sweep` |
 | Test files | 363 (330 `tests/`, 33 colocated) | `find tests server client/src shared -name '*.test.ts*'` |
 | Registered routes | 1,871 | `config/route-manifest.json` |
 | Docs | 48 reference in `docs/`, 131 archived records | `npm run audit:doc-index` |
-| God-file backlog | 64 files, 33,431 excess lines | `npm run audit:god-files` |
+| God-file backlog | 67 files, 34,997 excess lines | `npm run audit:god-files` |
 
 Every figure above is bound to its source in `config/doc-index.json` and checked
 by `npm run audit:doc-index`, so this table fails the build rather than going
@@ -45,7 +45,7 @@ absence.
 
 **The god-file backlog is much smaller than its own documentation claims.** That
 doc opened with "139 files, 74,858 lines over the limit" and later said "82 files
-and 45,684". The audit reports **64 and 33,431** — the program is 67% cleared,
+and 45,684". The audit reports **67 and 34,997** — the program is 67% cleared,
 not 45%. Three separate figures, all wrong, in a document whose entire purpose is
 tracking one number. The first draft of *this* document then repeated the
 mistake, citing 66 and 35,729 because those were derived from the frozen
@@ -268,7 +268,7 @@ Per-file floors were already right: 63–97% on the posting engines, inventory
 costing, and tenant isolation. That allocation is correct and this phase did not
 touch it.
 
-**2a. Floors raised to measured — done.** Backend measured 20.5% lines, and the
+**2a. Floors raised to measured — done.** Backend measured 21.0% lines, and the
 floors were sitting at 17/16/22/11. They are now 18/17/23/12, using the margin
 rule the config already documents (10% of measured, capped at 2 points).
 Frontend measured 7.5% lines against floors of 5/4/2/3, now 6/6/3/4, plus two
@@ -277,22 +277,30 @@ points below measured.
 
 **The plan's exit criterion of "global backend floor ≥35%" was written without
 measuring first, and it is not reachable by raising a floor: measured coverage
-is 20.5%.** Setting the gate to 35% would fail CI on the first run. Getting
+is 21.0%.** Setting the gate to 35% would fail CI on the first run. Getting
 there needs several hundred new tests, which is 2c's work, not 2a's — so the
 criterion is corrected to "floors track measured coverage, and measured coverage
 rises".
 
-One caveat on the backend number. It was measured in an environment where 15
-endpoints 5xx for want of tables the runtime migrations create, so 64 tests
-fail that pass in CI. Coverage there is therefore a **lower bound**, which is
-what makes raising the floor to it safe — CI executes strictly more. The same
-caveat is why the per-file backend floors were left alone: several report below
-their floor here purely because their tests could not run.
+The first measurement of that number carried a caveat, and the caveat turned out
+to be the whole story. It was taken in an environment where 15 endpoints 5xx'd
+and 64 tests failed — all because `drizzle-kit push` creates the Drizzle schema
+but not the tables the *runtime* startup migrations add, and the local database
+had never had those migrations run against it. Applying them turned a suite that
+had failed 64 tests for four phases into **306 files and 2,463 tests passing,
+zero failures**, and lifted `server/inventoryHelper.ts` from 60% back over its
+95% per-file floor.
+
+The lesson is worth keeping: every "known environmental failure" in this program
+was one missing setup step, and treating it as background noise for that long
+meant every verification ran against a lower bound. Coverage is now measured
+against a database that matches CI, so the floors track reality rather than a
+floor on reality.
 
 **2b. The sweep asserts a contract, not just liveness — done.** It called 401
 parameterless GETs and checked only for a non-5xx. It now also records each
 route's status and response *structure* in `config/api-smoke-shapes.json` and
-fails when either changes. 384 routes are pinned.
+fails when either changes. 397 routes are pinned.
 
 Scalar leaves collapse to `scalar` and an empty array matches a populated one,
 deliberately: a nullable column that is null in one run and a string in the next

@@ -3,8 +3,8 @@
   "backend": {
     "global": {
       "lines": 18,
-      "statements": 17,
-      "functions": 23,
+      "statements": 18,
+      "functions": 24,
       "branches": 12
     },
     "perFile": {

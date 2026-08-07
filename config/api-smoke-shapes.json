@@ -7,20 +7,7 @@
   ],
   "skippedFailing": [
     "/api/accounts/multi-currency/unresolved-openings",
-    "/api/auth/passkey/list",
-    "/api/git/agent-duty-wa-settings",
-    "/api/git/containers-wa-settings",
-    "/api/git/transfer-wa-settings",
-    "/api/sessions",
-    "/api/whatsapp/chats",
-    "/api/whatsapp/chats/pos",
-    "/api/whatsapp/instance-state/main",
-    "/api/whatsapp/instance-state/pos",
-    "/api/whatsapp/np-settings",
-    "/api/whatsapp/recipients",
-    "/api/whatsapp/settings",
-    "/api/whatsapp/settings/pos",
-    "/api/whatsapp/stock-settings"
+    "/api/sessions"
   ],
   "routes": {
     "/api/accounts/all": {
@@ -33,7 +20,7 @@
     },
     "/api/accounts/multi-currency/cash-bank-revaluation": {
       "status": 200,
-      "shape": "{accounts:[{accountKind:scalar,accountType:scalar,code:scalar,currentCfaPerUsd:scalar,currentRateMissing:scalar,currentTranslatedBaseBalance:scalar,historicalBaseBalance:scalar,id:scalar,linkedLedgerId:scalar,name:scalar,nativeBalancesByCurrency:{\u2026},openingBalanceCurrencyUnresolved:scalar,totalsProvisional:scalar,translationDifference:scalar,unresolvedLegacyEntryCount:scalar,unresolvedLegacyNetRaw:scalar,unresolvedOpeningBalanceRaw:scalar,unresolvedTranslationCurrencies:[]}],currentCfaPerUsd:scalar,unresolvedAccountCount:scalar}"
+      "shape": "{accounts:[{accountKind:scalar,accountType:scalar,code:scalar,currentCfaPerUsd:scalar,currentRateMissing:scalar,currentTranslatedBaseBalance:scalar,historicalBaseBalance:scalar,id:scalar,linkedLedgerId:scalar,name:scalar,nativeBalancesByCurrency:{…},openingBalanceCurrencyUnresolved:scalar,totalsProvisional:scalar,translationDifference:scalar,unresolvedLegacyEntryCount:scalar,unresolvedLegacyNetRaw:scalar,unresolvedOpeningBalanceRaw:scalar,unresolvedTranslationCurrencies:[]}],currentCfaPerUsd:scalar,unresolvedAccountCount:scalar}"
     },
     "/api/accounts/multi-currency/readiness": {
       "status": 200,
@@ -61,7 +48,7 @@
     },
     "/api/admin/operational-monitoring": {
       "status": 200,
-      "shape": "{alerts:[],buildVersion:scalar,events:{byCode:[],counts:{bandwidth:scalar,error:scalar,integrity:scalar},recent:[],severityCounts:{critical:scalar,info:scalar,warning:scalar}},generatedAt:scalar,metrics:{bandwidth:{apiEndpointCount:scalar,budgets:{\u2026},endpointCount:scalar,generatedAt:scalar,ranked:[],staticAssetCount:scalar,staticAssets:[],totalApiResponseBytes:scalar,totalStaticAssetResponseBytes:scalar,violations:[],windowMs:scalar},databasePool:{active:scalar,idle:scalar,max:scalar,total:scalar,utilizationPercent:scalar,waiting:scalar},operationalEvents:{byCode:[],counts:{\u2026},recent:[],severityCounts:{\u2026}},process:{memoryMb:{\u2026},nodeEnv:scalar,startedAt:scalar,uptimeSeconds:scalar},requests:{active:scalar,averageDurationMs:scalar,clientError:scalar,completed:scalar,database:{\u2026},durationBuckets:{\u2026},maxDurationMs:scalar,serverError:scalar,serverErrorPercent:scalar,slow:scalar,slowPercent:scalar,slowRequestThresholdMs:scalar,slowRequestThresholdsMs:{\u2026},success:scalar,total:scalar},status:scalar,timestamp:scalar},readMicrocache:{bytes:scalar,coalesced:scalar,entries:scalar,evictions:scalar,hits:scalar,invalidations:scalar,misses:scalar,revalidated:scalar,stores:scalar},status:scalar,summary:{activeRequests:scalar,databasePoolUtilizationPercent:scalar,databasePoolWaiting:scalar,heapUsedMb:scalar,recentCriticalEvents:scalar,serverErrorPercent:scalar,slowRequestPercent:scalar,uptimeSeconds:scalar},thresholds:{databasePoolWaitingWarning:scalar,heapUsedMbCritical:scalar,heapUsedMbWarning:scalar,recentCriticalEventsWarning:scalar,serverErrorPercentCritical:scalar,serverErrorPercentWarning:scalar,slowRequestPercentCritical:scalar,slowRequestPercentWarning:scalar}}"
+      "shape": "{alerts:[],buildVersion:scalar,events:{byCode:[],counts:{bandwidth:scalar,error:scalar,integrity:scalar},recent:[],severityCounts:{critical:scalar,info:scalar,warning:scalar}},generatedAt:scalar,metrics:{bandwidth:{apiEndpointCount:scalar,budgets:{…},endpointCount:scalar,generatedAt:scalar,ranked:[],staticAssetCount:scalar,staticAssets:[],totalApiResponseBytes:scalar,totalStaticAssetResponseBytes:scalar,violations:[],windowMs:scalar},databasePool:{active:scalar,idle:scalar,max:scalar,total:scalar,utilizationPercent:scalar,waiting:scalar},operationalEvents:{byCode:[],counts:{…},recent:[],severityCounts:{…}},process:{memoryMb:{…},nodeEnv:scalar,startedAt:scalar,uptimeSeconds:scalar},requests:{active:scalar,averageDurationMs:scalar,clientError:scalar,completed:scalar,database:{…},durationBuckets:{…},maxDurationMs:scalar,serverError:scalar,serverErrorPercent:scalar,slow:scalar,slowPercent:scalar,slowRequestThresholdMs:scalar,slowRequestThresholdsMs:{…},success:scalar,total:scalar},status:scalar,timestamp:scalar},readMicrocache:{bytes:scalar,coalesced:scalar,entries:scalar,evictions:scalar,hits:scalar,invalidations:scalar,misses:scalar,revalidated:scalar,stores:scalar},status:scalar,summary:{activeRequests:scalar,databasePoolUtilizationPercent:scalar,databasePoolWaiting:scalar,heapUsedMb:scalar,recentCriticalEvents:scalar,serverErrorPercent:scalar,slowRequestPercent:scalar,uptimeSeconds:scalar},thresholds:{databasePoolWaitingWarning:scalar,heapUsedMbCritical:scalar,heapUsedMbWarning:scalar,recentCriticalEventsWarning:scalar,serverErrorPercentCritical:scalar,serverErrorPercentWarning:scalar,slowRequestPercentCritical:scalar,slowRequestPercentWarning:scalar}}"
     },
     "/api/admin/orphaned-pos-sales": {
       "status": 200,
@@ -105,11 +92,15 @@
     },
     "/api/audit-log/overview": {
       "status": 200,
-      "shape": "{actions:[],activeUsers:scalar,companyId:scalar,diagnostics:{alerts:{cooldownMs:scalar,enabled:scalar,minimumSeverity:scalar,timeoutMs:scalar,webhookConfigured:scalar},logger:{format:scalar,level:scalar,redactionEnabled:scalar,renderDetected:scalar},operationalEvents:{byCode:[],counts:{\u2026},recent:[],severityCounts:{\u2026}}},latest:[],modules:[],total:scalar,users:[],windowDays:scalar}"
+      "shape": "{actions:[],activeUsers:scalar,companyId:scalar,diagnostics:{alerts:{cooldownMs:scalar,enabled:scalar,minimumSeverity:scalar,timeoutMs:scalar,webhookConfigured:scalar},logger:{format:scalar,level:scalar,redactionEnabled:scalar,renderDetected:scalar},operationalEvents:{byCode:[],counts:{…},recent:[],severityCounts:{…}}},latest:[],modules:[],total:scalar,users:[],windowDays:scalar}"
     },
     "/api/auth/me": {
       "status": 200,
       "shape": "{assignedLocationId:scalar,canAccessCustomers:scalar,canDeleteRecords:scalar,canSellNegativeStock:scalar,cashAccountId:scalar,currentCompanyId:scalar,currentLocationId:scalar,currentPOSStation:scalar,currentRole:scalar,daybookEditDays:scalar,id:scalar,posStation:scalar,posViewOnly:scalar,role:scalar,username:scalar}"
+    },
+    "/api/auth/passkey/list": {
+      "status": 200,
+      "shape": "[]"
     },
     "/api/auth/session-company": {
       "status": 200,
@@ -137,7 +128,7 @@
     },
     "/api/bank-accounts/revaluation": {
       "status": 200,
-      "shape": "{accounts:[{accountKind:scalar,accountType:scalar,code:scalar,currentCfaPerUsd:scalar,currentRateMissing:scalar,currentTranslatedBaseBalance:scalar,historicalBaseBalance:scalar,id:scalar,linkedLedgerId:scalar,name:scalar,nativeBalancesByCurrency:{\u2026},openingBalanceCurrencyUnresolved:scalar,totalsProvisional:scalar,translationDifference:scalar,unresolvedLegacyEntryCount:scalar,unresolvedLegacyNetRaw:scalar,unresolvedOpeningBalanceRaw:scalar,unresolvedTranslationCurrencies:[]}],currentCfaPerUsd:scalar,unresolvedAccountCount:scalar}"
+      "shape": "{accounts:[{accountKind:scalar,accountType:scalar,code:scalar,currentCfaPerUsd:scalar,currentRateMissing:scalar,currentTranslatedBaseBalance:scalar,historicalBaseBalance:scalar,id:scalar,linkedLedgerId:scalar,name:scalar,nativeBalancesByCurrency:{…},openingBalanceCurrencyUnresolved:scalar,totalsProvisional:scalar,translationDifference:scalar,unresolvedLegacyEntryCount:scalar,unresolvedLegacyNetRaw:scalar,unresolvedOpeningBalanceRaw:scalar,unresolvedTranslationCurrencies:[]}],currentCfaPerUsd:scalar,unresolvedAccountCount:scalar}"
     },
     "/api/business-alerts": {
       "status": 200,
@@ -911,6 +902,10 @@
       "status": 200,
       "shape": "{agents:[],asOf:scalar,companyId:scalar,companyName:scalar,mode:scalar}"
     },
+    "/api/git/agent-duty-wa-settings": {
+      "status": 200,
+      "shape": "{groups:{},hasCredentials:scalar,waEnabled:scalar}"
+    },
     "/api/git/at-port": {
       "status": 200,
       "shape": "{asOf:scalar,companyId:scalar,companyName:scalar,containers:[],facets:{agents:[],companies:[],containerNumbers:[],etaDates:[],hasContainersWithNoEta:scalar,locations:[],suppliers:[],transporters:[],trucks:[]},hasMore:scalar,mode:scalar,page:scalar,pageSize:scalar,summary:{arrived:scalar,atPort:scalar,atSea:scalar,delayed:scalar,inTransit:scalar,leftDar:scalar,overdue:scalar,total:scalar,totalCost:scalar,totalTransportDuty:scalar},total:scalar,totalPages:scalar}"
@@ -919,9 +914,17 @@
       "status": 200,
       "shape": "{asOf:scalar,companyId:scalar,companyName:scalar,containers:[],facets:{agents:[],companies:[],containerNumbers:[],etaDates:[],hasContainersWithNoEta:scalar,locations:[],suppliers:[],transporters:[],trucks:[]},hasMore:scalar,mode:scalar,page:scalar,pageSize:scalar,summary:{arrived:scalar,atPort:scalar,atSea:scalar,delayed:scalar,inTransit:scalar,leftDar:scalar,overdue:scalar,total:scalar,totalCost:scalar,totalTransportDuty:scalar},total:scalar,totalPages:scalar}"
     },
+    "/api/git/containers-wa-settings": {
+      "status": 200,
+      "shape": "{groupChatId:scalar,hasCredentials:scalar,lastSentAt:scalar,scheduleEnabled:scalar,scheduleHour:scalar,waEnabled:scalar}"
+    },
     "/api/git/summary": {
       "status": 200,
       "shape": "{asOf:scalar,companyId:scalar,companyName:scalar,mode:scalar,summary:{byStatus:{},delayed:scalar,docsReadyNotSent:scalar,overdue:scalar,total:scalar,withTruck:scalar,withoutTruck:scalar}}"
+    },
+    "/api/git/transfer-wa-settings": {
+      "status": 200,
+      "shape": "{companies:[{companyId:scalar,companyName:scalar,groupChatId:scalar}],hasCredentials:scalar,waEnabled:scalar}"
     },
     "/api/git/truck-location": {
       "status": 200,
@@ -1121,7 +1124,7 @@
     },
     "/api/pos/price-list-by-masters": {
       "status": 200,
-      "shape": "{items:[{baseSellingPrice:scalar,code:scalar,costPrice:scalar,masterPrices:{\u2026},name:scalar,offloadingCost:scalar,stockGroupName:scalar,stockItemId:scalar}],masters:[]}"
+      "shape": "{items:[{baseSellingPrice:scalar,code:scalar,costPrice:scalar,masterPrices:{…},name:scalar,offloadingCost:scalar,stockGroupName:scalar,stockItemId:scalar}],masters:[]}"
     },
     "/api/pos/shifts/current": {
       "status": 400,
@@ -1193,7 +1196,7 @@
     },
     "/api/reports/closing-stock-summary": {
       "status": 200,
-      "shape": "{grandTotal:{quantity:scalar,rate:scalar,value:scalar},stockGroups:[{closing:{\u2026},code:scalar,id:scalar,itemCount:scalar,name:scalar}]}"
+      "shape": "{grandTotal:{quantity:scalar,rate:scalar,value:scalar},stockGroups:[{closing:{…},code:scalar,id:scalar,itemCount:scalar,name:scalar}]}"
     },
     "/api/reports/containers": {
       "status": 200,
@@ -1221,7 +1224,7 @@
     },
     "/api/reports/opening-stock-summary": {
       "status": 200,
-      "shape": "{filters:{locationId:scalar},grandTotal:{closing:{quantity:scalar,value:scalar},opening:{quantity:scalar,value:scalar}},notes:{closing:scalar,opening:scalar},stockGroups:[{closing:{\u2026},code:scalar,id:scalar,itemCount:scalar,name:scalar,opening:{\u2026}}]}"
+      "shape": "{filters:{locationId:scalar},grandTotal:{closing:{quantity:scalar,value:scalar},opening:{quantity:scalar,value:scalar}},notes:{closing:scalar,opening:scalar},stockGroups:[{closing:{…},code:scalar,id:scalar,itemCount:scalar,name:scalar,opening:{…}}]}"
     },
     "/api/reports/profit-loss": {
       "status": 200,
@@ -1241,15 +1244,15 @@
     },
     "/api/reports/stock-in-sales/comparison": {
       "status": 400,
-      "shape": "{errors:{fieldErrors:{sideALocationId:[\u2026],sideBLocationId:[\u2026]},formErrors:[]},message:scalar}"
+      "shape": "{errors:{fieldErrors:{sideALocationId:[…],sideBLocationId:[…]},formErrors:[]},message:scalar}"
     },
     "/api/reports/stock-in-sales/detail": {
       "status": 400,
-      "shape": "{errors:{fieldErrors:{endDate:[\u2026],startDate:[\u2026]},formErrors:[]},message:scalar}"
+      "shape": "{errors:{fieldErrors:{endDate:[…],startDate:[…]},formErrors:[]},message:scalar}"
     },
     "/api/reports/stock-movement": {
       "status": 200,
-      "shape": "{filters:{endDate:scalar,locationId:scalar,startDate:scalar,stockGroupId:scalar},items:[{locations:[\u2026],stockItemCode:scalar,stockItemId:scalar,stockItemName:scalar,totalQuantity:scalar,totalValue:scalar}],summary:{grandTotalQuantity:scalar,grandTotalValue:scalar,totalItems:scalar}}"
+      "shape": "{filters:{endDate:scalar,locationId:scalar,startDate:scalar,stockGroupId:scalar},items:[{locations:[…],stockItemCode:scalar,stockItemId:scalar,stockItemName:scalar,totalQuantity:scalar,totalValue:scalar}],summary:{grandTotalQuantity:scalar,grandTotalValue:scalar,totalItems:scalar}}"
     },
     "/api/salary-advance-deductions": {
       "status": 200,
@@ -1393,7 +1396,7 @@
     },
     "/api/stats/country-activity": {
       "status": 200,
-      "shape": "{companies:[{code:scalar,days:[\u2026],id:scalar,name:scalar,totalOffloads:scalar,totalPurchases:scalar}],dateSeries:[scalar],days:scalar,endDate:scalar,startDate:scalar}"
+      "shape": "{companies:[{code:scalar,days:[…],id:scalar,name:scalar,totalOffloads:scalar,totalPurchases:scalar}],dateSeries:[scalar],days:scalar,endDate:scalar,startDate:scalar}"
     },
     "/api/stats/expense-breakdown": {
       "status": 200,
@@ -1401,7 +1404,7 @@
     },
     "/api/stats/import-cycle-balance": {
       "status": 200,
-      "shape": "{components:{apTransactionBalance:scalar,assetBalance:scalar,bankBalance:scalar,cashBalance:scalar,cogsBalance:scalar,consumptionBalance:scalar,directExpenseBalance:scalar,dutyAgentBalance:scalar,equityTransactionBalance:scalar,generalExpenseBalance:scalar,governmentTaxesBalance:scalar,incomeBalance:scalar,indirectExpenseBalance:scalar,liabilityBalance:scalar,loansBalance:scalar,openingBalanceEquity:scalar,openingStockValue:scalar,payrollExpenseBalance:scalar,payrollLiabilitiesBalance:scalar,productionBalance:scalar,profitBalance:scalar,salaryAdvancesBalance:scalar,stockOnFloorValue:scalar,stockOtwValue:scalar,supplierBalance:scalar,transporterAgentBalance:scalar},netImportCycleBalance:scalar,precisionTrace:{adjustedBalance:scalar,calculation:{assetTotal:{\u2026},expenseTotal:{\u2026},liabilityTotal:{\u2026}},discrepancyExplanation:scalar,finalRoundedBalance:scalar,formula:scalar,rawNetBalance:scalar,storedEquityAdjustment:scalar}}"
+      "shape": "{components:{apTransactionBalance:scalar,assetBalance:scalar,bankBalance:scalar,cashBalance:scalar,cogsBalance:scalar,consumptionBalance:scalar,directExpenseBalance:scalar,dutyAgentBalance:scalar,equityTransactionBalance:scalar,generalExpenseBalance:scalar,governmentTaxesBalance:scalar,incomeBalance:scalar,indirectExpenseBalance:scalar,liabilityBalance:scalar,loansBalance:scalar,openingBalanceEquity:scalar,openingStockValue:scalar,payrollExpenseBalance:scalar,payrollLiabilitiesBalance:scalar,productionBalance:scalar,profitBalance:scalar,salaryAdvancesBalance:scalar,stockOnFloorValue:scalar,stockOtwValue:scalar,supplierBalance:scalar,transporterAgentBalance:scalar},netImportCycleBalance:scalar,precisionTrace:{adjustedBalance:scalar,calculation:{assetTotal:{…},expenseTotal:{…},liabilityTotal:{…}},discrepancyExplanation:scalar,finalRoundedBalance:scalar,formula:scalar,rawNetBalance:scalar,storedEquityAdjustment:scalar}}"
     },
     "/api/stats/import-cycle-diagnostics": {
       "status": 200,
@@ -1413,7 +1416,7 @@
     },
     "/api/stats/net-profit": {
       "status": 200,
-      "shape": "{currencyRevaluation:{appliedToCurrentSnapshotOnly:scalar,currentCfaPerUsd:scalar,unresolvedAccountCount:scalar,unresolvedAccounts:[]},expenses:{accounts:[],breakdown:[],total:scalar},expensesTotal:scalar,forUs:{accounts:[{\u2026}],breakdown:[{\u2026}],total:scalar},forUsTotal:scalar,income:{accounts:[],breakdown:[],total:scalar},incomeTotal:scalar,netPosition:scalar,netPositionBreakdown:{assets:{breakdown:[\u2026],total:scalar},expenses:{breakdown:[],total:scalar},income:{breakdown:[],total:scalar},liabilities:{breakdown:[],total:scalar},netPosition:scalar},netPositionLabel:scalar,netProfit:scalar,netWorth:scalar,onUs:{accounts:[],breakdown:[],total:scalar},onUsTotal:scalar,ownersCapital:scalar,spPosProfit:scalar,totalExpenses:scalar,totalIncome:scalar}"
+      "shape": "{currencyRevaluation:{appliedToCurrentSnapshotOnly:scalar,currentCfaPerUsd:scalar,unresolvedAccountCount:scalar,unresolvedAccounts:[]},expenses:{accounts:[],breakdown:[],total:scalar},expensesTotal:scalar,forUs:{accounts:[{…}],breakdown:[{…}],total:scalar},forUsTotal:scalar,income:{accounts:[],breakdown:[],total:scalar},incomeTotal:scalar,netPosition:scalar,netPositionBreakdown:{assets:{breakdown:[…],total:scalar},expenses:{breakdown:[],total:scalar},income:{breakdown:[],total:scalar},liabilities:{breakdown:[],total:scalar},netPosition:scalar},netPositionLabel:scalar,netProfit:scalar,netWorth:scalar,onUs:{accounts:[],breakdown:[],total:scalar},onUsTotal:scalar,ownersCapital:scalar,spPosProfit:scalar,totalExpenses:scalar,totalIncome:scalar}"
     },
     "/api/stats/stock-summary": {
       "status": 200,
@@ -1550,6 +1553,42 @@
     "/api/waste-dispatches": {
       "status": 200,
       "shape": "[]"
+    },
+    "/api/whatsapp/chats": {
+      "status": 400,
+      "shape": "{message:scalar}"
+    },
+    "/api/whatsapp/chats/pos": {
+      "status": 400,
+      "shape": "{message:scalar}"
+    },
+    "/api/whatsapp/instance-state/main": {
+      "status": 200,
+      "shape": "{state:scalar}"
+    },
+    "/api/whatsapp/instance-state/pos": {
+      "status": 200,
+      "shape": "{state:scalar}"
+    },
+    "/api/whatsapp/np-settings": {
+      "status": 200,
+      "shape": "{autoSend:scalar,enabled:scalar,frequency:scalar,lastSentAt:scalar,recipientId:scalar,recipientName:scalar,sendDayOfWeek:scalar,sendHour:scalar}"
+    },
+    "/api/whatsapp/recipients": {
+      "status": 200,
+      "shape": "[]"
+    },
+    "/api/whatsapp/settings": {
+      "status": 200,
+      "shape": "{apiToken:scalar,dailyAutoSend:scalar,dailyRecipientId:scalar,dailyRecipientName:scalar,enabled:scalar,hasCredentials:scalar,instanceId:scalar,monthlyAutoSend:scalar}"
+    },
+    "/api/whatsapp/settings/pos": {
+      "status": 200,
+      "shape": "{apiToken:scalar,enabled:scalar,hasCredentials:scalar,instanceId:scalar}"
+    },
+    "/api/whatsapp/stock-settings": {
+      "status": 200,
+      "shape": "{autoSend:scalar,companyId:scalar,enabled:scalar,frequency:scalar,lastSentAt:scalar,recipientId:scalar,sendDayOfWeek:scalar,sendHour:scalar}"
     },
     "/api/worker-groups": {
       "status": 200,

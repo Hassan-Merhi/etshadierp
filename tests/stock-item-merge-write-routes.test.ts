@@ -9,12 +9,16 @@
  * endpoints by design.
  *
  * The invariant asserted is conservation: merging two items must move quantity
- * and value onto the kept item without creating or destroying any.
+ * and value onto the kept item without creating or destroying any, and
+ * unmerging must put both back exactly as they were.
  *
- * Writing it surfaced a defect the endpoint had been hiding — the merge's audit
- * log never persists, so no merge can be reversed. That is characterized in the
- * last test rather than fixed here, because correcting it means altering a
- * column type in a live table.
+ * Writing this surfaced a defect the endpoint had been hiding. The audit row it
+ * needs to reverse a merge never persisted, because
+ * stock_item_merge_logs.merged_by_user_id was `integer NOT NULL` while users.id
+ * is a varchar UUID — so every insert threw and the handler swallowed it as
+ * "non-fatal, merge already committed". Every merge was unaudited and
+ * irreversible. Fixed in startup-schema/016; these tests are the regression
+ * guard.
  */
 import request from "supertest";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -119,35 +123,52 @@ describe("stock-item merge write routes", () => {
     expect(duplicateAfter.quantity).toBe(0);
     expect(await isSoftDeleted(duplicate)).toBe(true);
 
-    // The merge itself is sound. What follows is not — see the next test.
+    const logs = await pool.query<{ id: number }>(
+      `SELECT id FROM stock_item_merge_logs
+       WHERE company_id = $1 AND kept_item_id = $2 AND merged_item_id = $3
+       ORDER BY id DESC LIMIT 1`,
+      [ctx.companyId, kept, duplicate]
+    );
+    const logId = logs.rows[0]?.id;
+    // Without a log row the merge is irreversible, so this is part of the
+    // contract rather than a detail. It is also the regression guard for the
+    // defect this file first characterized: merged_by_user_id was `integer`
+    // while users.id is a varchar UUID, so every insert here threw and the
+    // handler swallowed it as "non-fatal, merge already committed".
+    expect(logId, "merge must record a log row it can be reversed from").toBeTruthy();
+
+    const unmerge = await agent.post(`/api/stock-items/merge-logs/${logId}/unmerge`).send({});
+    expect(unmerge.status, JSON.stringify(unmerge.body)).toBe(200);
+
+    const keptRestored = await inventoryTotals(kept);
+    const duplicateRestored = await inventoryTotals(duplicate);
+
+    // Unmerge must put both items back exactly as they were.
+    expect(keptRestored.quantity).toBeCloseTo(keptBefore.quantity, 3);
+    expect(keptRestored.value).toBeCloseTo(keptBefore.value, 2);
+    expect(duplicateRestored.quantity).toBeCloseTo(duplicateBefore.quantity, 3);
+    expect(duplicateRestored.value).toBeCloseTo(duplicateBefore.value, 2);
+    expect(await isSoftDeleted(duplicate)).toBe(false);
   }, 60000);
 
-  it("records no audit log, so a merge cannot be reversed (known defect)", async () => {
-    // This characterizes a real bug rather than endorsing it.
-    //
-    // stock_item_merge_logs.merged_by_user_id is `integer NOT NULL`, but
-    // users.id is a varchar UUID. Every insert therefore fails with
-    // `invalid input syntax for type integer`, and the handler swallows it:
-    //
-    //     } catch (auditErr) {
-    //       // Audit log failure is non-fatal — merge already committed
-    //
-    // So the merge commits, the log row is never written, and
-    // POST /api/stock-items/merge-logs/:logId/unmerge — which restores both
-    // items from that row's snapshotBefore — has nothing to read. A
-    // destructive stock operation is both unreversible and unaudited, and
-    // nothing surfaces it.
-    //
-    // When the column type is corrected this test will fail. That is the
-    // intent: the fix should replace it with the conservation-on-unmerge
-    // assertions this file was written to make.
-    const logs = await pool.query<{ count: string }>(
-      `SELECT COUNT(*)::text AS count FROM stock_item_merge_logs WHERE company_id = $1`,
-      [ctx.companyId]
-    );
-    expect(Number(logs.rows[0].count)).toBe(0);
+  it("records who performed the merge", async () => {
+    const [kept, , third] = ctx.stockItemIds;
 
-    const unmerge = await agent.post(`/api/stock-items/merge-logs/999999/unmerge`).send({});
-    expect(unmerge.status).toBe(404);
+    const merge = await agent
+      .post(`/api/stock-items/${kept}/merge`)
+      .send({ duplicateId: third, confirm: "MERGE", notes: "audit attribution" });
+    expect(merge.status, JSON.stringify(merge.body)).toBe(200);
+
+    const log = await pool.query<{ merged_by_user_id: string; notes: string | null }>(
+      `SELECT merged_by_user_id, notes FROM stock_item_merge_logs
+       WHERE company_id = $1 AND merged_item_id = $2 ORDER BY id DESC LIMIT 1`,
+      [ctx.companyId, third]
+    );
+
+    // The whole point of the audit row: a destructive stock operation is
+    // attributable. users.id is a varchar UUID, so this column has to be one
+    // too — it was `integer`, which is what made every insert fail silently.
+    expect(log.rows[0]?.merged_by_user_id).toBe(ctx.userId);
+    expect(log.rows[0]?.notes).toBe("audit attribution");
   }, 60000);
 });

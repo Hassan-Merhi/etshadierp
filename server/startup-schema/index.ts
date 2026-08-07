@@ -25,6 +25,7 @@ import { productionPositions } from "./012-production-positions";
 import { baleProductionAttribution } from "./013-bale-production-attribution";
 import { productionPositionPlanner } from "./014-production-position-planner";
 import { productionBonusPayroll } from "./015-production-bonus-payroll";
+import { stockMergeAuditUserId } from "./016-stock-merge-audit-user-id";
 
 export const startupMigrations: string[] = [
   ...coreTablesAndColumns,
@@ -42,4 +43,5 @@ export const startupMigrations: string[] = [
   ...baleProductionAttribution,
   ...productionPositionPlanner,
   ...productionBonusPayroll,
+  ...stockMergeAuditUserId,
 ];

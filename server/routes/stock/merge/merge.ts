@@ -171,7 +171,10 @@ export function registerStockItemMergeRoutes(app: Express) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const userId: number = req.user?.id ?? req.session.userId;
+      // users.id is a varchar UUID, not a number. Declaring this as `number`
+      // is what produced an `integer` audit column that every merge insert
+      // then failed on, silently, for as long as the endpoint existed.
+      const userId: string = String(req.user?.id ?? req.session.userId ?? "");
 
       const keptId = parseInt(req.params.id);
       const duplicateId = parseInt(req.body.duplicateId);

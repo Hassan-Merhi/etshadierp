@@ -15,10 +15,8 @@
     "audit-god-file-boundaries.mjs": "Reports reviewed growth allowances as failures; the gate is tests/god-file-boundaries.test.ts, which consults config/ci-ratchet-allowances.json."
   },
   "knownFailing": {
-    "audit-i18n-phase14.mjs": "Actionable-literal ratchet is already breached on origin/main (12,348 -> 12,355 there). Wired into four workflows and failing in all of them before this audit existed.",
     "verify-phase9-final-i18n-baseline.mjs": "Same breached i18n literal baseline as audit-i18n-phase14.",
     "verify-multilingual-phases-4-7-current-main.mjs": "Reviewed-count contracts (248 reports, 405 backend messages) no longer match the source.",
-    "verify-mobile-responsive-phase11-regression.mjs": "Asserts a literal queryClient.invalidateQueries({ refetchType: \"active\" }) call that has since been reworded.",
     "audit-program6d-database-query-risks.mjs": "package.json invokes it with --json; run bare it reports findings and exits non-zero by design."
   }
 }
