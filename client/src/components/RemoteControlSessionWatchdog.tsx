@@ -1,62 +1,27 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Loader2, ShieldCheck } from "lucide-react";
-
-interface WatchTarget {
-  userId: string;
-  username: string;
-}
+import {
+  RemoteControllerRequestError,
+  remoteControllerRequestJson,
+  useRemoteControllerSession,
+  type RemoteControllerSessionView,
+} from "@/components/RemoteControllerSessionContext";
 
 interface SessionPayload {
-  session?: {
-    id?: string;
-    status?: string;
-    targetUserId?: string;
-  } | null;
+  session?: RemoteControllerSessionView | null;
   code?: string;
   message?: string;
 }
 
 type WatchdogState = "idle" | "waiting" | "starting" | "ready" | "error";
 
-const RECONCILE_INTERVAL_MS = 1500;
+const RECONCILE_INTERVAL_MS = 2500;
 const HEARTBEAT_INTERVAL_MS = 5000;
 const CONFLICT_RETRY_BASE_MS = 15000;
 const CONFLICT_RETRY_MAX_MS = 60000;
 
-function currentWatchTarget(): WatchTarget | null {
-  const dialog = document.querySelector<HTMLElement>(
-    "[data-testid='dialog-watch-user'], [data-testid='dialog-watch-user-fast']"
-  );
-  const userId = dialog?.dataset.watchedUserId?.trim() ?? "";
-  if (!dialog || !userId) return null;
-
-  const heading = dialog.querySelector<HTMLElement>("[data-watch-username]")?.dataset.watchUsername?.trim();
-  const text = dialog.textContent ?? "";
-  const match = text.match(/Watching:?\s*([^·\n]+)/i);
-  return {
-    userId,
-    username: heading || match?.[1]?.trim() || userId,
-  };
-}
-
-async function requestPayload(
-  url: string,
-  init?: RequestInit
-): Promise<{ response: Response; payload: SessionPayload }> {
-  const headers = new Headers(init?.headers);
-  if (init?.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-  const response = await fetch(url, {
-    credentials: "include",
-    cache: "no-store",
-    ...init,
-    headers,
-  });
-  const payload = (await response.json().catch(() => ({}))) as SessionPayload;
-  return { response, payload };
-}
-
 export function RemoteControlSessionWatchdog() {
-  const [target, setTarget] = useState<WatchTarget | null>(() => currentWatchTarget());
+  const { target, session, adoptSession, refreshSession } = useRemoteControllerSession();
   const [state, setState] = useState<WatchdogState>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const runningRef = useRef(false);
@@ -65,42 +30,22 @@ export function RemoteControlSessionWatchdog() {
   const conflictCountRef = useRef(0);
 
   useEffect(() => {
-    const refresh = () => {
-      const next = currentWatchTarget();
-      setTarget((current) =>
-        current?.userId === next?.userId && current?.username === next?.username ? current : next
-      );
-    };
-
-    refresh();
-    const observer = new MutationObserver(refresh);
-    observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
     lastHeartbeatRef.current = 0;
     nextStartAttemptAtRef.current = 0;
     conflictCountRef.current = 0;
     setState(target ? "waiting" : "idle");
     setMessage(null);
-  }, [target]);
+  }, [target?.userId]);
 
   useEffect(() => {
     if (!target) return;
     let cancelled = false;
 
     const reconcile = async () => {
-      if (cancelled || runningRef.current) return;
+      if (cancelled || runningRef.current || document.visibilityState !== "visible") return;
       runningRef.current = true;
       try {
-        const active = await requestPayload(
-          `/api/screen-feed/control/sessions/active/${encodeURIComponent(target.userId)}`
-        );
-        if (cancelled) return;
-
-        const activeSession = active.response.ok ? active.payload.session : null;
-        if (activeSession?.id && activeSession.status === "active") {
+        if (session?.id && session.status === "active" && session.targetUserId === target.userId) {
           conflictCountRef.current = 0;
           nextStartAttemptAtRef.current = 0;
           setState("ready");
@@ -108,13 +53,18 @@ export function RemoteControlSessionWatchdog() {
 
           if (Date.now() - lastHeartbeatRef.current >= HEARTBEAT_INTERVAL_MS) {
             lastHeartbeatRef.current = Date.now();
-            const heartbeat = await requestPayload(
-              `/api/screen-feed/control/sessions/${encodeURIComponent(activeSession.id)}/heartbeat`,
-              { method: "POST", body: JSON.stringify({}) }
-            );
-            if (!heartbeat.response.ok) {
+            try {
+              const heartbeat = await remoteControllerRequestJson<SessionPayload>(
+                `/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/heartbeat`,
+                { method: "POST", body: JSON.stringify({}) }
+              );
+              if (!cancelled && heartbeat.session) adoptSession(heartbeat.session);
+            } catch (error) {
+              if (cancelled) return;
+              adoptSession(null);
               setState("waiting");
-              setMessage(heartbeat.payload.message || "Reconnecting the support session.");
+              setMessage(error instanceof Error ? error.message : "Reconnecting the support session.");
+              void refreshSession().catch(() => undefined);
             }
           }
           return;
@@ -126,53 +76,53 @@ export function RemoteControlSessionWatchdog() {
         }
 
         setState("starting");
-        const started = await requestPayload("/api/screen-feed/control/sessions", {
-          method: "POST",
-          body: JSON.stringify({
-            targetUserId: target.userId,
-            targetUsername: target.username,
-            durationMinutes: 15,
-          }),
-        });
-        if (cancelled) return;
-
-        if (started.response.ok && started.payload.session?.id) {
-          conflictCountRef.current = 0;
-          nextStartAttemptAtRef.current = 0;
-          lastHeartbeatRef.current = Date.now();
-          setState("ready");
-          setMessage(null);
-          return;
+        try {
+          const started = await remoteControllerRequestJson<SessionPayload>("/api/screen-feed/control/sessions", {
+            method: "POST",
+            body: JSON.stringify({
+              targetUserId: target.userId,
+              targetUsername: target.username,
+              durationMinutes: 15,
+            }),
+          });
+          if (cancelled) return;
+          if (started.session?.id && started.session.targetUserId === target.userId) {
+            conflictCountRef.current = 0;
+            nextStartAttemptAtRef.current = 0;
+            lastHeartbeatRef.current = Date.now();
+            adoptSession(started.session);
+            setState("ready");
+            setMessage(null);
+            return;
+          }
+          throw new Error("Remote control session did not bind to the watched user.");
+        } catch (error) {
+          if (cancelled) return;
+          const code = error instanceof RemoteControllerRequestError ? error.code ?? "" : "";
+          const status = error instanceof RemoteControllerRequestError ? error.status : 0;
+          if (
+            status === 409 &&
+            ["TARGET_TAB_UNAVAILABLE", "TARGET_ALREADY_CONTROLLED", "SESSION_INACTIVE"].includes(code)
+          ) {
+            conflictCountRef.current += 1;
+            const retryDelay = Math.min(
+              CONFLICT_RETRY_MAX_MS,
+              CONFLICT_RETRY_BASE_MS * 2 ** Math.min(conflictCountRef.current - 1, 2)
+            );
+            nextStartAttemptAtRef.current = Date.now() + retryDelay;
+            setState("waiting");
+            setMessage(
+              code === "TARGET_ALREADY_CONTROLLED"
+                ? "Another controller already owns this support session."
+                : "Waiting for the employee ERP tab to register for control."
+            );
+            void refreshSession().catch(() => undefined);
+            return;
+          }
+          nextStartAttemptAtRef.current = Date.now() + CONFLICT_RETRY_BASE_MS;
+          setState("error");
+          setMessage(error instanceof Error ? error.message : "Unable to prepare remote control.");
         }
-
-        const code = started.payload.code ?? "";
-        if (
-          started.response.status === 409 &&
-          ["TARGET_TAB_UNAVAILABLE", "TARGET_ALREADY_CONTROLLED", "SESSION_INACTIVE"].includes(code)
-        ) {
-          conflictCountRef.current += 1;
-          const retryDelay = Math.min(
-            CONFLICT_RETRY_MAX_MS,
-            CONFLICT_RETRY_BASE_MS * 2 ** Math.min(conflictCountRef.current - 1, 2)
-          );
-          nextStartAttemptAtRef.current = Date.now() + retryDelay;
-          setState("waiting");
-          setMessage(
-            code === "TARGET_ALREADY_CONTROLLED"
-              ? "Another controller already owns this support session."
-              : "Waiting for the employee ERP tab to register for control."
-          );
-          return;
-        }
-
-        nextStartAttemptAtRef.current = Date.now() + CONFLICT_RETRY_BASE_MS;
-        setState("error");
-        setMessage(started.payload.message || `Remote control is unavailable (${started.response.status}).`);
-      } catch (error) {
-        if (cancelled) return;
-        nextStartAttemptAtRef.current = Date.now() + CONFLICT_RETRY_BASE_MS;
-        setState("error");
-        setMessage(error instanceof Error ? error.message : "Unable to prepare remote control.");
       } finally {
         runningRef.current = false;
       }
@@ -180,12 +130,17 @@ export function RemoteControlSessionWatchdog() {
 
     void reconcile();
     const intervalId = window.setInterval(() => void reconcile(), RECONCILE_INTERVAL_MS);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void reconcile();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       runningRef.current = false;
     };
-  }, [target]);
+  }, [adoptSession, refreshSession, session?.id, session?.status, target?.userId, target?.username]);
 
   if (!target || state === "idle" || state === "ready") return null;
 
