@@ -116,6 +116,8 @@ export const inventoryKeys = {
 };
 
 export const stockItemKeys = {
+  identity: (companyId: number | string | undefined) =>
+    ["/api/stock-items/light?profile=identity", companyId] as const,
   light: (companyId: number | string | undefined) => ["/api/stock-items/light", companyId] as const,
   full: (companyId: number | string | undefined) => ["/api/stock-items", companyId] as const,
   page: (
