@@ -1945,7 +1945,7 @@
         0
       ],
       "client/src/pages/location-inventory/LocationDialogs.tsx": [
-        10,
+        11,
         0,
         0
       ],
@@ -1960,6 +1960,11 @@
         0
       ],
       "client/src/pages/location-inventory/LocationInventoryHeader.tsx": [
+        2,
+        0,
+        0
+      ],
+      "client/src/pages/location-inventory/LocationWhatsappDeliveryHistoryDialog.tsx": [
         1,
         0,
         0
@@ -1971,7 +1976,7 @@
       ],
       "client/src/pages/location-inventory/StockGroupsView.tsx": [
         4,
-        2,
+        0,
         0
       ],
       "client/src/pages/location-inventory/StockMovementDialog.tsx": [
@@ -5085,8 +5090,8 @@
         0
       ],
       "server/routes/location/locationCrudRoutes.ts": [
-        3,
-        3,
+        5,
+        5,
         0
       ],
       "server/routes/location/locationInventoryRoutes.ts": [
@@ -5095,7 +5100,22 @@
         0
       ],
       "server/routes/location/locationReportRoutes.ts": [
+        0,
+        1,
+        0
+      ],
+      "server/routes/location/locationWhatsappDeliveryRoutes.ts": [
+        1,
         3,
+        0
+      ],
+      "server/routes/location/locationWhatsappLegacyCompatibilityRoutes.ts": [
+        0,
+        1,
+        0
+      ],
+      "server/routes/location/locationWhatsappScheduleRoutes.ts": [
+        4,
         1,
         0
       ],
@@ -6439,6 +6459,11 @@
         0,
         0
       ],
+      "server/services/scheduler/location-stock-report.ts": [
+        1,
+        0,
+        0
+      ],
       "server/services/scheduler/net-position.ts": [
         1,
         0,
@@ -6692,6 +6717,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 11491
+    "typeEscapeCeiling": 11504
   }
 }

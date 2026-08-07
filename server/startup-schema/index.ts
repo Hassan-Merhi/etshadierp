@@ -25,7 +25,10 @@ import { productionPositions } from "./012-production-positions";
 import { baleProductionAttribution } from "./013-bale-production-attribution";
 import { productionPositionPlanner } from "./014-production-position-planner";
 import { productionBonusPayroll } from "./015-production-bonus-payroll";
-import { stockMergeAuditUserId } from "./016-stock-merge-audit-user-id";
+import { locationWhatsAppStockReports } from "./016-location-whatsapp-stock-reports";
+import { locationWhatsAppStockSchedules } from "./017-location-whatsapp-stock-schedules";
+import { locationWhatsAppDeliveryHistory } from "./018-location-whatsapp-delivery-history";
+import { stockMergeAuditUserId } from "./019-stock-merge-audit-user-id";
 
 export const startupMigrations: string[] = [
   ...coreTablesAndColumns,
@@ -43,5 +46,9 @@ export const startupMigrations: string[] = [
   ...baleProductionAttribution,
   ...productionPositionPlanner,
   ...productionBonusPayroll,
+  ...locationWhatsAppStockReports,
+  ...locationWhatsAppStockSchedules,
+  ...locationWhatsAppDeliveryHistory,
+  // Last: an ALTER on a table created in 007, so it must run after it.
   ...stockMergeAuditUserId,
 ];

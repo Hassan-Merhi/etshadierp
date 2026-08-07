@@ -20,14 +20,14 @@ so it can be re-derived rather than trusted.
 
 | Signal | Now | Command |
 |---|---|---|
-| Type escapes (AST) | 11,491 total — 8,701 `: any`, 2,788 `as any`, 2 suppressions | `npm run audit:type-escapes` |
+| Type escapes (AST) | 11,504 total — 8,709 `: any`, 2,793 `as any`, 2 suppressions | `npm run audit:type-escapes` |
 | Files carrying escapes | 1,328 of 2,524 (53%) | `npm run audit:type-escapes` |
 | Drizzle result casts | 0 (was 344 — Phase 1b) | `npm run audit:type-escapes` |
 | Backend coverage floor (lines) | 18% (measured 21.0%) | `config/coverage-thresholds.json` |
 | Untested ledger/stock write routes | 283 of 325 | `npm run audit:write-routes` |
 | Swept endpoints with a pinned contract | 397 | `npm run test:smoke-sweep` |
 | Test files | 363 (330 `tests/`, 33 colocated) | `find tests server client/src shared -name '*.test.ts*'` |
-| Registered routes | 1,871 | `config/route-manifest.json` |
+| Registered routes | 1,891 | `config/route-manifest.json` |
 | Docs | 48 reference in `docs/`, 131 archived records | `npm run audit:doc-index` |
 | God-file backlog | 67 files, 34,997 excess lines | `npm run audit:god-files` |
 

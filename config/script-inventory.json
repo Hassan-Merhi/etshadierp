@@ -15,8 +15,6 @@
     "audit-god-file-boundaries.mjs": "Reports reviewed growth allowances as failures; the gate is tests/god-file-boundaries.test.ts, which consults config/ci-ratchet-allowances.json."
   },
   "knownFailing": {
-    "verify-phase9-final-i18n-baseline.mjs": "Same breached i18n literal baseline as audit-i18n-phase14.",
-    "verify-multilingual-phases-4-7-current-main.mjs": "Reviewed-count contracts (248 reports, 405 backend messages) no longer match the source.",
-    "audit-program6d-database-query-risks.mjs": "package.json invokes it with --json; run bare it reports findings and exits non-zero by design."
+    "verify-phase9-final-i18n-baseline.mjs": "NOT stale numbers \u2014 a real translation-coverage regression, left failing on purpose so it stays visible. Two modules are declared must-remain-zero and are not: backend-messages has 2 untranslated user-facing literals and supplier-partner has 34. inventory-logistics (1471 > 1381) and sales-pos (783 > 776) also exceed their reviewed caps. The overall total is still under its 12,545 cap, so only the per-module invariants are breached. Raising the caps would erase the finding; the fix is to translate those strings. The gate only runs on manual dispatch of release-verification.yml, which is why nobody saw it."
   }
 }

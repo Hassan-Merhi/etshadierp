@@ -63,18 +63,28 @@ export function useLocationInventoryMutations({
   const waGroupMutation = useMutation({
     mutationFn: async ({
       id,
-      name,
       whatsappGroupChatId,
+      enabled,
     }: {
       id: number;
-      name: string;
       whatsappGroupChatId: string | null;
+      enabled: boolean;
     }) => {
-      const res = await apiRequest("PATCH", `/api/locations/${id}`, { name, whatsappGroupChatId });
+      const res = await apiRequest("PUT", `/api/locations/${id}/whatsapp-settings`, {
+        whatsappGroupChatId,
+        enabled,
+      });
       return res.json();
     },
     onSuccess: (updated) => {
-      toast({ title: updated.whatsappGroupChatId ? "WhatsApp group assigned" : "WhatsApp group removed" });
+      const linked = Boolean(updated.whatsappGroupChatId);
+      const reportEnabled = linked && updated.whatsappStockReportsEnabled === true;
+      toast({
+        title: linked ? "WhatsApp settings saved" : "WhatsApp group removed",
+        description: linked
+          ? `${updated.whatsappGroupName || "WhatsApp group"} is ${reportEnabled ? "enabled" : "linked but disabled"} for location stock reports.`
+          : "This location no longer has a WhatsApp stock-report group.",
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
       if (selectedLocationLocal?.id === updated.id) setSelectedLocationLocal(updated);
       setWaGroupDialogOpen(false);
@@ -82,5 +92,17 @@ export function useLocationInventoryMutations({
     onError: (error: Error) => toast({ title: "Error", description: error.message, variant: "destructive" }),
   });
 
-  return { renameLocationMutation, createLocationMutation, waGroupMutation };
+  const waTestMutation = useMutation({
+    mutationFn: async ({ id, whatsappGroupChatId }: { id: number; whatsappGroupChatId: string | null }) => {
+      const res = await apiRequest("POST", `/api/locations/${id}/whatsapp-test`, { whatsappGroupChatId });
+      return res.json();
+    },
+    onSuccess: (result) => {
+      toast({ title: "WhatsApp test sent", description: result.message });
+    },
+    onError: (error: Error) =>
+      toast({ title: "WhatsApp test failed", description: error.message, variant: "destructive" }),
+  });
+
+  return { renameLocationMutation, createLocationMutation, waGroupMutation, waTestMutation };
 }

@@ -8,7 +8,7 @@ import {
   type ActiveCompanyPermissionContext,
 } from "../services/security/activeCompanyPermissionContext";
 
-export type PermMiddlewareType = "module" | "page" | "action" | "export" | "pos";
+export type PermMiddlewareType = "module" | "page" | "action" | "sensitive" | "export" | "pos";
 
 interface PermissionState {
   context: ActiveCompanyPermissionContext;
@@ -149,6 +149,10 @@ export function requirePageAccess(pageKey: string) {
 
 export function requireActionAccess(actionKey: string) {
   return requirePermission(actionKey, "action");
+}
+
+export function requireSensitiveAccess(fieldKey: string) {
+  return requirePermission(fieldKey, "sensitive");
 }
 
 export function requireExportAccess(exportKey: string) {

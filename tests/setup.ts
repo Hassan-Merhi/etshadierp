@@ -113,6 +113,17 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     await pool.query("DELETE FROM factory_container_other_charges WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_offload_additional_charges WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_container_commissions WHERE company_id = $1", [company.id]);
+    // Every table below carries a foreign key to factory_containers and was
+    // added after this teardown was written, so the container delete that
+    // follows started failing the moment a test actually offloaded one. Found
+    // by the raw-stock offload response pin, which is the only test that
+    // exercises that path end to end. Kept in one block so the next table with
+    // an FK to factory_containers is added here rather than discovered later.
+    await pool.query("DELETE FROM factory_container_receipts WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_container_profit_snapshots WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_duty_audit_log WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_fx_allocations WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_waste_entries WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_containers WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_suppliers WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_daybook_entries WHERE company_id = $1", [company.id]);

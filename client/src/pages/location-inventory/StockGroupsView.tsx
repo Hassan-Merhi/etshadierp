@@ -40,6 +40,7 @@ interface StockGroupSummary {
 interface StockGroupsViewProps {
   selectedLocationLocal: Location;
   posUser?: any;
+  canManageWhatsapp: boolean;
   openRenameDialog: (loc: Location, e?: any) => void;
   openWaGroupDialog: (loc: Location, e?: any) => void;
   activeInventoryLoading: boolean;
@@ -69,6 +70,7 @@ interface StockGroupsViewProps {
 export function StockGroupsView({
   selectedLocationLocal,
   posUser,
+  canManageWhatsapp,
   openRenameDialog,
   openWaGroupDialog,
   activeInventoryLoading,
@@ -94,6 +96,13 @@ export function StockGroupsView({
   setSelectedGroup,
   setItemCategoryFilter,
 }: StockGroupsViewProps) {
+  const whatsappTitle =
+    selectedLocationLocal.whatsappGroupChatId && selectedLocationLocal.whatsappStockReportsEnabled
+      ? `WhatsApp stock reports enabled${selectedLocationLocal.whatsappGroupName ? `: ${selectedLocationLocal.whatsappGroupName}` : ""}`
+      : selectedLocationLocal.whatsappGroupChatId
+        ? `WhatsApp group linked but stock reports disabled${selectedLocationLocal.whatsappGroupName ? `: ${selectedLocationLocal.whatsappGroupName}` : ""}`
+        : "Link WhatsApp group for stock reports";
+
   return (
     <>
       {/* Location title + action buttons */}
@@ -106,31 +115,34 @@ export function StockGroupsView({
             <div className="flex items-center gap-1.5 flex-wrap">
               <h2 className="text-2xl font-bold truncate">{selectedLocationLocal.name}</h2>
               {!posUser && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => openRenameDialog(selectedLocationLocal)}
-                    data-testid="button-rename-location"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => openWaGroupDialog(selectedLocationLocal)}
-                    data-testid="button-wa-location"
-                    title={
-                      (selectedLocationLocal as any)?.whatsappGroupChatId
-                        ? "WhatsApp group assigned"
-                        : "Assign WhatsApp group"
-                    }
-                  >
-                    <MessageCircle
-                      className={`h-4 w-4 ${(selectedLocationLocal as any)?.whatsappGroupChatId ? "text-green-500" : ""}`}
-                    />
-                  </Button>
-                </>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => openRenameDialog(selectedLocationLocal)}
+                  data-testid="button-rename-location"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              )}
+              {!posUser && canManageWhatsapp && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => openWaGroupDialog(selectedLocationLocal)}
+                  data-testid="button-wa-location"
+                  title={whatsappTitle}
+                  aria-label={`Configure WhatsApp stock reports for ${selectedLocationLocal.name}`}
+                >
+                  <MessageCircle
+                    className={`h-4 w-4 ${
+                      selectedLocationLocal.whatsappGroupChatId && selectedLocationLocal.whatsappStockReportsEnabled
+                        ? "text-green-500"
+                        : selectedLocationLocal.whatsappGroupChatId
+                          ? "text-amber-500"
+                          : ""
+                    }`}
+                  />
+                </Button>
               )}
             </div>
             <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Stock Groups</p>
@@ -175,10 +187,7 @@ export function StockGroupsView({
             <DropdownMenuItem onClick={() => handlePrintWithOption(true)} data-testid="menu-export-pdf-cost">
               <Printer className="h-4 w-4 mr-2" /> Export to PDF (with cost)
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handlePrintWithOption(false)}
-              data-testid="menu-export-pdf-nocost"
-            >
+            <DropdownMenuItem onClick={() => handlePrintWithOption(false)} data-testid="menu-export-pdf-nocost">
               <Printer className="h-4 w-4 mr-2" /> Export to PDF (without cost)
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -210,12 +219,7 @@ export function StockGroupsView({
         {!posUser && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 ml-auto"
-                data-testid="button-location-menu"
-              >
+              <Button variant="outline" size="sm" className="gap-1.5 ml-auto" data-testid="button-location-menu">
                 Location <ChevronDown className="h-3 w-3" />
               </Button>
             </DropdownMenuTrigger>
@@ -223,9 +227,11 @@ export function StockGroupsView({
               <DropdownMenuItem onClick={() => openRenameDialog(selectedLocationLocal)}>
                 <Pencil className="h-4 w-4 mr-2" /> Edit / Rename
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => openWaGroupDialog(selectedLocationLocal)}>
-                <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp Group
-              </DropdownMenuItem>
+              {canManageWhatsapp && (
+                <DropdownMenuItem onClick={() => openWaGroupDialog(selectedLocationLocal)}>
+                  <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp Stock Reports
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
@@ -327,9 +333,7 @@ export function StockGroupsView({
                       <td className="px-4 py-3 text-right font-mono text-muted-foreground">
                         {formatAmount(g.averageRate)}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono font-semibold">
-                        {formatAmount(g.totalValue)}
-                      </td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold">{formatAmount(g.totalValue)}</td>
                     </>
                   )}
                   <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
@@ -367,9 +371,7 @@ export function StockGroupsView({
               <tr className="bg-muted/50 border-t-2 font-semibold">
                 <td className="px-4 py-3 font-bold">Total</td>
                 <td className="px-4 py-3 text-center">
-                  <Badge variant="secondary">
-                    {filteredStockGroups.reduce((s, g) => s + g.itemCount, 0)}
-                  </Badge>
+                  <Badge variant="secondary">{filteredStockGroups.reduce((s, g) => s + g.itemCount, 0)}</Badge>
                 </td>
                 <td className="px-4 py-3 text-right font-mono font-bold">
                   {Math.floor(filteredStockGroups.reduce((s, g) => s + g.totalQuantity, 0)).toLocaleString()}

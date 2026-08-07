@@ -22,7 +22,13 @@ export type AuditAction =
   | "recalculate"
   | "migrate"
   | "factory_bilingual_document_export"
-  | "factory_bilingual_snapshot_backfill";
+  | "factory_bilingual_snapshot_backfill"
+  | "update_location_whatsapp_stock_reports"
+  | "test_location_whatsapp"
+  | "send_location_stock_whatsapp"
+  | "retry_location_stock_whatsapp"
+  | "update_location_whatsapp_group_legacy"
+  | "update_location_whatsapp_stock_schedule";
 
 export type AuditChange = { old?: unknown; new?: unknown };
 export type AuditChanges = Record<string, AuditChange>;

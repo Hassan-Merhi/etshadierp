@@ -53,6 +53,12 @@ export interface StockPdfResult {
   rowCount: number;
 }
 
+export interface StockPdfOptions {
+  includeZeroStock?: boolean;
+  includeNegativeStock?: boolean;
+  categoryId?: number | null;
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 export async function generateStockPdf(
   companyId: number,
@@ -60,7 +66,8 @@ export async function generateStockPdf(
   locationId?: number,
   locationName?: string,
   includeCost: boolean = false,
-  stockGroupId?: number | null
+  stockGroupId?: number | null,
+  options: StockPdfOptions = {}
 ): Promise<StockPdfResult> {
   // ── Fetch inventory ──────────────────────────────────────────────────────────
   const params: number[] = [companyId];
@@ -77,6 +84,12 @@ export async function generateStockPdf(
   } else if (stockGroupId !== undefined) {
     params.push(stockGroupId);
     groupFilter = "AND sg.id = $" + params.length;
+  }
+
+  let categoryFilter = "";
+  if (options.categoryId !== undefined && options.categoryId !== null) {
+    params.push(options.categoryId);
+    categoryFilter = "AND si.category_id = $" + params.length;
   }
 
   const result = await pool.query<{
@@ -100,10 +113,13 @@ export async function generateStockPdf(
      WHERE l.company_id = $1
        ${locationFilter}
        ${groupFilter}
+       ${categoryFilter}
      ORDER BY LOWER(COALESCE(sg.name, 'zzzzz')), LOWER(si.name)`,
     params
   );
 
+  const includeZeroStock = options.includeZeroStock === true;
+  const includeNegativeStock = options.includeNegativeStock !== false;
   const rows: StockRow[] = result.rows
     .map((r) => ({
       itemName: r.item_name,
@@ -113,7 +129,11 @@ export async function generateStockPdf(
       rate: parseFloat(r.average_rate || "0"),
       totalValue: parseFloat(r.total_value || "0"),
     }))
-    .filter((r) => r.qty !== 0);
+    .filter((r) => {
+      if (!includeNegativeStock && r.qty < 0) return false;
+      if (!includeZeroStock && r.qty === 0) return false;
+      return true;
+    });
 
   const grouped: { groupName: string; items: StockRow[] }[] = [];
   for (const row of rows) {

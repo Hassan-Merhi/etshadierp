@@ -72,6 +72,22 @@ function collectInvokers() {
   return invokers;
 }
 
+/**
+ * The arguments package.json actually invokes a script with.
+ *
+ * Several scripts are report-style: run bare they print findings and exit
+ * non-zero, but the npm script passes `--json` and they exit clean. Running
+ * them without those arguments measures an invocation nobody uses, and reports
+ * a gate as broken when it is not.
+ */
+function invocationArgs(script, invokers) {
+  const pkg = invokers.get("package.json");
+  if (!pkg) return [];
+  const match = pkg.match(new RegExp(`node scripts/${script.replace(/\./g, "\\.")}([^"]*)"`));
+  if (!match) return [];
+  return match[1].trim().split(/\s+/).filter(Boolean);
+}
+
 function classify(script, invokers) {
   const gates = [];
   const chains = [];
@@ -98,10 +114,14 @@ export function auditScriptInventory({ run = true } = {}) {
     const { bucket, invokedBy } = classify(script, invokers);
     let passes = null;
     if (run && bucket === "wired" && script !== SELF && !environmentDependent.has(script)) {
-      const result = spawnSync(process.execPath, [path.join("scripts", script)], {
+      const result = spawnSync(process.execPath, [path.join("scripts", script), ...invocationArgs(script, invokers)], {
         cwd: projectRoot,
         encoding: "utf8",
         timeout: 120000,
+        // Report-style scripts print thousands of findings. The default 1MB
+        // buffer overflows, spawnSync kills the child with SIGTERM, and the
+        // gate gets reported as broken when it exited cleanly.
+        maxBuffer: 64 * 1024 * 1024,
       });
       passes = result.status === 0;
       if (!passes && !knownFailing.has(script)) {

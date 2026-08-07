@@ -42,10 +42,36 @@ export function useLocationInventoryQueries({
   showAllStock,
   showNegativeStock,
 }: UseLocationInventoryQueriesParams) {
+  // Fail closed in the UI if the permission service is unavailable. The server
+  // remains the authoritative permission boundary for every group/config write.
+  const { data: whatsappCapability } = useQuery<{ canManage: boolean }>({
+    queryKey: companyId ? ["/api/location-inventory/whatsapp/capability", companyId] : [],
+    queryFn: async () => {
+      const res = await fetch("/api/location-inventory/whatsapp/capability", { credentials: "include" });
+      if (!res.ok) return { canManage: false };
+      return res.json();
+    },
+    enabled: !posUser && !!companyId,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const canManageWhatsapp = !posUser && whatsappCapability?.canManage === true;
+
   const { data: waChats = [], isLoading: waChatsLoading } = useQuery<{ id: string; name: string; type: string }[]>({
-    queryKey: ["/api/whatsapp/chats/pos"],
-    enabled: waGroupDialogOpen,
+    queryKey: ["/api/location-inventory/whatsapp/groups"],
+    queryFn: async () => {
+      const res = await fetch("/api/location-inventory/whatsapp/groups", { credentials: "include" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.message || `Failed to fetch WhatsApp groups: ${res.status}`);
+      }
+      return res.json();
+    },
+    enabled: waGroupDialogOpen && canManageWhatsapp,
     staleTime: 60_000,
+    retry: false,
+    refetchOnWindowFocus: false,
   });
 
   const { data: allLocations = [], isLoading: allLocationsLoading } = useQuery<Location[]>({
@@ -181,6 +207,7 @@ export function useLocationInventoryQueries({
   });
 
   return {
+    canManageWhatsapp,
     waChats,
     waChatsLoading,
     locations,

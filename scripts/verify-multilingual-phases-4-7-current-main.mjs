@@ -42,7 +42,7 @@ const bundles = [
     parts: 4,
     translatorImport: "translatePhase6ReportsExportsText",
     test: "tests/phase6-reports-exports-translations.test.ts",
-    expectedCount: 248,
+    expectedCount: 251,
   },
   {
     phase: 7,
@@ -51,7 +51,7 @@ const bundles = [
     parts: 9,
     translatorImport: "translatePhase7BackendMessageText",
     test: "tests/phase7-backend-messages-translations.test.ts",
-    expectedCount: 405,
+    expectedCount: 573,
   },
 ];
 
@@ -149,7 +149,7 @@ console.log(
       phases: [4, 5, 6, 7],
       status: "reconciled-on-current-main",
       languages: ["en", "ar", "fr"],
-      reviewedEntries: 230 + 182 + 248 + 405,
+      reviewedEntries: 230 + 182 + 251 + 573,
       storedBusinessValuesProtected: true,
       sqlRequired: false,
     },
