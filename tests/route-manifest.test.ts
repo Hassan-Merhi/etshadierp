@@ -26,6 +26,12 @@ const reviewedSpMounts: string[] = [];
 // guards (permissionBoundaryRoutes) register the same path ahead of the general handler and call
 // next(), which this counter cannot distinguish from a genuine duplicate.
 //
+// Phase 5 raises the reviewed ceiling by one for locationWhatsappLegacyCompatibilityRoutes. That
+// route intentionally handles only legacy PATCH /api/locations/:locationId requests carrying a
+// WhatsApp destination and calls next("route") for normal location edits, so the generic CRUD route
+// remains reachable while legacy WhatsApp writes pass through the new permission/group-validation
+// boundary.
+//
 // It is not all benign. POST /api/stock-transfer-revisions/:id/approve has three separate terminal
 // handlers - vouchers/immutableStockTransferRevisionRoutes.ts, vouchers/stockTransferRevisionLifecycleRoutes.ts
 // and fiscal-transfers/revisions-write.ts - and Express resolves first-match, so two are dead code.
@@ -33,7 +39,7 @@ const reviewedSpMounts: string[] = [];
 // implementation is authoritative changes stock-transfer approval behavior, so it is deliberately
 // left for the audit phase that targets duplicate route registrations rather than folded into a
 // CI-unblocking change. Tracked as a confirmed finding, not an accepted one.
-const MAX_SHADOWED_REGISTRATIONS = 158;
+const MAX_SHADOWED_REGISTRATIONS = 159;
 let actual: SerializedRouteManifest;
 
 async function buildManifest(): Promise<SerializedRouteManifest> {
