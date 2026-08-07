@@ -3555,8 +3555,8 @@
         0
       ],
       "server/routes/containers/containerFreightWriteRoutes.ts": [
-        16,
-        22,
+        6,
+        19,
         0
       ],
       "server/routes/containers/containerHelpers.ts": [
@@ -6712,6 +6712,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 11466
+    "typeEscapeCeiling": 11453
   }
 }
