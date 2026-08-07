@@ -1,5 +1,6 @@
 {
-  "version": 1,
-  "description": "Ratchet on write routes that touch the ledger or the stock ledger and have no test referencing them. The smoke sweep excludes mutating endpoints by design, so nothing else measures this surface. uncoveredSensitiveCeiling may only fall.",
-  "uncoveredSensitiveCeiling": 283
+  "version": 2,
+  "description": "Ratchet on write routes that touch the ledger or the stock ledger. The smoke sweep excludes mutating endpoints by design, so nothing else measures this surface. Two ceilings, both of which may only fall. uncoveredSensitiveCeiling counts routes no test names at all, and is held at zero by tests/write-route-guard-sweep.test.ts. guardOnlySensitiveCeiling counts routes that sweep covers and nothing else: the sweep proves they reject an unauthenticated caller, which is worth holding, but says nothing about the numbers they write. Phase F draws the second number down by giving them real tests.",
+  "uncoveredSensitiveCeiling": 0,
+  "guardOnlySensitiveCeiling": 284
 }

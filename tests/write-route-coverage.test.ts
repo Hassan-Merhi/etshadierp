@@ -7,6 +7,7 @@ import { auditWriteRouteCoverage } from "../scripts/audit-write-route-coverage.m
 
 const config = JSON.parse(fs.readFileSync(path.join(process.cwd(), "config/write-route-coverage.json"), "utf8")) as {
   uncoveredSensitiveCeiling: number;
+  guardOnlySensitiveCeiling: number;
 };
 
 describe("write-route coverage ratchet", () => {
@@ -23,6 +24,22 @@ describe("write-route coverage ratchet", () => {
         `\`npm run audit:write-routes -- --list\` to see them.`
     ).toBeLessThanOrEqual(config.uncoveredSensitiveCeiling);
     expect(report.failures, report.failures.join("\n")).toEqual([]);
+  });
+
+  it("never lets the guard-only write surface grow", () => {
+    const report = auditWriteRouteCoverage();
+
+    // The guard sweep took uncoveredSensitive to zero in one change, which is
+    // the right thing for the property it asserts — no sensitive write route
+    // answers an unauthenticated caller — but it would make the ceiling above
+    // meaningless on its own. This is the number Phase F actually works
+    // against: routes the sweep names and no other test does.
+    expect(
+      report.summary.guardOnlySensitive,
+      `${report.summary.guardOnlySensitive} write routes touching money or stock are covered only by the guard ` +
+        `sweep; the ceiling is ${config.guardOnlySensitiveCeiling}. Run ` +
+        `\`npm run audit:write-routes -- --list\` to see them.`
+    ).toBeLessThanOrEqual(config.guardOnlySensitiveCeiling);
   });
 
   it("still resolves most routes to the file that registers them", () => {
