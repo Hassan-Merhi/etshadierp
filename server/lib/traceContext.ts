@@ -28,8 +28,22 @@ export function updateTraceContext(update: Partial<TraceContext>): void {
   Object.assign(context, update);
 }
 
+function joinRouteTemplate(baseUrl: string, routePath: string): string {
+  const base = baseUrl && baseUrl !== "/" ? baseUrl.replace(/\/$/, "") : "";
+  const route = routePath.startsWith("/") ? routePath : `/${routePath}`;
+
+  // Express can expose an absolute route path even while req.baseUrl still
+  // contains a mounted middleware prefix. Concatenating both produced fake
+  // diagnostics such as /api/factory/api/factory/bale-products even though the
+  // browser requested /api/factory/bale-products. Preserve already-absolute API
+  // routes instead of double-prefixing them.
+  if (route.startsWith("/api/")) return route;
+  if (base && (route === base || route.startsWith(`${base}/`))) return route;
+  return `${base}${route}` || "/";
+}
+
 export function normaliseRouteTemplate(path: string, routePath?: unknown, baseUrl = ""): string {
-  if (typeof routePath === "string") return `${baseUrl}${routePath}` || "/";
+  if (typeof routePath === "string") return joinRouteTemplate(baseUrl, routePath);
   return path
     .split("/")
     .map((segment) => {
