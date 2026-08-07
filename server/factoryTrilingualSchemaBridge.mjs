@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import process from "node:process";
 import pg from "pg";
+import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 
 const INSTALL_KEY = Symbol.for("erp.factory-trilingual-schema.applied");
 
@@ -25,22 +26,20 @@ async function ensureFactoryTrilingualSchema() {
     throw new Error("Factory trilingual schema could not start because no PostgreSQL configuration is available.");
   }
 
-  const isLocalReplitDB = process.env.PGHOST === "helium" || connectionString.includes("@helium:");
-  const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
   const { Client } = pg;
   const client = new Client({
     connectionString,
-    ssl: !isLocalReplitDB && !sslExplicitlyDisabled ? { rejectUnauthorized: false } : false,
+    ssl: resolveDatabaseSsl(connectionString),
     connectionTimeoutMillis: 15_000,
   });
 
   const frenchSql = await readFile(
     new URL("../migrations/20260802_001_factory_french_catalog_snapshots.sql", import.meta.url),
-    "utf8",
+    "utf8"
   );
   const languagePreferenceSql = await readFile(
     new URL("../migrations/20260802_002_user_language_preferences.sql", import.meta.url),
-    "utf8",
+    "utf8"
   );
 
   try {
@@ -57,20 +56,24 @@ async function ensureFactoryTrilingualSchema() {
       END
       $$;
     `);
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      level: "INFO",
-      message: "Factory multilingual schema and language preferences verified",
-      module: "factory-trilingual-schema",
-    }));
+    console.log(
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level: "INFO",
+        message: "Factory multilingual schema and language preferences verified",
+        module: "factory-trilingual-schema",
+      })
+    );
   } catch (error) {
-    console.error(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      level: "ERROR",
-      message: "Factory trilingual schema verification failed",
-      module: "factory-trilingual-schema",
-      error: error instanceof Error ? error.message : String(error),
-    }));
+    console.error(
+      JSON.stringify({
+        timestamp: new Date().toISOString(),
+        level: "ERROR",
+        message: "Factory trilingual schema verification failed",
+        module: "factory-trilingual-schema",
+        error: error instanceof Error ? error.message : String(error),
+      })
+    );
     throw error;
   } finally {
     await client.end().catch(() => {});

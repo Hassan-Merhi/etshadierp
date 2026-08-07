@@ -1,5 +1,12 @@
 import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
+import {
+  inventoryMoney,
+  inventoryUnitCost,
+  multiplyInventoryValues,
+  subtractInventoryValues,
+  toInventoryDecimal,
+} from "../../lib/inventoryMath";
 import { db } from "../../db";
 import { requireAuth, requireNonPOS } from "../../auth";
 import { inventory, stockItems, vouchers, salesItems } from "@shared/schema";
@@ -11,29 +18,15 @@ export function registerStatsSalesRoutes(app: Express) {
   app.post("/api/sales-report/recalculate-costs", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
-      if (!companyId) {
-        return res.status(400).json({ message: "No company selected" });
-      }
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { startDate, endDate, stockItemId, locationId } = req.body;
-
-      // Build conditions for finding sales items to update
       const conditions = [eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)];
+      if (startDate) conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
+      if (endDate) conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
+      if (stockItemId) conditions.push(eq(salesItems.stockItemId, stockItemId));
+      if (locationId) conditions.push(eq(vouchers.locationId, locationId));
 
-      if (startDate) {
-        conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
-      }
-      if (endDate) {
-        conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
-      }
-      if (stockItemId) {
-        conditions.push(eq(salesItems.stockItemId, stockItemId));
-      }
-      if (locationId) {
-        conditions.push(eq(vouchers.locationId, locationId));
-      }
-
-      // Get all sales items that match the criteria
       const itemsToUpdate = await db
         .select({
           salesItemId: salesItems.id,
@@ -51,58 +44,41 @@ export function registerStatsSalesRoutes(app: Express) {
       const updates: { id: number; oldCost: number; newCost: number; itemName: string }[] = [];
 
       for (const item of itemsToUpdate) {
-        // Get current average rate from inventory at that location
-        let newCostPrice = 0;
-
+        let newCostPrice = toInventoryDecimal(0);
         if (item.locationId) {
-          const [invRecord] = await db
-            .select({
-              averageRate: inventory.averageRate,
-            })
+          const [inventoryRecord] = await db
+            .select({ averageRate: inventory.averageRate })
             .from(inventory)
             .where(and(eq(inventory.stockItemId, item.stockItemId), eq(inventory.locationId, item.locationId)))
             .limit(1);
-
-          if (invRecord) {
-            newCostPrice = parseFloat(invRecord.averageRate || "0");
-          }
+          if (inventoryRecord) newCostPrice = toInventoryDecimal(inventoryRecord.averageRate);
         }
 
-        // If no inventory at location, try to get from any location
-        if (newCostPrice === 0) {
-          const [anyInvRecord] = await db
-            .select({
-              averageRate: inventory.averageRate,
-            })
+        if (newCostPrice.isZero()) {
+          const [fallbackInventoryRecord] = await db
+            .select({ averageRate: inventory.averageRate })
             .from(inventory)
             .where(eq(inventory.stockItemId, item.stockItemId))
             .limit(1);
-
-          if (anyInvRecord) {
-            newCostPrice = parseFloat(anyInvRecord.averageRate || "0");
-          }
+          if (fallbackInventoryRecord) newCostPrice = toInventoryDecimal(fallbackInventoryRecord.averageRate);
         }
 
-        const oldCostPrice = parseFloat(item.oldCostPrice || "0");
-
-        // Only update if cost price is different
-        if (Math.abs(newCostPrice - oldCostPrice) > 0.01) {
-          const qty = parseFloat(item.quantity || "0");
-          const sellingPrice = parseFloat(item.sellingPrice || "0");
-          const totalSales = qty * sellingPrice;
-          const totalCost = qty * newCostPrice;
-          const profit = totalSales - totalCost;
+        const oldCostPrice = toInventoryDecimal(item.oldCostPrice);
+        if (newCostPrice.minus(oldCostPrice).abs().greaterThan("0.01")) {
+          const quantity = toInventoryDecimal(item.quantity);
+          const totalSales = multiplyInventoryValues(quantity, item.sellingPrice);
+          const totalCost = multiplyInventoryValues(quantity, newCostPrice);
+          const profit = subtractInventoryValues(totalSales, totalCost);
 
           await db
             .update(salesItems)
             .set({
-              costPrice: newCostPrice.toFixed(2),
-              totalCost: totalCost.toFixed(2),
-              profit: profit.toFixed(2),
+              costPrice: inventoryUnitCost(newCostPrice),
+              totalCost: inventoryMoney(totalCost),
+              profit: inventoryMoney(profit),
             })
             .where(eq(salesItems.id, item.salesItemId));
 
-          // Get item name for response
           const [stockItem] = await db
             .select({ name: stockItems.name })
             .from(stockItems)
@@ -111,11 +87,10 @@ export function registerStatsSalesRoutes(app: Express) {
 
           updates.push({
             id: item.salesItemId,
-            oldCost: oldCostPrice,
-            newCost: newCostPrice,
+            oldCost: oldCostPrice.toNumber(),
+            newCost: newCostPrice.toNumber(),
             itemName: stockItem?.name || "Unknown",
           });
-
           updatedCount++;
         }
       }
@@ -124,46 +99,32 @@ export function registerStatsSalesRoutes(app: Express) {
         message: `Updated cost prices for ${updatedCount} sales items`,
         totalChecked: itemsToUpdate.length,
         updatedCount,
-        updates: updates.slice(0, 50), // Limit response to first 50 updates
+        updates: updates.slice(0, 50),
       });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
-  // Reports API Endpoints
-
-  // Profit & Loss Report
   app.get("/api/reports/profit-loss", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
-      if (!companyId) {
-        return res.status(400).json({ message: "No company selected" });
-      }
-
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { startDate, endDate } = req.query;
-      const result = await getProfitLoss(companyId, startDate as string | undefined, endDate as string | undefined);
-      res.json(result);
+      res.json(await getProfitLoss(companyId, startDate as string | undefined, endDate as string | undefined));
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
-  // Balance Sheet Report
   app.get("/api/reports/balance-sheet", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
-      if (!companyId) {
-        return res.status(400).json({ message: "No company selected" });
-      }
-
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { asOfDate } = req.query;
-      const result = await getBalanceSheet(companyId, asOfDate as string | undefined);
-      res.json(result);
+      res.json(await getBalanceSheet(companyId, asOfDate as string | undefined));
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
-
-  // Sales Report
 }

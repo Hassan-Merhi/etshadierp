@@ -1,6 +1,16 @@
 import type { Express } from "express";
+import type Decimal from "decimal.js";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
+import {
+  addInventoryValues,
+  inventoryMoney,
+  inventoryQuantity,
+  inventoryUnitCost,
+  multiplyInventoryValues,
+  subtractInventoryValues,
+  toInventoryDecimal,
+} from "../lib/inventoryMath";
 import { db } from "../db";
 import { normalizeVoucherEntryAmounts } from "../services/accounting/currencyAmounts";
 import { storage } from "../storage";
@@ -19,14 +29,7 @@ import {
 import { eq, and, or, desc, ilike } from "drizzle-orm";
 import { adjustInventory } from "../inventoryHelper";
 
-/**
- * Find the "Sales Returns & Allowances" account for a company, or create one
- * if it doesn't exist. Used to post the variance between refund price and
- * inventory cost on Credit / Debit Notes.
- * Never falls back to a random Indirect Expense account.
- */
 async function getOrCreateSalesReturnsAccount(companyId: number, txOrDb: any = db): Promise<number | null> {
-  // 1. Existing account whose name contains "sales return" (case-insensitive)
   const byName = await txOrDb
     .select({ id: ledgerAccounts.id })
     .from(ledgerAccounts)
@@ -39,7 +42,6 @@ async function getOrCreateSalesReturnsAccount(companyId: number, txOrDb: any = d
     .limit(1);
   if (byName.length > 0) return byName[0].id;
 
-  // 2. Already auto-created under the canonical code
   const byCode = await txOrDb
     .select({ id: ledgerAccounts.id })
     .from(ledgerAccounts)
@@ -47,7 +49,6 @@ async function getOrCreateSalesReturnsAccount(companyId: number, txOrDb: any = d
     .limit(1);
   if (byCode.length > 0) return byCode[0].id;
 
-  // 3. Create it — Income type because it's a contra-revenue account
   const [created] = await txOrDb
     .insert(ledgerAccounts)
     .values({
@@ -62,19 +63,9 @@ async function getOrCreateSalesReturnsAccount(companyId: number, txOrDb: any = d
   return created?.id ?? null;
 }
 
-/**
- * Phase 5 — Dual-currency normalization for credit/debit note entries.
- *
- * Credit/debit notes have no multi-currency metadata in the request body —
- * they are always posted in the company base currency (USD). Using
- * normalizeVoucherEntryAmounts with IDENTITY convention ensures all 7
- * dual-currency columns are populated consistently with other voucher types.
- *
- * Falls back to raw amounts if normalization fails (zero-amount edge cases).
- */
-function normEntryAmounts(debit: number, credit: number): Record<string, string> {
-  const dStr = debit.toFixed(6);
-  const cStr = credit.toFixed(6);
+function normEntryAmounts(debit: Decimal.Value, credit: Decimal.Value): Record<string, string> {
+  const dStr = toInventoryDecimal(debit).toFixed(6);
+  const cStr = toInventoryDecimal(credit).toFixed(6);
   try {
     const norm = normalizeVoucherEntryAmounts({
       transactionCurrency: "USD",
@@ -95,8 +86,7 @@ function normEntryAmounts(debit: number, credit: number): Record<string, string>
       rateConvention: norm.rateConvention,
     };
   } catch {
-    // Fallback for zero-amount edge cases (zero-cost inventory items, etc.)
-    return { debitAmount: debit.toFixed(2), creditAmount: credit.toFixed(2) };
+    return { debitAmount: inventoryMoney(debit), creditAmount: inventoryMoney(credit) };
   }
 }
 
@@ -104,36 +94,18 @@ export function registerCreditNoteRoutes(app: Express) {
   app.post("/api/credit-notes", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
-      if (!companyId) {
-        return res.status(400).json({ message: "No company selected" });
-      }
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const {
-        noteType, // "Credit Note" or "Debit Note"
-        voucherDate,
-        cashAccountId,
-        cashAccountType, // "ledger" or "bank"
-        description,
-        items, // Array of { stockItemId, locationId, quantity, refundRate, inventoryCost }
-      } = req.body;
-
+      const { noteType, voucherDate, cashAccountId, cashAccountType, description, items } = req.body;
       if (!noteType || !["Credit Note", "Debit Note"].includes(noteType)) {
         return res.status(400).json({ message: "Invalid note type. Must be 'Credit Note' or 'Debit Note'" });
       }
-
-      if (!voucherDate) {
-        return res.status(400).json({ message: "Voucher date is required" });
-      }
-
-      if (!cashAccountId || !cashAccountType) {
-        return res.status(400).json({ message: "Cash/Bank account is required" });
-      }
-
+      if (!voucherDate) return res.status(400).json({ message: "Voucher date is required" });
+      if (!cashAccountId || !cashAccountType) return res.status(400).json({ message: "Cash/Bank account is required" });
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
       }
 
-      // Input validation assertions for inventory safety
       for (const item of items) {
         if (!item.stockItemId || isNaN(Number(item.stockItemId))) {
           return res.status(400).json({ message: `Invalid stockItemId: ${item.stockItemId}` });
@@ -143,35 +115,28 @@ export function registerCreditNoteRoutes(app: Express) {
             .status(400)
             .json({ message: `Invalid locationId for item ${item.stockItemId}: ${item.locationId}` });
         }
-        const qty = parseFloat(item.quantity);
-        if (isNaN(qty) || !isFinite(qty) || qty <= 0) {
+        const qty = toInventoryDecimal(item.quantity);
+        if (!qty.isFinite() || !qty.isPositive()) {
           return res.status(400).json({ message: `Invalid quantity for item ${item.stockItemId}: ${item.quantity}` });
         }
       }
 
-      // Calculate totals - refund amount (customer gets) and inventory value (goes to stock)
-      let totalRefundAmount = 0;
-      let totalInventoryValue = 0;
+      let totalRefundAmount = toInventoryDecimal(0);
+      let totalInventoryValue = toInventoryDecimal(0);
       for (const item of items) {
-        const qty = parseFloat(item.quantity);
-        const refundRate = parseFloat(item.refundRate || item.rate || "0");
-        const inventoryCost = parseFloat(item.inventoryCost || item.rate || "0");
-        if (isNaN(qty) || qty <= 0) {
-          return res.status(400).json({ message: "Invalid quantity for item" });
-        }
-        if (isNaN(refundRate) || refundRate < 0) {
-          return res.status(400).json({ message: "Invalid refund rate for item" });
-        }
-        totalRefundAmount += qty * refundRate;
-        totalInventoryValue += qty * inventoryCost;
+        const qty = toInventoryDecimal(item.quantity);
+        const refundRate = toInventoryDecimal(item.refundRate || item.rate);
+        const inventoryCost = toInventoryDecimal(item.inventoryCost || item.rate);
+        if (!qty.isPositive()) return res.status(400).json({ message: "Invalid quantity for item" });
+        if (refundRate.isNegative()) return res.status(400).json({ message: "Invalid refund rate for item" });
+        totalRefundAmount = addInventoryValues(totalRefundAmount, multiplyInventoryValues(qty, refundRate));
+        totalInventoryValue = addInventoryValues(totalInventoryValue, multiplyInventoryValues(qty, inventoryCost));
       }
 
-      // Generate voucher number
       const timestamp = Date.now();
       const prefix = noteType === "Credit Note" ? "CN" : "DN";
       const voucherNumber = `${prefix}-${timestamp}`;
 
-      // Create the voucher (total is the refund amount)
       const voucher = await db.transaction(async (tx) => {
         const [createdVoucher] = await tx
           .insert(vouchers)
@@ -181,13 +146,12 @@ export function registerCreditNoteRoutes(app: Express) {
             voucherType: noteType,
             voucherDate,
             description: description || `${noteType} for customer return`,
-            totalAmount: totalRefundAmount.toFixed(2),
+            totalAmount: inventoryMoney(totalRefundAmount),
           })
           .returning();
 
-        // Create voucher entries for the cash account using the REFUND amount
-        const cashDebit = noteType === "Debit Note" ? totalRefundAmount : 0;
-        const cashCredit = noteType === "Credit Note" ? totalRefundAmount : 0;
+        const cashDebit = noteType === "Debit Note" ? totalRefundAmount : toInventoryDecimal(0);
+        const cashCredit = noteType === "Credit Note" ? totalRefundAmount : toInventoryDecimal(0);
         if (cashAccountType === "bank") {
           await tx.insert(voucherEntries).values({
             voucherId: createdVoucher.id,
@@ -204,7 +168,6 @@ export function registerCreditNoteRoutes(app: Express) {
           });
         }
 
-        // For each item, process inventory (using inventoryCost) and track refund amounts
         for (const item of items) {
           const {
             stockItemId,
@@ -213,95 +176,83 @@ export function registerCreditNoteRoutes(app: Express) {
             refundRate: itemRefundRate,
             inventoryCost: itemInventoryCost,
           } = item;
-          const qty = parseFloat(quantity);
-          const refundRateVal = parseFloat(itemRefundRate || "0");
-          const inventoryCostVal = parseFloat(itemInventoryCost || "0");
-          const inventoryValue = qty * inventoryCostVal;
+          const qty = toInventoryDecimal(quantity);
+          const refundRateVal = toInventoryDecimal(itemRefundRate);
+          const inventoryCostVal = toInventoryDecimal(itemInventoryCost);
+          const inventoryValue = multiplyInventoryValues(qty, inventoryCostVal);
 
           const [location] = await tx.select().from(locations).where(eq(locations.id, locationId));
-
-          if (!location) {
-            throw new Error(`Location ${locationId} not found`);
-          }
+          if (!location) throw new Error(`Location ${locationId} not found`);
 
           if (noteType === "Credit Note") {
-            // Do NOT pass a rate — cost price must never change due to POS/credit-note returns.
-            await adjustInventory(tx, locationId, stockItemId, qty, companyId);
-
-            const inventoryAccount = await tx
-              .select()
-              .from(ledgerAccounts)
-              .where(
-                and(
-                  eq(ledgerAccounts.companyId, companyId),
-                  or(ilike(ledgerAccounts.name, "%inventory%"), ilike(ledgerAccounts.name, "%stock in hand%"))
-                )
-              )
-              .limit(1);
-
-            if (inventoryAccount.length > 0) {
-              await tx.insert(voucherEntries).values({
-                voucherId: createdVoucher.id,
-                ledgerAccountId: inventoryAccount[0].id,
-                ...normEntryAmounts(inventoryValue, 0),
-                narration: `Inventory restored - ${noteType}`,
-              });
-            }
+            await adjustInventory(tx, locationId, stockItemId, qty.toNumber(), companyId);
           } else {
-            await adjustInventory(tx, locationId, stockItemId, -qty, companyId);
+            await adjustInventory(tx, locationId, stockItemId, qty.negated().toNumber(), companyId);
+          }
 
-            const inventoryAccount = await tx
-              .select()
-              .from(ledgerAccounts)
-              .where(
-                and(
-                  eq(ledgerAccounts.companyId, companyId),
-                  or(ilike(ledgerAccounts.name, "%inventory%"), ilike(ledgerAccounts.name, "%stock in hand%"))
-                )
+          const inventoryAccount = await tx
+            .select()
+            .from(ledgerAccounts)
+            .where(
+              and(
+                eq(ledgerAccounts.companyId, companyId),
+                or(ilike(ledgerAccounts.name, "%inventory%"), ilike(ledgerAccounts.name, "%stock in hand%"))
               )
-              .limit(1);
+            )
+            .limit(1);
 
-            if (inventoryAccount.length > 0) {
-              await tx.insert(voucherEntries).values({
-                voucherId: createdVoucher.id,
-                ledgerAccountId: inventoryAccount[0].id,
-                ...normEntryAmounts(0, inventoryValue),
-                narration: `Inventory reduced - ${noteType}`,
-              });
-            }
+          if (inventoryAccount.length > 0) {
+            await tx.insert(voucherEntries).values({
+              voucherId: createdVoucher.id,
+              ledgerAccountId: inventoryAccount[0].id,
+              ...normEntryAmounts(
+                noteType === "Credit Note" ? inventoryValue : 0,
+                noteType === "Debit Note" ? inventoryValue : 0
+              ),
+              narration: `Inventory ${noteType === "Credit Note" ? "restored" : "reduced"} - ${noteType}`,
+            });
           }
 
           await tx.insert(creditNoteItems).values({
             voucherId: createdVoucher.id,
             stockItemId,
             locationId,
-            quantity: qty.toFixed(3),
-            rate: refundRateVal.toFixed(2),
-            inventoryCost: inventoryCostVal.toFixed(2),
-            totalValue: (qty * refundRateVal).toFixed(2),
+            quantity: inventoryQuantity(qty),
+            rate: inventoryUnitCost(refundRateVal),
+            inventoryCost: inventoryUnitCost(inventoryCostVal),
+            totalValue: inventoryMoney(multiplyInventoryValues(qty, refundRateVal)),
           });
         }
 
-        // Handle variance
-        const variance = totalRefundAmount - totalInventoryValue;
-        if (Math.abs(variance) > 0.01) {
+        const variance = subtractInventoryValues(totalRefundAmount, totalInventoryValue);
+        if (variance.abs().greaterThan("0.01")) {
           const salesReturnsAccountId = await getOrCreateSalesReturnsAccount(companyId, tx);
           if (salesReturnsAccountId) {
-            if (noteType === "Credit Note") {
-              await tx.insert(voucherEntries).values({
-                voucherId: createdVoucher.id,
-                ledgerAccountId: salesReturnsAccountId,
-                ...normEntryAmounts(variance > 0 ? variance : 0, variance < 0 ? Math.abs(variance) : 0),
-                narration: `Variance between refund and inventory cost`,
-              });
-            } else {
-              await tx.insert(voucherEntries).values({
-                voucherId: createdVoucher.id,
-                ledgerAccountId: salesReturnsAccountId,
-                ...normEntryAmounts(variance < 0 ? Math.abs(variance) : 0, variance > 0 ? variance : 0),
-                narration: `Variance between debit note amount and inventory cost`,
-              });
-            }
+            const debit =
+              noteType === "Credit Note"
+                ? variance.isPositive()
+                  ? variance
+                  : toInventoryDecimal(0)
+                : variance.isNegative()
+                  ? variance.abs()
+                  : toInventoryDecimal(0);
+            const credit =
+              noteType === "Credit Note"
+                ? variance.isNegative()
+                  ? variance.abs()
+                  : toInventoryDecimal(0)
+                : variance.isPositive()
+                  ? variance
+                  : toInventoryDecimal(0);
+            await tx.insert(voucherEntries).values({
+              voucherId: createdVoucher.id,
+              ledgerAccountId: salesReturnsAccountId,
+              ...normEntryAmounts(debit, credit),
+              narration:
+                noteType === "Credit Note"
+                  ? "Variance between refund and inventory cost"
+                  : "Variance between debit note amount and inventory cost",
+            });
           }
         }
 
@@ -312,7 +263,7 @@ export function registerCreditNoteRoutes(app: Express) {
         await logAudit({
           userId: req.session.userId!,
           username: (req.session as any).username || "unknown",
-          companyId: companyId,
+          companyId,
           action: "create",
           tableName: "vouchers",
           recordId: voucher.id,
@@ -320,7 +271,7 @@ export function registerCreditNoteRoutes(app: Express) {
           changes: {
             voucherType: { old: null, new: noteType },
             date: { old: null, new: voucherDate },
-            totalAmount: { old: null, new: totalRefundAmount.toFixed(2) },
+            totalAmount: { old: null, new: inventoryMoney(totalRefundAmount) },
             itemCount: { old: null, new: items.length },
             cashAccount: { old: null, new: cashAccountId },
           },
@@ -328,6 +279,7 @@ export function registerCreditNoteRoutes(app: Express) {
       } catch {
         /* non-fatal */
       }
+
       res.json({
         success: true,
         voucherId: voucher.id,
@@ -335,42 +287,29 @@ export function registerCreditNoteRoutes(app: Express) {
         message: `${noteType} created successfully`,
       });
     } catch (error: unknown) {
-      logger.error("Credit/Debit note error:", { error: error });
+      logger.error("Credit/Debit note error:", { error });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
-  // GET credit note details for editing
   app.get("/api/credit-notes/:id", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
-      if (!companyId) {
-        return res.status(400).json({ message: "No company selected" });
-      }
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const voucherId = parseInt(req.params.id);
-      if (isNaN(voucherId)) {
-        return res.status(400).json({ message: "Invalid credit note ID" });
-      }
+      if (isNaN(voucherId)) return res.status(400).json({ message: "Invalid credit note ID" });
 
-      // Get voucher
       const [voucher] = await db
         .select()
         .from(vouchers)
         .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, companyId)));
-
-      if (!voucher) {
-        return res.status(404).json({ message: "Credit note not found" });
-      }
-
+      if (!voucher) return res.status(404).json({ message: "Credit note not found" });
       if (!["Credit Note", "Debit Note"].includes(voucher.voucherType || "")) {
         return res.status(400).json({ message: "Not a credit/debit note" });
       }
 
-      // Get voucher entries
       const entries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
-
-      // Get credit note items
       const noteItems = await db
         .select({
           id: creditNoteItems.id,
@@ -389,7 +328,6 @@ export function registerCreditNoteRoutes(app: Express) {
         .leftJoin(locations, eq(creditNoteItems.locationId, locations.id))
         .where(eq(creditNoteItems.voucherId, voucherId));
 
-      // Find cash account from entries
       let cashAccountId = 0;
       let cashAccountType = "";
       for (const entry of entries) {
@@ -398,7 +336,6 @@ export function registerCreditNoteRoutes(app: Express) {
           cashAccountType = "bank";
           break;
         } else if (entry.ledgerAccountId) {
-          // Check if this is a cash-type account
           const [ledger] = await db.select().from(ledgerAccounts).where(eq(ledgerAccounts.id, entry.ledgerAccountId));
           if (ledger && ["Cash", "Bank"].includes(ledger.accountType || "")) {
             cashAccountId = entry.ledgerAccountId;
@@ -407,22 +344,18 @@ export function registerCreditNoteRoutes(app: Express) {
           }
         }
       }
-      // Fetch current inventory costs for each item at its location
-      // Fallback order: 1) Specific location, 2) Any location, 3) Container offload history
+
       const itemsWithCosts = await Promise.all(
         noteItems.map(async (item) => {
           let costRate = "0";
-
-          // First try to find inventory at the item's location
           const [inv] = await db
             .select()
             .from(inventory)
             .where(and(eq(inventory.stockItemId, item.stockItemId), eq(inventory.locationId, item.locationId)));
 
-          if (inv?.averageRate && parseFloat(inv.averageRate) > 0) {
+          if (inv?.averageRate && toInventoryDecimal(inv.averageRate).isPositive()) {
             costRate = inv.averageRate;
           } else {
-            // Try to find from any location
             const [anyInv] = await db
               .select()
               .from(inventory)
@@ -430,20 +363,16 @@ export function registerCreditNoteRoutes(app: Express) {
               .orderBy(desc(inventory.quantity))
               .limit(1);
 
-            if (anyInv?.averageRate && parseFloat(anyInv.averageRate) > 0) {
+            if (anyInv?.averageRate && toInventoryDecimal(anyInv.averageRate).isPositive()) {
               costRate = anyInv.averageRate;
             } else {
-              // Final fallback: check container offload history for this item's cost
               const [offloadItem] = await db
                 .select()
                 .from(containerOffloadItems)
                 .where(eq(containerOffloadItems.stockItemId, item.stockItemId))
                 .orderBy(desc(containerOffloadItems.id))
                 .limit(1);
-
-              if (offloadItem?.rate && parseFloat(offloadItem.rate) > 0) {
-                costRate = offloadItem.rate;
-              }
+              if (offloadItem?.rate && toInventoryDecimal(offloadItem.rate).isPositive()) costRate = offloadItem.rate;
             }
           }
 
@@ -475,42 +404,31 @@ export function registerCreditNoteRoutes(app: Express) {
         items: itemsWithCosts,
       });
     } catch (error: unknown) {
-      logger.error("Get credit note error:", { error: error });
+      logger.error("Get credit note error:", { error });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
-  // PATCH credit note - reverse old entries and apply new ones
   app.patch("/api/credit-notes/:id", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
-      if (!companyId) {
-        return res.status(400).json({ message: "No company selected" });
-      }
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const voucherId = parseInt(req.params.id);
-      if (isNaN(voucherId)) {
-        return res.status(400).json({ message: "Invalid credit note ID" });
-      }
+      if (isNaN(voucherId)) return res.status(400).json({ message: "Invalid credit note ID" });
 
       const { voucherDate, cashAccountId, cashAccountType, description, items } = req.body;
-
-      // Get existing voucher
       const [voucher] = await db
         .select()
         .from(vouchers)
         .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, companyId)));
-
-      if (!voucher) {
-        return res.status(404).json({ message: "Credit note not found" });
-      }
+      if (!voucher) return res.status(404).json({ message: "Credit note not found" });
 
       const noteType = voucher.voucherType;
       if (!["Credit Note", "Debit Note"].includes(noteType || "")) {
         return res.status(400).json({ message: "Not a credit/debit note" });
       }
 
-      // Input validation assertions for inventory safety
       if (items && Array.isArray(items)) {
         for (const item of items) {
           if (!item.stockItemId || isNaN(Number(item.stockItemId))) {
@@ -521,80 +439,68 @@ export function registerCreditNoteRoutes(app: Express) {
               .status(400)
               .json({ message: `Invalid locationId for item ${item.stockItemId}: ${item.locationId}` });
           }
-          const qty = parseFloat(item.quantity);
-          if (isNaN(qty) || !isFinite(qty) || qty <= 0) {
+          const qty = toInventoryDecimal(item.quantity);
+          if (!qty.isFinite() || !qty.isPositive()) {
             return res.status(400).json({ message: `Invalid quantity for item ${item.stockItemId}: ${item.quantity}` });
           }
         }
       }
 
-      // Snapshot old credit note items BEFORE the transaction (for audit diff)
-      const _oldCNItems = await db.select().from(creditNoteItems).where(eq(creditNoteItems.voucherId, voucherId));
+      const oldItems = await db.select().from(creditNoteItems).where(eq(creditNoteItems.voucherId, voucherId));
 
-      // Wrap all mutations in a transaction
       await db.transaction(async (tx) => {
-        // Get existing credit note items to reverse inventory
         const existingItems = await tx.select().from(creditNoteItems).where(eq(creditNoteItems.voucherId, voucherId));
-
-        // REVERSE: Undo inventory changes from existing items
         for (const item of existingItems) {
-          const qty = parseFloat(item.quantity || "0");
-          const rate = parseFloat(item.rate || "0");
-          const itemValue = qty * rate;
-
-          if (noteType === "Credit Note") {
-            await adjustInventory(tx, item.locationId, item.stockItemId, -qty, companyId);
-          } else {
-            // Do NOT pass a rate — cost price must never change due to POS/credit-note activity.
-            await adjustInventory(tx, item.locationId, item.stockItemId, qty, companyId);
-          }
+          const qty = toInventoryDecimal(item.quantity);
+          await adjustInventory(
+            tx,
+            item.locationId,
+            item.stockItemId,
+            (noteType === "Credit Note" ? qty.negated() : qty).toNumber(),
+            companyId
+          );
         }
 
-        // Delete old voucher entries and credit note items
         await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
         await tx.delete(creditNoteItems).where(eq(creditNoteItems.voucherId, voucherId));
 
-        // Calculate new totals
-        let totalRefundAmount = 0;
-        let totalInventoryValue = 0;
+        let totalRefundAmount = toInventoryDecimal(0);
+        let totalInventoryValue = toInventoryDecimal(0);
         for (const item of items) {
-          const qty = parseFloat(item.quantity);
-          const refundRate = parseFloat(item.refundRate || "0");
-          const inventoryCost = parseFloat(item.inventoryCost || "0");
-          totalRefundAmount += qty * refundRate;
-          totalInventoryValue += qty * inventoryCost;
+          const qty = toInventoryDecimal(item.quantity);
+          const refundRate = toInventoryDecimal(item.refundRate);
+          const inventoryCost = toInventoryDecimal(item.inventoryCost);
+          totalRefundAmount = addInventoryValues(totalRefundAmount, multiplyInventoryValues(qty, refundRate));
+          totalInventoryValue = addInventoryValues(totalInventoryValue, multiplyInventoryValues(qty, inventoryCost));
         }
 
-        // Update voucher
         await tx
           .update(vouchers)
           .set({
             voucherDate,
             description: description || voucher.description,
-            totalAmount: totalRefundAmount.toFixed(2),
+            totalAmount: inventoryMoney(totalRefundAmount),
           })
           .where(eq(vouchers.id, voucherId));
 
-        // Create new cash entry (Phase 5 normalization: populate dual-currency columns)
-        const patchCashDebit = noteType === "Debit Note" ? totalRefundAmount : 0;
-        const patchCashCredit = noteType === "Credit Note" ? totalRefundAmount : 0;
+        const cashDebit = noteType === "Debit Note" ? totalRefundAmount : toInventoryDecimal(0);
+        const cashCredit = noteType === "Credit Note" ? totalRefundAmount : toInventoryDecimal(0);
         if (cashAccountType === "bank") {
           await tx.insert(voucherEntries).values({
             voucherId,
             bankAccountId: cashAccountId,
-            ...normEntryAmounts(patchCashDebit, patchCashCredit),
+            ...normEntryAmounts(cashDebit, cashCredit),
             narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
           });
         } else {
           await tx.insert(voucherEntries).values({
             voucherId,
             ledgerAccountId: cashAccountId,
-            ...normEntryAmounts(patchCashDebit, patchCashCredit),
+            ...normEntryAmounts(cashDebit, cashCredit),
             narration: `${noteType} - cash ${noteType === "Credit Note" ? "refund" : "receipt"}`,
           });
         }
 
-        // Apply new items
         for (const item of items) {
           const {
             stockItemId,
@@ -603,109 +509,99 @@ export function registerCreditNoteRoutes(app: Express) {
             refundRate: itemRefundRate,
             inventoryCost: itemInventoryCost,
           } = item;
-          const qty = parseFloat(quantity);
-          const refundRateVal = parseFloat(itemRefundRate || "0");
-          const inventoryCostVal = parseFloat(itemInventoryCost || "0");
-          const inventoryValue = qty * inventoryCostVal;
+          const qty = toInventoryDecimal(quantity);
+          const refundRateVal = toInventoryDecimal(itemRefundRate);
+          const inventoryCostVal = toInventoryDecimal(itemInventoryCost);
+          const inventoryValue = multiplyInventoryValues(qty, inventoryCostVal);
 
           const [location] = await tx.select().from(locations).where(eq(locations.id, locationId));
+          if (!location) throw new Error(`Location ${locationId} not found`);
 
-          if (!location) {
-            throw new Error(`Location ${locationId} not found`);
-          }
+          await adjustInventory(
+            tx,
+            locationId,
+            stockItemId,
+            (noteType === "Credit Note" ? qty : qty.negated()).toNumber(),
+            companyId
+          );
 
-          if (noteType === "Credit Note") {
-            // Do NOT pass a rate — cost price must never change due to POS/credit-note returns.
-            await adjustInventory(tx, locationId, stockItemId, qty, companyId);
-
-            const inventoryAccount = await tx
-              .select()
-              .from(ledgerAccounts)
-              .where(
-                and(
-                  eq(ledgerAccounts.companyId, companyId),
-                  or(ilike(ledgerAccounts.name, "%inventory%"), ilike(ledgerAccounts.name, "%stock in hand%"))
-                )
+          const inventoryAccount = await tx
+            .select()
+            .from(ledgerAccounts)
+            .where(
+              and(
+                eq(ledgerAccounts.companyId, companyId),
+                or(ilike(ledgerAccounts.name, "%inventory%"), ilike(ledgerAccounts.name, "%stock in hand%"))
               )
-              .limit(1);
+            )
+            .limit(1);
 
-            if (inventoryAccount.length > 0) {
-              await tx.insert(voucherEntries).values({
-                voucherId,
-                ledgerAccountId: inventoryAccount[0].id,
-                ...normEntryAmounts(inventoryValue, 0),
-                narration: `Inventory restored - ${noteType}`,
-              });
-            }
-          } else {
-            await adjustInventory(tx, locationId, stockItemId, -qty, companyId);
-
-            const inventoryAccount = await tx
-              .select()
-              .from(ledgerAccounts)
-              .where(
-                and(
-                  eq(ledgerAccounts.companyId, companyId),
-                  or(ilike(ledgerAccounts.name, "%inventory%"), ilike(ledgerAccounts.name, "%stock in hand%"))
-                )
-              )
-              .limit(1);
-
-            if (inventoryAccount.length > 0) {
-              await tx.insert(voucherEntries).values({
-                voucherId,
-                ledgerAccountId: inventoryAccount[0].id,
-                ...normEntryAmounts(0, inventoryValue),
-                narration: `Inventory reduced - ${noteType}`,
-              });
-            }
+          if (inventoryAccount.length > 0) {
+            await tx.insert(voucherEntries).values({
+              voucherId,
+              ledgerAccountId: inventoryAccount[0].id,
+              ...normEntryAmounts(
+                noteType === "Credit Note" ? inventoryValue : 0,
+                noteType === "Debit Note" ? inventoryValue : 0
+              ),
+              narration: `Inventory ${noteType === "Credit Note" ? "restored" : "reduced"} - ${noteType}`,
+            });
           }
 
           await tx.insert(creditNoteItems).values({
             voucherId,
             stockItemId,
             locationId,
-            quantity: qty.toFixed(3),
-            rate: refundRateVal.toFixed(2),
-            inventoryCost: inventoryCostVal.toFixed(2),
-            totalValue: (qty * refundRateVal).toFixed(2),
+            quantity: inventoryQuantity(qty),
+            rate: inventoryUnitCost(refundRateVal),
+            inventoryCost: inventoryUnitCost(inventoryCostVal),
+            totalValue: inventoryMoney(multiplyInventoryValues(qty, refundRateVal)),
           });
         }
 
-        // Handle variance
-        const variance = totalRefundAmount - totalInventoryValue;
-        if (Math.abs(variance) > 0.01) {
+        const variance = subtractInventoryValues(totalRefundAmount, totalInventoryValue);
+        if (variance.abs().greaterThan("0.01")) {
           const salesReturnsAccountId = await getOrCreateSalesReturnsAccount(companyId, tx);
           if (salesReturnsAccountId) {
-            if (noteType === "Credit Note") {
-              await tx.insert(voucherEntries).values({
-                voucherId,
-                ledgerAccountId: salesReturnsAccountId,
-                ...normEntryAmounts(variance > 0 ? variance : 0, variance < 0 ? Math.abs(variance) : 0),
-                narration: `Variance between refund and inventory cost`,
-              });
-            } else {
-              await tx.insert(voucherEntries).values({
-                voucherId,
-                ledgerAccountId: salesReturnsAccountId,
-                ...normEntryAmounts(variance < 0 ? Math.abs(variance) : 0, variance > 0 ? variance : 0),
-                narration: `Variance between debit note amount and inventory cost`,
-              });
-            }
+            const debit =
+              noteType === "Credit Note"
+                ? variance.isPositive()
+                  ? variance
+                  : toInventoryDecimal(0)
+                : variance.isNegative()
+                  ? variance.abs()
+                  : toInventoryDecimal(0);
+            const credit =
+              noteType === "Credit Note"
+                ? variance.isNegative()
+                  ? variance.abs()
+                  : toInventoryDecimal(0)
+                : variance.isPositive()
+                  ? variance
+                  : toInventoryDecimal(0);
+            await tx.insert(voucherEntries).values({
+              voucherId,
+              ledgerAccountId: salesReturnsAccountId,
+              ...normEntryAmounts(debit, credit),
+              narration:
+                noteType === "Credit Note"
+                  ? "Variance between refund and inventory cost"
+                  : "Variance between debit note amount and inventory cost",
+            });
           }
         }
       });
 
       try {
-        const _cnChanges: Record<string, any> = {};
+        const changes: Record<string, any> = {};
         if (voucherDate && voucher.voucherDate !== voucherDate)
-          _cnChanges.date = { old: voucher.voucherDate, new: voucherDate };
+          changes.date = { old: voucher.voucherDate, new: voucherDate };
         if (cashAccountId !== undefined)
-          _cnChanges.cashAccount = { old: _oldCNItems[0]?.voucherId ?? null, new: cashAccountId };
-        const _resolveCNName = async (id: number) => (await storage.getStockItemById(id))?.name ?? `Item #${id}`;
-        const _cnItemDiff = items?.length
+          changes.cashAccount = { old: oldItems[0]?.voucherId ?? null, new: cashAccountId };
+        const resolveName = async (id: number) => (await storage.getStockItemById(id))?.name ?? `Item #${id}`;
+        const itemDiff = items?.length
           ? await buildItemLevelChanges(
-              _oldCNItems.map((it) => ({
+              oldItems.map((it) => ({
                 stockItemId: it.stockItemId,
                 quantity: it.quantity,
                 rate: it.rate,
@@ -715,33 +611,28 @@ export function registerCreditNoteRoutes(app: Express) {
                 stockItemId: Number(it.stockItemId),
                 quantity: String(it.quantity ?? ""),
                 rate: String(it.refundRate ?? it.rate ?? ""),
-                totalValue: String(
-                  parseFloat(String(it.quantity ?? 0)) * parseFloat(String(it.refundRate ?? it.rate ?? 0))
-                ),
+                totalValue: inventoryMoney(multiplyInventoryValues(it.quantity, it.refundRate ?? it.rate)),
               })),
-              _resolveCNName
+              resolveName
             )
           : {};
         await logAudit({
           userId: req.session.userId!,
           username: (req.session as any).username || "unknown",
-          companyId: companyId,
+          companyId,
           action: "update",
           tableName: "vouchers",
           recordId: voucherId,
           recordIdentifier: voucher.voucherNumber,
-          changes: { ..._cnChanges, ..._cnItemDiff },
+          changes: { ...changes, ...itemDiff },
         });
       } catch {
         /* non-fatal */
       }
-      res.json({
-        success: true,
-        voucherId,
-        message: `${noteType} updated successfully`,
-      });
+
+      res.json({ success: true, voucherId, message: `${noteType} updated successfully` });
     } catch (error: unknown) {
-      logger.error("Update credit note error:", { error: error });
+      logger.error("Update credit note error:", { error });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });

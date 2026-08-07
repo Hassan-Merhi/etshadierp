@@ -8,6 +8,14 @@ import type { Express } from "express";
 import { parseId } from "../../../lib/parseId";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
+import {
+  addInventoryValues,
+  divideInventoryValues,
+  inventoryMoney,
+  inventoryUnitCost,
+  subtractInventoryValues,
+  toInventoryDecimal,
+} from "../../../lib/inventoryMath";
 import { db } from "../../../db";
 import { storage } from "../../../storage";
 import { requireAuth, requireRole } from "../../../auth";
@@ -25,7 +33,6 @@ import { adjustInventory } from "../../../inventoryHelper";
 import { applyInventoryRateDeltaAndSync } from "../../../services/syncSalesItemCosts";
 
 export function registerContainerOffloadUpdateRoutes(app: Express) {
-  // Edit container offload (Admin only)
   app.patch("/api/containers/:id/offload", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
       const containerId = parseId(req.params.id);
@@ -34,25 +41,19 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid container ID" });
       }
 
-      // Get container
       const container = await storage.getContainerById(containerId);
       if (!container) {
         return res.status(404).json({ message: "Container not found" });
       }
 
-      // Verify container belongs to current company
       if (container.companyId !== req.session.currentCompanyId) {
-        return res.status(403).json({
-          message: "Access denied: Container belongs to a different company",
-        });
+        return res.status(403).json({ message: "Access denied: Container belongs to a different company" });
       }
 
-      // Check if container is offloaded
       if (container.status !== "OFFLOADED") {
         return res.status(400).json({ message: "Container must be offloaded to edit" });
       }
 
-      // Validate request body
       const validation = offloadRequestSchema
         .extend({
           dutiesAccountId: z.number().optional(),
@@ -60,13 +61,7 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
           officeChargesCashAccountId: z.number().optional(),
           transportAccountId: z.number().optional(),
           additionalCharges: z
-            .array(
-              z.object({
-                description: z.string(),
-                amount: z.number(),
-                ledgerAccountId: z.number(),
-              })
-            )
+            .array(z.object({ description: z.string(), amount: z.number(), ledgerAccountId: z.number() }))
             .optional(),
         })
         .safeParse(req.body);
@@ -79,17 +74,12 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
         locationId,
         offloadDate,
         duties,
-        dutiesAccountId,
         officeCharges,
-        officeChargesAccountId,
-        officeChargesCashAccountId,
         transferCharges,
         transportFees,
-        transportAccountId,
         additionalCharges = [],
       } = validation.data;
 
-      // Get current offload record
       const [currentOffload] = await db
         .select()
         .from(containerOffloads)
@@ -100,23 +90,20 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
         return res.status(404).json({ message: "Offload record not found" });
       }
 
-      // Captured inside the transaction so the post-commit inventory sync
-      // (fire-and-forget block below) can compute the per-bale cost delta.
-      let newAdditionalCostPerBale = 0;
+      let newAdditionalCostPerBale = toInventoryDecimal(0);
 
       await db.transaction(async (tx) => {
-        // If location changed, need to move inventory
         if (locationId !== currentOffload.locationId) {
           const pos = await storage.getPurchaseOrdersByContainer(containerId);
           for (const po of pos) {
             const lineItems = await storage.getLineItemsByPO(po.id);
             for (const item of lineItems) {
-              // Move inventory from old location to new location
+              const quantity = toInventoryDecimal(item.quantity);
               const removeResult = await adjustInventory(
                 tx,
                 currentOffload.locationId,
                 item.stockItemId,
-                -parseFloat(item.quantity),
+                quantity.negated().toNumber(),
                 req.session.currentCompanyId!
               );
               if (removeResult.previousQuantity !== 0) {
@@ -124,7 +111,7 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
                   tx,
                   locationId,
                   item.stockItemId,
-                  parseFloat(item.quantity),
+                  quantity.toNumber(),
                   req.session.currentCompanyId!,
                   removeResult.averageRate
                 );
@@ -133,21 +120,18 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
           }
         }
 
-        // Recalculate charges
-        const additionalChargesTotal = additionalCharges.reduce((sum, charge) => sum + charge.amount, 0);
-        const totalCharges =
-          parseFloat(duties) +
-          parseFloat(officeCharges) +
-          parseFloat(transferCharges) +
-          parseFloat(transportFees) +
-          additionalChargesTotal;
-
-        const totalBales = parseFloat(currentOffload.totalBales);
-        // Round to 2 decimal places to prevent floating-point accumulation errors
-        const additionalCostPerBale = totalBales > 0 ? Math.round((totalCharges / totalBales) * 100) / 100 : 0;
+        const additionalChargesTotal = addInventoryValues(...additionalCharges.map((charge) => charge.amount));
+        const totalCharges = addInventoryValues(
+          duties,
+          officeCharges,
+          transferCharges,
+          transportFees,
+          additionalChargesTotal
+        );
+        const totalBales = toInventoryDecimal(currentOffload.totalBales);
+        const additionalCostPerBale = divideInventoryValues(totalCharges, totalBales);
         newAdditionalCostPerBale = additionalCostPerBale;
 
-        // Update offload record
         await tx
           .update(containerOffloads)
           .set({
@@ -156,19 +140,16 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
             officeCharges,
             transferCharges,
             transportFees,
-            totalCharges: totalCharges.toString(),
-            additionalCostPerBale: additionalCostPerBale.toString(),
+            totalCharges: inventoryMoney(totalCharges),
+            additionalCostPerBale: inventoryUnitCost(additionalCostPerBale),
             offloadedAt: offloadDate ? new Date(offloadDate) : currentOffload.offloadedAt,
           })
           .where(eq(containerOffloads.id, currentOffload.id));
 
-        // Keep containers.dutyFee in sync with the actual duties entered so the
-        // Agent/Duty FIFO tab always uses the real duty amount.
-        if (parseFloat(duties) > 0) {
+        if (toInventoryDecimal(duties).greaterThan(0)) {
           await tx.update(containers).set({ dutyFee: duties }).where(eq(containers.id, containerId));
         }
 
-        // Delete old vouchers and create new ones with updated charges
         const containerVouchers = await tx
           .select()
           .from(vouchers)
@@ -183,36 +164,21 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
           await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucher.id));
           await tx.delete(vouchers).where(eq(vouchers.id, voucher.id));
         }
-
-        // Create new voucher entries with updated charges (similar to offloadContainer logic)
-        // This is a simplified version - you may want to call the full offload logic
-        // For now, we'll just update the records
       });
 
-      res.json({
-        success: true,
-        message: "Container offload updated successfully",
-      });
+      res.json({ success: true, message: "Container offload updated successfully" });
 
-      // ── Part B: sync inventory averageRate + sales_items costs after charge edit (fire-and-forget) ──
-      // The PATCH route updates additionalCostPerBale in containerOffloads but does NOT
-      // automatically adjust inventory.averageRate. We compute the per-unit delta and
-      // apply it to inventory, then propagate to sales_items.
       Promise.resolve().then(async () => {
         try {
           const companyId = req.session.currentCompanyId!;
-          const oldAdditionalCostPerBale = parseFloat(currentOffload.additionalCostPerBale || "0");
-          const delta = newAdditionalCostPerBale - oldAdditionalCostPerBale;
+          const delta = subtractInventoryValues(newAdditionalCostPerBale, currentOffload.additionalCostPerBale);
 
-          // Get affected stock items from stored offload items (most accurate)
           const offloadItems = await db
             .select({ stockItemId: containerOffloadItems.stockItemId })
             .from(containerOffloadItems)
             .where(eq(containerOffloadItems.offloadId, currentOffload.id));
 
           let stockItemIds: number[] = [...new Set(offloadItems.map((i) => i.stockItemId))];
-
-          // Fallback: derive from PO line items if no stored offload items
           if (stockItemIds.length === 0) {
             const pos = await storage.getPurchaseOrdersByContainer(containerId);
             const idSet = new Set<number>();
@@ -231,16 +197,16 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
             companyId,
             currentOffload.locationId,
             stockItemIds,
-            delta
+            delta.toNumber()
           );
 
-          if (result.updatedCount > 0 || Math.abs(delta) > 0.001) {
+          if (result.updatedCount > 0 || delta.abs().greaterThan("0.001")) {
             logger.info("Sales item costs synced after container charge edit", {
               module: "containers",
               action: "sync-sales-costs-patch",
               containerId,
               locationId: currentOffload.locationId,
-              delta,
+              delta: inventoryUnitCost(delta),
               stockItemIds,
               updatedSalesItems: result.updatedCount,
             });
@@ -255,7 +221,7 @@ export function registerContainerOffloadUpdateRoutes(app: Express) {
         }
       });
     } catch (error: unknown) {
-      logger.error("Edit offload error:", { error: error });
+      logger.error("Edit offload error:", { error });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });

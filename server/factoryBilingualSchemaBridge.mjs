@@ -1,5 +1,6 @@
 import process from "node:process";
 import pg from "pg";
+import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 
 const { Client } = pg;
 const INSTALL_KEY = Symbol.for("erp.factory-bilingual-schema.applied");
@@ -31,8 +32,7 @@ export const FACTORY_BILINGUAL_COLUMNS = Object.freeze([
   ["bale_recode_items", "product_name_ar", "TEXT", false],
 ]);
 
-export const FACTORY_BILINGUAL_ARTICLE_INDEX =
-  "factory_bale_products_company_article_code_normalized_idx";
+export const FACTORY_BILINGUAL_ARTICLE_INDEX = "factory_bale_products_company_article_code_normalized_idx";
 
 function quoteIdentifier(value) {
   return `"${String(value).replaceAll('"', '""')}"`;
@@ -58,11 +58,9 @@ export async function ensureFactoryBilingualSchema() {
     return { columnsAdded: [], missingOptionalTables: [] };
   }
 
-  const isLocalReplitDb = process.env.PGHOST === "helium" || connectionString.includes("@helium:");
-  const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
   const client = new Client({
     connectionString,
-    ssl: !isLocalReplitDb && !sslExplicitlyDisabled ? { rejectUnauthorized: false } : false,
+    ssl: resolveDatabaseSsl(connectionString),
     connectionTimeoutMillis: 8_000,
   });
 

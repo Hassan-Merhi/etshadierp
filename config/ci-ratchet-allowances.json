@@ -49,8 +49,9 @@
       "tests/stock-transfer-revision-lifecycle-policy.test.ts",
       "tests/loading-proforma-summary-lines.test.ts",
       "tests/pos-revision-whatsapp-routing.test.ts",
-      "tests/ui/remote-support-fast-viewer.test.ts"
+      "tests/ui/remote-support-fast-viewer.test.ts",
+      "server/lib/reportPrecision.test.ts"
     ],
-    "maxAdditionalTextAssertions": 544
+    "maxAdditionalTextAssertions": 548
   }
 }

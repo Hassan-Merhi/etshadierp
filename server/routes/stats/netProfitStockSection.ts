@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import { inventory, locations } from "@shared/schema";
 import { db } from "../../db";
+import { inventoryMoney, multiplyInventoryValues, toInventoryDecimal } from "../../lib/inventoryMath";
 import { calculateHistoricalLocationInventory } from "../_helpers";
 
 /**
@@ -11,10 +12,6 @@ import { calculateHistoricalLocationInventory } from "../_helpers";
  * active location's history through calculateHistoricalLocationInventory, which
  * is why the two branches look different: only the historical path can produce
  * quantities that no longer exist today.
- *
- * Extracted verbatim from the /api/stats/net-profit handler; it returns the
- * figure rather than pushing into the caller's accumulators.
- * config/report-characterization.json pins the endpoint's output across the move.
  */
 export async function computeStockInHand(companyId: number, toDate: string | null | undefined): Promise<number> {
   const activeLocationsData = await db
@@ -22,19 +19,20 @@ export async function computeStockInHand(companyId: number, toDate: string | nul
     .from(locations)
     .where(and(eq(locations.companyId, companyId), eq(locations.active, true), isNull(locations.deletedAt)))
     .execute();
-  const activeLocationIds = activeLocationsData.map((l) => l.id);
+  const activeLocationIds = activeLocationsData.map((location) => location.id);
 
-  let stockOnFloor = 0;
+  let stockOnFloor = toInventoryDecimal(0);
   if (activeLocationIds.length > 0) {
     if (toDate) {
       const allHistorical = await Promise.all(
-        activeLocationIds.map((locId) => calculateHistoricalLocationInventory(locId, companyId, toDate))
+        activeLocationIds.map((locationId) => calculateHistoricalLocationInventory(locationId, companyId, toDate))
       );
       for (const items of allHistorical) {
-        for (const inv of items) {
-          const qty = parseFloat(inv.quantity || "0");
-          const rate = parseFloat(inv.averageRate || "0");
-          if (qty > 0) stockOnFloor += qty * rate;
+        for (const item of items) {
+          const quantity = toInventoryDecimal(item.quantity);
+          if (quantity.isPositive()) {
+            stockOnFloor = stockOnFloor.plus(multiplyInventoryValues(quantity, item.averageRate));
+          }
         }
       }
     } else {
@@ -43,11 +41,11 @@ export async function computeStockInHand(companyId: number, toDate: string | nul
         .from(inventory)
         .where(inArray(inventory.locationId, activeLocationIds))
         .execute();
-      for (const inv of inventoryData) {
-        stockOnFloor += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
+      for (const item of inventoryData) {
+        stockOnFloor = stockOnFloor.plus(multiplyInventoryValues(item.quantity, item.averageRate));
       }
     }
   }
 
-  return Math.round((stockOnFloor + Number.EPSILON) * 100) / 100;
+  return Number(inventoryMoney(stockOnFloor));
 }

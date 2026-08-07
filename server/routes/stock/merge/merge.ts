@@ -7,6 +7,13 @@
 import type { Express } from "express";
 import { getErrorMessage } from "../../../lib/httpHandlers";
 import { logger } from "../../../lib/logger";
+import {
+  addInventoryValues,
+  divideInventoryValues,
+  inventoryMoney,
+  inventoryQuantity,
+  inventoryUnitCost,
+} from "../../../lib/inventoryMath";
 import { db } from "../../../db";
 import { requireAuth, requireNonPOS } from "../../../auth";
 import {
@@ -21,7 +28,6 @@ import {
 import { eq, and, inArray } from "drizzle-orm";
 
 export function registerStockItemMergeRoutes(app: Express) {
-  // Preview: GET /api/stock-items/:id/merge-preview?duplicateId=<id>
   app.get("/api/stock-items/:id/merge-preview", requireAuth, requireNonPOS, async (req: any, res: any) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -161,7 +167,6 @@ export function registerStockItemMergeRoutes(app: Express) {
     }
   });
 
-  // Execute: POST /api/stock-items/:id/merge
   app.post("/api/stock-items/:id/merge", requireAuth, requireNonPOS, async (req: any, res: any) => {
     try {
       const companyId = req.session.currentCompanyId;
@@ -195,7 +200,6 @@ export function registerStockItemMergeRoutes(app: Express) {
         });
       }
 
-      // Capture pre-merge inventory
       const keptInvBefore = await db
         .select()
         .from(inventory)
@@ -205,7 +209,7 @@ export function registerStockItemMergeRoutes(app: Express) {
         .from(inventory)
         .where(and(eq(inventory.stockItemId, duplicateId), eq(inventory.companyId, companyId)));
 
-      const totalValueBefore = [...keptInvBefore, ...dupInvBefore].reduce((s, r) => s + parseFloat(r.totalValue), 0);
+      const totalValueBefore = addInventoryValues(...[...keptInvBefore, ...dupInvBefore].map((row) => row.totalValue));
 
       const snapshotBefore: Record<string, unknown> = {};
       for (const r of [...keptInvBefore, ...dupInvBefore]) {
@@ -221,27 +225,24 @@ export function registerStockItemMergeRoutes(app: Express) {
       await db.transaction(async (tx) => {
         const keptMap = new Map(keptInvBefore.map((r) => [r.locationId, r]));
 
-        // Step 1 — combine / reassign inventory per location
         for (const dupRow of dupInvBefore) {
           const locId = dupRow.locationId;
           const keptRow = keptMap.get(locId);
           if (!keptRow) {
-            // Case 1: only dup has stock here — just remap the row
             await tx
               .update(inventory)
               .set({ stockItemId: keptId, lastUpdated: new Date() })
               .where(and(eq(inventory.stockItemId, duplicateId), eq(inventory.locationId, locId)));
           } else {
-            // Case 2: both have stock — weighted-average combine
-            const combinedQty = parseFloat(keptRow.quantity) + parseFloat(dupRow.quantity);
-            const combinedValue = parseFloat(keptRow.totalValue) + parseFloat(dupRow.totalValue);
-            const combinedRate = combinedQty > 0 ? combinedValue / combinedQty : 0;
+            const combinedQty = addInventoryValues(keptRow.quantity, dupRow.quantity);
+            const combinedValue = addInventoryValues(keptRow.totalValue, dupRow.totalValue);
+            const combinedRate = divideInventoryValues(combinedValue, combinedQty);
             await tx
               .update(inventory)
               .set({
-                quantity: combinedQty.toFixed(3),
-                totalValue: combinedValue.toFixed(2),
-                averageRate: combinedRate.toFixed(2),
+                quantity: inventoryQuantity(combinedQty),
+                totalValue: inventoryMoney(combinedValue),
+                averageRate: inventoryUnitCost(combinedRate),
                 lastUpdated: new Date(),
               })
               .where(and(eq(inventory.stockItemId, keptId), eq(inventory.locationId, locId)));
@@ -251,7 +252,6 @@ export function registerStockItemMergeRoutes(app: Express) {
           }
         }
 
-        // Step 2 — transfer aliases (skip conflicts)
         const dupAliases = await tx
           .select()
           .from(stockItemCodeAliases)
@@ -269,7 +269,6 @@ export function registerStockItemMergeRoutes(app: Express) {
             .where(eq(stockItemCodeAliases.id, alias.id));
           keptAliasCodes.add(alias.aliasCode);
         }
-        // Register dup's own code as alias of kept (if no conflict)
         if (!keptAliasCodes.has(duplicateItem.code)) {
           await tx.insert(stockItemCodeAliases).values({
             companyId,
@@ -279,7 +278,6 @@ export function registerStockItemMergeRoutes(app: Express) {
           });
         }
 
-        // Step 3 — location prices: kept wins on conflict, delete dup's conflicting rows
         const dupPrices = await tx
           .select()
           .from(stockItemLocationPrices)
@@ -300,31 +298,27 @@ export function registerStockItemMergeRoutes(app: Express) {
           }
         }
 
-        // Step 4a — re-point all PO line items from the duplicate to the kept item
         await tx
           .update(poLineItems)
           .set({ stockItemId: keptId, itemName: keptItem.name })
           .where(eq(poLineItems.stockItemId, duplicateId));
 
-        // Step 4b — soft-delete the duplicate
         await tx
           .update(stockItems)
           .set({ active: false, deletedAt: new Date(), name: `[MERGED] ${duplicateItem.name}` })
           .where(eq(stockItems.id, duplicateId));
 
-        // Step 5 — integrity check
         const keptInvAfter = await tx
           .select()
           .from(inventory)
           .where(and(eq(inventory.stockItemId, keptId), eq(inventory.companyId, companyId)));
-        const totalValueAfter = keptInvAfter.reduce((s, r) => s + parseFloat(r.totalValue), 0);
-        if (Math.abs(totalValueAfter - totalValueBefore) > 0.02) {
+        const totalValueAfter = addInventoryValues(...keptInvAfter.map((row) => row.totalValue));
+        if (totalValueAfter.minus(totalValueBefore).abs().greaterThan("0.02")) {
           throw new Error(
-            `Value integrity check failed — before: ${totalValueBefore.toFixed(2)}, after: ${totalValueAfter.toFixed(2)}`
+            `Value integrity check failed — before: ${inventoryMoney(totalValueBefore)}, after: ${inventoryMoney(totalValueAfter)}`
           );
         }
 
-        // Step 6 — capture post-merge snapshot (used for audit log outside the tx)
         const snapshotAfter: Record<string, unknown> = {};
         for (const r of keptInvAfter) {
           snapshotAfter[`${r.stockItemId}_${r.locationId}`] = {
@@ -335,11 +329,9 @@ export function registerStockItemMergeRoutes(app: Express) {
             totalValue: r.totalValue,
           };
         }
-        // Store for use after the transaction commits
         (req as any)._mergeSnapshotAfter = snapshotAfter;
       });
 
-      // Step 7 — audit log (outside transaction so it never rolls back the merge)
       try {
         await db.insert(stockItemMergeLogs).values({
           companyId,
@@ -355,7 +347,6 @@ export function registerStockItemMergeRoutes(app: Express) {
           notes: notes ?? null,
         });
       } catch (auditErr: unknown) {
-        // Audit log failure is non-fatal — merge already committed
         logger.error("[Merge] Audit log insert failed (merge succeeded):", { error: getErrorMessage(auditErr) });
       }
 

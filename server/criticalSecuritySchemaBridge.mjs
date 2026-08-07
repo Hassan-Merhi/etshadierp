@@ -1,5 +1,6 @@
 import process from "node:process";
 import pg from "pg";
+import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 
 const { Client } = pg;
 
@@ -29,14 +30,9 @@ async function ensureCriticalSecuritySchema() {
     return;
   }
 
-  const isLocalReplitDb =
-    process.env.PGHOST === "helium" || connectionString.includes("@helium:");
-  const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
-  const requiresSsl = !isLocalReplitDb && !sslExplicitlyDisabled;
-
   const client = new Client({
     connectionString,
-    ssl: requiresSsl ? { rejectUnauthorized: false } : false,
+    ssl: resolveDatabaseSsl(connectionString),
     connectionTimeoutMillis: 8_000,
   });
 
@@ -50,9 +46,7 @@ async function ensureCriticalSecuritySchema() {
     await client.query("SET LOCAL lock_timeout = '15s'");
     await client.query("SET LOCAL statement_timeout = '60s'");
 
-    const tableLookup = await client.query(
-      `SELECT to_regclass('public.user_security_permissions') AS table_name`
-    );
+    const tableLookup = await client.query(`SELECT to_regclass('public.user_security_permissions') AS table_name`);
 
     if (!tableLookup.rows[0]?.table_name) {
       await client.query(`
@@ -87,9 +81,7 @@ async function ensureCriticalSecuritySchema() {
 
       for (const [columnName, definition] of requiredColumns) {
         if (existingColumns.has(columnName)) continue;
-        await client.query(
-          `ALTER TABLE user_security_permissions ADD COLUMN ${columnName} ${definition}`
-        );
+        await client.query(`ALTER TABLE user_security_permissions ADD COLUMN ${columnName} ${definition}`);
         columnsAdded.push(columnName);
       }
     }

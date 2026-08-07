@@ -1,4 +1,5 @@
 import { Client } from "pg";
+import { resolveDatabaseSsl } from "./lib/databaseSsl.mjs";
 
 const REPAIR_LOCK_KEY = "erp-startup-warning-repair-v1";
 
@@ -40,7 +41,7 @@ function structuredLog(level, message, detail = {}) {
       module: "startup-warning-repair",
       action: "startup-repair",
       ...detail,
-    }),
+    })
   );
 }
 
@@ -53,12 +54,9 @@ function connectionOptions() {
 
   if (!connectionString) return null;
 
-  const isLocalReplitDb = process.env.PGHOST === "helium" || connectionString.includes("@helium:");
-  const sslDisabled = process.env.PGSSLMODE === "disable";
-
   return {
     connectionString,
-    ssl: !isLocalReplitDb && !sslDisabled ? { rejectUnauthorized: false } : false,
+    ssl: resolveDatabaseSsl(connectionString),
   };
 }
 
@@ -68,7 +66,7 @@ async function existingTables(client) {
        FROM information_schema.tables
       WHERE table_schema = 'public'
         AND table_name = ANY($1::text[])`,
-    [["exchange_rates", "vouchers", "voucher_entries", "sp_containers", "ledger_accounts"]],
+    [["exchange_rates", "vouchers", "voucher_entries", "sp_containers", "ledger_accounts"]]
   );
   return new Set(result.rows.map((row) => row.table_name));
 }
@@ -87,7 +85,7 @@ async function ensureSupplierSyncColumns(client, tables) {
             AND table_name = $1
             AND column_name = $2
        ) AS exists`,
-      [spec.table, spec.column],
+      [spec.table, spec.column]
     );
 
     if (columnCheck.rows[0]?.exists) continue;
@@ -105,7 +103,7 @@ async function repairExchangeRateDuplicates(client, tables) {
   }
 
   const indexCheck = await client.query(
-    `SELECT to_regclass('public.exchange_rates_company_date_pair_unique') IS NOT NULL AS exists`,
+    `SELECT to_regclass('public.exchange_rates_company_date_pair_unique') IS NOT NULL AS exists`
   );
   if (indexCheck.rows[0]?.exists) {
     return { duplicateRowsRemoved: 0, indexEnsured: true, indexAlreadyPresent: true };
