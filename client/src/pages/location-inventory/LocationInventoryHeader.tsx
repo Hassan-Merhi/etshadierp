@@ -12,8 +12,9 @@ import {
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation } from "@/contexts/LocationContext";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LocationWhatsappScheduleDialog } from "./LocationWhatsappScheduleDialog";
+import { LocationWhatsappDeliveryHistoryDialog } from "./LocationWhatsappDeliveryHistoryDialog";
 
 interface LocationInventoryHeaderProps {
   posUser?: any;
@@ -22,6 +23,11 @@ interface LocationInventoryHeaderProps {
 }
 
 type SendMode = "with_cost" | "no_cost" | null;
+
+function newIdempotencyToken(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 export function LocationInventoryHeader({
   posUser,
@@ -34,8 +40,6 @@ export function LocationInventoryHeader({
   const [sendMode, setSendMode] = useState<SendMode>(null);
   const companyId = selectedCompany?.id;
 
-  // Reuses the exact query key used by the Location Inventory data hook, so this
-  // normally reads the existing React Query cache rather than adding a request.
   const { data: whatsappCapability } = useQuery<{ canManage: boolean }>({
     queryKey: companyId ? ["/api/location-inventory/whatsapp/capability", companyId] : [],
     queryFn: async () => {
@@ -48,12 +52,8 @@ export function LocationInventoryHeader({
     retry: false,
     refetchOnWindowFocus: false,
   });
-
   const canManageWhatsapp = !posUser && whatsappCapability?.canManage === true;
 
-  // WITH COST is separately protected by the sensitive cost/value permissions.
-  // A denied or unavailable probe is treated as false; the POST endpoint enforces
-  // the same permissions again and remains authoritative.
   const { data: costCapability } = useQuery<{ canSendWithCost: boolean }>({
     queryKey: companyId ? ["/api/location-inventory/whatsapp/cost-capability", companyId] : [],
     queryFn: async () => {
@@ -89,12 +89,12 @@ export function LocationInventoryHeader({
       const response = await apiRequest(
         "POST",
         `/api/locations/${selectedLocation.id}/send-stock-whatsapp`,
-        { includeCost }
+        { includeCost, idempotencyKey: newIdempotencyToken() }
       );
       const result = await response.json();
       toast({
-        title: "Stock sent to WhatsApp",
-        description: `${result.itemCount ?? 0} items sent${result.pageCount ? ` in ${result.pageCount} PDF page${result.pageCount === 1 ? "" : "s"}` : ""}${includeCost ? " with cost" : " without cost"}.`,
+        title: result.duplicate ? "Stock report already sent" : "Stock sent to WhatsApp",
+        description: `${result.itemCount ?? 0} items${result.duplicate ? " were already processed" : " sent"}${result.pageCount ? ` in ${result.pageCount} PDF page${result.pageCount === 1 ? "" : "s"}` : ""}${includeCost ? " with cost" : " without cost"}.`,
       });
     } catch (error: any) {
       toast({
@@ -104,6 +104,7 @@ export function LocationInventoryHeader({
       });
     } finally {
       setSendMode(null);
+      await queryClient.invalidateQueries({ queryKey: ["/api/locations", selectedLocation.id, "whatsapp-deliveries"] });
     }
   };
 
@@ -116,16 +117,16 @@ export function LocationInventoryHeader({
         : `Send stock to ${selectedLocation.whatsappGroupName || "the linked WhatsApp group"}`;
 
   return (
-    <div className="flex items-center justify-between gap-4 px-6 py-4 border-b shrink-0">
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 px-4 sm:px-6 py-4 border-b shrink-0">
       <div className="min-w-0">
-        <h1 className="text-2xl font-bold">Location Inventory</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-xl sm:text-2xl font-bold">Location Inventory</h1>
+        <p className="text-sm text-muted-foreground truncate">
           {selectedLocation ? `Manage inventory for ${selectedLocation.name}` : "Manage inventory across all locations"}
         </p>
       </div>
 
       {!posUser && (
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           {canManageWhatsapp && selectedLocation && (
             <>
               <DropdownMenu>
@@ -175,6 +176,12 @@ export function LocationInventoryHeader({
               </DropdownMenu>
 
               <LocationWhatsappScheduleDialog
+                location={selectedLocation}
+                companyId={companyId}
+                canSendWithCost={canSendWithCost}
+              />
+
+              <LocationWhatsappDeliveryHistoryDialog
                 location={selectedLocation}
                 companyId={companyId}
                 canSendWithCost={canSendWithCost}
