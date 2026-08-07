@@ -20,11 +20,24 @@ export function ApproveRevisionDialog({
   approveRevisionMutation,
   approveRevisionTarget,
   setApproveRevisionTarget,
+  pendingRevisions = [],
 }: {
   approveRevisionMutation: any;
   approveRevisionTarget: any;
   setApproveRevisionTarget: any;
+  /**
+   * Every revision still awaiting review. Approving one applies all of them,
+   * so the dialog previews the whole set rather than just the clicked row.
+   */
+  pendingRevisions?: any[];
 }) {
+  const revisionsToApply = approveRevisionTarget
+    ? pendingRevisions.some((rev) => rev.id === approveRevisionTarget.id)
+      ? pendingRevisions
+      : [approveRevisionTarget]
+    : [];
+  const multiple = revisionsToApply.length > 1;
+
   return (
     <Dialog
       open={!!approveRevisionTarget}
@@ -34,49 +47,59 @@ export function ApproveRevisionDialog({
     >
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Approve Revision</DialogTitle>
+          <DialogTitle>{multiple ? `Approve ${revisionsToApply.length} Revisions` : "Approve Revision"}</DialogTitle>
           <DialogDescription>
-            The following quantity changes will be applied to the transfer. This action cannot be undone.
+            {multiple
+              ? "All pending adjustments on this transfer are applied together. This action cannot be undone."
+              : "The following quantity changes will be applied to the transfer. This action cannot be undone."}
           </DialogDescription>
         </DialogHeader>
-        {approveRevisionTarget && (
-          <div className="table-responsive rounded-md border">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40">
-                <tr>
-                  <th className="text-left p-2 font-medium">Item</th>
-                  <th className="text-right p-2 font-medium">Was</th>
-                  <th className="text-right p-2 font-medium">Change</th>
-                  <th className="text-right p-2 font-medium">Now</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(approveRevisionTarget.items ?? [])
-                  .filter((item: any) => parseFloat(item.delta) !== 0)
-                  .map((item: any, idx: number) => {
-                    const delta = parseFloat(item.delta);
-                    return (
-                      <tr key={idx} className="border-t">
-                        <td className="p-2 font-medium">{item.stockItemName}</td>
-                        <td className="p-2 text-right font-mono text-muted-foreground">
-                          {formatNumber(parseFloat(item.originalQuantity), 0)}
-                        </td>
-                        <td
-                          className={`p-2 text-right font-mono font-semibold ${delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}
-                        >
-                          {delta > 0 ? "+" : ""}
-                          {formatNumber(delta, 0)}
-                        </td>
-                        <td className="p-2 text-right font-mono font-semibold">
-                          {formatNumber(parseFloat(item.newQuantity), 0)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
+        {revisionsToApply.map((revision: any) => (
+          <div key={revision.id} className="space-y-1">
+            {multiple && (
+              <p className="text-xs font-medium text-muted-foreground">
+                Rev {revision.revisionNumber}
+                {revision.sourceLocationName ? ` · ${revision.sourceLocationName}` : ""}
+              </p>
+            )}
+            <div className="table-responsive rounded-md border">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40">
+                  <tr>
+                    <th className="text-left p-2 font-medium">Item</th>
+                    <th className="text-right p-2 font-medium">Was</th>
+                    <th className="text-right p-2 font-medium">Change</th>
+                    <th className="text-right p-2 font-medium">Now</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(revision.items ?? [])
+                    .filter((item: any) => parseFloat(item.delta) !== 0)
+                    .map((item: any, idx: number) => {
+                      const delta = parseFloat(item.delta);
+                      return (
+                        <tr key={idx} className="border-t">
+                          <td className="p-2 font-medium">{item.stockItemName}</td>
+                          <td className="p-2 text-right font-mono text-muted-foreground">
+                            {formatNumber(parseFloat(item.originalQuantity), 0)}
+                          </td>
+                          <td
+                            className={`p-2 text-right font-mono font-semibold ${delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}
+                          >
+                            {delta > 0 ? "+" : ""}
+                            {formatNumber(delta, 0)}
+                          </td>
+                          <td className="p-2 text-right font-mono font-semibold">
+                            {formatNumber(parseFloat(item.newQuantity), 0)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        )}
+        ))}
         <DialogFooter className="gap-2">
           <Button
             variant="outline"

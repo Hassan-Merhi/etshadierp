@@ -10,7 +10,10 @@ import {
   listImmutableStockTransferRevisions,
   rejectImmutableStockTransferRevision,
   resolveTransferIdByVoucher,
+  type ImmutableRevisionResult,
 } from "../../services/immutableStockTransferRevisionLifecycle";
+import { sendRevisedTransferWhatsApp } from "../../helpers/sendRevisedTransferWhatsApp";
+import { getErrorMessage } from "../../lib/httpHandlers";
 
 const revisionSchema = z.object({
   note: z.string().optional().nullable(),
@@ -66,6 +69,47 @@ function sendError(res: Response, error: unknown, context: string) {
     if ((error as any)?.[field] !== undefined) payload[field] = (error as any)[field];
   }
   return res.status(status).json(payload);
+}
+
+/**
+ * Post the revised-transfer image to the WhatsApp group configured for the
+ * transfer's destination, mirroring what creating the transfer itself sends.
+ * Fire-and-forget: a WhatsApp outage must never fail the revision that was
+ * already committed.
+ */
+function queueRevisedTransferWhatsApp(result: ImmutableRevisionResult) {
+  // Only revisions submitted for review (POS adjustments) are broadcast, the
+  // same set the legacy handler sent before the immutable routes took over.
+  if (!result.optional) return;
+
+  const items = result.items
+    .map((item) => ({
+      stockItemId: Number(item.stockItemId),
+      stockItemName: item.stockItemName ?? null,
+      originalQuantity: Number(item.originalQuantity) || 0,
+      delta: Number(item.delta) || 0,
+      newQuantity: Number(item.newQuantity) || 0,
+    }))
+    .filter((item) => item.stockItemId > 0);
+  if (items.length === 0) return;
+
+  const sourceLocationId = Number(result.items.find((item) => item.sourceLocationId)?.sourceLocationId ?? 0);
+
+  setImmediate(async () => {
+    try {
+      await sendRevisedTransferWhatsApp({
+        sourceLocationId,
+        sourceLocationName: result.sourceLocationName,
+        destinationLocationId: result.destinationLocationId,
+        destLocationName: result.destinationLocationName,
+        items,
+        voucherNumber: result.voucherNumber,
+        voucherDate: result.voucherDate,
+      });
+    } catch (error) {
+      logger.error("[RevisedTransferWA] Failed to send revision image", { error: getErrorMessage(error) });
+    }
+  });
 }
 
 async function auditRevision(
@@ -145,6 +189,8 @@ export function registerImmutableStockTransferRevisionRoutes(app: Express) {
           },
         }
       );
+
+      queueRevisedTransferWhatsApp(result);
 
       return res.status(201).json({
         id: result.revisionId,
