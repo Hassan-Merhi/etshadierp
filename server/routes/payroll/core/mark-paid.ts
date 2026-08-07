@@ -31,12 +31,16 @@ async function ensureNoPendingProductionBonuses(companyId: number, payrollIds: n
     .select({ id: factoryPayrolls.id, status: factoryPayrolls.status })
     .from(factoryPayrolls)
     .where(and(eq(factoryPayrolls.companyId, companyId), inArray(factoryPayrolls.id, payrollIds)));
-  if (scoped.length !== new Set(payrollIds).size) return { ok: false as const, status: 404, message: "One or more payroll records were not found" };
+  if (scoped.length !== new Set(payrollIds).size)
+    return { ok: false as const, status: 404, message: "One or more payroll records were not found" };
 
   for (const payroll of scoped) {
     if (payroll.status === "DRAFT") await prepareProductionBonusesForPayroll(db, payroll.id);
   }
-  const totals = await getProductionBonusTotalsForPayrollIds(db, scoped.map((payroll) => payroll.id));
+  const totals = await getProductionBonusTotalsForPayrollIds(
+    db,
+    scoped.map((payroll) => payroll.id)
+  );
   const pending = scoped
     .map((payroll) => ({ payrollId: payroll.id, totals: totals.get(payroll.id) }))
     .filter((row) => (row.totals?.pendingCount ?? 0) > 0);
@@ -156,7 +160,8 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
 
       res.json(updated);
     } catch (error: unknown) {
-      if (getErrorMessage(error) === "Payroll record not found") return res.status(404).json({ message: getErrorMessage(error) });
+      if (getErrorMessage(error) === "Payroll record not found")
+        return res.status(404).json({ message: getErrorMessage(error) });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
@@ -175,8 +180,10 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
         .from(factoryPayrolls)
         .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)));
       if (!payroll) return res.status(404).json({ message: "Payroll not found" });
-      if (!["PAID", "APPROVED"].includes(payroll.status)) return res.status(400).json({ message: "Payroll must be in PAID or APPROVED status" });
-      if (payroll.cashAccountId) return res.status(400).json({ message: "Accounting entry already exists for this payroll" });
+      if (!["PAID", "APPROVED"].includes(payroll.status))
+        return res.status(400).json({ message: "Payroll must be in PAID or APPROVED status" });
+      if (payroll.cashAccountId)
+        return res.status(400).json({ message: "Accounting entry already exists for this payroll" });
 
       const [cashAcc] = await db
         .select()
@@ -213,7 +220,10 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
           { voucherId: pVoucher.id, ledgerAccountId: cashAccountId, ...normUsd("0", netAmt.toFixed(2)), narration },
         ]);
       }
-      await db.update(factoryPayrolls).set({ cashAccountId } as any).where(eq(factoryPayrolls.id, id));
+      await db
+        .update(factoryPayrolls)
+        .set({ cashAccountId } as any)
+        .where(eq(factoryPayrolls.id, id));
       res.json({ message: "Accounting entry generated", voucherId: pVoucher.id });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
@@ -226,7 +236,9 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { payrollIds, cashAccountId } = req.body;
       if (!payrollIds?.length) return res.status(400).json({ message: "payrollIds required" });
-      const normalizedIds = [...new Set((payrollIds as any[]).map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+      const normalizedIds = [
+        ...new Set((payrollIds as any[]).map(Number).filter((id) => Number.isInteger(id) && id > 0)),
+      ];
       if (normalizedIds.length === 0) return res.status(400).json({ message: "Valid payrollIds required" });
       const cashId = cashAccountId ? parseInt(cashAccountId) : null;
       const bulkPrToday = req.body.paymentDate || getClientDate(req);
@@ -273,7 +285,12 @@ export function registerPayrollMarkPaidRoutes(app: Express) {
               .returning();
             if (netAmt > 0) {
               await tx.insert(voucherEntries).values([
-                { voucherId: pVoucher.id, ledgerAccountId: payableAccBulk.id, ...normUsd(netAmt.toFixed(2), "0"), narration },
+                {
+                  voucherId: pVoucher.id,
+                  ledgerAccountId: payableAccBulk.id,
+                  ...normUsd(netAmt.toFixed(2), "0"),
+                  narration,
+                },
                 { voucherId: pVoucher.id, ledgerAccountId: cashId, ...normUsd("0", netAmt.toFixed(2)), narration },
               ]);
             }

@@ -56,7 +56,8 @@ export function StockEntryProductionPositions({
         <div>
           <div className="text-sm font-bold">Production Position</div>
           <div className="text-xs text-muted-foreground">
-            Single-position workers are assigned automatically. Choose the position only when a worker belongs to more than one.
+            Single-position workers are assigned automatically. Choose the position only when a worker belongs to more
+            than one.
           </div>
         </div>
       </div>
@@ -73,7 +74,9 @@ export function StockEntryProductionPositions({
               className="grid gap-2 rounded-lg border bg-background/60 p-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(12rem,1fr)] sm:items-center"
             >
               <div className="min-w-0">
-                <div className="truncate text-xs font-semibold">{item.product?.name || `Product #${item.productId}`}</div>
+                <div className="truncate text-xs font-semibold">
+                  {item.product?.name || `Product #${item.productId}`}
+                </div>
                 <div className="text-[10px] text-muted-foreground">{workerName(item.finalizedBy)}</div>
               </div>
 
@@ -84,7 +87,9 @@ export function StockEntryProductionPositions({
                   </Badge>
                 ) : eligible.length === 1 ? (
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge variant="secondary" className="text-[10px]">{eligible[0].name}</Badge>
+                    <Badge variant="secondary" className="text-[10px]">
+                      {eligible[0].name}
+                    </Badge>
                     <span className="text-[10px]">Auto</span>
                   </div>
                 ) : (

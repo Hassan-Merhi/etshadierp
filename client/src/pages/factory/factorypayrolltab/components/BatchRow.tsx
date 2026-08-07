@@ -154,8 +154,12 @@ export function BatchRow({
                     </TableCell>
                     <TableCell>
                       <div>
-                        <p className="text-sm font-medium">{payroll.worker?.fullName || `Worker #${payroll.workerId}`}</p>
-                        {payroll.worker?.position && <p className="text-xs text-muted-foreground">{payroll.worker.position}</p>}
+                        <p className="text-sm font-medium">
+                          {payroll.worker?.fullName || `Worker #${payroll.workerId}`}
+                        </p>
+                        {payroll.worker?.position && (
+                          <p className="text-xs text-muted-foreground">{payroll.worker.position}</p>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="text-center font-mono text-sm" data-testid={`text-present-${payroll.id}`}>
@@ -200,7 +204,9 @@ export function BatchRow({
                         <span className="text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-sm font-semibold">${fmt(payroll.netSalary)}</TableCell>
+                    <TableCell className="text-right font-mono text-sm font-semibold">
+                      ${fmt(payroll.netSalary)}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="secondary" className={`no-default-active-elevate text-xs ${cfg.className}`}>
                         {cfg.label}
@@ -219,7 +225,9 @@ export function BatchRow({
                             data-testid={`button-review-production-bonus-${payroll.id}`}
                             title="Review production bonus"
                           >
-                            <Target className={`h-4 w-4 ${pendingBonus > 0 ? "text-amber-500" : "text-muted-foreground"}`} />
+                            <Target
+                              className={`h-4 w-4 ${pendingBonus > 0 ? "text-amber-500" : "text-muted-foreground"}`}
+                            />
                           </Button>
                         )}
                         {canPay && (
@@ -236,21 +244,23 @@ export function BatchRow({
                             Pay
                           </Button>
                         )}
-                        {isDeveloper && (payroll.status === "PAID" || payroll.status === "APPROVED") && !payroll.cashAccountId && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => {
-                              setFixAcctTargetId(payroll.id);
-                              setFixAcctCashId("");
-                              setFixAcctOpen(true);
-                            }}
-                            data-testid={`button-fix-acct-${payroll.id}`}
-                            title="Generate missing accounting entry"
-                          >
-                            <Wrench className="h-4 w-4 text-amber-500" />
-                          </Button>
-                        )}
+                        {isDeveloper &&
+                          (payroll.status === "PAID" || payroll.status === "APPROVED") &&
+                          !payroll.cashAccountId && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                setFixAcctTargetId(payroll.id);
+                                setFixAcctCashId("");
+                                setFixAcctOpen(true);
+                              }}
+                              data-testid={`button-fix-acct-${payroll.id}`}
+                              title="Generate missing accounting entry"
+                            >
+                              <Wrench className="h-4 w-4 text-amber-500" />
+                            </Button>
+                          )}
                         <Button
                           size="icon"
                           variant="ghost"
@@ -271,7 +281,10 @@ export function BatchRow({
       )}
 
       <Dialog open={bonusPayrollId !== null} onOpenChange={(open) => !open && setBonusPayrollId(null)}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl" data-testid="dialog-production-bonus-review">
+        <DialogContent
+          className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"
+          data-testid="dialog-production-bonus-review"
+        >
           <DialogHeader>
             <DialogTitle>Production Bonus Review</DialogTitle>
           </DialogHeader>

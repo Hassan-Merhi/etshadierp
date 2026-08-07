@@ -80,7 +80,10 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
           doc.moveDown(0.5);
         } catch {}
       }
-      doc.fontSize(12).font("Helvetica").text(company?.name || "HMD INTERNATIONAL GROUP", { align: "center" });
+      doc
+        .fontSize(12)
+        .font("Helvetica")
+        .text(company?.name || "HMD INTERNATIONAL GROUP", { align: "center" });
       doc.fontSize(11).text("Factory Payroll Report", { align: "center" });
       doc.fontSize(9).text(`Period: ${startDate} to ${endDate}`, { align: "center" });
       doc.moveDown(1);
@@ -110,7 +113,10 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
         x += colWidths[index];
       });
       y += 15;
-      doc.moveTo(startX, y).lineTo(startX + colWidths.reduce((sum, width) => sum + width, 0), y).stroke();
+      doc
+        .moveTo(startX, y)
+        .lineTo(startX + colWidths.reduce((sum, width) => sum + width, 0), y)
+        .stroke();
       y += 5;
       doc.font("Helvetica").fontSize(7);
 
@@ -167,7 +173,10 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
       }
 
       y += 5;
-      doc.moveTo(startX, y).lineTo(startX + colWidths.reduce((sum, width) => sum + width, 0), y).stroke();
+      doc
+        .moveTo(startX, y)
+        .lineTo(startX + colWidths.reduce((sum, width) => sum + width, 0), y)
+        .stroke();
       y += 5;
       doc.font("Helvetica-Bold").fontSize(7);
       const totalValues = [
@@ -237,7 +246,8 @@ export function registerFactoryPayrollExportRoutes(app: Express, requireAuth: an
       function addSheetHeader(sheet: ExcelJS.Worksheet, title: string, numCols: number, logoCenterCol = 0) {
         const logoRow = sheet.addRow([]);
         logoRow.height = 90;
-        if (logoId !== null) sheet.addImage(logoId, { tl: { col: logoCenterCol, row: 0 }, ext: { width: 300, height: 90 } });
+        if (logoId !== null)
+          sheet.addImage(logoId, { tl: { col: logoCenterCol, row: 0 }, ext: { width: 300, height: 90 } });
         const nameRow = sheet.addRow([company?.name || "HMD INTERNATIONAL GROUP"]);
         nameRow.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } };
         nameRow.getCell(1).alignment = { horizontal: "center" };

@@ -35,8 +35,11 @@ async function validateWorkers(companyId: number, ids: number[]) {
   const workers = await db
     .select({ id: factoryWorkers.id })
     .from(factoryWorkers)
-    .where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true), inArray(factoryWorkers.id, unique)));
-  if (workers.length !== unique.length) throw new Error("One or more selected workers are inactive or belong to another company");
+    .where(
+      and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true), inArray(factoryWorkers.id, unique))
+    );
+  if (workers.length !== unique.length)
+    throw new Error("One or more selected workers are inactive or belong to another company");
   return unique;
 }
 
@@ -99,7 +102,14 @@ async function getPositionState(companyId: number, positionId: number, asOf: str
   };
 }
 
-async function writeRuleVersion(tx: any, companyId: number, positionId: number, effectiveFrom: string, values: any, createdBy: string) {
+async function writeRuleVersion(
+  tx: any,
+  companyId: number,
+  positionId: number,
+  effectiveFrom: string,
+  values: any,
+  createdBy: string
+) {
   const [current] = await tx
     .select()
     .from(factoryProductionPositionRules)
@@ -139,7 +149,14 @@ async function writeRuleVersion(tx: any, companyId: number, positionId: number, 
   });
 }
 
-async function replaceMemberships(tx: any, companyId: number, positionId: number, effectiveFrom: string, workerIds: number[], createdBy: string) {
+async function replaceMemberships(
+  tx: any,
+  companyId: number,
+  positionId: number,
+  effectiveFrom: string,
+  workerIds: number[],
+  createdBy: string
+) {
   const activeRows = await tx
     .select()
     .from(factoryProductionPositionMemberships)
@@ -159,14 +176,14 @@ async function replaceMemberships(tx: any, companyId: number, positionId: number
       .set({ effectiveTo: effectiveFrom, updatedAt: new Date() })
       .where(eq(factoryProductionPositionMemberships.id, row.id));
   }
-  const currentIds = new Set(
-    activeRows.filter((r: any) => desired.has(r.workerId)).map((r: any) => r.workerId)
-  );
+  const currentIds = new Set(activeRows.filter((r: any) => desired.has(r.workerId)).map((r: any) => r.workerId));
   const toAdd = workerIds.filter((id) => !currentIds.has(id));
   if (toAdd.length) {
-    await tx.insert(factoryProductionPositionMemberships).values(
-      toAdd.map((workerId) => ({ companyId, positionId, workerId, effectiveFrom, effectiveTo: null, createdBy }))
-    );
+    await tx
+      .insert(factoryProductionPositionMemberships)
+      .values(
+        toAdd.map((workerId) => ({ companyId, positionId, workerId, effectiveFrom, effectiveTo: null, createdBy }))
+      );
   }
 }
 
@@ -202,7 +219,12 @@ export function registerProductionPositionRoutes(app: Express) {
       const rules = await db
         .select()
         .from(factoryProductionPositionRules)
-        .where(and(eq(factoryProductionPositionRules.companyId, companyId), eq(factoryProductionPositionRules.positionId, positionId)))
+        .where(
+          and(
+            eq(factoryProductionPositionRules.companyId, companyId),
+            eq(factoryProductionPositionRules.positionId, positionId)
+          )
+        )
         .orderBy(desc(factoryProductionPositionRules.effectiveFrom));
       const memberships = await db
         .select({
@@ -215,7 +237,12 @@ export function registerProductionPositionRoutes(app: Express) {
         })
         .from(factoryProductionPositionMemberships)
         .innerJoin(factoryWorkers, eq(factoryWorkers.id, factoryProductionPositionMemberships.workerId))
-        .where(and(eq(factoryProductionPositionMemberships.companyId, companyId), eq(factoryProductionPositionMemberships.positionId, positionId)))
+        .where(
+          and(
+            eq(factoryProductionPositionMemberships.companyId, companyId),
+            eq(factoryProductionPositionMemberships.positionId, positionId)
+          )
+        )
         .orderBy(desc(factoryProductionPositionMemberships.effectiveFrom), asc(factoryWorkers.fullName));
       res.json({ position, rules, memberships });
     } catch (e: unknown) {
@@ -237,11 +264,18 @@ export function registerProductionPositionRoutes(app: Express) {
           .insert(factoryProductionPositions)
           .values({ companyId, name: body.name, active: body.active, createdBy })
           .returning({ id: factoryProductionPositions.id });
-        await writeRuleVersion(tx, companyId, position.id, effectiveFrom, {
-          targetBales: body.targetBales,
-          bonusPerExtraBale: String(body.bonusPerExtraBale),
-          bonusEnabled: body.bonusEnabled,
-        }, createdBy);
+        await writeRuleVersion(
+          tx,
+          companyId,
+          position.id,
+          effectiveFrom,
+          {
+            targetBales: body.targetBales,
+            bonusPerExtraBale: String(body.bonusPerExtraBale),
+            bonusEnabled: body.bonusEnabled,
+          },
+          createdBy
+        );
         if (body.active) await replaceMemberships(tx, companyId, position.id, effectiveFrom, workerIds, createdBy);
         return position.id;
       });
@@ -261,7 +295,8 @@ export function registerProductionPositionRoutes(app: Express) {
       const effectiveFrom = body.effectiveFrom || todayIso();
       const current = await getPositionState(companyId, positionId, effectiveFrom);
       if (!current) return res.status(404).json({ message: "Production position not found" });
-      const workerIds = body.workerIds === undefined ? current.workerIds : await validateWorkers(companyId, body.workerIds);
+      const workerIds =
+        body.workerIds === undefined ? current.workerIds : await validateWorkers(companyId, body.workerIds);
       const targetBales = body.targetBales ?? current.targetBales;
       const bonusPerExtraBale = body.bonusPerExtraBale ?? Number(current.bonusPerExtraBale || 0);
       const bonusEnabled = body.bonusEnabled ?? current.bonusEnabled;
@@ -271,17 +306,26 @@ export function registerProductionPositionRoutes(app: Express) {
         await tx
           .update(factoryProductionPositions)
           .set({ name: body.name ?? current.name, active, updatedAt: new Date() })
-          .where(and(eq(factoryProductionPositions.id, positionId), eq(factoryProductionPositions.companyId, companyId)));
+          .where(
+            and(eq(factoryProductionPositions.id, positionId), eq(factoryProductionPositions.companyId, companyId))
+          );
         const ruleChanged =
           targetBales !== current.targetBales ||
           Number(bonusPerExtraBale) !== Number(current.bonusPerExtraBale || 0) ||
           bonusEnabled !== current.bonusEnabled;
         if (ruleChanged || !current.ruleEffectiveFrom) {
-          await writeRuleVersion(tx, companyId, positionId, effectiveFrom, {
-            targetBales,
-            bonusPerExtraBale: String(bonusPerExtraBale),
-            bonusEnabled,
-          }, createdBy);
+          await writeRuleVersion(
+            tx,
+            companyId,
+            positionId,
+            effectiveFrom,
+            {
+              targetBales,
+              bonusPerExtraBale: String(bonusPerExtraBale),
+              bonusEnabled,
+            },
+            createdBy
+          );
         }
         await replaceMemberships(tx, companyId, positionId, effectiveFrom, active ? workerIds : [], createdBy);
       });
@@ -304,7 +348,9 @@ export function registerProductionPositionRoutes(app: Express) {
         await tx
           .update(factoryProductionPositions)
           .set({ active: false, updatedAt: new Date() })
-          .where(and(eq(factoryProductionPositions.id, positionId), eq(factoryProductionPositions.companyId, companyId)));
+          .where(
+            and(eq(factoryProductionPositions.id, positionId), eq(factoryProductionPositions.companyId, companyId))
+          );
         await replaceMemberships(tx, companyId, positionId, effectiveFrom, [], actor(req));
       });
       res.json({ ok: true, archived: true });

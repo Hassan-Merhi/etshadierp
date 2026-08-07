@@ -1,10 +1,7 @@
 import { sql } from "drizzle-orm";
 import { sqlArray } from "../../lib/sqlArray";
 import { rebuildPayrollGenVoucher } from "../../routes/payroll/_payrollAccountingHelper";
-import {
-  calculateProductionBonusPreview,
-  type ProductionBonusMemberSnapshot,
-} from "../factory/productionBonusPreview";
+import { calculateProductionBonusPreview, type ProductionBonusMemberSnapshot } from "../factory/productionBonusPreview";
 
 const ELIGIBLE_BALE_STATUSES = ["IN_STOCK", "SOLD", "RESERVED_FOR_ORDER", "DISPATCHED", "FINALIZED"] as const;
 
@@ -81,7 +78,12 @@ const EMPTY_TOTALS: PayrollProductionBonusTotals = {
   rejectedCount: 0,
 };
 
-async function loadSavedPlanEntries(executor: any, companyId: number, startDate: string, endDate: string): Promise<SavedPlanEntry[]> {
+async function loadSavedPlanEntries(
+  executor: any,
+  companyId: number,
+  startDate: string,
+  endDate: string
+): Promise<SavedPlanEntry[]> {
   const result = await executor.execute(sql`
     SELECT p.id AS "planId", e.id AS "planEntryId", p.plan_date::text AS "productionDate",
            e.position_id AS "positionId", e.position_name_snapshot AS "positionName",
@@ -106,7 +108,12 @@ async function loadSavedPlanEntries(executor: any, companyId: number, startDate:
   }));
 }
 
-async function loadActualMap(executor: any, companyId: number, startDate: string, endDate: string): Promise<Map<string, number>> {
+async function loadActualMap(
+  executor: any,
+  companyId: number,
+  startDate: string,
+  endDate: string
+): Promise<Map<string, number>> {
   const result = await executor.execute(sql`
     SELECT a.stock_entry_date::text AS "productionDate", a.production_position_id AS "positionId",
            COUNT(*)::integer AS "actualBales"
@@ -120,7 +127,8 @@ async function loadActualMap(executor: any, companyId: number, startDate: string
     GROUP BY a.stock_entry_date, a.production_position_id
   `);
   const map = new Map<string, number>();
-  for (const row of rows(result)) map.set(`${String(row.productionDate)}:${Number(row.positionId)}`, Number(row.actualBales ?? 0));
+  for (const row of rows(result))
+    map.set(`${String(row.productionDate)}:${Number(row.positionId)}`, Number(row.actualBales ?? 0));
   return map;
 }
 
@@ -345,7 +353,9 @@ export async function getProductionBonusDetailsForPayroll(
     decidedAt: row.decidedAt == null ? null : String(row.decidedAt),
     decisionNote: row.decisionNote == null ? null : String(row.decisionNote),
   }));
-  const totals = (await getProductionBonusTotalsForPayrollIds(executor, [payrollId])).get(payrollId) ?? { ...EMPTY_TOTALS };
+  const totals = (await getProductionBonusTotalsForPayrollIds(executor, [payrollId])).get(payrollId) ?? {
+    ...EMPTY_TOTALS,
+  };
   return { totals, allocations };
 }
 

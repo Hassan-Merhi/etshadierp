@@ -104,10 +104,15 @@ export function registerFactoryPayrollUpdateRoutes(app: Express, requireAuth: an
       const oldOvertimePay = parseFloat(current.overtimePay || "0");
       const updatedDeductions = deductions !== undefined ? parseFloat(deductions) : oldDeductions;
       const updatedAdvances = advances !== undefined ? parseFloat(advances) : oldAdvances;
-      const updatedOvertimeHours = overtimeHours !== undefined ? parseFloat(overtimeHours) : parseFloat(current.overtimeHours || "0");
+      const updatedOvertimeHours =
+        overtimeHours !== undefined ? parseFloat(overtimeHours) : parseFloat(current.overtimeHours || "0");
       const updatedOvertimePay = overtimePay !== undefined ? parseFloat(overtimePay) : oldOvertimePay;
 
-      if (![updatedBonuses, updatedDeductions, updatedAdvances, updatedOvertimeHours, updatedOvertimePay].every(Number.isFinite)) {
+      if (
+        ![updatedBonuses, updatedDeductions, updatedAdvances, updatedOvertimeHours, updatedOvertimePay].every(
+          Number.isFinite
+        )
+      ) {
         return res.status(400).json({ message: "Payroll numeric values are invalid" });
       }
 

@@ -93,11 +93,15 @@ export function ProductionBonusDecisionPanel({
       items?: { runId: number; workerId: number }[];
       all?: boolean;
     }) => {
-      const response = await factoryApiRequest("POST", `/api/factory/payroll/${payrollId}/production-bonuses/decision`, {
-        decision,
-        items: items ?? [],
-        all: all === true,
-      });
+      const response = await factoryApiRequest(
+        "POST",
+        `/api/factory/payroll/${payrollId}/production-bonuses/decision`,
+        {
+          decision,
+          items: items ?? [],
+          all: all === true,
+        }
+      );
       const body = await response.json().catch(() => null);
       if (!response.ok) throw new Error(body?.message || "Failed to update production bonus");
       return body as ProductionBonusDecisionResult;
@@ -211,8 +215,8 @@ export function ProductionBonusDecisionPanel({
                     {allocation.positionName} · {allocation.productionDate}
                   </div>
                   <div className="mt-0.5 text-[11px] text-muted-foreground">
-                    Target {allocation.targetBales} · Actual {allocation.actualBales} · Extra {allocation.extraBales} · $
-                    {money(allocation.rate)}/extra bale
+                    Target {allocation.targetBales} · Actual {allocation.actualBales} · Extra {allocation.extraBales} ·
+                    ${money(allocation.rate)}/extra bale
                   </div>
                   <div className="text-[11px] text-muted-foreground">
                     Team pool ${money(allocation.bonusPool)} ÷ {allocation.memberCount} worker

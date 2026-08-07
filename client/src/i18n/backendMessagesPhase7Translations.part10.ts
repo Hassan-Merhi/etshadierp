@@ -593,7 +593,7 @@ export const backendMessagesPhase7TranslationsPart10: readonly Phase7BackendMess
     fr: "Un ou plusieurs dossiers de paie sont introuvables",
   },
   {
-    en: "Decide pending production bonuses before paying payroll (${pending.length} payroll record${pending.length === 1 ? \"\" : \"s\"}, $${pendingAmount.toFixed(2)} pending).",
+    en: 'Decide pending production bonuses before paying payroll (${pending.length} payroll record${pending.length === 1 ? "" : "s"}, $${pendingAmount.toFixed(2)} pending).',
     ar: "احسم مكافآت الإنتاج المعلقة قبل دفع الرواتب ({0} سجل رواتب، ${2} معلقة).",
     fr: "Traitez les primes de production en attente avant de payer la paie ({0} dossier(s), ${2} en attente).",
   },
@@ -603,7 +603,7 @@ export const backendMessagesPhase7TranslationsPart10: readonly Phase7BackendMess
     fr: "Des payrollIds valides sont requis",
   },
   {
-    en: "Payroll bulk paid: ${normalizedIds.length} worker${normalizedIds.length !== 1 ? \"s\" : \"\"}",
+    en: 'Payroll bulk paid: ${normalizedIds.length} worker${normalizedIds.length !== 1 ? "s" : ""}',
     ar: "تم دفع الرواتب جماعياً لـ {0} عامل{1}",
     fr: "Paie groupée versée à {0} travailleur{1}",
   },
@@ -638,7 +638,7 @@ export const backendMessagesPhase7TranslationsPart10: readonly Phase7BackendMess
     fr: "{0} appartient à plusieurs postes de production au {1}. Sélectionnez un poste de production avant d’enregistrer l’entrée de stock.",
   },
   {
-    en: "Payroll generated — Worker #${worker.id} (${worker.fullName || worker.employeeCode || \"\"}). Period: ${input.startDate} to ${input.endDate}. Net: $${finalNetSalary.toFixed(2)}",
+    en: 'Payroll generated — Worker #${worker.id} (${worker.fullName || worker.employeeCode || ""}). Period: ${input.startDate} to ${input.endDate}. Net: $${finalNetSalary.toFixed(2)}',
     ar: "تم إنشاء الرواتب — العامل رقم {0} ({1}). الفترة: {2} إلى {3}. الصافي: ${4}",
     fr: "Paie générée — Travailleur n° {0} ({1}). Période : {2} à {3}. Net : ${4}",
   },

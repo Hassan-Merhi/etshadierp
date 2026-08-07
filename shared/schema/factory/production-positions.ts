@@ -62,7 +62,11 @@ export const factoryProductionPositionRules = pgTable(
       t.effectiveFrom
     ),
     companyPositionIdx: index("factory_production_position_rules_company_position_idx").on(t.companyId, t.positionId),
-    effectiveIdx: index("factory_production_position_rules_effective_idx").on(t.positionId, t.effectiveFrom, t.effectiveTo),
+    effectiveIdx: index("factory_production_position_rules_effective_idx").on(
+      t.positionId,
+      t.effectiveFrom,
+      t.effectiveTo
+    ),
   })
 );
 
@@ -121,7 +125,11 @@ export const insertFactoryProductionPositionRuleSchema = createInsertSchema(fact
     companyId: z.number().int().positive(),
     positionId: z.number().int().positive(),
     effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    effectiveTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+    effectiveTo: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional()
+      .nullable(),
     targetBales: z.number().int().min(0),
     bonusPerExtraBale: z.string(),
     bonusEnabled: z.boolean(),
@@ -135,7 +143,11 @@ export const insertFactoryProductionPositionMembershipSchema = createInsertSchem
     positionId: z.number().int().positive(),
     workerId: z.number().int().positive(),
     effectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    effectiveTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+    effectiveTo: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional()
+      .nullable(),
     createdBy: z.string().max(100).optional().nullable(),
   });
 

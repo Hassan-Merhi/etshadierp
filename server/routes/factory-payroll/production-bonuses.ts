@@ -114,11 +114,17 @@ export function registerFactoryProductionBonusRoutes(app: Express, requireAuth: 
           FROM factory_production_bonus_allocations
           WHERE payroll_id = ${id}
         `);
-        const linked = rows(linkedResult).map((row: any) => ({ runId: Number(row.runId), workerId: Number(row.workerId) }));
+        const linked = rows(linkedResult).map((row: any) => ({
+          runId: Number(row.runId),
+          workerId: Number(row.workerId),
+        }));
         const requested = applyAll
           ? linked
-          : linked.filter((candidate) => items.some((item) => item.runId === candidate.runId && item.workerId === candidate.workerId));
-        if (requested.length === 0) throw new Error("No matching production bonus allocations were found on this payroll");
+          : linked.filter((candidate) =>
+              items.some((item) => item.runId === candidate.runId && item.workerId === candidate.workerId)
+            );
+        if (requested.length === 0)
+          throw new Error("No matching production bonus allocations were found on this payroll");
 
         const affectedRunIds: number[] = [];
         for (const item of requested) {
@@ -177,7 +183,11 @@ export function registerFactoryProductionBonusRoutes(app: Express, requireAuth: 
       res.json(result);
     } catch (error: unknown) {
       const message = getErrorMessage(error);
-      const status = /not found/i.test(message) ? 404 : /only be changed while payroll is DRAFT/i.test(message) ? 409 : 400;
+      const status = /not found/i.test(message)
+        ? 404
+        : /only be changed while payroll is DRAFT/i.test(message)
+          ? 409
+          : 400;
       res.status(status).json({ message });
     }
   });

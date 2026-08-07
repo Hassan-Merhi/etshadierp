@@ -178,15 +178,17 @@ export default function ProductionPlannerDialog() {
       setEntries(data.entries.map((entry) => previewEntry(entry)));
       setNotes(data.plan?.notes ?? "");
       await queryClient.invalidateQueries({ queryKey: ["/api/factory/production-position-planner", date] });
-      toast({ title: "Production plan saved", description: "Team, target and bonus-rule snapshots were frozen for this date." });
+      toast({
+        title: "Production plan saved",
+        description: "Team, target and bonus-rule snapshots were frozen for this date.",
+      });
     },
     onError: (saveError: Error) =>
       toast({ title: "Could not save production plan", description: saveError.message, variant: "destructive" }),
   });
 
   const copyPreviousMutation = useMutation({
-    mutationFn: () =>
-      fetchJson<CopyPreviousResponse>(`/api/factory/production-position-planner/${date}/copy-previous`),
+    mutationFn: () => fetchJson<CopyPreviousResponse>(`/api/factory/production-position-planner/${date}/copy-previous`),
     onSuccess: (data) => {
       if (!data.fromDate) {
         toast({ title: "No previous position plan found" });
@@ -210,13 +212,19 @@ export default function ProductionPlannerDialog() {
         )
       );
       setNotes(data.notes ?? "");
-      toast({ title: `Copied settings from ${data.fromDate}`, description: "Current-date team membership is kept; target/rate settings were copied." });
+      toast({
+        title: `Copied settings from ${data.fromDate}`,
+        description: "Current-date team membership is kept; target/rate settings were copied.",
+      });
     },
     onError: (copyError: Error) =>
       toast({ title: "Could not copy previous plan", description: copyError.message, variant: "destructive" }),
   });
 
-  const updateEntry = (positionId: number, patch: Partial<Pick<PlannerEntry, "targetBales" | "bonusPerExtraBale" | "bonusEnabled">>) => {
+  const updateEntry = (
+    positionId: number,
+    patch: Partial<Pick<PlannerEntry, "targetBales" | "bonusPerExtraBale" | "bonusEnabled">>
+  ) => {
     setEntries((current) => current.map((entry) => (entry.positionId === positionId ? { ...entry, ...patch } : entry)));
   };
 
@@ -256,18 +264,30 @@ export default function ProductionPlannerDialog() {
               disabled={copyPreviousMutation.isPending || isLoading}
               data-testid="button-copy-previous-position-plan"
             >
-              {copyPreviousMutation.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Copy className="mr-1 h-4 w-4" />}
+              {copyPreviousMutation.isPending ? (
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+              ) : (
+                <Copy className="mr-1 h-4 w-4" />
+              )}
               Copy Previous Plan
             </Button>
             <div className="ml-auto flex items-center gap-2">
-              {planner?.plan?.saved ? <Badge variant="secondary">Saved snapshot</Badge> : <Badge variant="outline">Preview / not saved</Badge>}
+              {planner?.plan?.saved ? (
+                <Badge variant="secondary">Saved snapshot</Badge>
+              ) : (
+                <Badge variant="outline">Preview / not saved</Badge>
+              )}
               <Button
                 size="sm"
                 onClick={() => saveMutation.mutate()}
                 disabled={saveMutation.isPending || isLoading || isError}
                 data-testid="button-save-position-plan"
               >
-                {saveMutation.isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
+                {saveMutation.isPending ? (
+                  <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-1 h-4 w-4" />
+                )}
                 Save Plan
               </Button>
             </div>
@@ -276,23 +296,33 @@ export default function ProductionPlannerDialog() {
           {!isLoading && !isError && (
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
               <div className="rounded-lg border bg-muted/20 p-3">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Total Target</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Total Target
+                </div>
                 <div className="mt-1 text-xl font-bold">{summary.totalTarget}</div>
               </div>
               <div className="rounded-lg border bg-muted/20 p-3">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Total Actual</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Total Actual
+                </div>
                 <div className="mt-1 text-xl font-bold">{summary.totalActual}</div>
               </div>
               <div className="rounded-lg border bg-muted/20 p-3">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Extra Bales</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Extra Bales
+                </div>
                 <div className="mt-1 text-xl font-bold">{summary.totalExtra}</div>
               </div>
               <div className="rounded-lg border bg-muted/20 p-3">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Suggested Bonus</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Suggested Bonus
+                </div>
                 <div className="mt-1 text-xl font-bold">${money(summary.totalBonusPool)}</div>
               </div>
               <div className="rounded-lg border bg-muted/20 p-3">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Bonus-Ineligible</div>
+                <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Bonus-Ineligible
+                </div>
                 <div className="mt-1 text-xl font-bold">{summary.unattributedBales}</div>
                 <div className="text-[10px] text-muted-foreground">worker-assigned bales with no position</div>
               </div>
@@ -310,7 +340,8 @@ export default function ProductionPlannerDialog() {
           ) : previewEntries.length === 0 ? (
             <div className="rounded-xl border p-10 text-center text-muted-foreground">
               <Target className="mx-auto mb-2 h-8 w-8 opacity-50" />
-              No Production Positions are configured for this date. Create positions and teams in Bale Stock Entry → Production Positions.
+              No Production Positions are configured for this date. Create positions and teams in Bale Stock Entry →
+              Production Positions.
             </div>
           ) : (
             <div className="overflow-x-auto rounded-xl border">
@@ -345,20 +376,32 @@ export default function ProductionPlannerDialog() {
                             <Badge variant={entry.bonusEnabled ? "default" : "outline"} className="text-[10px]">
                               Bonus {entry.bonusEnabled ? "On" : "Off"}
                             </Badge>
-                            {entry.saved && <Badge variant="secondary" className="text-[10px]">Snapshotted</Badge>}
+                            {entry.saved && (
+                              <Badge variant="secondary" className="text-[10px]">
+                                Snapshotted
+                              </Badge>
+                            )}
                           </div>
                         </td>
                         <td className="max-w-sm px-3 py-3">
                           <div className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
-                            <Users className="h-3.5 w-3.5" /> {entry.memberCount} worker{entry.memberCount === 1 ? "" : "s"}
+                            <Users className="h-3.5 w-3.5" /> {entry.memberCount} worker
+                            {entry.memberCount === 1 ? "" : "s"}
                           </div>
                           <div className="flex flex-wrap gap-1">
                             {entry.members.length ? (
                               entry.members.map((member) => {
-                                const allocation = entry.allocations.find((item) => item.workerId === member.workerId)?.amount ?? 0;
+                                const allocation =
+                                  entry.allocations.find((item) => item.workerId === member.workerId)?.amount ?? 0;
                                 return (
-                                  <Badge key={member.workerId} variant="outline" className="whitespace-normal text-[10px]" title={`${member.workerName}: $${money(allocation)}`}>
-                                    {member.workerName}{entry.bonusPool > 0 ? ` · $${money(allocation)}` : ""}
+                                  <Badge
+                                    key={member.workerId}
+                                    variant="outline"
+                                    className="whitespace-normal text-[10px]"
+                                    title={`${member.workerName}: $${money(allocation)}`}
+                                  >
+                                    {member.workerName}
+                                    {entry.bonusPool > 0 ? ` · $${money(allocation)}` : ""}
                                   </Badge>
                                 );
                               })
@@ -373,7 +416,11 @@ export default function ProductionPlannerDialog() {
                             min={0}
                             step={1}
                             value={entry.targetBales}
-                            onChange={(event) => updateEntry(entry.positionId, { targetBales: Math.max(0, parseInt(event.target.value) || 0) })}
+                            onChange={(event) =>
+                              updateEntry(entry.positionId, {
+                                targetBales: Math.max(0, parseInt(event.target.value) || 0),
+                              })
+                            }
                             className="h-8 text-right font-mono"
                             data-testid={`input-position-target-${entry.positionId}`}
                           />
@@ -387,7 +434,11 @@ export default function ProductionPlannerDialog() {
                               min={0}
                               step="0.01"
                               value={entry.bonusPerExtraBale}
-                              onChange={(event) => updateEntry(entry.positionId, { bonusPerExtraBale: Math.max(0, Number(event.target.value) || 0) })}
+                              onChange={(event) =>
+                                updateEntry(entry.positionId, {
+                                  bonusPerExtraBale: Math.max(0, Number(event.target.value) || 0),
+                                })
+                              }
                               className="h-8 text-right font-mono"
                               disabled={!entry.bonusEnabled}
                               data-testid={`input-position-bonus-rate-${entry.positionId}`}
@@ -396,7 +447,9 @@ export default function ProductionPlannerDialog() {
                               <input
                                 type="checkbox"
                                 checked={entry.bonusEnabled}
-                                onChange={(event) => updateEntry(entry.positionId, { bonusEnabled: event.target.checked })}
+                                onChange={(event) =>
+                                  updateEntry(entry.positionId, { bonusEnabled: event.target.checked })
+                                }
                               />
                               Enabled
                             </label>
@@ -406,16 +459,22 @@ export default function ProductionPlannerDialog() {
                         <td className="px-3 py-3 text-right">
                           <div className="font-mono font-bold">{splitText}</div>
                           {!entry.distributable && entry.bonusPool > 0 && (
-                            <div className="mt-1 text-[10px] font-medium text-destructive">No workers to divide pool</div>
+                            <div className="mt-1 text-[10px] font-medium text-destructive">
+                              No workers to divide pool
+                            </div>
                           )}
                         </td>
                         <td className="px-3 py-3 text-center">
                           {entry.targetBales <= 0 ? (
                             <Badge variant="outline">No target</Badge>
                           ) : entry.targetMet ? (
-                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-200">Target met</Badge>
+                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100 dark:bg-green-900 dark:text-green-200">
+                              Target met
+                            </Badge>
                           ) : (
-                            <Badge className="bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-900 dark:text-red-200">{shortBy} short</Badge>
+                            <Badge className="bg-red-100 text-red-800 hover:bg-red-100 dark:bg-red-900 dark:text-red-200">
+                              {shortBy} short
+                            </Badge>
                           )}
                         </td>
                       </tr>
@@ -438,7 +497,9 @@ export default function ProductionPlannerDialog() {
           </div>
 
           <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-xs text-muted-foreground">
-            <strong className="text-foreground">Preview only:</strong> Phase 3 calculates suggested production bonuses but does not create payroll, accounting entries, cash payments, or payable transactions. Acceptance/rejection and payroll application are Phase 4.
+            <strong className="text-foreground">Preview only:</strong> Phase 3 calculates suggested production bonuses
+            but does not create payroll, accounting entries, cash payments, or payable transactions.
+            Acceptance/rejection and payroll application are Phase 4.
           </div>
         </div>
       </DialogContent>

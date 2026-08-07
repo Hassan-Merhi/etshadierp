@@ -5,7 +5,10 @@ import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { sqlArray } from "../../lib/sqlArray";
-import { calculateProductionBonusPreview, type ProductionBonusMemberSnapshot } from "../../services/factory/productionBonusPreview";
+import {
+  calculateProductionBonusPreview,
+  type ProductionBonusMemberSnapshot,
+} from "../../services/factory/productionBonusPreview";
 import { checkFactoryAdmin } from "./_helpers";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -130,7 +133,10 @@ async function loadSavedPositionSnapshots(planId: number, companyId: number): Pr
   }));
 }
 
-async function loadActuals(companyId: number, date: string): Promise<{ actuals: Map<number, number>; unattributedBales: number }> {
+async function loadActuals(
+  companyId: number,
+  date: string
+): Promise<{ actuals: Map<number, number>; unattributedBales: number }> {
   const actualResult = await db.execute(sql`
     SELECT a.production_position_id AS "positionId", COUNT(*)::integer AS "actualBales"
     FROM factory_bale_production_attributions a
@@ -219,7 +225,13 @@ async function buildPlannerResponse(companyId: number, date: string) {
       acc.totalBonusPool = Number((acc.totalBonusPool + entry.bonusPool).toFixed(2));
       return acc;
     },
-    { totalTarget: 0, totalActual: 0, totalExtra: 0, totalBonusPool: 0, unattributedBales: actualData.unattributedBales }
+    {
+      totalTarget: 0,
+      totalActual: 0,
+      totalExtra: 0,
+      totalBonusPool: 0,
+      unattributedBales: actualData.unattributedBales,
+    }
   );
 
   return {
@@ -287,7 +299,9 @@ export function registerProductionPositionPlannerRoutes(app: Express) {
           WHERE company_id = ${companyId} AND id = ANY(${sqlArray(requestedIds)})
         `);
         if (rows(existingResult).length !== requestedIds.length) {
-          return res.status(400).json({ message: "One or more production positions belong to another company or do not exist" });
+          return res
+            .status(400)
+            .json({ message: "One or more production positions belong to another company or do not exist" });
         }
       }
 

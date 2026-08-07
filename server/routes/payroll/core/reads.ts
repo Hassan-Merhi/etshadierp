@@ -87,7 +87,10 @@ export function registerPayrollCoreReadRoutes(app: Express) {
             .where(inArray(factoryWorkers.id, workerIds))
         : [];
       const workerMap = new Map(workers.map((worker: any) => [worker.id, worker]));
-      const productionTotals = await getProductionBonusTotalsForPayrollIds(db, payrolls.map((payroll) => payroll.id));
+      const productionTotals = await getProductionBonusTotalsForPayrollIds(
+        db,
+        payrolls.map((payroll) => payroll.id)
+      );
       const result = payrolls.map((payroll: any) => {
         const production = productionTotals.get(payroll.id) ?? emptyBonusTotals();
         return {
@@ -148,7 +151,8 @@ export function registerPayrollCoreReadRoutes(app: Express) {
         .orderBy(desc(factoryPayrolls.periodEnd));
 
       const lastPaidEnd: Record<number, string> = {};
-      for (const payroll of paidPayrolls) if (!lastPaidEnd[payroll.workerId]) lastPaidEnd[payroll.workerId] = payroll.periodEnd;
+      for (const payroll of paidPayrolls)
+        if (!lastPaidEnd[payroll.workerId]) lastPaidEnd[payroll.workerId] = payroll.periodEnd;
 
       const periodStarts: Record<number, string> = {};
       for (const worker of workers) {
@@ -288,7 +292,10 @@ export function registerPayrollCoreReadRoutes(app: Express) {
         .from(factoryPayrolls)
         .where(and(eq(factoryPayrolls.workerId, id), eq(factoryPayrolls.companyId, companyId)))
         .orderBy(desc(factoryPayrolls.periodEnd));
-      const productionTotals = await getProductionBonusTotalsForPayrollIds(db, payrolls.map((payroll) => payroll.id));
+      const productionTotals = await getProductionBonusTotalsForPayrollIds(
+        db,
+        payrolls.map((payroll) => payroll.id)
+      );
       res.json(
         payrolls.map((payroll) => {
           const production = productionTotals.get(payroll.id) ?? emptyBonusTotals();

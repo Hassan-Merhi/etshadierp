@@ -101,14 +101,20 @@ export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
           doc.moveDown(0.5);
         } catch {}
       }
-      doc.fontSize(11).font("Helvetica").text(companyRow?.name || "Company", { align: "center" });
+      doc
+        .fontSize(11)
+        .font("Helvetica")
+        .text(companyRow?.name || "Company", { align: "center" });
       doc.fontSize(10).text("Payroll Payment Summary", { align: "center" });
       doc.moveDown(0.3);
       doc.fontSize(8).fillColor("#666666").text(`Generated: ${new Date().toLocaleDateString()}`, { align: "center" });
       doc.moveDown(0.8);
 
       const periods = [...new Set(payrollRows.map((payroll: any) => `${payroll.periodStart} – ${payroll.periodEnd}`))];
-      doc.fontSize(8).fillColor("#333333").text(`Period: ${periods.join(", ")}`);
+      doc
+        .fontSize(8)
+        .fillColor("#333333")
+        .text(`Period: ${periods.join(", ")}`);
       doc.moveDown(0.5);
 
       // Name | Present | Absent | Production Bonus | Other Bonus | Net | Signature
@@ -145,13 +151,26 @@ export function registerPayrollPaymentSummaryPdfRoutes(app: Express) {
         doc.fillColor("#000000");
         renderText(name, COL.name, y + 6, COL_W.name, "left", 7);
         doc.font("Helvetica").fontSize(7);
-        doc.text(present == null ? "—" : present % 1 === 0 ? present.toFixed(0) : present.toFixed(1), COL.present, y + 6, { width: COL_W.present, align: "center" });
-        doc.text(absent == null ? "—" : absent % 1 === 0 ? absent.toFixed(0) : absent.toFixed(1), COL.absent, y + 6, { width: COL_W.absent, align: "center" });
+        doc.text(
+          present == null ? "—" : present % 1 === 0 ? present.toFixed(0) : present.toFixed(1),
+          COL.present,
+          y + 6,
+          { width: COL_W.present, align: "center" }
+        );
+        doc.text(absent == null ? "—" : absent % 1 === 0 ? absent.toFixed(0) : absent.toFixed(1), COL.absent, y + 6, {
+          width: COL_W.absent,
+          align: "center",
+        });
         doc.text(production.toFixed(2), COL.prod, y + 6, { width: COL_W.prod, align: "right" });
         doc.text(other.toFixed(2), COL.other, y + 6, { width: COL_W.other, align: "right" });
         doc.text(net.toFixed(2), COL.amount, y + 6, { width: COL_W.amount, align: "right" });
         const sigY = y + rowH - 5;
-        doc.moveTo(COL.signature + 5, sigY).lineTo(COL.signature + COL_W.signature - 5, sigY).strokeColor("#aaaaaa").lineWidth(0.5).stroke();
+        doc
+          .moveTo(COL.signature + 5, sigY)
+          .lineTo(COL.signature + COL_W.signature - 5, sigY)
+          .strokeColor("#aaaaaa")
+          .lineWidth(0.5)
+          .stroke();
         y += rowH;
       });
 

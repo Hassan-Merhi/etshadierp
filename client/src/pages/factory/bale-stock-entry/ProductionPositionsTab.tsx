@@ -163,7 +163,8 @@ export function ProductionPositionsTab() {
       await invalidate();
       toast({ title: "Production position archived", description: "History and prior memberships were preserved." });
     },
-    onError: (error: Error) => toast({ title: "Could not archive", description: error.message, variant: "destructive" }),
+    onError: (error: Error) =>
+      toast({ title: "Could not archive", description: error.message, variant: "destructive" }),
   });
 
   const toggleWorker = (workerId: number) =>
@@ -215,61 +216,99 @@ export function ProductionPositionsTab() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={7} className="h-32 text-center text-muted-foreground">Loading production positions...</TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                  Loading production positions...
+                </TableCell>
+              </TableRow>
             ) : positions.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="h-36 text-center">
                   <div className="space-y-2 text-muted-foreground">
                     <Users className="mx-auto h-7 w-7 opacity-60" />
                     <p>No production positions created yet.</p>
-                    <p className="text-xs">Create positions such as T SHIRTS, JEANS, SPORTS or HHR and assign workers.</p>
+                    <p className="text-xs">
+                      Create positions such as T SHIRTS, JEANS, SPORTS or HHR and assign workers.
+                    </p>
                   </div>
                 </TableCell>
               </TableRow>
-            ) : positions.map((position) => (
-              <TableRow key={position.id} className={position.active ? "" : "opacity-60"}>
-                <TableCell>
-                  <div className="font-bold">{position.name}</div>
-                  {position.ruleEffectiveFrom && <div className="text-[10px] text-muted-foreground">Rule from {position.ruleEffectiveFrom}</div>}
-                </TableCell>
-                <TableCell>
-                  <div className="flex max-w-md flex-wrap gap-1">
-                    {position.members?.length ? position.members.map((member) => (
-                      <Badge key={member.workerId} variant="secondary" className="text-[10px]">{member.fullName}</Badge>
-                    )) : <span className="text-xs italic text-muted-foreground">No active team members</span>}
-                  </div>
-                </TableCell>
-                <TableCell className="text-right font-mono font-semibold">{position.targetBales}</TableCell>
-                <TableCell className="text-right font-mono font-semibold">${Number(position.bonusPerExtraBale || 0).toFixed(2)}</TableCell>
-                <TableCell>
-                  <Badge variant={position.bonusEnabled ? "default" : "outline"}>{position.bonusEnabled ? "Enabled" : "Disabled"}</Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={position.active ? "secondary" : "outline"}>{position.active ? "Active" : "Archived"}</Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-1">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setHistoryPosition(position)} title="History">
-                      <History className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(position)} title="Edit" data-testid={`button-edit-production-position-${position.id}`}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    {position.active && (
+            ) : (
+              positions.map((position) => (
+                <TableRow key={position.id} className={position.active ? "" : "opacity-60"}>
+                  <TableCell>
+                    <div className="font-bold">{position.name}</div>
+                    {position.ruleEffectiveFrom && (
+                      <div className="text-[10px] text-muted-foreground">Rule from {position.ruleEffectiveFrom}</div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex max-w-md flex-wrap gap-1">
+                      {position.members?.length ? (
+                        position.members.map((member) => (
+                          <Badge key={member.workerId} variant="secondary" className="text-[10px]">
+                            {member.fullName}
+                          </Badge>
+                        ))
+                      ) : (
+                        <span className="text-xs italic text-muted-foreground">No active team members</span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right font-mono font-semibold">{position.targetBales}</TableCell>
+                  <TableCell className="text-right font-mono font-semibold">
+                    ${Number(position.bonusPerExtraBale || 0).toFixed(2)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={position.bonusEnabled ? "default" : "outline"}>
+                      {position.bonusEnabled ? "Enabled" : "Disabled"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={position.active ? "secondary" : "outline"}>
+                      {position.active ? "Active" : "Archived"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-1">
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-destructive"
-                        onClick={() => confirm(`Archive ${position.name}? Historical rules and memberships will be kept.`) && archiveMutation.mutate(position.id)}
-                        title="Archive"
+                        className="h-8 w-8"
+                        onClick={() => setHistoryPosition(position)}
+                        title="History"
                       >
-                        <Archive className="h-3.5 w-3.5" />
+                        <History className="h-3.5 w-3.5" />
                       </Button>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => openEdit(position)}
+                        title="Edit"
+                        data-testid={`button-edit-production-position-${position.id}`}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      {position.active && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive"
+                          onClick={() =>
+                            confirm(`Archive ${position.name}? Historical rules and memberships will be kept.`) &&
+                            archiveMutation.mutate(position.id)
+                          }
+                          title="Archive"
+                        >
+                          <Archive className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
@@ -279,21 +318,41 @@ export function ProductionPositionsTab() {
           <DialogHeader>
             <DialogTitle>{editing ? `Edit ${editing.name}` : "New Production Position"}</DialogTitle>
             <DialogDescription>
-              Changes use an effective date so earlier production history is not rewritten. Workers may belong to multiple positions.
+              Changes use an effective date so earlier production history is not rewritten. Workers may belong to
+              multiple positions.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2 sm:grid-cols-2">
             <div className="space-y-2 sm:col-span-2">
               <label className="text-sm font-medium">Position Name</label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. T SHIRTS" data-testid="input-production-position-name" />
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. T SHIRTS"
+                data-testid="input-production-position-name"
+              />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Daily Target Bales</label>
-              <Input type="number" min="0" step="1" value={targetBales} onChange={(e) => setTargetBales(e.target.value)} data-testid="input-production-position-target" />
+              <Input
+                type="number"
+                min="0"
+                step="1"
+                value={targetBales}
+                onChange={(e) => setTargetBales(e.target.value)}
+                data-testid="input-production-position-target"
+              />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Bonus per Extra Bale ($)</label>
-              <Input type="number" min="0" step="0.01" value={bonusPerExtraBale} onChange={(e) => setBonusPerExtraBale(e.target.value)} data-testid="input-production-position-rate" />
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={bonusPerExtraBale}
+                onChange={(e) => setBonusPerExtraBale(e.target.value)}
+                data-testid="input-production-position-rate"
+              />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Effective From</label>
@@ -301,11 +360,21 @@ export function ProductionPositionsTab() {
             </div>
             <div className="space-y-3 pt-1">
               <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-                <input type="checkbox" checked={bonusEnabled} onChange={(e) => setBonusEnabled(e.target.checked)} className="h-4 w-4" />
+                <input
+                  type="checkbox"
+                  checked={bonusEnabled}
+                  onChange={(e) => setBonusEnabled(e.target.checked)}
+                  className="h-4 w-4"
+                />
                 Bonus enabled for this position
               </label>
               <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-                <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="h-4 w-4" />
+                <input
+                  type="checkbox"
+                  checked={active}
+                  onChange={(e) => setActive(e.target.checked)}
+                  className="h-4 w-4"
+                />
                 Position active
               </label>
             </div>
@@ -324,12 +393,16 @@ export function ProductionPositionsTab() {
                       onClick={() => toggleWorker(worker.id)}
                       className={`flex items-center gap-2 rounded-lg border p-2 text-left transition-colors ${selected ? "border-primary bg-primary/10" : "hover:bg-muted"}`}
                     >
-                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border ${selected ? "border-primary bg-primary" : "border-input"}`}>
+                      <span
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border ${selected ? "border-primary bg-primary" : "border-input"}`}
+                      >
                         {selected && <CheckCircle2 className="h-3 w-3 text-primary-foreground" />}
                       </span>
                       <span className="min-w-0">
                         <span className="block truncate text-xs font-medium">{worker.fullName || worker.name}</span>
-                        {worker.employeeCode && <span className="block text-[10px] text-muted-foreground">{worker.employeeCode}</span>}
+                        {worker.employeeCode && (
+                          <span className="block text-[10px] text-muted-foreground">{worker.employeeCode}</span>
+                        )}
                       </span>
                     </button>
                   );
@@ -338,7 +411,9 @@ export function ProductionPositionsTab() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              Cancel
+            </Button>
             <Button onClick={save} disabled={saveMutation.isPending} data-testid="button-save-production-position">
               {saveMutation.isPending ? "Saving..." : "Save Position"}
             </Button>
@@ -349,31 +424,58 @@ export function ProductionPositionsTab() {
       <Dialog open={!!historyPosition} onOpenChange={(open) => !open && setHistoryPosition(null)}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><CalendarClock className="h-5 w-5" />{historyPosition?.name} History</DialogTitle>
-            <DialogDescription>Previous targets, bonus rates and worker memberships are retained instead of being overwritten.</DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarClock className="h-5 w-5" />
+              {historyPosition?.name} History
+            </DialogTitle>
+            <DialogDescription>
+              Previous targets, bonus rates and worker memberships are retained instead of being overwritten.
+            </DialogDescription>
           </DialogHeader>
-          {historyLoading ? <div className="py-10 text-center text-muted-foreground">Loading history...</div> : (
+          {historyLoading ? (
+            <div className="py-10 text-center text-muted-foreground">Loading history...</div>
+          ) : (
             <div className="grid gap-5 py-2 md:grid-cols-2">
               <div className="space-y-2">
                 <h3 className="text-sm font-semibold">Rule Versions</h3>
                 <div className="max-h-72 space-y-2 overflow-y-auto">
-                  {history?.rules?.length ? history.rules.map((rule) => (
-                    <div key={rule.id} className="rounded-lg border p-3 text-xs">
-                      <div className="flex justify-between gap-2"><span className="font-semibold">{rule.effectiveFrom} → {rule.effectiveTo || "Current"}</span><Badge variant={rule.bonusEnabled ? "default" : "outline"}>{rule.bonusEnabled ? "Bonus on" : "Bonus off"}</Badge></div>
-                      <div className="mt-2 text-muted-foreground">Target: <b className="text-foreground">{rule.targetBales}</b> · Rate: <b className="text-foreground">${Number(rule.bonusPerExtraBale || 0).toFixed(2)}</b></div>
-                    </div>
-                  )) : <div className="text-xs text-muted-foreground">No rule history.</div>}
+                  {history?.rules?.length ? (
+                    history.rules.map((rule) => (
+                      <div key={rule.id} className="rounded-lg border p-3 text-xs">
+                        <div className="flex justify-between gap-2">
+                          <span className="font-semibold">
+                            {rule.effectiveFrom} → {rule.effectiveTo || "Current"}
+                          </span>
+                          <Badge variant={rule.bonusEnabled ? "default" : "outline"}>
+                            {rule.bonusEnabled ? "Bonus on" : "Bonus off"}
+                          </Badge>
+                        </div>
+                        <div className="mt-2 text-muted-foreground">
+                          Target: <b className="text-foreground">{rule.targetBales}</b> · Rate:{" "}
+                          <b className="text-foreground">${Number(rule.bonusPerExtraBale || 0).toFixed(2)}</b>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-xs text-muted-foreground">No rule history.</div>
+                  )}
                 </div>
               </div>
               <div className="space-y-2">
                 <h3 className="text-sm font-semibold">Membership History</h3>
                 <div className="max-h-72 space-y-2 overflow-y-auto">
-                  {history?.memberships?.length ? history.memberships.map((membership) => (
-                    <div key={membership.id} className="rounded-lg border p-3 text-xs">
-                      <div className="font-semibold">{membership.fullName}</div>
-                      <div className="mt-1 text-muted-foreground">{membership.effectiveFrom} → {membership.effectiveTo || "Current"}</div>
-                    </div>
-                  )) : <div className="text-xs text-muted-foreground">No membership history.</div>}
+                  {history?.memberships?.length ? (
+                    history.memberships.map((membership) => (
+                      <div key={membership.id} className="rounded-lg border p-3 text-xs">
+                        <div className="font-semibold">{membership.fullName}</div>
+                        <div className="mt-1 text-muted-foreground">
+                          {membership.effectiveFrom} → {membership.effectiveTo || "Current"}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-xs text-muted-foreground">No membership history.</div>
+                  )}
                 </div>
               </div>
             </div>

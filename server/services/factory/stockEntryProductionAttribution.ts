@@ -1,9 +1,5 @@
 import { and, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
-import {
-  factoryProductionPositionMemberships,
-  factoryProductionPositions,
-  factoryWorkers,
-} from "@shared/schema";
+import { factoryProductionPositionMemberships, factoryProductionPositions, factoryWorkers } from "@shared/schema";
 
 export interface StockEntryProductionAttributionInput {
   productId?: number | null;
@@ -80,7 +76,9 @@ export async function resolveStockEntryProductionAttributions(
       )
     );
 
-  const workerById = new Map<number, { id: number; fullName: string }>(workers.map((worker: any) => [worker.id, worker]));
+  const workerById = new Map<number, { id: number; fullName: string }>(
+    workers.map((worker: any) => [worker.id, worker])
+  );
   if (workerById.size !== workerIds.length) {
     throw new Error("One or more selected workers are inactive or belong to another company");
   }
@@ -148,9 +146,7 @@ export async function resolveStockEntryProductionAttributions(
     if (requestedPositionId != null) {
       selected = eligible.find((position) => position.id === requestedPositionId) ?? null;
       if (!selected) {
-        throw new Error(
-          `${worker.fullName} is not assigned to the selected production position on ${stockEntryDate}`
-        );
+        throw new Error(`${worker.fullName} is not assigned to the selected production position on ${stockEntryDate}`);
       }
     } else if (eligible.length === 1) {
       selected = eligible[0];

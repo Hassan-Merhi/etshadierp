@@ -542,7 +542,8 @@ export function StockEntryTab() {
                       if (draftData?.selectedLocationId) setSelectedLocationId(draftData.selectedLocationId);
                       if (draftData?.entryDate) setEntryDate(draftData.entryDate);
                       if (draftData?.selectedCustomerId) setSelectedCustomerId(draftData.selectedCustomerId);
-                      if (draftData && "selectedLogoId" in draftData) setSelectedLogoId(draftData.selectedLogoId ?? null);
+                      if (draftData && "selectedLogoId" in draftData)
+                        setSelectedLogoId(draftData.selectedLogoId ?? null);
                       discardCartDraft();
                     }}
                     onDiscard={discardCartDraft}

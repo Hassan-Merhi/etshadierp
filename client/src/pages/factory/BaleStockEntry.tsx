@@ -2,11 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ScanLine, List, CalendarDays, Tag, Factory, Users } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  FactoryMobileHeader,
-  FactoryMobileHeaderActions,
-  FactoryMobilePage,
-} from "@/components/ui/factory-mobile";
+import { FactoryMobileHeader, FactoryMobileHeaderActions, FactoryMobilePage } from "@/components/ui/factory-mobile";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { LabelPrintSettings } from "@/components/LabelPrintSettings";
