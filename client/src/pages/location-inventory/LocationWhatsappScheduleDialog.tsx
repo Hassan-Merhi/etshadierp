@@ -137,7 +137,11 @@ export function LocationWhatsappScheduleDialog({
     setDaysOfWeek(schedule.daysOfWeek?.length ? schedule.daysOfWeek : [0, 1, 2, 3, 4, 5, 6]);
     setSendTime(schedule.sendTime || "18:00");
     setTimezone(schedule.timezone || "Africa/Lubumbashi");
-    setIncludeCost(schedule.includeCost && canSendWithCost);
+    // Preserve an existing WITH COST schedule even when the current viewer no
+    // longer has cost permission. The form then blocks saving that sensitive
+    // configuration until they explicitly choose WITHOUT COST instead of
+    // silently downgrading it merely by opening/saving another field.
+    setIncludeCost(schedule.includeCost);
     setIncludeZeroStock(schedule.includeZeroStock);
     setIncludeNegativeStock(schedule.includeNegativeStock);
     setStockGroupId(schedule.stockGroupId == null ? "all" : String(schedule.stockGroupId));
