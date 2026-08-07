@@ -1,0 +1,49 @@
+name: Phase 5 Format Contracts
+
+on:
+  push:
+    branches:
+      - feature/location-whatsapp-phase1
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feature/location-whatsapp-phase1
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Normalize lockfile registry
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+      - name: Format reviewed contract files
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            tests/phase14-i18n-release-gate.test.ts \
+            tests/route-manifest.test.ts \
+            tests/startup-schema-integrity.test.ts
+          node node_modules/prettier/bin/prettier.cjs --check \
+            tests/phase14-i18n-release-gate.test.ts \
+            tests/route-manifest.test.ts \
+            tests/startup-schema-integrity.test.ts
+      - name: Commit formatted contracts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/phase14-i18n-release-gate.test.ts tests/route-manifest.test.ts tests/startup-schema-integrity.test.ts
+          if git diff --cached --quiet; then
+            echo "No formatting changes to commit."
+            exit 0
+          fi
+          git commit -m "Phase 5: format reviewed CI contracts"
+          git push origin HEAD:feature/location-whatsapp-phase1
