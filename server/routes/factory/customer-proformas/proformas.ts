@@ -96,65 +96,33 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
       const profile = String(req.query.profile || "full");
       if (profile === "summary") {
         const rawSummary = await db.execute(sql`
-        SELECT
-          cp.id,
-          cp.company_id,
-          cp.customer_id,
-          cp.name,
-          cp.is_active,
-          cp.created_at,
-          COALESCE(NULLIF(to_jsonb(cp)->>'updated_at', '')::timestamptz, cp.created_at) AS updated_at,
-          (
-            SELECT COUNT(*)::int
-            FROM customer_proforma_lines cpl
-            WHERE cpl.proforma_id = cp.id
-          ) AS line_count
-        FROM customer_proformas cp
-        WHERE cp.company_id = ${companyId}
-          AND cp.customer_id = ${customerId}
-          AND cp.deleted_at IS NULL
-        ORDER BY cp.name ASC
-      `);
+          SELECT
+            cp.id,
+            cp.company_id,
+            cp.customer_id,
+            cp.name,
+            cp.is_active,
+            cp.created_at,
+            COALESCE(NULLIF(to_jsonb(cp)->>'updated_at', '')::timestamptz, cp.created_at) AS updated_at,
+            (
+              SELECT COUNT(*)::int
+              FROM customer_proforma_lines cpl
+              WHERE cpl.proforma_id = cp.id
+            ) AS line_count
+          FROM customer_proformas cp
+          WHERE cp.company_id = ${companyId}
+            AND cp.customer_id = ${customerId}
+            AND cp.deleted_at IS NULL
+          ORDER BY cp.name ASC
+        `);
         const summaryRows = (rawSummary as any).rows ?? (rawSummary as unknown as any[]);
-        const proformaIds = summaryRows.map((row: any) => Number(row.id)).filter((id: number) => Number.isInteger(id));
-        let linesByProforma = new Map<number, any[]>();
-
-        if (proformaIds.length > 0) {
-          const idList = sql.join(
-            proformaIds.map((id: number) => sql`${id}`),
-            sql`,`,
-          );
-          const rawLines = await db.execute(
-            sql`SELECT id, proforma_id, article_code, product_name, quantity, price_per_bale, created_at
-                FROM customer_proforma_lines
-                WHERE proforma_id IN (${idList})`
-          );
-          const rows: any[] = (rawLines as any).rows ?? (rawLines as unknown as any[]);
-          linesByProforma = rows.reduce((map: Map<number, any[]>, line: any) => {
-            const proformaId = Number(line.proforma_id);
-            const current = map.get(proformaId) || [];
-            current.push({
-              id: line.id,
-              proformaId,
-              articleCode: line.article_code ?? "",
-              productName: line.product_name ?? "",
-              quantity: Number(line.quantity) || 0,
-              pricePerBale: line.price_per_bale ?? "0",
-              createdAt: line.created_at,
-            });
-            map.set(proformaId, current);
-            return map;
-          }, new Map<number, any[]>());
-        }
-
         const summaries = summaryRows.map((row: any) => ({
-          id: row.id,
-          companyId: row.company_id,
-          customerId: row.customer_id,
+          id: Number(row.id),
+          companyId: Number(row.company_id),
+          customerId: Number(row.customer_id),
           name: row.name ?? "",
           isActive: row.is_active ?? false,
           lineCount: Number(row.line_count) || 0,
-          lines: linesByProforma.get(Number(row.id)) || [],
           createdAt: row.created_at,
           updatedAt: row.updated_at ?? row.created_at,
         }));
@@ -187,7 +155,7 @@ export function registerFactoryCustomerProformaCrudRoutes(app: Express) {
       if (proformaIds.length > 0) {
         const idList = sql.join(
           proformaIds.map((id: number) => sql`${id}`),
-          sql`,`,
+          sql`,`
         );
         const rawLines = await db.execute(sql`SELECT * FROM customer_proforma_lines WHERE proforma_id IN (${idList})`);
         const rawRows: any[] = (rawLines as any).rows ?? (rawLines as unknown as any[]);
