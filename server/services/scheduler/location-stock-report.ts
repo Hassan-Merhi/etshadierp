@@ -1,15 +1,15 @@
 import { pool } from "../../db";
-import { generateStockPdf } from "../../helpers/generateStockPdf";
-import { releaseManagedExportAttachment } from "../../helpers/exportAttachmentSource";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
-import { sendWhatsAppFileToChatIdPos } from "../whatsappService";
+import {
+  deliverLocationStockWhatsApp,
+  recordLocationStockDeliveryFailure,
+  recoverStaleLocationStockDeliveries,
+} from "../locationStockWhatsAppDelivery";
 
 interface ScheduleRow {
   location_id: number;
   company_id: number;
-  location_name: string;
-  company_name: string;
   enabled: boolean;
   frequency: "daily" | "selected_days";
   days_of_week: number[] | null;
@@ -22,9 +22,6 @@ interface ScheduleRow {
   category_id: number | null;
   last_scheduled_for: string | Date | null;
   updated_by_user_id: string | null;
-  whatsapp_group_chat_id: string | null;
-  whatsapp_group_name: string | null;
-  destination_enabled: boolean | null;
 }
 
 const DAY_INDEX: Record<string, number> = {
@@ -36,10 +33,6 @@ const DAY_INDEX: Record<string, number> = {
   Fri: 5,
   Sat: 6,
 };
-
-function safeFilePart(value: string): string {
-  return value.replace(/[^\w\s.\-]/g, "_").replace(/\s+/g, "_");
-}
 
 function localScheduleParts(date: Date, timezone: string): { localDate: string; dayOfWeek: number; localTime: string } {
   const formatter = new Intl.DateTimeFormat("en-CA", {
@@ -82,7 +75,7 @@ function isDue(row: ScheduleRow, now: Date): { due: boolean; localDate: string }
 
   if (alreadyScheduledFor(row, parts.localDate)) return { due: false, localDate: parts.localDate };
   const scheduledTime = String(row.send_time || "18:00").slice(0, 5);
-  // Catch-up semantics are deliberate: if Render was asleep/redeploying at the
+  // Catch-up semantics are deliberate: if the service was redeploying at the
   // exact minute, the first scheduler tick later that local day still sends once.
   if (parts.localTime < scheduledTime) return { due: false, localDate: parts.localDate };
 
@@ -146,9 +139,7 @@ async function finishSchedule(
 }
 
 async function runOneLocationSchedule(row: ScheduleRow, localDate: string): Promise<void> {
-  // Atomic claim: with multiple app instances only one process can mark this local
-  // schedule date. The claim is persisted before the external WhatsApp call so a
-  // second process cannot duplicate the same day's report.
+  // First layer of duplicate protection: atomically claim the local calendar day.
   const claim = await pool.query(
     `UPDATE location_whatsapp_stock_schedules
         SET last_scheduled_for = $2::date,
@@ -164,79 +155,54 @@ async function runOneLocationSchedule(row: ScheduleRow, localDate: string): Prom
   );
   if (!claim.rows.length) return;
 
+  const idempotencyKey = `scheduled:${row.company_id}:${row.location_id}:${localDate}`;
   try {
-    if (!row.destination_enabled || !row.whatsapp_group_chat_id || !row.whatsapp_group_chat_id.endsWith("@g.us")) {
-      await finishSchedule(row.location_id, "failed", "Linked WhatsApp group is missing or disabled", false);
-      return;
-    }
-
     if (!(await scheduleAuthorStillAuthorized(row))) {
-      await finishSchedule(row.location_id, "failed", "Schedule owner no longer has permission to send this report", false);
+      const message = "Schedule owner no longer has permission to send this report";
+      await recordLocationStockDeliveryFailure(
+        {
+          companyId: row.company_id,
+          locationId: row.location_id,
+          includeCost: row.include_cost,
+          includeZeroStock: row.include_zero_stock,
+          includeNegativeStock: row.include_negative_stock,
+          stockGroupId: row.stock_group_id ?? undefined,
+          categoryId: row.category_id,
+          source: "scheduled",
+          initiatedByUserId: row.updated_by_user_id,
+          scheduledFor: localDate,
+          idempotencyKey,
+          reportDate: localDate,
+        },
+        message
+      );
+      await finishSchedule(row.location_id, "failed", message, false);
       return;
     }
 
-    const { buffer, pageCount, rowCount } = await generateStockPdf(
-      row.company_id,
-      row.company_name,
+    const delivery = await deliverLocationStockWhatsApp({
+      companyId: row.company_id,
+      locationId: row.location_id,
+      includeCost: row.include_cost,
+      includeZeroStock: row.include_zero_stock,
+      includeNegativeStock: row.include_negative_stock,
+      stockGroupId: row.stock_group_id ?? undefined,
+      categoryId: row.category_id,
+      source: "scheduled",
+      initiatedByUserId: row.updated_by_user_id,
+      scheduledFor: localDate,
+      idempotencyKey,
+      reportDate: localDate,
+    });
+
+    await finishSchedule(
       row.location_id,
-      row.location_name,
-      row.include_cost,
-      row.stock_group_id ?? undefined,
-      {
-        includeZeroStock: row.include_zero_stock,
-        includeNegativeStock: row.include_negative_stock,
-        categoryId: row.category_id,
-      }
+      delivery.status,
+      delivery.error,
+      delivery.status === "sent"
     );
-
-    try {
-      if (rowCount === 0) {
-        await finishSchedule(row.location_id, "skipped_empty", null, false);
-        return;
-      }
-
-      const maxAllowedPages = Math.ceil(rowCount / 20) + 5;
-      if (pageCount > maxAllowedPages) {
-        await finishSchedule(
-          row.location_id,
-          "failed",
-          `PDF safety guard rejected ${pageCount} pages for ${rowCount} rows`,
-          false
-        );
-        return;
-      }
-
-      const mode = row.include_cost ? "with_cost" : "no_cost";
-      const fileName = `${safeFilePart(row.location_name)}_Godown_${localDate.replace(/-/g, "")}_${mode}.pdf`;
-      const caption = `Stock Report — ${row.location_name} — ${row.include_cost ? "With Cost" : "Without Cost"}`;
-      const sendResult = await sendWhatsAppFileToChatIdPos(
-        row.whatsapp_group_chat_id,
-        buffer,
-        fileName,
-        caption,
-        "application/pdf"
-      );
-      if (!sendResult.success) {
-        await finishSchedule(row.location_id, "failed", sendResult.error || "WhatsApp send failed", false);
-        return;
-      }
-
-      await finishSchedule(row.location_id, "sent", null, true);
-      logger.info("[LocationStockSchedule] sent", {
-        companyId: row.company_id,
-        locationId: row.location_id,
-        localDate,
-        timezone: row.timezone,
-        includeCost: row.include_cost,
-        rowCount,
-        pageCount,
-        whatsappGroupName: row.whatsapp_group_name,
-      });
-    } finally {
-      await releaseManagedExportAttachment(buffer);
-    }
   } catch (error: unknown) {
-    const message = getErrorMessage(error);
+    const message = getErrorMessage(error) || "Scheduled WhatsApp stock report failed";
     await finishSchedule(row.location_id, "failed", message, false).catch(() => undefined);
     logger.error("[LocationStockSchedule] run failed", {
       companyId: row.company_id,
@@ -253,21 +219,15 @@ async function runOneLocationSchedule(row: ScheduleRow, localDate: string): Prom
  */
 export async function checkAndRunLocationStockReports(now = new Date()): Promise<void> {
   try {
+    await recoverStaleLocationStockDeliveries();
     const result = await pool.query<ScheduleRow>(
       `SELECT s.location_id, s.company_id, s.enabled, s.frequency, s.days_of_week,
               s.send_time::text, s.timezone, s.include_cost, s.include_zero_stock,
               s.include_negative_stock, s.stock_group_id, s.category_id,
-              s.last_scheduled_for, s.updated_by_user_id,
-              l.name AS location_name,
-              c.name AS company_name,
-              d.whatsapp_group_chat_id,
-              d.whatsapp_group_name,
-              d.enabled AS destination_enabled
+              s.last_scheduled_for, s.updated_by_user_id
          FROM location_whatsapp_stock_schedules s
          JOIN locations l ON l.id = s.location_id AND l.company_id = s.company_id
          JOIN companies c ON c.id = s.company_id
-         LEFT JOIN location_whatsapp_stock_reports d
-           ON d.location_id = s.location_id AND d.company_id = s.company_id
         WHERE s.enabled = true
         ORDER BY s.company_id, s.location_id`
     );
@@ -278,8 +238,7 @@ export async function checkAndRunLocationStockReports(now = new Date()): Promise
       await runOneLocationSchedule(row, due.localDate);
     }
   } catch (error: any) {
-    // During a rolling deployment an older database may briefly precede the
-    // startup migration. Treat that as no schedules rather than breaking all cron.
+    // During a rolling deployment an older database may briefly precede startup migrations.
     if (error?.code === "42P01") return;
     logger.error("[LocationStockSchedule] scheduler check failed", { error });
   }
