@@ -68,7 +68,9 @@ export const factoryProductionPositionRules = pgTable(
 
 // Memberships are also effective-dated and intentionally many-to-many. A worker
 // can therefore be valid for T SHIRTS and BLOUSE, for example, without relying
-// on the legacy free-text position field.
+// on the legacy free-text position field. The effective-date lookup is indexed
+// but not unique so archive/reactivate corrections made on the same day can be
+// represented as separate historical intervals without deleting audit history.
 export const factoryProductionPositionMemberships = pgTable(
   "factory_production_position_memberships",
   {
@@ -87,7 +89,7 @@ export const factoryProductionPositionMemberships = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => ({
-    positionWorkerEffectiveUnique: uniqueIndex("factory_production_position_memberships_unique").on(
+    positionWorkerEffectiveIdx: index("factory_production_position_memberships_position_worker_effective_idx").on(
       t.positionId,
       t.workerId,
       t.effectiveFrom
