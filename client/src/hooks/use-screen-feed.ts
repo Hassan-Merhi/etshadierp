@@ -1,7 +1,11 @@
 import { useEffect, useRef } from "react";
 import {
+  ACTIVE_CAPTURE_MIN_GAP_MS,
+  DIRTY_SETTLE_MS,
+  FAILED_CAPTURE_BACKOFF_MS,
+  IDLE_REFRESH_MS,
+  MAX_DIRTY_LATENCY_MS,
   hashScreenFeedPixels,
-  nextScreenFeedCaptureDelay,
   shouldUploadScreenFrame,
 } from "./screen-feed-capture-policy";
 import {
@@ -13,15 +17,17 @@ import {
 } from "./screen-feed-viewing-quality";
 
 const POLL_INTERVAL_MS = 15000;
-const LEGACY_CAPTURE_INTERVAL_MS = 3000;
 const POINTER_INTERVAL_MS = 250;
-const CAPTURE_TIMEOUT_MS = 12000;
-const RETRY_CAPTURE_TIMEOUT_MS = 7000;
+const CAPTURE_TIMEOUT_MS = 9000;
+const RETRY_CAPTURE_TIMEOUT_MS = 5000;
 const CLICK_RETAIN_MS = 8000;
 const MAX_DATA_URL_LEN = 1_300_000;
 const FAST_MAX_DATA_URL_LEN = 560_000;
 const SIGNATURE_WIDTH = 32;
 const SIGNATURE_HEIGHT = 18;
+const MAX_CAPTURE_WIDTH = 1536;
+const MIN_CAPTURE_SCALE = 0.4;
+const SCROLL_KEY_ATTRIBUTE = "data-screenfeed-scroll-key";
 const UNSUPPORTED_COLOR_FUNCTION_RE = /\b(?:color|color-mix|lab|lch|oklab|oklch)\(/i;
 
 const isDev = import.meta.env.DEV;
@@ -29,6 +35,12 @@ const isDev = import.meta.env.DEV;
 type Html2Canvas = (typeof import("html2canvas"))["default"];
 type CaptureSource = "dom" | "retry" | "fallback";
 let html2canvasPromise: Promise<Html2Canvas> | null = null;
+let scrollKeySequence = 0;
+let unsupportedCssCache: { styleSheetCount: number; found: boolean } | null = null;
+
+const clickBuffer: ClickEvent[] = [];
+const trackedScrollElements = new Set<HTMLElement>();
+const scrollSnapshot = new Map<string, { top: number; left: number }>();
 
 async function loadHtml2Canvas(): Promise<Html2Canvas> {
   if (!html2canvasPromise) {
@@ -76,8 +88,6 @@ interface CaptureResult {
   latestClickTs: number;
 }
 
-const clickBuffer: ClickEvent[] = [];
-
 function trimLabel(el: HTMLElement): string {
   const txt =
     el.getAttribute("aria-label") ||
@@ -88,23 +98,9 @@ function trimLabel(el: HTMLElement): string {
   return txt.slice(0, 60);
 }
 
-if (typeof window !== "undefined") {
-  window.addEventListener(
-    "click",
-    (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (target.closest("[data-screenfeed-ignore='true']")) return;
-      const point = normalizeScreenFeedPoint(event.clientX, event.clientY, window.innerWidth, window.innerHeight);
-      clickBuffer.push({ ...point, label: trimLabel(target), ts: Date.now() });
-      if (clickBuffer.length > 50) clickBuffer.shift();
-    },
-    { capture: true }
-  );
-}
-
 function runWhenIdle(fn: () => void): void {
   if (typeof window.requestIdleCallback === "function") {
-    window.requestIdleCallback(fn, { timeout: 750 });
+    window.requestIdleCallback(fn, { timeout: 500 });
   } else {
     setTimeout(fn, 0);
   }
@@ -121,11 +117,11 @@ function errorMessage(error: unknown): string {
 }
 
 async function waitForCaptureReady(): Promise<void> {
-  await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   try {
     await Promise.race([
       document.fonts?.ready ?? Promise.resolve(),
-      new Promise<void>((resolve) => setTimeout(resolve, 1500)),
+      new Promise<void>((resolve) => setTimeout(resolve, 500)),
     ]);
   } catch {
     // Font readiness must never block capture.
@@ -133,8 +129,12 @@ async function waitForCaptureReady(): Promise<void> {
 }
 
 function copyLiveFormState(doc: Document): void {
-  const originals = Array.from(document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("input, textarea, select"));
-  const clones = Array.from(doc.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("input, textarea, select"));
+  const originals = Array.from(
+    document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("input, textarea, select")
+  );
+  const clones = Array.from(
+    doc.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("input, textarea, select")
+  );
 
   originals.forEach((original, index) => {
     const clone = clones[index];
@@ -163,15 +163,42 @@ function copyLiveFormState(doc: Document): void {
   });
 }
 
+function prepareScrollableSnapshot(): () => void {
+  scrollSnapshot.clear();
+  const candidates = new Set<HTMLElement>();
+  candidates.add(document.documentElement);
+  if (document.body) candidates.add(document.body);
+
+  for (const element of trackedScrollElements) {
+    if (element.isConnected) candidates.add(element);
+    else trackedScrollElements.delete(element);
+  }
+
+  const restores: Array<{ element: HTMLElement; previous: string | null }> = [];
+  for (const element of candidates) {
+    if (element.scrollTop === 0 && element.scrollLeft === 0) continue;
+    const key = `sf-scroll-${++scrollKeySequence}`;
+    restores.push({ element, previous: element.getAttribute(SCROLL_KEY_ATTRIBUTE) });
+    element.setAttribute(SCROLL_KEY_ATTRIBUTE, key);
+    scrollSnapshot.set(key, { top: element.scrollTop, left: element.scrollLeft });
+  }
+
+  return () => {
+    for (const { element, previous } of restores) {
+      if (previous === null) element.removeAttribute(SCROLL_KEY_ATTRIBUTE);
+      else element.setAttribute(SCROLL_KEY_ATTRIBUTE, previous);
+    }
+    scrollSnapshot.clear();
+  };
+}
+
 function copyScrollablePositions(doc: Document): void {
-  const originals = Array.from(document.querySelectorAll<HTMLElement>("*"));
-  const clones = Array.from(doc.querySelectorAll<HTMLElement>("*"));
-  originals.forEach((original, index) => {
-    const clone = clones[index];
-    if (!clone || (original.scrollTop === 0 && original.scrollLeft === 0)) return;
-    clone.scrollTop = original.scrollTop;
-    clone.scrollLeft = original.scrollLeft;
-  });
+  for (const [key, position] of scrollSnapshot) {
+    const clone = doc.querySelector<HTMLElement>(`[${SCROLL_KEY_ATTRIBUTE}="${key}"]`);
+    if (!clone) continue;
+    clone.scrollTop = position.top;
+    clone.scrollLeft = position.left;
+  }
 }
 
 function createCssColorNormalizer(doc: Document): (value: string, fallback: string) => string {
@@ -195,9 +222,7 @@ function createCssColorNormalizer(doc: Document): (value: string, fallback: stri
       const [red, green, blue, alphaByte] = context.getImageData(0, 0, 1, 1).data;
       const alpha = Math.round((alphaByte / 255) * 1000) / 1000;
       const normalized =
-        alpha >= 1
-          ? `rgb(${red}, ${green}, ${blue})`
-          : `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+        alpha >= 1 ? `rgb(${red}, ${green}, ${blue})` : `rgba(${red}, ${green}, ${blue}, ${alpha})`;
       cache.set(key, normalized);
       return normalized;
     } catch {
@@ -207,11 +232,45 @@ function createCssColorNormalizer(doc: Document): (value: string, fallback: stri
   };
 }
 
+function documentMayUseUnsupportedColors(doc: Document): boolean {
+  const styleSheetCount = doc.styleSheets.length;
+  if (doc === document && unsupportedCssCache?.styleSheetCount === styleSheetCount) {
+    return unsupportedCssCache.found;
+  }
+
+  let found = false;
+  for (const styleSheet of Array.from(doc.styleSheets)) {
+    try {
+      for (const rule of Array.from(styleSheet.cssRules)) {
+        if (UNSUPPORTED_COLOR_FUNCTION_RE.test(rule.cssText)) {
+          found = true;
+          break;
+        }
+      }
+    } catch {
+      // Cross-origin stylesheets are already excluded from screen-feed assets.
+    }
+    if (found) break;
+  }
+
+  if (!found) {
+    for (const element of Array.from(doc.querySelectorAll<HTMLElement>("[style]"))) {
+      if (UNSUPPORTED_COLOR_FUNCTION_RE.test(element.getAttribute("style") ?? "")) {
+        found = true;
+        break;
+      }
+    }
+  }
+
+  if (doc === document) unsupportedCssCache = { styleSheetCount, found };
+  return found;
+}
+
 function sanitizeComputedStyle(
   element: HTMLElement,
   computed: CSSStyleDeclaration,
   origin: string,
-  normalizeColor: (value: string, fallback: string) => string,
+  normalizeColor: (value: string, fallback: string) => string
 ): void {
   const backgroundImage = computed.backgroundImage;
   if (
@@ -245,10 +304,9 @@ function sanitizeComputedStyle(
   if (computed.mixBlendMode !== "normal") element.style.mixBlendMode = "normal";
 }
 
-function sanitizeClone(doc: Document): void {
+function sanitizeClone(doc: Document, sanitizeColors: boolean): void {
   const origin = window.location.origin;
   const view = doc.defaultView ?? window;
-  const normalizeColor = createCssColorNormalizer(doc);
   copyLiveFormState(doc);
   copyScrollablePositions(doc);
 
@@ -283,6 +341,9 @@ function sanitizeClone(doc: Document): void {
     if (href && !isSafeScreenFeedAssetUrl(href, origin)) element.remove();
   });
 
+  if (!sanitizeColors) return;
+
+  const normalizeColor = createCssColorNormalizer(doc);
   doc.querySelectorAll<HTMLElement>("*").forEach((element) => {
     try {
       sanitizeComputedStyle(element, view.getComputedStyle(element), origin, normalizeColor);
@@ -309,21 +370,27 @@ function sanitizeClone(doc: Document): void {
 }
 
 function buildHtml2CanvasOptions() {
+  const nativeScale = getScreenFeedCaptureScale(window.devicePixelRatio);
+  const viewportScale = Math.min(1, MAX_CAPTURE_WIDTH / Math.max(1, window.innerWidth));
+  const captureScale = Math.max(MIN_CAPTURE_SCALE, Math.min(nativeScale, viewportScale));
+  const sanitizeColors = documentMayUseUnsupportedColors(document);
+
   return {
-    scale: getScreenFeedCaptureScale(window.devicePixelRatio),
+    scale: captureScale,
     useCORS: true,
     allowTaint: false,
     logging: false,
     foreignObjectRendering: true,
-    imageTimeout: 2500,
+    imageTimeout: 1800,
     removeContainer: true,
-    onclone: (doc: Document) => sanitizeClone(doc),
+    onclone: (doc: Document) => sanitizeClone(doc, sanitizeColors),
     ignoreElements: (element: Element) => element.getAttribute("data-screenfeed-ignore") === "true",
   } as const;
 }
 
 async function tryCapture(opts: Record<string, unknown>, timeoutMs: number): Promise<HTMLCanvasElement> {
   const html2canvas = await loadHtml2Canvas();
+  const restoreScrollMarkers = prepareScrollableSnapshot();
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
@@ -344,6 +411,7 @@ async function tryCapture(opts: Record<string, unknown>, timeoutMs: number): Pro
     ]);
   } finally {
     if (timeoutId) clearTimeout(timeoutId);
+    restoreScrollMarkers();
   }
 }
 
@@ -385,7 +453,10 @@ function buildFallbackCanvas(reason: string): HTMLCanvasElement {
 
 async function withSafeCreatePattern<T>(fn: () => Promise<T>): Promise<T> {
   const original = CanvasRenderingContext2D.prototype.createPattern;
-  CanvasRenderingContext2D.prototype.createPattern = function (image: CanvasImageSource, repetition: string | null): CanvasPattern | null {
+  CanvasRenderingContext2D.prototype.createPattern = function (
+    image: CanvasImageSource,
+    repetition: string | null
+  ): CanvasPattern | null {
     try {
       return original.call(this, image, repetition);
     } catch {
@@ -423,21 +494,32 @@ function resizeCanvas(source: HTMLCanvasElement, maxWidth: number): HTMLCanvasEl
   return target;
 }
 
-function encodeFastFrame(canvas: HTMLCanvasElement): EncodedFrame | null {
-  const attempts = [
-    { maxWidth: 1440, quality: 0.72 },
-    { maxWidth: 1280, quality: 0.66 },
-    { maxWidth: 1120, quality: 0.58 },
-    { maxWidth: 960, quality: 0.5 },
-    { maxWidth: 800, quality: 0.44 },
-  ];
+function encodeFrame(canvas: HTMLCanvasElement, fast: boolean): EncodedFrame | null {
+  const attempts = fast
+    ? [
+        { maxWidth: 1440, quality: 0.7 },
+        { maxWidth: 1280, quality: 0.64 },
+        { maxWidth: 1120, quality: 0.56 },
+        { maxWidth: 960, quality: 0.48 },
+        { maxWidth: 800, quality: 0.42 },
+      ]
+    : [
+        { maxWidth: 1536, quality: 0.74 },
+        { maxWidth: 1440, quality: 0.7 },
+        { maxWidth: 1280, quality: 0.64 },
+        { maxWidth: 1120, quality: 0.56 },
+        { maxWidth: 960, quality: 0.5 },
+      ];
+  const limit = fast ? FAST_MAX_DATA_URL_LEN : MAX_DATA_URL_LEN;
   let lastFrame: EncodedFrame | null = null;
+
   for (const attempt of attempts) {
     const candidate = resizeCanvas(canvas, attempt.maxWidth);
     const dataUrl = candidate.toDataURL("image/jpeg", attempt.quality);
     lastFrame = { dataUrl, canvas: candidate, quality: attempt.quality };
-    if (dataUrl.length <= FAST_MAX_DATA_URL_LEN) return lastFrame;
+    if (dataUrl.length <= limit) return lastFrame;
   }
+
   return lastFrame && lastFrame.dataUrl.length <= MAX_DATA_URL_LEN ? lastFrame : null;
 }
 
@@ -457,11 +539,11 @@ async function captureCanvas(): Promise<CaptureCanvasResult> {
         tryCapture(
           {
             ...options,
-            scale: 0.5,
-            imageTimeout: 800,
+            scale: Math.min(Number(options.scale) || 0.5, 0.5),
+            imageTimeout: 700,
             foreignObjectRendering: false,
           },
-          RETRY_CAPTURE_TIMEOUT_MS,
+          RETRY_CAPTURE_TIMEOUT_MS
         )
       );
       trace("capture-ok-retry");
@@ -500,8 +582,15 @@ async function captureAndUpload(
   const { canvas, source, failureReason } = await captureCanvas();
   if (window.location.href !== expectedPath) {
     trace("capture-discarded-navigation");
-    return { uploaded: false, unchanged: false, failed: false, signature: null, latestClickTs: lastUploadedClickTs };
+    return {
+      uploaded: false,
+      unchanged: false,
+      failed: false,
+      signature: null,
+      latestClickTs: lastUploadedClickTs,
+    };
   }
+
   const signature = buildFrameSignature(canvas);
   const cutoff = Date.now() - CLICK_RETAIN_MS;
   const clicks = clickBuffer.filter((click) => click.ts >= cutoff);
@@ -513,7 +602,7 @@ async function captureAndUpload(
 
   let encoded: EncodedFrame | null;
   try {
-    encoded = fast ? encodeFastFrame(canvas) : { dataUrl: canvas.toDataURL("image/jpeg", 0.75), canvas, quality: 0.75 };
+    encoded = encodeFrame(canvas, fast);
   } catch (error) {
     trace("to-data-url-failed", errorMessage(error));
     return { uploaded: false, unchanged: false, failed: true, signature, latestClickTs };
@@ -556,7 +645,33 @@ async function captureAndUpload(
 
 function cursorsDiffer(previous: CursorEvent | null, next: CursorEvent): boolean {
   if (!previous) return true;
-  return previous.visible !== next.visible || Math.abs(previous.x - next.x) > 0.002 || Math.abs(previous.y - next.y) > 0.002 || next.ts - previous.ts > 1000;
+  return (
+    previous.visible !== next.visible ||
+    Math.abs(previous.x - next.x) > 0.002 ||
+    Math.abs(previous.y - next.y) > 0.002 ||
+    next.ts - previous.ts > 1000
+  );
+}
+
+function ignoredForCapture(node: Node | null): boolean {
+  const element = node instanceof Element ? node : node?.parentElement;
+  if (!element) return false;
+  return !!element.closest(
+    "[data-screenfeed-ignore='true'], .html2canvas-container, [data-screenfeed-capture-styles='true']"
+  );
+}
+
+function mutationHasVisibleChange(records: MutationRecord[]): boolean {
+  for (const record of records) {
+    if (ignoredForCapture(record.target)) continue;
+    if (record.type === "attributes" || record.type === "characterData") return true;
+    if (record.type !== "childList") continue;
+
+    const nodes = [...Array.from(record.addedNodes), ...Array.from(record.removedNodes)];
+    if (nodes.length === 0) return true;
+    if (nodes.some((node) => !ignoredForCapture(node))) return true;
+  }
+  return false;
 }
 
 export function useScreenFeed() {
@@ -564,96 +679,245 @@ export function useScreenFeed() {
   const watchedRef = useRef(false);
   const fastModeRef = useRef(false);
   const captureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const captureDueAtRef = useRef(0);
   const pointerTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pointerRef = useRef<CursorEvent | null>(null);
   const lastSentPointerRef = useRef<CursorEvent | null>(null);
   const lastSignatureRef = useRef<string | null>(null);
   const lastUploadedClickTsRef = useRef(0);
-  const unchangedFramesRef = useRef(0);
+  const lastCaptureAtRef = useRef(0);
+  const dirtyRef = useRef(false);
+  const dirtySinceRef = useRef(0);
 
   useEffect(() => {
     busyRef.current = false;
-    const onPointerMove = (event: PointerEvent) => {
-      const point = normalizeScreenFeedPoint(event.clientX, event.clientY, window.innerWidth, window.innerHeight);
-      pointerRef.current = { ...point, visible: true, ts: Date.now() };
-    };
-    const onPointerLeave = () => {
-      const previous = pointerRef.current ?? { x: 0, y: 0, visible: false, ts: Date.now() };
-      pointerRef.current = { ...previous, visible: false, ts: Date.now() };
-    };
-    window.addEventListener("pointermove", onPointerMove, { passive: true });
-    document.documentElement.addEventListener("pointerleave", onPointerLeave, { passive: true });
+    let disposed = false;
+    let lastObservedHref = window.location.href;
 
     const clearCaptureTimer = () => {
       if (captureTimerRef.current) clearTimeout(captureTimerRef.current);
       captureTimerRef.current = null;
+      captureDueAtRef.current = 0;
     };
-    const stopPointerLoop = () => {
-      if (pointerTimerRef.current) clearInterval(pointerTimerRef.current);
-      pointerTimerRef.current = null;
-      lastSentPointerRef.current = null;
+
+    function scheduleAt(dueAt: number) {
+      if (!watchedRef.current || document.visibilityState !== "visible" || disposed) return;
+      if (busyRef.current) return;
+      if (captureTimerRef.current && captureDueAtRef.current > 0 && captureDueAtRef.current <= dueAt) return;
+
+      clearCaptureTimer();
+      captureDueAtRef.current = dueAt;
+      captureTimerRef.current = setTimeout(() => {
+        captureTimerRef.current = null;
+        captureDueAtRef.current = 0;
+        runCaptureCycle();
+      }, Math.max(0, dueAt - Date.now()));
+    }
+
+    function scheduleIdleRefresh() {
+      if (!watchedRef.current || document.visibilityState !== "visible" || disposed || busyRef.current) return;
+      const base = lastCaptureAtRef.current || Date.now();
+      scheduleAt(base + IDLE_REFRESH_MS);
+    }
+
+    function markDirty(urgent = false) {
+      const now = Date.now();
+      if (window.location.href !== lastObservedHref) {
+        lastObservedHref = window.location.href;
+        lastSignatureRef.current = null;
+        urgent = true;
+      }
+      if (!dirtyRef.current) dirtySinceRef.current = now;
+      dirtyRef.current = true;
+
+      if (!watchedRef.current || document.visibilityState !== "visible" || busyRef.current || disposed) return;
+
+      const settleAt = urgent ? now : now + DIRTY_SETTLE_MS;
+      const minGapAt = lastCaptureAtRef.current + ACTIVE_CAPTURE_MIN_GAP_MS;
+      const maxLatencyAt = (dirtySinceRef.current || now) + MAX_DIRTY_LATENCY_MS;
+      const dueAt = Math.max(minGapAt, Math.min(settleAt, maxLatencyAt));
+      scheduleAt(dueAt);
+    }
+
+    function scheduleAfterCapture(failed: boolean) {
+      if (!watchedRef.current || document.visibilityState !== "visible" || disposed) return;
+      if (failed) {
+        if (!dirtyRef.current) dirtySinceRef.current = Date.now();
+        dirtyRef.current = true;
+        scheduleAt(Date.now() + FAILED_CAPTURE_BACKOFF_MS);
+        return;
+      }
+      if (dirtyRef.current) markDirty(false);
+      else scheduleIdleRefresh();
+    }
+
+    function runCaptureCycle() {
+      if (!watchedRef.current || busyRef.current || disposed) return;
+      if (document.visibilityState !== "visible") return;
+
+      const now = Date.now();
+      if (!dirtyRef.current && lastCaptureAtRef.current && now - lastCaptureAtRef.current < IDLE_REFRESH_MS) {
+        scheduleIdleRefresh();
+        return;
+      }
+
+      const minGapAt = lastCaptureAtRef.current + ACTIVE_CAPTURE_MIN_GAP_MS;
+      if (dirtyRef.current && lastCaptureAtRef.current && now < minGapAt) {
+        scheduleAt(minGapAt);
+        return;
+      }
+
+      busyRef.current = true;
+      dirtyRef.current = false;
+      dirtySinceRef.current = 0;
+      const expectedPath = window.location.href;
+
+      runWhenIdle(() => {
+        if (!watchedRef.current || document.visibilityState !== "visible" || disposed) {
+          busyRef.current = false;
+          if (watchedRef.current) markDirty(true);
+          return;
+        }
+
+        captureAndUpload(
+          fastModeRef.current,
+          lastSignatureRef.current,
+          lastUploadedClickTsRef.current,
+          pointerRef.current,
+          expectedPath
+        )
+          .then((result) => {
+            lastCaptureAtRef.current = Date.now();
+            if (result.uploaded) {
+              lastSignatureRef.current = result.signature;
+              lastUploadedClickTsRef.current = result.latestClickTs;
+            } else if (result.unchanged && result.signature) {
+              lastSignatureRef.current = result.signature;
+            } else if (!result.signature) {
+              if (!dirtyRef.current) dirtySinceRef.current = Date.now();
+              dirtyRef.current = true;
+            }
+            scheduleAfterCapture(result.failed);
+          })
+          .catch(() => {
+            lastCaptureAtRef.current = Date.now();
+            scheduleAfterCapture(true);
+          })
+          .finally(() => {
+            busyRef.current = false;
+            if (dirtyRef.current) markDirty(false);
+            else scheduleIdleRefresh();
+          });
+      });
+    }
+
+    const onPointerMove = (event: PointerEvent) => {
+      const point = normalizeScreenFeedPoint(event.clientX, event.clientY, window.innerWidth, window.innerHeight);
+      pointerRef.current = { ...point, visible: true, ts: Date.now() };
     };
+
+    const onPointerLeave = () => {
+      const previous = pointerRef.current ?? { x: 0, y: 0, visible: false, ts: Date.now() };
+      pointerRef.current = { ...previous, visible: false, ts: Date.now() };
+    };
+
+    const onClick = (event: MouseEvent) => {
+      if (!watchedRef.current) return;
+      const target = event.target instanceof HTMLElement ? event.target : event.target instanceof Element ? event.target.parentElement : null;
+      if (!target || target.closest("[data-screenfeed-ignore='true']")) return;
+      const point = normalizeScreenFeedPoint(event.clientX, event.clientY, window.innerWidth, window.innerHeight);
+      clickBuffer.push({ ...point, label: trimLabel(target), ts: Date.now() });
+      if (clickBuffer.length > 50) clickBuffer.shift();
+      markDirty(false);
+    };
+
+    const onInput = (event: Event) => {
+      if (!watchedRef.current || ignoredForCapture(event.target as Node | null)) return;
+      markDirty(false);
+    };
+
+    const onScroll = (event: Event) => {
+      if (!watchedRef.current) return;
+      if (event.target instanceof HTMLElement && !ignoredForCapture(event.target)) {
+        trackedScrollElements.add(event.target);
+      }
+      markDirty(false);
+    };
+
+    const onResize = () => {
+      lastSignatureRef.current = null;
+      markDirty(false);
+    };
+
+    const onNavigation = () => {
+      lastObservedHref = window.location.href;
+      lastSignatureRef.current = null;
+      markDirty(true);
+    };
+
     const sendPointerUpdate = () => {
       const cursor = pointerRef.current;
-      if (!watchedRef.current || !cursor || !cursorsDiffer(lastSentPointerRef.current, cursor)) return;
+      if (
+        !watchedRef.current ||
+        document.visibilityState !== "visible" ||
+        !cursor ||
+        !cursorsDiffer(lastSentPointerRef.current, cursor)
+      ) {
+        return;
+      }
       lastSentPointerRef.current = cursor;
       void fetch("/api/screen-feed/pointer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ cursor }),
-      }).catch(() => { lastSentPointerRef.current = null; });
+      }).catch(() => {
+        lastSentPointerRef.current = null;
+      });
     };
+
     const startPointerLoop = () => {
       if (pointerTimerRef.current) return;
       sendPointerUpdate();
       pointerTimerRef.current = setInterval(sendPointerUpdate, POINTER_INTERVAL_MS);
     };
+
+    const stopPointerLoop = () => {
+      if (pointerTimerRef.current) clearInterval(pointerTimerRef.current);
+      pointerTimerRef.current = null;
+      lastSentPointerRef.current = null;
+    };
+
     const stopCapturing = () => {
       clearCaptureTimer();
       stopPointerLoop();
       lastSignatureRef.current = null;
       lastUploadedClickTsRef.current = 0;
-      unchangedFramesRef.current = 0;
+      lastCaptureAtRef.current = 0;
+      dirtyRef.current = false;
+      dirtySinceRef.current = 0;
+      clickBuffer.length = 0;
+      trackedScrollElements.clear();
     };
-    const scheduleCapture = (delayMs: number) => {
-      clearCaptureTimer();
-      if (watchedRef.current) captureTimerRef.current = setTimeout(runCaptureCycle, delayMs);
-    };
-    const runCaptureCycle = () => {
-      captureTimerRef.current = null;
-      if (!watchedRef.current || busyRef.current) return;
-      busyRef.current = true;
-      const expectedPath = window.location.href;
-      runWhenIdle(() => {
-        captureAndUpload(fastModeRef.current, lastSignatureRef.current, lastUploadedClickTsRef.current, pointerRef.current, expectedPath)
-          .then((result) => {
-            if (result.uploaded) {
-              lastSignatureRef.current = result.signature;
-              lastUploadedClickTsRef.current = result.latestClickTs;
-              unchangedFramesRef.current = 0;
-            } else if (result.unchanged) {
-              unchangedFramesRef.current += 1;
-            }
-            if (!watchedRef.current) return;
-            const delay = fastModeRef.current ? nextScreenFeedCaptureDelay(unchangedFramesRef.current, result.failed) : LEGACY_CAPTURE_INTERVAL_MS;
-            scheduleCapture(delay);
-          })
-          .finally(() => { busyRef.current = false; });
-      });
-    };
+
     const applyWatchStatus = (watched: boolean, fast: boolean) => {
+      const wasWatched = watchedRef.current;
+      const modeChanged = fastModeRef.current !== fast;
       fastModeRef.current = fast;
+
       if (watched) {
-        const wasWatched = watchedRef.current;
         watchedRef.current = true;
         startPointerLoop();
-        if (!wasWatched && !busyRef.current) scheduleCapture(0);
-      } else if (watchedRef.current) {
+        if (!wasWatched || modeChanged) {
+          lastSignatureRef.current = null;
+          markDirty(true);
+        }
+      } else if (wasWatched) {
         watchedRef.current = false;
         stopCapturing();
       }
     };
+
     const pollWatcherStatus = async () => {
       try {
         const response = await fetch("/api/screen-feed/being-watched", { credentials: "include" });
@@ -693,22 +957,58 @@ export function useScreenFeed() {
       startFallbackPolling();
     }
 
-    const onNavigation = () => {
-      lastSignatureRef.current = null;
-      if (watchedRef.current && !busyRef.current) scheduleCapture(0);
+    const mutationObserver = new MutationObserver((records) => {
+      if (!watchedRef.current || !mutationHasVisibleChange(records)) return;
+      markDirty(false);
+    });
+    mutationObserver.observe(document.body, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ["value", "checked", "selected", "aria-expanded", "aria-checked", "data-state", "hidden"],
+    });
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") {
+        clearCaptureTimer();
+        return;
+      }
+      if (watchedRef.current) {
+        lastSignatureRef.current = null;
+        markDirty(true);
+        sendPointerUpdate();
+      }
     };
+
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    document.documentElement.addEventListener("pointerleave", onPointerLeave, { passive: true });
+    window.addEventListener("click", onClick, { capture: true });
+    document.addEventListener("input", onInput, { capture: true });
+    document.addEventListener("change", onInput, { capture: true });
+    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
     window.addEventListener("popstate", onNavigation);
     window.addEventListener("hashchange", onNavigation);
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
+      disposed = true;
+      mutationObserver.disconnect();
       eventSource?.close();
       stopFallbackPolling();
       watchedRef.current = false;
       stopCapturing();
       window.removeEventListener("pointermove", onPointerMove);
       document.documentElement.removeEventListener("pointerleave", onPointerLeave);
+      window.removeEventListener("click", onClick, true);
+      document.removeEventListener("input", onInput, true);
+      document.removeEventListener("change", onInput, true);
+      document.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onResize);
       window.removeEventListener("popstate", onNavigation);
       window.removeEventListener("hashchange", onNavigation);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 }
