@@ -9,6 +9,7 @@ const transportSource = read("server/routes/screenFeedTransportHardening.ts");
 const routesSource = read("server/routes/applicationRoutes.ts");
 const viewerSource = read("client/src/pages/settings/WatchUserDialog.tsx");
 const captureSource = read("client/src/hooks/use-screen-feed.ts");
+const capturePolicySource = read("client/src/hooks/screen-feed-capture-policy.ts");
 
 describe("Phase 5 faster remote viewing contracts", () => {
   it("keeps fast mode disabled by default", () => {
@@ -46,10 +47,21 @@ describe("Phase 5 faster remote viewing contracts", () => {
     expect(viewerSource).toContain("setLiveCursor(null)");
   });
 
-  it("keeps client-side upload serialization and failed-upload backoff", () => {
+  it("keeps client-side serialization while making full-frame capture dirty-driven", () => {
     expect(captureSource).toContain("busyRef.current");
-    expect(captureSource).toContain("nextScreenFeedCaptureDelay(unchangedFramesRef.current, result.failed)");
+    expect(captureSource).toContain("new MutationObserver");
+    expect(captureSource).toContain("document.visibilityState !== \"visible\"");
+    expect(captureSource).toContain("ACTIVE_CAPTURE_MIN_GAP_MS");
+    expect(captureSource).toContain("IDLE_REFRESH_MS");
+    expect(captureSource).toContain("FAILED_CAPTURE_BACKOFF_MS");
+    expect(captureSource).toContain("markDirty(");
     expect(captureSource).toContain("startFallbackPolling()");
     expect(captureSource).toContain("eventSource?.close()");
+  });
+
+  it("prevents the old sub-second continuous full-frame capture loop from returning", () => {
+    expect(capturePolicySource).toContain("ACTIVE_CAPTURE_MIN_GAP_MS = 850");
+    expect(capturePolicySource).toContain("IDLE_REFRESH_MS = 60000");
+    expect(capturePolicySource).not.toContain("ACTIVE_CAPTURE_DELAY_MS = 150");
   });
 });
