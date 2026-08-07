@@ -35,8 +35,8 @@ export class RemoteControllerRequestError extends Error {
   }
 }
 
-interface ControllerTargetResponse {
-  session?: RemoteControllerSessionView | null;
+interface ControllerActiveResponse {
+  sessions?: RemoteControllerSessionView[];
 }
 
 interface RemoteControllerSessionContextValue {
@@ -153,14 +153,31 @@ export function RemoteControllerSessionProvider({ children }: { children: ReactN
     if (existing?.targetUserId === activeTarget.userId) return existing.promise;
 
     let request: Promise<RemoteControllerSessionView | null>;
-    request = remoteControllerRequestJson<ControllerTargetResponse>(
-      `/api/screen-feed/control/sessions/controller-target/${encodeURIComponent(activeTarget.userId)}`
+    request = remoteControllerRequestJson<ControllerActiveResponse>(
+      "/api/screen-feed/control/sessions/controller-active"
     )
       .then((payload) => {
         if (targetRef.current?.userId !== activeTarget.userId) return null;
-        const next = normalizeSession(payload.session, activeTarget.userId);
-        setSession(next);
-        return next;
+        const candidate = Array.isArray(payload.sessions)
+          ? payload.sessions.find((item) => item?.targetUserId === activeTarget.userId)
+          : undefined;
+        const next = normalizeSession(candidate, activeTarget.userId);
+        if (!next) {
+          setSession(null);
+          return null;
+        }
+
+        const current = sessionRef.current;
+        const merged =
+          current?.id === next.id
+            ? {
+                ...next,
+                mouseAuthorization: next.mouseAuthorization ?? current.mouseAuthorization,
+                keyboardAuthorization: next.keyboardAuthorization ?? current.keyboardAuthorization,
+              }
+            : next;
+        setSession(merged);
+        return merged;
       })
       .finally(() => {
         if (refreshInFlightRef.current?.promise === request) refreshInFlightRef.current = null;
