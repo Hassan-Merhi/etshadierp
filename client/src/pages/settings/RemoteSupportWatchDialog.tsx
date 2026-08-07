@@ -1,6 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Clock, History, RefreshCw, Wifi, WifiOff, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Clock,
+  History,
+  Maximize2,
+  Monitor,
+  RefreshCw,
+  Wifi,
+  WifiOff,
+  X,
+  ZoomIn,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { apiRequest } from "@/lib/queryClient";
@@ -34,6 +45,8 @@ interface ActivityEvent {
 interface GroupedActivityEvent extends ActivityEvent {
   count: number;
 }
+
+type DisplayMode = "fit" | "actual";
 
 const FALLBACK_POLL_MS = 3000;
 
@@ -88,9 +101,11 @@ function ScreenFeedDialog({
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [displayMode, setDisplayMode] = useState<DisplayMode>("fit");
   const stateRef = useRef<FastPollState>({ etag: null, frame: null });
   const connectedRef = useRef(false);
   const pollAbortRef = useRef<AbortController | null>(null);
+  const viewerSurfaceRef = useRef<HTMLDivElement>(null);
 
   const { data: presenceRaw } = useQuery<any>({
     queryKey: ["/api/user-presence", userId],
@@ -197,6 +212,10 @@ function ScreenFeedDialog({
       : date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   };
 
+  const openNativeFullscreen = () => {
+    if (viewerSurfaceRef.current?.requestFullscreen) void viewerSurfaceRef.current.requestFullscreen();
+  };
+
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
@@ -205,9 +224,11 @@ function ScreenFeedDialog({
         data-watched-user-id={userId}
         data-screenfeed-ignore="true"
       >
-        <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
           <div className="min-w-0">
-            <div className="font-semibold truncate">Watching {username}</div>
+            <div className="font-semibold truncate" data-watch-username={username}>
+              Watching {username}
+            </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               {liveTransportEnabled && connected ? (
                 <Wifi className="h-3.5 w-3.5" />
@@ -219,11 +240,32 @@ function ScreenFeedDialog({
               {presence?.lastSeen ? <span>· last seen {fmtTime(presence.lastSeen)}</span> : null}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => void pollOnce()} disabled={refreshing}>
               <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
               Refresh
             </Button>
+            <Button
+              size="sm"
+              variant={displayMode === "fit" ? "default" : "outline"}
+              onClick={() => setDisplayMode("fit")}
+              data-testid="button-feed-fit"
+            >
+              <Monitor className="mr-1.5 h-3.5 w-3.5" /> Fit
+            </Button>
+            <Button
+              size="sm"
+              variant={displayMode === "actual" ? "default" : "outline"}
+              onClick={() => setDisplayMode("actual")}
+              data-testid="button-feed-actual"
+            >
+              <ZoomIn className="mr-1.5 h-3.5 w-3.5" /> 100%
+            </Button>
+            {frame?.dataUrl ? (
+              <Button size="sm" variant="outline" onClick={openNativeFullscreen} data-testid="button-fullscreen-feed">
+                <Maximize2 className="mr-1.5 h-3.5 w-3.5" /> Full Screen
+              </Button>
+            ) : null}
             <Button variant="ghost" size="icon" aria-label="Close viewer" onClick={onClose}>
               <X className="h-5 w-5" />
             </Button>
@@ -238,17 +280,25 @@ function ScreenFeedDialog({
         ) : null}
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          <div className="flex min-w-0 flex-1 items-center justify-center overflow-auto bg-black">
+          <div
+            ref={viewerSurfaceRef}
+            className={`flex min-w-0 flex-1 bg-black ${
+              displayMode === "fit"
+                ? "items-center justify-center overflow-hidden"
+                : "items-start justify-start overflow-auto"
+            }`}
+            data-testid="screen-feed-viewport"
+          >
             {frame?.dataUrl ? (
               <img
                 src={frame.dataUrl}
                 alt={`Live screen for ${username}`}
-                className="max-h-full max-w-full object-contain"
+                className={displayMode === "fit" ? "max-h-full max-w-full object-contain" : "max-h-none max-w-none object-none"}
                 draggable={false}
                 data-testid="img-screen-feed"
               />
             ) : (
-              <div className="flex flex-col items-center gap-2 text-sm text-white/70">
+              <div className="m-auto flex flex-col items-center gap-2 text-sm text-white/70">
                 <Clock className="h-9 w-9 opacity-40" />
                 <span>Waiting for the first screen frame…</span>
               </div>
@@ -349,7 +399,9 @@ export function RemoteSupportWatchDialog(props: {
   return (
     <ScreenFeedDialog
       {...props}
-      liveTransportEnabled={!isError && runtime?.flags?.screenFeedEnabled === true && runtime.flags.fastScreenFeed === true}
+      liveTransportEnabled={
+        !isError && runtime?.flags?.screenFeedEnabled === true && runtime?.flags?.fastScreenFeed === true
+      }
     />
   );
 }
