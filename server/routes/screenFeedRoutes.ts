@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { requireAuth, requireLogin } from "../auth";
 import { logger } from "../lib/logger";
 import { requireActionAccess } from "../lib/permissionMiddleware";
-import { getSessionCompanyId, getSessionRole, getSessionUserId, getSessionUsername } from "../lib/requestContext";
+import { getSessionRole, getSessionUserId, getSessionUsername } from "../lib/requestContext";
 import {
   screenFeedCursorStore,
   screenFeedStore,
@@ -10,15 +10,7 @@ import {
   type ScreenFeedCursor,
   type ScreenFrame,
 } from "../screenFeedStore";
-import {
-  RemoteControlSessionError,
-  heartbeatRemoteControlController,
-  isRemoteControlControllerRole,
-  startRemoteControlSession,
-  stopAllRemoteControlSessions,
-  stopRemoteControlSession,
-  type RemoteControlSession,
-} from "../services/remoteControlSessionService";
+import { isRemoteControlControllerRole, stopAllRemoteControlSessions } from "../services/remoteControlSessionService";
 import { screenFeedLiveHub } from "../services/screenFeedLiveHub";
 import {
   isValidScreenFeedDataUrl,
@@ -28,7 +20,6 @@ import {
   sanitizeScreenFeedCursor,
   sanitizeScreenFeedViewport,
 } from "../services/screenFeedService";
-import { writeRemoteSupportAudit } from "../services/remoteSupportAuditService";
 import {
   emergencyDisableRemoteSupport,
   getRemoteSupportRuntimeSnapshot,
@@ -115,25 +106,6 @@ function serializeFrame(frame: ScreenFrame) {
   };
 }
 
-function serializeControlSession(session: RemoteControlSession) {
-  return {
-    id: session.id,
-    companyId: session.companyId,
-    targetUserId: session.targetUserId,
-    targetUsername: session.targetUsername,
-    targetTabId: session.targetTabId,
-    targetRoute: session.targetRoute,
-    controllerUserId: session.controllerUserId,
-    controllerUsername: session.controllerUsername,
-    controllerRole: session.controllerRole,
-    scope: session.scope,
-    status: session.status,
-    startedAt: new Date(session.startedAt).toISOString(),
-    expiresAt: new Date(session.expiresAt).toISOString(),
-    capabilities: session.capabilities,
-  };
-}
-
 export function registerScreenFeedRoutes(app: Express) {
   app.get("/api/screen-feed/admin/runtime", requireAuth, (req, res) => {
     if (!requireDeveloper(req, res)) return;
@@ -185,7 +157,8 @@ export function registerScreenFeedRoutes(app: Express) {
 
   app.get("/api/screen-feed/live/status", requireLogin, (req, res) => {
     if (!isRemoteSupportEnabled("screenFeedEnabled") || !isRemoteSupportEnabled("fastScreenFeed")) {
-      return res.status(409).json({ live: false });
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(204).end();
     }
     const userId = String(getSessionUserId(req));
     openEventStream(res);
@@ -214,61 +187,14 @@ export function registerScreenFeedRoutes(app: Express) {
   app.get("/api/screen-feed/live/:userId", requireAuth, viewPermission, (req, res) => {
     if (!requireSupportController(req, res)) return;
     if (!isRemoteSupportEnabled("screenFeedEnabled") || !isRemoteSupportEnabled("fastScreenFeed")) {
-      return res.status(409).json({ live: false });
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(204).end();
     }
 
     const watchedUserId = req.params.userId;
-    const controllerUserId = String(getSessionUserId(req));
-    const controllerUsername = getSessionUsername(req) || controllerUserId;
-    const controllerRole = getSessionRole(req) || "";
-    const controllerCompanyId = getSessionCompanyId(req);
     openEventStream(res);
     recordRemoteSupportMetric("liveViewerConnected");
     watcherPollStore.set(watchedUserId, Date.now());
-
-    let controlSessionId: string | null = null;
-    let controlStarting = false;
-    const tryStartControlSession = async () => {
-      if (controlSessionId || controlStarting || !isRemoteSupportEnabled("remoteControl")) return;
-      controlStarting = true;
-      try {
-        const session = startRemoteControlSession({
-          targetUserId: watchedUserId,
-          controllerUserId,
-          controllerUsername,
-          controllerRole,
-          controllerCompanyId,
-        });
-        try {
-          await writeRemoteSupportAudit({
-            event: "session_started",
-            session,
-            actorUserId: controllerUserId,
-            actorUsername: controllerUsername,
-            details: { capability: "view", status: "requested", route: session.targetRoute },
-          });
-        } catch {
-          stopRemoteControlSession(session.id, "audit-unavailable");
-          writeEvent(res, "control-error", {
-            code: "REMOTE_SUPPORT_AUDIT_UNAVAILABLE",
-            message: "Remote support auditing is unavailable. Control was not enabled.",
-          });
-          return;
-        }
-        controlSessionId = session.id;
-        writeEvent(res, "control-session", serializeControlSession(session));
-      } catch (error) {
-        if (
-          error instanceof RemoteControlSessionError &&
-          ["TARGET_TAB_UNAVAILABLE", "TARGET_ALREADY_CONTROLLED", "REMOTE_CONTROL_DISABLED"].includes(error.code)
-        ) {
-          return;
-        }
-        logger.warn(`[RemoteSupport] unable to start control session for user ${watchedUserId}: ${String(error)}`);
-      } finally {
-        controlStarting = false;
-      }
-    };
 
     const unsubscribeFrames = screenFeedLiveHub.subscribeFrames(watchedUserId, (frame) => {
       writeEvent(res, "frame", serializeFrame(frame));
@@ -279,14 +205,8 @@ export function registerScreenFeedRoutes(app: Express) {
     let unsubscribeDisconnect = () => {};
     let closed = false;
 
-    void tryStartControlSession();
     const heartbeatId = setInterval(() => {
       watcherPollStore.set(watchedUserId, Date.now());
-      if (controlSessionId) {
-        const active = heartbeatRemoteControlController(controlSessionId, controllerUserId);
-        if (!active) controlSessionId = null;
-      }
-      void tryStartControlSession();
       writeHeartbeat(res);
     }, LIVE_HEARTBEAT_MS);
 
@@ -300,19 +220,6 @@ export function registerScreenFeedRoutes(app: Express) {
       if (!screenFeedLiveHub.hasViewer(watchedUserId)) {
         watcherPollStore.delete(watchedUserId);
         screenFeedLiveHub.notifyStatus(watchedUserId);
-        if (controlSessionId) {
-          const stopped = stopRemoteControlSession(controlSessionId, "controller-stopped");
-          if (stopped) {
-            void writeRemoteSupportAudit({
-              event: "session_stopped",
-              session: stopped,
-              actorUserId: controllerUserId,
-              actorUsername: controllerUsername,
-              details: { capability: "view", stopReason: "controller-stopped", route: stopped.targetRoute },
-            }).catch(() => undefined);
-          }
-          controlSessionId = null;
-        }
       }
       if (!res.writableEnded) res.end();
     };
@@ -362,7 +269,9 @@ export function registerScreenFeedRoutes(app: Express) {
     const userId = String(getSessionUserId(req));
     if (!isUserBeingWatched(userId)) return res.status(204).end();
     const cursor = sanitizeScreenFeedCursor(req.body?.cursor ?? req.body);
-    if (!cursor) return res.status(400).json({ message: "Invalid pointer update." });
+    // Pointer telemetry is visual-only. A stale/skewed sample must never create
+    // a 400 retry loop or interfere with the employee's ERP session.
+    if (!cursor) return res.status(204).end();
     screenFeedCursorStore.set(userId, cursor);
     const existingFrame = screenFeedStore.get(userId);
     if (existingFrame) existingFrame.cursor = cursor;

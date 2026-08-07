@@ -1,0 +1,712 @@
+import { hashScreenFeedPixels, shouldUploadScreenFrame } from "./screen-feed-capture-policy";
+import {
+  approximateDataUrlBytes,
+  getScreenFeedCaptureScale,
+  isSafeScreenFeedAssetUrl,
+  shouldPreserveScreenFeedBackground,
+} from "./screen-feed-viewing-quality";
+
+const CAPTURE_TIMEOUT_MS = 9000;
+const RETRY_CAPTURE_TIMEOUT_MS = 5000;
+const UPLOAD_TIMEOUT_MS = 8000;
+const CLICK_RETAIN_MS = 8000;
+const MAX_DATA_URL_LEN = 1_300_000;
+const FAST_MAX_DATA_URL_LEN = 560_000;
+const SIGNATURE_WIDTH = 32;
+const SIGNATURE_HEIGHT = 18;
+const MAX_CAPTURE_WIDTH = 1536;
+const MIN_CAPTURE_SCALE = 0.4;
+const SCROLL_KEY_ATTRIBUTE = "data-screenfeed-scroll-key";
+const UNSUPPORTED_COLOR_FUNCTION_RE = /\b(?:color|color-mix|lab|lch|oklab|oklch)\(/i;
+
+const isDev = import.meta.env.DEV;
+
+type Html2Canvas = (typeof import("html2canvas"))["default"];
+type CaptureSource = "dom" | "retry" | "fallback";
+let html2canvasPromise: Promise<Html2Canvas> | null = null;
+let scrollKeySequence = 0;
+let unsupportedCssCache: { styleSheetCount: number; found: boolean } | null = null;
+
+export interface ScreenFeedClickEvent {
+  x: number;
+  y: number;
+  label: string;
+  ts: number;
+}
+
+export interface ScreenFeedCursorEvent {
+  x: number;
+  y: number;
+  visible: boolean;
+  ts: number;
+}
+
+export interface ScreenFeedCaptureResult {
+  uploaded: boolean;
+  unchanged: boolean;
+  failed: boolean;
+  cancelled: boolean;
+  signature: string | null;
+  latestClickTs: number;
+}
+
+interface EncodedFrame {
+  dataUrl: string;
+  canvas: HTMLCanvasElement;
+  quality: number;
+}
+
+interface CaptureCanvasResult {
+  canvas: HTMLCanvasElement;
+  source: CaptureSource;
+  failureReason?: string;
+}
+
+interface ScrollSnapshotLease {
+  snapshot: Map<string, { top: number; left: number }>;
+  restore: () => void;
+}
+
+async function loadHtml2Canvas(): Promise<Html2Canvas> {
+  if (!html2canvasPromise) {
+    html2canvasPromise = import("html2canvas")
+      .then((module) => module.default)
+      .catch((error) => {
+        html2canvasPromise = null;
+        throw error;
+      });
+  }
+  return html2canvasPromise;
+}
+
+function trace(event: string, extra?: string): void {
+  if (!isDev) return;
+  const url = `/api/screen-feed/trace/${encodeURIComponent(event)}${extra ? `?d=${encodeURIComponent(extra)}` : ""}`;
+  fetch(url, { credentials: "include" }).catch(() => {});
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message.slice(0, 180) : String(error).slice(0, 180);
+}
+
+function isCaptureTimeout(error: unknown): boolean {
+  return error instanceof Error && error.message.startsWith("timeout-");
+}
+
+async function waitForCaptureReady(): Promise<void> {
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  try {
+    await Promise.race([
+      document.fonts?.ready ?? Promise.resolve(),
+      new Promise<void>((resolve) => setTimeout(resolve, 500)),
+    ]);
+  } catch {
+    // Font readiness must never block capture.
+  }
+}
+
+function copyLiveFormState(doc: Document): void {
+  const originals = Array.from(
+    document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("input, textarea, select")
+  );
+  const clones = Array.from(
+    doc.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("input, textarea, select")
+  );
+
+  originals.forEach((original, index) => {
+    const clone = clones[index];
+    if (!clone) return;
+    if (original instanceof HTMLInputElement && clone instanceof HTMLInputElement) {
+      clone.value = original.value;
+      clone.checked = original.checked;
+      clone.setAttribute("value", original.value);
+      if (original.checked) clone.setAttribute("checked", "checked");
+      else clone.removeAttribute("checked");
+    } else if (original instanceof HTMLTextAreaElement && clone instanceof HTMLTextAreaElement) {
+      clone.value = original.value;
+      clone.textContent = original.value;
+    } else if (original instanceof HTMLSelectElement && clone instanceof HTMLSelectElement) {
+      clone.value = original.value;
+      Array.from(clone.options).forEach((option, optionIndex) => {
+        option.selected = original.options[optionIndex]?.selected ?? false;
+      });
+    }
+  });
+
+  const editableOriginals = Array.from(document.querySelectorAll<HTMLElement>("[contenteditable='true']"));
+  const editableClones = Array.from(doc.querySelectorAll<HTMLElement>("[contenteditable='true']"));
+  editableOriginals.forEach((original, index) => {
+    if (editableClones[index]) editableClones[index].innerHTML = original.innerHTML;
+  });
+}
+
+function prepareScrollableSnapshot(scrollElements: Iterable<HTMLElement>): ScrollSnapshotLease {
+  const snapshot = new Map<string, { top: number; left: number }>();
+  const candidates = new Set<HTMLElement>();
+  candidates.add(document.documentElement);
+  if (document.body) candidates.add(document.body);
+  for (const element of scrollElements) {
+    if (element.isConnected) candidates.add(element);
+  }
+
+  const restores: Array<{ element: HTMLElement; previous: string | null }> = [];
+  for (const element of candidates) {
+    if (element.scrollTop === 0 && element.scrollLeft === 0) continue;
+    const key = `sf-scroll-${++scrollKeySequence}`;
+    restores.push({ element, previous: element.getAttribute(SCROLL_KEY_ATTRIBUTE) });
+    element.setAttribute(SCROLL_KEY_ATTRIBUTE, key);
+    snapshot.set(key, { top: element.scrollTop, left: element.scrollLeft });
+  }
+
+  return {
+    snapshot,
+    restore: () => {
+      for (const { element, previous } of restores) {
+        if (previous === null) element.removeAttribute(SCROLL_KEY_ATTRIBUTE);
+        else element.setAttribute(SCROLL_KEY_ATTRIBUTE, previous);
+      }
+      snapshot.clear();
+    },
+  };
+}
+
+function copyScrollablePositions(doc: Document, snapshot: Map<string, { top: number; left: number }>): void {
+  for (const [key, position] of snapshot) {
+    const clone = doc.querySelector<HTMLElement>(`[${SCROLL_KEY_ATTRIBUTE}="${key}"]`);
+    if (!clone) continue;
+    clone.scrollTop = position.top;
+    clone.scrollLeft = position.left;
+  }
+}
+
+function createCssColorNormalizer(doc: Document): (value: string, fallback: string) => string {
+  const canvas = doc.createElement("canvas");
+  canvas.width = 1;
+  canvas.height = 1;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  const cache = new Map<string, string>();
+
+  return (value: string, fallback: string): string => {
+    const key = `${value}\u0000${fallback}`;
+    const cached = cache.get(key);
+    if (cached) return cached;
+    if (!context) return fallback;
+
+    try {
+      context.clearRect(0, 0, 1, 1);
+      context.fillStyle = fallback;
+      context.fillStyle = value;
+      context.fillRect(0, 0, 1, 1);
+      const [red, green, blue, alphaByte] = context.getImageData(0, 0, 1, 1).data;
+      const alpha = Math.round((alphaByte / 255) * 1000) / 1000;
+      const normalized = alpha >= 1 ? `rgb(${red}, ${green}, ${blue})` : `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+      cache.set(key, normalized);
+      return normalized;
+    } catch {
+      cache.set(key, fallback);
+      return fallback;
+    }
+  };
+}
+
+function documentMayUseUnsupportedColors(doc: Document): boolean {
+  const styleSheetCount = doc.styleSheets.length;
+  if (doc === document && unsupportedCssCache?.styleSheetCount === styleSheetCount) {
+    return unsupportedCssCache.found;
+  }
+
+  let found = false;
+  for (const styleSheet of Array.from(doc.styleSheets)) {
+    try {
+      for (const rule of Array.from(styleSheet.cssRules)) {
+        if (UNSUPPORTED_COLOR_FUNCTION_RE.test(rule.cssText)) {
+          found = true;
+          break;
+        }
+      }
+    } catch {
+      // Cross-origin stylesheet inspection is optional.
+    }
+    if (found) break;
+  }
+
+  if (!found) {
+    for (const element of Array.from(doc.querySelectorAll<HTMLElement>("[style]"))) {
+      if (UNSUPPORTED_COLOR_FUNCTION_RE.test(element.getAttribute("style") ?? "")) {
+        found = true;
+        break;
+      }
+    }
+  }
+
+  if (doc === document) unsupportedCssCache = { styleSheetCount, found };
+  return found;
+}
+
+function sanitizeComputedStyle(
+  element: HTMLElement,
+  computed: CSSStyleDeclaration,
+  origin: string,
+  normalizeColor: (value: string, fallback: string) => string
+): void {
+  const backgroundImage = computed.backgroundImage;
+  if (
+    !shouldPreserveScreenFeedBackground(backgroundImage, origin) ||
+    UNSUPPORTED_COLOR_FUNCTION_RE.test(backgroundImage)
+  ) {
+    element.style.backgroundImage = "none";
+  }
+
+  element.style.color = normalizeColor(computed.color, "rgb(0, 0, 0)");
+  element.style.backgroundColor = normalizeColor(computed.backgroundColor, "rgba(0, 0, 0, 0)");
+  element.style.borderTopColor = normalizeColor(computed.borderTopColor, "rgba(0, 0, 0, 0)");
+  element.style.borderRightColor = normalizeColor(computed.borderRightColor, "rgba(0, 0, 0, 0)");
+  element.style.borderBottomColor = normalizeColor(computed.borderBottomColor, "rgba(0, 0, 0, 0)");
+  element.style.borderLeftColor = normalizeColor(computed.borderLeftColor, "rgba(0, 0, 0, 0)");
+  element.style.outlineColor = normalizeColor(computed.outlineColor, "rgba(0, 0, 0, 0)");
+  element.style.textDecorationColor = normalizeColor(computed.textDecorationColor, computed.color);
+  element.style.caretColor = "transparent";
+
+  if (computed.boxShadow !== "none" && UNSUPPORTED_COLOR_FUNCTION_RE.test(computed.boxShadow)) {
+    element.style.boxShadow = "none";
+  }
+  if (computed.textShadow !== "none" && UNSUPPORTED_COLOR_FUNCTION_RE.test(computed.textShadow)) {
+    element.style.textShadow = "none";
+  }
+  if (computed.borderImageSource !== "none" && UNSUPPORTED_COLOR_FUNCTION_RE.test(computed.borderImageSource)) {
+    element.style.borderImageSource = "none";
+  }
+  if (computed.filter !== "none") element.style.filter = "none";
+  if (computed.backdropFilter !== "none") element.style.backdropFilter = "none";
+  if (computed.mixBlendMode !== "normal") element.style.mixBlendMode = "normal";
+}
+
+function sanitizeClone(
+  doc: Document,
+  snapshot: Map<string, { top: number; left: number }>,
+  sanitizeColors: boolean
+): void {
+  const origin = window.location.origin;
+  const view = doc.defaultView ?? window;
+  copyLiveFormState(doc);
+  copyScrollablePositions(doc, snapshot);
+
+  const captureOverrides = doc.createElement("style");
+  captureOverrides.setAttribute("data-screenfeed-capture-styles", "true");
+  captureOverrides.textContent = `
+    *::before,
+    *::after {
+      color: inherit !important;
+      background-color: transparent !important;
+      background-image: none !important;
+      border-color: currentColor !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+      filter: none !important;
+      backdrop-filter: none !important;
+    }
+  `;
+  doc.head.appendChild(captureOverrides);
+
+  doc.querySelectorAll<HTMLImageElement>("img").forEach((element) => {
+    const src = element.currentSrc || element.getAttribute("src") || "";
+    if (src && !isSafeScreenFeedAssetUrl(src, origin)) {
+      element.removeAttribute("src");
+      element.removeAttribute("srcset");
+      element.style.visibility = "hidden";
+    }
+  });
+
+  doc.querySelectorAll<SVGImageElement>("image").forEach((element) => {
+    const href = element.getAttribute("href") || element.getAttribute("xlink:href") || "";
+    if (href && !isSafeScreenFeedAssetUrl(href, origin)) element.remove();
+  });
+
+  if (!sanitizeColors) return;
+
+  const normalizeColor = createCssColorNormalizer(doc);
+  doc.querySelectorAll<HTMLElement>("*").forEach((element) => {
+    try {
+      sanitizeComputedStyle(element, view.getComputedStyle(element), origin, normalizeColor);
+    } catch {
+      element.style.backgroundImage = "none";
+      element.style.filter = "none";
+      element.style.backdropFilter = "none";
+      element.style.boxShadow = "none";
+      element.style.textShadow = "none";
+    }
+  });
+
+  doc.querySelectorAll<SVGElement>("svg, svg *").forEach((element) => {
+    try {
+      const computed = view.getComputedStyle(element);
+      element.style.setProperty("color", normalizeColor(computed.color, "rgb(0, 0, 0)"));
+      element.style.setProperty("fill", normalizeColor(computed.fill, "rgba(0, 0, 0, 0)"));
+      element.style.setProperty("stroke", normalizeColor(computed.stroke, "rgba(0, 0, 0, 0)"));
+      element.style.setProperty("filter", "none");
+    } catch {
+      element.style.setProperty("filter", "none");
+    }
+  });
+}
+
+function buildHtml2CanvasOptions(snapshot: Map<string, { top: number; left: number }>) {
+  const nativeScale = getScreenFeedCaptureScale(window.devicePixelRatio);
+  const viewportScale = Math.min(1, MAX_CAPTURE_WIDTH / Math.max(1, window.innerWidth));
+  const captureScale = Math.max(MIN_CAPTURE_SCALE, Math.min(nativeScale, viewportScale));
+  const sanitizeColors = documentMayUseUnsupportedColors(document);
+
+  return {
+    scale: captureScale,
+    useCORS: true,
+    allowTaint: false,
+    logging: false,
+    foreignObjectRendering: true,
+    imageTimeout: 1800,
+    removeContainer: true,
+    onclone: (doc: Document) => sanitizeClone(doc, snapshot, sanitizeColors),
+    ignoreElements: (element: Element) => element.getAttribute("data-screenfeed-ignore") === "true",
+  } as const;
+}
+
+async function tryCapture(opts: Record<string, unknown>, timeoutMs: number): Promise<HTMLCanvasElement> {
+  const html2canvas = await loadHtml2Canvas();
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      html2canvas(document.body, {
+        ...opts,
+        x: window.scrollX,
+        y: window.scrollY,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        scrollX: -window.scrollX,
+        scrollY: -window.scrollY,
+        windowWidth: window.innerWidth,
+        windowHeight: window.innerHeight,
+      }),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(`timeout-${timeoutMs}ms`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+function buildFallbackCanvas(reason: string): HTMLCanvasElement {
+  const width = Math.max(800, Math.min(1440, window.innerWidth));
+  const height = Math.max(480, Math.round(width * (window.innerHeight / Math.max(1, window.innerWidth))));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return canvas;
+  const dark = document.documentElement.classList.contains("dark");
+
+  ctx.fillStyle = dark ? "#1c1c1e" : "#f0f0f0";
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = dark ? "#e5e5e5" : "#111";
+  ctx.font = "bold 18px system-ui, sans-serif";
+  ctx.fillText(document.title.slice(0, 90), 24, 48);
+  ctx.fillStyle = dark ? "#aaa" : "#555";
+  ctx.font = "14px monospace";
+  ctx.fillText(window.location.href.slice(0, 120), 24, 80);
+  ctx.fillStyle = "#888";
+  ctx.font = "12px system-ui, sans-serif";
+  ctx.fillText(new Date().toLocaleTimeString(), 24, 110);
+  ctx.fillText(`Capture fallback: ${reason.slice(0, 120)}`, 24, 132);
+
+  let y = 170;
+  document.querySelectorAll<HTMLElement>("header, nav, h1, h2, h3, button, [role='dialog']").forEach((element) => {
+    const text = element.textContent?.replace(/\s+/g, " ").trim().slice(0, 120);
+    if (!text || y > height - 24) return;
+    ctx.fillStyle = dark ? "#ccc" : "#222";
+    ctx.font = element.matches("h1, h2, h3") ? "bold 15px system-ui" : "13px system-ui, sans-serif";
+    ctx.fillText(text, 24, y);
+    y += 22;
+  });
+
+  return canvas;
+}
+
+async function withSafeCreatePattern<T>(fn: () => Promise<T>): Promise<T> {
+  const original = CanvasRenderingContext2D.prototype.createPattern;
+  CanvasRenderingContext2D.prototype.createPattern = function (
+    image: CanvasImageSource,
+    repetition: string | null
+  ): CanvasPattern | null {
+    try {
+      return original.call(this, image, repetition);
+    } catch {
+      return null;
+    }
+  };
+  try {
+    return await fn();
+  } finally {
+    CanvasRenderingContext2D.prototype.createPattern = original;
+  }
+}
+
+function buildFrameSignature(canvas: HTMLCanvasElement): string {
+  const sample = document.createElement("canvas");
+  sample.width = SIGNATURE_WIDTH;
+  sample.height = SIGNATURE_HEIGHT;
+  const ctx = sample.getContext("2d", { willReadFrequently: true });
+  if (!ctx) return `${canvas.width}x${canvas.height}`;
+  ctx.drawImage(canvas, 0, 0, SIGNATURE_WIDTH, SIGNATURE_HEIGHT);
+  return hashScreenFeedPixels(ctx.getImageData(0, 0, SIGNATURE_WIDTH, SIGNATURE_HEIGHT).data);
+}
+
+function resizeCanvas(source: HTMLCanvasElement, maxWidth: number): HTMLCanvasElement {
+  if (source.width <= maxWidth) return source;
+  const scale = maxWidth / source.width;
+  const target = document.createElement("canvas");
+  target.width = maxWidth;
+  target.height = Math.max(1, Math.round(source.height * scale));
+  const ctx = target.getContext("2d");
+  if (!ctx) return source;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(source, 0, 0, target.width, target.height);
+  return target;
+}
+
+function encodeFrame(canvas: HTMLCanvasElement, fast: boolean): EncodedFrame | null {
+  const attempts = fast
+    ? [
+        { maxWidth: 1440, quality: 0.7 },
+        { maxWidth: 1280, quality: 0.64 },
+        { maxWidth: 1120, quality: 0.56 },
+        { maxWidth: 960, quality: 0.48 },
+        { maxWidth: 800, quality: 0.42 },
+      ]
+    : [
+        { maxWidth: 1536, quality: 0.74 },
+        { maxWidth: 1440, quality: 0.7 },
+        { maxWidth: 1280, quality: 0.64 },
+        { maxWidth: 1120, quality: 0.56 },
+        { maxWidth: 960, quality: 0.5 },
+      ];
+  const limit = fast ? FAST_MAX_DATA_URL_LEN : MAX_DATA_URL_LEN;
+  let lastFrame: EncodedFrame | null = null;
+
+  for (const attempt of attempts) {
+    const candidate = resizeCanvas(canvas, attempt.maxWidth);
+    const dataUrl = candidate.toDataURL("image/jpeg", attempt.quality);
+    lastFrame = { dataUrl, canvas: candidate, quality: attempt.quality };
+    if (dataUrl.length <= limit) return lastFrame;
+  }
+
+  return lastFrame && lastFrame.dataUrl.length <= MAX_DATA_URL_LEN ? lastFrame : null;
+}
+
+async function runCaptureAttempt(scrollElements: Iterable<HTMLElement>, retry: boolean): Promise<HTMLCanvasElement> {
+  const lease = prepareScrollableSnapshot(scrollElements);
+  try {
+    const options = buildHtml2CanvasOptions(lease.snapshot);
+    if (!retry) return await withSafeCreatePattern(() => tryCapture(options, CAPTURE_TIMEOUT_MS));
+    return await withSafeCreatePattern(() =>
+      tryCapture(
+        {
+          ...options,
+          scale: Math.min(Number(options.scale) || 0.5, 0.5),
+          imageTimeout: 700,
+          foreignObjectRendering: false,
+        },
+        RETRY_CAPTURE_TIMEOUT_MS
+      )
+    );
+  } finally {
+    lease.restore();
+  }
+}
+
+async function captureCanvas(scrollElements: Iterable<HTMLElement>): Promise<CaptureCanvasResult> {
+  trace("capture-start");
+  await waitForCaptureReady();
+  try {
+    const canvas = await runCaptureAttempt(scrollElements, false);
+    trace("capture-ok");
+    return { canvas, source: "dom" };
+  } catch (error) {
+    const firstReason = errorMessage(error);
+    trace("capture-fail-p1", firstReason);
+
+    // html2canvas cannot be cancelled. If it hits our timeout, starting another
+    // html2canvas immediately would create two expensive full-page renderers at
+    // once and is worse for the employee. Fall back without a second render.
+    if (isCaptureTimeout(error)) {
+      trace("capture-fallback-timeout", firstReason);
+      return { canvas: buildFallbackCanvas(firstReason), source: "fallback", failureReason: firstReason };
+    }
+
+    try {
+      const canvas = await runCaptureAttempt(scrollElements, true);
+      trace("capture-ok-retry");
+      return { canvas, source: "retry", failureReason: firstReason };
+    } catch (retryError) {
+      const reason = `${firstReason}; retry: ${errorMessage(retryError)}`;
+      trace("capture-fallback", reason);
+      return { canvas: buildFallbackCanvas(reason), source: "fallback", failureReason: reason };
+    }
+  }
+}
+
+function buildViewportMetadata() {
+  const documentElement = document.documentElement;
+  const body = document.body;
+  return {
+    width: Math.max(1, Math.round(window.innerWidth)),
+    height: Math.max(1, Math.round(window.innerHeight)),
+    scrollX: Math.max(0, Math.round(window.scrollX)),
+    scrollY: Math.max(0, Math.round(window.scrollY)),
+    documentWidth: Math.max(documentElement.scrollWidth, body?.scrollWidth ?? 0, window.innerWidth),
+    documentHeight: Math.max(documentElement.scrollHeight, body?.scrollHeight ?? 0, window.innerHeight),
+    devicePixelRatio: Math.max(0.25, window.devicePixelRatio || 1),
+    visualScale: Math.max(0.25, window.visualViewport?.scale ?? 1),
+  };
+}
+
+function cancelledResult(lastUploadedClickTs: number): ScreenFeedCaptureResult {
+  return {
+    uploaded: false,
+    unchanged: false,
+    failed: false,
+    cancelled: true,
+    signature: null,
+    latestClickTs: lastUploadedClickTs,
+  };
+}
+
+export async function captureAndUploadScreenFrame(input: {
+  fast: boolean;
+  lastSignature: string | null;
+  lastUploadedClickTs: number;
+  cursor: ScreenFeedCursorEvent | null;
+  expectedPath: string;
+  clicks: readonly ScreenFeedClickEvent[];
+  scrollElements: Iterable<HTMLElement>;
+  shouldContinue: () => boolean;
+}): Promise<ScreenFeedCaptureResult> {
+  if (!input.shouldContinue() || document.visibilityState !== "visible") {
+    return cancelledResult(input.lastUploadedClickTs);
+  }
+
+  const startedAt = Date.now();
+  const { canvas, source, failureReason } = await captureCanvas(input.scrollElements);
+  if (
+    !input.shouldContinue() ||
+    document.visibilityState !== "visible" ||
+    window.location.href !== input.expectedPath
+  ) {
+    trace("capture-discarded");
+    return cancelledResult(input.lastUploadedClickTs);
+  }
+
+  const signature = buildFrameSignature(canvas);
+  const cutoff = Date.now() - CLICK_RETAIN_MS;
+  const clicks = input.clicks.filter((click) => click.ts >= cutoff);
+  const latestClickTs = clicks.reduce((latest, click) => Math.max(latest, click.ts), 0);
+
+  if (
+    !shouldUploadScreenFrame({
+      signature,
+      lastSignature: input.lastSignature,
+      latestClickTs,
+      lastUploadedClickTs: input.lastUploadedClickTs,
+    })
+  ) {
+    return {
+      uploaded: false,
+      unchanged: true,
+      failed: false,
+      cancelled: false,
+      signature,
+      latestClickTs,
+    };
+  }
+
+  let encoded: EncodedFrame | null;
+  try {
+    encoded = encodeFrame(canvas, input.fast);
+  } catch (error) {
+    trace("to-data-url-failed", errorMessage(error));
+    return {
+      uploaded: false,
+      unchanged: false,
+      failed: true,
+      cancelled: false,
+      signature,
+      latestClickTs,
+    };
+  }
+
+  if (!encoded?.dataUrl.startsWith("data:image/") || encoded.dataUrl.length > MAX_DATA_URL_LEN) {
+    trace("encode-invalid", String(encoded?.dataUrl.length ?? 0));
+    return {
+      uploaded: false,
+      unchanged: false,
+      failed: true,
+      cancelled: false,
+      signature,
+      latestClickTs,
+    };
+  }
+
+  if (!input.shouldContinue() || document.visibilityState !== "visible") {
+    return cancelledResult(input.lastUploadedClickTs);
+  }
+
+  const completedAt = Date.now();
+  const uploadController = new AbortController();
+  const uploadTimeout = setTimeout(() => uploadController.abort(), UPLOAD_TIMEOUT_MS);
+  try {
+    const response = await fetch("/api/screen-feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      signal: uploadController.signal,
+      body: JSON.stringify({
+        dataUrl: encoded.dataUrl,
+        clicks,
+        cursor: input.cursor,
+        viewport: buildViewportMetadata(),
+        clientCapturedAt: new Date(completedAt).toISOString(),
+        capture: {
+          width: encoded.canvas.width,
+          height: encoded.canvas.height,
+          source,
+          quality: encoded.quality,
+          encodedBytes: approximateDataUrlBytes(encoded.dataUrl),
+          durationMs: completedAt - startedAt,
+          failureReason,
+        },
+      }),
+    });
+    return {
+      uploaded: response.ok,
+      unchanged: false,
+      failed: !response.ok,
+      cancelled: false,
+      signature,
+      latestClickTs,
+    };
+  } catch (error) {
+    if (!input.shouldContinue() || document.visibilityState !== "visible") {
+      return cancelledResult(input.lastUploadedClickTs);
+    }
+    trace("upload-error", errorMessage(error));
+    return {
+      uploaded: false,
+      unchanged: false,
+      failed: true,
+      cancelled: false,
+      signature,
+      latestClickTs,
+    };
+  } finally {
+    clearTimeout(uploadTimeout);
+  }
+}
