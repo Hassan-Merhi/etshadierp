@@ -39,10 +39,17 @@ function stableTestCompanyCode(prefix: string): string {
   return `${base}${suffix}`;
 }
 
+/**
+ * Fixtures that need a factory-typed company.
+ *
+ * The factory route tree sits behind a guard that rejects a session whose
+ * company is not of type "factory", so any suite exercising it has to seed one.
+ * Ordinary ERP/POS tests stay on "erp".
+ */
+const FACTORY_COMPANY_PREFIXES = new Set(["xlsexp", "charfact", "supcrud"]);
+
 function testCompanyType(prefix: string): "erp" | "factory" {
-  // Factory export integration tests must exercise the same authorized factory
-  // company resolution used in production. Ordinary ERP/POS tests remain ERP.
-  return prefix === "xlsexp" || prefix === "charfact" ? "factory" : "erp";
+  return FACTORY_COMPANY_PREFIXES.has(prefix) ? "factory" : "erp";
 }
 
 export async function setupTestApp(): Promise<express.Express> {
