@@ -55,6 +55,7 @@ const FACTORY_COMPANY_PREFIXES = new Set([
   "ordchg",
   "v3load",
   "advwr",
+  "empadv",
 ]);
 
 function testCompanyType(prefix: string): "erp" | "factory" {
@@ -111,6 +112,9 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     // they must be cleared before the vouchers themselves — a suite that
     // recorded a transporter charge otherwise leaves the company undeletable.
     await pool.query("DELETE FROM factory_transporter_transactions WHERE company_id = $1", [company.id]);
+    // Same constraint, same reason: employee_bonuses.voucher_id is ON DELETE
+    // RESTRICT, so a suite that recorded a bonus blocks the voucher delete.
+    await pool.query("DELETE FROM employee_bonuses WHERE company_id = $1", [company.id]);
     await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, company.id));
     await db.delete(schema.stockItems).where(eq(schema.stockItems.companyId, company.id));
     await db.delete(schema.stockGroups).where(eq(schema.stockGroups.companyId, company.id));
@@ -148,6 +152,10 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     await pool.query("DELETE FROM factory_containers WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_suppliers WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_daybook_entries WHERE company_id = $1", [company.id]);
+    // Employees, once the voucher_entries keyed by employee_id are gone.
+    await pool.query("DELETE FROM employee_advance_repayments WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM employee_advances WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM employees WHERE company_id = $1", [company.id]);
     // Barcode sequence rows are allocated lazily on read — GET
     // /api/production-bales/next-barcode writes one — so a test that only
     // exercises read endpoints can still leave an FK reference behind.

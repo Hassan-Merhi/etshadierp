@@ -245,23 +245,33 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
       const bonus = bonusResult.rows[0] as any;
       if (!bonus) return res.status(404).json({ message: "Bonus not found" });
 
-      // Reverse the credit
-      const [emp] = await db.select().from(employees).where(eq(employees.id, bonus.employee_id));
-      if (emp) {
-        const newBalance = parseFloat(emp.currentBalance || "0") - parseFloat(bonus.amount);
-        const newDeposits = parseFloat(emp.totalDeposits || "0") - parseFloat(bonus.amount);
-        await db
-          .update(employees)
-          .set({ currentBalance: newBalance.toFixed(2), totalDeposits: newDeposits.toFixed(2) })
-          .where(eq(employees.id, bonus.employee_id));
-      }
-      if (bonus.voucher_id) {
-        await db.execute(sql`DELETE FROM voucher_entries WHERE voucher_id = ${bonus.voucher_id}`);
-        await db.execute(sql`DELETE FROM vouchers WHERE id = ${bonus.voucher_id}`);
-      }
-      await db.execute(
-        sql`DELETE FROM employee_bonuses WHERE id = ${parseInt(req.params.id)} AND company_id = ${companyId}`
-      );
+      // Reversing a bonus touches four rows, and all four have to move or none
+      // of them may. This ran unwrapped and in the wrong order:
+      // employee_bonuses.voucher_id references vouchers.id ON DELETE RESTRICT,
+      // so the voucher delete raised 23503 *after* the employee's balance had
+      // already been decremented and the voucher entries removed. The request
+      // answered 500 while leaving the balance reduced, the bonus row present
+      // and its voucher stripped of both legs — and every retry decremented the
+      // balance again.
+      await db.transaction(async (tx) => {
+        const [emp] = await tx.select().from(employees).where(eq(employees.id, bonus.employee_id));
+        if (emp) {
+          const newBalance = parseFloat(emp.currentBalance || "0") - parseFloat(bonus.amount);
+          const newDeposits = parseFloat(emp.totalDeposits || "0") - parseFloat(bonus.amount);
+          await tx
+            .update(employees)
+            .set({ currentBalance: newBalance.toFixed(2), totalDeposits: newDeposits.toFixed(2) })
+            .where(eq(employees.id, bonus.employee_id));
+        }
+        // The bonus row goes first so the voucher it references is free to drop.
+        await tx.execute(
+          sql`DELETE FROM employee_bonuses WHERE id = ${parseInt(req.params.id)} AND company_id = ${companyId}`
+        );
+        if (bonus.voucher_id) {
+          await tx.execute(sql`DELETE FROM voucher_entries WHERE voucher_id = ${bonus.voucher_id}`);
+          await tx.execute(sql`DELETE FROM vouchers WHERE id = ${bonus.voucher_id}`);
+        }
+      });
       res.json({ message: "Bonus deleted and reversed" });
     } catch (err: unknown) {
       res.status(500).json({ message: getErrorMessage(err) });
