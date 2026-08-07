@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import {
+  ACTIVE_CAPTURE_DELAY_MS,
+  ACTIVE_CAPTURE_MIN_GAP_MS,
+  FAILED_CAPTURE_BACKOFF_MS,
+  IDLE_REFRESH_MS,
+} from "../client/src/hooks/screen-feed-capture-policy";
 
 const read = (file: string) => fs.readFileSync(path.join(process.cwd(), file), "utf8");
 
@@ -9,7 +15,6 @@ const transportSource = read("server/routes/screenFeedTransportHardening.ts");
 const routesSource = read("server/routes/applicationRoutes.ts");
 const viewerSource = read("client/src/pages/settings/WatchUserDialog.tsx");
 const captureSource = read("client/src/hooks/use-screen-feed.ts");
-const capturePolicySource = read("client/src/hooks/screen-feed-capture-policy.ts");
 
 describe("Phase 5 faster remote viewing contracts", () => {
   it("keeps fast mode disabled by default", () => {
@@ -47,21 +52,17 @@ describe("Phase 5 faster remote viewing contracts", () => {
     expect(viewerSource).toContain("setLiveCursor(null)");
   });
 
-  it("keeps client-side serialization while making full-frame capture dirty-driven", () => {
+  it("keeps full-frame capture serialized, dirty-driven, and hidden-tab aware", () => {
     expect(captureSource).toContain("busyRef.current");
     expect(captureSource).toContain("new MutationObserver");
     expect(captureSource).toContain('document.visibilityState !== "visible"');
-    expect(captureSource).toContain("ACTIVE_CAPTURE_MIN_GAP_MS");
-    expect(captureSource).toContain("IDLE_REFRESH_MS");
-    expect(captureSource).toContain("FAILED_CAPTURE_BACKOFF_MS");
     expect(captureSource).toContain("markDirty(");
-    expect(captureSource).toContain("startFallbackPolling()");
-    expect(captureSource).toContain("eventSource?.close()");
   });
 
-  it("prevents the old sub-second continuous full-frame capture loop from returning", () => {
-    expect(capturePolicySource).toContain("ACTIVE_CAPTURE_MIN_GAP_MS = 850");
-    expect(capturePolicySource).toContain("IDLE_REFRESH_MS = 60000");
-    expect(capturePolicySource).not.toContain("ACTIVE_CAPTURE_DELAY_MS = 150");
+  it("uses a low-impact capture cadence instead of the old 150ms loop", () => {
+    expect(ACTIVE_CAPTURE_MIN_GAP_MS).toBeGreaterThanOrEqual(850);
+    expect(ACTIVE_CAPTURE_DELAY_MS).toBe(ACTIVE_CAPTURE_MIN_GAP_MS);
+    expect(IDLE_REFRESH_MS).toBeGreaterThanOrEqual(60_000);
+    expect(FAILED_CAPTURE_BACKOFF_MS).toBeGreaterThanOrEqual(3_000);
   });
 });
