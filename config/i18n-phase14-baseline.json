@@ -3,59 +3,31 @@
   "detectorVersion": 9,
   "policyDigest": "c26178dd9bc7d71d34976e5bb87aa946cc5d59e6db54b7415f9e363514809f8f",
   "reviewedAt": "2026-08-06",
-  "reviewedHead": "main@e81ea0ce0a595ed4c536551f76a54674f6563547",
-  "description": "Reviewed the classified untranslated-text report after synchronizing with the current main branch. The detector and policy digest are unchanged, unclassified findings remain at zero, and the report contains 12359 actionable literals. The exact delta from the previous reviewed baseline is administration +4, introduced by the already-merged current-main remote-support and settings work rather than this database TLS or inventory-precision branch. This update pins only the observed totals and administration ceiling; any additional untranslated-text growth will continue to fail CI. Stock item names, stock group names, business names, codes, references, dates, and amounts remain outside translation behavior.",
+  "reviewedHead": "fix/remote-support-retry-pointer-noise@6c9cae98e25419d9e9bc0cec07085d03aa7b22ee",
+  "description": "Reviewed the classified untranslated-text report for the combined remote-support reconnect repair. The detector and policy digest are unchanged, unclassified findings remain at zero, and the report contains 12359 actionable literals. The exact delta from the previous reviewed baseline is administration +4 for explicit reconnect and target-tab status messages. These findings are intentional user-facing recovery text rather than classifier or policy regressions. This update pins only the observed totals and module ceilings; any additional untranslated-text growth will continue to fail CI. Stock item names, stock group names, business names, codes, references, dates, and amounts remain outside translation behavior.",
   "reviewedTotals": {
     "candidates": 22580,
     "actionable": 12359,
     "excluded": 10221,
-    "compatibilityCovered": 9163,
+    "compatibilityCovered": 9179,
     "unclassified": 0
   },
   "maxActionable": 12359,
   "modules": {
-    "accounting": {
-      "maxActionable": 1356
-    },
-    "administration": {
-      "maxActionable": 1167
-    },
-    "backend-messages": {
-      "maxActionable": 2
-    },
-    "container-purchasing": {
-      "maxActionable": 848
-    },
-    "factory": {
-      "maxActionable": 5428
-    },
-    "inventory-logistics": {
-      "maxActionable": 1343
-    },
-    "other-client": {
-      "maxActionable": 843
-    },
-    "payroll": {
-      "maxActionable": 551
-    },
-    "properties-rentals": {
-      "maxActionable": 0
-    },
-    "reports-exports": {
-      "maxActionable": 0
-    },
-    "sales-pos": {
-      "maxActionable": 783
-    },
-    "shared-contracts": {
-      "maxActionable": 4
-    },
-    "shared-ui": {
-      "maxActionable": 0
-    },
-    "supplier-partner": {
-      "maxActionable": 34
-    }
+    "accounting": { "maxActionable": 1356 },
+    "administration": { "maxActionable": 1167 },
+    "backend-messages": { "maxActionable": 2 },
+    "container-purchasing": { "maxActionable": 848 },
+    "factory": { "maxActionable": 5428 },
+    "inventory-logistics": { "maxActionable": 1343 },
+    "other-client": { "maxActionable": 843 },
+    "payroll": { "maxActionable": 551 },
+    "properties-rentals": { "maxActionable": 0 },
+    "reports-exports": { "maxActionable": 0 },
+    "sales-pos": { "maxActionable": 783 },
+    "shared-contracts": { "maxActionable": 4 },
+    "shared-ui": { "maxActionable": 0 },
+    "supplier-partner": { "maxActionable": 34 }
   },
   "maxUnclassified": 0
 }

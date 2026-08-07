@@ -17,6 +17,7 @@ export interface RemoteControlTabPresence {
 export interface RemoteControlSession {
   id: string;
   companyId: number;
+  targetCompanyId?: number;
   targetUserId: string;
   targetUsername: string;
   targetTabId: string;
@@ -218,7 +219,7 @@ export function registerRemoteControlTab(input: {
 
   const session = activeSessionRecord(userId);
   if (session?.targetTabId === tabId) {
-    if (session.companyId !== companyId) {
+    if ((session.targetCompanyId ?? session.companyId) !== companyId) {
       stopSessionInternal(session, "target-company-changed", "stopped", now);
       return null;
     }
@@ -270,14 +271,20 @@ export function startRemoteControlSession(input: StartRemoteControlSessionInput)
     );
   }
 
-  const tabs = freshTabs(targetUserId).filter((tab) => tab.companyId === controllerCompanyId);
+  const availableTabs = freshTabs(targetUserId);
+  const tabs =
+    input.controllerRole === "Developer"
+      ? availableTabs
+      : availableTabs.filter((tab) => tab.companyId === controllerCompanyId);
   const requestedTabId = cleanIdentifier(input.requestedTabId);
   const selectedTab = requestedTabId ? tabs.find((tab) => tab.tabId === requestedTabId) : tabs[0];
   if (!selectedTab) {
     throw new RemoteControlSessionError(
       "TARGET_TAB_UNAVAILABLE",
       409,
-      "No active ERP browser tab is available for this user in the selected company."
+      input.controllerRole === "Developer"
+        ? "No active ERP browser tab is available for this user."
+        : "No active ERP browser tab is available for this user in the selected company."
     );
   }
 
@@ -286,6 +293,7 @@ export function startRemoteControlSession(input: StartRemoteControlSessionInput)
   const session: RemoteControlSession = {
     id: randomUUID(),
     companyId: controllerCompanyId,
+    targetCompanyId: selectedTab.companyId,
     targetUserId,
     targetUsername: cleanIdentifier(input.targetUsername, 160) || selectedTab.username || targetUserId,
     targetTabId: selectedTab.tabId,

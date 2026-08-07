@@ -48,8 +48,8 @@ export function sanitizeScreenFeedClicks(value: unknown, now = Date.now()): Scre
     )
     .slice(-MAX_CLICKS_PER_FRAME)
     .map((click) => ({
-      x: Math.min(1, Math.max(0, click.x)),
-      y: Math.min(1, Math.max(0, click.y)),
+      x: click.x,
+      y: click.y,
       ...(typeof click.label === "string" ? { label: click.label.slice(0, 60) } : {}),
       ts: click.ts,
     }));
@@ -61,7 +61,7 @@ export function sanitizeScreenFeedCursor(value: unknown, now = Date.now()): Scre
   const x = normalizedCoordinate(cursor.x);
   const y = normalizedCoordinate(cursor.y);
   const ts = finiteNumber(cursor.ts);
-  if (x === null || y === null || ts === null || now - ts > MAX_POINTER_AGE_MS) return null;
+  if (x === null || y === null || ts === null || Math.abs(now - ts) > MAX_POINTER_AGE_MS) return null;
 
   return {
     x,
