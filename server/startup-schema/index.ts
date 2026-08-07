@@ -21,9 +21,9 @@ import { posExportsAndDispatch } from "./008-pos-exports-and-dispatch";
 import { supplierPartnerAndAi } from "./009-supplier-partner-and-ai";
 import { securityNotificationsAndPrecision } from "./010-security-notifications-and-precision";
 import { stockTransferRevisionIntegrity } from "./011-stock-transfer-revision-integrity";
-import { locationWhatsAppStockReports } from "./012-location-whatsapp-stock-reports";
-import { locationWhatsAppStockSchedules } from "./013-location-whatsapp-stock-schedules";
-import { locationWhatsAppDeliveryHistory } from "./014-location-whatsapp-delivery-history";
+import { locationWhatsAppStockReports } from "./016-location-whatsapp-stock-reports";
+import { locationWhatsAppStockSchedules } from "./017-location-whatsapp-stock-schedules";
+import { locationWhatsAppDeliveryHistory } from "./018-location-whatsapp-delivery-history";
 
 export const startupMigrations: string[] = [
   ...coreTablesAndColumns,
