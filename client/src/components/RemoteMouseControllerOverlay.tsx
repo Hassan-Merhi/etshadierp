@@ -54,11 +54,13 @@ export function RemoteMouseControllerOverlay() {
   const scrollTimerRef = useRef<number | null>(null);
   const t = useCallback((value: string) => translateRemoteSupportPhase5Text(value, language), [language]);
 
+  const sessionId = session?.id ?? null;
+  const sessionTargetUserId = session?.targetUserId ?? null;
   const authorized = authorizationIsFresh(session?.mouseAuthorization?.expiresAt);
-  const controlEnabled = !!session && session.capabilities.mouse && authorized;
+  const controlEnabled = !!sessionId && !!session?.capabilities.mouse && authorized;
 
   useEffect(() => {
-    activeSessionIdRef.current = session?.id ?? null;
+    activeSessionIdRef.current = sessionId;
     setError(null);
     setLastResult(null);
     setPasswordOpen(false);
@@ -69,21 +71,21 @@ export function RemoteMouseControllerOverlay() {
     if (scrollTimerRef.current !== null) window.clearTimeout(scrollTimerRef.current);
     pointerTimerRef.current = null;
     scrollTimerRef.current = null;
-  }, [session?.id]);
+  }, [sessionId]);
 
   const requestMouseAuthorization = useCallback(async () => {
-    if (!session) return;
+    if (!sessionId) return;
     await remoteControllerRequestJson(
-      `/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/mouse-authorization`,
+      `/api/screen-feed/control/sessions/${encodeURIComponent(sessionId)}/mouse-authorization`,
       { method: "POST", body: JSON.stringify({}) }
     );
     await refreshSession();
     setPasswordOpen(false);
     setPassword("");
-  }, [refreshSession, session]);
+  }, [refreshSession, sessionId]);
 
   const authorizeMouse = useCallback(async () => {
-    if (!session || busy) return;
+    if (!sessionId || busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -100,10 +102,10 @@ export function RemoteMouseControllerOverlay() {
     } finally {
       setBusy(false);
     }
-  }, [busy, requestMouseAuthorization, session, t]);
+  }, [busy, requestMouseAuthorization, sessionId, t]);
 
   const confirmPasswordAndAuthorize = useCallback(async () => {
-    if (!password || busy || !session) return;
+    if (!password || busy || !sessionId) return;
     setBusy(true);
     setError(null);
     try {
@@ -117,15 +119,15 @@ export function RemoteMouseControllerOverlay() {
     } finally {
       setBusy(false);
     }
-  }, [busy, password, requestMouseAuthorization, session, t]);
+  }, [busy, password, requestMouseAuthorization, sessionId, t]);
 
   const stopMouse = useCallback(async () => {
-    if (!session || busy) return;
+    if (!sessionId || busy) return;
     setBusy(true);
     setError(null);
     try {
       await remoteControllerRequestJson(
-        `/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/mouse-authorization/revoke`,
+        `/api/screen-feed/control/sessions/${encodeURIComponent(sessionId)}/mouse-authorization/revoke`,
         { method: "POST", body: JSON.stringify({}) }
       );
       setLastResult(null);
@@ -135,11 +137,10 @@ export function RemoteMouseControllerOverlay() {
     } finally {
       setBusy(false);
     }
-  }, [busy, refreshSession, session, t]);
+  }, [busy, refreshSession, sessionId, t]);
 
   const enqueueCommand = useCallback(
     (payload: MouseCommandPayload) => {
-      const sessionId = session?.id;
       if (!sessionId || !controlEnabled) return;
 
       const run = async () => {
@@ -167,7 +168,7 @@ export function RemoteMouseControllerOverlay() {
 
       commandTailRef.current = commandTailRef.current.catch(() => undefined).then(run);
     },
-    [controlEnabled, refreshSession, session?.id, t]
+    [controlEnabled, refreshSession, sessionId, t]
   );
 
   const flushPointer = useCallback(() => {
@@ -187,9 +188,9 @@ export function RemoteMouseControllerOverlay() {
   }, [enqueueCommand]);
 
   useEffect(() => {
-    if (!controlEnabled || !session || !portalHost) return;
+    if (!controlEnabled || !sessionTargetUserId || !portalHost) return;
     const dialog = portalHost.closest<HTMLElement>("[data-testid='dialog-watch-user']");
-    if (!dialog || dialog.dataset.watchedUserId !== session.targetUserId) return;
+    if (!dialog || dialog.dataset.watchedUserId !== sessionTargetUserId) return;
     const image = dialog.querySelector<HTMLImageElement>("[data-testid='img-screen-feed']");
     if (!image) return;
 
@@ -252,17 +253,17 @@ export function RemoteMouseControllerOverlay() {
       pointerTimerRef.current = null;
       scrollTimerRef.current = null;
     };
-  }, [controlEnabled, enqueueCommand, flushPointer, flushScroll, portalHost, session]);
+  }, [controlEnabled, enqueueCommand, flushPointer, flushScroll, portalHost, sessionTargetUserId]);
 
   useEffect(() => {
-    if (!controlEnabled || !session) return;
-    const eventSource = new EventSource(`/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/results`, {
+    if (!controlEnabled || !sessionId) return;
+    const eventSource = new EventSource(`/api/screen-feed/control/sessions/${encodeURIComponent(sessionId)}/results`, {
       withCredentials: true,
     });
     eventSource.addEventListener("result", (event) => {
       try {
         const result = JSON.parse((event as MessageEvent<string>).data) as CommandResultView;
-        if (result?.sessionId === session.id) {
+        if (result?.sessionId === sessionId) {
           setLastResult(result);
           if (result.status === "blocked") {
             setError(t("That control is protected and cannot be activated remotely."));
@@ -273,7 +274,7 @@ export function RemoteMouseControllerOverlay() {
       }
     });
     return () => eventSource.close();
-  }, [controlEnabled, session, t]);
+  }, [controlEnabled, sessionId, t]);
 
   if (!target || !session || !portalHost) return null;
 
