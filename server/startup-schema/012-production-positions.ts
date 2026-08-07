@@ -53,7 +53,7 @@ export const productionPositions: string[] = [
       created_at     TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at     TIMESTAMP NOT NULL DEFAULT NOW()
     )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS factory_production_position_memberships_unique
+  `CREATE INDEX IF NOT EXISTS factory_production_position_memberships_position_worker_effective_idx
        ON factory_production_position_memberships (position_id, worker_id, effective_from)`,
   `CREATE INDEX IF NOT EXISTS factory_production_position_memberships_company_position_idx
        ON factory_production_position_memberships (company_id, position_id)`,
