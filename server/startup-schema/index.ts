@@ -22,6 +22,7 @@ import { supplierPartnerAndAi } from "./009-supplier-partner-and-ai";
 import { securityNotificationsAndPrecision } from "./010-security-notifications-and-precision";
 import { stockTransferRevisionIntegrity } from "./011-stock-transfer-revision-integrity";
 import { productionPositions } from "./012-production-positions";
+import { baleProductionAttribution } from "./013-bale-production-attribution";
 
 export const startupMigrations: string[] = [
   ...coreTablesAndColumns,
@@ -36,4 +37,5 @@ export const startupMigrations: string[] = [
   ...securityNotificationsAndPrecision,
   ...stockTransferRevisionIntegrity,
   ...productionPositions,
+  ...baleProductionAttribution,
 ];
