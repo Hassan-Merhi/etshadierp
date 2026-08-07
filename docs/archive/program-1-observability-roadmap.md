@@ -60,7 +60,7 @@ Status: complete.
 
 ## Verification boundary
 
-`npm run verify:program1-observability` protects the complete Phase 1–4 source contract.
+`npm run verify:observability` protects the complete Phase 1–4 source contract.
 
 Static source review is complete. No claim is made that TypeScript, lint, tests, production build, deployment, webhook delivery, or live alert behavior passed without separate execution evidence.
 

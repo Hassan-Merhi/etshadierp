@@ -1,4 +1,4 @@
-name: Phase 8 RTL and accessibility
+name: RTL and Accessibility
 
 on:
   pull_request:
@@ -14,7 +14,7 @@ on:
       - "tests/phase14-i18n-release-gate.test.ts"
       - "tests/phase8-rtl-responsive-accessibility.test.ts"
       - "vitest.config.i18n-contracts.ts"
-      - ".github/workflows/phase8-rtl-accessibility.yml"
+      - ".github/workflows/rtl-accessibility.yml"
   push:
     branches:
       - agent/phase-8-rtl-responsive-accessibility
@@ -38,7 +38,7 @@ jobs:
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "22.14"
           cache: npm
 
       - name: Normalize registry URLs

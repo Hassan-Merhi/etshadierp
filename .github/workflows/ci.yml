@@ -50,7 +50,7 @@ jobs:
       - name: Set up Node.js 22
         uses: actions/setup-node@v6
         with:
-          node-version: "22"
+          node-version: "22.14"
           cache: npm
 
       - name: Normalize Replit registry URLs for CI
@@ -100,6 +100,28 @@ jobs:
       - name: Write-route coverage ratchet
         if: always() && steps.install.outcome == 'success'
         run: npm run audit:write-routes
+
+      # One Node version across .node-version, .nvmrc, .replit, package.json
+      # engines, every workflow, CircleCI's image tag, and the README. Seven
+      # sources used to disagree, and a fresh clone that followed the README
+      # produced an environment violating the engines constraint.
+      - name: Toolchain coherence
+        if: always() && steps.install.outcome == 'success'
+        run: npm run audit:toolchain
+
+      # A verification script nobody runs, or one wired in that cannot pass,
+      # looks like coverage and provides none. This asserts that every wired
+      # gate passes and that the orphan count only falls.
+      - name: Script inventory
+        if: always() && steps.install.outcome == 'success'
+        run: npm run audit:scripts
+
+      # Re-homed here when the phase-named workflow that used to run it was
+      # deleted: its trigger branch no longer exists, so the check had stopped
+      # firing entirely. It is static and fast, so it belongs in the main run.
+      - name: Readable logging contracts
+        if: always() && steps.install.outcome == 'success'
+        run: node scripts/verify-readable-logging-phase-10.mjs
 
       - name: Type-check
         id: typecheck

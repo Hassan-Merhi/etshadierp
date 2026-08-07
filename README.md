@@ -21,7 +21,7 @@ PostgreSQL) that also ships as native mobile apps via Capacitor.
 
 ## Prerequisites
 
-- Node.js **20** (see `.node-version`)
+- Node.js **22.14** (see `.node-version`)
 - A PostgreSQL database
 
 ## Getting started
@@ -74,6 +74,11 @@ documenting it.
 | `npm run verify:dependency-audit` | Fail on unreviewed high/critical production vulnerabilities |
 | `npm run audit:coverage-ratchet` | Report coverage floors that measured coverage has outgrown |
 | `npm run verify:runtime-dependencies` | Check everything production imports is in `dependencies` |
+| `npm run audit:type-escapes` | Per-file ratchet on `any` and compiler suppressions |
+| `npm run audit:write-routes` | Ledger and stock write routes with no test naming them |
+| `npm run audit:doc-index` | Docs classified, records archived, documented figures still true |
+| `npm run audit:toolchain` | One Node version across every file that states one |
+| `npm run audit:scripts` | Every wired verification script passes; orphans only decrease |
 
 ## Project layout
 
@@ -138,9 +143,15 @@ embeds source text containing import statements inside template literals.
 
 GitHub Actions runs on every push / PR to `main`:
 
-- **CI** (`.github/workflows/ci.yml`): env-doc check → type-check → build →
-  lint → format → DB schema push → startup-migration smoke test → backend &
-  frontend tests with coverage thresholds → coverage ratchet audit.
+- **CI** (`.github/workflows/ci.yml`): env-doc check → static ratchets
+  (type escapes, doc index, write-route coverage, toolchain coherence, script
+  inventory) → type-check → build → lint → format → DB schema push →
+  startup-migration smoke test → backend & frontend tests with coverage
+  thresholds → API smoke sweep → coverage ratchet audit.
+
+  The static ratchets run first because they need nothing but a checkout, so a
+  baseline moved the wrong way fails in seconds rather than after the build.
+  Each is a one-way gate: the number it guards may fall freely and never rise.
 
   Coverage floors live in `config/coverage-thresholds.json`: a global floor per
   suite plus per-file floors on the modules where a regression is most

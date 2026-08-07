@@ -50,7 +50,7 @@ npm run build
 npm run verify:production-dependencies
 npm run verify:stabilization
 npm run verify:bandwidth
-npm run check:program-6-security
+npm run check:security
 ```
 
 Also run the focused UI navigation configurations used by the ERP and Properties audits.

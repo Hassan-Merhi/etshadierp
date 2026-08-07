@@ -24,7 +24,7 @@ All completion criteria met as of 2026-07-19:
 The branch contains a reproducible, read-only query-review workflow:
 
 ```bash
-npm run audit:program-6d
+npm run audit:query-risks
 node scripts/run-program6d-query-review.mjs --report=tmp/program6d-report.json
 node scripts/validate-program6d-query-classifications.mjs \
   --report=tmp/program6d-report.json \

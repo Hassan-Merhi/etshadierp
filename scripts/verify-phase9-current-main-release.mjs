@@ -10,7 +10,7 @@ const read = (file) => {
   return fs.readFileSync(file, "utf8");
 };
 
-const workflowPath = ".github/workflows/phase9-final-release.yml";
+const workflowPath = ".github/workflows/release-verification.yml";
 const workflow = read(workflowPath);
 const configSource = read("config/i18n-phase9-final-release.json");
 const baselineVerifier = read("scripts/verify-phase9-final-i18n-baseline.mjs");

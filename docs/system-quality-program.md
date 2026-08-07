@@ -8,6 +8,11 @@ It is written to the same rule as `docs/god-file-split-program.md`: a harness
 that makes progress measurable comes before any cleanup, because a cleanup with
 no ratchet behind it refills silently.
 
+**Phases 0 through 4 are complete.** Phase 5 (tightening the ratchets) is
+ongoing by nature, and two drawdowns are deliberately left running rather than
+finished: type escapes (Phase 1d) and the untested write surface (Phase 2c).
+Both have a frozen ceiling, so untouched code cannot get worse while they fall.
+
 ## Where things stand
 
 Measured on `main` at the time of writing. Every figure has a command beside it
@@ -404,45 +409,72 @@ the split is enforced in CI ✓.
 
 ## Phase 4 — configuration coherence
 
-Small, independent of every other phase, and safe to do first if someone wants a
-quick win.
+**Done.**
 
-**4a. Node version.** Four sources disagree: `.node-version` says `20.19.2`,
-`.nvmrc` says `22`, `package.json` engines says `>=22.0.0`, CI runs `22` and
-`22.14`, and `README.md` line 24 tells a new contributor to install Node 20 and
-cites `.node-version` as authority. A fresh clone followed literally produces an
-environment that violates the engines constraint. Pick 22, set all five.
+**4a. Node version — one, asserted.** Seven sources disagreed: `.node-version`
+said 20.19.2, `.nvmrc` said 22, `.replit` provisioned nodejs-20, `package.json`
+required >=22.0.0, the workflows mixed "22" and "22.14", CircleCI pinned
+`cimg/node:22.14`, and `README.md` told a new contributor to install Node 20 —
+citing `.node-version` as the authority. A fresh clone followed literally
+produced an environment violating the engines constraint.
 
-**4b. npm script naming.** 40+ scripts named after programs and phase numbers —
-`verify:program1-observability`, `audit:program-6c:stock-items`,
-`audit:program-6d:validate`. The name says when the work happened, not what the
-script checks, so nobody can tell which to run without opening it. Rename by
-subject, keeping the old names as aliases for one release.
+All of them now say **22.14**, anchored on CircleCI's image tag because that is
+the one this repository does not control. `npm run audit:toolchain` checks all
+15 sources on every CI run, so this cannot drift again — which matters more than
+the fix, since nobody was going to notice by reading.
 
-The renaming is the smaller half. Running every `scripts/verify-*.mjs` and
-`scripts/audit-*.mjs` on a clean tree during Phase 3 found **44 of them exit
-non-zero**, and **32 of those are referenced by nothing at all** — not CI, not
-`package.json`, not another script. Some of the 12 that are wired up fail only
-because they need a build, a database, or network; others are simply broken
-(`verify-program2-phase1-accounting-foundation` looks for a source file that
-does not exist; `verify-program6d-query-safety` asserts SQL substrings with
-exact whitespace that no longer match).
+**4b. Scripts — triaged first, renamed second.** The renaming was the smaller
+half. Classifying every `verify-*.mjs` and `audit-*.mjs` by whether anything
+invokes it, and whether it can pass, gave:
 
-So Phase 4b starts by deciding which of these are gates and which are litter:
-delete the dead ones, fix or retire the broken ones, and only then rename what
-survives. A verification script nobody runs and that cannot pass is worse than
-no script — it looks like coverage.
+| | passes | fails |
+|---|---|---|
+| **wired** (CI, package.json, CircleCI) | 26 | 12 |
+| **chained** (another script or a test) | 16 | 16 |
+| **orphan** (nothing invokes it) | 15 | 16 |
 
-**4c. CI workflow consolidation.** Ten workflows, six named for phases
-(`phase8-rtl-accessibility`, `phase9-final-release`,
-`mobile-responsive-phase11`, `readable-logging-phase-10`,
-`sp-phases-9-10-release-verification`). Same problem as 4b, with the extra cost
-that a release-gate workflow for a finished phase either runs forever or is
-quietly ignored. Fold the still-meaningful checks into `ci.yml`; delete the
-gates whose phase is closed.
+**Sixteen scripts were invoked by nothing and could not pass.** Before deleting
+them I checked why they failed, because a "must retain server-side pagination"
+assertion failing could equally mean the pagination was gone. It did not: every
+one asserts literal source text that the god-file split legitimately moved.
+`verify-program6c` looks for `.limit(pageSizeNum)` in `inventoryRoutes.ts`; the
+pagination is alive in `inventory/inventoryRequestContext.ts` and
+`stock/groups-items/items.ts`. `verify-phase9-type-safety-contracts` looks for
+`removeCompanySessionQueries(queryClient)`; the call is there, with a second
+argument, across a line break. Three others crash outright reading
+`server/routesLegacy.ts` — a file the god-file program deliberately deleted and
+asserts stays deleted.
 
-**Exit criteria:** one Node version everywhere, no phase numbers in script or
-workflow names.
+This is the same source-coupling the god-file program documents for tests (61
+tests, 713 assertions), one layer out — and worse, because nothing runs these,
+so nothing ever reported it. All sixteen deleted.
+
+`npm run audit:scripts` now enforces two rules: **a wired script must pass**,
+and **the orphan count may only fall**. Five gates were already red when it was
+written and are listed in `config/script-inventory.json` with reasons — most
+notably `audit-i18n-phase14`, wired into four workflows, whose actionable-literal
+ratchet is breached on `origin/main` itself. The list may only shrink, and a
+script that starts passing has to come off it.
+
+Ten npm scripts named after programs were renamed by subject —
+`audit:program-6d` → `audit:query-risks`, `check:program-6-security` →
+`check:security`, and so on — with every invoker in CI, CircleCI and the docs
+updated.
+
+**4c. Workflows — two deleted, three renamed.** `readable-logging-phase-10.yml`
+and `sp-phases-9-10-release-verification.yml` triggered only on pull requests to
+branches that no longer exist. They could not fire at all, which is why nobody
+noticed the checks inside them had stopped running; `verify-readable-logging`
+was re-homed into `ci.yml`, where it passes.
+
+The other three were renamed to what they check: `mobile-responsive.yml`,
+`rtl-accessibility.yml`, `release-verification.yml`. Two of them fire on ordinary
+frontend pull requests to `main`, so their phase names were actively misleading
+about what a red check meant.
+
+**Exit criteria:** one Node version everywhere ✓, asserted in CI ✓; no phase
+numbers in npm script or workflow names ✓; and the dead weight that made the
+naming confusing in the first place is gone rather than renamed ✓.
 
 ---
 
