@@ -18,6 +18,7 @@ export const locationWhatsAppDeliveryHistory: string[] = [
       include_zero_stock boolean NOT NULL DEFAULT false,
       include_negative_stock boolean NOT NULL DEFAULT true,
       stock_group_id integer REFERENCES stock_groups(id) ON DELETE SET NULL,
+      stock_group_unassigned boolean NOT NULL DEFAULT false,
       category_id integer REFERENCES stock_categories(id) ON DELETE SET NULL,
       initiated_by_user_id text,
       scheduled_for date,
@@ -36,6 +37,8 @@ export const locationWhatsAppDeliveryHistory: string[] = [
         CHECK (status IN ('running', 'sent', 'failed', 'skipped_empty')),
       CONSTRAINT location_whatsapp_stock_deliveries_idempotency_unique UNIQUE (idempotency_key)
     )`,
+  `ALTER TABLE location_whatsapp_stock_deliveries
+     ADD COLUMN IF NOT EXISTS stock_group_unassigned boolean NOT NULL DEFAULT false`,
   `CREATE INDEX IF NOT EXISTS location_whatsapp_stock_deliveries_location_idx
      ON location_whatsapp_stock_deliveries (company_id, location_id, started_at DESC)`,
   `CREATE INDEX IF NOT EXISTS location_whatsapp_stock_deliveries_status_idx
