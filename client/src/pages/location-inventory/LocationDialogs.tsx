@@ -266,8 +266,8 @@ export function LocationDialogs({
               <MessageCircle className="h-5 w-5" /> Location WhatsApp Stock Reports
             </DialogTitle>
             <DialogDescription>
-              Link the WhatsApp group for <strong>{waGroupLocation?.name}</strong>. Phase 2 will use this destination for
-              manual stock reports with or without cost.
+              Link the WhatsApp group for <strong>{waGroupLocation?.name}</strong>. This destination is used by Location
+              Inventory WhatsApp stock reporting.
             </DialogDescription>
           </DialogHeader>
 
