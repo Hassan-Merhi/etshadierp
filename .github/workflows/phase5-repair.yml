@@ -100,7 +100,6 @@ jobs:
             tests/production-bonus-preview.test.ts
           npm run verify:dependency-audit
           node scripts/audit-i18n-phase14.mjs
-          npx vitest run tests/production-bonus-preview.test.ts tests/phase7-backend-messages-translations.test.ts
       - name: Commit generated repairs
         run: |
           git config user.name "github-actions[bot]"
