@@ -12,6 +12,8 @@ describe("Bandwidth Phase 1 invalidation policy", () => {
     expect(getBandwidthInvalidationScope("/api/factory/customer-orders/88/bales")).toBe("live");
     expect(getBandwidthInvalidationScope("/api/vouchers")).toBe("live");
     expect(getBandwidthInvalidationScope("/api/stock-transfers/44/finalize")).toBe("live");
+    expect(getBandwidthInvalidationScope("/api/factory/customer-proforma-lines/42")).toBe("live");
+    expect(getBandwidthInvalidationScope("/api/factory/customer-proformas/42")).toBe("live");
     expect(shouldClearBandwidthEntry("live", "live")).toBe(true);
     expect(shouldClearBandwidthEntry("reference", "live")).toBe(false);
   });
@@ -24,7 +26,6 @@ describe("Bandwidth Phase 1 invalidation policy", () => {
       "/api/ledger-accounts/7",
       "/api/factory/settings",
       "/api/factory/workers/9",
-      "/api/factory/customer-proforma-lines/42",
       "/api/factory/customers/31",
       "/api/stock-items/55",
     ];
@@ -42,7 +43,7 @@ describe("Bandwidth Phase 1 invalidation policy", () => {
     expect(getBandwidthInvalidationScope("/api/factory/daily-bale-scans")).toBe("live");
   });
 
-  it("contains every production hotspot identified in the August bandwidth snapshots", () => {
+  it("contains the canonical production hotspots identified in the August bandwidth snapshots", () => {
     const source = readFileSync(resolve("client/src/lib/bandwidthPhase1HotspotGuard.ts"), "utf8");
     const requiredRoutes = [
       "shipping-container-rows",
@@ -51,21 +52,30 @@ describe("Bandwidth Phase 1 invalidation policy", () => {
       "audit-log",
       "vouchers\\/\\d+",
       "locations",
-      "factory\\/api\\/factory\\/bale-products",
+      "factory\\/bale-products",
     ];
 
     for (const route of requiredRoutes) {
       expect(source, route).toContain(route);
     }
+    expect(source).not.toContain("factory\\/api\\/factory\\/bale-products");
     expect(source).toContain("BANDWIDTH_INVALIDATION_CHANNEL");
     expect(source).toContain('scope: "reference"');
   });
 
-  it("prevents ordinary scans from evicting the customer-proforma snapshot", () => {
-    const source = readFileSync(resolve("client/src/lib/requestStormGuard.ts"), "utf8");
-    expect(source).toContain("generationAtStart !== writeGeneration");
-    expect(source).toContain("getBandwidthInvalidationScope(url.pathname)");
-    expect(source).toContain("BANDWIDTH_INVALIDATION_CHANNEL");
-    expect(source).toMatch(/customer-proformas\$\/,[\s\S]*scope: "reference"/);
+  it("keeps reference generations reusable across ordinary live writes", () => {
+    const requestGuard = readFileSync(resolve("client/src/lib/requestStormGuard.ts"), "utf8");
+    const hotspotGuard = readFileSync(resolve("client/src/lib/bandwidthPhase1HotspotGuard.ts"), "utf8");
+
+    for (const source of [requestGuard, hotspotGuard]) {
+      expect(source).toContain("generationForScope");
+      expect(source).toContain("bumpWriteGeneration");
+      expect(source).toContain("referenceWriteGeneration");
+      expect(source).toContain("getBandwidthInvalidationScope(url.pathname)");
+      expect(source).toContain("BANDWIDTH_INVALIDATION_CHANNEL");
+    }
+
+    expect(requestGuard).toMatch(/customer-proformas\$\/,[\s\S]*scope: "live"/);
+    expect(requestGuard).toMatch(/factory\\\/bale-products\$\/,[\s\S]*scope: "reference"/);
   });
 });
