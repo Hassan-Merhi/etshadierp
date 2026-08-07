@@ -362,7 +362,9 @@ export function registerScreenFeedRoutes(app: Express) {
     const userId = String(getSessionUserId(req));
     if (!isUserBeingWatched(userId)) return res.status(204).end();
     const cursor = sanitizeScreenFeedCursor(req.body?.cursor ?? req.body);
-    if (!cursor) return res.status(400).json({ message: "Invalid pointer update." });
+    // Pointer telemetry is visual-only. A stale/skewed sample must never create
+    // a 400 retry loop or interfere with the employee's ERP session.
+    if (!cursor) return res.status(204).end();
     screenFeedCursorStore.set(userId, cursor);
     const existingFrame = screenFeedStore.get(userId);
     if (existingFrame) existingFrame.cursor = cursor;
