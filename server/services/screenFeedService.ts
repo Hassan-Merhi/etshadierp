@@ -9,7 +9,7 @@ export interface ScreenFeedClick {
 
 const MAX_CLICK_AGE_MS = 8_000;
 const MAX_CLICKS_PER_FRAME = 50;
-const MAX_POINTER_AGE_MS = 30_000;
+const MAX_POINTER_CLOCK_SKEW_MS = 5 * 60 * 1000;
 const MAX_VIEWPORT_DIMENSION = 20_000;
 const MAX_CAPTURE_DIMENSION = 8_000;
 const MAX_CAPTURE_DURATION_MS = 30_000;
@@ -27,6 +27,12 @@ function boundedNumber(value: unknown, minimum: number, maximum: number): number
 
 function normalizedCoordinate(value: unknown): number | null {
   return boundedNumber(value, 0, 1);
+}
+
+function clampedNormalizedCoordinate(value: unknown): number | null {
+  const number = finiteNumber(value);
+  if (number === null) return null;
+  return Math.min(1, Math.max(0, number));
 }
 
 export function isValidScreenFeedDataUrl(value: unknown): value is string {
@@ -56,12 +62,17 @@ export function sanitizeScreenFeedClicks(value: unknown, now = Date.now()): Scre
 }
 
 export function sanitizeScreenFeedCursor(value: unknown, now = Date.now()): ScreenFeedCursor | null {
-  if (!value || typeof value !== "object") return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const cursor = value as Record<string, unknown>;
-  const x = normalizedCoordinate(cursor.x);
-  const y = normalizedCoordinate(cursor.y);
-  const ts = finiteNumber(cursor.ts);
-  if (x === null || y === null || ts === null || Math.abs(now - ts) > MAX_POINTER_AGE_MS) return null;
+  const x = clampedNormalizedCoordinate(cursor.x);
+  const y = clampedNormalizedCoordinate(cursor.y);
+  if (x === null || y === null) return null;
+
+  const suppliedTs = finiteNumber(cursor.ts);
+  const ts =
+    suppliedTs !== null && Math.abs(now - suppliedTs) <= MAX_POINTER_CLOCK_SKEW_MS
+      ? suppliedTs
+      : now;
 
   return {
     x,
