@@ -4,12 +4,20 @@
  * Extracted from ProductionComparison.tsx during the Phase 4 god-file split.
  */
 
+export interface ProductWorkerRef {
+  id: number | null;
+  name: string;
+  qty: number;
+}
+
 export interface ProductRow {
   articleCode: string;
   productName: string;
   categoryName: string;
   qty: number;
   totalWeightKg: number;
+  /** Workers who finalized bales of this product in the period (most bales first). */
+  workers?: ProductWorkerRef[];
 }
 
 export interface SupplierDayRow {
@@ -44,6 +52,8 @@ export interface MergedRow {
   bQty: number;
   aKg: number;
   bKg: number;
+  /** Distinct worker names across both periods, most bales first. */
+  workers: string[];
 }
 
 // ── Formatting ────────────────────────────────────────────────────────────────

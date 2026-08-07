@@ -7,6 +7,12 @@ type TableProps = React.TableHTMLAttributes<HTMLTableElement> & {
   scrollLabel?: string;
   scrollDescription?: string;
   minimumWidth?: string;
+  /**
+   * Caps the scroll region's height so `TableHeader`'s sticky positioning has something to
+   * stick against. Any CSS length; pass `"none"` to let the table run its full height (which
+   * also disables the sticky header). Defaults to the `max-h-[70vh]` class on the wrapper.
+   */
+  maxHeight?: string;
 };
 
 const Table = React.forwardRef<HTMLTableElement, TableProps>(
@@ -15,14 +21,20 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
       className,
       wrapperClassName,
       scrollLabel = "Scrollable data table",
-      scrollDescription = "Scroll horizontally to view additional columns.",
+      scrollDescription,
       minimumWidth,
+      maxHeight,
       style,
       ...props
     },
     ref
   ) => {
     const descriptionId = React.useId();
+
+    // Some callers opt out of clipping so menus and popovers rendered inside a row can escape
+    // the box. Those must not get a height cap either: with `overflow: visible` a capped table
+    // would spill over whatever follows it instead of scrolling. They forgo the sticky header.
+    const unclipped = /overflow-visible/.test(wrapperClassName ?? "");
 
     return (
       <div
@@ -34,11 +46,23 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
         data-table-scroll-region="true"
         className={cn(
           "relative max-w-full touch-pan-x overflow-x-auto overscroll-x-contain rounded-md border border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:border-slate-600",
+          // A sticky `thead` sticks to its nearest scrollport, which is this wrapper (declaring
+          // overflow on one axis makes the other `auto` too). Without a height cap the scrollport
+          // is exactly as tall as the table, so the header has no room to stick and scrolls away
+          // with the page. Capping the height gives long tables their own scroll and makes the
+          // header behave. Short tables never reach the cap, so their layout is unchanged.
+          // Printing must never clip rows, so the cap lifts and the table paginates naturally.
+          !unclipped && "max-h-[70vh] overflow-y-auto overscroll-y-contain",
+          !unclipped && "print:max-h-none print:overflow-visible",
           wrapperClassName
         )}
+        style={{ maxHeight }}
       >
         <span id={descriptionId} className="sr-only">
-          {scrollDescription}
+          {scrollDescription ??
+            (unclipped
+              ? "Scroll horizontally to view additional columns."
+              : "Scroll to view additional rows and columns.")}
         </span>
         <table
           ref={ref}
@@ -116,12 +140,17 @@ const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<
 );
 TableHead.displayName = "TableHead";
 
+// Text cells wrap (`break-words`), but numeric cells must not: a formatted amount like
+// "$ 65.66" contains a space, so under column pressure the browser would break it across
+// two lines ("$" above "65.66"), which visually shreds the column alignment. Right-aligned
+// and monospaced cells are always numeric here, so they are pinned to a single line and the
+// wrapper's horizontal scroll absorbs the extra width instead.
 const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<HTMLTableCellElement>>(
   ({ className, ...props }, ref) => (
     <td
       ref={ref}
       className={cn(
-        "min-w-0 break-words border-r border-slate-300 px-3 py-2 text-xs align-middle last:border-r-0 dark:border-slate-600 sm:px-2 sm:py-1 [&:has([role=checkbox])]:pr-0",
+        "min-w-0 break-words border-r border-slate-300 px-3 py-2 text-xs align-middle last:border-r-0 dark:border-slate-600 sm:px-2 sm:py-1 [&.font-mono]:whitespace-nowrap [&.text-right]:whitespace-nowrap [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props}

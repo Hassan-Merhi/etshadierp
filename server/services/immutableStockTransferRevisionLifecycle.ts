@@ -224,6 +224,22 @@ export async function createImmutableStockTransferRevision(
       throw lifecycleError("An identical pending revision already exists", "STOCK_TRANSFER_REVISION_DUPLICATE");
     }
 
+    const previousIds = input.pending ? previousPending.map((revision) => Number(revision.id)) : [];
+    if (previousIds.length > 0) {
+      // Free the partial unique index before inserting the replacement pending
+      // revision. The surrounding transaction restores these rows if the
+      // replacement insert fails for any reason.
+      await tx
+        .update(stockTransferRevisions)
+        .set({
+          status: "superseded",
+          optional: false,
+          reviewedAt: new Date(),
+          reviewedBy: userId,
+        })
+        .where(and(inArray(stockTransferRevisions.id, previousIds), eq(stockTransferRevisions.status, "pending")));
+    }
+
     const maxRow = firstRow<any>(
       await tx.execute(sql`
         SELECT COALESCE(MAX(revision_number), 0) AS max_revision
@@ -280,21 +296,14 @@ export async function createImmutableStockTransferRevision(
       )
       .returning();
 
-    if (input.pending && previousPending.length > 0) {
-      const previousIds = previousPending.map((revision) => Number(revision.id));
-      // Built with inArray rather than `= ANY(${ids}::int[])`: the sql template
-      // binds a JS array as a single scalar parameter, which Postgres rejects
-      // as a malformed array literal and which failed every resubmission.
+    if (previousIds.length > 0) {
+      // The old rows were already superseded before the insert so the unique
+      // pending-per-user index could admit the replacement. Link them to the
+      // newly created revision now that its id is known.
       await tx
         .update(stockTransferRevisions)
-        .set({
-          status: "superseded",
-          optional: false,
-          reviewedAt: new Date(),
-          reviewedBy: userId,
-          supersededByRevisionId: revisionId,
-        })
-        .where(and(inArray(stockTransferRevisions.id, previousIds), eq(stockTransferRevisions.status, "pending")));
+        .set({ supersededByRevisionId: revisionId })
+        .where(and(inArray(stockTransferRevisions.id, previousIds), eq(stockTransferRevisions.status, "superseded")));
     }
 
     const distinctSources = Array.from(
