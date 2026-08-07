@@ -23,7 +23,7 @@ so it can be re-derived rather than trusted.
 | Swept endpoints with a pinned contract | 384 | `npm run test:smoke-sweep` |
 | Test files | 363 (330 `tests/`, 33 colocated) | `find tests server client/src shared -name '*.test.ts*'` |
 | Registered routes | 1,871 | `config/route-manifest.json` |
-| Docs | 177 files, 116 phase-named (65%) | `npm run audit:doc-index` |
+| Docs | 48 reference in `docs/`, 131 archived records | `npm run audit:doc-index` |
 | God-file backlog | 64 files, 33,431 excess lines | `npm run audit:god-files` |
 
 Every figure above is bound to its source in `config/doc-index.json` and checked
@@ -348,30 +348,57 @@ ratchet is what stops it growing meanwhile.
 
 ## Phase 3 — documentation state
 
-Depends on 0.3.
+Depends on 0.3. **Done.**
 
-116 of 177 docs are phase-named. Most are records of completed work — correct as
-history, misleading as reference, and indistinguishable from reference at a
-glance. A newcomer opening `docs/` cannot tell which files describe the system
-as it is today.
+116 of 178 docs were phase-named. Most were records of completed work — correct
+as history, misleading as reference, and indistinguishable from reference at a
+glance.
 
-**3a. Move records to `docs/archive/`.** Mechanical, guided by the 0.3
-classification. The `translation/` subtree alone is 16 phase files describing
-finished work.
+**3a. Records moved to `docs/archive/` — done.** 131 documents moved; 48 remain
+in `docs/` and every one of them describes current behaviour.
 
-**3b. Fix the numbers the audit flags.** Starting with the god-file program
-header, which is wrong by a factor of two in a document whose entire purpose is
-tracking a number.
+The filename heuristic that seeded the classification was not good enough to
+act on, which is why it was only ever data for this review. It had classified
+**16 records as references**, including every `program-N-*` write-up: they open
+with "Program status: complete", "Baseline commit: …", or "Status: implemented
+by scope; draft and unmerged", and the filenames say none of that. It also got
+one wrong in the other direction — `i18n/phases-1-4-global-language-foundation.md`
+is phase-named but is the *active* language foundation, linked as such from
+`i18n/README.md`. Moving it would have archived a live document.
 
-**3c. Give `docs/` an index** that names the current-state references —
-`architecture.md`, `onboarding.md`, the flow docs — and says plainly that
-everything under `archive/` is history.
+The move itself was not just `git mv`. About 30 `scripts/verify-*.mjs` files
+call `fs.existsSync` and `fs.readFileSync` on these exact paths, and four
+workflows pass them as CLI arguments, so 40 files needed their references
+rewritten. What made it tractable was that the docs contain **zero markdown
+links to each other** — cross-references are backticked paths — so no relative
+link had to be recomputed. Verified afterwards by scanning every tracked file
+for `docs/**.md` paths that no longer resolve: one hit, and it is a
+pre-existing reference to a file that never existed in git history.
 
-**3d. Stop the recurrence.** Phase docs are written during the work, which is
-right. The rule is that they are *born* in `docs/archive/`, and only material
-that describes lasting behaviour is promoted out of it.
+**3b. Numbers the audit flagged — done.** Fixed as they surfaced, in the phases
+that surfaced them: the god-file backlog header (wrong by a factor of two in
+two places), the type-escape ceiling, and the 1,787 route count both programs
+cited against a manifest holding 1,871.
 
-**Exit criteria:** `docs/` root is reference-only, doc-index audit green.
+**3c. `docs/README.md` — done.** An index of the 48 reference documents grouped
+by what a reader is trying to do, plus an explicit statement of what `archive/`
+is. Linked from the root `README.md`, which previously pointed people at a
+directory of 178 files with no way to tell which were current.
+
+**3d. Recurrence stopped — done, and enforced rather than documented.** The
+audit now fails when classification and location disagree: a record outside
+`docs/archive/` fails, and a reference inside it fails. Phase documents are
+written straight into `archive/`; the seeding heuristic treats anything filed
+there as a record. Promoting one out means editing its classification in
+`config/doc-index.json`, which is exactly the moment to check it is still true.
+
+That last part is what makes this phase stick. Every previous attempt at
+documentation hygiene in this repository was a convention, and conventions here
+have a track record: the god-file program's own backlog figure drifted to double
+the real number in a document whose entire purpose was tracking it.
+
+**Exit criteria:** `docs/` root is reference-only ✓; doc-index audit green ✓;
+the split is enforced in CI ✓.
 
 ---
 
@@ -391,6 +418,20 @@ environment that violates the engines constraint. Pick 22, set all five.
 `audit:program-6d:validate`. The name says when the work happened, not what the
 script checks, so nobody can tell which to run without opening it. Rename by
 subject, keeping the old names as aliases for one release.
+
+The renaming is the smaller half. Running every `scripts/verify-*.mjs` and
+`scripts/audit-*.mjs` on a clean tree during Phase 3 found **44 of them exit
+non-zero**, and **32 of those are referenced by nothing at all** — not CI, not
+`package.json`, not another script. Some of the 12 that are wired up fail only
+because they need a build, a database, or network; others are simply broken
+(`verify-program2-phase1-accounting-foundation` looks for a source file that
+does not exist; `verify-program6d-query-safety` asserts SQL substrings with
+exact whitespace that no longer match).
+
+So Phase 4b starts by deciding which of these are gates and which are litter:
+delete the dead ones, fix or retire the broken ones, and only then rename what
+survives. A verification script nobody runs and that cannot pass is worse than
+no script — it looks like coverage.
 
 **4c. CI workflow consolidation.** Ten workflows, six named for phases
 (`phase8-rtl-accessibility`, `phase9-final-release`,

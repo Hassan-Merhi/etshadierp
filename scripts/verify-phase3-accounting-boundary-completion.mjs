@@ -109,7 +109,7 @@ for (const builderPath of [
   requireText(builderPath, "idempotencyKey", "idempotency identity");
 }
 
-const completion = read("docs/engineering/phase3-accounting-boundary-completion.md");
+const completion = read("docs/archive/engineering/phase3-accounting-boundary-completion.md");
 for (const phrase of [
   "balanced posting",
   "company ownership",
@@ -121,7 +121,7 @@ for (const phrase of [
   "Merge boundary",
 ]) {
   if (!completion.includes(phrase)) {
-    failures.push(`docs/engineering/phase3-accounting-boundary-completion.md: missing ${phrase}`);
+    failures.push(`docs/archive/engineering/phase3-accounting-boundary-completion.md: missing ${phrase}`);
   }
 }
 

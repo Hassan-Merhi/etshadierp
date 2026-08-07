@@ -137,7 +137,7 @@ for (const testPath of [
   if (!fs.existsSync(path.join(root, testPath))) failures.push(`missing focused test: ${testPath}`);
 }
 
-const docs = requireText("docs/engineering/phase9-type-safety-contracts.md", "# Phase 9");
+const docs = requireText("docs/archive/engineering/phase9-type-safety-contracts.md", "# Phase 9");
 for (const phrase of [
   "Runtime validation",
   "unknown at the network boundary",

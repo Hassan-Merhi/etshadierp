@@ -41,7 +41,7 @@ describe("Phase 8D audit coverage", () => {
     // These handlers left employeeRoutes.ts when payrollRoutes.ts was split;
     // reading the directory means the assertion follows them.
     const payroll = moduleSource("server/routes/erp-payroll");
-    const guidance = moduleSource("docs/phase-8d-domain-auditing.md");
+    const guidance = moduleSource("docs/archive/phase-8d-domain-auditing.md");
 
     expect(payroll).toContain('app.post("/api/payroll/runs"');
     expect(payroll).toContain('app.patch("/api/payroll/runs/:id"');

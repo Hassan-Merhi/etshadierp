@@ -154,6 +154,10 @@ GitHub Actions runs on every push / PR to `main`:
 
 ## More documentation
 
-The `docs/` directory contains deeper references — architecture, accounting
-and inventory flows, deployment, and security. Start with
-`docs/architecture.md` and `docs/onboarding.md`.
+`docs/README.md` is the index. Everything in `docs/` describes how the system
+behaves now — architecture, accounting and inventory flows, deployment,
+security, and operations runbooks. Finished work (phase write-ups, completion
+records, dated audits) lives in `docs/archive/` and is history rather than
+reference; the split is enforced by `npm run audit:doc-index`.
+
+Start with `docs/architecture.md` and `docs/onboarding.md`.

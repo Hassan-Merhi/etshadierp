@@ -39,6 +39,9 @@ const configPath = path.join(projectRoot, "config/doc-index.json");
 
 const VALID_CLASSES = new Set(["reference", "record"]);
 
+/** Where finished work lives. Records belong here; references must not. */
+const ARCHIVE_ROOT = "docs/archive";
+
 function normalizeRelativePath(absolutePath) {
   return path.relative(projectRoot, absolutePath).split(path.sep).join("/");
 }
@@ -62,10 +65,14 @@ function collectDocs(root, scanConfig, output) {
 
 /**
  * Heuristic used only to seed the classification. A doc named for a phase or
- * carrying a completion word is almost always a record of finished work. It is
- * a starting point for the Phase 3a review, never an assertion.
+ * carrying a completion word is almost always a record of finished work, and
+ * anything already filed under the archive is one by definition. It is a
+ * starting point for review, never an assertion — the Phase 3a pass moved 16
+ * docs the filename rule had called references, including every `program-N-*`
+ * write-up that opens with "Program status: complete".
  */
 function guessClassification(relativePath) {
+  if (relativePath.startsWith(`${ARCHIVE_ROOT}/`)) return "record";
   const name = path.basename(relativePath).toLowerCase();
   const looksLikeRecord =
     /(^|[-_])phases?[-_ ]?\d/.test(name) ||
@@ -139,6 +146,28 @@ export async function auditDocIndex() {
     warnings.push(`${doc} is classified but no longer exists; remove the entry`);
   }
 
+  // Classification and location have to agree, or the split stops meaning
+  // anything the moment someone adds a file. A record outside the archive puts
+  // finished work back where a reader looks for current behaviour; a reference
+  // inside it hides something that is still true. Phase 3d of
+  // docs/system-quality-program.md: phase write-ups are *born* in docs/archive/,
+  // and only material describing lasting behaviour is promoted out.
+  const misplaced = [];
+  for (const doc of docs) {
+    const value = classification[doc];
+    if (value === undefined) continue;
+    const archived = doc.startsWith(`${ARCHIVE_ROOT}/`);
+    if (value === "record" && !archived) {
+      misplaced.push(`${doc} is a record but sits outside ${ARCHIVE_ROOT}/. Move it there.`);
+    }
+    if (value === "reference" && archived) {
+      misplaced.push(
+        `${doc} is under ${ARCHIVE_ROOT}/ but classified "reference". Either move it out, or reclassify it.`
+      );
+    }
+  }
+  failures.push(...misplaced);
+
   // --- Figure agreement ---
   const figureResults = [];
   for (const figure of config.figures ?? []) {
@@ -196,12 +225,15 @@ export async function auditDocIndex() {
     docs,
     unclassified,
     staleEntries,
+    misplaced,
     figureResults,
     summary: {
       totalDocs: docs.length,
       reference: counts.reference,
       record: counts.record,
       unclassified: unclassified.length,
+      misplaced: misplaced.length,
+      archived: docs.filter((doc) => doc.startsWith(`${ARCHIVE_ROOT}/`)).length,
       figuresChecked: figureResults.length,
       figureMismatches: figureResults.filter((result) => !result.ok).length,
     },
@@ -254,8 +286,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   } else {
     const { summary } = report;
     console.log(
-      `Doc index verified: ${summary.totalDocs} docs (${summary.reference} reference, ${summary.record} record), ` +
-        `${summary.figuresChecked} documented figures agree with their source.`
+      `Doc index verified: ${summary.totalDocs} docs — ${summary.reference} reference in docs/, ` +
+        `${summary.archived} archived records — and ${summary.figuresChecked} documented figures agree with their source.`
     );
   }
 }

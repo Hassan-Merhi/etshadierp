@@ -89,7 +89,7 @@ The newer shared `LoadingState` already provides status, live-region, busy, head
 
 ### 15. Query structure, N+1 review, parallel reads, and bounded search
 
-Program 6D is recorded complete in `docs/program-6d-database-query-optimization.md`. All high-severity scanner findings were classified, independent reads were parallelized only where safe, and the net-profit endpoint replaced large entry materialization with grouped SQL.
+Program 6D is recorded complete in `docs/archive/program-6d-database-query-optimization.md`. All high-severity scanner findings were classified, independent reads were parallelized only where safe, and the net-profit endpoint replaced large entry materialization with grouped SQL.
 
 ### 16. Evidence-based indexes
 

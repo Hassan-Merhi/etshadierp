@@ -8,7 +8,7 @@ function source(path) {
 
 const runner = source("scripts/run-phase12-business-regression.mjs");
 const contract = source("tests/phase12-business-regression-suite.test.ts");
-const documentation = source("docs/engineering/phase12-business-regression-suite.md");
+const documentation = source("docs/archive/engineering/phase12-business-regression-suite.md");
 
 const requiredSuites = [
   "tests/workflow.test.ts",

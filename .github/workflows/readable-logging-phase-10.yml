@@ -14,8 +14,8 @@ on:
       - "server/middleware/requestLogger.ts"
       - "server/middleware/bandwidthDebug.ts"
       - "docs/render-production-logging.md"
-      - "docs/logging-phases-8-9.md"
-      - "docs/logging-phase-10-release.md"
+      - "docs/archive/logging-phases-8-9.md"
+      - "docs/archive/logging-phase-10-release.md"
       - "scripts/verify-readable-logging-*.mjs"
       - ".github/workflows/readable-logging-phase-10.yml"
   workflow_dispatch:

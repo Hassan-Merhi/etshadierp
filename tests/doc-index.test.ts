@@ -36,6 +36,19 @@ describe("documentation state index", () => {
     expect(report.summary.figuresChecked).toBeGreaterThanOrEqual(7);
   });
 
+  it("keeps records in the archive and references out of it", async () => {
+    const report = await auditDocIndex();
+
+    // Classification without location is just an opinion in a config file. A
+    // record left in docs/ puts finished work back where a reader looks for
+    // current behaviour, which is the exact confusion Phase 3 removed — 131
+    // documents deep.
+    expect(report.misplaced, `Docs whose location disagrees with their class:\n${report.misplaced.join("\n")}`).toEqual(
+      []
+    );
+    expect(report.summary.archived).toBeGreaterThan(100);
+  });
+
   it("has no classification entries for deleted docs", async () => {
     const report = await auditDocIndex();
     expect(report.staleEntries).toEqual([]);

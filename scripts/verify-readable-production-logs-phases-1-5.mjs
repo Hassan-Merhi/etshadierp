@@ -27,7 +27,7 @@ const bandwidth = read("server/middleware/bandwidthDebug.ts");
 const bandwidthTests = read("server/middleware/bandwidthDebug.test.ts");
 const runtime = read("server/runtimeObservability.mjs");
 const auditScript = read("scripts/audit-production-logs.mjs");
-const auditDoc = read("docs/observability/render-log-readability-phases-1-5.md");
+const auditDoc = read("docs/archive/observability/render-log-readability-phases-1-5.md");
 
 requireText(logger, "process.env.LOG_LEVEL", "shared logger must support LOG_LEVEL");
 requireText(logger, "process.env.LOG_FORMAT", "shared logger must support LOG_FORMAT");

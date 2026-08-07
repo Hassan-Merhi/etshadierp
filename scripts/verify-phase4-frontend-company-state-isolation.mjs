@@ -148,7 +148,7 @@ for (const testPath of [
   if (!fs.existsSync(path.join(root, testPath))) failures.push(`missing focused test: ${testPath}`);
 }
 
-const completion = read("docs/engineering/phase4-frontend-company-state-isolation.md");
+const completion = read("docs/archive/engineering/phase4-frontend-company-state-isolation.md");
 const normalizedCompletion = completion.toLowerCase();
 for (const phrase of [
   "server-authoritative switch",
@@ -161,7 +161,7 @@ for (const phrase of [
   "merge boundary",
 ]) {
   if (!normalizedCompletion.includes(phrase)) {
-    failures.push(`docs/engineering/phase4-frontend-company-state-isolation.md: missing ${phrase}`);
+    failures.push(`docs/archive/engineering/phase4-frontend-company-state-isolation.md: missing ${phrase}`);
   }
 }
 

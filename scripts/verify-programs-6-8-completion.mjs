@@ -43,7 +43,7 @@ for (const file of [
   assert(exists(file), `Missing Program 6 safeguard: ${file}`);
 }
 
-const program6d = read("docs/program-6d-database-query-optimization.md");
+const program6d = read("docs/archive/program-6d-database-query-optimization.md");
 assert(program6d.includes("## Status: COMPLETE"), "Program 6D completion status is missing.");
 assert(program6d.includes("995/995"), "Program 6D reconciliation evidence is missing.");
 assert(program6d.includes("Stock movement summary is year-bounded and drill-down is month-bounded"), "Stock movement/history bound evidence is missing.");
@@ -92,8 +92,8 @@ for (const file of [
   "docs/program-8b-approval-exception-workflows.md",
   "scripts/program8c-reporting-traceability-baseline.json",
   "scripts/verify-program8c-reporting-traceability.mjs",
-  "docs/program-8c-reporting-traceability.md",
-  "docs/programs-6-8-completion.md",
+  "docs/archive/program-8c-reporting-traceability.md",
+  "docs/archive/programs-6-8-completion.md",
 ]) {
   assert(exists(file), `Missing Program 8 or completion safeguard: ${file}`);
 }

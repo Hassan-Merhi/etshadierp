@@ -80,8 +80,8 @@ jobs:
           node node_modules/prettier/bin/prettier.cjs --check \
             .github/workflows/phase9-final-release.yml \
             config/i18n-phase9-final-release.json \
-            docs/translation/phase-8-current-main-reconciliation.md \
-            docs/translation/phase-9-current-main-release.md \
+            docs/archive/translation/phase-8-current-main-reconciliation.md \
+            docs/archive/translation/phase-9-current-main-release.md \
             scripts/run-phase9-language-browser-smoke.mjs \
             scripts/verify-multilingual-phases-4-7-current-main.mjs \
             scripts/verify-phase8-current-main-reconciliation.mjs \

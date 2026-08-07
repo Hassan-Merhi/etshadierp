@@ -8,7 +8,7 @@ on:
       - "scripts/verify-mobile-responsive-*.mjs"
       - "scripts/verify-phase10-dialog-form-consistency.mjs"
       - "tests/ui/mobile-responsive-*.test.ts"
-      - "docs/mobile-responsive-phase-status.md"
+      - "docs/archive/mobile-responsive-phase-status.md"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/mobile-responsive-phase11.yml"

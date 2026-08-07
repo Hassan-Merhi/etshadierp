@@ -173,7 +173,7 @@ No test was unskipped and no large test file was rewritten while CI is unavailab
 
 At this evidence point the branch differs from `main` only by:
 
-- `docs/program-1-release-verification.md`
+- `docs/archive/program-1-release-verification.md`
 - `docs/inventory-cost-memory-policy.md`
 
 No application, schema, migration, workflow, dependency, test, accounting, inventory, or frontend source file has been changed.

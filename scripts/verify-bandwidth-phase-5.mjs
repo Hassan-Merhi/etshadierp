@@ -4,11 +4,11 @@ const requiredFiles = [
   "server/middleware/bandwidthDebug.ts",
   "server/middleware/bandwidthDebug.test.ts",
   "server/lib/operationalEvents.ts",
-  "docs/bandwidth-phase-5-diagnostics-verification.md",
+  "docs/archive/bandwidth-phase-5-diagnostics-verification.md",
 ];
 
 const missingFiles = requiredFiles.filter((file) => !fs.existsSync(file));
-const docs = fs.readFileSync("docs/bandwidth-phase-5-diagnostics-verification.md", "utf8");
+const docs = fs.readFileSync("docs/archive/bandwidth-phase-5-diagnostics-verification.md", "utf8");
 const missingTargets = ["50 MB", "20 MB", "25 KB"].filter((target) => !docs.includes(target));
 
 if (missingFiles.length > 0 || missingTargets.length > 0) {

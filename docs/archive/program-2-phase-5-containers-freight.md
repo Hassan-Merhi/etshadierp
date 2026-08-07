@@ -50,7 +50,7 @@ The following remain isolated:
 - `server/routes/factory/suppliers/supplierBrokerRoutes.ts`
 - `server/routes/factory/suppliers/supplierBalanceRoutes.ts`
 - `server/services/factory/currencyConversion.ts`
-- `docs/program-2-accounting-convergence.md`
+- `docs/archive/program-2-accounting-convergence.md`
 
 ## Scope protection
 

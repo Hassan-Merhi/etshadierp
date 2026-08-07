@@ -115,7 +115,7 @@ Do not add the deferred unique `(user_id, company_id)` constraint or validate hi
 
 Use a non-production rehearsal source and target company.
 
-Follow `docs/sp-migration-phase-4-runbook.md` and require:
+Follow `docs/archive/sp-migration-phase-4-runbook.md` and require:
 
 1. final verification returns `PASS` or only approved synchronizable warnings;
 2. Prepare locks source and target writes;

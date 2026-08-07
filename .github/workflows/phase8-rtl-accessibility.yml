@@ -64,7 +64,7 @@ jobs:
             client/src/i18n/applicationDirection.ts \
             client/src/i18n/applicationTranslations.ts \
             client/src/styles/rtl-hardening.css \
-            docs/translation/phase-8-rtl-responsive-accessibility.md \
+            docs/archive/translation/phase-8-rtl-responsive-accessibility.md \
             scripts/audit-i18n-phase14.mjs \
             scripts/verify-program7d-accessibility-responsive.mjs \
             tests/phase14-i18n-release-gate.test.ts \
