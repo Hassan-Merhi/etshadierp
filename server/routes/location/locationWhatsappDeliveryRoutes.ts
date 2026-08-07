@@ -77,6 +77,27 @@ async function loadRetryDelivery(req: Request, res: Response, next: NextFunction
       res.status(409).json({ message: "Only failed or empty delivery attempts can be retried" });
       return;
     }
+
+    const child = await pool.query<{ status: string }>(
+      `SELECT status
+         FROM location_whatsapp_stock_deliveries
+        WHERE retry_of_id = $1
+          AND company_id = $2
+          AND location_id = $3
+          AND status IN ('running', 'sent')
+        ORDER BY started_at DESC, id DESC
+        LIMIT 1`,
+      [deliveryId, companyId, locationId]
+    );
+    if (child.rows[0]?.status === "running") {
+      res.status(409).json({ message: "A retry for this delivery is already in progress" });
+      return;
+    }
+    if (child.rows[0]?.status === "sent") {
+      res.status(409).json({ message: "This delivery has already been successfully retried" });
+      return;
+    }
+
     req._locationStockRetryDelivery = { ...row, id: Number(row.id) };
     next();
   } catch (error: unknown) {
@@ -168,6 +189,11 @@ export function registerLocationWhatsappDeliveryRoutes(app: Express) {
           [locationId, companyId, limit]
         );
 
+        const blockedRetryParents = new Set(
+          result.rows
+            .filter((row) => row.source === "retry" && row.retry_of_id != null && (row.status === "running" || row.status === "sent"))
+            .map((row) => Number(row.retry_of_id))
+        );
         const deliveries = result.rows.map((row) => ({
           id: Number(row.id),
           source: row.source,
@@ -191,7 +217,9 @@ export function registerLocationWhatsappDeliveryRoutes(app: Express) {
           error: row.error,
           startedAt: isoOrNull(row.started_at),
           completedAt: isoOrNull(row.completed_at),
-          canRetry: row.status === "failed" || row.status === "skipped_empty",
+          canRetry:
+            (row.status === "failed" || row.status === "skipped_empty") &&
+            !blockedRetryParents.has(Number(row.id)),
         }));
         const latest = deliveries[0] ?? null;
         const lastSent = deliveries.find((delivery) => delivery.status === "sent") ?? null;
