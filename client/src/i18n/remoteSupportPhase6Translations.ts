@@ -43,6 +43,11 @@ export const remoteSupportPhase6Translations: readonly Phase7BackendMessagesEntr
     fr: "La commande clavier a échoué.",
   },
   {
+    en: "Remote control request failed.",
+    ar: "فشل طلب التحكم عن بُعد.",
+    fr: "La requête de contrôle à distance a échoué.",
+  },
+  {
     en: "Keyboard control is disabled.",
     ar: "التحكم بلوحة المفاتيح معطل.",
     fr: "Le contrôle du clavier est désactivé.",
