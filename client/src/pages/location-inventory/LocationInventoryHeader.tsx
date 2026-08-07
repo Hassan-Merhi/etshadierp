@@ -49,12 +49,39 @@ export function LocationInventoryHeader({
   });
 
   const canManageWhatsapp = !posUser && whatsappCapability?.canManage === true;
+
+  // WITH COST is separately protected by the sensitive cost/value permissions.
+  // A denied or unavailable probe is treated as false; the POST endpoint enforces
+  // the same permissions again and remains authoritative.
+  const { data: costCapability } = useQuery<{ canSendWithCost: boolean }>({
+    queryKey: companyId ? ["/api/location-inventory/whatsapp/cost-capability", companyId] : [],
+    queryFn: async () => {
+      const response = await fetch("/api/location-inventory/whatsapp/cost-capability", { credentials: "include" });
+      if (!response.ok) return { canSendWithCost: false };
+      return response.json();
+    },
+    enabled: canManageWhatsapp && !!companyId,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const canSendWithCost = costCapability?.canSendWithCost === true;
   const whatsappReady = Boolean(
     selectedLocation?.whatsappGroupChatId && selectedLocation?.whatsappStockReportsEnabled
   );
 
   const handleSendStock = async (includeCost: boolean) => {
     if (!selectedLocation || sendMode) return;
+    if (includeCost && !canSendWithCost) {
+      toast({
+        title: "Cost report restricted",
+        description: "Your role does not have permission to send cost price and total inventory value.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const mode: SendMode = includeCost ? "with_cost" : "no_cost";
     setSendMode(mode);
     try {
@@ -129,13 +156,17 @@ export function LocationInventoryHeader({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => handleSendStock(true)}
-                  disabled={sendMode !== null}
+                  disabled={sendMode !== null || !canSendWithCost}
                   data-testid="menu-send-stock-whatsapp-with-cost"
                 >
                   <MessageCircle className="h-4 w-4 mr-2" />
                   <div>
                     <div className="font-medium">Send WITH COST</div>
-                    <div className="text-xs text-muted-foreground">Includes average rate and total value</div>
+                    <div className="text-xs text-muted-foreground">
+                      {canSendWithCost
+                        ? "Includes average rate and total value"
+                        : "Requires cost-price and total-value permission"}
+                    </div>
                   </div>
                 </DropdownMenuItem>
               </DropdownMenuContent>
