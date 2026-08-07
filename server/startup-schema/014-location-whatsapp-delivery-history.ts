@@ -49,4 +49,7 @@ export const locationWhatsAppDeliveryHistory: string[] = [
   `CREATE INDEX IF NOT EXISTS location_whatsapp_stock_deliveries_retry_idx
      ON location_whatsapp_stock_deliveries (retry_of_id)
      WHERE retry_of_id IS NOT NULL`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS location_whatsapp_stock_deliveries_one_active_retry_idx
+     ON location_whatsapp_stock_deliveries (retry_of_id)
+     WHERE retry_of_id IS NOT NULL AND status IN ('running', 'sent')`,
 ];
