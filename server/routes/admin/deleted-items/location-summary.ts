@@ -20,10 +20,13 @@ import {
   voucherEntries,
 } from "@shared/schema";
 import { eq, and, inArray, sql, isNull } from "drizzle-orm";
+import { handleLocationSummaryBandwidthProfile } from "./location-summary-bandwidth";
 
 export function registerLocationSummaryRoutes(app: Express) {
   // Stock Item Monthly Summary - Get aggregated monthly data for a stock item
   app.get("/api/location-summary", requireAuth, async (req, res) => {
+    if (await handleLocationSummaryBandwidthProfile(req, res)) return;
+
     try {
       const companyId = req.query.companyId ? parseInt(req.query.companyId as string) : req.session.currentCompanyId;
       const locationIds = req.query.locationIds
