@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Keyboard, ShieldCheck, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { RemoteControllerSessionProvider } from "@/components/RemoteControllerSessionContext";
 import { RemoteControlSessionWatchdog } from "@/components/RemoteControlSessionWatchdog";
 import { RemoteKeyboardControllerOverlay } from "@/components/RemoteKeyboardControllerOverlay";
 import { RemoteKeyboardControlTarget } from "@/components/RemoteKeyboardControlTarget";
@@ -34,9 +35,11 @@ export function RemoteSupportIndicator() {
 
   return (
     <>
-      <RemoteControlSessionWatchdog />
-      <RemoteMouseControllerOverlay />
-      <RemoteKeyboardControllerOverlay />
+      <RemoteControllerSessionProvider>
+        <RemoteControlSessionWatchdog />
+        <RemoteMouseControllerOverlay />
+        <RemoteKeyboardControllerOverlay />
+      </RemoteControllerSessionProvider>
       <RemoteMouseControlTarget session={session} tabId={tabId} />
       <RemoteKeyboardControlTarget session={session} tabId={tabId} />
       {session && inputControlActive && (
