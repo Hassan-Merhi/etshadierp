@@ -24,6 +24,12 @@ export interface RevisedTransferWAItem {
 export interface SendRevisedTransferWAOptions {
   sourceLocationId: number;
   sourceLocationName: string;
+  /**
+   * Destination the revised transfer is routed to. Pass it whenever the caller
+   * already knows it — voucher numbers are only unique per company, so the
+   * lookup below can pick the wrong transfer.
+   */
+  destinationLocationId?: number;
   destLocationName: string;
   items: RevisedTransferWAItem[];
   voucherNumber: string;
@@ -49,15 +55,19 @@ export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOpt
     return;
   }
 
-  const [transferTarget] = await db
-    .select({ destinationLocationId: stockTransferVouchers.destinationLocationId })
-    .from(stockTransferVouchers)
-    .innerJoin(vouchers, eq(vouchers.id, stockTransferVouchers.voucherId))
-    .where(eq(vouchers.voucherNumber, voucherNumber))
-    .limit(1);
+  let resolvedDestinationId = opts.destinationLocationId ?? null;
+  if (!resolvedDestinationId) {
+    const [transferTarget] = await db
+      .select({ destinationLocationId: stockTransferVouchers.destinationLocationId })
+      .from(stockTransferVouchers)
+      .innerJoin(vouchers, eq(vouchers.id, stockTransferVouchers.voucherId))
+      .where(eq(vouchers.voucherNumber, voucherNumber))
+      .limit(1);
+    resolvedDestinationId = transferTarget?.destinationLocationId ?? null;
+  }
 
-  const targetLocationId = transferTarget?.destinationLocationId ?? sourceLocationId;
-  if (!transferTarget?.destinationLocationId) {
+  const targetLocationId = resolvedDestinationId ?? sourceLocationId;
+  if (!resolvedDestinationId) {
     logger.warn(
       `[RevisedTransferWA] Could not resolve destination for ${voucherNumber}; using source location ${sourceLocationId} as fallback`
     );

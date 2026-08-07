@@ -64,6 +64,7 @@ import { RevisionDialog } from "./stock-transfer-order/dialogs/RevisionDialog";
 import { ImportDialog } from "./stock-transfer-order/dialogs/ImportDialog";
 import { QuantityPickerDialog } from "./stock-transfer-order/dialogs/QuantityPickerDialog";
 import { StockMovementDialog } from "./stock-transfer-order/dialogs/StockMovementDialog";
+import { useMatrixRows, useSelectedLocations } from "./stock-transfer-order/useMatrixDerived";
 import { DetailDialog } from "./stock-transfer-order/dialogs/DetailDialog";
 export default function StockTransferOrder() {
   const [_location, navigate] = useLocation();
@@ -403,9 +404,7 @@ export default function StockTransferOrder() {
     el?.scrollIntoView({ block: "nearest", behavior: "instant" });
   }, [focusedCell]);
 
-  const selectedLocations = selectedLocationIds
-    .map((id) => locations.find((loc) => loc.id === id))
-    .filter((loc): loc is Location => loc !== undefined);
+  const selectedLocations = useSelectedLocations(locations, selectedLocationIds);
 
   const availableDestinations = locations;
 
@@ -431,10 +430,7 @@ export default function StockTransferOrder() {
     return [...items].sort((a, b) => a.sourceLocationName.localeCompare(b.sourceLocationName));
   };
 
-  const flatItems =
-    summaryData?.stockGroups.flatMap((group) =>
-      expandedGroups.has(group.id) ? [...group.items].sort((a, b) => a.name.localeCompare(b.name)) : []
-    ) || [];
+  const { sortedGroupItems, flatItems, flatRowIndexById } = useMatrixRows(summaryData, expandedGroups);
 
   const openQuantityPicker = useCallback(
     (item: StockItemData, locationId: number, locationName: string, availableQty: number) => {
@@ -1636,55 +1632,52 @@ export default function StockTransferOrder() {
                         </tr>
 
                         {expandedGroups.has(group.id) &&
-                          [...group.items]
-                            .sort((a, b) => a.name.localeCompare(b.name))
-                            .map((item) => {
-                              const flatRowIndex = flatItems.findIndex((fi) => fi.id === item.id);
-                              return (
-                                <tr
-                                  key={item.id}
-                                  data-testid={`item-row-${item.id}`}
-                                  className="border-b transition-colors hover:bg-muted/50 bg-background"
-                                >
-                                  <td className="p-4 align-middle pl-8 sticky left-0 bg-background z-20 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
-                                    <p className="text-sm">{item.name}</p>
-                                  </td>
-                                  {selectedLocations.map((loc, colIndex) => {
-                                    const locData = item.locationData[loc.id];
-                                    const qty = locData?.quantity || 0;
-                                    const hasStock = qty > 0;
-                                    const isFocused =
-                                      focusedCell?.row === flatRowIndex && focusedCell?.col === colIndex;
+                          (sortedGroupItems.get(group.id) ?? []).map((item) => {
+                            const flatRowIndex = flatRowIndexById.get(item.id) ?? -1;
+                            return (
+                              <tr
+                                key={item.id}
+                                data-testid={`item-row-${item.id}`}
+                                className="border-b transition-colors hover:bg-muted/50 bg-background"
+                              >
+                                <td className="p-4 align-middle pl-8 sticky left-0 bg-background z-20 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                                  <p className="text-sm">{item.name}</p>
+                                </td>
+                                {selectedLocations.map((loc, colIndex) => {
+                                  const locData = item.locationData[loc.id];
+                                  const qty = locData?.quantity || 0;
+                                  const hasStock = qty > 0;
+                                  const isFocused = focusedCell?.row === flatRowIndex && focusedCell?.col === colIndex;
 
-                                    return (
-                                      <td
-                                        key={loc.id}
-                                        className="p-1 align-middle"
-                                        data-focused={isFocused ? "true" : undefined}
+                                  return (
+                                    <td
+                                      key={loc.id}
+                                      className="p-1 align-middle"
+                                      data-focused={isFocused ? "true" : undefined}
+                                    >
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className={cn(
+                                          "w-full font-mono",
+                                          hasStock && "hover:bg-primary/10 cursor-pointer",
+                                          isFocused && "ring-2 ring-primary ring-offset-1"
+                                        )}
+                                        disabled={!hasStock}
+                                        onClick={() => {
+                                          setFocusedCell({ row: flatRowIndex, col: colIndex });
+                                          handleCellClick(item, loc.id, loc.name, qty);
+                                        }}
+                                        data-testid={`cell-item-${item.id}-loc-${loc.id}`}
                                       >
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className={cn(
-                                            "w-full font-mono",
-                                            hasStock && "hover:bg-primary/10 cursor-pointer",
-                                            isFocused && "ring-2 ring-primary ring-offset-1"
-                                          )}
-                                          disabled={!hasStock}
-                                          onClick={() => {
-                                            setFocusedCell({ row: flatRowIndex, col: colIndex });
-                                            handleCellClick(item, loc.id, loc.name, qty);
-                                          }}
-                                          data-testid={`cell-item-${item.id}-loc-${loc.id}`}
-                                        >
-                                          {hasStock ? formatNumber(qty, 0) : "-"}
-                                        </Button>
-                                      </td>
-                                    );
-                                  })}
-                                </tr>
-                              );
-                            })}
+                                        {hasStock ? formatNumber(qty, 0) : "-"}
+                                      </Button>
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            );
+                          })}
                       </Fragment>
                     ))}
                   </tbody>
