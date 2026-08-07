@@ -11,6 +11,8 @@ export interface InventoryLocation {
   createdAt?: string;
   supplierPartnerPayableDeductionPerQty?: string | null;
   whatsappGroupChatId?: string | null;
+  whatsappGroupName?: string | null;
+  whatsappStockReportsEnabled?: boolean;
 }
 
 /** @deprecated use `InventoryLocation` */

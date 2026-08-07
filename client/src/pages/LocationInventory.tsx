@@ -34,45 +34,78 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
   // ─── State ────────────────────────────────────────────────────────────────
   const {
-    selectedLocationLocal, setSelectedLocationLocal,
-    selectedGroup, setSelectedGroup,
-    selectedRowIndex, setSelectedRowIndex,
-    viewAllItems, setViewAllItems,
-    locationSearchTerm, setLocationSearchTerm,
-    groupSearchTerm, setGroupSearchTerm,
-    itemSearchTerm, setItemSearchTerm,
-    asOfDate, setAsOfDate,
-    fromDate, setFromDate,
-    showNegativeStock, setShowNegativeStock,
-    showZeroStock, setShowZeroStock,
-    negativeSearchTerm, setNegativeSearchTerm,
-    showAllStock, setShowAllStock,
-    allStockGroupFilter, setAllStockGroupFilter,
-    allStockSearchTerm, setAllStockSearchTerm,
-    allStockLocationFilter, setAllStockLocationFilter,
-    allStockCategoryFilter, setAllStockCategoryFilter,
-    itemCategoryFilter, setItemCategoryFilter,
-    groupCategoryFilter, setGroupCategoryFilter,
+    selectedLocationLocal,
+    setSelectedLocationLocal,
+    selectedGroup,
+    setSelectedGroup,
+    selectedRowIndex,
+    setSelectedRowIndex,
+    viewAllItems,
+    setViewAllItems,
+    locationSearchTerm,
+    setLocationSearchTerm,
+    groupSearchTerm,
+    setGroupSearchTerm,
+    itemSearchTerm,
+    setItemSearchTerm,
+    asOfDate,
+    setAsOfDate,
+    fromDate,
+    setFromDate,
+    showNegativeStock,
+    setShowNegativeStock,
+    showZeroStock,
+    setShowZeroStock,
+    negativeSearchTerm,
+    setNegativeSearchTerm,
+    showAllStock,
+    setShowAllStock,
+    allStockGroupFilter,
+    setAllStockGroupFilter,
+    allStockSearchTerm,
+    setAllStockSearchTerm,
+    allStockLocationFilter,
+    setAllStockLocationFilter,
+    allStockCategoryFilter,
+    setAllStockCategoryFilter,
+    itemCategoryFilter,
+    setItemCategoryFilter,
+    groupCategoryFilter,
+    setGroupCategoryFilter,
     allStockSelectedRowIndex,
-    stockMovementOpen, setStockMovementOpen,
-    stockMovementItem, setStockMovementItem,
-    stockMovementPeriod, setStockMovementPeriod,
-    drillMonth, setDrillMonth,
+    stockMovementOpen,
+    setStockMovementOpen,
+    stockMovementItem,
+    setStockMovementItem,
+    stockMovementPeriod,
+    setStockMovementPeriod,
+    drillMonth,
+    setDrillMonth,
     allStockTableRef,
-    deleteDialogOpen, setDeleteDialogOpen,
+    deleteDialogOpen,
+    setDeleteDialogOpen,
     isDeleting,
-    archiveDialogOpen, setArchiveDialogOpen,
+    archiveDialogOpen,
+    setArchiveDialogOpen,
     isArchiving,
-    renameDialogOpen, setRenameDialogOpen,
+    renameDialogOpen,
+    setRenameDialogOpen,
     renamingLocation,
-    renameInput, setRenameInput,
-    renameDeductionInput, setRenameDeductionInput,
-    waGroupDialogOpen, setWaGroupDialogOpen,
+    renameInput,
+    setRenameInput,
+    renameDeductionInput,
+    setRenameDeductionInput,
+    waGroupDialogOpen,
+    setWaGroupDialogOpen,
     waGroupLocation,
-    waGroupSearch, setWaGroupSearch,
-    waGroupSelectedId, setWaGroupSelectedId,
-    createLocationOpen, setCreateLocationOpen,
-    createLocationName, setCreateLocationName,
+    waGroupSearch,
+    setWaGroupSearch,
+    waGroupSelectedId,
+    setWaGroupSelectedId,
+    createLocationOpen,
+    setCreateLocationOpen,
+    createLocationName,
+    setCreateLocationName,
     openRenameDialog,
     openWaGroupDialog,
     handleDeleteLocation,
@@ -81,18 +114,20 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   } = useLocationInventoryState({ companyId, toast });
 
   // ─── Mutations ────────────────────────────────────────────────────────────
-  const { renameLocationMutation, createLocationMutation, waGroupMutation } = useLocationInventoryMutations({
-    toast,
-    selectedLocationLocal,
-    setSelectedLocationLocal,
-    setRenameDialogOpen,
-    setCreateLocationOpen,
-    setCreateLocationName,
-    setWaGroupDialogOpen,
-  });
+  const { renameLocationMutation, createLocationMutation, waGroupMutation, waTestMutation } =
+    useLocationInventoryMutations({
+      toast,
+      selectedLocationLocal,
+      setSelectedLocationLocal,
+      setRenameDialogOpen,
+      setCreateLocationOpen,
+      setCreateLocationName,
+      setWaGroupDialogOpen,
+    });
 
   // ─── Queries ──────────────────────────────────────────────────────────────
   const {
+    canManageWhatsapp,
     waChats,
     waChatsLoading,
     locations,
@@ -275,6 +310,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   locationSearchTerm={locationSearchTerm}
                   setLocationSearchTerm={setLocationSearchTerm}
                   posUser={posUser}
+                  canManageWhatsapp={canManageWhatsapp}
                   openRenameDialog={openRenameDialog}
                   openWaGroupDialog={openWaGroupDialog}
                 />
@@ -286,6 +322,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               <StockGroupsView
                 selectedLocationLocal={selectedLocationLocal}
                 posUser={posUser}
+                canManageWhatsapp={canManageWhatsapp}
                 openRenameDialog={openRenameDialog}
                 openWaGroupDialog={openWaGroupDialog}
                 activeInventoryLoading={activeInventoryLoading}
@@ -402,6 +439,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
         waGroupSelectedId={waGroupSelectedId}
         setWaGroupSelectedId={setWaGroupSelectedId}
         waGroupMutation={waGroupMutation}
+        waTestMutation={waTestMutation}
         waGroupLocation={waGroupLocation}
         stockMovementOpen={stockMovementOpen}
         setStockMovementOpen={setStockMovementOpen}
