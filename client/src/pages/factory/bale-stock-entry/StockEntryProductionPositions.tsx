@@ -20,9 +20,10 @@ export function eligibleProductionPositions(
   workerId: number | null
 ): StockEntryProductionPosition[] {
   if (!workerId) return [];
-  return positions.filter(
-    (position) => position.active !== false && Array.isArray(position.workerIds) && position.workerIds.includes(workerId)
-  );
+  // workerIds already reflects the server's effective-dated membership for the
+  // Stock Entry date. Do not filter on the position's current active flag: an
+  // archived position can still be historically valid for a backdated entry.
+  return positions.filter((position) => Array.isArray(position.workerIds) && position.workerIds.includes(workerId));
 }
 
 export function StockEntryProductionPositions({
