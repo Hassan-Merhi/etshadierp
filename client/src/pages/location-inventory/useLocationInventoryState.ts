@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useLocation } from "@/contexts/LocationContext";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
 import { getDefaultPeriodValue } from "@/components/ui/period-filter";
@@ -10,6 +11,8 @@ interface UseLocationInventoryStateParams {
 }
 
 export function useLocationInventoryState({ companyId, toast }: UseLocationInventoryStateParams) {
+  const { setSelectedLocation } = useLocation();
+
   // ─── Main view state ──────────────────────────────────────────────────────
   const [selectedLocationLocal, setSelectedLocationLocal] = useState<Location | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<StockGroupSummary | null>(null);
@@ -37,6 +40,12 @@ export function useLocationInventoryState({ companyId, toast }: UseLocationInven
   const [stockMovementPeriod, setStockMovementPeriod] = useState<any>(() => getDefaultPeriodValue("this_month"));
   const [drillMonth, setDrillMonth] = useState<any>(null);
   const allStockTableRef = useRef<HTMLDivElement>(null);
+
+  // Keep the shared location context aligned with the Location Inventory page so
+  // header-level actions can safely target the exact location currently open.
+  useEffect(() => {
+    setSelectedLocation(selectedLocationLocal);
+  }, [selectedLocationLocal, setSelectedLocation]);
 
   // ─── Dialog state ─────────────────────────────────────────────────────────
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -134,47 +143,81 @@ export function useLocationInventoryState({ companyId, toast }: UseLocationInven
 
   return {
     // View state
-    selectedLocationLocal, setSelectedLocationLocal,
-    selectedGroup, setSelectedGroup,
-    selectedRowIndex, setSelectedRowIndex,
-    viewAllItems, setViewAllItems,
-    locationSearchTerm, setLocationSearchTerm,
-    groupSearchTerm, setGroupSearchTerm,
-    itemSearchTerm, setItemSearchTerm,
-    asOfDate, setAsOfDate,
-    fromDate, setFromDate,
-    showNegativeStock, setShowNegativeStock,
-    showZeroStock, setShowZeroStock,
-    negativeSearchTerm, setNegativeSearchTerm,
-    showAllStock, setShowAllStock,
-    allStockGroupFilter, setAllStockGroupFilter,
-    allStockSearchTerm, setAllStockSearchTerm,
-    allStockLocationFilter, setAllStockLocationFilter,
-    allStockCategoryFilter, setAllStockCategoryFilter,
-    itemCategoryFilter, setItemCategoryFilter,
-    groupCategoryFilter, setGroupCategoryFilter,
+    selectedLocationLocal,
+    setSelectedLocationLocal,
+    selectedGroup,
+    setSelectedGroup,
+    selectedRowIndex,
+    setSelectedRowIndex,
+    viewAllItems,
+    setViewAllItems,
+    locationSearchTerm,
+    setLocationSearchTerm,
+    groupSearchTerm,
+    setGroupSearchTerm,
+    itemSearchTerm,
+    setItemSearchTerm,
+    asOfDate,
+    setAsOfDate,
+    fromDate,
+    setFromDate,
+    showNegativeStock,
+    setShowNegativeStock,
+    showZeroStock,
+    setShowZeroStock,
+    negativeSearchTerm,
+    setNegativeSearchTerm,
+    showAllStock,
+    setShowAllStock,
+    allStockGroupFilter,
+    setAllStockGroupFilter,
+    allStockSearchTerm,
+    setAllStockSearchTerm,
+    allStockLocationFilter,
+    setAllStockLocationFilter,
+    allStockCategoryFilter,
+    setAllStockCategoryFilter,
+    itemCategoryFilter,
+    setItemCategoryFilter,
+    groupCategoryFilter,
+    setGroupCategoryFilter,
     tableRef,
-    allStockSelectedRowIndex, setAllStockSelectedRowIndex,
-    stockMovementOpen, setStockMovementOpen,
-    stockMovementItem, setStockMovementItem,
-    stockMovementPeriod, setStockMovementPeriod,
-    drillMonth, setDrillMonth,
+    allStockSelectedRowIndex,
+    setAllStockSelectedRowIndex,
+    stockMovementOpen,
+    setStockMovementOpen,
+    stockMovementItem,
+    setStockMovementItem,
+    stockMovementPeriod,
+    setStockMovementPeriod,
+    drillMonth,
+    setDrillMonth,
     allStockTableRef,
     // Dialog state
-    deleteDialogOpen, setDeleteDialogOpen,
+    deleteDialogOpen,
+    setDeleteDialogOpen,
     isDeleting,
-    archiveDialogOpen, setArchiveDialogOpen,
+    archiveDialogOpen,
+    setArchiveDialogOpen,
     isArchiving,
-    renameDialogOpen, setRenameDialogOpen,
+    renameDialogOpen,
+    setRenameDialogOpen,
     renamingLocation,
-    renameInput, setRenameInput,
-    renameDeductionInput, setRenameDeductionInput,
-    waGroupDialogOpen, setWaGroupDialogOpen,
+    renameInput,
+    setRenameInput,
+    renameDeductionInput,
+    setRenameDeductionInput,
+    waGroupDialogOpen,
+    setWaGroupDialogOpen,
     waGroupLocation,
-    waGroupSearch, setWaGroupSearch,
-    waGroupSelectedId, setWaGroupSelectedId,
-    createLocationOpen, setCreateLocationOpen,
-    createLocationName, setCreateLocationName,
+    waGroupSearch,
+    setWaGroupSearch,
+    waGroupSelectedId,
+    setWaGroupSelectedId,
+    createLocationOpen,
+    setCreateLocationOpen,
+    createLocationName,
+    setCreateLocationName,
     // Handlers
     openRenameDialog,
     openWaGroupDialog,
