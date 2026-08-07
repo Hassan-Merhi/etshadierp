@@ -40,6 +40,20 @@ function safeFilePart(value: string): string {
 }
 
 export function registerLocationReportRoutes(app: Express) {
+  // Fail-closed UI probe for the WITH COST option. The POST route repeats these
+  // checks, so hiding/disabling the option in the browser is only a UX layer.
+  app.get(
+    "/api/location-inventory/whatsapp/cost-capability",
+    requireAuth,
+    requireNonPOS,
+    requireExportAccess(LOCATION_WHATSAPP_PERMISSION),
+    requireCostPriceAccess,
+    requireTotalValueAccess,
+    async (_req, res) => {
+      res.json({ canSendWithCost: true });
+    }
+  );
+
   // Manual Phase-2 delivery: generate the same Godown Summary PDF available from
   // Location Inventory and send it to the location's verified WhatsApp group.
   // Cost-bearing reports additionally require both cost-price and total-value
