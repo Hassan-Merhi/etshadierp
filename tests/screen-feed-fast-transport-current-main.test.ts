@@ -50,7 +50,7 @@ describe("Phase 5 faster remote viewing contracts", () => {
   it("keeps client-side serialization while making full-frame capture dirty-driven", () => {
     expect(captureSource).toContain("busyRef.current");
     expect(captureSource).toContain("new MutationObserver");
-    expect(captureSource).toContain("document.visibilityState !== \"visible\"");
+    expect(captureSource).toContain('document.visibilityState !== "visible"');
     expect(captureSource).toContain("ACTIVE_CAPTURE_MIN_GAP_MS");
     expect(captureSource).toContain("IDLE_REFRESH_MS");
     expect(captureSource).toContain("FAILED_CAPTURE_BACKOFF_MS");

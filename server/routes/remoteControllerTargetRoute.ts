@@ -54,29 +54,24 @@ function serializeAuthorization(authorization: RemoteMouseAuthorization | Remote
  * fallback and gives mouse + keyboard overlays one shared authoritative state.
  */
 export function registerRemoteControllerTargetRoute(app: Express): void {
-  app.get(
-    "/api/screen-feed/control/sessions/controller-target/:userId",
-    requireAuth,
-    viewPermission,
-    (req, res) => {
-      if (!requireController(req, res)) return;
-      const ownerId = controllerUserId(req);
-      const targetUserId = String(req.params.userId ?? "").trim();
-      const companyId = getSessionCompanyId(req);
-      const session = listActiveRemoteControlSessionsForController(ownerId).find(
-        (candidate) => candidate.companyId === companyId && candidate.targetUserId === targetUserId
-      );
+  app.get("/api/screen-feed/control/sessions/controller-target/:userId", requireAuth, viewPermission, (req, res) => {
+    if (!requireController(req, res)) return;
+    const ownerId = controllerUserId(req);
+    const targetUserId = String(req.params.userId ?? "").trim();
+    const companyId = getSessionCompanyId(req);
+    const session = listActiveRemoteControlSessionsForController(ownerId).find(
+      (candidate) => candidate.companyId === companyId && candidate.targetUserId === targetUserId
+    );
 
-      res.setHeader("Cache-Control", "no-store");
-      if (!session) return res.json({ session: null });
+    res.setHeader("Cache-Control", "no-store");
+    if (!session) return res.json({ session: null });
 
-      res.json({
-        session: {
-          ...serializeSession(session),
-          mouseAuthorization: serializeAuthorization(getRemoteMouseAuthorization(session.id, ownerId)),
-          keyboardAuthorization: serializeAuthorization(getRemoteKeyboardAuthorization(session.id, ownerId)),
-        },
-      });
-    }
-  );
+    res.json({
+      session: {
+        ...serializeSession(session),
+        mouseAuthorization: serializeAuthorization(getRemoteMouseAuthorization(session.id, ownerId)),
+        keyboardAuthorization: serializeAuthorization(getRemoteKeyboardAuthorization(session.id, ownerId)),
+      },
+    });
+  });
 }

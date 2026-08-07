@@ -10,10 +10,7 @@ import {
   type ScreenFeedCursor,
   type ScreenFrame,
 } from "../screenFeedStore";
-import {
-  isRemoteControlControllerRole,
-  stopAllRemoteControlSessions,
-} from "../services/remoteControlSessionService";
+import { isRemoteControlControllerRole, stopAllRemoteControlSessions } from "../services/remoteControlSessionService";
 import { screenFeedLiveHub } from "../services/screenFeedLiveHub";
 import {
   isValidScreenFeedDataUrl,

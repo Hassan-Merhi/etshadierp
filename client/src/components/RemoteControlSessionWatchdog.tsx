@@ -102,7 +102,7 @@ export function RemoteControlSessionWatchdog() {
           throw new Error(t("Remote control session did not bind to the watched user."));
         } catch (error) {
           if (cancelled) return;
-          const code = error instanceof RemoteControllerRequestError ? error.code ?? "" : "";
+          const code = error instanceof RemoteControllerRequestError ? (error.code ?? "") : "";
           const status = error instanceof RemoteControllerRequestError ? error.status : 0;
           if (
             status === 409 &&

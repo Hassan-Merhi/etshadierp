@@ -65,7 +65,9 @@ function normalizeSession(value: unknown): RemoteControlSessionView | null {
 }
 
 function isUnauthorized(error: unknown): boolean {
-  return !!error && typeof error === "object" && "status" in error && Number((error as { status?: unknown }).status) === 401;
+  return (
+    !!error && typeof error === "object" && "status" in error && Number((error as { status?: unknown }).status) === 401
+  );
 }
 
 export function useRemoteControlSession() {

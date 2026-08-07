@@ -20,19 +20,21 @@ export function usePresence(enabled = true) {
       headers: { "Content-Type": "application/json" },
       credentials: "include",
       body: JSON.stringify({ route, type }),
-    }).then((res) => {
-      // Session expired — stop all remote-support browser work immediately.
-      // The global fetch interceptor will also confirm the session loss and
-      // redirect to login, but the local lifecycle prevents request churn while
-      // that confirmation/redirect is happening.
-      if (res.status === 401) {
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
+    })
+      .then((res) => {
+        // Session expired — stop all remote-support browser work immediately.
+        // The global fetch interceptor will also confirm the session loss and
+        // redirect to login, but the local lifecycle prevents request churn while
+        // that confirmation/redirect is happening.
+        if (res.status === 401) {
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+          markRemoteSupportAuthLost();
         }
-        markRemoteSupportAuthLost();
-      }
-    }).catch(() => {});
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {

@@ -1,17 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  AlertTriangle,
-  Clock,
-  History,
-  Maximize2,
-  Monitor,
-  RefreshCw,
-  Wifi,
-  WifiOff,
-  X,
-  ZoomIn,
-} from "lucide-react";
+import { AlertTriangle, Clock, History, Maximize2, Monitor, RefreshCw, Wifi, WifiOff, X, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
@@ -241,7 +230,11 @@ function ScreenFeedDialog({
               )}
               <span>{liveTransportEnabled && connected ? t("Fast live feed") : t("Polling mode")}</span>
               {frame?.capturedAt ? <span>· {new Date(frame.capturedAt).toLocaleTimeString()}</span> : null}
-              {presence?.lastSeen ? <span>· {t("last seen")} {fmtTime(presence.lastSeen)}</span> : null}
+              {presence?.lastSeen ? (
+                <span>
+                  · {t("last seen")} {fmtTime(presence.lastSeen)}
+                </span>
+              ) : null}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -297,7 +290,9 @@ function ScreenFeedDialog({
               <img
                 src={frame.dataUrl}
                 alt={`${t("Live screen for")} ${username}`}
-                className={displayMode === "fit" ? "max-h-full max-w-full object-contain" : "max-h-none max-w-none object-none"}
+                className={
+                  displayMode === "fit" ? "max-h-full max-w-full object-contain" : "max-h-none max-w-none object-none"
+                }
                 draggable={false}
                 data-testid="img-screen-feed"
               />
@@ -388,12 +383,12 @@ function RuntimeDisabledDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-export function RemoteSupportWatchDialog(props: {
-  userId: string;
-  username: string;
-  onClose: () => void;
-}) {
-  const { data: runtime, isLoading, isError } = useQuery<RemoteSupportRuntime>({
+export function RemoteSupportWatchDialog(props: { userId: string; username: string; onClose: () => void }) {
+  const {
+    data: runtime,
+    isLoading,
+    isError,
+  } = useQuery<RemoteSupportRuntime>({
     queryKey: ["/api/screen-feed/admin/runtime"],
     queryFn: () => apiRequest("GET", "/api/screen-feed/admin/runtime").then((response) => response.json()),
     staleTime: 15000,

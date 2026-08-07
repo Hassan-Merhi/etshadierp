@@ -69,10 +69,7 @@ export function sanitizeScreenFeedCursor(value: unknown, now = Date.now()): Scre
   if (x === null || y === null) return null;
 
   const suppliedTs = finiteNumber(cursor.ts);
-  const ts =
-    suppliedTs !== null && Math.abs(now - suppliedTs) <= MAX_POINTER_CLOCK_SKEW_MS
-      ? suppliedTs
-      : now;
+  const ts = suppliedTs !== null && Math.abs(now - suppliedTs) <= MAX_POINTER_CLOCK_SKEW_MS ? suppliedTs : now;
 
   return {
     x,

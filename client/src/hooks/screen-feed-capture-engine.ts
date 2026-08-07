@@ -199,8 +199,7 @@ function createCssColorNormalizer(doc: Document): (value: string, fallback: stri
       context.fillRect(0, 0, 1, 1);
       const [red, green, blue, alphaByte] = context.getImageData(0, 0, 1, 1).data;
       const alpha = Math.round((alphaByte / 255) * 1000) / 1000;
-      const normalized =
-        alpha >= 1 ? `rgb(${red}, ${green}, ${blue})` : `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+      const normalized = alpha >= 1 ? `rgb(${red}, ${green}, ${blue})` : `rgba(${red}, ${green}, ${blue}, ${alpha})`;
       cache.set(key, normalized);
       return normalized;
     } catch {
@@ -370,10 +369,7 @@ function buildHtml2CanvasOptions(snapshot: Map<string, { top: number; left: numb
   } as const;
 }
 
-async function tryCapture(
-  opts: Record<string, unknown>,
-  timeoutMs: number
-): Promise<HTMLCanvasElement> {
+async function tryCapture(opts: Record<string, unknown>, timeoutMs: number): Promise<HTMLCanvasElement> {
   const html2canvas = await loadHtml2Canvas();
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -506,10 +502,7 @@ function encodeFrame(canvas: HTMLCanvasElement, fast: boolean): EncodedFrame | n
   return lastFrame && lastFrame.dataUrl.length <= MAX_DATA_URL_LEN ? lastFrame : null;
 }
 
-async function runCaptureAttempt(
-  scrollElements: Iterable<HTMLElement>,
-  retry: boolean
-): Promise<HTMLCanvasElement> {
+async function runCaptureAttempt(scrollElements: Iterable<HTMLElement>, retry: boolean): Promise<HTMLCanvasElement> {
   const lease = prepareScrollableSnapshot(scrollElements);
   try {
     const options = buildHtml2CanvasOptions(lease.snapshot);

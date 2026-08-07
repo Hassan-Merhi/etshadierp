@@ -105,11 +105,14 @@ export function useScreenFeed() {
 
       clearCaptureTimer();
       captureDueAtRef.current = dueAt;
-      captureTimerRef.current = setTimeout(() => {
-        captureTimerRef.current = null;
-        captureDueAtRef.current = 0;
-        runCaptureCycle();
-      }, Math.max(0, dueAt - Date.now()));
+      captureTimerRef.current = setTimeout(
+        () => {
+          captureTimerRef.current = null;
+          captureDueAtRef.current = 0;
+          runCaptureCycle();
+        },
+        Math.max(0, dueAt - Date.now())
+      );
     }
 
     function scheduleIdleRefresh() {
@@ -239,8 +242,7 @@ export function useScreenFeed() {
           expectedPath,
           clicks: clickBuffer,
           scrollElements: trackedScrollElements,
-          shouldContinue: () =>
-            !disposed && watchedRef.current && document.visibilityState === "visible",
+          shouldContinue: () => !disposed && watchedRef.current && document.visibilityState === "visible",
         })
           .then((result) => {
             failed = result.failed;

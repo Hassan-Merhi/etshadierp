@@ -80,8 +80,7 @@ function currentWatchTarget(): RemoteWatchTarget | null {
   const dialog = findRemoteSupportWatchDialog();
   const userId = dialog?.dataset.watchedUserId?.trim() ?? "";
   if (!dialog || !userId) return null;
-  const username =
-    dialog.querySelector<HTMLElement>("[data-watch-username]")?.dataset.watchUsername?.trim() || userId;
+  const username = dialog.querySelector<HTMLElement>("[data-watch-username]")?.dataset.watchUsername?.trim() || userId;
   return { userId, username };
 }
 
@@ -213,13 +212,10 @@ export function RemoteControllerSessionProvider({ children }: { children: ReactN
     return () => {
       const current = sessionRef.current;
       if (!targetUserId || !current || current.targetUserId !== targetUserId) return;
-      void remoteControllerRequestJson(
-        `/api/screen-feed/control/sessions/${encodeURIComponent(current.id)}/stop`,
-        {
-          method: "POST",
-          body: JSON.stringify({ reason: "controller-viewer-closed" }),
-        }
-      ).catch(() => undefined);
+      void remoteControllerRequestJson(`/api/screen-feed/control/sessions/${encodeURIComponent(current.id)}/stop`, {
+        method: "POST",
+        body: JSON.stringify({ reason: "controller-viewer-closed" }),
+      }).catch(() => undefined);
     };
   }, [target?.userId]);
 

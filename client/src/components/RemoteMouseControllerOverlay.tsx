@@ -183,12 +183,7 @@ export function RemoteMouseControllerOverlay() {
   );
 
   const schedulePointerDrain = useCallback(() => {
-    if (
-      !sessionId ||
-      !controlEnabled ||
-      pointerQueueActiveRef.current ||
-      !pointerLatestRef.current
-    ) {
+    if (!sessionId || !controlEnabled || pointerQueueActiveRef.current || !pointerLatestRef.current) {
       return;
     }
 
@@ -196,12 +191,14 @@ export function RemoteMouseControllerOverlay() {
     pointerQueueActiveRef.current = true;
     pointerQueueSessionRef.current = expectedSessionId;
 
-    const nextTail = commandTailRef.current.catch(() => undefined).then(async () => {
-      if (activeSessionIdRef.current !== expectedSessionId) return;
-      const point = pointerLatestRef.current;
-      pointerLatestRef.current = null;
-      if (point) await sendCommandNow({ type: "pointer-move", ...point }, expectedSessionId);
-    });
+    const nextTail = commandTailRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        if (activeSessionIdRef.current !== expectedSessionId) return;
+        const point = pointerLatestRef.current;
+        pointerLatestRef.current = null;
+        if (point) await sendCommandNow({ type: "pointer-move", ...point }, expectedSessionId);
+      });
     commandTailRef.current = nextTail;
 
     void nextTail.finally(() => {

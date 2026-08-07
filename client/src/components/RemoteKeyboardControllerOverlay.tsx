@@ -65,8 +65,7 @@ export function RemoteKeyboardControllerOverlay() {
   const t = useCallback((value: string) => translateRemoteSupportPhase6Text(value, language), [language]);
 
   const sessionId = session?.id ?? null;
-  const mouseActive =
-    !!session?.capabilities.mouse && authorizationIsFresh(session.mouseAuthorization?.expiresAt);
+  const mouseActive = !!session?.capabilities.mouse && authorizationIsFresh(session.mouseAuthorization?.expiresAt);
   const keyboardActive =
     !!session?.capabilities.keyboard && authorizationIsFresh(session.keyboardAuthorization?.expiresAt);
 

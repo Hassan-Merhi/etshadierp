@@ -1,5 +1,4 @@
-const WATCH_DIALOG_SELECTOR =
-  "[data-testid='dialog-watch-user'], [data-testid='dialog-watch-user-fast']";
+const WATCH_DIALOG_SELECTOR = "[data-testid='dialog-watch-user'], [data-testid='dialog-watch-user-fast']";
 const HOST_SELECTOR = "[data-remote-control-panel-host='true']";
 const DIALOG_RESERVE_CLASSES = ["!pb-[46vh]", "lg:!pb-0", "lg:!pr-[376px]"] as const;
 
