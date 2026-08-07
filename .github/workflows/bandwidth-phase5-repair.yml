@@ -29,11 +29,11 @@ jobs:
       - name: Regenerate route manifest
         env:
           UPDATE_ROUTE_MANIFEST: "1"
-        run: npx vitest run --config vitest.backend.config.ts tests/route-manifest.test.ts
+        run: npx vitest run tests/route-manifest.test.ts
       - name: Run Phase 5 targeted regression set
         run: |
-          npx vitest run --config vitest.backend.config.ts tests/loading-proforma-summary-lines.test.ts tests/phase7-backend-messages-translations.test.ts tests/god-file-boundaries.test.ts tests/source-text-assertions.test.ts tests/route-manifest.test.ts
-          npx vitest run --config vitest.frontend.config.ts tests/ui/bandwidth-phase-1-invalidation-policy.test.ts tests/ui/bandwidth-phase-2-payloads.test.ts tests/ui/bandwidth-phase-4-heavy-pages.test.ts
+          npx vitest run tests/loading-proforma-summary-lines.test.ts tests/phase7-backend-messages-translations.test.ts tests/god-file-boundaries.test.ts tests/source-text-assertions.test.ts tests/route-manifest.test.ts
+          npx vitest run --config vitest.config.frontend.ts tests/ui/bandwidth-phase-1-invalidation-policy.test.ts tests/ui/bandwidth-phase-2-payloads.test.ts tests/ui/bandwidth-phase-4-heavy-pages.test.ts
       - name: Commit regenerated manifest
         run: |
           if git diff --quiet config/route-manifest.json; then
