@@ -31,9 +31,7 @@ describe("Phase 14 trilingual release gate", () => {
     expect(audit).toContain("enforceBaseline");
     expect(audit).toContain("process.exit(1)");
     expect(classifier).toContain("I18n audit classifier contract verified");
-    expect(policy.ignoredPathRules.every((rule: { reason?: string }) => Boolean(rule.reason))).toBe(
-      true
-    );
+    expect(policy.ignoredPathRules.every((rule: { reason?: string }) => Boolean(rule.reason))).toBe(true);
     expect(baseline.schemaVersion).toBe(2);
     expect(baseline.detectorVersion).toBe(9);
     expect(baseline.maxActionable).toBe(12455);
@@ -51,10 +49,7 @@ describe("Phase 14 trilingual release gate", () => {
   });
 
   it("preserves business identifiers while translating interface attributes", () => {
-    const translator = fs.readFileSync(
-      "client/src/components/ApplicationInterfaceTranslator.tsx",
-      "utf8"
-    );
+    const translator = fs.readFileSync("client/src/components/ApplicationInterfaceTranslator.tsx", "utf8");
     expect(translator).toContain('"aria-label"');
     expect(translator).toContain('"placeholder"');
     expect(translator).toContain('"title"');
