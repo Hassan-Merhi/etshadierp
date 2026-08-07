@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useApplicationLanguage } from "@/contexts/ApplicationLanguageContext";
+import { translateRemoteSupportPhase5Text } from "@/i18n/remoteSupportPhase5Translations";
 import { apiRequest } from "@/lib/queryClient";
 import { getPageLabel } from "./WatchUserDialog";
 
@@ -77,7 +79,7 @@ async function fetchConditionalFrame(
   });
 
   if (response.status === 304) return state;
-  if (!response.ok) throw new Error(`Screen feed request failed (${response.status}).`);
+  if (!response.ok) throw new Error("Screen feed request failed.");
 
   const frame = (await response.json()) as ScreenFrame | null;
   return {
@@ -97,6 +99,7 @@ function ScreenFeedDialog({
   onClose: () => void;
   liveTransportEnabled: boolean;
 }) {
+  const { language } = useApplicationLanguage();
   const [frame, setFrame] = useState<ScreenFrame | null>(null);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,6 +109,7 @@ function ScreenFeedDialog({
   const connectedRef = useRef(false);
   const pollAbortRef = useRef<AbortController | null>(null);
   const viewerSurfaceRef = useRef<HTMLDivElement>(null);
+  const t = useCallback((value: string) => translateRemoteSupportPhase5Text(value, language), [language]);
 
   const { data: presenceRaw } = useQuery<any>({
     queryKey: ["/api/user-presence", userId],
@@ -139,14 +143,14 @@ function ScreenFeedDialog({
       setError(null);
     } catch (pollError) {
       if (controller.signal.aborted) return;
-      setError(pollError instanceof Error ? pollError.message : "Polling recovery failed.");
+      setError(pollError instanceof Error ? t(pollError.message) : t("Polling recovery failed."));
     } finally {
       if (pollAbortRef.current === controller) {
         pollAbortRef.current = null;
         setRefreshing(false);
       }
     }
-  }, [userId]);
+  }, [t, userId]);
 
   useEffect(() => {
     stateRef.current = { etag: null, frame: null };
@@ -177,13 +181,13 @@ function ScreenFeedDialog({
           setConnectionState(true);
           setError(null);
         } catch {
-          setError("A live frame arrived in an invalid format.");
+          setError(t("A live frame arrived in an invalid format."));
         }
       });
       eventSource.onerror = () => {
         if (closed) return;
         setConnectionState(false);
-        setError("Live connection interrupted. Polling recovery is active.");
+        setError(t("Live connection interrupted. Polling recovery is active."));
         void pollOnce();
       };
     }
@@ -202,7 +206,7 @@ function ScreenFeedDialog({
       connectedRef.current = false;
       stateRef.current = { etag: null, frame: null };
     };
-  }, [liveTransportEnabled, pollOnce, setConnectionState, userId]);
+  }, [liveTransportEnabled, pollOnce, setConnectionState, t, userId]);
 
   const fmtTime = (value: string | null | undefined) => {
     if (!value) return "—";
@@ -227,7 +231,7 @@ function ScreenFeedDialog({
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
           <div className="min-w-0">
             <div className="font-semibold truncate" data-watch-username={username}>
-              Watching {username}
+              {t("Watching")} {username}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               {liveTransportEnabled && connected ? (
@@ -235,15 +239,15 @@ function ScreenFeedDialog({
               ) : (
                 <WifiOff className="h-3.5 w-3.5" />
               )}
-              <span>{liveTransportEnabled && connected ? "Fast live feed" : "Polling mode"}</span>
+              <span>{liveTransportEnabled && connected ? t("Fast live feed") : t("Polling mode")}</span>
               {frame?.capturedAt ? <span>· {new Date(frame.capturedAt).toLocaleTimeString()}</span> : null}
-              {presence?.lastSeen ? <span>· last seen {fmtTime(presence.lastSeen)}</span> : null}
+              {presence?.lastSeen ? <span>· {t("last seen")} {fmtTime(presence.lastSeen)}</span> : null}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => void pollOnce()} disabled={refreshing}>
               <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-              Refresh
+              {t("Refresh")}
             </Button>
             <Button
               size="sm"
@@ -251,7 +255,7 @@ function ScreenFeedDialog({
               onClick={() => setDisplayMode("fit")}
               data-testid="button-feed-fit"
             >
-              <Monitor className="mr-1.5 h-3.5 w-3.5" /> Fit
+              <Monitor className="mr-1.5 h-3.5 w-3.5" /> {t("Fit")}
             </Button>
             <Button
               size="sm"
@@ -263,10 +267,10 @@ function ScreenFeedDialog({
             </Button>
             {frame?.dataUrl ? (
               <Button size="sm" variant="outline" onClick={openNativeFullscreen} data-testid="button-fullscreen-feed">
-                <Maximize2 className="mr-1.5 h-3.5 w-3.5" /> Full Screen
+                <Maximize2 className="mr-1.5 h-3.5 w-3.5" /> {t("Full Screen")}
               </Button>
             ) : null}
-            <Button variant="ghost" size="icon" aria-label="Close viewer" onClick={onClose}>
+            <Button variant="ghost" size="icon" aria-label={t("Close viewer")} onClick={onClose}>
               <X className="h-5 w-5" />
             </Button>
           </div>
@@ -292,7 +296,7 @@ function ScreenFeedDialog({
             {frame?.dataUrl ? (
               <img
                 src={frame.dataUrl}
-                alt={`Live screen for ${username}`}
+                alt={`${t("Live screen for")} ${username}`}
                 className={displayMode === "fit" ? "max-h-full max-w-full object-contain" : "max-h-none max-w-none object-none"}
                 draggable={false}
                 data-testid="img-screen-feed"
@@ -300,7 +304,7 @@ function ScreenFeedDialog({
             ) : (
               <div className="m-auto flex flex-col items-center gap-2 text-sm text-white/70">
                 <Clock className="h-9 w-9 opacity-40" />
-                <span>Waiting for the first screen frame…</span>
+                <span>{t("Waiting for the first screen frame…")}</span>
               </div>
             )}
           </div>
@@ -308,19 +312,19 @@ function ScreenFeedDialog({
           <aside className="hidden w-72 shrink-0 flex-col border-l lg:flex">
             <div className="border-b px-3 py-2">
               <p className="flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                <History className="h-3.5 w-3.5" /> Page history
+                <History className="h-3.5 w-3.5" /> {t("Page history")}
               </p>
             </div>
             {presence?.currentRoute ? (
               <div className="border-b bg-muted/40 px-3 py-2">
-                <p className="mb-0.5 text-xs text-muted-foreground">Currently on</p>
+                <p className="mb-0.5 text-xs text-muted-foreground">{t("Currently on")}</p>
                 <p className="truncate text-sm font-semibold">{getPageLabel(presence.currentRoute)}</p>
                 <p className="truncate font-mono text-xs text-muted-foreground">{presence.currentRoute}</p>
               </div>
             ) : null}
             <div className="min-h-0 flex-1 divide-y overflow-y-auto text-sm">
               {groupedActivity.length === 0 ? (
-                <p className="px-3 py-3 text-xs text-muted-foreground">No history yet.</p>
+                <p className="px-3 py-3 text-xs text-muted-foreground">{t("No history yet.")}</p>
               ) : (
                 groupedActivity.map((event) => (
                   <div key={`${event.id}-${event.route}`} className="space-y-0.5 px-3 py-2">
@@ -346,6 +350,8 @@ function ScreenFeedDialog({
 }
 
 function RuntimeLoadingDialog({ onClose }: { onClose: () => void }) {
+  const { language } = useApplicationLanguage();
+  const t = useCallback((value: string) => translateRemoteSupportPhase5Text(value, language), [language]);
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
@@ -353,7 +359,7 @@ function RuntimeLoadingDialog({ onClose }: { onClose: () => void }) {
         data-screenfeed-ignore="true"
       >
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <RefreshCw className="h-4 w-4 animate-spin" /> Preparing remote viewer…
+          <RefreshCw className="h-4 w-4 animate-spin" /> {t("Preparing remote viewer…")}
         </div>
       </DialogContent>
     </Dialog>
@@ -361,6 +367,8 @@ function RuntimeLoadingDialog({ onClose }: { onClose: () => void }) {
 }
 
 function RuntimeDisabledDialog({ onClose }: { onClose: () => void }) {
+  const { language } = useApplicationLanguage();
+  const t = useCallback((value: string) => translateRemoteSupportPhase5Text(value, language), [language]);
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
@@ -369,9 +377,11 @@ function RuntimeDisabledDialog({ onClose }: { onClose: () => void }) {
       >
         <div className="max-w-md space-y-3 p-6 text-center">
           <AlertTriangle className="mx-auto h-8 w-8 text-amber-500" />
-          <p className="font-semibold">Remote screen feed is disabled.</p>
-          <p className="text-sm text-muted-foreground">Enable screen feed in Remote Support settings before opening a viewer.</p>
-          <Button onClick={onClose}>Close</Button>
+          <p className="font-semibold">{t("Remote screen feed is disabled.")}</p>
+          <p className="text-sm text-muted-foreground">
+            {t("Enable screen feed in Remote Support settings before opening a viewer.")}
+          </p>
+          <Button onClick={onClose}>{t("Close")}</Button>
         </div>
       </DialogContent>
     </Dialog>
