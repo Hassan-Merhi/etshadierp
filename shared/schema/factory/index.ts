@@ -12,6 +12,7 @@ export * from "./customer-orders";
 export * from "./daybook-fx";
 export * from "./workers-payroll";
 export * from "./production-positions";
+export * from "./bale-production-attribution";
 export * from "./settings-analytics";
 export * from "./pos-transport";
 export * from "./loading-shipping";
