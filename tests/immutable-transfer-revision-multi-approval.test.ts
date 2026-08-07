@@ -245,13 +245,13 @@ describe("immutable transfer revision approval across POS locations", () => {
   });
 
   it("is a no-op when the same revision is approved twice", async () => {
-    const [anyApproved] = await db
+    const [alreadyApproved] = await db
       .select({ id: stockTransferRevisions.id })
       .from(stockTransferRevisions)
-      .where(eq(stockTransferRevisions.transferId, transferId));
+      .where(and(eq(stockTransferRevisions.transferId, transferId), eq(stockTransferRevisions.status, "approved")));
 
     const before = [await inventoryQty(sourceAId, itemAId), await inventoryQty(destinationId, itemAId)];
-    const repeat = await approveImmutableStockTransferRevision(companyId, anyApproved.id, `${PREFIX}-admin`);
+    const repeat = await approveImmutableStockTransferRevision(companyId, alreadyApproved.id, `${PREFIX}-admin`);
     expect(repeat.transition).toBe("no-op");
     expect([await inventoryQty(sourceAId, itemAId), await inventoryQty(destinationId, itemAId)]).toEqual(before);
   });
