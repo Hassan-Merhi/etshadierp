@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -21,7 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Check, Loader2, MessageCircle, Send } from "lucide-react";
+import { AlertTriangle, Check, Loader2, MessageCircle, RefreshCw, Send } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { StockMovementDialog } from "./StockMovementDialog";
@@ -121,6 +122,28 @@ export function LocationDialogs({
 }: LocationDialogsProps) {
   const [waEnabled, setWaEnabled] = useState(false);
 
+  // Subscribe to the exact same React Query cache entry used by the page-level
+  // group loader. This adds no duplicate request, but it lets the dialog surface
+  // the actual disconnected/credentials/API failure and provide an explicit retry.
+  const {
+    error: waChatsError,
+    refetch: refetchWaChats,
+    isFetching: waChatsRefreshing,
+  } = useQuery<{ id: string; name: string; type: string }[]>({
+    queryKey: ["/api/location-inventory/whatsapp/groups"],
+    queryFn: async () => {
+      const res = await fetch("/api/location-inventory/whatsapp/groups", { credentials: "include" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.message || `Failed to fetch WhatsApp groups: ${res.status}`);
+      }
+      return res.json();
+    },
+    enabled: false,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
   useEffect(() => {
     if (!waGroupDialogOpen) return;
     setWaEnabled(
@@ -142,6 +165,12 @@ export function LocationDialogs({
     selectedWaGroup?.name ||
     (waGroupSelectedId === waGroupLocation?.whatsappGroupChatId ? waGroupLocation?.whatsappGroupName : null) ||
     null;
+  const waConnectionError =
+    waChatsError instanceof Error
+      ? waChatsError.message
+      : waChatsError
+        ? "Could not load WhatsApp groups from the connected account."
+        : null;
 
   return (
     <>
@@ -260,7 +289,7 @@ export function LocationDialogs({
 
       {/* WhatsApp Stock Report Configuration */}
       <Dialog open={waGroupDialogOpen} onOpenChange={setWaGroupDialogOpen}>
-        <DialogContent className="sm:max-w-[520px]">
+        <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-[520px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MessageCircle className="h-5 w-5" /> Location WhatsApp Stock Reports
@@ -287,11 +316,31 @@ export function LocationDialogs({
             </div>
 
             <div className="max-h-60 overflow-y-auto border rounded-md p-1 space-y-1">
-              {waChatsLoading ? (
+              {waChatsLoading || (waChatsRefreshing && !waConnectionError) ? (
                 <div className="p-4 space-y-2">
                   <Skeleton className="h-8 w-full" />
                   <Skeleton className="h-8 w-full" />
                   <Skeleton className="h-8 w-full" />
+                </div>
+              ) : waConnectionError ? (
+                <div className="p-4 text-center space-y-3" data-testid="location-wa-groups-error">
+                  <AlertTriangle className="h-5 w-5 text-amber-500 mx-auto" />
+                  <div>
+                    <p className="text-sm font-medium">WhatsApp groups could not be loaded</p>
+                    <p className="text-xs text-muted-foreground mt-1 break-words">{waConnectionError}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => void refetchWaChats()}
+                    disabled={waChatsRefreshing}
+                    data-testid="button-retry-location-wa-groups"
+                  >
+                    {waChatsRefreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    Retry connection
+                  </Button>
                 </div>
               ) : filteredWaChats.length === 0 ? (
                 <div className="p-8 text-center text-sm text-muted-foreground">No WhatsApp groups found</div>
