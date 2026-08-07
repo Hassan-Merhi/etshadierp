@@ -19,9 +19,15 @@ import BaleProductsPage from "./BaleProducts";
 type TranslationFilter = "all" | "complete" | "missing-product" | "missing-category";
 
 interface BilingualProduct {
+  name?: string | null;
   nameAr?: string | null;
+  nameFr?: string | null;
+  code?: string | null;
+  articleCode?: string | null;
   categoryId?: number | null;
+  categoryName?: string | null;
   categoryNameAr?: string | null;
+  categoryNameFr?: string | null;
 }
 
 function matchesTranslationFilter(product: BilingualProduct, filter: TranslationFilter): boolean {
@@ -31,6 +37,21 @@ function matchesTranslationFilter(product: BilingualProduct, filter: Translation
   if (filter === "missing-product") return !hasProduct;
   if (filter === "missing-category") return Boolean(product.categoryId) && !hasCategory;
   return true;
+}
+
+function matchesCatalogSearch(product: BilingualProduct, search: string): boolean {
+  const needle = search.trim().toLocaleLowerCase();
+  if (!needle) return true;
+  return [
+    product.name,
+    product.nameAr,
+    product.nameFr,
+    product.code,
+    product.articleCode,
+    product.categoryName,
+    product.categoryNameAr,
+    product.categoryNameFr,
+  ].some((value) => value?.toLocaleLowerCase().includes(needle));
 }
 
 function CatalogFetchBoundary({
@@ -54,17 +75,26 @@ function CatalogFetchBoundary({
       const isRelative = rawUrl.startsWith("/");
 
       if (parsed.pathname === "/api/factory/bale-products") {
+        // Phase 4 bandwidth fix: search/status filters are presentation state,
+        // not different server datasets. Fetch one language-specific catalog
+        // representation and filter it locally so typing does not create a new
+        // large HTTP response for every debounced search term.
+        parsed.searchParams.delete("q");
         parsed.searchParams.set("lang", language);
-        if (search) parsed.searchParams.set("q", search);
         const response = await originalFetch(
           isRelative ? `${parsed.pathname}${parsed.search}` : parsed.toString(),
           init
         );
-        if (!response.ok || translationFilter === "all") return response;
+        if (!response.ok || (!search && translationFilter === "all")) return response;
+
         const products = (await response.clone().json()) as BilingualProduct[];
-        const filtered = products.filter((product) => matchesTranslationFilter(product, translationFilter));
+        const filtered = products.filter(
+          (product) =>
+            matchesCatalogSearch(product, search) && matchesTranslationFilter(product, translationFilter)
+        );
         const headers = new Headers(response.headers);
         headers.set("content-type", "application/json; charset=utf-8");
+        headers.delete("content-length");
         return new Response(JSON.stringify(filtered), {
           status: response.status,
           statusText: response.statusText,
@@ -113,9 +143,9 @@ export default function BaleProductsBilingual() {
     const handleLanguageChange = (event: Event) => {
       const next = (event as CustomEvent<FactoryCatalogLanguage>).detail;
       if (next !== "en" && next !== "ar" && next !== "fr") return;
+      // CatalogFetchBoundary remounts for the new language and clears its own
+      // React Query entries. Avoid clearing the same large catalogs twice here.
       setLanguage(next);
-      queryClient.removeQueries({ queryKey: ["/api/factory/bale-products"] });
-      queryClient.removeQueries({ queryKey: ["/api/factory/categories"] });
     };
     window.addEventListener(FACTORY_CATALOG_LANGUAGE_EVENT, handleLanguageChange);
     return () => window.removeEventListener(FACTORY_CATALOG_LANGUAGE_EVENT, handleLanguageChange);
