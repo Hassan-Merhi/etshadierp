@@ -10,6 +10,7 @@ interface LocationGridProps {
   locationSearchTerm: string;
   setLocationSearchTerm: (s: string) => void;
   posUser?: any;
+  canManageWhatsapp?: boolean;
   openRenameDialog?: (loc: Location, e?: any) => void;
   openWaGroupDialog?: (loc: Location, e?: any) => void;
 }
@@ -22,6 +23,7 @@ export function LocationGrid({
   locationSearchTerm,
   setLocationSearchTerm,
   posUser,
+  canManageWhatsapp = false,
   openRenameDialog,
   openWaGroupDialog,
 }: LocationGridProps) {
@@ -83,14 +85,27 @@ export function LocationGrid({
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
                 )}
-                {!posUser && openWaGroupDialog && (
+                {!posUser && canManageWhatsapp && openWaGroupDialog && (
                   <button
-                    className={`p-1 rounded hover:bg-muted ${loc.whatsappGroupChatId ? "text-green-500 hover:text-green-600" : "text-muted-foreground hover:text-foreground"}`}
+                    className={`p-1 rounded hover:bg-muted ${
+                      loc.whatsappGroupChatId && loc.whatsappStockReportsEnabled
+                        ? "text-green-500 hover:text-green-600"
+                        : loc.whatsappGroupChatId
+                          ? "text-amber-500 hover:text-amber-600"
+                          : "text-muted-foreground hover:text-foreground"
+                    }`}
                     onClick={(e) => {
                       e.stopPropagation();
                       openWaGroupDialog(loc, e);
                     }}
-                    title={loc.whatsappGroupChatId ? "WhatsApp group assigned" : "Assign WhatsApp group"}
+                    title={
+                      loc.whatsappGroupChatId && loc.whatsappStockReportsEnabled
+                        ? `WhatsApp stock reports enabled${loc.whatsappGroupName ? `: ${loc.whatsappGroupName}` : ""}`
+                        : loc.whatsappGroupChatId
+                          ? `WhatsApp group linked but stock reports disabled${loc.whatsappGroupName ? `: ${loc.whatsappGroupName}` : ""}`
+                          : "Link WhatsApp group for stock reports"
+                    }
+                    aria-label={`Configure WhatsApp stock reports for ${loc.name}`}
                     data-testid={`button-wa-${loc.id}`}
                   >
                     <MessageCircle className="h-3.5 w-3.5" />
