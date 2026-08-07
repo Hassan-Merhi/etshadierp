@@ -17,6 +17,7 @@ const serviceWorker = read("client/public/sw.js");
 const main = read("client/src/main.tsx");
 const app = read("client/src/App.tsx");
 const screenFeed = read("client/src/hooks/use-screen-feed.ts");
+const screenFeedCaptureEngine = read("client/src/hooks/screen-feed-capture-engine.ts");
 const presence = read("client/src/hooks/use-presence.ts");
 const lazyImports = read("build/viteLazyHeavyImportsPlugin.ts");
 const labelAssetPlugin = read("build/viteLabelAssetExtractionPlugin.ts");
@@ -50,9 +51,26 @@ requireText(
   "The update banner must handle service-worker updates."
 );
 
-rejectText(screenFeed, 'import html2canvas from "html2canvas"', "html2canvas must not be statically imported.");
-requireText(screenFeed, 'import("html2canvas")', "html2canvas must load only when capture starts.");
-requireText(screenFeed, "return await fn();", "The canvas guard must remain active across async capture.");
+rejectText(
+  screenFeedCaptureEngine,
+  'import html2canvas from "html2canvas"',
+  "html2canvas must not be statically imported."
+);
+requireText(
+  screenFeedCaptureEngine,
+  'import("html2canvas")',
+  "html2canvas must load only when capture starts."
+);
+requireText(
+  screenFeedCaptureEngine,
+  "return await fn();",
+  "The canvas guard must remain active across async capture."
+);
+requireText(
+  screenFeed,
+  "captureAndUploadScreenFrame",
+  "The screen-feed scheduler must delegate heavy rendering to the capture engine."
+);
 requireText(lazyImports, 'await import("@/lib/excelHelper")', "ExcelJS must load only after an export request.");
 requireText(lazyImports, "StockInSalesReport.tsx", "The main Stock In and Sales report must be covered.");
 requireText(lazyImports, "StockInSalesReportDetail.tsx", "The detail report must be covered.");
