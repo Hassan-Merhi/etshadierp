@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
-  Calendar,
   CheckCircle2,
   Download,
   DollarSign,
@@ -33,6 +32,7 @@ import {
   ProductionBonusDecisionPanel,
   type ProductionBonusDecisionResult,
 } from "./factorypayroll/ProductionBonusDecisionPanel";
+import { PayrollSummaryCards } from "./factorypayroll/PayrollSummaryCards";
 import type { Company, PayrollRecord } from "./factorypayroll/types";
 import { getStatusBadge } from "./factorypayroll/utils";
 
@@ -513,26 +513,7 @@ export default function FactoryPayrollPage() {
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
-            {[
-              ["Records", String(payrollRecords.length), Users],
-              ["Total Net Salary", `$${totals.netSalary.toFixed(2)}`, DollarSign],
-              ["Total Base", `$${totals.baseSalary.toFixed(2)}`, DollarSign],
-              ["Production Bonus", `$${totals.productionBonus.toFixed(2)}`, CheckCircle2],
-              ["Pending Bonus", `$${totals.pendingProductionBonus.toFixed(2)}`, Calendar],
-              ["Other Bonus", `$${totals.otherBonuses.toFixed(2)}`, DollarSign],
-            ].map(([label, value, Icon]: any) => (
-              <Card key={label}>
-                <CardContent className="pt-4">
-                  <div className="flex items-center gap-2">
-                    <Icon className="h-4 w-4 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">{label}</p>
-                  </div>
-                  <p className="mt-1 font-mono text-xl font-bold">{value}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <PayrollSummaryCards recordCount={payrollRecords.length} totals={totals} />
 
           <Card>
             <CardHeader>
