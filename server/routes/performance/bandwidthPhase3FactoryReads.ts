@@ -60,7 +60,7 @@ const LEDGER_CLASSIFICATION_SQL = `
             AND co.company_id = $1
             AND co.status IN ('FINALIZED', 'DISPATCHED', 'SOLD')
         ) THEN 'sold'
-        WHEN COALESCE(fb.article_code, fbp.article_code, '') LIKE 'HMD16%'
+        WHEN COALESCE(fb.article_code, '') LIKE 'HMD16%'
           OR LOWER(COALESCE(fc.name, '')) LIKE '%garbage%'
           OR LOWER(COALESCE(fc.name, '')) LIKE '%wiper%'
         THEN 'wasteStock'
