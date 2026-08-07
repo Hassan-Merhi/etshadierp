@@ -25,12 +25,9 @@ export function startScheduler(): void {
   cron.schedule("* * * * *", async () => {
     const startedAt = Date.now();
     try {
+      // Successful no-op checks are deliberately silent; this runs every minute
+      // and should not flood production logs when no location is due.
       await checkAndRunLocationStockReports();
-      logger.info("cron locationStockWhatsApp succeeded", {
-        module: "scheduler",
-        action: "locationStockWhatsApp",
-        durationMs: Date.now() - startedAt,
-      });
     } catch (error: unknown) {
       logger.error("cron locationStockWhatsApp failed", {
         module: "scheduler",
