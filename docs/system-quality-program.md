@@ -24,7 +24,8 @@ so it can be re-derived rather than trusted.
 | Files carrying escapes | 1,328 of 2,524 (53%) | `npm run audit:type-escapes` |
 | Drizzle result casts | 0 (was 344 — Phase 1b) | `npm run audit:type-escapes` |
 | Backend coverage floor (lines) | 18% (measured 21.0%) | `config/coverage-thresholds.json` |
-| Untested ledger/stock write routes | 283 of 325 | `npm run audit:write-routes` |
+| Write routes with no test at all | 0 of 328 | `npm run audit:write-routes` |
+| Write routes covered only by the guard sweep | 268 of 328 | `npm run audit:write-routes` |
 | Swept endpoints with a pinned contract | 397 | `npm run test:smoke-sweep` |
 | Test files | 363 (330 `tests/`, 33 colocated) | `find tests server client/src shared -name '*.test.ts*'` |
 | Registered routes | 1,891 | `config/route-manifest.json` |

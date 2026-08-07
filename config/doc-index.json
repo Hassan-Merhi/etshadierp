@@ -96,7 +96,7 @@
     },
     {
       "id": "uncoveredSensitiveWriteRoutes",
-      "description": "Write routes touching the ledger or stock ledger with no test referencing them.",
+      "description": "Write routes touching the ledger or stock ledger with no test referencing them at all.",
       "source": {
         "kind": "jsonValue",
         "file": "config/write-route-coverage.json",
@@ -105,7 +105,22 @@
       "claims": [
         {
           "doc": "docs/system-quality-program.md",
-          "pattern": "Untested ledger/stock write routes \\| ([\\d,]+)"
+          "pattern": "Write routes with no test at all \\| ([\\d,]+)"
+        }
+      ]
+    },
+    {
+      "id": "guardOnlySensitiveWriteRoutes",
+      "description": "Write routes touching the ledger or stock ledger covered only by the guard sweep, which proves they reject an unauthenticated caller and nothing more.",
+      "source": {
+        "kind": "jsonValue",
+        "file": "config/write-route-coverage.json",
+        "path": "guardOnlySensitiveCeiling"
+      },
+      "claims": [
+        {
+          "doc": "docs/system-quality-program.md",
+          "pattern": "Write routes covered only by the guard sweep \\| ([\\d,]+)"
         }
       ]
     }

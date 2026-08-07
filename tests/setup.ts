@@ -46,7 +46,7 @@ function stableTestCompanyCode(prefix: string): string {
  * company is not of type "factory", so any suite exercising it has to seed one.
  * Ordinary ERP/POS tests stay on "erp".
  */
-const FACTORY_COMPANY_PREFIXES = new Set(["xlsexp", "charfact", "supcrud", "balecrud"]);
+const FACTORY_COMPANY_PREFIXES = new Set(["xlsexp", "charfact", "supcrud", "balecrud", "transwr"]);
 
 function testCompanyType(prefix: string): "erp" | "factory" {
   return FACTORY_COMPANY_PREFIXES.has(prefix) ? "factory" : "erp";
@@ -98,10 +98,15 @@ export async function cleanupTestData(prefix: string): Promise<void> {
       .where(
         sql`${schema.stockTransferVouchers.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`
       );
+    // Transporter transactions reference vouchers with ON DELETE RESTRICT, so
+    // they must be cleared before the vouchers themselves — a suite that
+    // recorded a transporter charge otherwise leaves the company undeletable.
+    await pool.query("DELETE FROM factory_transporter_transactions WHERE company_id = $1", [company.id]);
     await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, company.id));
     await db.delete(schema.stockItems).where(eq(schema.stockItems.companyId, company.id));
     await db.delete(schema.stockGroups).where(eq(schema.stockGroups.companyId, company.id));
     await db.delete(schema.locations).where(eq(schema.locations.companyId, company.id));
+    await pool.query("DELETE FROM factory_transporters WHERE company_id = $1", [company.id]);
     await db.delete(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.companyId, company.id));
     await db.delete(schema.userSecurityPermissions).where(eq(schema.userSecurityPermissions.companyId, company.id));
     await db.delete(schema.userCompanyRoles).where(eq(schema.userCompanyRoles.companyId, company.id));
