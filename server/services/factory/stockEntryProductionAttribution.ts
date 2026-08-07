@@ -28,10 +28,15 @@ interface EligiblePosition {
  *
  * Rules:
  * - no worker: no production position is allowed;
- * - one active position on the entry date: auto-resolve when omitted;
- * - multiple active positions: the client must choose one;
- * - zero active positions: bale remains valid but bonus-ineligible;
+ * - one valid position on the entry date: auto-resolve when omitted;
+ * - multiple valid positions: the client must choose one;
+ * - zero valid positions: bale remains valid but bonus-ineligible;
  * - cross-company/inactive workers and invalid position memberships are rejected.
+ *
+ * Position eligibility is driven by the effective-dated membership interval,
+ * not the position's current `active` flag. That is intentional: a position
+ * archived today can still be the correct historical attribution for a
+ * backdated Stock Entry from before its membership interval ended.
  */
 export async function resolveStockEntryProductionAttributions(
   tx: any,
@@ -95,7 +100,6 @@ export async function resolveStockEntryProductionAttributions(
       and(
         eq(factoryProductionPositionMemberships.companyId, companyId),
         eq(factoryProductionPositions.companyId, companyId),
-        eq(factoryProductionPositions.active, true),
         inArray(factoryProductionPositionMemberships.workerId, workerIds),
         lte(factoryProductionPositionMemberships.effectiveFrom, stockEntryDate),
         or(
