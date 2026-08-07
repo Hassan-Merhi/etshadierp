@@ -48,8 +48,11 @@ export function RemoteMouseControllerOverlay() {
   const [lastResult, setLastResult] = useState<CommandResultView | null>(null);
   const commandTailRef = useRef<Promise<void>>(Promise.resolve());
   const activeSessionIdRef = useRef<string | null>(null);
-  const pointerPendingRef = useRef<{ x: number; y: number } | null>(null);
+  const pointerLatestRef = useRef<{ x: number; y: number } | null>(null);
   const pointerTimerRef = useRef<number | null>(null);
+  const pointerQueueActiveRef = useRef(false);
+  const pointerQueueSessionRef = useRef<string | null>(null);
+  const schedulePointerDrainRef = useRef<() => void>(() => undefined);
   const scrollPendingRef = useRef<{ x: number; y: number; deltaX: number; deltaY: number } | null>(null);
   const scrollTimerRef = useRef<number | null>(null);
   const t = useCallback((value: string) => translateRemoteSupportPhase5Text(value, language), [language]);
@@ -61,11 +64,14 @@ export function RemoteMouseControllerOverlay() {
 
   useEffect(() => {
     activeSessionIdRef.current = sessionId;
+    commandTailRef.current = Promise.resolve();
+    pointerQueueActiveRef.current = false;
+    pointerQueueSessionRef.current = null;
     setError(null);
     setLastResult(null);
     setPasswordOpen(false);
     setPassword("");
-    pointerPendingRef.current = null;
+    pointerLatestRef.current = null;
     scrollPendingRef.current = null;
     if (pointerTimerRef.current !== null) window.clearTimeout(pointerTimerRef.current);
     if (scrollTimerRef.current !== null) window.clearTimeout(scrollTimerRef.current);
@@ -139,53 +145,92 @@ export function RemoteMouseControllerOverlay() {
     }
   }, [busy, refreshSession, sessionId, t]);
 
-  const enqueueCommand = useCallback(
+  const sendCommandNow = useCallback(
+    async (payload: MouseCommandPayload, expectedSessionId: string) => {
+      if (activeSessionIdRef.current !== expectedSessionId) return;
+      try {
+        await remoteControllerRequestJson(
+          `/api/screen-feed/control/sessions/${encodeURIComponent(expectedSessionId)}/commands`,
+          {
+            method: "POST",
+            body: JSON.stringify(payload),
+          }
+        );
+      } catch (requestError) {
+        if (activeSessionIdRef.current !== expectedSessionId) return;
+        if (
+          requestError instanceof RemoteControllerRequestError &&
+          (requestError.status === 428 || requestError.code === "MOUSE_AUTHORIZATION_REQUIRED")
+        ) {
+          setPasswordOpen(true);
+          void refreshSession().catch(() => undefined);
+        }
+        setError(requestError instanceof Error ? t(requestError.message) : t("Mouse command failed."));
+      }
+    },
+    [refreshSession, t]
+  );
+
+  const enqueueOrderedCommand = useCallback(
     (payload: MouseCommandPayload) => {
       if (!sessionId || !controlEnabled) return;
-
-      const run = async () => {
-        if (activeSessionIdRef.current !== sessionId) return;
-        try {
-          await remoteControllerRequestJson(
-            `/api/screen-feed/control/sessions/${encodeURIComponent(sessionId)}/commands`,
-            {
-              method: "POST",
-              body: JSON.stringify(payload),
-            }
-          );
-        } catch (requestError) {
-          if (activeSessionIdRef.current !== sessionId) return;
-          if (
-            requestError instanceof RemoteControllerRequestError &&
-            (requestError.status === 428 || requestError.code === "MOUSE_AUTHORIZATION_REQUIRED")
-          ) {
-            setPasswordOpen(true);
-            void refreshSession().catch(() => undefined);
-          }
-          setError(requestError instanceof Error ? t(requestError.message) : t("Mouse command failed."));
-        }
-      };
-
-      commandTailRef.current = commandTailRef.current.catch(() => undefined).then(run);
+      const expectedSessionId = sessionId;
+      commandTailRef.current = commandTailRef.current
+        .catch(() => undefined)
+        .then(() => sendCommandNow(payload, expectedSessionId));
     },
-    [controlEnabled, refreshSession, sessionId, t]
+    [controlEnabled, sendCommandNow, sessionId]
   );
+
+  const schedulePointerDrain = useCallback(() => {
+    if (
+      !sessionId ||
+      !controlEnabled ||
+      pointerQueueActiveRef.current ||
+      !pointerLatestRef.current
+    ) {
+      return;
+    }
+
+    const expectedSessionId = sessionId;
+    pointerQueueActiveRef.current = true;
+    pointerQueueSessionRef.current = expectedSessionId;
+
+    const nextTail = commandTailRef.current.catch(() => undefined).then(async () => {
+      if (activeSessionIdRef.current !== expectedSessionId) return;
+      const point = pointerLatestRef.current;
+      pointerLatestRef.current = null;
+      if (point) await sendCommandNow({ type: "pointer-move", ...point }, expectedSessionId);
+    });
+    commandTailRef.current = nextTail;
+
+    void nextTail.finally(() => {
+      if (pointerQueueSessionRef.current !== expectedSessionId) return;
+      pointerQueueActiveRef.current = false;
+      pointerQueueSessionRef.current = null;
+      if (pointerLatestRef.current && activeSessionIdRef.current === expectedSessionId) {
+        schedulePointerDrainRef.current();
+      }
+    });
+  }, [controlEnabled, sendCommandNow, sessionId]);
+
+  useEffect(() => {
+    schedulePointerDrainRef.current = schedulePointerDrain;
+  }, [schedulePointerDrain]);
 
   const flushPointer = useCallback(() => {
     pointerTimerRef.current = null;
-    const point = pointerPendingRef.current;
-    pointerPendingRef.current = null;
-    if (point) enqueueCommand({ type: "pointer-move", ...point });
-  }, [enqueueCommand]);
+    schedulePointerDrain();
+  }, [schedulePointerDrain]);
 
   const flushScroll = useCallback(() => {
     scrollTimerRef.current = null;
     const pending = scrollPendingRef.current;
     scrollPendingRef.current = null;
     if (pending && (pending.deltaX !== 0 || pending.deltaY !== 0)) {
-      enqueueCommand({ type: "scroll", ...pending });
+      enqueueOrderedCommand({ type: "scroll", ...pending });
     }
-  }, [enqueueCommand]);
+  }, [enqueueOrderedCommand]);
 
   useEffect(() => {
     if (!controlEnabled || !sessionTargetUserId || !portalHost) return;
@@ -203,7 +248,7 @@ export function RemoteMouseControllerOverlay() {
     const onPointerMove = (event: PointerEvent) => {
       const point = pointFromEvent(event.clientX, event.clientY);
       if (!point) return;
-      pointerPendingRef.current = point;
+      pointerLatestRef.current = point;
       if (pointerTimerRef.current === null) {
         pointerTimerRef.current = window.setTimeout(flushPointer, POINTER_COALESCE_MS);
       }
@@ -215,10 +260,10 @@ export function RemoteMouseControllerOverlay() {
       if (!point) return;
       event.preventDefault();
       event.stopPropagation();
-      pointerPendingRef.current = null;
+      pointerLatestRef.current = null;
       if (pointerTimerRef.current !== null) window.clearTimeout(pointerTimerRef.current);
       pointerTimerRef.current = null;
-      enqueueCommand({ type: "click", ...point });
+      enqueueOrderedCommand({ type: "click", ...point });
     };
 
     const onWheel = (event: WheelEvent) => {
@@ -246,14 +291,14 @@ export function RemoteMouseControllerOverlay() {
       image.removeEventListener("pointermove", onPointerMove);
       image.removeEventListener("click", onClick, true);
       image.removeEventListener("wheel", onWheel, true);
-      pointerPendingRef.current = null;
+      pointerLatestRef.current = null;
       scrollPendingRef.current = null;
       if (pointerTimerRef.current !== null) window.clearTimeout(pointerTimerRef.current);
       if (scrollTimerRef.current !== null) window.clearTimeout(scrollTimerRef.current);
       pointerTimerRef.current = null;
       scrollTimerRef.current = null;
     };
-  }, [controlEnabled, enqueueCommand, flushPointer, flushScroll, portalHost, sessionTargetUserId]);
+  }, [controlEnabled, enqueueOrderedCommand, flushPointer, flushScroll, portalHost, sessionTargetUserId]);
 
   useEffect(() => {
     if (!controlEnabled || !sessionId) return;
