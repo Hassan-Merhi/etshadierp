@@ -4609,6 +4609,11 @@
         2,
         0
       ],
+      "server/routes/factory/raw-stock/offloadCosting.ts": [
+        3,
+        1,
+        0
+      ],
       "server/routes/factory/raw-stock/opening-balance/crud.ts": [
         14,
         11,
@@ -4675,8 +4680,8 @@
         0
       ],
       "server/routes/factory/raw-stock/rawStockOffloadRoutes.ts": [
-        17,
-        44,
+        6,
+        20,
         0
       ],
       "server/routes/factory/raw-stock/rawStockRecalcRoutes.ts": [
@@ -4687,6 +4692,11 @@
       "server/routes/factory/raw-stock/rawStockReceiptRoutes.ts": [
         11,
         6,
+        0
+      ],
+      "server/routes/factory/raw-stock/rawStockReverseOffloadRoute.ts": [
+        0,
+        1,
         0
       ],
       "server/routes/factory/raw-stock/recalc/_helpers.ts": [
@@ -6712,6 +6722,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 11453
+    "typeEscapeCeiling": 11423
   }
 }

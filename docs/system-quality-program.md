@@ -20,7 +20,7 @@ so it can be re-derived rather than trusted.
 
 | Signal | Now | Command |
 |---|---|---|
-| Type escapes (AST) | 11,453 total — 8,661 `: any`, 2,790 `as any`, 2 suppressions | `npm run audit:type-escapes` |
+| Type escapes (AST) | 11,423 total — 8,653 `: any`, 2,768 `as any`, 2 suppressions | `npm run audit:type-escapes` |
 | Files carrying escapes | 1,328 of 2,524 (53%) | `npm run audit:type-escapes` |
 | Drizzle result casts | 0 (was 344 — Phase 1b) | `npm run audit:type-escapes` |
 | Backend coverage floor (lines) | 18% (measured 21.0%) | `config/coverage-thresholds.json` |
@@ -29,7 +29,7 @@ so it can be re-derived rather than trusted.
 | Test files | 363 (330 `tests/`, 33 colocated) | `find tests server client/src shared -name '*.test.ts*'` |
 | Registered routes | 1,891 | `config/route-manifest.json` |
 | Docs | 48 reference in `docs/`, 131 archived records | `npm run audit:doc-index` |
-| God-file backlog | 65 files, 34,420 excess lines | `npm run audit:god-files` |
+| God-file backlog | 64 files, 33,920 excess lines | `npm run audit:god-files` |
 
 Every figure above is bound to its source in `config/doc-index.json` and checked
 by `npm run audit:doc-index`, so this table fails the build rather than going
@@ -45,7 +45,7 @@ absence.
 
 **The god-file backlog is much smaller than its own documentation claims.** That
 doc opened with "139 files, 74,858 lines over the limit" and later said "82 files
-and 45,684". The audit reports **65 and 34,420** — the program is 67% cleared,
+and 45,684". The audit reports **64 and 33,920** — the program is 67% cleared,
 not 45%. Three separate figures, all wrong, in a document whose entire purpose is
 tracking one number. The first draft of *this* document then repeated the
 mistake, citing 66 and 35,729 because those were derived from the frozen
