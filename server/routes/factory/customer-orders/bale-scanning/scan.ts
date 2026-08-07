@@ -16,9 +16,7 @@ import {
   factoryBales,
   customerProformaLines,
   customerOrders,
-  customerOrderLines,
   customerOrderBales,
-  customerOrderCharges,
 } from "@shared/schema";
 import { eq, and, or, sql, inArray, ilike } from "drizzle-orm";
 
@@ -291,15 +289,19 @@ export function registerOrderBaleScanRoutes(app: Express) {
 
       if (!result.ok) return res.status(result.httpStatus).json(result.body);
 
-      const updatedBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
-      const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
-      const updatedLines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
-      const updatedCharges = await db
-        .select()
-        .from(customerOrderCharges)
-        .where(eq(customerOrderCharges.orderId, orderId));
+      // A scan client needs the refreshed order header and the current bale list.
+      // Returning order lines and charges after every physical scan duplicated
+      // unrelated invoice data on the wire and forced two extra DB reads per scan.
+      // Those resources keep their existing GET/detail contracts and are refreshed
+      // only by screens that actually render them.
+      const [updatedBales, updatedOrderRows] = await Promise.all([
+        db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId)),
+        db.select().from(customerOrders).where(eq(customerOrders.id, orderId)),
+      ]);
+      const updatedOrder = updatedOrderRows[0];
 
-      res.json({ ...updatedOrder, bales: updatedBales, lines: updatedLines, charges: updatedCharges });
+      res.set("X-ERP-Payload-Profile", "customer-order-scan-state");
+      res.json({ ...updatedOrder, bales: updatedBales });
     } catch (error: unknown) {
       logger.error("Error adding bale to order:", { error: error });
       res.status(500).json({ message: getErrorMessage(error) });
