@@ -76,7 +76,7 @@ export function registerFactoryPayrollReadRoutes(app: Express, requireAuth: any,
 
       const bonusTotals = await getProductionBonusTotalsForPayrollIds(
         db,
-        results.map((result) => result.payroll.id)
+        results.map((result: any) => result.payroll.id)
       );
       const formatted = results.map((r: any) => {
         const production = bonusTotals.get(r.payroll.id) ?? emptyTotals();
