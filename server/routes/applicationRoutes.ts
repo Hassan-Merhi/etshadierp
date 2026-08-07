@@ -13,6 +13,7 @@ import { registerApprovalRoutes } from "./approvalRoutes";
 import { registerAuthRoutes } from "./authRoutes";
 import { registerBalanceRepairRoutes } from "./balance-repair";
 import { registerBaleRoutes } from "./baleRoutes";
+import { registerBarcodeImageBandwidthMiddleware } from "./barcodeImageBandwidthMiddleware";
 import { registerBankAssetRoutes } from "./bankAssetRoutes";
 import { registerBusinessAlertRoutes } from "./businessAlertsRoutes";
 import { registerChatbotRoutes } from "./chatbot";
@@ -168,6 +169,10 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerImportCycleRoutes(app);
   registerDebugRoutes(app);
   registerReportsRoutes(app);
+  // Must precede registerBaleRoutes: the legacy /api/barcode/:code handler is
+  // retained as a PNG fallback, while browser image requests are intercepted
+  // here and served as compact immutable SVG when supported.
+  registerBarcodeImageBandwidthMiddleware(app);
   registerBaleRoutes(app);
   registerAdminRoutes(app);
   registerBalanceRepairRoutes(app);
