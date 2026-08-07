@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import type { RemoteControlSessionView } from "@/hooks/use-remote-control-session";
 import {
   applyRemoteKeyboardCommand,
@@ -9,6 +9,7 @@ import {
 } from "@/hooks/remote-keyboard-control-policy";
 
 const MAX_COMMAND_AGE_MS = 8000;
+const MAX_SEEN_COMMANDS = 256;
 
 function parseCommand(value: unknown): RemoteKeyboardCommandView | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -57,8 +58,19 @@ export function RemoteKeyboardControlTarget({
   session: RemoteControlSessionView | null;
   tabId: string;
 }) {
+  const seenCommandIdsRef = useRef(new Set<string>());
+  const lastSequenceRef = useRef(0);
+  const sessionId = session?.id ?? null;
+  const targetTabId = session?.targetTabId ?? null;
+  const keyboardEnabled = !!session?.capabilities.keyboard;
+
   useEffect(() => {
-    if (!session || !session.capabilities.keyboard || session.targetTabId !== tabId) {
+    seenCommandIdsRef.current.clear();
+    lastSequenceRef.current = 0;
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!sessionId || !keyboardEnabled || targetTabId !== tabId) {
       clearRemoteEditableFocus();
       return;
     }
@@ -71,41 +83,55 @@ export function RemoteKeyboardControlTarget({
     document.addEventListener("beforeinput", onTrustedLocalInteraction, true);
     document.addEventListener("input", onTrustedLocalInteraction, true);
 
-    let eventSource: EventSource | null = null;
-    try {
-      const params = new URLSearchParams({ sessionId: session.id, tabId });
-      eventSource = new EventSource(`/api/screen-feed/control/keyboard-commands?${params.toString()}`, {
-        withCredentials: true,
-      });
-      eventSource.addEventListener("command", (event) => {
-        let command: RemoteKeyboardCommandView | null = null;
-        try {
-          command = parseCommand(JSON.parse((event as MessageEvent<string>).data));
-        } catch {
-          command = null;
-        }
-        if (!command || command.sessionId !== session.id) return;
+    let closed = false;
+    const params = new URLSearchParams({ sessionId, tabId });
+    const eventSource = new EventSource(`/api/screen-feed/control/keyboard-commands?${params.toString()}`, {
+      withCredentials: true,
+    });
 
-        const createdAt = command.createdAt ? new Date(command.createdAt).getTime() : Date.now();
-        const result =
-          !Number.isFinite(createdAt) || Date.now() - createdAt > MAX_COMMAND_AGE_MS
-            ? { status: "ignored" as const, reason: "stale-command" }
-            : applyRemoteKeyboardCommand(command);
-        void reportResult(session.id, tabId, command.id, result);
-      });
-    } catch {
-      eventSource = null;
-    }
+    eventSource.addEventListener("command", (event) => {
+      if (closed) return;
+      let command: RemoteKeyboardCommandView | null = null;
+      try {
+        command = parseCommand(JSON.parse((event as MessageEvent<string>).data));
+      } catch {
+        command = null;
+      }
+      if (!command || command.sessionId !== sessionId) return;
+
+      if (seenCommandIdsRef.current.has(command.id) || command.sequence <= lastSequenceRef.current) {
+        void reportResult(sessionId, tabId, command.id, {
+          status: "ignored",
+          reason: "duplicate-command",
+        });
+        return;
+      }
+
+      seenCommandIdsRef.current.add(command.id);
+      lastSequenceRef.current = Math.max(lastSequenceRef.current, command.sequence);
+      if (seenCommandIdsRef.current.size > MAX_SEEN_COMMANDS) {
+        const first = seenCommandIdsRef.current.values().next().value;
+        if (first) seenCommandIdsRef.current.delete(first);
+      }
+
+      const createdAt = command.createdAt ? new Date(command.createdAt).getTime() : Date.now();
+      const result =
+        !Number.isFinite(createdAt) || Date.now() - createdAt > MAX_COMMAND_AGE_MS
+          ? { status: "ignored" as const, reason: "stale-command" }
+          : applyRemoteKeyboardCommand(command);
+      void reportResult(sessionId, tabId, command.id, result);
+    });
 
     return () => {
-      eventSource?.close();
+      closed = true;
+      eventSource.close();
       document.removeEventListener("pointerdown", onTrustedLocalInteraction, true);
       document.removeEventListener("keydown", onTrustedLocalInteraction, true);
       document.removeEventListener("beforeinput", onTrustedLocalInteraction, true);
       document.removeEventListener("input", onTrustedLocalInteraction, true);
       clearRemoteEditableFocus();
     };
-  }, [session, tabId]);
+  }, [keyboardEnabled, sessionId, tabId, targetTabId]);
 
   return null;
 }
