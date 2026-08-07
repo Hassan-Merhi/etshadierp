@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { CheckCircle2, Clock3, History, Loader2, RefreshCw, RotateCcw, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -93,6 +93,7 @@ function newIdempotencyToken(): string {
 export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, canSendWithCost }: Props) {
   const [open, setOpen] = useState(false);
   const [retryingId, setRetryingId] = useState<number | null>(null);
+  const retryLockRef = useRef(false);
   const { toast } = useToast();
 
   const historyQuery = useQuery<DeliveryHistoryResponse>({
@@ -115,16 +116,17 @@ export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, can
   const retryMutation = useMutation({
     mutationFn: async (delivery: DeliveryEntry) => {
       setRetryingId(delivery.id);
+      const idempotencyKey = newIdempotencyToken();
       const response = await apiRequest(
         "POST",
         `/api/locations/${location.id}/whatsapp-deliveries/${delivery.id}/retry`,
-        { idempotencyKey: newIdempotencyToken() }
+        { idempotencyKey }
       );
       return response.json();
     },
     onSuccess: (result: any) => {
       toast({
-        title: "Stock report resent",
+        title: result.duplicate ? "Retry already processed" : "Stock report resent",
         description: `${result.itemCount ?? 0} items sent to ${result.destinationGroupName || "the linked WhatsApp group"}.`,
       });
     },
@@ -132,6 +134,7 @@ export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, can
       toast({ title: "Retry failed", description: error.message, variant: "destructive" });
     },
     onSettled: async () => {
+      retryLockRef.current = false;
       setRetryingId(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["/api/locations", location.id, "whatsapp-deliveries"] }),
@@ -139,6 +142,20 @@ export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, can
       ]);
     },
   });
+
+  const handleRetry = (delivery: DeliveryEntry) => {
+    if (retryLockRef.current || retryMutation.isPending) return;
+    if (delivery.includeCost && !canSendWithCost) {
+      toast({
+        title: "Cost report restricted",
+        description: "Cost-price and total-value permission is required to retry this report.",
+        variant: "destructive",
+      });
+      return;
+    }
+    retryLockRef.current = true;
+    retryMutation.mutate(delivery);
+  };
 
   const summary = historyQuery.data?.summary;
   const deliveries = historyQuery.data?.deliveries ?? [];
@@ -253,7 +270,7 @@ export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, can
                                 className="gap-2 shrink-0"
                                 disabled={retryMutation.isPending || costRetryRestricted}
                                 title={costRetryRestricted ? "Cost-price and total-value permission is required to retry this report" : "Retry using fresh live stock and the original report filters"}
-                                onClick={() => retryMutation.mutate(delivery)}
+                                onClick={() => handleRetry(delivery)}
                                 data-testid={`button-retry-location-stock-delivery-${delivery.id}`}
                               >
                                 {retryingId === delivery.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
@@ -273,6 +290,12 @@ export function LocationWhatsappDeliveryHistoryDialog({ location, companyId, can
                             {delivery.stockGroupName && <div><span className="text-muted-foreground">Stock group:</span> {delivery.stockGroupName}</div>}
                             {delivery.categoryName && <div><span className="text-muted-foreground">Category:</span> {delivery.categoryName}</div>}
                           </div>
+
+                          {delivery.fileName && (
+                            <p className="text-xs text-muted-foreground break-all">
+                              <span className="font-medium text-foreground/80">Report file:</span> {delivery.fileName}
+                            </p>
+                          )}
 
                           <p className="text-xs text-muted-foreground">
                             Filters: {delivery.includeZeroStock ? "include zero" : "exclude zero"} · {delivery.includeNegativeStock ? "include negative" : "exclude negative"}
