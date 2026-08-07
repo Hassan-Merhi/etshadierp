@@ -26,7 +26,7 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --ignore-scripts
       - name: Patch production dependency audit
-        run: npm audit fix --omit=dev --package-lock-only
+        run: npm audit fix --omit=dev --package-lock-only || true
       - name: Format Phase 1-5 changed source
         run: |
           node node_modules/prettier/bin/prettier.cjs --write \
@@ -60,13 +60,15 @@ jobs:
             shared/schema/factory/index.ts \
             shared/schema/factory/production-positions.ts \
             scripts/audit-i18n-phase14.mjs \
-            tests/phase7-backend-messages-translations.test.ts
+            tests/phase7-backend-messages-translations.test.ts \
+            tests/production-bonus-preview.test.ts
       - name: Verify repaired gates
         run: |
           npm run check
           npm run format:check
           npm run verify:dependency-audit
           node scripts/audit-i18n-phase14.mjs
+          npx vitest run tests/production-bonus-preview.test.ts tests/phase7-backend-messages-translations.test.ts
       - name: Commit generated repairs
         run: |
           git config user.name "github-actions[bot]"
