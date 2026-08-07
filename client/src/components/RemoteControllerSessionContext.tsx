@@ -47,6 +47,11 @@ interface RemoteControllerSessionContextValue {
   adoptSession: (session: RemoteControlSessionView | RemoteControllerSessionView | null) => void;
 }
 
+interface RefreshInFlight {
+  targetUserId: string;
+  promise: Promise<RemoteControllerSessionView | null>;
+}
+
 const RemoteControllerSessionContext = createContext<RemoteControllerSessionContextValue | null>(null);
 const SESSION_REFRESH_MS = 5000;
 
@@ -103,7 +108,7 @@ export function RemoteControllerSessionProvider({ children }: { children: ReactN
   const [portalHost, setPortalHost] = useState<HTMLElement | null>(null);
   const targetRef = useRef(target);
   const sessionRef = useRef(session);
-  const refreshInFlightRef = useRef<Promise<RemoteControllerSessionView | null> | null>(null);
+  const refreshInFlightRef = useRef<RefreshInFlight | null>(null);
 
   useEffect(() => {
     targetRef.current = target;
@@ -144,9 +149,12 @@ export function RemoteControllerSessionProvider({ children }: { children: ReactN
       setSession(null);
       return null;
     }
-    if (refreshInFlightRef.current) return refreshInFlightRef.current;
 
-    const request = remoteControllerRequestJson<ControllerTargetResponse>(
+    const existing = refreshInFlightRef.current;
+    if (existing?.targetUserId === activeTarget.userId) return existing.promise;
+
+    let request: Promise<RemoteControllerSessionView | null>;
+    request = remoteControllerRequestJson<ControllerTargetResponse>(
       `/api/screen-feed/control/sessions/controller-target/${encodeURIComponent(activeTarget.userId)}`
     )
       .then((payload) => {
@@ -156,10 +164,10 @@ export function RemoteControllerSessionProvider({ children }: { children: ReactN
         return next;
       })
       .finally(() => {
-        refreshInFlightRef.current = null;
+        if (refreshInFlightRef.current?.promise === request) refreshInFlightRef.current = null;
       });
 
-    refreshInFlightRef.current = request;
+    refreshInFlightRef.current = { targetUserId: activeTarget.userId, promise: request };
     return request;
   }, []);
 
