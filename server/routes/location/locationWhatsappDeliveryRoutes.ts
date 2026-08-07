@@ -188,6 +188,35 @@ export function registerLocationWhatsappDeliveryRoutes(app: Express) {
             LIMIT $3`,
           [locationId, companyId, limit]
         );
+        const summaryResult = await pool.query<{
+          latest_status: "running" | "sent" | "failed" | "skipped_empty" | null;
+          latest_error: string | null;
+          latest_at: string | Date | null;
+          last_sent_at: string | Date | null;
+          last_sent_source: "manual" | "scheduled" | "retry" | null;
+          last_sent_include_cost: boolean | null;
+        }>(
+          `SELECT
+             (SELECT status FROM location_whatsapp_stock_deliveries
+               WHERE location_id = $1 AND company_id = $2
+               ORDER BY started_at DESC, id DESC LIMIT 1) AS latest_status,
+             (SELECT error FROM location_whatsapp_stock_deliveries
+               WHERE location_id = $1 AND company_id = $2
+               ORDER BY started_at DESC, id DESC LIMIT 1) AS latest_error,
+             (SELECT started_at FROM location_whatsapp_stock_deliveries
+               WHERE location_id = $1 AND company_id = $2
+               ORDER BY started_at DESC, id DESC LIMIT 1) AS latest_at,
+             (SELECT COALESCE(completed_at, started_at) FROM location_whatsapp_stock_deliveries
+               WHERE location_id = $1 AND company_id = $2 AND status = 'sent'
+               ORDER BY started_at DESC, id DESC LIMIT 1) AS last_sent_at,
+             (SELECT source FROM location_whatsapp_stock_deliveries
+               WHERE location_id = $1 AND company_id = $2 AND status = 'sent'
+               ORDER BY started_at DESC, id DESC LIMIT 1) AS last_sent_source,
+             (SELECT include_cost FROM location_whatsapp_stock_deliveries
+               WHERE location_id = $1 AND company_id = $2 AND status = 'sent'
+               ORDER BY started_at DESC, id DESC LIMIT 1) AS last_sent_include_cost`,
+          [locationId, companyId]
+        );
 
         const blockedRetryParents = new Set(
           result.rows
@@ -221,18 +250,17 @@ export function registerLocationWhatsappDeliveryRoutes(app: Express) {
             (row.status === "failed" || row.status === "skipped_empty") &&
             !blockedRetryParents.has(Number(row.id)),
         }));
-        const latest = deliveries[0] ?? null;
-        const lastSent = deliveries.find((delivery) => delivery.status === "sent") ?? null;
+        const summary = summaryResult.rows[0];
         res.json({
           locationId,
           deliveries,
           summary: {
-            latestStatus: latest?.status ?? null,
-            latestError: latest?.error ?? null,
-            latestAt: latest?.startedAt ?? null,
-            lastSentAt: lastSent?.completedAt ?? lastSent?.startedAt ?? null,
-            lastSentSource: lastSent?.source ?? null,
-            lastSentIncludeCost: lastSent?.includeCost ?? null,
+            latestStatus: summary?.latest_status ?? null,
+            latestError: summary?.latest_error ?? null,
+            latestAt: isoOrNull(summary?.latest_at),
+            lastSentAt: isoOrNull(summary?.last_sent_at),
+            lastSentSource: summary?.last_sent_source ?? null,
+            lastSentIncludeCost: summary?.last_sent_include_cost ?? null,
           },
         });
       } catch (error: any) {
