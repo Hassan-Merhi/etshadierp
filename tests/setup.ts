@@ -58,6 +58,7 @@ const FACTORY_COMPANY_PREFIXES = new Set([
   "empadv",
   "prodblk",
   "shiprow",
+  "ordcrud",
 ]);
 
 function testCompanyType(prefix: string): "erp" | "factory" {
@@ -110,30 +111,12 @@ export async function cleanupTestData(prefix: string): Promise<void> {
       .where(
         sql`${schema.stockTransferVouchers.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`
       );
-    // Transporter transactions reference vouchers with ON DELETE RESTRICT, so
-    // they must be cleared before the vouchers themselves — a suite that
-    // recorded a transporter charge otherwise leaves the company undeletable.
-    await pool.query("DELETE FROM factory_transporter_transactions WHERE company_id = $1", [company.id]);
-    // Same constraint, same reason: employee_bonuses.voucher_id is ON DELETE
-    // RESTRICT, so a suite that recorded a bonus blocks the voucher delete.
-    await pool.query("DELETE FROM employee_bonuses WHERE company_id = $1", [company.id]);
-    await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, company.id));
-    await db.delete(schema.stockItems).where(eq(schema.stockItems.companyId, company.id));
-    await db.delete(schema.stockGroups).where(eq(schema.stockGroups.companyId, company.id));
-    await db.delete(schema.locations).where(eq(schema.locations.companyId, company.id));
-    await pool.query("DELETE FROM factory_transporters WHERE company_id = $1", [company.id]);
-    await db.delete(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.companyId, company.id));
-    await db.delete(schema.userSecurityPermissions).where(eq(schema.userSecurityPermissions.companyId, company.id));
-    await db.delete(schema.userCompanyRoles).where(eq(schema.userCompanyRoles.companyId, company.id));
-    await db.delete(schema.userLocations).where(eq(schema.userLocations.companyId, company.id));
-
-    // A crashed/interrupted factory test can leave rows in factory_* tables
-    // referencing this company; those FKs otherwise block the company delete
-    // below on the NEXT run that reuses this prefix. Delete in FK-safe order.
-    // The customer-order family. customer_order_bales references factory_bales,
-    // and customer_orders.proforma_id_used references customer_proformas, so the
-    // order is: scan rows, orders, proforma lines, proformas. Without this a
-    // suite that created a proforma leaves the company undeletable.
+    // The customer-order family, cleared early for three reasons:
+    // customer_order_charges references vouchers, customer_order_bales
+    // references locations, and customer_orders.proforma_id_used references
+    // customer_proformas — so all of it has to go before the voucher, location
+    // and company deletes below. Without this a suite that created a proforma
+    // or scanned a bale into an order leaves the company undeletable.
     await pool.query(
       "DELETE FROM customer_order_bales WHERE order_id IN (SELECT id FROM customer_orders WHERE company_id = $1)",
       [company.id]
@@ -155,6 +138,26 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     await pool.query("DELETE FROM customer_proformas WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM customer_balances WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM customers WHERE company_id = $1", [company.id]);
+    // Transporter transactions reference vouchers with ON DELETE RESTRICT, so
+    // they must be cleared before the vouchers themselves — a suite that
+    // recorded a transporter charge otherwise leaves the company undeletable.
+    await pool.query("DELETE FROM factory_transporter_transactions WHERE company_id = $1", [company.id]);
+    // Same constraint, same reason: employee_bonuses.voucher_id is ON DELETE
+    // RESTRICT, so a suite that recorded a bonus blocks the voucher delete.
+    await pool.query("DELETE FROM employee_bonuses WHERE company_id = $1", [company.id]);
+    await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, company.id));
+    await db.delete(schema.stockItems).where(eq(schema.stockItems.companyId, company.id));
+    await db.delete(schema.stockGroups).where(eq(schema.stockGroups.companyId, company.id));
+    await db.delete(schema.locations).where(eq(schema.locations.companyId, company.id));
+    await pool.query("DELETE FROM factory_transporters WHERE company_id = $1", [company.id]);
+    await db.delete(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.companyId, company.id));
+    await db.delete(schema.userSecurityPermissions).where(eq(schema.userSecurityPermissions.companyId, company.id));
+    await db.delete(schema.userCompanyRoles).where(eq(schema.userCompanyRoles.companyId, company.id));
+    await db.delete(schema.userLocations).where(eq(schema.userLocations.companyId, company.id));
+
+    // A crashed/interrupted factory test can leave rows in factory_* tables
+    // referencing this company; those FKs otherwise block the company delete
+    // below on the NEXT run that reuses this prefix. Delete in FK-safe order.
     await pool.query("DELETE FROM factory_bales WHERE company_id = $1", [company.id]);
     await pool.query(
       "DELETE FROM factory_mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM factory_mix_batches WHERE company_id = $1)",
