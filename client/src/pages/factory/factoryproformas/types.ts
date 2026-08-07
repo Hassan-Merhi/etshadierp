@@ -25,6 +25,12 @@ export interface Proforma {
   createdAt: string | null;
   updatedAt: string | null;
   lines: ProformaLine[];
+  // Compact list-profile metrics. Full detail responses may omit these because
+  // the page can derive them from `lines` once an individual card is expanded.
+  lineCount?: number;
+  totalQty?: number;
+  totalWeightKg?: number;
+  totalAmount?: number;
 }
 
 export interface Customer {
