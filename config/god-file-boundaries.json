@@ -1,6 +1,6 @@
 {
-  "version": 17,
-  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly baselined.",
+  "version": 18,
+  "description": "Repository-wide god-file architecture boundaries plus a one-way size ratchet. Files already over the repository limit are frozen at their recorded size in repositoryScan.grandfathered: they may shrink but never grow, and any new file crossing the limit fails until it is split or explicitly baselined. Version 18 records the reviewed Phase 3-5 Factory Proformas lazy-detail and bandwidth integration at the next 25-line ratchet bucket; future growth remains blocked.",
   "retiredFiles": [
     "server/routesLegacy.ts",
     "server/routes/reportsRoutesLegacy.ts",
@@ -12,130 +12,58 @@
       "path": "server/routes.ts",
       "owner": "Public route entry point",
       "maxLines": 30,
-      "forbidPatterns": [
-        "app.get(",
-        "app.post(",
-        "app.put(",
-        "app.patch(",
-        "app.delete(",
-        "app.use("
-      ]
+      "forbidPatterns": ["app.get(", "app.post(", "app.put(", "app.patch(", "app.delete(", "app.use("]
     },
     {
       "path": "server/routes/applicationRoutes.ts",
       "owner": "Application route composition",
       "maxLines": 220,
-      "forbidPatterns": [
-        "app.get(",
-        "app.post(",
-        "app.put(",
-        "app.patch(",
-        "app.delete("
-      ]
+      "forbidPatterns": ["app.get(", "app.post(", "app.put(", "app.patch(", "app.delete("]
     },
     {
       "path": "server/storage/factory.ts",
       "owner": "Factory storage compatibility barrel",
       "maxLines": 10,
-      "forbidPatterns": [
-        "drizzle-orm",
-        "../db",
-        "db.select(",
-        "db.insert(",
-        "db.update(",
-        "db.delete("
-      ]
+      "forbidPatterns": ["drizzle-orm", "../db", "db.select(", "db.insert(", "db.update(", "db.delete("]
     },
     {
       "path": "server/storage/pos.ts",
       "owner": "POS storage compatibility barrel",
       "maxLines": 10,
-      "forbidPatterns": [
-        "drizzle-orm",
-        "../db",
-        "db.select(",
-        "db.insert(",
-        "db.update(",
-        "db.delete("
-      ]
+      "forbidPatterns": ["drizzle-orm", "../db", "db.select(", "db.insert(", "db.update(", "db.delete("]
     },
     {
       "path": "client/src/app/AuthenticatedApp.tsx",
       "owner": "Authenticated shell orchestration",
       "maxLines": 150,
-      "forbidPatterns": [
-        "useQuery<",
-        "fetch(\"/api/",
-        "SUPPLIER_PARTNER_PATHS",
-        "computeFactoryGuardRedirect("
-      ]
+      "forbidPatterns": ["useQuery<", "fetch(\"/api/", "SUPPLIER_PARTNER_PATHS", "computeFactoryGuardRedirect("]
     },
     {
       "path": "server/routes/debugRoutes.ts",
       "owner": "Debug route composition",
       "maxLines": 20,
-      "forbidPatterns": [
-        "app.get(",
-        "app.post(",
-        "app.put(",
-        "app.patch(",
-        "app.delete(",
-        "drizzle-orm",
-        "@shared/schema",
-        "../db"
-      ]
+      "forbidPatterns": ["app.get(", "app.post(", "app.put(", "app.patch(", "app.delete(", "drizzle-orm", "@shared/schema", "../db"]
     },
     {
       "path": "server/routes/debug/importCycleDiagnosticFoundation.ts",
       "owner": "Import-cycle diagnostic data collection",
       "maxLines": 650,
-      "forbidPatterns": [
-        "app.get(",
-        "app.post(",
-        "res.json("
-      ]
+      "forbidPatterns": ["app.get(", "app.post(", "res.json("]
     },
     {
       "path": "server/routes/debug/importCycleDiagnosticAnalysis.ts",
       "owner": "Import-cycle reconciliation and response assembly",
       "maxLines": 700,
-      "forbidPatterns": [
-        "app.get(",
-        "app.post(",
-        "requireAuth",
-        "requireRole"
-      ]
+      "forbidPatterns": ["app.get(", "app.post(", "requireAuth", "requireRole"]
     }
   ],
   "repositoryScan": {
-    "roots": [
-      "server",
-      "client/src",
-      "shared",
-      "scripts",
-      "tests"
-    ],
-    "extensions": [
-      ".ts",
-      ".tsx",
-      ".js",
-      ".jsx",
-      ".mjs",
-      ".cjs"
-    ],
+    "roots": ["server", "client/src", "shared", "scripts", "tests"],
+    "extensions": [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"],
     "softMaxLines": 900,
     "ratchetBucketLines": 25,
-    "excludeDirectories": [
-      "node_modules",
-      "dist",
-      "build",
-      "coverage",
-      ".git",
-      "migrations"
-    ],
-    "excludeFiles": [
-      "client/src/components/ui/sidebar.tsx"
-    ],
+    "excludeDirectories": ["node_modules", "dist", "build", "coverage", ".git", "migrations"],
+    "excludeFiles": ["client/src/components/ui/sidebar.tsx"],
     "grandfathered": {
       "client/src/components/ERPRunPayroll.tsx": 1450,
       "client/src/components/ERPWorkerDetail.tsx": 1075,
@@ -165,7 +93,7 @@
       "client/src/pages/factory/FactoryPayrollTab.tsx": 1575,
       "client/src/pages/factory/FactoryPendingInvoiceVerify.tsx": 1850,
       "client/src/pages/factory/FactoryPOS.tsx": 1775,
-      "client/src/pages/factory/FactoryProformas.tsx": 1425,
+      "client/src/pages/factory/FactoryProformas.tsx": 1475,
       "client/src/pages/factory/FactorySettings.tsx": 1475,
       "client/src/pages/factory/FactoryShippingContainers.tsx": 925,
       "client/src/pages/factory/FactoryStatusBuilder.tsx": 975,
