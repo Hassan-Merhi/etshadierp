@@ -170,10 +170,14 @@ export default function FactoryProformas() {
   const invalidateCustomerProformas = () =>
     queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-proformas") });
 
+  // Phase 4: opening/expanding a proforma no longer downloads the ERP stock
+  // catalog. The add-item dialog is the only consumer, and it only needs the
+  // identity profile (id/code/name/uom).
   const { data: allStockItems = [] } = useQuery<any[]>({
-    queryKey: ["/api/stock-items/light", selectedCompany?.id],
-    enabled: isAddLineOpen || expandedProformaIds.size > 0,
-    staleTime: 10 * 60 * 1000,
+    queryKey: ["/api/stock-items/light?profile=identity", selectedCompany?.id],
+    enabled: isAddLineOpen && !!selectedCompany?.id,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 2 * 60 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,
