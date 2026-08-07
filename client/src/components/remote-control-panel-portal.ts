@@ -28,7 +28,7 @@ function createHost(dialog: HTMLElement): HTMLElement {
   host.setAttribute("data-screenfeed-ignore", "true");
   host.setAttribute("aria-label", "Remote controls");
   host.className =
-    "absolute inset-x-0 bottom-0 z-[2147483645] flex max-h-[46vh] flex-col gap-2 overflow-y-auto border-t bg-background/98 p-3 shadow-2xl backdrop-blur lg:inset-x-auto lg:bottom-0 lg:right-0 lg:top-14 lg:w-[376px] lg:max-h-none lg:border-l lg:border-t-0";
+    "absolute inset-x-0 bottom-0 z-[2147483645] flex max-h-[46vh] flex-col gap-2 overflow-y-auto border-t bg-background/95 p-3 shadow-2xl backdrop-blur lg:inset-x-auto lg:bottom-0 lg:right-0 lg:top-14 lg:w-[376px] lg:max-h-none lg:border-l lg:border-t-0";
   host.style.setProperty("pointer-events", "auto", "important");
   host.style.setProperty("touch-action", "auto", "important");
   dialog.appendChild(host);
