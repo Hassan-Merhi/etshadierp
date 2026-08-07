@@ -4,6 +4,7 @@ import { registerLocationWhatsappLegacyCompatibilityRoutes } from "./locationWha
 import { registerLocationCrudRoutes } from "./locationCrudRoutes";
 import { registerLocationInventoryRoutes } from "./locationInventoryRoutes";
 import { registerLocationReportRoutes } from "./locationReportRoutes";
+import { registerLocationWhatsappScheduleRoutes } from "./locationWhatsappScheduleRoutes";
 
 export function registerLocationRoutes(app: Express) {
   registerCommonInventoryPerformanceRoutes(app);
@@ -14,4 +15,5 @@ export function registerLocationRoutes(app: Express) {
   registerLocationCrudRoutes(app);
   registerLocationInventoryRoutes(app);
   registerLocationReportRoutes(app);
+  registerLocationWhatsappScheduleRoutes(app);
 }
