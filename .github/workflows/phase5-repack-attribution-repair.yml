@@ -1,0 +1,55 @@
+name: Phase 5 repack attribution repair
+
+on:
+  push:
+    branches:
+      - agent/factory-production-bonus-payroll-phase4
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: "!contains(github.event.head_commit.message, '[phase5-repack-repaired]')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/factory-production-bonus-payroll-phase4
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: npm
+      - run: npm ci
+      - name: Preserve production attribution across bale repacks
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("server/routes/factory/bales/balesCrudRoutes.ts")
+          text = path.read_text()
+
+          old_values = '''            totalCost: originalBale.totalCost,\n            status: "IN_STOCK",\n          })'''
+          new_values = '''            totalCost: originalBale.totalCost,\n            status: "IN_STOCK",\n            finalizedBy: originalBale.finalizedBy,\n            workerName: originalBale.workerName,\n            finalizedAt: originalBale.finalizedAt,\n            stockEntryDate: originalBale.stockEntryDate,\n          })'''
+          if old_values not in text:
+              raise SystemExit("repack bale values anchor not found")
+          text = text.replace(old_values, new_values, 1)
+
+          old_after_insert = '''          .returning();\n\n        await tx.update(factoryBales).set({ status: "REPACKED", updatedAt: new Date() }).where(eq(factoryBales.id, id));'''
+          new_after_insert = '''          .returning();\n\n        const [productionAttribution] = await tx\n          .select()\n          .from(factoryBaleProductionAttributions)\n          .where(\n            and(\n              eq(factoryBaleProductionAttributions.companyId, companyId),\n              eq(factoryBaleProductionAttributions.baleId, id)\n            )\n          )\n          .limit(1);\n        if (productionAttribution) {\n          await tx.insert(factoryBaleProductionAttributions).values({\n            companyId,\n            baleId: newBale.id,\n            workerId: productionAttribution.workerId,\n            workerNameSnapshot: productionAttribution.workerNameSnapshot,\n            productionPositionId: productionAttribution.productionPositionId,\n            productionPositionNameSnapshot: productionAttribution.productionPositionNameSnapshot,\n            stockEntryDate: productionAttribution.stockEntryDate,\n          });\n        }\n\n        await tx.update(factoryBales).set({ status: "REPACKED", updatedAt: new Date() }).where(eq(factoryBales.id, id));'''
+          if old_after_insert not in text:
+              raise SystemExit("repack post-insert anchor not found")
+          path.write_text(text.replace(old_after_insert, new_after_insert, 1))
+      - name: Format and verify repair
+        run: |
+          npx prettier@3.8.4 --write server/routes/factory/bales/balesCrudRoutes.ts
+          npm run check
+      - name: Commit repair and remove helper
+        run: |
+          rm .github/workflows/phase5-repack-attribution-repair.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/routes/factory/bales/balesCrudRoutes.ts .github/workflows/phase5-repack-attribution-repair.yml
+          git commit -m "fix: preserve production attribution on repack [phase5-repack-repaired]"
+          git push origin HEAD:agent/factory-production-bonus-payroll-phase4
