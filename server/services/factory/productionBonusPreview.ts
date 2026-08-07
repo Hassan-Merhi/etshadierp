@@ -42,9 +42,12 @@ export function calculateProductionBonusPreview(input: {
   const poolCents = input.bonusEnabled ? Math.max(0, Math.round(extraBales * rate * 100 + Number.EPSILON)) : 0;
   const bonusPool = moneyFromCents(poolCents);
 
-  const members = [...input.members]
-    .filter((member) => Number.isInteger(member.workerId) && member.workerId > 0)
-    .sort((a, b) => a.workerId - b.workerId);
+  const membersById = new Map<number, ProductionBonusMemberSnapshot>();
+  for (const member of input.members) {
+    if (!Number.isInteger(member.workerId) || member.workerId <= 0 || membersById.has(member.workerId)) continue;
+    membersById.set(member.workerId, member);
+  }
+  const members = [...membersById.values()].sort((a, b) => a.workerId - b.workerId);
 
   if (poolCents === 0 || members.length === 0) {
     return {
