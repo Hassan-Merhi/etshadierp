@@ -57,6 +57,7 @@ const FACTORY_COMPANY_PREFIXES = new Set([
   "advwr",
   "empadv",
   "prodblk",
+  "shiprow",
 ]);
 
 function testCompanyType(prefix: string): "erp" | "factory" {
@@ -129,6 +130,31 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     // A crashed/interrupted factory test can leave rows in factory_* tables
     // referencing this company; those FKs otherwise block the company delete
     // below on the NEXT run that reuses this prefix. Delete in FK-safe order.
+    // The customer-order family. customer_order_bales references factory_bales,
+    // and customer_orders.proforma_id_used references customer_proformas, so the
+    // order is: scan rows, orders, proforma lines, proformas. Without this a
+    // suite that created a proforma leaves the company undeletable.
+    await pool.query(
+      "DELETE FROM customer_order_bales WHERE order_id IN (SELECT id FROM customer_orders WHERE company_id = $1)",
+      [company.id]
+    );
+    await pool.query(
+      "DELETE FROM customer_order_charges WHERE order_id IN (SELECT id FROM customer_orders WHERE company_id = $1)",
+      [company.id]
+    );
+    await pool.query(
+      "DELETE FROM customer_order_lines WHERE order_id IN (SELECT id FROM customer_orders WHERE company_id = $1)",
+      [company.id]
+    );
+    await pool.query("DELETE FROM factory_shipping_container_rows WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM customer_orders WHERE company_id = $1", [company.id]);
+    await pool.query(
+      "DELETE FROM customer_proforma_lines WHERE proforma_id IN (SELECT id FROM customer_proformas WHERE company_id = $1)",
+      [company.id]
+    );
+    await pool.query("DELETE FROM customer_proformas WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM customer_balances WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM customers WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_bales WHERE company_id = $1", [company.id]);
     await pool.query(
       "DELETE FROM factory_mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM factory_mix_batches WHERE company_id = $1)",

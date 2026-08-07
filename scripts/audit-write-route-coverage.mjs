@@ -88,11 +88,31 @@ export function auditWriteRouteCoverage() {
   const sources = new Map(serverFiles.map((file) => [file, fs.readFileSync(path.join(projectRoot, file), "utf8")]));
 
   const testFiles = [...walk("tests", [".ts"]), ...serverFiles.filter((file) => file.endsWith(".test.ts"))];
-  // Kept per file rather than concatenated, so a route can be told apart by
-  // *which* test names it — see guardOnly below.
-  const testSources = new Map(testFiles.map((file) => [file, fs.readFileSync(path.join(projectRoot, file), "utf8")]));
-  const referencingTests = (routePath) =>
-    [...testSources].filter(([, source]) => source.includes(routePath)).map(([file]) => file);
+  // Two blobs rather than a per-file scan. The only distinction this audit
+  // needs is "named by the guard sweep" versus "named by some other test", so
+  // splitting the sources once beats searching every file for every route:
+  // the per-file version cost 962 routes x ~370 files of substring searching
+  // and took six seconds, which pushed the script-inventory gate over its
+  // 30-second budget.
+  const readTest = (file) => fs.readFileSync(path.join(projectRoot, file), "utf8");
+  const sweepText = testFiles.includes(GUARD_SWEEP_TEST) ? readTest(GUARD_SWEEP_TEST) : "";
+  const otherTestText = testFiles
+    .filter((file) => file !== GUARD_SWEEP_TEST)
+    .map(readTest)
+    .join("\n");
+
+  // Route path -> the file that registers it, built in one pass over the server
+  // sources. The obvious shape — compile a regex per route and scan every file —
+  // is 962 routes x ~2,500 files and took six seconds on its own, enough to push
+  // the script-inventory gate past its 30-second budget. Scanning each file once
+  // for every registration it makes gives the same answer in one sweep.
+  const registrationOwners = new Map();
+  const REGISTRATION_PATTERN = /\.(?:get|post|put|patch|delete)\(\s*"([^"]+)"/g;
+  for (const [file, source] of sources) {
+    for (const match of source.matchAll(REGISTRATION_PATTERN)) {
+      if (!registrationOwners.has(match[1])) registrationOwners.set(match[1], file);
+    }
+  }
 
   const routes = [];
   // The manifest is an ordered list and contains genuine duplicate
@@ -114,27 +134,25 @@ export function auditWriteRouteCoverage() {
     // touching voucher_entries on the strength of unrelated code in the same
     // file. The literal match stays as the fallback for routes assembled in a
     // way the registration pattern cannot see.
-    let owner = null;
-    let literalOwner = null;
-    const registration = new RegExp(
-      `\\.(get|post|put|patch|delete)\\(\\s*"${routePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`
-    );
-    for (const [file, source] of sources) {
-      if (!owner && registration.test(source)) owner = file;
-      if (!literalOwner && source.includes(`"${routePath}"`)) literalOwner = file;
-      if (owner && literalOwner) break;
+    let owner = registrationOwners.get(routePath) ?? null;
+    if (!owner) {
+      for (const [file, source] of sources) {
+        if (source.includes(`"${routePath}"`)) {
+          owner = file;
+          break;
+        }
+      }
     }
-    owner = owner ?? literalOwner;
 
     const sensitiveTable = owner ? writesSensitiveTable(sources.get(owner)) : null;
-    const referencedIn = referencingTests(routePath);
-    const referenced = referencedIn.length > 0;
+    const namedElsewhere = otherTestText.includes(routePath);
+    const referenced = namedElsewhere || sweepText.includes(routePath);
     // Covered by the guard sweep and nothing else. The sweep asserts one real
     // thing about every sensitive write route — that it refuses an
     // unauthenticated caller — which is worth having, but it says nothing about
     // whether the route computes the right numbers. Tracking it separately
     // keeps "referenced by a test" from quietly coming to mean "swept".
-    const guardOnly = referenced && referencedIn.every((file) => file === GUARD_SWEEP_TEST);
+    const guardOnly = referenced && !namedElsewhere;
     routes.push({ method, path: routePath, owner, sensitiveTable, referenced, guardOnly });
   }
 
