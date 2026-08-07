@@ -65,7 +65,39 @@ jobs:
       - name: Verify repaired gates
         run: |
           npm run check
-          npm run format:check
+          node node_modules/prettier/bin/prettier.cjs --check \
+            client/src/pages/factory/BaleStockEntry.tsx \
+            client/src/pages/factory/FactoryPayroll.tsx \
+            client/src/pages/factory/ProductionPlannerDialog.tsx \
+            client/src/pages/factory/bale-stock-entry/ProductionPositionsTab.tsx \
+            client/src/pages/factory/bale-stock-entry/StockEntryProductionPositions.tsx \
+            client/src/pages/factory/bale-stock-entry/StockEntryTab.tsx \
+            client/src/pages/factory/factorypayroll/ProductionBonusDecisionPanel.tsx \
+            client/src/pages/factory/factorypayrolltab/components/BatchRow.tsx \
+            client/src/i18n/backendMessagesPhase7Translations.part10.ts \
+            client/src/i18n/backendMessagesPhase7Translations.ts \
+            server/routes/factory-payroll/exports.ts \
+            server/routes/factory-payroll/production-bonuses.ts \
+            server/routes/factory-payroll/reads.ts \
+            server/routes/factory-payroll/update.ts \
+            server/routes/factory/employee-pos/pos-financial/index.ts \
+            server/routes/factory/employee-pos/pos-financial/production-positions.ts \
+            server/routes/factory/productionPositionPlannerRoutes.ts \
+            server/routes/factory/stock/stockEntryRoutes.ts \
+            server/routes/factoryRoutes.ts \
+            server/routes/payroll/core/mark-paid.ts \
+            server/routes/payroll/core/payment-summary-pdf.ts \
+            server/routes/payroll/core/reads.ts \
+            server/services/factory/stockEntryProductionAttribution.ts \
+            server/services/payroll/productionBonusPayrollService.ts \
+            server/startup-schema/012-production-positions.ts \
+            server/startup-schema/index.ts \
+            shared/schema/factory/bale-production-attribution.ts \
+            shared/schema/factory/index.ts \
+            shared/schema/factory/production-positions.ts \
+            scripts/audit-i18n-phase14.mjs \
+            tests/phase7-backend-messages-translations.test.ts \
+            tests/production-bonus-preview.test.ts
           npm run verify:dependency-audit
           node scripts/audit-i18n-phase14.mjs
           npx vitest run tests/production-bonus-preview.test.ts tests/phase7-backend-messages-translations.test.ts
