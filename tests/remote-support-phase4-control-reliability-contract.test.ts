@@ -9,6 +9,7 @@ const mouseController = read("client/src/components/RemoteMouseControllerOverlay
 const keyboardController = read("client/src/components/RemoteKeyboardControllerOverlay.tsx");
 const mouseTarget = read("client/src/components/RemoteMouseControlTarget.tsx");
 const keyboardTarget = read("client/src/components/RemoteKeyboardControlTarget.tsx");
+const controllerTargetRoute = read("server/routes/remoteControllerTargetRoute.ts");
 const pointerRoute = read("server/routes/screenFeedPointerRoute.ts");
 const screenFeedService = read("server/services/screenFeedService.ts");
 const applicationRoutes = read("server/routes/applicationRoutes.ts");
@@ -16,7 +17,8 @@ const applicationRoutes = read("server/routes/applicationRoutes.ts");
 describe("remote support Phase 4 control reliability contracts", () => {
   it("binds the controller to the exact watched user with one shared session source", () => {
     expect(controllerContext).toContain("controller-target/${encodeURIComponent(activeTarget.userId)}");
-    expect(controllerContext).toContain("candidate.targetUserId").not;
+    expect(controllerTargetRoute).toContain("candidate.targetUserId === targetUserId");
+    expect(controllerTargetRoute).toContain("candidate.companyId === companyId");
     expect(mouseController).not.toContain("sessions[0]");
     expect(keyboardController).not.toContain("sessions[0]");
     expect(mouseController).not.toContain("useQuery");
@@ -54,7 +56,7 @@ describe("remote support Phase 4 control reliability contracts", () => {
 
   it("cleans up the owned support session when the watched target changes or closes", () => {
     expect(controllerContext).toContain('reason: "controller-viewer-closed"');
-    expect(controllerContext).toContain("document.visibilityState !== \"visible\"");
+    expect(controllerContext).toContain('document.visibilityState !== "visible"');
     expect(watchdog).toContain("HEARTBEAT_INTERVAL_MS = 5000");
   });
 });
