@@ -56,6 +56,7 @@ const FACTORY_COMPANY_PREFIXES = new Set([
   "v3load",
   "advwr",
   "empadv",
+  "prodblk",
 ]);
 
 function testCompanyType(prefix: string): "erp" | "factory" {
