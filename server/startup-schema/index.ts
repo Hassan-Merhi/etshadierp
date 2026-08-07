@@ -23,6 +23,7 @@ import { securityNotificationsAndPrecision } from "./010-security-notifications-
 import { stockTransferRevisionIntegrity } from "./011-stock-transfer-revision-integrity";
 import { productionPositions } from "./012-production-positions";
 import { baleProductionAttribution } from "./013-bale-production-attribution";
+import { productionPositionPlanner } from "./014-production-position-planner";
 
 export const startupMigrations: string[] = [
   ...coreTablesAndColumns,
@@ -38,4 +39,5 @@ export const startupMigrations: string[] = [
   ...stockTransferRevisionIntegrity,
   ...productionPositions,
   ...baleProductionAttribution,
+  ...productionPositionPlanner,
 ];

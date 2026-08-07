@@ -22,6 +22,7 @@ import { registerFactoryGroundScanRoutes } from "./factory/factoryGroundScanRout
 import { registerFactoryContainerTrackingRoutes } from "./factory/factoryContainerTrackingRoutes";
 import { registerEndProductionRoutes } from "./factory/endProductionRoutes";
 import { registerProductionPlannerRoutes } from "./factory/factoryProductionPlannerRoutes";
+import { registerProductionPositionPlannerRoutes } from "./factory/productionPositionPlannerRoutes";
 import { registerFactoryContactRoutes } from "./factory/factoryContactRoutes";
 import { registerPerformanceReadMicrocache } from "./performance/readMicrocache";
 import { registerFactoryDaybookPaginationRoutes } from "./factory/factoryDaybookPaginationRoutes";
@@ -172,5 +173,6 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   registerFactoryGroundScanRoutes(app);
   registerEndProductionRoutes(app, requireAuth);
   registerProductionPlannerRoutes(app);
+  registerProductionPositionPlannerRoutes(app);
   registerFactoryContactRoutes(app);
 }
