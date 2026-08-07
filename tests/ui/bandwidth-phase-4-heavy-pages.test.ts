@@ -36,7 +36,7 @@ describe("Bandwidth Phase 4 heavy-page contracts", () => {
 
   it("loads the compact stock identity catalog only while adding a proforma item", () => {
     const source = read("client/src/pages/factory/FactoryProformas.tsx");
-    expect(source).toContain('/api/stock-items/light?profile=identity');
+    expect(source).toContain("/api/stock-items/light?profile=identity");
     expect(source).toContain("enabled: isAddLineOpen && !!selectedCompany?.id");
   });
 });
