@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Response } from "express";
 import { requireAuth, requireLogin } from "../auth";
 import { requireActionAccess } from "../lib/permissionMiddleware";
 import { isRemoteSupportEnabled } from "../services/remoteSupportRuntime";
@@ -9,7 +9,7 @@ function liveTransportEnabled(): boolean {
   return isRemoteSupportEnabled("screenFeedEnabled") && isRemoteSupportEnabled("fastScreenFeed");
 }
 
-function stopEventSourceReconnect(res: Parameters<Express["get"]>[1] extends never ? never : any): void {
+function stopEventSourceReconnect(res: Response): void {
   res.setHeader("Cache-Control", "no-store");
   res.status(204).end();
 }
