@@ -42,7 +42,7 @@ function cachedBarcode(key: string): BarcodeImage | undefined {
 
 function sendBarcode(req: any, res: any, image: BarcodeImage) {
   res.setHeader("Content-Type", image.contentType);
-  res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+  res.setHeader("Cache-Control", "private, max-age=31536000, immutable");
   res.setHeader("Vary", "Accept");
   res.setHeader("X-ERP-Payload-Profile", image.profile);
   if (req.method === "HEAD") return res.status(200).end();
@@ -54,8 +54,8 @@ function sendBarcode(req: any, res: any, image: BarcodeImage) {
  *
  * Label/preview <img> requests advertise image/svg+xml support, so they receive
  * a compact vector Code 128 image instead of the old scale-14 raster PNG. A
- * direct fetch with Accept: */* still receives PNG for backwards compatibility,
- * and callers can force either representation with ?format=svg|png.
+ * generic direct fetch still receives PNG for backwards compatibility, and
+ * callers can force either representation with ?format=svg|png.
  *
  * Barcode content is immutable for a given URL. Browser caching is therefore
  * extended to one year, and a bounded process-local LRU avoids repeatedly
