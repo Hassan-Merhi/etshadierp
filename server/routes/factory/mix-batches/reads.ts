@@ -12,7 +12,7 @@ import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { factoryMixBatches, factoryMixBatchSources } from "@shared/schema";
 import { eq, and, desc, inArray, isNull } from "drizzle-orm";
-import { getLockedSupplierRateReadOnly } from "../../../services/factory/rawStockLockedRate";
+import { getLockedSupplierRatesReadOnlyBulk } from "../../../services/factory/rawStockLockedRateBulk";
 import Decimal from "decimal.js";
 
 export function registerFactoryMixBatchReadRoutes(app: Express) {
@@ -31,25 +31,30 @@ export function registerFactoryMixBatchReadRoutes(app: Express) {
       const batchIds = results.map((b: any) => b.id);
       let sourceRows: any[] = [];
       if (batchIds.length > 0) {
+        // Only read the fields needed to compute list display totals. The old
+        // select() materialized every source column even though none of the
+        // source records themselves are returned by this endpoint.
         sourceRows = await db
-          .select()
+          .select({
+            mixBatchId: factoryMixBatchSources.mixBatchId,
+            sourceBatchId: factoryMixBatchSources.sourceBatchId,
+            supplierId: factoryMixBatchSources.supplierId,
+            weightKg: factoryMixBatchSources.weightKg,
+            costPerKg: factoryMixBatchSources.costPerKg,
+          })
           .from(factoryMixBatchSources)
           .where(inArray(factoryMixBatchSources.mixBatchId, batchIds));
       }
 
-      // Collect unique supplier IDs referenced by any source row
       const uniqueSupplierIds = [
-        ...new Set(sourceRows.filter((s: any) => s.supplierId != null).map((s: any) => s.supplierId as number)),
-      ];
+        ...new Set(sourceRows.filter((s: any) => s.supplierId != null).map((s: any) => Number(s.supplierId))),
+      ].filter((id) => Number.isInteger(id) && id > 0);
 
-      // Load current locked USD raw-material rate for each supplier (read-only)
-      const supplierRateMap = new Map<number, number>();
-      for (const supplierId of uniqueSupplierIds) {
-        const { rate } = await getLockedSupplierRateReadOnly(db, companyId, supplierId);
-        supplierRateMap.set(supplierId, rate);
-      }
+      // Phase 3: persisted supplier locked rates are loaded in one query rather
+      // than one query per supplier. Legacy NULL-rate suppliers still use the
+      // same stable historical derivation as before, read-only and concurrently.
+      const supplierRateMap = await getLockedSupplierRatesReadOnlyBulk(db, Number(companyId), uniqueSupplierIds);
 
-      // Group source rows by mixBatchId
       const sourcesByBatch = new Map<number, any[]>();
       for (const src of sourceRows) {
         if (!sourcesByBatch.has(src.mixBatchId)) sourcesByBatch.set(src.mixBatchId, []);
@@ -73,7 +78,7 @@ export function registerFactoryMixBatchReadRoutes(app: Express) {
           if (src.sourceBatchId != null) {
             effectiveCostPerKg = new Decimal(src.costPerKg || 0);
           } else if (src.supplierId != null) {
-            effectiveCostPerKg = new Decimal(supplierRateMap.get(src.supplierId) || 0);
+            effectiveCostPerKg = new Decimal(supplierRateMap.get(Number(src.supplierId)) || 0);
           } else {
             effectiveCostPerKg = new Decimal(src.costPerKg || 0);
           }
@@ -100,6 +105,8 @@ export function registerFactoryMixBatchReadRoutes(app: Express) {
         };
       });
 
+      res.set("X-ERP-Payload-Profile", "mix-batches-bulk-locked-rates");
+      res.set("Cache-Control", "private, max-age=10");
       res.json(enriched);
     } catch (error: unknown) {
       logger.error("Error fetching mix batches:", { error: error });
@@ -124,6 +131,7 @@ export function registerFactoryMixBatchReadRoutes(app: Express) {
 
       const total = parseFloat(batch.totalWeightKg) || 0;
       const used = parseFloat(batch.usedKg) || 0;
+      res.set("Cache-Control", "private, max-age=30");
       res.json({ ...batch, remainingKg: (total - used).toFixed(3) });
     } catch (error: unknown) {
       logger.error("Error fetching mix batch:", { error: error });
