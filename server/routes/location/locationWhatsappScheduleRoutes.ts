@@ -13,6 +13,7 @@ const LOCATION_WHATSAPP_PERMISSION = "exp_whatsapp_send";
 const requireCostPriceAccess = requireSensitiveAccess("fld_cost_price");
 const requireTotalValueAccess = requireSensitiveAccess("fld_total_value");
 const DEFAULT_TIMEZONE = "Africa/Lubumbashi";
+const DAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 
 function parseBoolean(value: unknown, fallback = false): boolean {
   if (value === undefined || value === null) return fallback;
@@ -24,7 +25,6 @@ function requireCostScheduleAccess(req: Request, res: Response, next: NextFuncti
     next();
     return;
   }
-
   requireCostPriceAccess(req, res, (error?: unknown) => {
     if (error) {
       next(error);
@@ -90,6 +90,86 @@ async function validateOptionalFilter(
   return id;
 }
 
+function localParts(date: Date, timezone: string) {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  });
+  const parts = new Map(formatter.formatToParts(date).map((part) => [part.type, part.value]));
+  return {
+    year: Number(parts.get("year")),
+    month: Number(parts.get("month")),
+    day: Number(parts.get("day")),
+    weekday: DAY_INDEX[parts.get("weekday") || ""] ?? date.getUTCDay(),
+    hour: Number(parts.get("hour")),
+    minute: Number(parts.get("minute")),
+  };
+}
+
+function zonedLocalToUtc(
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  timezone: string
+): Date {
+  const desired = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
+  let guess = desired;
+  for (let i = 0; i < 4; i++) {
+    const current = localParts(new Date(guess), timezone);
+    const represented = Date.UTC(current.year, current.month - 1, current.day, current.hour, current.minute, 0, 0);
+    const delta = desired - represented;
+    guess += delta;
+    if (delta === 0) break;
+  }
+  return new Date(guess);
+}
+
+function lastScheduledLocalDate(value: any): string | null {
+  if (!value) return null;
+  if (typeof value === "string") return value.slice(0, 10);
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+}
+
+function computeNextSendAt(row: any, now = new Date()): string | null {
+  if (!row?.enabled) return null;
+  const timezone = row.timezone || DEFAULT_TIMEZONE;
+  if (!isValidTimezone(timezone)) return null;
+  const sendTime = typeof row.send_time === "string" ? row.send_time.slice(0, 5) : "18:00";
+  const [sendHour, sendMinute] = sendTime.split(":").map(Number);
+  const current = localParts(now, timezone);
+  const currentLocalTime = `${String(current.hour).padStart(2, "0")}:${String(current.minute).padStart(2, "0")}`;
+  const allowedDays = row.frequency === "selected_days"
+    ? new Set((Array.isArray(row.days_of_week) ? row.days_of_week : []).map(Number))
+    : new Set([0, 1, 2, 3, 4, 5, 6]);
+  const already = lastScheduledLocalDate(row.last_scheduled_for);
+  const anchor = Date.UTC(current.year, current.month - 1, current.day);
+
+  for (let offset = 0; offset < 8; offset++) {
+    const calendar = new Date(anchor + offset * 24 * 60 * 60 * 1000);
+    const year = calendar.getUTCFullYear();
+    const month = calendar.getUTCMonth() + 1;
+    const day = calendar.getUTCDate();
+    const weekday = calendar.getUTCDay();
+    if (!allowedDays.has(weekday)) continue;
+    const localDate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    if (offset === 0) {
+      if (already === localDate) continue;
+      if (currentLocalTime >= sendTime) return now.toISOString();
+    }
+    return zonedLocalToUtc(year, month, day, sendHour, sendMinute, timezone).toISOString();
+  }
+  return null;
+}
+
 function defaultSchedule(locationId: number) {
   return {
     locationId,
@@ -103,9 +183,12 @@ function defaultSchedule(locationId: number) {
     includeNegativeStock: true,
     stockGroupId: null as number | null,
     categoryId: null as number | null,
+    lastAttemptAt: null as string | null,
     lastSentAt: null as string | null,
+    lastScheduledFor: null as string | null,
     lastStatus: null as string | null,
     lastError: null as string | null,
+    nextSendAt: null as string | null,
   };
 }
 
@@ -124,9 +207,12 @@ function serializeSchedule(row: any, locationId: number) {
     includeNegativeStock: row.include_negative_stock !== false,
     stockGroupId: row.stock_group_id == null ? null : Number(row.stock_group_id),
     categoryId: row.category_id == null ? null : Number(row.category_id),
+    lastAttemptAt: row.last_attempt_at ? new Date(row.last_attempt_at).toISOString() : null,
     lastSentAt: row.last_sent_at ? new Date(row.last_sent_at).toISOString() : null,
+    lastScheduledFor: lastScheduledLocalDate(row.last_scheduled_for),
     lastStatus: row.last_status ?? null,
     lastError: row.last_error ?? null,
+    nextSendAt: computeNextSendAt(row),
   };
 }
 
@@ -150,16 +236,15 @@ export function registerLocationWhatsappScheduleRoutes(app: Express) {
         const result = await pool.query(
           `SELECT enabled, frequency, days_of_week, send_time, timezone,
                   include_cost, include_zero_stock, include_negative_stock,
-                  stock_group_id, category_id, last_sent_at, last_status, last_error
+                  stock_group_id, category_id, last_attempt_at, last_sent_at,
+                  last_scheduled_for, last_status, last_error
              FROM location_whatsapp_stock_schedules
             WHERE location_id = $1 AND company_id = $2`,
           [locationId, companyId]
         );
         res.json(serializeSchedule(result.rows[0], locationId));
       } catch (error: any) {
-        if (error?.code === "42P01") {
-          return res.json(defaultSchedule(Number.parseInt(req.params.locationId, 10)));
-        }
+        if (error?.code === "42P01") return res.json(defaultSchedule(Number.parseInt(req.params.locationId, 10)));
         logger.error("[LocationStockSchedule] GET failed", { error });
         res.status(500).json({ message: getErrorMessage(error) });
       }
@@ -186,17 +271,12 @@ export function registerLocationWhatsappScheduleRoutes(app: Express) {
         const enabled = parseBoolean(req.body?.enabled);
         const frequency = req.body?.frequency === "selected_days" ? "selected_days" : req.body?.frequency === "daily" ? "daily" : null;
         if (!frequency) return res.status(400).json({ message: "Frequency must be daily or selected_days" });
-
         const daysOfWeek = normalizeDays(req.body?.daysOfWeek, frequency);
         if (!daysOfWeek) return res.status(400).json({ message: "Select at least one day for this schedule" });
-
         const sendTime = normalizeSendTime(req.body?.sendTime);
         if (!sendTime) return res.status(400).json({ message: "Invalid send time. Use HH:mm" });
-
         const timezone = typeof req.body?.timezone === "string" ? req.body.timezone.trim() : "";
-        if (!timezone || !isValidTimezone(timezone)) {
-          return res.status(400).json({ message: "Invalid IANA timezone" });
-        }
+        if (!timezone || !isValidTimezone(timezone)) return res.status(400).json({ message: "Invalid IANA timezone" });
 
         const includeCost = parseBoolean(req.body?.includeCost);
         const includeZeroStock = parseBoolean(req.body?.includeZeroStock);
@@ -212,9 +292,7 @@ export function registerLocationWhatsappScheduleRoutes(app: Express) {
         );
         const destinationRow = destination.rows[0];
         if (enabled && (!destinationRow?.whatsapp_group_chat_id || destinationRow.enabled !== true)) {
-          return res.status(400).json({
-            message: "Link and enable the location WhatsApp group before enabling automatic stock reports",
-          });
+          return res.status(400).json({ message: "Link and enable the location WhatsApp group before enabling automatic stock reports" });
         }
         if (enabled && !destinationRow.whatsapp_group_chat_id!.endsWith("@g.us")) {
           return res.status(400).json({ message: "The linked WhatsApp destination is not a valid group" });
@@ -253,22 +331,10 @@ export function registerLocationWhatsappScheduleRoutes(app: Express) {
               updated_at = now()
             RETURNING enabled, frequency, days_of_week, send_time, timezone,
                       include_cost, include_zero_stock, include_negative_stock,
-                      stock_group_id, category_id, last_sent_at, last_status, last_error`,
-          [
-            locationId,
-            companyId,
-            enabled,
-            frequency,
-            daysOfWeek,
-            sendTime,
-            timezone,
-            includeCost,
-            includeZeroStock,
-            includeNegativeStock,
-            stockGroupId,
-            categoryId,
-            req.session.userId!,
-          ]
+                      stock_group_id, category_id, last_attempt_at, last_sent_at,
+                      last_scheduled_for, last_status, last_error`,
+          [locationId, companyId, enabled, frequency, daysOfWeek, sendTime, timezone, includeCost, includeZeroStock,
+            includeNegativeStock, stockGroupId, categoryId, req.session.userId!]
         );
 
         try {
@@ -300,9 +366,7 @@ export function registerLocationWhatsappScheduleRoutes(app: Express) {
         res.json(serializeSchedule(result.rows[0], locationId));
       } catch (error: unknown) {
         const message = getErrorMessage(error);
-        if (message.startsWith("Invalid ") || message.includes("not found for this company")) {
-          return res.status(400).json({ message });
-        }
+        if (message.startsWith("Invalid ") || message.includes("not found for this company")) return res.status(400).json({ message });
         logger.error("[LocationStockSchedule] PUT failed", { error });
         res.status(500).json({ message });
       }
