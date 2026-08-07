@@ -151,6 +151,9 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     // Barcode sequence rows are allocated lazily on read — GET
     // /api/production-bales/next-barcode writes one — so a test that only
     // exercises read endpoints can still leave an FK reference behind.
+    // POST /api/bale-label-prints/allocate-pool allocates from this table, so a
+    // suite that printed labels leaves a row here holding the company down.
+    await pool.query("DELETE FROM reference_sequences WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM bale_sequences WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_bale_sequences WHERE company_id = $1", [company.id]);
 
