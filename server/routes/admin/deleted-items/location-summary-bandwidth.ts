@@ -17,7 +17,7 @@ type CompactGroup = {
   code: string;
   name: string;
   locationData: Record<number, LocationCell>;
-  items: [];
+  items: CompactItem[];
 };
 
 type CompactItem = {
@@ -62,25 +62,33 @@ function emptyCell(): LocationCell {
   return { quantity: 0, rate: 0, value: 0 };
 }
 
+function responseAsOfDate(req: Request): string {
+  return typeof req.query.asOfDate === "string" && req.query.asOfDate ? req.query.asOfDate : getClientDate(req);
+}
+
 /**
- * Handles the bandwidth-optimized profiles for GET /api/location-summary.
+ * Handles bandwidth-optimized GET /api/location-summary contracts.
  *
- * `profile=summary` returns only stock-group totals plus grand totals. It never
- * serializes item rows, which keeps the initial Location Summary page payload
- * small even for companies with thousands of stock items.
+ * No profile: backwards-compatible full shape for legacy callers, but generated
+ * only from non-zero inventory rows and with sparse location cells. This removes
+ * the old Cartesian-style zero cells while keeping every group/item the caller
+ * actually needs.
  *
- * `profile=group&groupId=<id>` returns only the non-zero item rows for one
- * expanded stock group. Location cells are sparse; the client already treats a
- * missing location cell as zero. `groupId=0` represents ungrouped items.
+ * `profile=summary`: stock-group totals + grand totals only. The Location
+ * Summary page uses this for its first paint, so thousands of item rows are not
+ * transferred until a group is expanded.
  *
- * Returning false leaves the legacy full-payload contract untouched for any
- * older caller that has not migrated yet.
+ * `profile=group&groupId=<id>`: item rows for one expanded stock group only.
+ * `groupId=0` represents ungrouped items.
  */
 export async function handleLocationSummaryBandwidthProfile(req: Request, res: Response): Promise<boolean> {
-  const profile = typeof req.query.profile === "string" ? req.query.profile : "";
-  if (profile !== "summary" && profile !== "group") return false;
+  const requestedProfile = typeof req.query.profile === "string" ? req.query.profile : "";
+  const profile = requestedProfile === "" ? "full" : requestedProfile;
+  if (profile !== "full" && profile !== "summary" && profile !== "group") return false;
 
   try {
+    // Compact contracts are always scoped to the authenticated session company;
+    // callers cannot widen the read by supplying an arbitrary companyId query.
     const companyId = req.session.currentCompanyId;
     const locationIds = parseLocationIds(req.query.locationIds);
 
@@ -91,7 +99,7 @@ export async function handleLocationSummaryBandwidthProfile(req: Request, res: R
 
     if (locationIds.length === 0) {
       if (profile === "group") res.json({ groupId: null, items: [] });
-      else res.json({ stockGroups: [], grandTotals: {}, asOfDate: getClientDate(req) });
+      else res.json({ stockGroups: [], grandTotals: {}, asOfDate: responseAsOfDate(req) });
       return true;
     }
 
@@ -167,34 +175,100 @@ export async function handleLocationSummaryBandwidthProfile(req: Request, res: R
       res.json({
         stockGroups: Array.from(groups.values()),
         grandTotals,
-        asOfDate: getClientDate(req),
+        asOfDate: responseAsOfDate(req),
       });
       return true;
     }
 
-    const groupId = Number.parseInt(String(req.query.groupId ?? ""), 10);
-    if (!Number.isInteger(groupId) || groupId < 0) {
-      res.status(400).json({ message: "groupId is required for profile=group" });
+    if (profile === "group") {
+      const groupId = Number.parseInt(String(req.query.groupId ?? ""), 10);
+      if (!Number.isInteger(groupId) || groupId < 0) {
+        res.status(400).json({ message: "groupId is required for profile=group" });
+        return true;
+      }
+
+      if (groupId !== 0) {
+        const existingGroup = await db
+          .select({ id: stockGroups.id })
+          .from(stockGroups)
+          .where(and(eq(stockGroups.id, groupId), eq(stockGroups.companyId, companyId), eq(stockGroups.active, true)))
+          .limit(1);
+        if (existingGroup.length === 0) {
+          res.status(404).json({ message: "Stock group not found" });
+          return true;
+        }
+      }
+
+      const itemRows = await db
+        .select({
+          id: stockItems.id,
+          code: stockItems.code,
+          name: stockItems.name,
+          uom: stockItems.uom,
+          locationId: inventory.locationId,
+          quantity: inventory.quantity,
+          averageRate: inventory.averageRate,
+        })
+        .from(inventory)
+        .innerJoin(
+          stockItems,
+          and(
+            eq(stockItems.id, inventory.stockItemId),
+            eq(stockItems.companyId, companyId),
+            eq(stockItems.active, true),
+            isNull(stockItems.deletedAt)
+          )
+        )
+        .where(
+          and(
+            eq(inventory.companyId, companyId),
+            inArray(inventory.locationId, locationIds),
+            groupId === 0 ? isNull(stockItems.stockGroupId) : eq(stockItems.stockGroupId, groupId),
+            sql`${inventory.quantity}::numeric <> 0`
+          )
+        )
+        .orderBy(stockItems.name, stockItems.id);
+
+      const items = new Map<number, CompactItem>();
+      for (const row of itemRows) {
+        const itemId = Number(row.id);
+        let item = items.get(itemId);
+        if (!item) {
+          item = {
+            id: itemId,
+            code: row.code,
+            name: row.name,
+            uom: row.uom,
+            locationData: {},
+          };
+          items.set(itemId, item);
+        }
+
+        const quantity = numeric(row.quantity);
+        const rate = numeric(row.averageRate);
+        item.locationData[Number(row.locationId)] = {
+          quantity,
+          rate,
+          value: quantity * rate,
+        };
+      }
+
+      res.setHeader("X-ERP-Payload-Profile", "location-summary-group-items");
+      res.json({ groupId, items: Array.from(items.values()) });
       return true;
     }
 
-    if (groupId !== 0) {
-      const existingGroup = await db
-        .select({ id: stockGroups.id })
-        .from(stockGroups)
-        .where(and(eq(stockGroups.id, groupId), eq(stockGroups.companyId, companyId), eq(stockGroups.active, true)))
-        .limit(1);
-      if (existingGroup.length === 0) {
-        res.status(404).json({ message: "Stock group not found" });
-        return true;
-      }
-    }
-
-    const itemRows = await db
+    // Legacy full contract, optimized: one joined read of only non-zero inventory
+    // and sparse location cells. This keeps Stock Transfer / Smart Transfer
+    // callers compatible while removing the large zero-filled payload.
+    const rows = await db
       .select({
-        id: stockItems.id,
-        code: stockItems.code,
-        name: stockItems.name,
+        groupId: sql<number>`COALESCE(${stockGroups.id}, 0)::int`,
+        groupCode: sql<string>`COALESCE(${stockGroups.code}, 'UNGROUPED')`,
+        groupName: sql<string>`COALESCE(${stockGroups.name}, 'Ungrouped Items')`,
+        itemId: stockItems.id,
+        itemCode: stockItems.code,
+        itemName: stockItems.name,
         uom: stockItems.uom,
         locationId: inventory.locationId,
         quantity: inventory.quantity,
@@ -210,42 +284,91 @@ export async function handleLocationSummaryBandwidthProfile(req: Request, res: R
           isNull(stockItems.deletedAt)
         )
       )
+      .leftJoin(
+        stockGroups,
+        and(eq(stockGroups.id, stockItems.stockGroupId), eq(stockGroups.companyId, companyId), eq(stockGroups.active, true))
+      )
       .where(
         and(
           eq(inventory.companyId, companyId),
           inArray(inventory.locationId, locationIds),
-          groupId === 0 ? isNull(stockItems.stockGroupId) : eq(stockItems.stockGroupId, groupId),
-          sql`${inventory.quantity}::numeric <> 0`
+          sql`${inventory.quantity}::numeric <> 0`,
+          sql`(${stockItems.stockGroupId} IS NULL OR ${stockGroups.id} IS NOT NULL)`
         )
       )
-      .orderBy(stockItems.name, stockItems.id);
+      .orderBy(
+        sql`CASE WHEN ${stockGroups.id} IS NULL THEN 1 ELSE 0 END`,
+        stockGroups.name,
+        stockItems.name,
+        stockItems.id
+      );
 
-    const items = new Map<number, CompactItem>();
-    for (const row of itemRows) {
-      const itemId = Number(row.id);
-      let item = items.get(itemId);
+    const groups = new Map<number, CompactGroup>();
+    const itemsByGroup = new Map<number, Map<number, CompactItem>>();
+    const grandTotals: Record<number, LocationCell> = {};
+
+    for (const row of rows) {
+      const groupId = Number(row.groupId);
+      const itemId = Number(row.itemId);
+      const locationId = Number(row.locationId);
+      const quantity = numeric(row.quantity);
+      const rate = numeric(row.averageRate);
+      const value = quantity * rate;
+
+      let group = groups.get(groupId);
+      if (!group) {
+        group = {
+          id: groupId,
+          code: row.groupCode || (groupId === 0 ? "UNGROUPED" : ""),
+          name: row.groupName || (groupId === 0 ? "Ungrouped Items" : ""),
+          locationData: {},
+          items: [],
+        };
+        groups.set(groupId, group);
+        itemsByGroup.set(groupId, new Map());
+      }
+
+      const groupCell = group.locationData[locationId] ?? emptyCell();
+      addCell(groupCell, quantity, value);
+      group.locationData[locationId] = groupCell;
+
+      const groupItems = itemsByGroup.get(groupId)!;
+      let item = groupItems.get(itemId);
       if (!item) {
         item = {
           id: itemId,
-          code: row.code,
-          name: row.name,
+          code: row.itemCode,
+          name: row.itemName,
           uom: row.uom,
           locationData: {},
         };
-        items.set(itemId, item);
+        groupItems.set(itemId, item);
+        group.items.push(item);
       }
+      item.locationData[locationId] = { quantity, rate, value };
 
-      const quantity = numeric(row.quantity);
-      const rate = numeric(row.averageRate);
-      item.locationData[Number(row.locationId)] = {
-        quantity,
-        rate,
-        value: quantity * rate,
-      };
+      const grand = grandTotals[locationId] ?? emptyCell();
+      addCell(grand, quantity, value);
+      grandTotals[locationId] = grand;
     }
 
-    res.setHeader("X-ERP-Payload-Profile", "location-summary-group-items");
-    res.json({ groupId, items: Array.from(items.values()) });
+    for (const group of groups.values()) {
+      for (const locationId of Object.keys(group.locationData)) {
+        const id = Number(locationId);
+        group.locationData[id] = finalizeCell(group.locationData[id]);
+      }
+    }
+    for (const locationId of Object.keys(grandTotals)) {
+      const id = Number(locationId);
+      grandTotals[id] = finalizeCell(grandTotals[id]);
+    }
+
+    res.setHeader("X-ERP-Payload-Profile", "location-summary-full-sparse");
+    res.json({
+      stockGroups: Array.from(groups.values()),
+      grandTotals,
+      asOfDate: responseAsOfDate(req),
+    });
     return true;
   } catch (error: unknown) {
     logger.error("Location summary bandwidth profile error:", { error });
