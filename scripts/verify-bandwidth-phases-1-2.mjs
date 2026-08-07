@@ -101,9 +101,18 @@ requireText(hotspotGuard, "/api\\/factory\\/mix-batches", "Mix batches must be r
 requireText(hotspotGuard, "/api\\/factory\\/raw-stock", "Raw-stock reads must be request-contained.");
 requireText(hotspotGuard, "/api\\/accounts\\/all", "Accounts reads must be request-contained.");
 requireText(hotspotGuard, "inFlightRequests", "Identical hotspot GETs must share one in-flight request.");
-requireText(hotspotGuard, "writeGeneration", "Writes must prevent raced GETs from caching stale data.");
-requireText(hotspotGuard, "writeGeneration += 1", "Every write boundary must advance the cache generation.");
-requireText(hotspotGuard, "clearCache();", "Writes must clear short-lived hotspot snapshots.");
+requireText(
+  hotspotGuard,
+  "generationAtStart !== generationForScope(rule.scope)",
+  "Writes must prevent raced GETs from caching stale data."
+);
+requireText(hotspotGuard, "liveWriteGeneration += 1", "Every write boundary must advance the live cache generation.");
+requireText(
+  hotspotGuard,
+  'if (scope === "all") referenceWriteGeneration += 1',
+  "Reference-data writes must advance the reference cache generation."
+);
+requireText(hotspotGuard, "clearCache(scope);", "Writes must clear the affected short-lived hotspot snapshots.");
 // Asserted on behavior rather than on the exact argument expression: the abort signal handed to
 // waitUntilVisible is the shared request lifetime's, not the per-caller one, so that a single
 // cancelled caller cannot abort a request other callers are still waiting on.
