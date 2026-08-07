@@ -86,6 +86,7 @@ import { registerSalaryAdvanceRoutes } from "./employees/salaryAdvanceRoutes";
 import { registerLegacyHealthRoutes } from "./core/healthRoutes";
 import { registerPermissionBoundaryRoutes } from "./core/permissionBoundaryRoutes";
 import { registerIntercompanyPosConfigRoutes } from "./pos/intercompanyPosConfigRoutes";
+import { registerBandwidthPhase3FactoryReads } from "./performance/bandwidthPhase3FactoryReads";
 
 function registerWriteInvalidationSignal(app: Express): void {
   app.use((req, res, next) => {
@@ -111,6 +112,11 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerWriteInvalidationSignal(app);
   registerPermissionBoundaryRoutes(app);
 
+  // Bandwidth Phase 3: register compact high-volume read contracts before the
+  // legacy Factory registrar. The interceptor calls next() for every contract it
+  // does not explicitly own, so existing write behavior and unrelated reads stay
+  // on their original handlers.
+  registerBandwidthPhase3FactoryReads(app);
   registerFactoryRoutes(app, requireAuth, db);
   registerFactoryWorkerRoutes(app, requireAuth, db);
   registerFactoryPayrollRoutes(app, requireAuth, db);
