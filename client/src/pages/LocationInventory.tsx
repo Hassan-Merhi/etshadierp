@@ -81,7 +81,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   } = useLocationInventoryState({ companyId, toast });
 
   // ─── Mutations ────────────────────────────────────────────────────────────
-  const { renameLocationMutation, createLocationMutation, waGroupMutation } = useLocationInventoryMutations({
+  const { renameLocationMutation, createLocationMutation, waGroupMutation, waTestMutation } = useLocationInventoryMutations({
     toast,
     selectedLocationLocal,
     setSelectedLocationLocal,
@@ -93,6 +93,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
   // ─── Queries ──────────────────────────────────────────────────────────────
   const {
+    canManageWhatsapp,
     waChats,
     waChatsLoading,
     locations,
@@ -275,6 +276,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   locationSearchTerm={locationSearchTerm}
                   setLocationSearchTerm={setLocationSearchTerm}
                   posUser={posUser}
+                  canManageWhatsapp={canManageWhatsapp}
                   openRenameDialog={openRenameDialog}
                   openWaGroupDialog={openWaGroupDialog}
                 />
@@ -286,6 +288,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               <StockGroupsView
                 selectedLocationLocal={selectedLocationLocal}
                 posUser={posUser}
+                canManageWhatsapp={canManageWhatsapp}
                 openRenameDialog={openRenameDialog}
                 openWaGroupDialog={openWaGroupDialog}
                 activeInventoryLoading={activeInventoryLoading}
@@ -402,6 +405,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
         waGroupSelectedId={waGroupSelectedId}
         setWaGroupSelectedId={setWaGroupSelectedId}
         waGroupMutation={waGroupMutation}
+        waTestMutation={waTestMutation}
         waGroupLocation={waGroupLocation}
         stockMovementOpen={stockMovementOpen}
         setStockMovementOpen={setStockMovementOpen}
