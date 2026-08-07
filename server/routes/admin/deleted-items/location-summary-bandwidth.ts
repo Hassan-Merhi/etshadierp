@@ -128,7 +128,7 @@ export async function handleLocationSummaryBandwidthProfile(req: Request, res: R
           )
         )
         .groupBy(inventory.locationId, stockGroups.id, stockGroups.code, stockGroups.name)
-        .orderBy(sql`COALESCE(${stockGroups.name}, 'Ungrouped Items')`);
+        .orderBy(sql`CASE WHEN ${stockGroups.id} IS NULL THEN 1 ELSE 0 END`, stockGroups.name);
 
       const groups = new Map<number, CompactGroup>();
       const grandTotals: Record<number, LocationCell> = {};
