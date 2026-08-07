@@ -1,0 +1,65 @@
+name: Bandwidth Phase 5 Autoformat
+
+on:
+  push:
+    branches:
+      - agent/bandwidth-phase4-global-request-pressure
+    paths:
+      - .github/workflows/bandwidth-phase5-autoformat.yml
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v7
+        with:
+          ref: agent/bandwidth-phase4-global-request-pressure
+          fetch-depth: 0
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22.14
+          cache: npm
+
+      - name: Normalize package registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Format Phase 5 files
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            client/src/lib/queryKeys.ts \
+            client/src/lib/requestStormGuard.ts \
+            client/src/pages/BaleProductsBilingual.tsx \
+            client/src/pages/factory/FactoryProformas.tsx \
+            server/lib/traceContext.ts \
+            server/routes/admin/deleted-items/location-summary-bandwidth.ts \
+            server/routes/factory/customer-proformas/proformas.ts \
+            server/routes/factory/raw-stock/rawStockAvailableContainerRoutes.ts \
+            server/routes/performance/bandwidthPhase3FactoryReads.ts \
+            server/services/factory/rawStockLockedRateBulk.ts \
+            client/src/lib/bandwidthPhase1HotspotGuard.ts \
+            server/routes/barcodeImageBandwidthMiddleware.ts \
+            tests/ui/bandwidth-phase-1-invalidation-policy.test.ts \
+            client/src/i18n/backendMessagesPhase7Translations.part11.ts \
+            client/src/i18n/backendMessagesPhase7Translations.ts \
+            scripts/audit-i18n-phase14.mjs
+
+      - name: Commit formatting
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/src server scripts tests
+          git commit -m "format bandwidth phase 5 source"
+          git push origin HEAD:agent/bandwidth-phase4-global-request-pressure
