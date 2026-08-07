@@ -13,6 +13,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation } from "@/contexts/LocationContext";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { LocationWhatsappScheduleDialog } from "./LocationWhatsappScheduleDialog";
 
 interface LocationInventoryHeaderProps {
   posUser?: any;
@@ -126,51 +127,59 @@ export function LocationInventoryHeader({
       {!posUser && (
         <div className="flex items-center gap-2 shrink-0">
           {canManageWhatsapp && selectedLocation && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  disabled={!whatsappReady || sendMode !== null}
-                  title={whatsappButtonTitle}
-                  data-testid="button-send-location-stock-whatsapp"
-                >
-                  {sendMode ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
-                  {sendMode ? "Sending…" : "Send Stock"}
-                  {!sendMode && <ChevronDown className="h-3.5 w-3.5" />}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-64">
-                <DropdownMenuItem
-                  onClick={() => handleSendStock(false)}
-                  disabled={sendMode !== null}
-                  data-testid="menu-send-stock-whatsapp-no-cost"
-                >
-                  <MessageCircle className="h-4 w-4 mr-2" />
-                  <div>
-                    <div className="font-medium">Send WITHOUT COST</div>
-                    <div className="text-xs text-muted-foreground">Quantity-only Godown Summary PDF</div>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => handleSendStock(true)}
-                  disabled={sendMode !== null || !canSendWithCost}
-                  data-testid="menu-send-stock-whatsapp-with-cost"
-                >
-                  <MessageCircle className="h-4 w-4 mr-2" />
-                  <div>
-                    <div className="font-medium">Send WITH COST</div>
-                    <div className="text-xs text-muted-foreground">
-                      {canSendWithCost
-                        ? "Includes average rate and total value"
-                        : "Requires cost-price and total-value permission"}
+            <>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    disabled={!whatsappReady || sendMode !== null}
+                    title={whatsappButtonTitle}
+                    data-testid="button-send-location-stock-whatsapp"
+                  >
+                    {sendMode ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+                    {sendMode ? "Sending…" : "Send Stock"}
+                    {!sendMode && <ChevronDown className="h-3.5 w-3.5" />}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-64">
+                  <DropdownMenuItem
+                    onClick={() => handleSendStock(false)}
+                    disabled={sendMode !== null}
+                    data-testid="menu-send-stock-whatsapp-no-cost"
+                  >
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    <div>
+                      <div className="font-medium">Send WITHOUT COST</div>
+                      <div className="text-xs text-muted-foreground">Quantity-only Godown Summary PDF</div>
                     </div>
-                  </div>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => handleSendStock(true)}
+                    disabled={sendMode !== null || !canSendWithCost}
+                    data-testid="menu-send-stock-whatsapp-with-cost"
+                  >
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    <div>
+                      <div className="font-medium">Send WITH COST</div>
+                      <div className="text-xs text-muted-foreground">
+                        {canSendWithCost
+                          ? "Includes average rate and total value"
+                          : "Requires cost-price and total-value permission"}
+                      </div>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <LocationWhatsappScheduleDialog
+                location={selectedLocation}
+                companyId={companyId}
+                canSendWithCost={canSendWithCost}
+              />
+            </>
           )}
 
           <Button
