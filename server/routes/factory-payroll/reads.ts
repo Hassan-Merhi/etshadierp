@@ -1,8 +1,9 @@
 /**
  * factoryPayrollRoutes: FactoryPayrollRead endpoints.
  *
- * Registered by ./index.ts in the original order; Express resolves
- * first-match, so that order is behaviour.
+ * Production-bonus proposals are refreshed only for DRAFT payroll periods.
+ * APPROVED/PAID payrolls are read-only historical records and are never given
+ * newly-created bonus proposals retroactively.
  */
 import type { Express } from "express";
 import { getErrorMessage } from "../../lib/httpHandlers";
@@ -10,14 +11,28 @@ import { logger } from "../../lib/logger";
 import { parseId } from "../../lib/parseId";
 import { eq, and, asc, gte, lte, desc } from "drizzle-orm";
 import { factoryWorkers, factoryPayrolls, ledgerAccounts } from "@shared/schema";
+import {
+  attachProductionBonusesToPayroll,
+  getProductionBonusTotalsForPayrollIds,
+  prepareProductionBonusesForPayroll,
+  syncProductionBonusProposalsForPeriod,
+} from "../../services/payroll/productionBonusPayrollService";
+
+const emptyTotals = () => ({
+  approved: 0,
+  pending: 0,
+  rejected: 0,
+  totalSuggested: 0,
+  pendingCount: 0,
+  approvedCount: 0,
+  rejectedCount: 0,
+});
 
 export function registerFactoryPayrollReadRoutes(app: Express, requireAuth: any, db: any) {
   app.get("/api/factory/payroll", requireAuth, async (req: any, res: any) => {
     try {
       const { companyId, startDate, endDate, status } = req.query;
-      if (!companyId) {
-        return res.status(400).json({ message: "companyId is required" });
-      }
+      if (!companyId) return res.status(400).json({ message: "companyId is required" });
 
       const companyIdNum = parseInt(companyId as string, 10);
       if (isNaN(companyIdNum)) return res.status(400).json({ message: "Invalid companyId" });
@@ -40,23 +55,57 @@ export function registerFactoryPayrollReadRoutes(app: Express, requireAuth: any,
         .where(and(...conditions))
         .orderBy(asc(factoryWorkers.fullName), desc(factoryPayrolls.periodStart));
 
-      const formatted = results.map((r: any) => ({
-        ...r.payroll,
-        workerName: r.workerName,
-        workerCode: r.workerCode,
-        workerPosition: r.workerPosition,
-        workerSalaryType: r.workerSalaryType,
-        workerDepartment: r.workerDepartment,
-      }));
+      // Refresh proposals only where at least one payroll in the result is DRAFT.
+      // This makes historical APPROVED/PAID reads side-effect free.
+      const periodKeys = new Set<string>();
+      for (const result of results) {
+        if (result.payroll.status !== "DRAFT") continue;
+        const key = `${result.payroll.periodStart}:${result.payroll.periodEnd}`;
+        if (periodKeys.has(key)) continue;
+        periodKeys.add(key);
+        await syncProductionBonusProposalsForPeriod(
+          db,
+          companyIdNum,
+          result.payroll.periodStart,
+          result.payroll.periodEnd
+        );
+      }
+      for (const result of results) {
+        if (result.payroll.status === "DRAFT") await attachProductionBonusesToPayroll(db, result.payroll.id);
+      }
+
+      const bonusTotals = await getProductionBonusTotalsForPayrollIds(
+        db,
+        results.map((result) => result.payroll.id)
+      );
+      const formatted = results.map((r: any) => {
+        const production = bonusTotals.get(r.payroll.id) ?? emptyTotals();
+        const totalBonuses = Number(r.payroll.bonuses ?? 0);
+        return {
+          ...r.payroll,
+          workerName: r.workerName,
+          workerCode: r.workerCode,
+          workerPosition: r.workerPosition,
+          workerSalaryType: r.workerSalaryType,
+          workerDepartment: r.workerDepartment,
+          productionBonus: production.approved.toFixed(2),
+          pendingProductionBonus: production.pending.toFixed(2),
+          rejectedProductionBonus: production.rejected.toFixed(2),
+          suggestedProductionBonus: production.totalSuggested.toFixed(2),
+          productionBonusPendingCount: production.pendingCount,
+          productionBonusApprovedCount: production.approvedCount,
+          productionBonusRejectedCount: production.rejectedCount,
+          otherBonuses: Math.max(0, totalBonuses - production.approved).toFixed(2),
+        };
+      });
 
       res.json(formatted);
     } catch (error: unknown) {
-      logger.error("Error fetching payroll:", { error: error });
+      logger.error("Error fetching payroll", { error });
       res.status(500).json({ message: getErrorMessage(error) });
     }
   });
 
-  // ── GET single payroll summary (for daybook detail view) ─────────────────
   app.get("/api/factory/payroll/:id/summary", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
@@ -100,7 +149,16 @@ export function registerFactoryPayrollReadRoutes(app: Express, requireAuth: any,
         .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)));
 
       if (!row) return res.status(404).json({ message: "Payroll not found" });
-      res.json(row);
+      if (row.status === "DRAFT") await prepareProductionBonusesForPayroll(db, id);
+      const production = (await getProductionBonusTotalsForPayrollIds(db, [id])).get(id) ?? emptyTotals();
+      res.json({
+        ...row,
+        productionBonus: production.approved.toFixed(2),
+        pendingProductionBonus: production.pending.toFixed(2),
+        rejectedProductionBonus: production.rejected.toFixed(2),
+        suggestedProductionBonus: production.totalSuggested.toFixed(2),
+        otherBonuses: Math.max(0, Number(row.bonuses ?? 0) - production.approved).toFixed(2),
+      });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }

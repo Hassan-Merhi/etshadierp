@@ -1,8 +1,5 @@
 /**
  * payrollCoreRoutes: PayrollCoreRead endpoints.
- *
- * Registered by ./index.ts in the original order; Express resolves
- * first-match, so that order is behaviour.
  */
 import type { Express } from "express";
 import { parseId, parseOptionalId } from "../../../lib/parseId";
@@ -20,6 +17,21 @@ import {
   ledgerAccounts,
 } from "@shared/schema";
 import { computeMonthlyPay, getFactoryCompanyId } from "./_helpers";
+import {
+  attachProductionBonusesToPayroll,
+  getProductionBonusTotalsForPayrollIds,
+  syncProductionBonusProposalsForPeriod,
+} from "../../../services/payroll/productionBonusPayrollService";
+
+const emptyBonusTotals = () => ({
+  approved: 0,
+  pending: 0,
+  rejected: 0,
+  totalSuggested: 0,
+  pendingCount: 0,
+  approvedCount: 0,
+  rejectedCount: 0,
+});
 
 export function registerPayrollCoreReadRoutes(app: Express) {
   app.get("/api/factory/cash-accounts", requireAuth, async (req: any, res: any) => {
@@ -37,7 +49,7 @@ export function registerPayrollCoreReadRoutes(app: Express) {
     }
   });
 
-  // GET /api/factory/payrolls - All payroll records for company with worker info
+  // GET /api/factory/payrolls - live Workers Hub payroll records with production-bonus state.
   app.get("/api/factory/payrolls", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
@@ -47,8 +59,22 @@ export function registerPayrollCoreReadRoutes(app: Express) {
         .from(factoryPayrolls)
         .where(eq(factoryPayrolls.companyId, companyId))
         .orderBy(desc(factoryPayrolls.periodEnd));
-      // Attach worker names
-      const workerIds = [...new Set(payrolls.map((p: any) => p.workerId))];
+
+      // Only DRAFT periods may generate/attach new proposals. Locked payrolls
+      // remain historical and side-effect free.
+      const draftPeriods = new Set<string>();
+      for (const payroll of payrolls) {
+        if (payroll.status !== "DRAFT") continue;
+        const key = `${payroll.periodStart}:${payroll.periodEnd}`;
+        if (draftPeriods.has(key)) continue;
+        draftPeriods.add(key);
+        await syncProductionBonusProposalsForPeriod(db, companyId, payroll.periodStart, payroll.periodEnd);
+      }
+      for (const payroll of payrolls) {
+        if (payroll.status === "DRAFT") await attachProductionBonusesToPayroll(db, payroll.id);
+      }
+
+      const workerIds = [...new Set(payrolls.map((payroll: any) => payroll.workerId))];
       const workers = workerIds.length
         ? await db
             .select({
@@ -60,8 +86,23 @@ export function registerPayrollCoreReadRoutes(app: Express) {
             .from(factoryWorkers)
             .where(inArray(factoryWorkers.id, workerIds))
         : [];
-      const workerMap = new Map(workers.map((w: any) => [w.id, w]));
-      const result = payrolls.map((p: any) => ({ ...p, worker: workerMap.get(p.workerId) || null }));
+      const workerMap = new Map(workers.map((worker: any) => [worker.id, worker]));
+      const productionTotals = await getProductionBonusTotalsForPayrollIds(db, payrolls.map((payroll) => payroll.id));
+      const result = payrolls.map((payroll: any) => {
+        const production = productionTotals.get(payroll.id) ?? emptyBonusTotals();
+        return {
+          ...payroll,
+          worker: workerMap.get(payroll.workerId) || null,
+          productionBonus: production.approved.toFixed(2),
+          pendingProductionBonus: production.pending.toFixed(2),
+          rejectedProductionBonus: production.rejected.toFixed(2),
+          suggestedProductionBonus: production.totalSuggested.toFixed(2),
+          productionBonusPendingCount: production.pendingCount,
+          productionBonusApprovedCount: production.approvedCount,
+          productionBonusRejectedCount: production.rejectedCount,
+          otherBonuses: Math.max(0, Number(payroll.bonuses ?? 0) - production.approved).toFixed(2),
+        };
+      });
       res.json(result);
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
@@ -69,30 +110,19 @@ export function registerPayrollCoreReadRoutes(app: Express) {
   });
 
   // GET /api/factory/workers/amount-due
-  // Returns a "owed till today" snapshot for every active worker.
-  // Uses calendar-day proration then deducts explicitly recorded Absent / Half Day
-  // entries from the attendance table — consistent with the full payroll calculation.
-  // Period start = day after last PAID payroll's periodEnd, or 1st of current month.
-  // Only salary_deduction advances are auto-deducted (same rule as payroll preview).
   app.get("/api/factory/workers/amount-due", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      // Use the client's local date (from X-Client-Date header) so the
-      // period boundary is correct across timezone offsets. Falls back to
-      // UTC today when the header is absent.
       const todayStr = getClientDate(req);
       const today = new Date(todayStr + "T00:00:00");
       const pad = (n: number) => String(n).padStart(2, "0");
-
-      // Helper: days in the month containing dateStr
       const getDIM = (dateStr: string) => {
-        const d = new Date(dateStr + "T00:00:00");
-        return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+        const date = new Date(dateStr + "T00:00:00");
+        return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
       };
 
-      // All active workers for this company
       const workers = await db
         .select({
           id: factoryWorkers.id,
@@ -102,12 +132,9 @@ export function registerPayrollCoreReadRoutes(app: Express) {
         })
         .from(factoryWorkers)
         .where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true)));
-
       if (workers.length === 0) return res.json({});
 
-      const workerIds = workers.map((w) => w.id);
-
-      // Most-recent PAID payroll per worker (to determine where the new period starts)
+      const workerIds = workers.map((worker) => worker.id);
       const paidPayrolls = await db
         .select({ workerId: factoryPayrolls.workerId, periodEnd: factoryPayrolls.periodEnd })
         .from(factoryPayrolls)
@@ -121,32 +148,23 @@ export function registerPayrollCoreReadRoutes(app: Express) {
         .orderBy(desc(factoryPayrolls.periodEnd));
 
       const lastPaidEnd: Record<number, string> = {};
-      for (const p of paidPayrolls) {
-        if (!lastPaidEnd[p.workerId]) lastPaidEnd[p.workerId] = p.periodEnd;
-      }
+      for (const payroll of paidPayrolls) if (!lastPaidEnd[payroll.workerId]) lastPaidEnd[payroll.workerId] = payroll.periodEnd;
 
-      // Pre-compute period start for every worker so we can do a bulk attendance query
       const periodStarts: Record<number, string> = {};
-      for (const w of workers) {
-        if (lastPaidEnd[w.id]) {
-          const d = new Date(lastPaidEnd[w.id] + "T00:00:00");
-          d.setDate(d.getDate() + 1);
-          periodStarts[w.id] = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+      for (const worker of workers) {
+        if (lastPaidEnd[worker.id]) {
+          const date = new Date(lastPaidEnd[worker.id] + "T00:00:00");
+          date.setDate(date.getDate() + 1);
+          periodStarts[worker.id] = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
         } else {
-          periodStarts[w.id] = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-01`;
+          periodStarts[worker.id] = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-01`;
         }
       }
 
-      // Earliest period start across all workers (lower bound for attendance query)
       const allStarts = Object.values(periodStarts);
       const minPeriodStart = allStarts.length > 0 ? allStarts.reduce((a, b) => (a < b ? a : b)) : todayStr;
-
-      // Pending salary_deduction advances per worker
       const advanceRows = await db
-        .select({
-          workerId: factoryWorkerAdvances.workerId,
-          remaining: factoryWorkerAdvances.remainingBalance,
-        })
+        .select({ workerId: factoryWorkerAdvances.workerId, remaining: factoryWorkerAdvances.remainingBalance })
         .from(factoryWorkerAdvances)
         .where(
           and(
@@ -156,13 +174,11 @@ export function registerPayrollCoreReadRoutes(app: Express) {
             eq(factoryWorkerAdvances.repaymentType, "salary_deduction")
           )
         );
-
       const advanceMap: Record<number, number> = {};
-      for (const a of advanceRows) {
-        advanceMap[a.workerId] = (advanceMap[a.workerId] || 0) + parseFloat(a.remaining || "0");
+      for (const advance of advanceRows) {
+        advanceMap[advance.workerId] = (advanceMap[advance.workerId] || 0) + parseFloat(advance.remaining || "0");
       }
 
-      // Bulk-fetch attendance records for all workers covering their unpaid periods
       const attendanceRows = await db
         .select({
           workerId: factoryAttendance.workerId,
@@ -178,19 +194,16 @@ export function registerPayrollCoreReadRoutes(app: Express) {
             lte(factoryAttendance.attendanceDate, todayStr)
           )
         );
-
-      // Group attendance by workerId for O(1) lookup
       const attendanceByWorker: Record<number, Array<{ date: string; status: string }>> = {};
-      for (const att of attendanceRows) {
-        if (!attendanceByWorker[att.workerId]) attendanceByWorker[att.workerId] = [];
-        attendanceByWorker[att.workerId].push({
-          date: att.attendanceDate,
-          status: att.status ?? "Present",
+      for (const attendance of attendanceRows) {
+        if (!attendanceByWorker[attendance.workerId]) attendanceByWorker[attendance.workerId] = [];
+        attendanceByWorker[attendance.workerId].push({
+          date: attendance.attendanceDate,
+          status: attendance.status ?? "Present",
         });
       }
 
       const round2 = (n: number) => Math.round(n * 100) / 100;
-
       const result: Record<
         number,
         {
@@ -205,14 +218,12 @@ export function registerPayrollCoreReadRoutes(app: Express) {
         }
       > = {};
 
-      for (const w of workers) {
-        const baseSal = parseFloat(w.baseSalary || "0");
-        const transport = parseFloat(w.transportAllowance || "0");
-        const periodStart = periodStarts[w.id];
-
-        // Nothing owed if already paid through today or beyond
+      for (const worker of workers) {
+        const baseSal = parseFloat(worker.baseSalary || "0");
+        const transport = parseFloat(worker.transportAllowance || "0");
+        const periodStart = periodStarts[worker.id];
         if (periodStart > todayStr) {
-          result[w.id] = {
+          result[worker.id] = {
             periodStart,
             periodEnd: todayStr,
             base: 0,
@@ -220,26 +231,22 @@ export function registerPayrollCoreReadRoutes(app: Express) {
             absenceDeducted: 0,
             advanceDeducted: 0,
             net: 0,
-            lastPaidThrough: lastPaidEnd[w.id] || null,
+            lastPaidThrough: lastPaidEnd[worker.id] || null,
           };
           continue;
         }
 
-        // Calendar-day gross
         const grossBase = computeMonthlyPay(baseSal, periodStart, todayStr);
         const grossTransport = computeMonthlyPay(transport, periodStart, todayStr);
-
-        // Deduct for each explicitly recorded Absent or Half Day in this period.
-        // Days with no attendance record are NOT deducted (calendar proration stands).
         let absDeductBase = 0;
         let absDeductTransport = 0;
-        for (const att of attendanceByWorker[w.id] ?? []) {
-          if (att.date < periodStart || att.date > todayStr) continue;
-          const dim = getDIM(att.date);
-          if (att.status === "Absent") {
+        for (const attendance of attendanceByWorker[worker.id] ?? []) {
+          if (attendance.date < periodStart || attendance.date > todayStr) continue;
+          const dim = getDIM(attendance.date);
+          if (attendance.status === "Absent") {
             absDeductBase += baseSal / dim;
             absDeductTransport += transport / dim;
-          } else if (att.status === "Half Day") {
+          } else if (attendance.status === "Half Day") {
             absDeductBase += (baseSal / dim) * 0.5;
             absDeductTransport += (transport / dim) * 0.5;
           }
@@ -248,12 +255,10 @@ export function registerPayrollCoreReadRoutes(app: Express) {
         const base = Math.max(0, grossBase - absDeductBase);
         const transportDue = Math.max(0, grossTransport - absDeductTransport);
         const absenceDeducted = absDeductBase + absDeductTransport;
-
-        const advanceBalance = advanceMap[w.id] || 0;
+        const advanceBalance = advanceMap[worker.id] || 0;
         const advanceDeducted = Math.min(advanceBalance, base + transportDue);
         const net = Math.max(0, base + transportDue - advanceDeducted);
-
-        result[w.id] = {
+        result[worker.id] = {
           periodStart,
           periodEnd: todayStr,
           base: round2(base),
@@ -261,18 +266,17 @@ export function registerPayrollCoreReadRoutes(app: Express) {
           absenceDeducted: round2(absenceDeducted),
           advanceDeducted: round2(advanceDeducted),
           net: round2(net),
-          lastPaidThrough: lastPaidEnd[w.id] || null,
+          lastPaidThrough: lastPaidEnd[worker.id] || null,
         };
       }
 
       res.json(result);
     } catch (err: unknown) {
-      logger.error("GET /api/factory/workers/amount-due error:", { error: err });
+      logger.error("GET /api/factory/workers/amount-due error", { error: err });
       res.status(500).json({ message: getErrorMessage(err) });
     }
   });
 
-  // GET /api/factory/workers/:id/payrolls - Payroll history for one worker
   app.get("/api/factory/workers/:id/payrolls", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
@@ -284,7 +288,19 @@ export function registerPayrollCoreReadRoutes(app: Express) {
         .from(factoryPayrolls)
         .where(and(eq(factoryPayrolls.workerId, id), eq(factoryPayrolls.companyId, companyId)))
         .orderBy(desc(factoryPayrolls.periodEnd));
-      res.json(payrolls);
+      const productionTotals = await getProductionBonusTotalsForPayrollIds(db, payrolls.map((payroll) => payroll.id));
+      res.json(
+        payrolls.map((payroll) => {
+          const production = productionTotals.get(payroll.id) ?? emptyBonusTotals();
+          return {
+            ...payroll,
+            productionBonus: production.approved.toFixed(2),
+            pendingProductionBonus: production.pending.toFixed(2),
+            rejectedProductionBonus: production.rejected.toFixed(2),
+            otherBonuses: Math.max(0, Number(payroll.bonuses ?? 0) - production.approved).toFixed(2),
+          };
+        })
+      );
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
