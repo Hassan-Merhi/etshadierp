@@ -8,13 +8,15 @@
  */
 export const locationWhatsAppStockReports: string[] = [
   `CREATE TABLE IF NOT EXISTS location_whatsapp_stock_reports (
-      location_id integer PRIMARY KEY,
-      company_id integer NOT NULL,
+      location_id integer PRIMARY KEY REFERENCES locations(id) ON DELETE CASCADE,
+      company_id integer NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
       whatsapp_group_chat_id text,
       whatsapp_group_name text,
       enabled boolean NOT NULL DEFAULT false,
       created_at timestamp NOT NULL DEFAULT now(),
-      updated_at timestamp NOT NULL DEFAULT now()
+      updated_at timestamp NOT NULL DEFAULT now(),
+      CONSTRAINT location_whatsapp_stock_reports_enabled_requires_group
+        CHECK (NOT enabled OR whatsapp_group_chat_id IS NOT NULL)
     )`,
   `CREATE INDEX IF NOT EXISTS location_whatsapp_stock_reports_company_idx
      ON location_whatsapp_stock_reports (company_id, location_id)`,
