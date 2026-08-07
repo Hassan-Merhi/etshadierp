@@ -7,32 +7,23 @@ import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts, type AccountLike } from "../../../netPositionHelper";
-import { buildBrokerStatement } from "../suppliers/broker";
-import { resolveStoredFxRate } from "../../../services/factory/currencyConversion";
-import { getLockedSupplierRate } from "../../../services/factory/rawStockLockedRate";
 
 import {
-  factorySuppliers,
-  factoryContainers,
   customerOrders,
   customerBalances,
   customers,
   ledgerAccounts,
   voucherEntries,
   companies,
-  factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges,
   employees,
   vouchers,
-  factorySupplierPayments,
-  factorySupplierFxTransfers,
   propertyContracts,
   propertyMonthlyLedger,
   propertyUnits,
 } from "@shared/schema";
 import { eq, and, desc, sql, inArray, isNull, lte } from "drizzle-orm";
-import { type BrokerCalcContext } from "./netPositionBrokerCalc";
 import { computeNetPositionInventory } from "./netPositionInventory";
+import { computeNetPositionSupplierBalances } from "./netPositionSupplierBalances";
 import { resultRows } from "../../../lib/queryResult";
 
 export function registerEmployeeNetPositionRoutes(app: Express) {
@@ -95,287 +86,16 @@ export function registerEmployeeNetPositionRoutes(app: Express) {
       const getConfigFx = (cc: string): number => configFxRates[cc] ?? 1;
 
       // ── 1. Factory supplier balances (What We Owe) ──────────────────────
-      const suppliersList = await db
-        .select()
-        .from(factorySuppliers)
-        .where(eq(factorySuppliers.companyId, companyId))
-        .orderBy(factorySuppliers.name);
-
-      // Authoritative locked rate (USD) per supplier — same map rawStockReceiptRoutes.ts
-      // builds, so "Factory Raw Material Stock" here can never disagree with the Raw
-      // Materials page's "Stock Value". Never recompute a rate from receipt history.
-      const supplierLockedRateMapNp = new Map<number, number>();
-      for (const s of suppliersList as any[]) {
-        const persisted = s.currentRawMaterialCostPerKgUsd;
-        if (persisted !== null && persisted !== undefined) {
-          supplierLockedRateMapNp.set(s.id, parseFloat(persisted as string) || 0);
-        } else {
-          supplierLockedRateMapNp.set(s.id, await getLockedSupplierRate(db, companyId, s.id));
-        }
-      }
-
-      const allContainersF = await db
-        .select()
-        .from(factoryContainers)
-        .where(
-          and(
-            eq(factoryContainers.companyId, companyId),
-            isNull(factoryContainers.deletedAt),
-            sql`DATE(${factoryContainers.createdAt}) <= ${asOf}::date`
-          )
-        );
-
-      const allPaymentsF = await db
-        .select()
-        .from(factorySupplierPayments)
-        .where(and(eq(factorySupplierPayments.companyId, companyId), lte(factorySupplierPayments.date, asOf)));
-
-      const allFxTransfersF = await db
-        .select()
-        .from(factorySupplierFxTransfers)
-        .where(and(eq(factorySupplierFxTransfers.companyId, companyId), lte(factorySupplierFxTransfers.date, asOf)));
-
-      // Additional charge sources — must match buildBrokerStatement exactly
-      const allOffloadChargesF = await db
-        .select({
-          supplierId: factoryOffloadAdditionalCharges.supplierId,
-          amount: factoryOffloadAdditionalCharges.amount,
-          currencyCode: factoryOffloadAdditionalCharges.currencyCode,
-        })
-        .from(factoryOffloadAdditionalCharges)
-        .where(eq(factoryOffloadAdditionalCharges.companyId, companyId));
-
-      const allContainerOtherChargesF = await db
-        .select({
-          supplierId: factoryContainers.supplierId,
-          amount: factoryContainerOtherCharges.amount,
-          currencyCode: factoryContainerOtherCharges.currencyCode,
-          containerCurrencyCode: factoryContainers.currencyCode,
-        })
-        .from(factoryContainerOtherCharges)
-        .innerJoin(factoryContainers, eq(factoryContainerOtherCharges.containerId, factoryContainers.id))
-        .where(
-          and(
-            eq(factoryContainerOtherCharges.companyId, companyId),
-            isNull(factoryContainers.deletedAt),
-            sql`DATE(${factoryContainers.createdAt}) <= ${asOf}::date`
-          )
-        );
-
-      const allColOtherChargesF = await db
-        .select({
-          otherChargesSupplierId: factoryContainers.otherChargesSupplierId,
-          otherCharges: factoryContainers.otherCharges,
-          otherChargesCurrencyCode: factoryContainers.otherChargesCurrencyCode,
-        })
-        .from(factoryContainers)
-        .where(
-          and(
-            eq(factoryContainers.companyId, companyId),
-            isNull(factoryContainers.deletedAt),
-            sql`${factoryContainers.otherChargesSupplierId} IS NOT NULL`,
-            sql`CAST(COALESCE(${factoryContainers.otherCharges}, '0') AS numeric) > 0`,
-            sql`DATE(${factoryContainers.createdAt}) <= ${asOf}::date`
-          )
-        );
-
-      // Voucher-based payments (exclude auto-generated FACTORY-PAY-* and optional vouchers)
-      const allSupplierIds = (suppliersList as any[]).map((s: any) => s.id);
-      const voucherPaidBySupplier: Record<number, number> = {};
-      const voucherFxUnresolvedSuppliers = new Set<number>();
-      // Per-currency voucher amounts needed for broker consolidated calculation
-      const voucherPaidByCurrencyBySupplierId: Record<number, Record<string, number>> = {};
-      if (allSupplierIds.length > 0) {
-        const voucherRows = await db
-          .select({
-            factorySupplierId: voucherEntries.factorySupplierId,
-            debitAmount: voucherEntries.debitAmount,
-            currency: vouchers.currency,
-            exchangeRate: vouchers.exchangeRate,
-            optional: vouchers.optional,
-          })
-          .from(voucherEntries)
-          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-          .where(
-            and(
-              inArray(voucherEntries.factorySupplierId, allSupplierIds),
-              sql`${voucherEntries.debitAmount}::numeric > 0`,
-              sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAY-%'`,
-              sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${asOf}`
-            )
-          );
-        for (const row of voucherRows as any[]) {
-          const sid = row.factorySupplierId;
-          if (!sid) continue;
-          if (row.optional) continue; // optional vouchers don't affect the balance
-          const amt = parseFloat(row.debitAmount || "0");
-          const cc = row.currency || "USD";
-          let usd: number;
-          if (cc === "USD") {
-            usd = amt;
-          } else {
-            // vouchers.exchangeRate has no fxRateConfirmed column yet — legacy heuristic stopgap.
-            const { fxRate, looksSet } = resolveStoredFxRate(cc, row.exchangeRate);
-            if (!looksSet) {
-              voucherFxUnresolvedSuppliers.add(sid);
-              continue; // exclude this payment from the total rather than guess at 1
-            }
-            usd = amt / fxRate;
-          }
-          voucherPaidBySupplier[sid] = (voucherPaidBySupplier[sid] || 0) + usd;
-          if (!voucherPaidByCurrencyBySupplierId[sid]) voucherPaidByCurrencyBySupplierId[sid] = {};
-          voucherPaidByCurrencyBySupplierId[sid][cc] = (voucherPaidByCurrencyBySupplierId[sid][cc] || 0) + amt;
-        }
-      }
-
-      // Identify brokers (suppliers that have children linked via parentId)
-      // and linked suppliers (those with parentId set pointing to a broker)
-      const brokerIds = new Set<number>();
-      const linkedSupplierParent = new Map<number, number>(); // childId → brokerId
-      for (const s of suppliersList as any[]) {
-        if (s.parentId) {
-          linkedSupplierParent.set(s.id, s.parentId);
-          brokerIds.add(s.parentId);
-        }
-      }
-
-      // Pre-group children IDs for each broker
-      const brokerChildren = new Map<number, number[]>(); // brokerId → [childIds]
-      for (const [childId, brokerId] of linkedSupplierParent) {
-        if (!brokerChildren.has(brokerId)) brokerChildren.set(brokerId, []);
-        brokerChildren.get(brokerId)!.push(childId);
-      }
-
-      // Broker consolidated balance: calculate per-currency running balance for the
-      // broker + all linked suppliers, then apply approximate FX rates to get one USD total.
-      // Formula: USD_balance + (EUR_balance × 1.16) + (AUD_balance × 0.71)
-      // Broker rollups live in ./netPositionBrokerCalc; they read ten values
-      // from this scope, bundled here rather than captured.
-      const brokerCtx: BrokerCalcContext = {
-        suppliersList,
+      // Computed in ./netPositionSupplierBalances. suppliersList,
+      // supplierLockedRateMapNp and allContainersF come back with the balances
+      // because the inventory valuations below are built from the same loads.
+      const {
+        supplierLockedRateMapNp,
         allContainersF,
-        allPaymentsF,
-        allFxTransfersF,
-        allOffloadChargesF,
-        allContainerOtherChargesF,
-        allColOtherChargesF,
-        getConfigFx,
-        companyId,
-        round2,
-        brokerChildren,
-        linkedSupplierParent,
-        voucherPaidByCurrencyBySupplierId,
-      };
-
-      const supplierItems: {
-        name: string;
-        balanceUsd: number;
-        breakdown?: { label: string; native: string; usd: number }[];
-      }[] = [];
-      let totalSupplierLiabilities = 0;
-      let totalSupplierOverpayments = 0;
-
-      // Track which broker entries have already been added (avoid duplicates)
-      const processedBrokers = new Set<number>();
-
-      for (const s of suppliersList as any[]) {
-        // Linked suppliers: their balances are rolled into their parent broker — skip individually
-        if (linkedSupplierParent.has(s.id)) continue;
-
-        // Brokers: use buildBrokerStatement (same function as Suppliers page) for exact parity
-        if (brokerIds.has(s.id) && !processedBrokers.has(s.id)) {
-          processedBrokers.add(s.id);
-          const stmt = await buildBrokerStatement(s.id, companyId, true);
-          if (!stmt) continue;
-          let brokerUsd = 0;
-          for (const ledger of stmt.currencyLedgers as any[]) {
-            const cc = ledger.currencyCode as string;
-            const bal = parseFloat(ledger.netBalance || "0");
-            brokerUsd += cc === "USD" ? bal : bal * getConfigFx(cc);
-          }
-          const rounded = round2(brokerUsd);
-          if (Math.abs(rounded) > 0.01) {
-            supplierItems.push({ name: s.name, balanceUsd: rounded });
-            if (rounded > 0) totalSupplierLiabilities += rounded;
-            else totalSupplierOverpayments += Math.abs(rounded);
-          }
-          continue;
-        }
-
-        // Standalone (non-broker) suppliers: native-bucket approach — exact match to
-        // computeStats / Suppliers page. Accumulate all transactions in their native
-        // currency, multiply each bucket by the configured rate once at the end.
-        const byCurrencyNative: Record<string, number> = {};
-        const addNative = (cc: string, amt: number) => {
-          byCurrencyNative[cc] = (byCurrencyNative[cc] || 0) + amt;
-        };
-
-        // Opening balance (always USD-denominated)
-        const ob = parseFloat(s.openingBalance || "0");
-        if (ob !== 0) addNative("USD", ob);
-
-        // Containers: goods + freight + commission (native currency each)
-        const sc = allContainersF.filter((c: any) => c.supplierId === s.id);
-        for (const c of sc) {
-          const cc = c.currencyCode || "USD";
-          const kg = parseFloat(c.totalKg || "0");
-          const rate = parseFloat(c.ratePerKg || "0");
-          addNative(cc, kg * rate);
-          const freight = parseFloat(c.freight || "0");
-          if (freight > 0) {
-            const fcc = c.freightCurrencyCode || cc;
-            addNative(fcc, freight);
-          }
-          const commAmt = parseFloat(c.commissionAmount || "0");
-          if (commAmt > 0) {
-            const commCc = c.commissionCurrencyCode || cc;
-            addNative(commCc, commAmt);
-          }
-        }
-
-        // Column-level other charges (otherCharges / otherChargesSupplierId on containers)
-        for (const oc of allColOtherChargesF as any[]) {
-          if (oc.otherChargesSupplierId !== s.id) continue;
-          const ocAmt = parseFloat(oc.otherCharges || "0");
-          if (ocAmt <= 0) continue;
-          addNative(oc.otherChargesCurrencyCode || "USD", ocAmt);
-        }
-
-        // Direct payments — use native amount (p.amount), not p.amountUsd
-        for (const p of allPaymentsF as any[]) {
-          if (p.supplierId !== s.id) continue;
-          addNative(p.currencyCode || "USD", -parseFloat(p.amount || "0"));
-        }
-
-        // Voucher payments — native amounts per currency
-        const voucherCurrMap = voucherPaidByCurrencyBySupplierId[s.id] || {};
-        for (const [cc, amt] of Object.entries(voucherCurrMap)) {
-          addNative(cc, -(amt as number));
-        }
-
-        // FX transfers — subtract native from-currency, credit USD to USD bucket
-        for (const t of allFxTransfersF as any[]) {
-          if (t.fromSupplierId === s.id) {
-            addNative(t.fromCurrencyCode || "USD", -parseFloat(t.fromAmount || "0"));
-          }
-          if (t.toSupplierId === s.id) {
-            addNative("USD", parseFloat(t.toAmountUsd || "0"));
-          }
-        }
-
-        // Balance: each currency bucket × configured rate (same formula as computeStats)
-        const balance = round2(
-          Object.entries(byCurrencyNative).reduce((sum, [cc, native]) => {
-            return sum + native * getConfigFx(cc);
-          }, 0)
-        );
-
-        if (Math.abs(balance) > 0.01) {
-          supplierItems.push({ name: s.name, balanceUsd: balance });
-          if (balance > 0) totalSupplierLiabilities += balance;
-          else totalSupplierOverpayments += Math.abs(balance);
-        }
-      }
+        supplierItems,
+        totalSupplierLiabilities,
+        totalSupplierOverpayments,
+      } = await computeNetPositionSupplierBalances({ companyId, asOf, round2, getConfigFx });
 
       // ── 2. ERP ledger account balances for the factory company ──────────
       const factoryAccounts = await db
