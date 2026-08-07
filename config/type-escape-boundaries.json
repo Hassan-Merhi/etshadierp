@@ -4105,7 +4105,7 @@
         0
       ],
       "server/routes/factory/customer-proformas/proformas.ts": [
-        34,
+        28,
         10,
         0
       ],
@@ -6717,6 +6717,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 11504
+    "typeEscapeCeiling": 11498
   }
 }

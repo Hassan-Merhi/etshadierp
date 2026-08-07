@@ -1,4 +1,25 @@
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
+
+import { resultRows } from "../../../../lib/queryResult";
+
+/**
+ * The only surface this helper needs from its connection. Typing it
+ * structurally rather than as the concrete Drizzle database keeps both real
+ * callers working — `db` and a transaction `tx` alike — without naming a
+ * generic that would drag the whole schema in.
+ */
+type SqlExecutor = {
+  execute: (query: SQL) => Promise<unknown>;
+};
+
+/**
+ * The aggregate statement's result row. Every column is read through a `String`
+ * or `Number` coercion below except `updated_at`, which is returned as-is, so
+ * that one column is the only member worth naming a type for.
+ */
+type OrderTotalsRow = Record<string, unknown> & {
+  updated_at?: Date | string | null;
+};
 
 export interface ScannedArticleTotalsPatch {
   line: {
@@ -40,7 +61,7 @@ export interface ScannedArticleTotalsPatch {
  * Query cost is constant (two SQL statements) instead of O(article groups).
  */
 export async function recalculateOrderTotalsForScannedArticle(
-  dbConn: any,
+  dbConn: SqlExecutor,
   orderId: number,
   articleCode: string | null | undefined
 ): Promise<ScannedArticleTotalsPatch> {
@@ -199,8 +220,7 @@ export async function recalculateOrderTotalsForScannedArticle(
     LEFT JOIN inserted_target it ON TRUE
   `);
 
-  const rows = (result as any).rows ?? (result as unknown as any[]);
-  const row = rows?.[0] || {};
+  const row: OrderTotalsRow = resultRows<OrderTotalsRow>(result)[0] || {};
 
   return {
     line:

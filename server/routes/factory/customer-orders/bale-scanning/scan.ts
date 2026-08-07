@@ -11,7 +11,7 @@ import { EXPECTED_CLIENT_RESPONSE_CODES, markExpectedClientResponse } from "../.
 import { parseId } from "../../../../lib/parseId";
 import { db } from "../../../../db";
 import { requireAuth } from "../../../../auth";
-import { recalculateOrderTotalsForScannedArticle } from "./incrementalTotals";
+import { recalculateOrderTotalsForScannedArticle, type ScannedArticleTotalsPatch } from "./incrementalTotals";
 import {
   factoryBaleProducts,
   factoryBales,
@@ -131,16 +131,12 @@ export function registerOrderBaleScanRoutes(app: Express) {
       type PickResult =
         | {
             ok: true;
-            bale: any;
-            line: any;
-            totals: {
-              subtotalBales: string;
-              freightAmount: string;
-              otherChargesTotal: string;
-              grandTotal: string;
-              totalQtyBales: number;
-              updatedAt: Date | string | null;
-            };
+            // Both come straight from the writes below, so they are described by
+            // the row that was inserted and by the recalculation's own return
+            // type rather than restated here.
+            bale: typeof customerOrderBales.$inferSelect;
+            line: ScannedArticleTotalsPatch["line"];
+            totals: ScannedArticleTotalsPatch["totals"];
           }
         | { ok: false; httpStatus: number; body: any };
 
