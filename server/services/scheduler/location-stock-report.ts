@@ -138,6 +138,49 @@ async function finishSchedule(
   );
 }
 
+/**
+ * If the process dies after claiming a schedule date but before creating a
+ * delivery ledger row, no WhatsApp call could have started yet. Releasing only
+ * those orphaned claims is therefore safe and lets the normal catch-up path run
+ * later that day. If ANY delivery row exists for the claimed date, the claim is
+ * preserved because the external outcome may be ambiguous and must not auto-send.
+ */
+async function recoverOrphanedScheduleClaims(): Promise<number> {
+  const result = await pool.query<{ location_id: number; company_id: number }>(
+    `WITH orphaned AS (
+       SELECT s.location_id, s.company_id, s.last_scheduled_for
+         FROM location_whatsapp_stock_schedules s
+        WHERE s.enabled = true
+          AND s.last_status = 'running'
+          AND s.last_attempt_at < now() - interval '20 minutes'
+          AND s.last_scheduled_for IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1
+              FROM location_whatsapp_stock_deliveries d
+             WHERE d.company_id = s.company_id
+               AND d.location_id = s.location_id
+               AND d.source = 'scheduled'
+               AND d.scheduled_for = s.last_scheduled_for
+          )
+     )
+     UPDATE location_whatsapp_stock_schedules s
+        SET last_scheduled_for = NULL,
+            last_status = 'failed',
+            last_error = 'Scheduler interrupted before delivery started; released for safe catch-up',
+            updated_at = now()
+       FROM orphaned o
+      WHERE s.location_id = o.location_id
+        AND s.company_id = o.company_id
+      RETURNING s.location_id, s.company_id`
+  );
+  if (result.rowCount) {
+    logger.warn("[LocationStockSchedule] recovered orphaned schedule claims", {
+      count: result.rowCount,
+    });
+  }
+  return result.rowCount ?? 0;
+}
+
 async function runOneLocationSchedule(row: ScheduleRow, localDate: string): Promise<void> {
   // First layer of duplicate protection: atomically claim the local calendar day.
   const claim = await pool.query(
@@ -220,6 +263,7 @@ async function runOneLocationSchedule(row: ScheduleRow, localDate: string): Prom
 export async function checkAndRunLocationStockReports(now = new Date()): Promise<void> {
   try {
     await recoverStaleLocationStockDeliveries();
+    await recoverOrphanedScheduleClaims();
     const result = await pool.query<ScheduleRow>(
       `SELECT s.location_id, s.company_id, s.enabled, s.frequency, s.days_of_week,
               s.send_time::text, s.timezone, s.include_cost, s.include_zero_stock,
