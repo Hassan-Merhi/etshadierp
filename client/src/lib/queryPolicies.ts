@@ -37,6 +37,7 @@ export const STABLE_REFERENCE_API_ENDPOINTS = [
   "/api/employee-groups",
   "/api/user/companies",
   "/api/factory/bale-products",
+  "/api/factory/categories",
   "/api/factory/workers",
   "/api/factory/employees",
   "/api/factory/cash-accounts",
