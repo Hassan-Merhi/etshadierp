@@ -5,6 +5,7 @@ import { registerLocationCrudRoutes } from "./locationCrudRoutes";
 import { registerLocationInventoryRoutes } from "./locationInventoryRoutes";
 import { registerLocationReportRoutes } from "./locationReportRoutes";
 import { registerLocationWhatsappScheduleRoutes } from "./locationWhatsappScheduleRoutes";
+import { registerLocationWhatsappDeliveryRoutes } from "./locationWhatsappDeliveryRoutes";
 
 export function registerLocationRoutes(app: Express) {
   registerCommonInventoryPerformanceRoutes(app);
@@ -16,4 +17,5 @@ export function registerLocationRoutes(app: Express) {
   registerLocationInventoryRoutes(app);
   registerLocationReportRoutes(app);
   registerLocationWhatsappScheduleRoutes(app);
+  registerLocationWhatsappDeliveryRoutes(app);
 }
