@@ -1,0 +1,61 @@
+name: Phase 5 Location WhatsApp autoformat
+
+on:
+  push:
+    branches:
+      - feature/location-whatsapp-phase1
+
+permissions:
+  contents: write
+
+jobs:
+  format-feature-diff:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v7
+        with:
+          ref: feature/location-whatsapp-phase1
+          fetch-depth: 0
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Normalize Replit registry URLs for CI
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --ignore-scripts
+
+      - name: Format only feature-changed source files
+        shell: bash
+        run: |
+          git fetch origin main
+          mapfile -d '' changed_files < <(
+            git diff --name-only --diff-filter=ACMR -z origin/main...HEAD -- client/src server shared |
+              grep -zE '\.(ts|tsx|css)$' || true
+          )
+          if [ "${#changed_files[@]}" -eq 0 ]; then
+            echo 'No changed source files to format.'
+            exit 0
+          fi
+          printf 'Formatting %s feature-changed source file(s).\n' "${#changed_files[@]}"
+          node node_modules/prettier/bin/prettier.cjs --write "${changed_files[@]}"
+
+      - name: Commit mechanical formatting
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo 'All feature source files were already formatted.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add client/src server shared
+          git commit -m 'Phase 5: format Location WhatsApp feature source'
+          git push origin HEAD:feature/location-whatsapp-phase1
