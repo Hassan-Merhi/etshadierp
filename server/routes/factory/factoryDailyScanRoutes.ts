@@ -127,7 +127,7 @@ export function registerFactoryDailyScanRoutes(app: Express) {
            FROM factory_bales fb
            LEFT JOIN loading_refs lr ON lr.bale_reference = fb.reference_number
            LEFT JOIN factory_daily_bale_scans ds
-             ON ds.company_id::text = fb.company_id::text
+             ON ds.company_id = fb.company_id::text
             AND ds.scan_date = fb.stock_entry_date
             AND ds.reference_number = fb.reference_number
            WHERE fb.company_id = $1
@@ -187,7 +187,7 @@ export function registerFactoryDailyScanRoutes(app: Express) {
       const result = await pool.query(
         `INSERT INTO factory_daily_bale_scans
            (company_id, scan_date, reference_number, article_code, product_name, weight_kg, scanned_by_user_id)
-         SELECT $1, $2, $3, fb.article_code, fb.product_name, fb.weight_kg, $4
+         SELECT $1::text, $2, $3, fb.article_code, fb.product_name, fb.weight_kg, $4::text
          FROM factory_bales fb
          WHERE fb.company_id = $1
            AND fb.stock_entry_date = $2
