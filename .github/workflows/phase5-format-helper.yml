@@ -1,0 +1,62 @@
+name: Phase 5 formatting helper
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22.14"
+          cache: npm
+      - name: Normalize registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+      - name: Install dependencies
+        run: npm ci --no-audit --ignore-scripts
+      - name: Format Phase 5 files
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write \
+            client/src/components/RemoteControlSessionWatchdog.tsx \
+            client/src/components/RemoteControllerSessionContext.tsx \
+            client/src/components/RemoteKeyboardControllerOverlay.tsx \
+            client/src/components/RemoteMouseControllerOverlay.tsx \
+            client/src/components/remote-control-panel-portal.ts \
+            client/src/hooks/screen-feed-capture-engine.ts \
+            client/src/hooks/use-presence.ts \
+            client/src/hooks/use-remote-control-session.ts \
+            client/src/hooks/use-screen-feed.ts \
+            client/src/pages/settings/RemoteSupportWatchDialog.tsx \
+            server/routes/remoteControllerTargetRoute.ts \
+            server/routes/screenFeedRoutes.ts \
+            server/services/screenFeedService.ts \
+            tests/screen-feed-fast-transport-current-main.test.ts
+      - name: Package formatted files
+        run: |
+          tar -czf phase5-formatted.tar.gz \
+            client/src/components/RemoteControlSessionWatchdog.tsx \
+            client/src/components/RemoteControllerSessionContext.tsx \
+            client/src/components/RemoteKeyboardControllerOverlay.tsx \
+            client/src/components/RemoteMouseControllerOverlay.tsx \
+            client/src/components/remote-control-panel-portal.ts \
+            client/src/hooks/screen-feed-capture-engine.ts \
+            client/src/hooks/use-presence.ts \
+            client/src/hooks/use-remote-control-session.ts \
+            client/src/hooks/use-screen-feed.ts \
+            client/src/pages/settings/RemoteSupportWatchDialog.tsx \
+            server/routes/remoteControllerTargetRoute.ts \
+            server/routes/screenFeedRoutes.ts \
+            server/services/screenFeedService.ts \
+            tests/screen-feed-fast-transport-current-main.test.ts
+      - uses: actions/upload-artifact@v7
+        with:
+          name: phase5-formatted
+          path: phase5-formatted.tar.gz
+          retention-days: 1
