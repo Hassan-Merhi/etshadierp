@@ -187,15 +187,15 @@ export function registerFactoryDailyScanRoutes(app: Express) {
       const result = await pool.query(
         `INSERT INTO factory_daily_bale_scans
            (company_id, scan_date, reference_number, article_code, product_name, weight_kg, scanned_by_user_id)
-         SELECT $1::text, $2, $3, fb.article_code, fb.product_name, fb.weight_kg, $4::text
+         SELECT $1, $2, $3, fb.article_code, fb.product_name, fb.weight_kg, $4
          FROM factory_bales fb
-         WHERE fb.company_id = $1
+         WHERE fb.company_id = $5
            AND fb.stock_entry_date = $2
            AND fb.reference_number = $3
            AND fb.deleted_at IS NULL
          ON CONFLICT (company_id, scan_date, reference_number) DO NOTHING
          RETURNING id, scan_date::text AS scan_date, reference_number, scanned_at`,
-        [companyId, scanDate, reference, userId]
+        [String(companyId), scanDate, reference, userId == null ? null : String(userId), companyId]
       );
 
       if (!result.rowCount) {
