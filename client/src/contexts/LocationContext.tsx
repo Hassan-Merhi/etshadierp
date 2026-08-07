@@ -8,6 +8,9 @@ interface Location {
   city: string | null;
   state: string | null;
   country: string | null;
+  whatsappGroupChatId?: string | null;
+  whatsappGroupName?: string | null;
+  whatsappStockReportsEnabled?: boolean;
 }
 
 interface LocationContextType {
