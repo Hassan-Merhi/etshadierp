@@ -15,7 +15,7 @@ describe("Bandwidth Phase 4 heavy-page contracts", () => {
 
   it("does not poll historical daily scans and updates scan cache locally", () => {
     const source = read("client/src/pages/factory/DailyScan.tsx");
-    expect(source).toContain("isToday ? visibleTabInterval(60_000) : false");
+    expect(source).toContain("isToday ? visibleTabInterval(90_000) : false");
     expect(source).toContain("setQueryData<DailyScanRow[]>");
     expect(source).not.toContain("refetchInterval: 10000");
   });
@@ -32,5 +32,11 @@ describe("Bandwidth Phase 4 heavy-page contracts", () => {
     expect(source).toContain("profile=summary&pageSize=250");
     expect(source).toContain('activeTab === "reports" ? visibleTabInterval(60_000) : false');
     expect(source).not.toContain("customerId=${form.customerId}`, form.customerId]");
+  });
+
+  it("loads the compact stock identity catalog only while adding a proforma item", () => {
+    const source = read("client/src/pages/factory/FactoryProformas.tsx");
+    expect(source).toContain('/api/stock-items/light?profile=identity');
+    expect(source).toContain("enabled: isAddLineOpen && !!selectedCompany?.id");
   });
 });
