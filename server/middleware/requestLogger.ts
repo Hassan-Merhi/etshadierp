@@ -7,6 +7,7 @@ import { randomUUID } from "crypto";
 import type { Request, Response, NextFunction } from "express";
 import { pool } from "../db";
 import { logger } from "../lib/logger";
+import { getExpectedClientResponseCode } from "../lib/expectedClientResponse";
 import { getOperationalEventSnapshot, recordOperationalEvent } from "../lib/operationalEvents";
 import { handlePerformanceDashboard, recordPerformanceSample } from "../lib/performanceDashboard";
 import {
@@ -39,6 +40,7 @@ interface RequestMetrics {
   total: number;
   active: number;
   success: number;
+  expectedClientResponse: number;
   clientError: number;
   serverError: number;
   slow: number;
@@ -53,6 +55,7 @@ const metrics: RequestMetrics = {
   total: 0,
   active: 0,
   success: 0,
+  expectedClientResponse: 0,
   clientError: 0,
   serverError: 0,
   slow: 0,
@@ -95,7 +98,7 @@ export function getRequestMetricsSnapshot() {
   const poolTotal = Number((pool as any).totalCount || 0);
   const poolIdle = Number((pool as any).idleCount || 0);
   const poolWaiting = Number((pool as any).waitingCount || 0);
-  const completed = metrics.success + metrics.clientError + metrics.serverError;
+  const completed = metrics.success + metrics.expectedClientResponse + metrics.clientError + metrics.serverError;
   const slowRequestThresholdsMs = getSlowRequestThresholdConfig();
 
   return {
@@ -116,6 +119,7 @@ export function getRequestMetricsSnapshot() {
       active: metrics.active,
       completed,
       success: metrics.success,
+      expectedClientResponse: metrics.expectedClientResponse,
       clientError: metrics.clientError,
       serverError: metrics.serverError,
       slow: metrics.slow,
@@ -234,6 +238,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
           const locationId = Number(currentSession?.currentLocationId) || undefined;
           const timingClass = classifyRequestTiming(routeTemplate);
           const slowRequestThresholdMs = getSlowRequestThresholdMs(routeTemplate);
+          const expectedClientResponseCode = getExpectedClientResponseCode(res);
 
           updateTraceContext({ routeTemplate, userId, companyId, factoryCompanyId, locationId });
           recordDuration(durationMs);
@@ -251,6 +256,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
           writeSuccessfulActivityAudit(req, statusCode);
 
           if (statusCode >= 500) metrics.serverError += 1;
+          else if (expectedClientResponseCode) metrics.expectedClientResponse += 1;
           else if (statusCode >= 400) metrics.clientError += 1;
           else metrics.success += 1;
 
@@ -278,14 +284,23 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
           }
 
           if (SKIPPED_PATHS.has(path)) return;
-          const isFailure = statusCode >= 400;
-          const sampledSuccess = !isFailure && SUCCESS_SAMPLE_RATE > 0 && Math.random() < SUCCESS_SAMPLE_RATE;
-          if (!isFailure && !isSlow && !sampledSuccess) return;
+          const isFailure = statusCode >= 400 && !expectedClientResponseCode;
+          const sampledSuccess =
+            !isFailure && !expectedClientResponseCode && SUCCESS_SAMPLE_RATE > 0 && Math.random() < SUCCESS_SAMPLE_RATE;
+          if (!isFailure && !isSlow && !sampledSuccess && !expectedClientResponseCode) return;
 
-          const level = statusCode >= 400 || isSlow ? "warn" : "info";
-          logger[level](`${method} ${routeTemplate} ${statusCode}`, {
+          const level = expectedClientResponseCode ? "info" : statusCode >= 400 || isSlow ? "warn" : "info";
+          const message = expectedClientResponseCode
+            ? "Request requires an expected client confirmation"
+            : `${method} ${routeTemplate} ${statusCode}`;
+          const action = expectedClientResponseCode
+            ? `expected_client_response.${expectedClientResponseCode}`
+            : isSlow
+              ? "slow_request"
+              : "request";
+          logger[level](message, {
             module: "http",
-            action: isSlow ? "slow_request" : "request",
+            action,
             requestId,
             routeTemplate,
             ...(userId != null ? { userId } : {}),
@@ -300,6 +315,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
             slow: isSlow,
             thresholdMs: slowRequestThresholdMs,
             thresholdClass: timingClass,
+            ...(expectedClientResponseCode ? { expectedClientResponseCode } : {}),
           });
         });
 

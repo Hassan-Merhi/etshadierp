@@ -5,6 +5,11 @@ import { requireAuth } from "../../auth";
 import { logger } from "../../lib/logger";
 import { parseListPagination, setListPaginationHeaders } from "../../lib/listPagination";
 
+function readAfterId(value: unknown): number | null {
+  const parsed = Number.parseInt(String(value ?? ""), 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 export function registerFactoryDailyScanRoutes(app: Express) {
   app.get("/api/factory/daily-bale-scans/produced", requireAuth, async (req: any, res: any) => {
     try {
@@ -18,6 +23,11 @@ export function registerFactoryDailyScanRoutes(app: Express) {
       if (req.query.status) {
         params.push(String(req.query.status));
         clauses.push(`fb.status = $${params.length}`);
+      }
+      const afterId = readAfterId(req.query.afterId);
+      if (afterId !== null) {
+        params.push(afterId);
+        clauses.push(`fb.id > $${params.length}`);
       }
       const whereSql = clauses.join(" AND ");
       const countResult = await pool.query(
@@ -98,11 +108,8 @@ export function registerFactoryDailyScanRoutes(app: Express) {
       const date = String(req.query.date || "");
       if (!date) return res.status(400).json({ message: "date query param required (YYYY-MM-DD)" });
 
-      // Bandwidth Phase 2: the Daily Scan screen used to download the day's
-      // produced bales and the day's scan log as two independent, overlapping
-      // payloads every polling cycle. The opt-in `profile=day` contract returns
-      // the exact screen model in one compact query and keeps the legacy scan-log
-      // response unchanged for every other caller.
+      // Bandwidth Phase 2: return the Daily Scan screen model in one compact query.
+      // This profile stays opt-in so legacy callers retain the paginated scan-log response.
       if (req.query.profile === "day") {
         const result = await pool.query(
           `WITH loading_refs AS (
@@ -141,18 +148,28 @@ export function registerFactoryDailyScanRoutes(app: Express) {
       }
 
       const pagination = parseListPagination(req.query, { defaultPageSize: 500, maxPageSize: 1000, force: true });
+      const params: unknown[] = [companyId, date];
+      const clauses = ["company_id = $1", "scan_date = $2"];
+      const afterId = readAfterId(req.query.afterId);
+      if (afterId !== null) {
+        params.push(afterId);
+        clauses.push(`id > $${params.length}`);
+      }
+      const whereSql = clauses.join(" AND ");
       const countResult = await pool.query(
-        `SELECT COUNT(*)::int AS count FROM factory_daily_bale_scans WHERE company_id = $1 AND scan_date = $2`,
-        [companyId, date]
+        `SELECT COUNT(*)::int AS count FROM factory_daily_bale_scans WHERE ${whereSql}`,
+        params
       );
+      const limitParam = params.length + 1;
+      const offsetParam = params.length + 2;
       const result = await pool.query(
         `SELECT id, company_id, scan_date::text AS scan_date, reference_number, article_code,
                 product_name, weight_kg, scanned_at, scanned_by_user_id
          FROM factory_daily_bale_scans
-         WHERE company_id = $1 AND scan_date = $2
-         ORDER BY scanned_at ASC
-         LIMIT $3 OFFSET $4`,
-        [companyId, date, pagination.pageSize, pagination.offset]
+         WHERE ${whereSql}
+         ORDER BY id ASC
+         LIMIT $${limitParam} OFFSET $${offsetParam}`,
+        [...params, pagination.pageSize, pagination.offset]
       );
       setListPaginationHeaders(res, countResult.rows[0]?.count ?? 0, pagination);
       res.set("Cache-Control", "private, max-age=10");
@@ -180,10 +197,8 @@ export function registerFactoryDailyScanRoutes(app: Express) {
       }
       const reference = String(referenceNumber).trim().toUpperCase();
 
-      // Source article/name/weight directly from the authoritative bale row.
-      // This removes redundant scan-request bytes and prevents stale client-side
-      // metadata from being persisted. Successful scans are one DB round trip;
-      // only missing/duplicate scans need the small follow-up discriminator.
+      // Source metadata from the authoritative bale row. Successful scans are one
+      // DB round trip; missing/duplicate scans use one small discriminator query.
       const result = await pool.query(
         `INSERT INTO factory_daily_bale_scans
            (company_id, scan_date, reference_number, article_code, product_name, weight_kg, scanned_by_user_id)

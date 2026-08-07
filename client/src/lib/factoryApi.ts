@@ -1,6 +1,7 @@
 import { queryClient, apiRequest } from "./queryClient";
 import { attachAccountingRequestIdentity, releaseAccountingRequestIdentity } from "./accountingRequestIdentity";
 import { isUnsafeFactoryLoadingScanRequest, purgeUnsafeFactoryLoadingScans } from "./factoryOfflineQueueSafety";
+import { isCustomerOrderBaleScanPatch, mergeCustomerOrderBaleScanPatch } from "./customerOrderBaleScanPatch";
 import {
   forgetHistoricalReplayPreparation,
   freezeHistoricalReplayApplyRequest,
@@ -15,6 +16,7 @@ const FACTORY_PREFIX = "/api/factory/";
 const POST_OFFLOAD_CREATE_PATH = /^\/api\/factory\/containers\/\d+\/post-offload-charges(?:\?.*)?$/;
 const POST_OFFLOAD_MUTATION_PATH =
   /^\/api\/factory\/containers\/\d+\/post-offload-charges(?:\/\d+(?:\/legacy-rebuild)?)?(?:\?.*)?$/;
+const CUSTOMER_ORDER_BALE_SCAN_PATH = /^\/api\/factory\/customer-orders\/(\d+)\/bales(?:\?.*)?$/;
 const ALLOWED_SHARED_PREFIXES = [
   "/api/locations",
   "/api/barcode",
@@ -218,6 +220,58 @@ async function invalidatePostOffloadReconciliationQueries(
   );
 }
 
+function jsonResponseFrom(source: Response, payload: unknown): Response {
+  const headers = new Headers(source.headers);
+  headers.set("Content-Type", "application/json");
+  headers.delete("Content-Length");
+  return new Response(JSON.stringify(payload), {
+    status: source.status,
+    statusText: source.statusText,
+    headers,
+  });
+}
+
+/**
+ * The single-bale endpoint returns a tiny patch instead of re-sending the full
+ * order. Rehydrate the existing legacy response shape from TanStack Query cache
+ * so both ERP and Factory loading screens can keep their current success flow.
+ * A cache-miss fallback performs one full GET; normal scans stay patch-only.
+ */
+async function hydrateCompactBaleScanResponse(
+  delegate: RequestDelegate,
+  method: string,
+  url: string,
+  response: Response
+): Promise<Response> {
+  if (!response.ok || method.toUpperCase() !== "POST") return response;
+  const match = url.match(CUSTOMER_ORDER_BALE_SCAN_PATH);
+  if (!match) return response;
+
+  const payload = await response
+    .clone()
+    .json()
+    .catch(() => null);
+  if (!isCustomerOrderBaleScanPatch(payload)) return response;
+
+  const orderId = Number(match[1]);
+  const queryKey = ["/api/factory/customer-orders", orderId] as const;
+  let current = queryClient.getQueryData(queryKey);
+
+  if (!current) {
+    try {
+      const fullResponse = await delegate("GET", `/api/factory/customer-orders/${orderId}`);
+      if (fullResponse.ok) current = await fullResponse.json();
+    } catch {
+      // The scan has already committed. Fall back to the compact order seed
+      // rather than turning a successful scan into a false client-side failure.
+    }
+  }
+
+  const merged = mergeCustomerOrderBaleScanPatch(current, payload);
+  queryClient.setQueryData(queryKey, merged);
+  return jsonResponseFrom(response, merged);
+}
+
 /**
  * Shared replay guard for both ERP and Factory app modes. The UI may pass current
  * checkbox state, but a token-backed apply is rebuilt from the server-prepared
@@ -246,7 +300,7 @@ async function requestWithPreparedReplayState(
       rememberHistoricalReplayPreparation(payload);
     }
     await invalidatePostOffloadReconciliationQueries(method, url, response);
-    return response;
+    return await hydrateCompactBaleScanResponse(delegate, method, url, response);
   } catch (error: any) {
     // OfflineQueued means the exact body (including clientRequestId) is persisted.
     // A 4xx is a definite rejection. Keep the identity only for network errors,
