@@ -1,0 +1,61 @@
+name: Phase 5 attribution repair
+
+on:
+  push:
+    branches:
+      - agent/factory-production-bonus-payroll-phase4
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: "!contains(github.event.head_commit.message, '[phase5-attribution-repaired]')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/factory-production-bonus-payroll-phase4
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: npm
+      - run: npm ci
+      - name: Keep bale worker corrections synchronized with production attribution
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("server/routes/factory/bales/balesCrudRoutes.ts")
+          text = path.read_text()
+
+          old_import = '''  factoryV3LoadBales,\n  factoryInvoiceLoadingBales,\n} from "@shared/schema";'''
+          new_import = '''  factoryV3LoadBales,\n  factoryInvoiceLoadingBales,\n  factoryBaleProductionAttributions,\n} from "@shared/schema";'''
+          if old_import not in text:
+              raise SystemExit("schema import anchor not found")
+          text = text.replace(old_import, new_import, 1)
+
+          old_single = '''      const [bale] = await db\n        .select()\n        .from(factoryBales)\n        .where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)));\n      if (!bale) return res.status(404).json({ message: "Bale not found" });\n      const numericWorkerId = parseInt(workerId);\n      const [worker] = await db\n        .select({ fullName: factoryWorkers.fullName })\n        .from(factoryWorkers)\n        .where(eq(factoryWorkers.id, numericWorkerId))\n        .limit(1);\n      const [updated] = await db\n        .update(factoryBales)\n        .set({ finalizedBy: numericWorkerId, workerName: worker?.fullName ?? null, updatedAt: new Date() })\n        .where(eq(factoryBales.id, id))\n        .returning();\n      res.json(updated);'''
+          new_single = '''      const numericWorkerId = Number(workerId);\n      if (!Number.isInteger(numericWorkerId) || numericWorkerId <= 0) {\n        return res.status(400).json({ message: "Invalid workerId" });\n      }\n      const [worker] = await db\n        .select({ fullName: factoryWorkers.fullName })\n        .from(factoryWorkers)\n        .where(\n          and(\n            eq(factoryWorkers.id, numericWorkerId),\n            eq(factoryWorkers.companyId, companyId),\n            eq(factoryWorkers.active, true)\n          )\n        )\n        .limit(1);\n      if (!worker) return res.status(400).json({ message: "Worker is inactive or belongs to another company" });\n\n      const updated = await db.transaction(async (tx: any) => {\n        const [updatedBale] = await tx\n          .update(factoryBales)\n          .set({ finalizedBy: numericWorkerId, workerName: worker.fullName, updatedAt: new Date() })\n          .where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)))\n          .returning();\n        if (!updatedBale) return null;\n\n        // A worker-only correction must not silently move production between\n        // teams. Preserve the position snapshot, but keep the worker snapshot\n        // synchronized for Stock Entry bales that have attribution records.\n        await tx\n          .update(factoryBaleProductionAttributions)\n          .set({ workerId: numericWorkerId, workerNameSnapshot: worker.fullName })\n          .where(\n            and(\n              eq(factoryBaleProductionAttributions.companyId, companyId),\n              eq(factoryBaleProductionAttributions.baleId, id)\n            )\n          );\n        return updatedBale;\n      });\n\n      if (!updated) return res.status(404).json({ message: "Bale not found" });\n      res.json(updated);'''
+          if old_single not in text:
+              raise SystemExit("single worker assignment block not found")
+          text = text.replace(old_single, new_single, 1)
+
+          old_bulk = '''      const numericIds = baleIds.map(Number).filter((n) => !isNaN(n));\n      const numericWorkerId = parseInt(workerId);\n      const [worker] = await db\n        .select({ fullName: factoryWorkers.fullName })\n        .from(factoryWorkers)\n        .where(eq(factoryWorkers.id, numericWorkerId))\n        .limit(1);\n      await db\n        .update(factoryBales)\n        .set({ finalizedBy: numericWorkerId, workerName: worker?.fullName ?? null, updatedAt: new Date() })\n        .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, numericIds)));\n      res.json({ updated: numericIds.length, workerId: numericWorkerId });'''
+          new_bulk = '''      const numericIds = [...new Set(baleIds.map(Number).filter((n) => Number.isInteger(n) && n > 0))];\n      if (numericIds.length === 0) return res.status(400).json({ message: "No valid bale IDs supplied" });\n      const numericWorkerId = Number(workerId);\n      if (!Number.isInteger(numericWorkerId) || numericWorkerId <= 0) {\n        return res.status(400).json({ message: "Invalid workerId" });\n      }\n      const [worker] = await db\n        .select({ fullName: factoryWorkers.fullName })\n        .from(factoryWorkers)\n        .where(\n          and(\n            eq(factoryWorkers.id, numericWorkerId),\n            eq(factoryWorkers.companyId, companyId),\n            eq(factoryWorkers.active, true)\n          )\n        )\n        .limit(1);\n      if (!worker) return res.status(400).json({ message: "Worker is inactive or belongs to another company" });\n\n      const updatedIds = await db.transaction(async (tx: any) => {\n        const updatedBales = await tx\n          .update(factoryBales)\n          .set({ finalizedBy: numericWorkerId, workerName: worker.fullName, updatedAt: new Date() })\n          .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, numericIds)))\n          .returning({ id: factoryBales.id });\n        const ids = updatedBales.map((bale: any) => bale.id);\n        if (ids.length > 0) {\n          await tx\n            .update(factoryBaleProductionAttributions)\n            .set({ workerId: numericWorkerId, workerNameSnapshot: worker.fullName })\n            .where(\n              and(\n                eq(factoryBaleProductionAttributions.companyId, companyId),\n                inArray(factoryBaleProductionAttributions.baleId, ids)\n              )\n            );\n        }\n        return ids;\n      });\n\n      res.json({ updated: updatedIds.length, workerId: numericWorkerId });'''
+          if old_bulk not in text:
+              raise SystemExit("bulk worker assignment block not found")
+          path.write_text(text.replace(old_bulk, new_bulk, 1))
+      - name: Format and verify repair
+        run: |
+          npx prettier@3.8.4 --write server/routes/factory/bales/balesCrudRoutes.ts
+          npm run check
+      - name: Commit repair and remove helper
+        run: |
+          rm .github/workflows/phase5-attribution-repair.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/routes/factory/bales/balesCrudRoutes.ts .github/workflows/phase5-attribution-repair.yml
+          git commit -m "fix: synchronize bale worker attribution [phase5-attribution-repaired]"
+          git push origin HEAD:agent/factory-production-bonus-payroll-phase4
