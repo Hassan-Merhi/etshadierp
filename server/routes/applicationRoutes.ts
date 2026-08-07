@@ -87,6 +87,7 @@ import { registerLegacyHealthRoutes } from "./core/healthRoutes";
 import { registerPermissionBoundaryRoutes } from "./core/permissionBoundaryRoutes";
 import { registerIntercompanyPosConfigRoutes } from "./pos/intercompanyPosConfigRoutes";
 import { registerBandwidthPhase3FactoryReads } from "./performance/bandwidthPhase3FactoryReads";
+import { registerBandwidthPhase3MixBatchRead } from "./performance/bandwidthPhase3MixBatchRead";
 
 function registerWriteInvalidationSignal(app: Express): void {
   app.use((req, res, next) => {
@@ -117,6 +118,7 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   // does not explicitly own, so existing write behavior and unrelated reads stay
   // on their original handlers.
   registerBandwidthPhase3FactoryReads(app);
+  registerBandwidthPhase3MixBatchRead(app);
   registerFactoryRoutes(app, requireAuth, db);
   registerFactoryWorkerRoutes(app, requireAuth, db);
   registerFactoryPayrollRoutes(app, requireAuth, db);
