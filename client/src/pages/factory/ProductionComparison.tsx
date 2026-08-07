@@ -1,22 +1,36 @@
-import {useState, useMemo} from "react";
-import {useQuery} from "@tanstack/react-query";
-import {PageHeader} from "@/components/PageHeader";
-import {Button} from "@/components/ui/button";
-import {Badge} from "@/components/ui/badge";
-import {Skeleton} from "@/components/ui/skeleton";
-import {Input} from "@/components/ui/input";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { PageHeader } from "@/components/PageHeader";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import {} from "@/components/ui/command";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
-import {AlertTriangle, ChevronDown, Package, Scale} from "lucide-react";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AlertTriangle, ChevronDown, Package, Scale } from "lucide-react";
 import React from "react";
-import {cn} from "@/lib/utils";
-import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
-import type {MergedRow, Preset, ReportData, SupplierDayRow} from "./productioncomparison/types";
-import {deriveGrade, fmtDateRange, fmtKg, fmtMoney, fmtNum, fmtPct, fmtUsd, lastMonthRange, lastYearRange, pctChange, thisMonthRange, thisYearRange, todayStr, yesterdayStr} from "./productioncomparison/utils";
-import {MultiSelectFilter} from "./productioncomparison/components/MultiSelectFilter";
-import {DiffCell} from "./productioncomparison/components/DiffCell";
-import {StatCard} from "./productioncomparison/components/StatCard";
+import type { MergedRow, Preset, ProductRow, ReportData, SupplierDayRow } from "./productioncomparison/types";
+import {
+  deriveGrade,
+  fmtDateRange,
+  fmtKg,
+  fmtMoney,
+  fmtNum,
+  fmtPct,
+  fmtUsd,
+  lastMonthRange,
+  lastYearRange,
+  pctChange,
+  thisMonthRange,
+  thisYearRange,
+  todayStr,
+  yesterdayStr,
+} from "./productioncomparison/utils";
+import { MultiSelectFilter } from "./productioncomparison/components/MultiSelectFilter";
+import { DiffCell } from "./productioncomparison/components/DiffCell";
+import { StatCard } from "./productioncomparison/components/StatCard";
 // ── Date helpers ─────────────────────────────────────────────────────────────
 
 export default function ProductionComparison() {
@@ -29,15 +43,45 @@ export default function ProductionComparison() {
   const [filterCategories, setFilterCategories] = useState<string[]>([]);
   const [filterGrades, setFilterGrades] = useState<string[]>([]);
   const [filterProduct, setFilterProduct] = useState("");
-  // Worker filter (single select by worker ID)
-  const [filterWorker, setFilterWorker] = useState<string>("");
+  // Worker filter (multi-select by worker ID)
+  const [filterWorkers, setFilterWorkers] = useState<string[]>([]);
   // Supplier mix breakdown filter
   const [filterSuppliers, setFilterSuppliers] = useState<string[]>([]);
 
-  const { data: workers = [] } = useQuery<{ id: number; fullName: string }[]>({
+  const { data: workers = [] } = useQuery<{ id: number; fullName: string; active?: boolean }[]>({
     queryKey: ["/api/factory/workers"],
     staleTime: 60_000,
   });
+
+  // Worker categories — the filter only offers the pressing-team workers.
+  const { data: workerCategories = [] } = useQuery<{ id: number; name: string; workerIds: number[] }[]>({
+    queryKey: ["/api/factory/worker-categories"],
+    staleTime: 60_000,
+    queryFn: async () => {
+      const r = await fetch("/api/factory/worker-categories", { credentials: "include" });
+      if (!r.ok) throw new Error("Failed to load worker categories");
+      return r.json();
+    },
+  });
+
+  // Only workers belonging to a "pressing" category are selectable.  When no such
+  // category exists yet, fall back to every active worker so the filter still works.
+  const workerOptions = useMemo(() => {
+    const pressingIds = new Set<number>();
+    for (const cat of workerCategories) {
+      if (!(cat.name || "").toLowerCase().includes("pressing")) continue;
+      for (const id of Array.isArray(cat.workerIds) ? cat.workerIds : []) pressingIds.add(Number(id));
+    }
+    const active = workers.filter((w) => w.active !== false);
+    const pool = pressingIds.size > 0 ? active.filter((w) => pressingIds.has(w.id)) : active;
+    return pool
+      .slice()
+      .sort((a, b) => (a.fullName || "").localeCompare(b.fullName || ""))
+      .map((w) => ({ value: String(w.id), label: w.fullName }));
+  }, [workers, workerCategories]);
+
+  // Stable key for the query cache / request param.
+  const workerIdsParam = useMemo(() => [...filterWorkers].sort().join(","), [filterWorkers]);
 
   const [rangeA, rangeB] = useMemo<[[string, string], [string, string]]>(() => {
     if (preset === "today-yesterday")
@@ -68,11 +112,11 @@ export default function ProductionComparison() {
           : "Period B";
 
   const qA = useQuery<ReportData>({
-    queryKey: ["/api/factory/production-value-report", rangeA[0], rangeA[1], filterWorker],
+    queryKey: ["/api/factory/production-value-report", rangeA[0], rangeA[1], workerIdsParam],
     staleTime: 0,
     queryFn: async () => {
       const params = new URLSearchParams({ from: rangeA[0], to: rangeA[1] });
-      if (filterWorker) params.set("workerId", filterWorker);
+      if (workerIdsParam) params.set("workerIds", workerIdsParam);
       const r = await fetch(`/api/factory/production-value-report?${params}`, { credentials: "include" });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "Request failed");
       return r.json();
@@ -80,11 +124,11 @@ export default function ProductionComparison() {
   });
 
   const qB = useQuery<ReportData>({
-    queryKey: ["/api/factory/production-value-report", rangeB[0], rangeB[1], filterWorker],
+    queryKey: ["/api/factory/production-value-report", rangeB[0], rangeB[1], workerIdsParam],
     staleTime: 0,
     queryFn: async () => {
       const params = new URLSearchParams({ from: rangeB[0], to: rangeB[1] });
-      if (filterWorker) params.set("workerId", filterWorker);
+      if (workerIdsParam) params.set("workerIds", workerIdsParam);
       const r = await fetch(`/api/factory/production-value-report?${params}`, { credentials: "include" });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).message ?? "Request failed");
       return r.json();
@@ -107,6 +151,17 @@ export default function ProductionComparison() {
 
   const mergedAll = useMemo<MergedRow[]>(() => {
     const map = new Map<string, MergedRow>();
+    // Worker names are accumulated across both periods, ordered by bale count.
+    const workerTally = new Map<string, Map<string, number>>();
+    const tallyWorkers = (row: ProductRow) => {
+      let t = workerTally.get(row.articleCode);
+      if (!t) workerTally.set(row.articleCode, (t = new Map()));
+      for (const w of row.workers ?? []) {
+        if (!w?.name) continue;
+        t.set(w.name, (t.get(w.name) ?? 0) + (w.qty ?? 0));
+      }
+    };
+
     for (const row of qA.data?.production.byProduct ?? []) {
       map.set(row.articleCode, {
         articleCode: row.articleCode,
@@ -117,7 +172,9 @@ export default function ProductionComparison() {
         bQty: 0,
         aKg: row.totalWeightKg,
         bKg: 0,
+        workers: [],
       });
+      tallyWorkers(row);
     }
     for (const row of qB.data?.production.byProduct ?? []) {
       const ex = map.get(row.articleCode);
@@ -134,8 +191,15 @@ export default function ProductionComparison() {
           bQty: row.qty,
           aKg: 0,
           bKg: row.totalWeightKg,
+          workers: [],
         });
       }
+      tallyWorkers(row);
+    }
+
+    for (const row of map.values()) {
+      const t = workerTally.get(row.articleCode);
+      row.workers = t ? [...t.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([n]) => n) : [];
     }
     return [...map.values()];
   }, [qA.data, qB.data]);
@@ -239,9 +303,11 @@ export default function ProductionComparison() {
   const totalSupACost = supplierBreakdownA.reduce((s, r) => s + r.totalCost, 0);
   const totalSupBKg = supplierBreakdownB.reduce((s, r) => s + r.totalKg, 0);
   const totalSupBCost = supplierBreakdownB.reduce((s, r) => s + r.totalCost, 0);
+  const totalSupKgDiff = totalSupAKg - totalSupBKg;
+  const totalSupCostDiff = totalSupACost - totalSupBCost;
 
   const hasActiveFilter =
-    filterCategories.length > 0 || filterGrades.length > 0 || filterProduct !== "" || filterWorker !== "";
+    filterCategories.length > 0 || filterGrades.length > 0 || filterProduct !== "" || filterWorkers.length > 0;
   const hasSupplierFilter = filterSuppliers.length > 0;
 
   return (
@@ -500,6 +566,25 @@ export default function ProductionComparison() {
                     </TableRow>
                   )}
                 </TableBody>
+                {supplierSummary.length > 0 && (
+                  <TableFooter>
+                    <TableRow className="border-t-2 bg-muted/40 hover:bg-muted/40">
+                      <TableCell className="font-bold uppercase text-xs tracking-wider">
+                        Total ({supplierSummary.length} supplier{supplierSummary.length === 1 ? "" : "s"})
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums font-bold">{fmtKg(totalSupAKg)} kg</TableCell>
+                      <TableCell className="text-right tabular-nums font-bold">{fmtUsd(totalSupACost)}</TableCell>
+                      <TableCell className="text-right tabular-nums font-bold">{fmtKg(totalSupBKg)} kg</TableCell>
+                      <TableCell className="text-right tabular-nums font-bold">{fmtUsd(totalSupBCost)}</TableCell>
+                      <TableCell className="text-right font-bold">
+                        <DiffCell value={totalSupKgDiff} fmt={(n) => `${n > 0 ? "+" : ""}${fmtKg(n)} kg`} />
+                      </TableCell>
+                      <TableCell className="text-right font-bold">
+                        <DiffCell value={totalSupCostDiff} fmt={(n) => `${n > 0 ? "+" : ""}${fmtUsd(Math.abs(n))}`} />
+                      </TableCell>
+                    </TableRow>
+                  </TableFooter>
+                )}
               </Table>
 
               {/* Daily detail (collapsible-style: always shown when ≤30 rows, hidden behind toggle otherwise) */}
@@ -564,19 +649,14 @@ export default function ProductionComparison() {
               className="w-36"
             />
 
-            <Select value={filterWorker || "__all__"} onValueChange={(v) => setFilterWorker(v === "__all__" ? "" : v)}>
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="All Workers" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All Workers</SelectItem>
-                {workers.map((w) => (
-                  <SelectItem key={w.id} value={String(w.id)}>
-                    {w.fullName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelectFilter
+              options={workerOptions}
+              selected={filterWorkers}
+              onChange={setFilterWorkers}
+              placeholder="Workers"
+              allLabel="All Workers"
+              className="w-44"
+            />
 
             <Input
               placeholder="Search product…"
@@ -593,7 +673,7 @@ export default function ProductionComparison() {
                   setFilterCategories([]);
                   setFilterGrades([]);
                   setFilterProduct("");
-                  setFilterWorker("");
+                  setFilterWorkers([]);
                 }}
               >
                 Clear filters
@@ -638,6 +718,12 @@ export default function ProductionComparison() {
                         className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom"
                       >
                         Grade
+                      </th>
+                      <th
+                        rowSpan={2}
+                        className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-muted-foreground border-r border-border/50 align-bottom min-w-[140px]"
+                      >
+                        Worker
                       </th>
                       <th
                         colSpan={3}
@@ -697,6 +783,19 @@ export default function ProductionComparison() {
                               <Badge variant="secondary" className="text-xs font-semibold px-2">
                                 {row.grade}
                               </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 border-r border-border/30">
+                            {row.workers.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {row.workers.map((w) => (
+                                  <Badge key={w} variant="outline" className="text-xs font-normal">
+                                    {w}
+                                  </Badge>
+                                ))}
+                              </div>
                             ) : (
                               <span className="text-muted-foreground text-xs">—</span>
                             )}

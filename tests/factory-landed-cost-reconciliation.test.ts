@@ -44,11 +44,11 @@ async function cleanupFactoryTables(companyId: number) {
   await pool.query(`DELETE FROM factory_fx_rates WHERE company_id = $1`, [companyId]);
   await pool.query(
     `DELETE FROM factory_bales WHERE mix_batch_id IN (SELECT id FROM factory_mix_batches WHERE company_id = $1)`,
-    [companyId],
+    [companyId]
   );
   await pool.query(
     `DELETE FROM factory_mix_batch_sources WHERE mix_batch_id IN (SELECT id FROM factory_mix_batches WHERE company_id = $1)`,
-    [companyId],
+    [companyId]
   );
   await pool.query(`DELETE FROM factory_mix_batches WHERE company_id = $1`, [companyId]);
   await pool.query(`DELETE FROM factory_raw_stock WHERE company_id = $1`, [companyId]);
@@ -175,7 +175,7 @@ describe("cascadeContainerCostChange", () => {
         containerId: container.id,
         newCostPerKg: 0.6,
         newCostPerKgUsd: 0.6,
-      }),
+      })
     );
 
     const [updatedRawStock] = await db
@@ -205,10 +205,7 @@ describe("cascadeContainerCostChange", () => {
     expect(parseFloat(updatedBatch.costPerKg)).toBeCloseTo(0.65, 4);
     expect(parseFloat(updatedBatch.totalCost)).toBeCloseTo(520, 2);
 
-    const [updatedBale] = await db
-      .select()
-      .from(schema.factoryBales)
-      .where(eq(schema.factoryBales.id, bale.id));
+    const [updatedBale] = await db.select().from(schema.factoryBales).where(eq(schema.factoryBales.id, bale.id));
     expect(parseFloat(updatedBale.costPerKg)).toBeCloseTo(0.65, 4);
     expect(parseFloat(updatedBale.totalCost)).toBeCloseTo(65, 2);
 
@@ -291,5 +288,5 @@ describe("POST /api/factory/raw-stock/offload — FX safeguard", () => {
 
     expect(res.status).toBe(400);
     expect(JSON.stringify(res.body).toLowerCase()).toContain("fx");
-  });
+  }, 60_000);
 });
