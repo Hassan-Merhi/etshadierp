@@ -60,6 +60,7 @@ const FACTORY_COMPANY_PREFIXES = new Set([
   "shiprow",
   "ordcrud",
   "rsadj",
+  "dbkedit",
 ]);
 
 function testCompanyType(prefix: string): "erp" | "factory" {
