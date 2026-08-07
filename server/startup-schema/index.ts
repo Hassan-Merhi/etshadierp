@@ -22,6 +22,7 @@ import { supplierPartnerAndAi } from "./009-supplier-partner-and-ai";
 import { securityNotificationsAndPrecision } from "./010-security-notifications-and-precision";
 import { stockTransferRevisionIntegrity } from "./011-stock-transfer-revision-integrity";
 import { locationWhatsAppStockReports } from "./012-location-whatsapp-stock-reports";
+import { locationWhatsAppStockSchedules } from "./013-location-whatsapp-stock-schedules";
 
 export const startupMigrations: string[] = [
   ...coreTablesAndColumns,
@@ -36,4 +37,5 @@ export const startupMigrations: string[] = [
   ...securityNotificationsAndPrecision,
   ...stockTransferRevisionIntegrity,
   ...locationWhatsAppStockReports,
+  ...locationWhatsAppStockSchedules,
 ];
