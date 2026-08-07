@@ -7,18 +7,17 @@
 import type { Express } from "express";
 import { getErrorMessage } from "../../../../lib/httpHandlers";
 import { logger } from "../../../../lib/logger";
+import { EXPECTED_CLIENT_RESPONSE_CODES, markExpectedClientResponse } from "../../../../lib/expectedClientResponse";
 import { parseId } from "../../../../lib/parseId";
 import { db } from "../../../../db";
 import { requireAuth } from "../../../../auth";
-import { recalculateOrderTotals } from "../../_helpers";
+import { recalculateOrderTotalsForScannedArticle } from "./incrementalTotals";
 import {
   factoryBaleProducts,
   factoryBales,
   customerProformaLines,
   customerOrders,
-  customerOrderLines,
   customerOrderBales,
-  customerOrderCharges,
 } from "@shared/schema";
 import { eq, and, or, sql, inArray, ilike } from "drizzle-orm";
 import { firstRow } from "../../../../lib/queryResult";
@@ -127,9 +126,23 @@ export function registerOrderBaleScanRoutes(app: Express) {
       // other active order has it + insert the join row + flip status — all
       // inside one transaction with SELECT FOR UPDATE so two concurrent scans
       // of the same article cannot both claim the same physical bale.
-      // Errors with `httpStatus` and `body` are thrown to bubble out of the
-      // tx, then translated back to res.status(...).json(...) below.
-      type PickResult = { ok: true; baleId: number } | { ok: false; httpStatus: number; body: any };
+      // Errors with `httpStatus` and `body` are returned from the transaction
+      // and translated back to res.status(...).json(...) below.
+      type PickResult =
+        | {
+            ok: true;
+            bale: any;
+            line: any;
+            totals: {
+              subtotalBales: string;
+              freightAmount: string;
+              otherChargesTotal: string;
+              grandTotal: string;
+              totalQtyBales: number;
+              updatedAt: Date | string | null;
+            };
+          }
+        | { ok: false; httpStatus: number; body: any };
 
       const result: PickResult = await db.transaction(async (tx: any) => {
         const [bale] = await tx
@@ -190,7 +203,7 @@ export function registerOrderBaleScanRoutes(app: Express) {
         }
 
         // Resolve the product record first so its articleCode can be used as a
-        // fallback when bale.articleCode is null.  Bales pressed before the
+        // fallback when bale.articleCode is null. Bales pressed before the
         // articleCode column was added (or imported without it) can otherwise
         // bypass the proforma overload check entirely.
         let productForBale: any = null;
@@ -244,6 +257,8 @@ export function registerOrderBaleScanRoutes(app: Express) {
                   ok: false,
                   httpStatus: 400,
                   body: {
+                    confirmationRequired: true,
+                    confirmationType: "overload",
                     overloaded: true,
                     message: `Quantity exceeded (${currentCount}/${proformaLine.quantity}). Scan again to bypass.`,
                   },
@@ -255,6 +270,8 @@ export function registerOrderBaleScanRoutes(app: Express) {
               ok: false,
               httpStatus: 400,
               body: {
+                confirmationRequired: true,
+                confirmationType: "not_in_proforma",
                 notInProforma: true,
                 message: "Item loaded not requested. Please scan again to bypass.",
               },
@@ -265,17 +282,20 @@ export function registerOrderBaleScanRoutes(app: Express) {
         // Always prefer the canonical product name from factoryBaleProducts
         const resolvedBaleName = productForBale?.name || bale.productName || bale.articleCode || bale.baleCode;
 
-        await tx.insert(customerOrderBales).values({
-          orderId,
-          baleId: bale.id,
-          baleReference: bale.referenceNumber,
-          locationId: parseInt(locationId),
-          weight: bale.weightKg,
-          articleCode: effectiveArticleCode || bale.articleCode,
-          baleName: resolvedBaleName,
-          priceUsed,
-          scannedBy: scannerName,
-        });
+        const [insertedOrderBale] = await tx
+          .insert(customerOrderBales)
+          .values({
+            orderId,
+            baleId: bale.id,
+            baleReference: bale.referenceNumber,
+            locationId: parseInt(locationId),
+            weight: bale.weightKg,
+            articleCode: effectiveArticleCode || bale.articleCode,
+            baleName: resolvedBaleName,
+            priceUsed,
+            scannedBy: scannerName,
+          })
+          .returning();
 
         // V5 guard: proformaIdUsed IS NOT NULL
         // V5 bales remain IN_STOCK during loading — only legacy V2/V3 orders set RESERVED_FOR_ORDER.
@@ -286,21 +306,42 @@ export function registerOrderBaleScanRoutes(app: Express) {
             .where(eq(factoryBales.id, bale.id));
         }
 
-        await recalculateOrderTotals(tx, orderId);
-        return { ok: true, baleId: bale.id };
+        const recalculated = await recalculateOrderTotalsForScannedArticle(
+          tx,
+          orderId,
+          effectiveArticleCode || bale.articleCode
+        );
+        return {
+          ok: true,
+          bale: insertedOrderBale,
+          line: recalculated.line,
+          totals: recalculated.totals,
+        };
       });
 
-      if (!result.ok) return res.status(result.httpStatus).json(result.body);
+      if (!result.ok) {
+        if (result.body?.confirmationType === "overload") {
+          markExpectedClientResponse(res, EXPECTED_CLIENT_RESPONSE_CODES.BALE_SCAN_OVERLOAD);
+        } else if (result.body?.confirmationType === "not_in_proforma") {
+          markExpectedClientResponse(res, EXPECTED_CLIENT_RESPONSE_CODES.BALE_SCAN_NOT_IN_PROFORMA);
+        }
+        return res.status(result.httpStatus).json(result.body);
+      }
 
-      const updatedBales = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
-      const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
-      const updatedLines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
-      const updatedCharges = await db
-        .select()
-        .from(customerOrderCharges)
-        .where(eq(customerOrderCharges.orderId, orderId));
-
-      res.json({ ...updatedOrder, bales: updatedBales, lines: updatedLines, charges: updatedCharges });
+      // Phase 3 compact response: the client merges this tiny patch into its
+      // already-cached order instead of downloading all historical bales/lines/
+      // charges after every scan.
+      return res.json({
+        compactBaleScan: true,
+        orderId,
+        order: {
+          ...order,
+          ...result.totals,
+        },
+        bale: result.bale,
+        line: result.line,
+        totals: result.totals,
+      });
     } catch (error: unknown) {
       logger.error("Error adding bale to order:", { error: error });
       res.status(500).json({ message: getErrorMessage(error) });
