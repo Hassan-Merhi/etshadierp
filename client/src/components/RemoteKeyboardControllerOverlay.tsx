@@ -64,13 +64,14 @@ export function RemoteKeyboardControllerOverlay() {
   const textTimerRef = useRef<number | null>(null);
   const t = useCallback((value: string) => translateRemoteSupportPhase6Text(value, language), [language]);
 
+  const sessionId = session?.id ?? null;
   const mouseActive =
     !!session?.capabilities.mouse && authorizationIsFresh(session.mouseAuthorization?.expiresAt);
   const keyboardActive =
     !!session?.capabilities.keyboard && authorizationIsFresh(session.keyboardAuthorization?.expiresAt);
 
   useEffect(() => {
-    activeSessionIdRef.current = session?.id ?? null;
+    activeSessionIdRef.current = sessionId;
     setError(null);
     setLastResult(null);
     setPasswordOpen(false);
@@ -78,26 +79,26 @@ export function RemoteKeyboardControllerOverlay() {
     textBufferRef.current = "";
     if (textTimerRef.current !== null) window.clearTimeout(textTimerRef.current);
     textTimerRef.current = null;
-  }, [session?.id]);
+  }, [sessionId]);
 
   useEffect(() => {
     if (keyboardActive) captureRef.current?.focus({ preventScroll: true });
   }, [keyboardActive]);
 
   const requestKeyboardAuthorization = useCallback(async () => {
-    if (!session) return;
+    if (!sessionId) return;
     await remoteControllerRequestJson(
-      `/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/keyboard-authorization`,
+      `/api/screen-feed/control/sessions/${encodeURIComponent(sessionId)}/keyboard-authorization`,
       { method: "POST", body: JSON.stringify({}) }
     );
     await refreshSession();
     setPasswordOpen(false);
     setPassword("");
     window.setTimeout(() => captureRef.current?.focus({ preventScroll: true }), 0);
-  }, [refreshSession, session]);
+  }, [refreshSession, sessionId]);
 
   const enableKeyboard = useCallback(async () => {
-    if (!session || !mouseActive || busy) return;
+    if (!sessionId || !mouseActive || busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -114,10 +115,10 @@ export function RemoteKeyboardControllerOverlay() {
     } finally {
       setBusy(false);
     }
-  }, [busy, mouseActive, requestKeyboardAuthorization, session, t]);
+  }, [busy, mouseActive, requestKeyboardAuthorization, sessionId, t]);
 
   const confirmPasswordAndEnable = useCallback(async () => {
-    if (!password || !session || busy) return;
+    if (!password || !sessionId || busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -135,15 +136,15 @@ export function RemoteKeyboardControllerOverlay() {
     } finally {
       setBusy(false);
     }
-  }, [busy, language, password, requestKeyboardAuthorization, session]);
+  }, [busy, language, password, requestKeyboardAuthorization, sessionId]);
 
   const stopKeyboard = useCallback(async () => {
-    if (!session || busy) return;
+    if (!sessionId || busy) return;
     setBusy(true);
     setError(null);
     try {
       await remoteControllerRequestJson(
-        `/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/keyboard-authorization/revoke`,
+        `/api/screen-feed/control/sessions/${encodeURIComponent(sessionId)}/keyboard-authorization/revoke`,
         { method: "POST", body: JSON.stringify({}) }
       );
       setLastResult(null);
@@ -153,11 +154,10 @@ export function RemoteKeyboardControllerOverlay() {
     } finally {
       setBusy(false);
     }
-  }, [busy, refreshSession, session, t]);
+  }, [busy, refreshSession, sessionId, t]);
 
   const enqueueCommand = useCallback(
     (payload: KeyboardPayload) => {
-      const sessionId = session?.id;
       if (!sessionId || !keyboardActive) return;
       const run = async () => {
         if (activeSessionIdRef.current !== sessionId) return;
@@ -180,7 +180,7 @@ export function RemoteKeyboardControllerOverlay() {
       };
       commandTailRef.current = commandTailRef.current.catch(() => undefined).then(run);
     },
-    [keyboardActive, refreshSession, session?.id, t]
+    [keyboardActive, refreshSession, sessionId, t]
   );
 
   const flushTextBuffer = useCallback(() => {
@@ -220,15 +220,15 @@ export function RemoteKeyboardControllerOverlay() {
   }, [keyboardActive]);
 
   useEffect(() => {
-    if (!session || !keyboardActive) return;
+    if (!sessionId || !keyboardActive) return;
     const eventSource = new EventSource(
-      `/api/screen-feed/control/sessions/${encodeURIComponent(session.id)}/keyboard-results`,
+      `/api/screen-feed/control/sessions/${encodeURIComponent(sessionId)}/keyboard-results`,
       { withCredentials: true }
     );
     eventSource.addEventListener("result", (event) => {
       try {
         const result = JSON.parse((event as MessageEvent<string>).data) as KeyboardResultView;
-        if (result?.sessionId !== session.id) return;
+        if (result?.sessionId !== sessionId) return;
         setLastResult(result);
         if (result.status === "blocked") {
           setError(t("That field is protected and cannot be edited remotely."));
@@ -238,7 +238,7 @@ export function RemoteKeyboardControllerOverlay() {
       }
     });
     return () => eventSource.close();
-  }, [keyboardActive, session, t]);
+  }, [keyboardActive, sessionId, t]);
 
   if (!target || !session || !portalHost) return null;
 
