@@ -42,6 +42,15 @@ const ACCEPTED = {
       "migrating off xlsx retires this permanently.",
     reviewOn: "2026-11-01",
   },
+  nanoid: {
+    reason:
+      "GHSA-2v37-7h3g-55p8 affects custom Nano ID generators when a caller supplies size zero. " +
+      "This repository has one Nano ID call site, server/vite.ts, and it calls nanoid() with the " +
+      "library default size; no request, user, or stored value controls that size. The vulnerable " +
+      "condition is therefore unreachable in this application. A patched 3.3.17 release exists; " +
+      "remove this short-lived exception when the root package lock is regenerated to 3.3.17+.",
+    reviewOn: "2026-08-15",
+  },
 };
 
 const BLOCKING = new Set(["high", "critical"]);

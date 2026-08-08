@@ -1,4 +1,4 @@
-import { Suspense, useEffect } from "react";
+import { Suspense } from "react";
 import { lazyRetry as lazy } from "@/lib/lazyRetry";
 import { useDialogScrollFix } from "@/hooks/use-dialog-scroll-fix";
 import { useMobilePerformanceLifecycle } from "@/hooks/use-mobile-performance-lifecycle";
@@ -13,6 +13,7 @@ import { useAuthenticatedAppData } from "./useAuthenticatedAppData";
 import { resolveAuthenticatedAppRoute } from "./authenticatedAppRouteGuard";
 import { AppLeaveConfirmDialog } from "./AppLeaveConfirmDialog";
 import { AppLoadingState } from "./AppLoadingState";
+import { useErpScrollRestoration } from "./useErpScrollRestoration";
 
 const PosShell = lazy(() => import("./PosShell").then((module) => ({ default: module.PosShell })));
 const PropertiesShell = lazy(() => import("./PropertiesShell").then((module) => ({ default: module.PropertiesShell })));
@@ -31,16 +32,9 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
   useDialogScrollFix();
 
   const [currentLocation] = useLocation();
+  useErpScrollRestoration(currentLocation);
   const { showLeaveConfirm, setShowLeaveConfirm, handleGoBack, handleConfirmLeave } = useAppNavigation();
   const isPOS = user.role === "POS";
-
-  useEffect(() => {
-    const main = document.getElementById("main-content");
-    if (main) {
-      main.scrollTop = 0;
-      main.focus({ preventScroll: true });
-    }
-  }, [currentLocation]);
 
   const { chatUnread, posImportEnabled, myAccess, myAccessLoading, myAccessError, factorySettings } =
     useAuthenticatedAppData({ selectedCompanyId: selectedCompany?.id, userPresent: true, isPOS });
