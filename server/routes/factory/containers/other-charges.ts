@@ -17,6 +17,23 @@ import { factoryContainers, voucherEntries, factoryContainerOtherCharges, vouche
 import { eq, and, inArray, ilike } from "drizzle-orm";
 import { normFactoryEntry } from "./_helpers";
 
+type OtherChargeInput = {
+  description: string;
+  amount: string;
+  currencyCode?: string;
+  ledgerAccountId?: number | null;
+};
+
+type PreparedCharge = {
+  companyId: number;
+  containerId: number;
+  description: string;
+  amount: string;
+  currencyCode: string;
+  ledgerAccountId: number | null;
+  fxRate: string | null;
+};
+
 export function registerFactoryContainerOtherChargesRoutes(app: Express) {
   app.get("/api/factory/containers/:id/other-charges", requireAuth, async (req: any, res: any) => {
     try {
@@ -46,147 +63,175 @@ export function registerFactoryContainerOtherChargesRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const containerId = parseId(req.params.id);
       if (containerId === null) return res.status(400).json({ message: "Invalid id" });
-      const { charges, isCreate } = req.body as {
-        charges: { description: string; amount: string; currencyCode?: string; ledgerAccountId?: number | null }[];
-        isCreate?: boolean;
-      };
-
-      // Void any previously created other-charge vouchers for this container (to avoid duplicates on edit)
-      const ocPrefix = `FACTORY-OC-${containerId}-%`;
-      const existingVouchers = await db
-        .select({ id: vouchers.id })
-        .from(vouchers)
-        .where(
-          and(
-            eq(vouchers.companyId, companyId),
-            eq(vouchers.sourceModule, "FACTORY"),
-            ilike(vouchers.voucherNumber, ocPrefix)
-          )
-        );
-      if (existingVouchers.length > 0) {
-        const vIds = existingVouchers.map((v) => v.id);
-        await db.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
-        await db.delete(vouchers).where(inArray(vouchers.id, vIds));
+      const { charges } = req.body as { charges?: OtherChargeInput[]; isCreate?: boolean };
+      if (charges !== undefined && !Array.isArray(charges)) {
+        return res.status(400).json({ message: "charges must be an array" });
       }
 
-      await db
-        .delete(factoryContainerOtherCharges)
-        .where(
-          and(
-            eq(factoryContainerOtherCharges.containerId, containerId),
-            eq(factoryContainerOtherCharges.companyId, companyId)
-          )
-        );
+      // Load and scope the container before any mutation. A foreign/nonexistent
+      // container must never cause old charge rows or vouchers to be removed.
+      const [container] = await db
+        .select({
+          id: factoryContainers.id,
+          supplierId: factoryContainers.supplierId,
+          containerNumber: factoryContainers.containerNumber,
+          currencyCode: factoryContainers.currencyCode,
+          fxRateToUsd: factoryContainers.fxRateToUsd,
+          fxRateConfirmed: (factoryContainers as any).fxRateConfirmed,
+          arrivalDate: factoryContainers.arrivalDate,
+          createdAt: factoryContainers.createdAt,
+        })
+        .from(factoryContainers)
+        .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)))
+        .limit(1);
+      if (!container) return res.status(404).json({ message: "Container not found" });
 
-      let newCharges: any[] = [];
-      if (charges && charges.length > 0) {
-        const resolvedCharges = await Promise.all(
-          charges.map(async (c) => {
-            let ledgerAccountId = c.ledgerAccountId || null;
-            if (!ledgerAccountId && c.description?.trim()) {
-              const code = ("OC_" + c.description.toUpperCase().replace(/[^A-Z0-9]/g, "_")).slice(0, 50);
-              ledgerAccountId = await getOrCreateLedgerAccount(companyId, code, c.description);
-            }
-            return {
-              companyId,
-              containerId,
-              description: c.description,
-              amount: c.amount,
-              currencyCode: c.currencyCode || "USD",
-              ledgerAccountId,
-            };
-          })
-        );
-        newCharges = await db.insert(factoryContainerOtherCharges).values(resolvedCharges).returning();
-      }
+      const today = getClientDate(req);
+      const containerCreatedDate = container.createdAt
+        ? new Date(container.createdAt).toISOString().slice(0, 10)
+        : today;
+      const voucherDate = container.arrivalDate || containerCreatedDate;
 
-      const total = charges?.reduce((sum, c) => sum + parseFloat(c.amount || "0"), 0) ?? 0;
-      await db
-        .update(factoryContainers)
-        .set({ otherCharges: total.toFixed(2) })
-        .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
+      // Resolve every external dependency before the destructive portion starts.
+      // In particular, unresolved FX must leave all existing rows/vouchers intact.
+      const preparedCharges: PreparedCharge[] = [];
+      for (const rawCharge of charges ?? []) {
+        const description = rawCharge.description?.trim() ?? "";
+        if (!description) return res.status(400).json({ message: "Charge description is required" });
 
-      // Double-entry for each other charge: Dr Factory Charges Payable / Cr chosen account
-      if (newCharges.length > 0) {
-        const [container] = await db
-          .select({
-            supplierId: factoryContainers.supplierId,
-            containerNumber: factoryContainers.containerNumber,
-            currencyCode: factoryContainers.currencyCode,
-            fxRateToUsd: factoryContainers.fxRateToUsd,
-            fxRateConfirmed: (factoryContainers as any).fxRateConfirmed,
-            arrivalDate: factoryContainers.arrivalDate,
-            createdAt: factoryContainers.createdAt,
-          })
-          .from(factoryContainers)
-          .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
+        let ledgerAccountId = rawCharge.ledgerAccountId || null;
+        if (!ledgerAccountId) {
+          const code = ("OC_" + description.toUpperCase().replace(/[^A-Z0-9]/g, "_")).slice(0, 50);
+          ledgerAccountId = await getOrCreateLedgerAccount(companyId, code, description);
+        }
 
-        if (container) {
-          const today = getClientDate(req);
-          const containerCreatedDate = container.createdAt
-            ? new Date(container.createdAt).toISOString().slice(0, 10)
-            : today;
-          const voucherDate = container.arrivalDate || containerCreatedDate;
-          for (const charge of newCharges) {
-            const chargeAmt = parseFloat(charge.amount || "0");
-            if (chargeAmt <= 0 || !charge.ledgerAccountId) continue;
-            // Use the charge's own currency, not the container's currency
-            const chargeCcy = charge.currencyCode || container.currencyCode || "USD";
-            let chargeFxRate: string;
-            if (chargeCcy === "USD") {
-              chargeFxRate = "1";
-            } else if (chargeCcy === (container.currencyCode || "USD")) {
-              const { fxRate, looksSet } = resolveStoredFxRate(
-                chargeCcy,
-                container.fxRateToUsd,
-                (container as any).fxRateConfirmed
-              );
-              if (!looksSet) {
-                return res.status(400).json({ message: new UnresolvedExchangeRateError(chargeCcy).message });
-              }
-              chargeFxRate = String(fxRate);
-            } else {
-              chargeFxRate = await getOrFetchFxRateToUsd(companyId, chargeCcy, voucherDate);
-            }
-            const ocVoucherNum = `FACTORY-OC-${containerId}-${charge.id}-${Date.now()}`;
-            const [ocVoucher] = await db
-              .insert(vouchers)
-              .values({
-                companyId,
-                voucherType: "Journal",
-                voucherNumber: ocVoucherNum,
-                voucherDate,
-                description: `${charge.description} - container ${container.containerNumber}`,
-                totalAmount: String(chargeAmt),
-                currency: chargeCcy,
-                exchangeRate: chargeFxRate,
-                sourceModule: "FACTORY",
-              })
-              .returning();
-            // Dr Factory Charges Payable
-            const payableAccId = await getOrCreateLedgerAccount(
-              companyId,
-              "FACTORY_CHARGES_PAYABLE",
-              "Factory Charges Payable"
+        const chargeCcy = rawCharge.currencyCode || container.currencyCode || "USD";
+        const chargeAmt = parseFloat(rawCharge.amount || "0");
+        if (!Number.isFinite(chargeAmt)) {
+          return res.status(400).json({ message: `Invalid amount for ${description}` });
+        }
+
+        let fxRate: string | null = null;
+        if (chargeAmt > 0 && ledgerAccountId) {
+          if (chargeCcy === "USD") {
+            fxRate = "1";
+          } else if (chargeCcy === (container.currencyCode || "USD")) {
+            const { fxRate: storedRate, looksSet } = resolveStoredFxRate(
+              chargeCcy,
+              container.fxRateToUsd,
+              (container as any).fxRateConfirmed
             );
-            await db.insert(voucherEntries).values({
-              voucherId: ocVoucher.id,
-              ledgerAccountId: payableAccId,
-              ...normFactoryEntry(chargeCcy, String(chargeAmt), "0", chargeFxRate),
-              narration: `${charge.description} payable - container ${container.containerNumber}`,
-            });
-            // Cr chosen account (credit = I owe this person)
-            await db.insert(voucherEntries).values({
-              voucherId: ocVoucher.id,
-              ledgerAccountId: charge.ledgerAccountId,
-              ...normFactoryEntry(chargeCcy, "0", String(chargeAmt), chargeFxRate),
-              narration: `${charge.description} - container ${container.containerNumber}`,
-            });
+            if (!looksSet) {
+              return res.status(400).json({ message: new UnresolvedExchangeRateError(chargeCcy).message });
+            }
+            fxRate = String(storedRate);
+          } else {
+            fxRate = await getOrFetchFxRateToUsd(companyId, chargeCcy, voucherDate);
           }
         }
+
+        preparedCharges.push({
+          companyId,
+          containerId,
+          description,
+          amount: rawCharge.amount,
+          currencyCode: chargeCcy,
+          ledgerAccountId,
+          fxRate,
+        });
       }
 
-      res.json({ charges: newCharges, total: total.toFixed(2) });
+      const total = preparedCharges.reduce((sum, charge) => sum + parseFloat(charge.amount || "0"), 0);
+      const hasPostableCharge = preparedCharges.some(
+        (charge) => parseFloat(charge.amount || "0") > 0 && !!charge.ledgerAccountId
+      );
+      const payableAccId = hasPostableCharge
+        ? await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable")
+        : null;
+
+      const result = await db.transaction(async (tx) => {
+        // Void any previously created other-charge vouchers for this container
+        // and replace the charge set atomically with the newly prepared set.
+        const ocPrefix = `FACTORY-OC-${containerId}-%`;
+        const existingVouchers = await tx
+          .select({ id: vouchers.id })
+          .from(vouchers)
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              eq(vouchers.sourceModule, "FACTORY"),
+              ilike(vouchers.voucherNumber, ocPrefix)
+            )
+          );
+        if (existingVouchers.length > 0) {
+          const voucherIds = existingVouchers.map((voucher) => voucher.id);
+          await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, voucherIds));
+          await tx.delete(vouchers).where(inArray(vouchers.id, voucherIds));
+        }
+
+        await tx
+          .delete(factoryContainerOtherCharges)
+          .where(
+            and(
+              eq(factoryContainerOtherCharges.containerId, containerId),
+              eq(factoryContainerOtherCharges.companyId, companyId)
+            )
+          );
+
+        const insertValues = preparedCharges.map(({ fxRate: _fxRate, ...charge }) => charge);
+        const newCharges =
+          insertValues.length > 0
+            ? await tx.insert(factoryContainerOtherCharges).values(insertValues).returning()
+            : [];
+
+        await tx
+          .update(factoryContainers)
+          .set({ otherCharges: total.toFixed(2) })
+          .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
+
+        for (let index = 0; index < newCharges.length; index += 1) {
+          const charge = newCharges[index];
+          const prepared = preparedCharges[index];
+          const chargeAmt = parseFloat(charge.amount || "0");
+          if (chargeAmt <= 0 || !charge.ledgerAccountId || !prepared.fxRate || !payableAccId) continue;
+
+          const chargeCcy = charge.currencyCode || "USD";
+          const ocVoucherNum = `FACTORY-OC-${containerId}-${charge.id}-${Date.now()}-${index}`;
+          const [ocVoucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId,
+              voucherType: "Journal",
+              voucherNumber: ocVoucherNum,
+              voucherDate,
+              description: `${charge.description} - container ${container.containerNumber}`,
+              totalAmount: String(chargeAmt),
+              currency: chargeCcy,
+              exchangeRate: prepared.fxRate,
+              sourceModule: "FACTORY",
+            })
+            .returning();
+
+          await tx.insert(voucherEntries).values([
+            {
+              voucherId: ocVoucher.id,
+              ledgerAccountId: payableAccId,
+              ...normFactoryEntry(chargeCcy, String(chargeAmt), "0", prepared.fxRate),
+              narration: `${charge.description} payable - container ${container.containerNumber}`,
+            },
+            {
+              voucherId: ocVoucher.id,
+              ledgerAccountId: charge.ledgerAccountId,
+              ...normFactoryEntry(chargeCcy, "0", String(chargeAmt), prepared.fxRate),
+              narration: `${charge.description} - container ${container.containerNumber}`,
+            },
+          ]);
+        }
+
+        return newCharges;
+      });
+
+      res.json({ charges: result, total: total.toFixed(2) });
     } catch (error: unknown) {
       logger.error("Error syncing container other charges:", { error: error });
       res.status(500).json({ message: getErrorMessage(error) });
