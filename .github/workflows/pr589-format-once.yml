@@ -1,0 +1,45 @@
+name: PR 589 format once
+
+on:
+  push:
+    branches:
+      - fix/otw-container-number-detail-link
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v7
+        with:
+          ref: fix/otw-container-number-detail-link
+          fetch-depth: 0
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Normalize package registry URLs
+        run: sed -i 's#http://package-firewall.replit.local/npm/#https://registry.npmjs.org/#g' package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --bin-links=true
+
+      - name: Format target and remove this temporary workflow
+        run: |
+          node node_modules/prettier/bin/prettier.cjs --write client/src/pages/git-containers/ContainerTable.tsx
+          git checkout -- package-lock.json
+          git rm .github/workflows/pr589-format-once.yml
+
+      - name: Commit formatted result
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/src/pages/git-containers/ContainerTable.tsx
+          git commit -m "style: format OTW container link change"
+          git push origin HEAD:fix/otw-container-number-detail-link
