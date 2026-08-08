@@ -2,29 +2,21 @@
 /**
  * audit-script-inventory.mjs
  *
- * Keeps `scripts/` honest about which of its verifiers are gates and which are
- * decoration.
+ * Keeps scripts/ honest about what is actually enforced.
  *
- * Every `verify-*.mjs` and `audit-*.mjs` falls into one of three buckets:
+ * Every verify-*.mjs and audit-*.mjs is classified as:
  *
- *   wired    — invoked by a workflow, package.json, or CircleCI. A real gate.
- *   chained  — invoked by another script or referenced by a test. Runs, but
- *              only because something else runs it.
- *   orphan   — nothing invokes it.
+ *   wired    — invoked by an automatic GitHub Actions workflow or CircleCI;
+ *   manual   — exposed by package.json or a workflow_dispatch-only workflow,
+ *              but not automatically enforced;
+ *   chained  — invoked by another script/test only;
+ *   orphan   — nothing invokes or exposes it.
  *
- * Two rules are enforced:
- *
- *   1. **A wired script must pass.** A gate that cannot pass is either broken
- *      or lying, and either way CI is not checking what its name claims.
- *   2. **The orphan count may only fall.** An orphan that also fails is the
- *      worst case — it looks like coverage and provides none. Sixteen of those
- *      were deleted when this audit was written: each asserted literal source
- *      text that the god-file split had legitimately moved, so they had been
- *      failing silently for as long as nobody ran them.
- *
- * Rule 1 is skipped for scripts that need a build artifact, a database, or the
- * network — those legitimately fail on a bare checkout and are listed in
- * config/script-inventory.json with the reason.
+ * The distinction matters: an npm alias makes a script runnable, not a CI gate.
+ * Automatic wired scripts must pass on a bare checkout unless their declared
+ * environment dependency makes that impossible. Manual known-failing scripts
+ * may be tracked, but they are forbidden from becoming automatic gates while
+ * failing. Orphan count remains a falling ceiling.
  *
  * Usage:
  *   npm run audit:scripts
@@ -39,8 +31,6 @@ import { fileURLToPath } from "node:url";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const configPath = path.join(projectRoot, "config/script-inventory.json");
-
-/** This audit is wired too; running itself would recurse until the timeout. */
 const SELF = "audit-script-inventory.mjs";
 
 function listScripts() {
@@ -50,106 +40,199 @@ function listScripts() {
     .sort();
 }
 
-/** Files that could plausibly invoke a script, excluding the scripts themselves. */
-function collectInvokers() {
-  const roots = [".github/workflows", ".circleci", "scripts", "tests"];
-  const invokers = new Map();
-  const add = (relativePath) => {
-    const absolute = path.join(projectRoot, relativePath);
-    if (!fs.existsSync(absolute)) return;
-    if (fs.statSync(absolute).isDirectory()) {
-      for (const entry of fs.readdirSync(absolute)) add(path.join(relativePath, entry));
-      return;
-    }
+function walkTextFiles(root, out = new Map()) {
+  const absolute = path.join(projectRoot, root);
+  if (!fs.existsSync(absolute)) return out;
+  const stat = fs.statSync(absolute);
+  if (!stat.isDirectory()) {
     try {
-      invokers.set(relativePath.split(path.sep).join("/"), fs.readFileSync(absolute, "utf8"));
+      out.set(root.split(path.sep).join("/"), fs.readFileSync(absolute, "utf8"));
     } catch {
-      /* unreadable files cannot invoke anything */
+      // Binary/unreadable files cannot invoke scripts.
     }
-  };
-  roots.forEach(add);
-  add("package.json");
-  return invokers;
-}
-
-/**
- * The arguments package.json actually invokes a script with.
- *
- * Several scripts are report-style: run bare they print findings and exit
- * non-zero, but the npm script passes `--json` and they exit clean. Running
- * them without those arguments measures an invocation nobody uses, and reports
- * a gate as broken when it is not.
- */
-function invocationArgs(script, invokers) {
-  const pkg = invokers.get("package.json");
-  if (!pkg) return [];
-  const match = pkg.match(new RegExp(`node scripts/${script.replace(/\./g, "\\.")}([^"]*)"`));
-  if (!match) return [];
-  return match[1].trim().split(/\s+/).filter(Boolean);
-}
-
-function classify(script, invokers) {
-  const gates = [];
-  const chains = [];
-  for (const [file, text] of invokers) {
-    if (file === `scripts/${script}`) continue;
-    if (!text.includes(script)) continue;
-    if (file.startsWith(".github/") || file.startsWith(".circleci") || file === "package.json") gates.push(file);
-    else chains.push(file);
+    return out;
   }
-  if (gates.length) return { bucket: "wired", invokedBy: gates };
-  if (chains.length) return { bucket: "chained", invokedBy: chains };
-  return { bucket: "orphan", invokedBy: [] };
+
+  for (const entry of fs.readdirSync(absolute, { withFileTypes: true })) {
+    if (entry.name === "node_modules" || entry.name === "dist") continue;
+    walkTextFiles(path.join(root, entry.name), out);
+  }
+  return out;
+}
+
+function collectSources() {
+  const ci = new Map();
+  const chains = new Map();
+  walkTextFiles(".github/workflows", ci);
+  walkTextFiles(".circleci", ci);
+  walkTextFiles("scripts", chains);
+  walkTextFiles("tests", chains);
+  return { ci, chains };
+}
+
+function workflowIsAutomatic(file, text) {
+  if (file.startsWith(".circleci/")) return true;
+  return /^\s*(?:push|pull_request|schedule):/m.test(text);
+}
+
+function packageAliases() {
+  const pkg = JSON.parse(fs.readFileSync(path.join(projectRoot, "package.json"), "utf8"));
+  return pkg.scripts ?? {};
+}
+
+function aliasesForScript(script, aliases) {
+  const needle = `scripts/${script}`;
+  return Object.entries(aliases)
+    .filter(([, command]) => typeof command === "string" && command.includes(needle))
+    .map(([name, command]) => ({ name, command }));
+}
+
+function aliasReferenced(text, alias) {
+  const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\bnpm\\s+(?:run\\s+)?${escaped}(?:\\s|$)`).test(text);
+}
+
+function sourceReferencesScript(text, script, scriptAliases) {
+  if (text.includes(script)) return true;
+  return scriptAliases.some(({ name }) => aliasReferenced(text, name));
+}
+
+function classify(script, ciSources, chainSources, aliases) {
+  const scriptAliases = aliasesForScript(script, aliases);
+  const automatic = [];
+  const manualWorkflows = [];
+  const chains = [];
+
+  for (const [file, text] of ciSources) {
+    if (!sourceReferencesScript(text, script, scriptAliases)) continue;
+    if (workflowIsAutomatic(file, text)) automatic.push(file);
+    else manualWorkflows.push(file);
+  }
+
+  for (const [file, text] of chainSources) {
+    if (file === `scripts/${script}`) continue;
+    if (text.includes(script)) chains.push(file);
+  }
+
+  if (automatic.length) {
+    return { bucket: "wired", invokedBy: automatic, manualWorkflows, chains, aliases: scriptAliases };
+  }
+  if (manualWorkflows.length || scriptAliases.length) {
+    return {
+      bucket: "manual",
+      invokedBy: [...manualWorkflows, ...scriptAliases.map(({ name }) => `package.json#${name}`)],
+      manualWorkflows,
+      chains,
+      aliases: scriptAliases,
+    };
+  }
+  if (chains.length) return { bucket: "chained", invokedBy: chains, manualWorkflows, chains, aliases: [] };
+  return { bucket: "orphan", invokedBy: [], manualWorkflows: [], chains: [], aliases: [] };
+}
+
+function packageInvocationArgs(script, scriptAliases) {
+  for (const { command } of scriptAliases) {
+    const marker = `scripts/${script}`;
+    const index = command.indexOf(marker);
+    if (index < 0) continue;
+    const tail = command.slice(index + marker.length).trim();
+    if (!tail) return [];
+    return tail.split(/\s+/).filter(Boolean);
+  }
+  return [];
+}
+
+function directInvocationArgs(script, invokedBy, ciSources) {
+  const escaped = script.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`(?:node\\s+)?scripts/${escaped}([^\\n]*)`);
+  for (const file of invokedBy) {
+    const text = ciSources.get(file);
+    if (!text) continue;
+    const match = text.match(pattern);
+    if (!match) continue;
+    const tail = match[1]
+      .replace(/\\\s*$/, "")
+      .trim();
+    return tail ? tail.split(/\s+/).filter(Boolean) : [];
+  }
+  return [];
+}
+
+function invocationArgs(script, entry, ciSources) {
+  const packageArgs = packageInvocationArgs(script, entry.aliases ?? []);
+  if (packageArgs.length) return packageArgs;
+  return directInvocationArgs(script, entry.invokedBy ?? [], ciSources);
+}
+
+function executeScript(script, args) {
+  return spawnSync(process.execPath, [path.join("scripts", script), ...args], {
+    cwd: projectRoot,
+    encoding: "utf8",
+    timeout: 120000,
+    maxBuffer: 64 * 1024 * 1024,
+  });
 }
 
 export function auditScriptInventory({ run = true } = {}) {
   const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-  const environmentDependent = new Set(Object.keys(config.environmentDependent ?? {}));
-  const knownFailing = new Set(Object.keys(config.knownFailing ?? {}));
-  const invokers = collectInvokers();
+  const scriptsOnDisk = listScripts();
+  const scriptSet = new Set(scriptsOnDisk);
+  const environmentDependent = new Map(Object.entries(config.environmentDependent ?? {}));
+  const knownFailing = new Map(Object.entries(config.knownFailing ?? {}));
+  const aliases = packageAliases();
+  const { ci, chains } = collectSources();
   const failures = [];
   const scripts = [];
 
-  for (const script of listScripts()) {
-    const { bucket, invokedBy } = classify(script, invokers);
+  for (const [script, reason] of environmentDependent) {
+    if (!scriptSet.has(script)) failures.push(`environmentDependent lists ${script}, but that script no longer exists.`);
+    if (!String(reason ?? "").trim()) failures.push(`environmentDependent.${script} must explain why the script cannot run here.`);
+  }
+  for (const [script, reason] of knownFailing) {
+    if (!scriptSet.has(script)) failures.push(`knownFailing lists ${script}, but that script no longer exists.`);
+    if (!String(reason ?? "").trim()) failures.push(`knownFailing.${script} must explain the real outstanding failure.`);
+  }
+
+  for (const script of scriptsOnDisk) {
+    const entry = classify(script, ci, chains, aliases);
     let passes = null;
-    if (run && bucket === "wired" && script !== SELF && !environmentDependent.has(script)) {
-      const result = spawnSync(process.execPath, [path.join("scripts", script), ...invocationArgs(script, invokers)], {
-        cwd: projectRoot,
-        encoding: "utf8",
-        timeout: 120000,
-        // Report-style scripts print thousands of findings. The default 1MB
-        // buffer overflows, spawnSync kills the child with SIGTERM, and the
-        // gate gets reported as broken when it exited cleanly.
-        maxBuffer: 64 * 1024 * 1024,
-      });
+    const needsExecution =
+      run &&
+      script !== SELF &&
+      !environmentDependent.has(script) &&
+      (entry.bucket === "wired" || knownFailing.has(script));
+
+    if (needsExecution) {
+      const result = executeScript(script, invocationArgs(script, entry, ci));
       passes = result.status === 0;
-      if (!passes && !knownFailing.has(script)) {
+      if (entry.bucket === "wired" && !passes) {
         const detail = `${result.stderr || result.stdout || ""}`.trim().split("\n").slice(0, 3).join(" / ");
         failures.push(
-          `scripts/${script} is wired into ${invokedBy.join(", ")} but exits non-zero: ${detail || "no output"}`
+          `scripts/${script} is automatically wired through ${entry.invokedBy.join(", ")} but exits non-zero: ${detail || "no output"}`
         );
       }
     }
-    scripts.push({ script, bucket, invokedBy, passes });
-  }
 
-  // A gate on the known-failing list that starts passing should come off it,
-  // or the list quietly becomes permission to stay broken.
-  const recovered = scripts.filter((entry) => knownFailing.has(entry.script) && entry.passes === true);
-  for (const entry of recovered) {
-    failures.push(
-      `scripts/${entry.script} now passes but is still listed in knownFailing. Remove the entry — ` +
-        `the list may only shrink.`
-    );
+    if (knownFailing.has(script)) {
+      if (entry.bucket === "wired") {
+        failures.push(
+          `scripts/${script} is listed knownFailing but is now an automatic CI gate. Automatic gates may not be suppressed; fix the script or remove it from the automatic workflow.`
+        );
+      }
+      if (passes === true) {
+        failures.push(`scripts/${script} now passes but remains in knownFailing. Remove the stale exception.`);
+      }
+    }
+
+    scripts.push({ script, ...entry, passes });
   }
 
   const orphans = scripts.filter((entry) => entry.bucket === "orphan");
   const ceiling = config.orphanCeiling;
   if (ceiling !== undefined && orphans.length > ceiling) {
     failures.push(
-      `${orphans.length} verify/audit scripts are invoked by nothing; the ceiling is ${ceiling}. ` +
-        `Wire it up, or delete it — a script nobody runs cannot be a check.`
+      `${orphans.length} verify/audit scripts are invoked or exposed by nothing; the ceiling is ${ceiling}. ` +
+        `Wire it up, expose it intentionally, or delete it.`
     );
   }
 
@@ -157,16 +240,15 @@ export function auditScriptInventory({ run = true } = {}) {
     version: config.version,
     failures,
     scripts,
-    recovered,
     summary: {
       total: scripts.length,
       wired: scripts.filter((entry) => entry.bucket === "wired").length,
+      manual: scripts.filter((entry) => entry.bucket === "manual").length,
       chained: scripts.filter((entry) => entry.bucket === "chained").length,
       orphan: orphans.length,
       orphanCeiling: ceiling ?? null,
       environmentDependent: environmentDependent.size,
       knownFailing: knownFailing.size,
-      recovered: recovered.length,
     },
   };
 }
@@ -188,7 +270,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
 
   if (process.argv.includes("--list")) {
-    for (const bucket of ["wired", "chained", "orphan"]) {
+    for (const bucket of ["wired", "manual", "chained", "orphan"]) {
       const entries = report.scripts.filter((entry) => entry.bucket === bucket);
       console.log(`\n${bucket} (${entries.length})`);
       for (const entry of entries) console.log(`  ${entry.script}`);
@@ -198,8 +280,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   const { summary } = report;
   console.log(
-    `Scripts: ${summary.total} — ${summary.wired} wired, ${summary.chained} chained, ` +
-      `${summary.orphan} orphaned (ceiling ${summary.orphanCeiling}).`
+    `Scripts: ${summary.total} — ${summary.wired} automatic gates, ${summary.manual} manual, ` +
+      `${summary.chained} chained, ${summary.orphan} orphaned (ceiling ${summary.orphanCeiling}).`
   );
 
   if (report.failures.length > 0) {
