@@ -7,7 +7,8 @@ type ErpHistoryMeta = {
 };
 
 const ERP_HISTORY_STATE_KEY = "__erpNavigation";
-const ERP_BACK_CONTROL_SELECTOR = '[data-testid="button-back"], [data-testid^="button-"][data-testid$="-back"]';
+const ERP_BACK_CONTROL_SELECTOR =
+  '[data-testid="button-back"], [data-testid^="button-back-to-"], [data-testid^="button-"][data-testid$="-back"]';
 
 let installCount = 0;
 let originalPushState: History["pushState"] | null = null;
@@ -151,7 +152,8 @@ export function installErpNavigationHistory(): () => void {
 
   popstateHandler = (event: PopStateEvent) => {
     const meta = readMeta(event.state);
-    pendingScrollRestore = meta?.mode === "erp" && isCurrentErpPath() ? Math.max(0, meta.scrollTop) : null;
+    pendingScrollRestore =
+      meta?.mode === "erp" && isCurrentErpPath() ? Math.max(0, meta.scrollTop) : null;
   };
   window.addEventListener("popstate", popstateHandler);
 
