@@ -7,9 +7,10 @@
  * Why this is behavioural coverage rather than another route-name sweep:
  * - every current guard-only sensitive route is invoked through the real app as
  *   an authenticated Developer in the correct company mode;
- * - parameterised routes receive a guaranteed-missing resource and must not
- *   partially change vouchers, inventory, raw stock, bales, or ledger accounts;
- * - validation/security failures on parameterless routes must also be atomic;
+ * - parameterised routes receive a guaranteed-missing resource;
+ * - parameterless routes receive a poison/dry-run body on a disposable company;
+ * - every call must leave vouchers, inventory, raw stock, bales and ledger
+ *   accounts unchanged, even when the route reports a validation/security error;
  * - after every call, every live voucher in the selected company must still be
  *   balanced;
  * - sentinel vouchers in untouched ERP, Factory and Supplier Partner companies
@@ -272,7 +273,7 @@ afterAll(async () => {
 
 describe.sequential("authenticated sensitive write safety sweep", () => {
   it(
-    "exercises every route that would otherwise be guard-only without corrupting sensitive state",
+    "exercises every route that would otherwise be guard-only without mutating sensitive state",
     async () => {
       // Disable recognition of this file while deriving the inventory it has to
       // execute; otherwise the audit would (correctly) report zero guard-only
@@ -299,13 +300,7 @@ describe.sequential("authenticated sensitive write safety sweep", () => {
         expect(response.status, `${route.method} ${route.path} lost its authenticated session`).not.toBe(401);
 
         const after = await sensitiveFingerprint(companyId);
-        // Missing-resource writes and every request that reports failure must be
-        // atomic. A 4xx that already inserted an account/voucher or moved stock
-        // is still a production data-corruption bug.
-        if (parameterised || response.status >= 400) {
-          expect(after, `${route.method} ${route.path} partially mutated sensitive state`).toEqual(before);
-        }
-
+        expect(after, `${route.method} ${route.path} mutated sensitive state during the safety sweep`).toEqual(before);
         await expectBalancedVouchers(companyId, route);
       }
 
