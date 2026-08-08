@@ -120,6 +120,18 @@ function serializeFrame(frame: ScreenFrame, failure?: ScreenFeedFailureInfo | nu
   };
 }
 
+function recordCaptureFailure(userId: string, value: unknown): boolean {
+  const sanitized = sanitizeScreenFeedFailure(value);
+  if (!sanitized) return false;
+  const failure: ScreenFeedFailureInfo = { ...sanitized, occurredAt: new Date() };
+  screenFeedFailureStore.set(userId, failure);
+  logger.warn(
+    `[ScreenFeed] capture failure userId=${userId} stage=${failure.stage} durationMs=${failure.durationMs ?? "unknown"} reason=${failure.reason}`
+  );
+  if (isRemoteSupportEnabled("fastScreenFeed")) screenFeedLiveHub.publishFailure(userId, failure);
+  return true;
+}
+
 export function registerScreenFeedRoutes(app: Express) {
   app.get("/api/screen-feed/admin/runtime", requireAuth, (req, res) => {
     if (!requireDeveloper(req, res)) return;
@@ -303,26 +315,16 @@ export function registerScreenFeedRoutes(app: Express) {
     res.status(204).end();
   });
 
-  app.post("/api/screen-feed/capture-failure", requireLogin, (req, res) => {
-    if (!isRemoteSupportEnabled("screenFeedEnabled")) return res.status(204).end();
-    const userId = String(getSessionUserId(req));
-    if (!isUserBeingWatched(userId)) return res.status(204).end();
-    const sanitized = sanitizeScreenFeedFailure(req.body);
-    if (!sanitized) return res.status(204).end();
-
-    const failure: ScreenFeedFailureInfo = { ...sanitized, occurredAt: new Date() };
-    screenFeedFailureStore.set(userId, failure);
-    logger.warn(
-      `[ScreenFeed] capture failure userId=${userId} stage=${failure.stage} durationMs=${failure.durationMs ?? "unknown"} reason=${failure.reason}`
-    );
-    if (isRemoteSupportEnabled("fastScreenFeed")) screenFeedLiveHub.publishFailure(userId, failure);
-    res.status(204).end();
-  });
-
   app.post("/api/screen-feed/pointer", requireLogin, (req, res) => {
     if (!isRemoteSupportEnabled("screenFeedEnabled")) return res.status(204).end();
     const userId = String(getSessionUserId(req));
     if (!isUserBeingWatched(userId)) return res.status(204).end();
+
+    // Failure telemetry shares this tiny watched-user channel so diagnostics do
+    // not create another route or another always-on request path. The payload is
+    // sanitized before storage/logging and contains no screenshot or page data.
+    if (recordCaptureFailure(userId, req.body?.failure)) return res.status(204).end();
+
     const cursor = sanitizeScreenFeedCursor(req.body?.cursor ?? req.body);
     // Pointer telemetry is visual-only. A stale/skewed sample must never create
     // a 400 retry loop or interfere with the employee's ERP session.
