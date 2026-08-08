@@ -43,7 +43,7 @@ export function StockNameUpdateImport() {
   const [isReading, setIsReading] = useState(false);
   const [result, setResult] = useState<RenameResult | null>(null);
 
-  const { data: stockItems = [] } = useQuery<StockItemLite[]>({
+  const { data: stockItems = [], isLoading: itemsLoading } = useQuery<StockItemLite[]>({
     queryKey: ["/api/stock-items"],
     staleTime: 60_000,
   });
@@ -53,13 +53,14 @@ export function StockNameUpdateImport() {
     [stockItems]
   );
 
-  const readyRows = rows.filter((row) => row.status === "ready" || row.status === "unchanged");
-  const problemCount = rows.length - readyRows.length;
+  const changeRows = rows.filter((row) => row.status === "ready");
+  const unchangedCount = rows.filter((row) => row.status === "unchanged").length;
+  const problemCount = rows.filter((row) => !["ready", "unchanged"].includes(row.status)).length;
 
   const mutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/stock-items/update-names-by-code", {
-        rows: readyRows.map((row) => ({ code: row.code, newName: row.newName })),
+        rows: changeRows.map((row) => ({ code: row.code, newName: row.newName })),
       });
       return response.json() as Promise<RenameResult>;
     },
@@ -170,10 +171,12 @@ export function StockNameUpdateImport() {
             type="file"
             accept=".xlsx,.xls,.csv"
             onChange={handleFileChange}
-            disabled={isReading || mutation.isPending}
+            disabled={itemsLoading || isReading || mutation.isPending}
             data-testid="input-update-stock-names-file"
           />
-          <p className="text-xs text-muted-foreground">Required columns: "Code" and "New Name".</p>
+          <p className="text-xs text-muted-foreground">
+            {itemsLoading ? "Loading current item codes..." : 'Required columns: "Code" and "New Name".'}
+          </p>
         </div>
         <Button
           type="button"
@@ -193,8 +196,8 @@ export function StockNameUpdateImport() {
         <>
           <div className="flex flex-wrap gap-2 text-xs">
             <Badge variant="secondary">{rows.length} rows</Badge>
-            <Badge variant="secondary">{rows.filter((row) => row.status === "ready").length} changes</Badge>
-            <Badge variant="secondary">{rows.filter((row) => row.status === "unchanged").length} unchanged</Badge>
+            <Badge variant="secondary">{changeRows.length} changes</Badge>
+            <Badge variant="secondary">{unchangedCount} unchanged</Badge>
             {problemCount > 0 && <Badge variant="destructive">{problemCount} need attention</Badge>}
           </div>
 
@@ -229,12 +232,12 @@ export function StockNameUpdateImport() {
           <div className="flex justify-end">
             <Button
               onClick={() => mutation.mutate()}
-              disabled={mutation.isPending || readyRows.length === 0 || problemCount > 0}
+              disabled={mutation.isPending || changeRows.length === 0 || problemCount > 0}
               className="gap-2"
               data-testid="button-update-stock-names-by-code"
             >
               <Upload className="h-4 w-4" />
-              {mutation.isPending ? "Updating..." : `Apply ${rows.filter((row) => row.status === "ready").length} Name Changes`}
+              {mutation.isPending ? "Updating..." : `Apply ${changeRows.length} Name Changes`}
             </Button>
           </div>
         </>
