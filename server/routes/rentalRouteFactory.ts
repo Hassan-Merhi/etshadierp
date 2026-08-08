@@ -23,12 +23,20 @@ export function registerRentalRoutes(
 ) {
   // Properties-mode landlord accounting now recognises rent immediately on receipt.
   // Run the legacy Deferred Rent Revenue cleanup automatically at route startup.
-  // The service is idempotent and company-lock protected, so repeated starts are safe.
+  // If startup happens before a fresh database is fully ready, the middleware below
+  // retries on the first Properties request. A successful run becomes a process no-op.
   if (module === "PROPERTIES") {
-    void reclassifyLegacyDeferredRentForProperties().catch((error: unknown) => {
-      logger.error("[PROPERTIES/rental] deferred-rent startup reclassification failed", {
-        error: getErrorMessage(error),
+    const ensurePropertiesIncomeCleanup = () =>
+      reclassifyLegacyDeferredRentForProperties().catch((error: unknown) => {
+        logger.error("[PROPERTIES/rental] deferred-rent reclassification failed", {
+          error: getErrorMessage(error),
+        });
       });
+
+    void ensurePropertiesIncomeCleanup();
+    app.use(urlPrefix, (_req, _res, next) => {
+      void ensurePropertiesIncomeCleanup();
+      next();
     });
   }
 
