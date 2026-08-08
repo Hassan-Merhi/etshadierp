@@ -36,6 +36,15 @@ function normalizeHeader(value: string): string {
   return value.toLowerCase().replace(/[\s_-]+/g, "");
 }
 
+function isGloballyHandledError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null || !("_handledGlobally" in error)) return false;
+  return Boolean((error as { _handledGlobally?: unknown })._handledGlobally);
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown file import error";
+}
+
 export function StockNameUpdateImport() {
   const { toast } = useToast();
   const [file, setFile] = useState<File | null>(null);
@@ -72,7 +81,7 @@ export function StockNameUpdateImport() {
       toast({ title: "Names updated", description: data.message });
     },
     onError: (error: Error) => {
-      if ((error as any)?._handledGlobally) return;
+      if (isGloballyHandledError(error)) return;
       toast({ title: "Update failed", description: error.message, variant: "destructive" });
     },
   });
@@ -141,8 +150,8 @@ export function StockNameUpdateImport() {
         title: "Preview ready",
         description: `${ready} name change${ready === 1 ? "" : "s"} ready to apply${missing > 0 ? `; ${missing} missing code${missing === 1 ? "" : "s"} will be ignored` : ""}`,
       });
-    } catch (error: any) {
-      toast({ title: "Could not read file", description: error.message, variant: "destructive" });
+    } catch (error: unknown) {
+      toast({ title: "Could not read file", description: getErrorMessage(error), variant: "destructive" });
     } finally {
       setIsReading(false);
     }
