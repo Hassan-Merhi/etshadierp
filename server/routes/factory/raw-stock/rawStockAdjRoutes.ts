@@ -480,9 +480,12 @@ export function registerRawStockAdjRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const batchId = parseId(req.body.batchId) ?? -1;
-      const supplierId = parseId(req.body.supplierId) ?? -1;
-      if (isNaN(batchId) || isNaN(supplierId))
+      // parseId yields null for anything unusable, and the old `?? -1` turned
+      // that into a lookup for batch -1 — a missing id came back as a 500 with
+      // "Batch not found" rather than the 400 it is.
+      const batchId = parseId(req.body.batchId);
+      const supplierId = parseId(req.body.supplierId);
+      if (batchId === null || supplierId === null)
         return res.status(400).json({ message: "batchId and supplierId are required" });
 
       await db.transaction(async (tx: any) => {
@@ -546,8 +549,14 @@ export function registerRawStockAdjRoutes(app: Express) {
 
       res.json({ success: true });
     } catch (error: unknown) {
+      const message = getErrorMessage(error);
+      // A batch in another company and a supplier with nothing in this batch
+      // are both things the caller got wrong, not failures of the server.
+      if (message === "Batch not found") return res.status(404).json({ message });
+      if (message === "No source records found for this supplier in this batch")
+        return res.status(400).json({ message });
       logger.error("Error deleting batch source:", { error: error });
-      res.status(500).json({ message: getErrorMessage(error) });
+      res.status(500).json({ message });
     }
   });
 
