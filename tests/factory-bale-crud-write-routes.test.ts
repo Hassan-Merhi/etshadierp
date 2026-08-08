@@ -33,6 +33,11 @@ let ctx: TestContext;
 let agent: request.SuperAgentTest;
 let foreignCompanyId: number;
 let foreignBaleId: number;
+let foreignWorkerId: number;
+let activeWorkerId: number;
+let inactiveWorkerId: number;
+let otherWorkerId: number;
+let positionId: number;
 
 let baleSeq = 0;
 
@@ -75,6 +80,39 @@ async function baleRow(id: number) {
   return result.rows[0] ?? null;
 }
 
+/** The bale's worker fields, which payroll and the bale label both read. */
+async function workerFields(id: number) {
+  const result = await pool.query<{ finalized_by: number | null; worker_name: string | null }>(
+    `SELECT finalized_by, worker_name FROM factory_bales WHERE id = $1`,
+    [id]
+  );
+  return result.rows[0] ?? null;
+}
+
+async function attributionRow(baleId: number) {
+  const result = await pool.query<{
+    worker_id: number | null;
+    worker_name_snapshot: string | null;
+    production_position_id: number | null;
+  }>(
+    `SELECT worker_id, worker_name_snapshot, production_position_id
+     FROM factory_bale_production_attributions WHERE bale_id = $1`,
+    [baleId]
+  );
+  return result.rows[0] ?? null;
+}
+
+/** A Stock Entry bale carries an attribution row; a pressed one may not. */
+async function attributeBale(baleId: number, workerId: number, workerName: string) {
+  await pool.query(
+    `INSERT INTO factory_bale_production_attributions
+       (company_id, bale_id, worker_id, worker_name_snapshot, production_position_id,
+        production_position_name_snapshot, stock_entry_date)
+     VALUES ($1, $2, $3, $4, $5, $6, '2026-05-01')`,
+    [ctx.companyId, baleId, workerId, workerName, positionId, `${TEST_PREFIX} Position`]
+  );
+}
+
 beforeAll(async () => {
   ctx = await seedTestData(TEST_PREFIX);
   agent = request.agent(ctx.app);
@@ -100,10 +138,37 @@ beforeAll(async () => {
     [foreignCompanyId, `${TEST_PREFIX}-FGN-1`]
   );
   foreignBaleId = foreign.rows[0].id;
+
+  const workers = await pool.query<{ id: number }>(
+    `INSERT INTO factory_workers (company_id, full_name, active) VALUES
+       ($1, $2, true), ($1, $3, false), ($1, $4, true) RETURNING id`,
+    [ctx.companyId, `${TEST_PREFIX} Active`, `${TEST_PREFIX} Inactive`, `${TEST_PREFIX} Other`]
+  );
+  activeWorkerId = workers.rows[0].id;
+  inactiveWorkerId = workers.rows[1].id;
+  otherWorkerId = workers.rows[2].id;
+
+  const foreignWorker = await pool.query<{ id: number }>(
+    `INSERT INTO factory_workers (company_id, full_name) VALUES ($1, $2) RETURNING id`,
+    [foreignCompanyId, `${TEST_PREFIX} Foreign`]
+  );
+  foreignWorkerId = foreignWorker.rows[0].id;
+
+  const position = await pool.query<{ id: number }>(
+    `INSERT INTO factory_production_positions (company_id, name) VALUES ($1, $2) RETURNING id`,
+    [ctx.companyId, `${TEST_PREFIX} Position`]
+  );
+  positionId = position.rows[0].id;
 }, 120000);
 
 afterAll(async () => {
+  await pool.query(
+    `DELETE FROM factory_bale_production_attributions WHERE company_id IN ($1, $2)`,
+    [ctx.companyId, foreignCompanyId]
+  );
+  await pool.query(`DELETE FROM factory_production_positions WHERE company_id = $1`, [ctx.companyId]);
   await pool.query(`DELETE FROM factory_bales WHERE company_id = $1`, [foreignCompanyId]);
+  await pool.query(`DELETE FROM factory_workers WHERE company_id IN ($1, $2)`, [ctx.companyId, foreignCompanyId]);
   await pool.query(`DELETE FROM companies WHERE id = $1`, [foreignCompanyId]);
   await cleanupTestData(TEST_PREFIX);
   closeTestServer();
@@ -299,5 +364,144 @@ describe("PATCH /api/factory/bales/:id/product-name", () => {
 
     expect(response.status).not.toBe(200);
     expect((await baleRow(foreignBaleId))?.product_name).toBe(before?.product_name ?? null);
+  });
+});
+
+describe("PATCH /api/factory/bales/:id/assign-worker", () => {
+  it("stamps the worker on the bale and on its production attribution", async () => {
+    const baleId = await createBale();
+    await attributeBale(baleId, otherWorkerId, `${TEST_PREFIX} Other`);
+
+    const response = await agent
+      .patch(`/api/factory/bales/${baleId}/assign-worker`)
+      .send({ workerId: activeWorkerId });
+    expect(response.status).toBe(200);
+
+    const bale = await workerFields(baleId);
+    expect(bale?.finalized_by).toBe(activeWorkerId);
+    expect(bale?.worker_name).toBe(`${TEST_PREFIX} Active`);
+
+    // Payroll reads the attribution, not the bale. Correcting one and not the
+    // other pays the previous worker for production credited to someone else.
+    const attribution = await attributionRow(baleId);
+    expect(attribution?.worker_id).toBe(activeWorkerId);
+    expect(attribution?.worker_name_snapshot).toBe(`${TEST_PREFIX} Active`);
+    // The position snapshot is a team record, not a worker record; a worker
+    // correction must not quietly move production between teams.
+    expect(attribution?.production_position_id).toBe(positionId);
+  });
+
+  it("refuses an inactive worker or one from another company", async () => {
+    const baleId = await createBale();
+
+    for (const workerId of [inactiveWorkerId, foreignWorkerId]) {
+      const response = await agent.patch(`/api/factory/bales/${baleId}/assign-worker`).send({ workerId });
+      expect(response.status).toBe(400);
+    }
+    expect((await workerFields(baleId))?.finalized_by).toBeNull();
+  });
+
+  it("rejects a missing or non-positive worker id, and 404s an unknown bale", async () => {
+    const baleId = await createBale();
+    expect((await agent.patch(`/api/factory/bales/${baleId}/assign-worker`).send({})).status).toBe(400);
+    expect((await agent.patch(`/api/factory/bales/${baleId}/assign-worker`).send({ workerId: 0 })).status).toBe(400);
+    expect(
+      (await agent.patch(`/api/factory/bales/${foreignBaleId}/assign-worker`).send({ workerId: activeWorkerId })).status
+    ).toBe(404);
+  });
+});
+
+describe("PATCH /api/factory/bales/bulk-assign-worker", () => {
+  it("assigns every named bale in this company and reports the count", async () => {
+    const first = await createBale();
+    const second = await createBale();
+    await attributeBale(first, otherWorkerId, `${TEST_PREFIX} Other`);
+
+    const response = await agent
+      .patch("/api/factory/bales/bulk-assign-worker")
+      .send({ baleIds: [first, second], workerId: activeWorkerId });
+
+    expect(response.status).toBe(200);
+    expect(response.body.updated).toBe(2);
+    expect((await workerFields(first))?.finalized_by).toBe(activeWorkerId);
+    expect((await workerFields(second))?.finalized_by).toBe(activeWorkerId);
+    expect((await attributionRow(first))?.worker_id).toBe(activeWorkerId);
+  });
+
+  it("silently skips bales in another company", async () => {
+    const mine = await createBale();
+
+    const response = await agent
+      .patch("/api/factory/bales/bulk-assign-worker")
+      .send({ baleIds: [mine, foreignBaleId], workerId: activeWorkerId });
+
+    // The id array comes straight from the request; the company predicate in
+    // the WHERE clause is the only thing keeping another tenant's bales out.
+    expect(response.body.updated).toBe(1);
+    expect((await workerFields(foreignBaleId))?.finalized_by).toBeNull();
+  });
+
+  it("counts a repeated id once and rejects a list with nothing usable", async () => {
+    const baleId = await createBale();
+
+    const repeated = await agent
+      .patch("/api/factory/bales/bulk-assign-worker")
+      .send({ baleIds: [baleId, baleId], workerId: activeWorkerId });
+    expect(repeated.body.updated).toBe(1);
+
+    expect(
+      (await agent.patch("/api/factory/bales/bulk-assign-worker").send({ baleIds: [], workerId: activeWorkerId }))
+        .status
+    ).toBe(400);
+    expect(
+      (
+        await agent
+          .patch("/api/factory/bales/bulk-assign-worker")
+          .send({ baleIds: ["x", -1], workerId: activeWorkerId })
+      ).status
+    ).toBe(400);
+  });
+});
+
+describe("POST /api/factory/bales/:id/repack", () => {
+  it("issues a new bale from the counter and retires the original", async () => {
+    const baleId = await createBale({ weightKg: "80.000", costPerKg: "2.50" });
+    await attributeBale(baleId, activeWorkerId, `${TEST_PREFIX} Active`);
+
+    const response = await agent.post(`/api/factory/bales/${baleId}/repack`).send({});
+    expect(response.status).toBe(200);
+
+    // The original is retired rather than deleted — its reference number is on
+    // paperwork — and exactly one replacement takes its place in stock.
+    expect((await baleRow(baleId))?.status).toBe("REPACKED");
+    const replacement = await baleRow(response.body.newBale.id);
+    expect(replacement?.status).toBe("IN_STOCK");
+    expect(Number(replacement?.weight_kg)).toBeCloseTo(80, 3);
+    expect(Number(replacement?.cost_per_kg)).toBeCloseTo(2.5, 2);
+    expect(Number(replacement?.total_cost)).toBeCloseTo(200, 2);
+    expect(response.body.newBale.referenceNumber).not.toBe(response.body.originalBale.referenceNumber);
+
+    // Production credit follows the bale, or the worker loses it at repack.
+    const attribution = await attributionRow(response.body.newBale.id);
+    expect(attribution?.worker_id).toBe(activeWorkerId);
+    expect(attribution?.production_position_id).toBe(positionId);
+  });
+
+  it("refuses to repack a bale twice or a sold one", async () => {
+    const baleId = await createBale();
+    expect((await agent.post(`/api/factory/bales/${baleId}/repack`).send({})).status).toBe(200);
+
+    // Repacking a REPACKED bale would mint a second replacement for stock that
+    // has already been replaced once.
+    expect((await agent.post(`/api/factory/bales/${baleId}/repack`).send({})).status).toBe(400);
+
+    const sold = await createBale({ status: "SOLD" });
+    expect((await agent.post(`/api/factory/bales/${sold}/repack`).send({})).status).toBe(400);
+    expect((await baleRow(sold))?.status).toBe("SOLD");
+  });
+
+  it("returns 400 for a bale in another company", async () => {
+    expect((await agent.post(`/api/factory/bales/${foreignBaleId}/repack`).send({})).status).toBe(400);
+    expect((await baleRow(foreignBaleId))?.status).toBe("IN_STOCK");
   });
 });
