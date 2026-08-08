@@ -24,7 +24,7 @@ export interface RevisedTransferWAItem {
 export interface SendRevisedTransferWAOptions {
   sourceLocationId: number;
   sourceLocationName: string;
-  destinationLocationId: number;
+  destinationLocationId?: number;
   destLocationName: string;
   items: RevisedTransferWAItem[];
   voucherNumber: string;
@@ -58,7 +58,7 @@ export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOpt
   } = opts;
 
   logger.info(
-    `[RevisedTransferWA] Starting for ${voucherNumber} → sourceLocId=${sourceLocationId}, destLocId=${destinationLocationId}, items=${items.length}`
+    `[RevisedTransferWA] Starting for ${voucherNumber} → sourceLocId=${sourceLocationId}, destLocId=${destinationLocationId ?? "unknown"}, items=${items.length}`
   );
 
   if (!items || items.length === 0) {
@@ -66,11 +66,12 @@ export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOpt
     return;
   }
 
-  if (!Number.isInteger(destinationLocationId) || destinationLocationId <= 0) {
+  if (!Number.isInteger(destinationLocationId) || Number(destinationLocationId) <= 0) {
     logger.warn(`[RevisedTransferWA] Invalid destination location for ${voucherNumber} — skipping`);
     return;
   }
 
+  const destinationId = Number(destinationLocationId);
   const [destination] = await db
     .select({
       id: locations.id,
@@ -79,11 +80,11 @@ export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOpt
       transferWaGroupChatId: locations.transferWaGroupChatId,
     })
     .from(locations)
-    .where(eq(locations.id, destinationLocationId))
+    .where(eq(locations.id, destinationId))
     .limit(1);
 
   if (!destination) {
-    logger.warn(`[RevisedTransferWA] Destination location ${destinationLocationId} not found for ${voucherNumber} — skipping`);
+    logger.warn(`[RevisedTransferWA] Destination location ${destinationId} not found for ${voucherNumber} — skipping`);
     return;
   }
 
@@ -102,13 +103,13 @@ export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOpt
 
   if (!chatId) {
     logger.info(
-      `[RevisedTransferWA] No transfer WhatsApp group configured for destination ${destinationLocationId} (${destination.name}) or its company for ${voucherNumber} — skipping`
+      `[RevisedTransferWA] No transfer WhatsApp group configured for destination ${destinationId} (${destination.name}) or its company for ${voucherNumber} — skipping`
     );
     return;
   }
 
   logger.info(
-    `[RevisedTransferWA] Routing ${voucherNumber} to ${routingSource} group ${chatId} for destination ${destinationLocationId} (${destination.name})`
+    `[RevisedTransferWA] Routing ${voucherNumber} to ${routingSource} group ${chatId} for destination ${destinationId} (${destination.name})`
   );
 
   const uniqueIds = [...new Set(items.map((i) => i.stockItemId).filter((id) => id > 0))];
@@ -171,7 +172,7 @@ export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOpt
     if (result.success) {
       imageSent = true;
       logger.info(
-        `[RevisedTransferWA] Sent ${voucherNumber} revised image to ${routingSource} group ${chatId} (destination ${destinationLocationId})`
+        `[RevisedTransferWA] Sent ${voucherNumber} revised image to ${routingSource} group ${chatId} (destination ${destinationId})`
       );
     } else {
       logger.warn(`[RevisedTransferWA] Image send failed for ${voucherNumber} → ${chatId}: ${result.error}`);
@@ -182,7 +183,7 @@ export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOpt
     const textResult = await sendWhatsAppTextToChatIdPos(chatId, caption);
     if (textResult.success) {
       logger.info(
-        `[RevisedTransferWA] Text fallback sent for ${voucherNumber} → ${routingSource} group ${chatId} (destination ${destinationLocationId})`
+        `[RevisedTransferWA] Text fallback sent for ${voucherNumber} → ${routingSource} group ${chatId} (destination ${destinationId})`
       );
     } else {
       logger.warn(`[RevisedTransferWA] Text fallback failed for ${voucherNumber} → ${chatId}: ${textResult.error}`);
