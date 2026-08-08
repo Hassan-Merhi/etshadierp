@@ -3,6 +3,7 @@ import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 
 let inFlight: Promise<void> | null = null;
+let completed = false;
 
 /**
  * One-time/idempotent data correction for Properties-mode landlord accounting.
@@ -13,16 +14,23 @@ let inFlight: Promise<void> | null = null;
  * on landlord monthly rows are cleared so the old deferred-recognition pass can
  * never recognise the same cash a second time.
  *
- * Safe to call on every server start:
+ * Safe to call repeatedly in one process:
  *  - the company-scoped advisory lock prevents concurrent runs;
  *  - the transfer is based on the CURRENT deferred balance;
- *  - after the first successful run that balance is zero, so later calls no-op.
+ *  - after a successful run the process-local completed flag makes later calls no-op;
+ *  - a failed early-startup attempt remains retryable on the first Properties request.
  */
 export function reclassifyLegacyDeferredRentForProperties(): Promise<void> {
+  if (completed) return Promise.resolve();
+
   if (!inFlight) {
-    inFlight = runReclassification().finally(() => {
-      inFlight = null;
-    });
+    inFlight = runReclassification()
+      .then(() => {
+        completed = true;
+      })
+      .finally(() => {
+        inFlight = null;
+      });
   }
   return inFlight;
 }
