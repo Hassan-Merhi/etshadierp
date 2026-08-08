@@ -55,7 +55,8 @@ export function StockNameUpdateImport() {
 
   const changeRows = rows.filter((row) => row.status === "ready");
   const unchangedCount = rows.filter((row) => row.status === "unchanged").length;
-  const problemCount = rows.filter((row) => !["ready", "unchanged"].includes(row.status)).length;
+  const notFoundCount = rows.filter((row) => row.status === "not_found").length;
+  const blockingProblemCount = rows.filter((row) => ["duplicate", "invalid"].includes(row.status)).length;
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -135,9 +136,10 @@ export function StockNameUpdateImport() {
 
       setRows(preview);
       const ready = preview.filter((row) => row.status === "ready").length;
+      const missing = preview.filter((row) => row.status === "not_found").length;
       toast({
         title: "Preview ready",
-        description: `${ready} name change${ready === 1 ? "" : "s"} ready to apply`,
+        description: `${ready} name change${ready === 1 ? "" : "s"} ready to apply${missing > 0 ? `; ${missing} missing code${missing === 1 ? "" : "s"} will be ignored` : ""}`,
       });
     } catch (error: any) {
       toast({ title: "Could not read file", description: error.message, variant: "destructive" });
@@ -149,7 +151,7 @@ export function StockNameUpdateImport() {
   const statusBadge = (status: PreviewStatus) => {
     if (status === "ready") return <Badge>Ready</Badge>;
     if (status === "unchanged") return <Badge variant="secondary">Unchanged</Badge>;
-    if (status === "not_found") return <Badge variant="destructive">Code not found</Badge>;
+    if (status === "not_found") return <Badge variant="secondary">Ignored — code not found</Badge>;
     if (status === "duplicate") return <Badge variant="destructive">Duplicate code</Badge>;
     return <Badge variant="destructive">Invalid</Badge>;
   };
@@ -159,8 +161,9 @@ export function StockNameUpdateImport() {
       <Alert>
         <CheckCircle2 className="h-4 w-4" />
         <AlertDescription>
-          Match existing stock items by primary code and replace only the item name. Stock quantity, costs, selling
-          prices, barcodes, groups, grades and categories are not changed.
+          Match existing stock items by primary code and replace only the item name. Codes that do not exist are ignored
+          and the remaining valid matches still proceed. Stock quantity, costs, selling prices, barcodes, groups, grades
+          and categories are not changed.
         </AlertDescription>
       </Alert>
 
@@ -198,7 +201,8 @@ export function StockNameUpdateImport() {
             <Badge variant="secondary">{rows.length} rows</Badge>
             <Badge variant="secondary">{changeRows.length} changes</Badge>
             <Badge variant="secondary">{unchangedCount} unchanged</Badge>
-            {problemCount > 0 && <Badge variant="destructive">{problemCount} need attention</Badge>}
+            {notFoundCount > 0 && <Badge variant="secondary">{notFoundCount} ignored (not found)</Badge>}
+            {blockingProblemCount > 0 && <Badge variant="destructive">{blockingProblemCount} need attention</Badge>}
           </div>
 
           <div className="max-h-72 overflow-auto rounded-md border">
@@ -232,7 +236,7 @@ export function StockNameUpdateImport() {
           <div className="flex justify-end">
             <Button
               onClick={() => mutation.mutate()}
-              disabled={mutation.isPending || changeRows.length === 0 || problemCount > 0}
+              disabled={mutation.isPending || changeRows.length === 0 || blockingProblemCount > 0}
               className="gap-2"
               data-testid="button-update-stock-names-by-code"
             >
