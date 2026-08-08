@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "wouter";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EnrichedContainerRow, OtwColId, fmtDate } from "./gitContainerTypes";
 import {
@@ -83,7 +84,15 @@ export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDra
                         {idx + 1}
                       </TableCell>
                       <TableCell className="font-mono font-bold text-[11px] h-10">
-                        <span className="group-hover:text-primary transition-colors">{c.containerNumber}</span>
+                        <Link
+                          href={`/containers/${c.id}`}
+                          className="text-foreground hover:text-primary hover:underline underline-offset-2 transition-colors"
+                          onClick={(event) => event.stopPropagation()}
+                          data-testid={`link-container-${c.id}`}
+                          title={`Open container ${c.containerNumber}`}
+                        >
+                          {c.containerNumber}
+                        </Link>
                       </TableCell>
                       {colVis.supplier && (
                         <TableCell className="text-muted-foreground h-10">
