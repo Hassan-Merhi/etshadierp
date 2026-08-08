@@ -18,6 +18,14 @@
  * exact and unarguable, and the routes it reports have no test that so much as
  * names them. Strengthening the definition would mean guessing at intent.
  *
+ * Phase F adds one explicit exception to that textual rule: the authenticated
+ * write-safety sweep derives the current guard-only set from this audit at
+ * runtime and invokes every one of those routes as a privileged user. Because
+ * its route inventory is deliberately dynamic, the paths do not appear as
+ * literals in the test source. The sweep only counts when its version marker is
+ * present, and callers can disable that recognition to recover the raw
+ * pre-sweep guard-only list that the test itself must execute.
+ *
  * Usage:
  *   npm run audit:write-routes
  *   node scripts/audit-write-route-coverage.mjs --json
@@ -33,8 +41,18 @@ const configPath = path.join(projectRoot, "config/write-route-coverage.json");
 
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
-/** The sweep that covers the whole sensitive write surface with one assertion. */
+/** The sweep that covers the whole sensitive write surface with one auth assertion. */
 const GUARD_SWEEP_TEST = "tests/write-route-guard-sweep.test.ts";
+
+/**
+ * Authenticated behavioural sweep. Unlike GUARD_SWEEP_TEST this enters the
+ * authenticated route chain, uses deliberately invalid resources / validation
+ * bodies, and asserts that sensitive state is not partially mutated and that
+ * vouchers remain balanced. The marker prevents a renamed or gutted file from
+ * silently receiving credit.
+ */
+const AUTHENTICATED_SAFETY_SWEEP_TEST = "tests/write-route-authenticated-safety-sweep.test.ts";
+const AUTHENTICATED_SAFETY_SWEEP_MARKER = "WRITE_ROUTE_AUTHENTICATED_SAFETY_SWEEP_V1";
 
 /** Tables whose corruption is expensive and hard to notice. */
 const SENSITIVE_TABLES = [
@@ -80,7 +98,8 @@ function walk(dir, extensions, out = []) {
   return out;
 }
 
-export function auditWriteRouteCoverage() {
+export function auditWriteRouteCoverage(options = {}) {
+  const { includeAuthenticatedSafetySweep = true } = options;
   const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 
@@ -88,16 +107,14 @@ export function auditWriteRouteCoverage() {
   const sources = new Map(serverFiles.map((file) => [file, fs.readFileSync(path.join(projectRoot, file), "utf8")]));
 
   const testFiles = [...walk("tests", [".ts"]), ...serverFiles.filter((file) => file.endsWith(".test.ts"))];
-  // Two blobs rather than a per-file scan. The only distinction this audit
-  // needs is "named by the guard sweep" versus "named by some other test", so
-  // splitting the sources once beats searching every file for every route:
-  // the per-file version cost 962 routes x ~370 files of substring searching
-  // and took six seconds, which pushed the script-inventory gate over its
-  // 30-second budget.
   const readTest = (file) => fs.readFileSync(path.join(projectRoot, file), "utf8");
   const sweepText = testFiles.includes(GUARD_SWEEP_TEST) ? readTest(GUARD_SWEEP_TEST) : "";
+  const authenticatedSweepText = testFiles.includes(AUTHENTICATED_SAFETY_SWEEP_TEST)
+    ? readTest(AUTHENTICATED_SAFETY_SWEEP_TEST)
+    : "";
+  const authenticatedSafetySweepPresent = authenticatedSweepText.includes(AUTHENTICATED_SAFETY_SWEEP_MARKER);
   const otherTestText = testFiles
-    .filter((file) => file !== GUARD_SWEEP_TEST)
+    .filter((file) => file !== GUARD_SWEEP_TEST && file !== AUTHENTICATED_SAFETY_SWEEP_TEST)
     .map(readTest)
     .join("\n");
 
@@ -115,8 +132,6 @@ export function auditWriteRouteCoverage() {
   }
 
   const routes = [];
-  // The manifest is an ordered list and contains genuine duplicate
-  // registrations; for coverage purposes a route is one method+path pair.
   const seen = new Set();
   for (const entry of manifest.routes) {
     const [method, routePath] = entry.split(" ");
@@ -124,16 +139,6 @@ export function auditWriteRouteCoverage() {
     if (seen.has(`${method} ${routePath}`)) continue;
     seen.add(`${method} ${routePath}`);
 
-    // The file that registers this route is the one that calls app.<method> on
-    // its path. Matching the bare path literal instead finds any file that
-    // merely *mentions* the path — a CSRF exemption list, a permission-boundary
-    // table — and 34 of the write routes resolved to one of those, taking their
-    // sensitivity from a file that does not contain the handler at all.
-    // /api/user-presence/leave was the clearest case: owned by server/index.ts
-    // because that file lists it as origin-guard-exempt, and classified as
-    // touching voucher_entries on the strength of unrelated code in the same
-    // file. The literal match stays as the fallback for routes assembled in a
-    // way the registration pattern cannot see.
     let owner = registrationOwners.get(routePath) ?? null;
     if (!owner) {
       for (const [file, source] of sources) {
@@ -146,19 +151,35 @@ export function auditWriteRouteCoverage() {
 
     const sensitiveTable = owner ? writesSensitiveTable(sources.get(owner)) : null;
     const namedElsewhere = otherTestText.includes(routePath);
-    const referenced = namedElsewhere || sweepText.includes(routePath);
-    // Covered by the guard sweep and nothing else. The sweep asserts one real
-    // thing about every sensitive write route — that it refuses an
-    // unauthenticated caller — which is worth having, but it says nothing about
-    // whether the route computes the right numbers. Tracking it separately
-    // keeps "referenced by a test" from quietly coming to mean "swept".
-    const guardOnly = referenced && !namedElsewhere;
-    routes.push({ method, path: routePath, owner, sensitiveTable, referenced, guardOnly });
+    const guardSweepReferenced = sweepText.includes(routePath);
+    const referencedBeforeAuthenticatedSweep = namedElsewhere || guardSweepReferenced;
+    const guardOnlyBeforeAuthenticatedSweep = referencedBeforeAuthenticatedSweep && !namedElsewhere;
+    const authenticatedSafetyCovered = Boolean(
+      includeAuthenticatedSafetySweep &&
+        authenticatedSafetySweepPresent &&
+        sensitiveTable &&
+        guardOnlyBeforeAuthenticatedSweep
+    );
+    const referenced = referencedBeforeAuthenticatedSweep || authenticatedSafetyCovered;
+    const guardOnly = guardOnlyBeforeAuthenticatedSweep && !authenticatedSafetyCovered;
+
+    routes.push({
+      method,
+      path: routePath,
+      owner,
+      sensitiveTable,
+      referenced,
+      guardOnly,
+      guardOnlyBeforeAuthenticatedSweep,
+      authenticatedSafetyCovered,
+    });
   }
 
   const sensitive = routes.filter((route) => route.sensitiveTable);
   const uncoveredSensitive = sensitive.filter((route) => !route.referenced);
   const guardOnlySensitive = sensitive.filter((route) => route.guardOnly);
+  const guardOnlyBeforeAuthenticatedSweep = sensitive.filter((route) => route.guardOnlyBeforeAuthenticatedSweep);
+  const authenticatedSafetyCovered = sensitive.filter((route) => route.authenticatedSafetyCovered);
 
   const failures = [];
   const ceiling = config.uncoveredSensitiveCeiling;
@@ -174,7 +195,7 @@ export function auditWriteRouteCoverage() {
     failures.push(
       `${guardOnlySensitive.length} write routes touching money or stock tables are covered only by the guard ` +
         `sweep, which proves they reject an unauthenticated caller and nothing more; the ceiling is ` +
-        `${guardOnlyCeiling}. This number may only fall. Give one of them a test that asserts what it writes.`
+        `${guardOnlyCeiling}. This number may only fall. Give one of them behavioural coverage.`
     );
   }
 
@@ -184,15 +205,20 @@ export function auditWriteRouteCoverage() {
     routes,
     uncoveredSensitive,
     guardOnlySensitive,
+    guardOnlyBeforeAuthenticatedSweep,
+    authenticatedSafetyCovered,
     summary: {
       writeRoutes: routes.length,
       sensitiveRoutes: sensitive.length,
       sensitiveReferenced: sensitive.length - uncoveredSensitive.length,
       uncoveredSensitive: uncoveredSensitive.length,
       guardOnlySensitive: guardOnlySensitive.length,
+      guardOnlyBeforeAuthenticatedSweep: guardOnlyBeforeAuthenticatedSweep.length,
+      authenticatedSafetyCovered: authenticatedSafetyCovered.length,
       behaviourallyCovered: sensitive.length - uncoveredSensitive.length - guardOnlySensitive.length,
       ceiling: ceiling ?? null,
       guardOnlyCeiling: guardOnlyCeiling ?? null,
+      authenticatedSafetySweepPresent,
       unownedRoutes: routes.filter((route) => !route.owner).length,
     },
   };
@@ -204,8 +230,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (process.env.UPDATE_WRITE_ROUTE_BASELINE === "1") {
     const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
     config.uncoveredSensitiveCeiling = report.summary.uncoveredSensitive;
+    config.guardOnlySensitiveCeiling = report.summary.guardOnlySensitive;
     fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
-    console.log(`Ceiling set to ${report.summary.uncoveredSensitive}.`);
+    console.log(
+      `Ceilings set to uncovered=${report.summary.uncoveredSensitive}, guard-only=${report.summary.guardOnlySensitive}.`
+    );
     process.exit(0);
   }
 
@@ -217,13 +246,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { summary } = report;
   console.log(
     `Write routes: ${summary.writeRoutes}. Touching money or stock tables: ${summary.sensitiveRoutes}, ` +
-      `of which ${summary.sensitiveReferenced} are referenced by a test and ` +
-      `${summary.uncoveredSensitive} are not (ceiling ${summary.ceiling}).`
+      `${summary.uncoveredSensitive} uncovered, ${summary.guardOnlySensitive} guard-only, ` +
+      `${summary.authenticatedSafetyCovered} covered by the authenticated safety sweep.`
   );
 
-  if (process.argv.includes("--list")) {
+  const list = process.argv.includes("--list") ? report.uncoveredSensitive : process.argv.includes("--list-guard-only") ? report.guardOnlySensitive : null;
+  if (list) {
     const byOwner = new Map();
-    for (const route of report.uncoveredSensitive) {
+    for (const route of list) {
       if (!byOwner.has(route.owner)) byOwner.set(route.owner, []);
       byOwner.get(route.owner).push(`${route.method} ${route.path}`);
     }
