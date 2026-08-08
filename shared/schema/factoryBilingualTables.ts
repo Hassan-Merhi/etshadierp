@@ -187,15 +187,7 @@ export const insertFactoryBaleSchema = createInsertSchema(factoryBales)
     costPerKg: z.string().optional(),
     totalCost: z.string().optional(),
     status: z
-      .enum([
-        "PENDING_PRESSING",
-        "IN_STOCK",
-        "RESERVED_FOR_ORDER",
-        "FINALIZED",
-        "SOLD",
-        "DISPATCHED",
-        "DELETED",
-      ])
+      .enum(["PENDING_PRESSING", "IN_STOCK", "RESERVED_FOR_ORDER", "FINALIZED", "SOLD", "DISPATCHED", "DELETED"])
       .optional(),
     pressedAt: z.string().optional().nullable(),
     finalizedAt: z.string().optional().nullable(),
@@ -217,9 +209,7 @@ export const customerProformaLines = pgTable(
     productNameAr: text("product_name_ar"),
     quantity: integer("quantity").notNull().default(0),
     pricePerBale: decimal("price_per_bale", { precision: 20, scale: 2 }).notNull(),
-    productionPricePerBale: decimal("production_price_per_bale", { precision: 20, scale: 2 })
-      .notNull()
-      .default("0"),
+    productionPricePerBale: decimal("production_price_per_bale", { precision: 20, scale: 2 }).notNull().default("0"),
     priceFixed: boolean("price_fixed").notNull().default(false),
     pricingMode: text("pricing_mode").notNull().default("per_bale"),
     pricePerKg: decimal("price_per_kg", { precision: 20, scale: 6 }),
@@ -408,10 +398,10 @@ export const factoryV3LoadBales = pgTable("factory_v3_load_bales", {
   productNameAr: text("product_name_ar"),
   weightKg: decimal("weight_kg", { precision: 15, scale: 3 }).notNull().default("0"),
   phase: text("phase").notNull().default("scanned"),
-  addedBy: integer("added_by"),
+  addedBy: varchar("added_by"),
   addedByName: text("added_by_name"),
   addedAt: timestamp("added_at").notNull().defaultNow(),
-  removedBy: integer("removed_by"),
+  removedBy: varchar("removed_by"),
   removedByName: text("removed_by_name"),
   removedAt: timestamp("removed_at"),
   notes: text("notes"),
