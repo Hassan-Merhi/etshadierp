@@ -16,6 +16,7 @@ import {
 import { adjustSpInventoryAtomic, respondToSpInventoryIntegrityError } from "../../services/sp/spInventoryIntegrity";
 import { SP_RELEASE_CURRENCY, SP_RELEASE_EXCHANGE_RATE } from "../../services/sp/spReleasePolicy";
 import { requireSpCompany, getSpAccount, parseNum } from "./spHelpers";
+import { resultRows } from "../../lib/queryResult";
 
 // ── Sales + Stock Movements ───────────────────────────────────────────────────
 
@@ -156,7 +157,7 @@ export function registerSpSalesRoutes(app: Express) {
             );
           }
 
-          const lots = (lotsQuery as any).rows ?? (lotsQuery as any);
+          const lots = resultRows(lotsQuery);
           const totalAvail = lots.reduce((s: number, l: any) => s + parseNum(l.qty_remaining), 0);
           if (qtySold > totalAvail + 0.0001) {
             throw new Error(

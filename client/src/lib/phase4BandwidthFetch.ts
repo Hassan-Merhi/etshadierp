@@ -12,8 +12,34 @@ const PROFORMA_DETAIL_PATH = /^\/api\/factory\/customer-proformas\/(\d+)$/;
 const PROFORMA_WRITE_PATH = /^\/api\/factory\/customer-proforma(?:s|-lines)(?:\/|$)/;
 const ORDER_DETAIL_PATH = /^\/api\/factory\/customer-orders\/(\d+)$/;
 
+/**
+ * The payloads this interceptor handles come off the wire untyped. Each shape
+ * below names only the fields the interception logic actually reads; the index
+ * signature carries the rest of the server's response through untouched, so
+ * re-serialising a row never drops a field this file does not know about.
+ */
+type DailyScanRow = {
+  id?: number | string;
+  scan_date?: string;
+  [field: string]: unknown;
+};
+
+type ProformaSummaryRow = {
+  id?: number | string;
+  isActive?: boolean;
+  [field: string]: unknown;
+};
+
+type ProformaDetail = {
+  lines?: unknown;
+  [field: string]: unknown;
+};
+
+/** Marker for the one-time fetch patch, kept off the global `Window` type. */
+type PatchedWindow = Window & { __phase4BandwidthFetchInstalled?: boolean };
+
 type DailyCacheEntry = {
-  rows: any[];
+  rows: DailyScanRow[];
   reconciledAt: number;
 };
 
@@ -75,8 +101,8 @@ function dailyKey(url: URL): string {
   return `${url.pathname}?${params.toString()}`;
 }
 
-function mergeRows(current: any[], incoming: any[]): any[] {
-  const byId = new Map<number, any>();
+function mergeRows(current: DailyScanRow[], incoming: DailyScanRow[]): DailyScanRow[] {
+  const byId = new Map<number, DailyScanRow>();
   for (const row of current) byId.set(Number(row.id), row);
   for (const row of incoming) byId.set(Number(row.id), row);
   return [...byId.values()].sort((a, b) => Number(a.id) - Number(b.id));
@@ -87,8 +113,8 @@ async function fetchAllPages(
   sourceUrl: URL,
   init: RequestInit | undefined,
   afterId?: number
-): Promise<{ rows: any[]; response: Response }> {
-  const rows: any[] = [];
+): Promise<{ rows: DailyScanRow[]; response: Response }> {
+  const rows: DailyScanRow[] = [];
   let page = 1;
   let totalPages = 1;
   let lastResponse: Response | null = null;
@@ -153,7 +179,7 @@ async function getProformaDetail(
   originalFetch: typeof window.fetch,
   id: number,
   init?: RequestInit
-): Promise<any | null> {
+): Promise<ProformaDetail | null> {
   const cached = proformaDetailCache.get(id);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.response
@@ -172,7 +198,7 @@ async function getProformaDetail(
     .catch(() => null);
 }
 
-function patchProformaSummaryQueries(id: number, detail: any): void {
+function patchProformaSummaryQueries(id: number, detail: ProformaDetail): void {
   if (!detail?.lines) return;
   const queries = queryClient.getQueryCache().findAll({
     predicate: (query) => {
@@ -184,7 +210,8 @@ function patchProformaSummaryQueries(id: number, detail: any): void {
   for (const query of queries) {
     queryClient.setQueryData(query.queryKey, (current: unknown) => {
       if (!Array.isArray(current)) return current;
-      return current.map((row: any) => (Number(row?.id) === id ? { ...row, lines: detail.lines } : row));
+      const rows = current as ProformaSummaryRow[];
+      return rows.map((row) => (Number(row?.id) === id ? { ...row, lines: detail.lines } : row));
     });
   }
 }
@@ -208,18 +235,19 @@ async function handleProformaSummary(
 
   if (!isLoadingProformaPage()) return raw;
 
-  const summaries = await raw
+  const payload: unknown = await raw
     .clone()
     .json()
     .catch(() => []);
-  if (!Array.isArray(summaries)) return raw;
+  if (!Array.isArray(payload)) return raw;
+  const summaries = payload as ProformaSummaryRow[];
 
   const detailIds = new Set<number>(linkedProformaIds);
   for (const row of summaries) {
     if (row?.isActive && Number.isFinite(Number(row.id))) detailIds.add(Number(row.id));
   }
 
-  const details = new Map<number, any>();
+  const details = new Map<number, ProformaDetail>();
   await Promise.all(
     [...detailIds].map(async (id) => {
       const detail = await getProformaDetail(originalFetch, id, init);
@@ -227,7 +255,7 @@ async function handleProformaSummary(
     })
   );
 
-  const enriched = summaries.map((row: any) => {
+  const enriched = summaries.map((row) => {
     const detail = details.get(Number(row.id));
     return detail?.lines ? { ...row, lines: detail.lines } : row;
   });
@@ -252,7 +280,7 @@ function updateDailyCacheFromWrite(pathname: string, method: string, response: R
     void response
       .clone()
       .json()
-      .then((row: any) => {
+      .then((row: DailyScanRow | null) => {
         if (!row?.scan_date || !row?.id) return;
         for (const [key, entry] of dailyCache) {
           if (!key.startsWith("/api/factory/daily-bale-scans?")) continue;
@@ -265,8 +293,9 @@ function updateDailyCacheFromWrite(pathname: string, method: string, response: R
 }
 
 export function installPhase4BandwidthFetch(): void {
-  if ((window as any).__phase4BandwidthFetchInstalled) return;
-  (window as any).__phase4BandwidthFetchInstalled = true;
+  const patchedWindow = window as PatchedWindow;
+  if (patchedWindow.__phase4BandwidthFetchInstalled) return;
+  patchedWindow.__phase4BandwidthFetchInstalled = true;
 
   const originalFetch = window.fetch.bind(window);
 

@@ -3,14 +3,10 @@ import { sql } from "drizzle-orm";
 import { db } from "../../db";
 import { logger } from "../../lib/logger";
 import { requireAuth, requireRole } from "../../auth";
-import {
-  ensurePhase2Schema,
-  getSuspenseReview,
-  pn,
-  validateMigrationPair,
-} from "./spMigrationPhase2Common";
+import { ensurePhase2Schema, getSuspenseReview, pn, validateMigrationPair } from "./spMigrationPhase2Common";
 import { importHistoricalSales } from "./spMigrationPhase2Sales";
 import { importContainers } from "./spMigrationPhase2Containers";
+import { resultRows, firstRow } from "../../lib/queryResult";
 
 async function rollbackMigrationRun(req: any, res: any): Promise<any> {
   const runId = String(req.body?.runId ?? "");
@@ -26,7 +22,7 @@ async function rollbackMigrationRun(req: any, res: any): Promise<any> {
     WHERE id = ${runId}
     LIMIT 1
   `);
-  const run = (runResult as any).rows?.[0];
+  const run = firstRow(runResult);
   if (!run) return res.status(404).json({ message: "Migration run not found" });
   if (run.status === "rolled_back") return res.status(409).json({ message: "Run is already rolled back" });
   if (run.status === "running") return res.status(409).json({ message: "A running migration cannot be rolled back" });
@@ -44,7 +40,7 @@ async function rollbackMigrationRun(req: any, res: any): Promise<any> {
     ORDER BY id DESC
   `);
   const grouped = new Map<string, number[]>();
-  for (const row of (trackedResult as any).rows ?? []) {
+  for (const row of resultRows<{ table_name: string; row_id: number }>(trackedResult)) {
     grouped.set(row.table_name, [...(grouped.get(row.table_name) ?? []), pn(row.row_id)]);
   }
 
@@ -89,7 +85,7 @@ async function rollbackMigrationRun(req: any, res: any): Promise<any> {
 
     if (directCompanyTables.has(table)) {
       const result = await db.execute(sql.raw(`SELECT company_id FROM ${table} WHERE id = ${id} LIMIT 1`));
-      return pn((result as any).rows?.[0]?.company_id) === targetId;
+      return pn(firstRow(result)?.company_id) === targetId;
     }
     if (table === "voucher_entries") {
       const result = await db.execute(sql`
@@ -99,7 +95,7 @@ async function rollbackMigrationRun(req: any, res: any): Promise<any> {
         WHERE e.id = ${id}
         LIMIT 1
       `);
-      return pn((result as any).rows?.[0]?.company_id) === targetId;
+      return pn(firstRow(result)?.company_id) === targetId;
     }
     if (table === "sales_items") {
       const result = await db.execute(sql`
@@ -109,7 +105,7 @@ async function rollbackMigrationRun(req: any, res: any): Promise<any> {
         WHERE i.id = ${id}
         LIMIT 1
       `);
-      return pn((result as any).rows?.[0]?.company_id) === targetId;
+      return pn(firstRow(result)?.company_id) === targetId;
     }
     return false;
   }
@@ -152,30 +148,20 @@ export function registerSpMigrationPhase2Routes(app: Express): void {
 
   // registerSpRoutes runs before the legacy migration router, so these focused
   // handlers replace the older incomplete Step 6/7 and rollback implementations.
-  app.post(
-    "/api/sp/migration/gc-sales-readonly",
-    requireAuth,
-    requireRole("Developer"),
-    importHistoricalSales
-  );
+  app.post("/api/sp/migration/gc-sales-readonly", requireAuth, requireRole("Developer"), importHistoricalSales);
   app.post("/api/sp/migration/gc-containers", requireAuth, requireRole("Developer"), importContainers);
   app.post("/api/sp/migration/rollback", requireAuth, requireRole("Developer"), rollbackMigrationRun);
 
-  app.get(
-    "/api/sp/migration/gc-suspense-review",
-    requireAuth,
-    requireRole("Developer"),
-    async (req: any, res: any) => {
-      try {
-        const pair = await validateMigrationPair(req, res, false);
-        if (!pair) return;
-        return res.json(await getSuspenseReview(pair.sourceId, pair.targetId));
-      } catch (error) {
-        logger.error("[SP Phase 2] Suspense review failed", { error });
-        return res.status(500).json({ message: "Failed to load migration suspense review" });
-      }
+  app.get("/api/sp/migration/gc-suspense-review", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
+    try {
+      const pair = await validateMigrationPair(req, res, false);
+      if (!pair) return;
+      return res.json(await getSuspenseReview(pair.sourceId, pair.targetId));
+    } catch (error) {
+      logger.error("[SP Phase 2] Suspense review failed", { error });
+      return res.status(500).json({ message: "Failed to load migration suspense review" });
     }
-  );
+  });
 
   app.get(
     "/api/sp/migration/gc-container-charge-review",
@@ -196,7 +182,7 @@ export function registerSpMigrationPhase2Routes(app: Express): void {
             AND r.status <> 'rolled_back'
           ORDER BY m.review_status DESC, m.source_container_id ASC, m.id ASC
         `);
-        const items = (result as any).rows ?? [];
+        const items = resultRows(result);
         return res.json({
           count: items.length,
           mapped: items.filter((item: any) => item.review_status === "mapped").length,

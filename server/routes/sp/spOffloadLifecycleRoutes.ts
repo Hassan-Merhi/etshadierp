@@ -1,14 +1,6 @@
 import type { Express } from "express";
 import { and, eq, sql } from "drizzle-orm";
-import {
-  spContainers,
-  spOffloadCharges,
-  spOffloads,
-  spPrepaidCharges,
-  spStockMovements,
-  voucherEntries,
-  vouchers,
-} from "@shared/schema";
+import { spContainers, spOffloadCharges, spStockMovements, voucherEntries, vouchers } from "@shared/schema";
 import { requireAuth, requireRole } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
@@ -64,20 +56,25 @@ export async function ensureSpOffloadReversalStorage(): Promise<void> {
   `);
 }
 
-async function createExactVoucherReversal(tx: any, input: {
-  companyId: number;
-  originalVoucherId: number;
-  reversalDate: string;
-  numberPrefix: string;
-  description: string;
-}): Promise<number> {
-  const originalVoucher = first(await tx.execute(sql`
+async function createExactVoucherReversal(
+  tx: any,
+  input: {
+    companyId: number;
+    originalVoucherId: number;
+    reversalDate: string;
+    numberPrefix: string;
+    description: string;
+  }
+): Promise<number> {
+  const originalVoucher = first(
+    await tx.execute(sql`
     SELECT * FROM vouchers
     WHERE id = ${input.originalVoucherId}
       AND company_id = ${input.companyId}
       AND deleted_at IS NULL
     FOR UPDATE
-  `));
+  `)
+  );
   if (!originalVoucher) {
     throw new SpLifecycleError(
       `Voucher #${input.originalVoucherId} is unavailable; no reversal was posted.`,
@@ -126,55 +123,58 @@ export function registerSpOffloadLifecycleRoutes(app: Express): void {
     });
   });
 
-  app.post(
-    "/api/sp/offloads/:id/reverse",
-    requireAuth,
-    requireRole("Admin"),
-    async (req: any, res: any) => {
-      try {
-        await ensureSpOffloadReversalStorage();
-        const companyId = await requireSpCompany(req, res);
-        if (!companyId) return;
+  app.post("/api/sp/offloads/:id/reverse", requireAuth, requireRole("Admin"), async (req: any, res: any) => {
+    try {
+      await ensureSpOffloadReversalStorage();
+      const companyId = await requireSpCompany(req, res);
+      if (!companyId) return;
 
-        const offloadId = Number(req.params.id);
-        if (!Number.isInteger(offloadId) || offloadId <= 0) {
-          return res.status(400).json({ message: "Invalid Supplier Partner offload ID" });
-        }
+      const offloadId = Number(req.params.id);
+      if (!Number.isInteger(offloadId) || offloadId <= 0) {
+        return res.status(400).json({ message: "Invalid Supplier Partner offload ID" });
+      }
 
-        const reason = normalizeSpLifecycleReason(req.body?.reason, "reverse this Supplier Partner offload");
-        const reversalDate = lifecycleDate(req.body?.reversalDate);
+      const reason = normalizeSpLifecycleReason(req.body?.reason, "reverse this Supplier Partner offload");
+      const reversalDate = lifecycleDate(req.body?.reversalDate);
 
-        const result = await db.transaction(async (tx) => {
-          const offload = first(await tx.execute(sql`
+      const result = await db.transaction(async (tx) => {
+        const offload = first(
+          await tx.execute(sql`
             SELECT * FROM sp_offloads
             WHERE id = ${offloadId} AND company_id = ${companyId}
             FOR UPDATE
-          `));
-          if (!offload) {
-            throw new SpLifecycleError("Supplier Partner offload not found.", "SP_LIFECYCLE_CONFLICT", 404);
-          }
+          `)
+        );
+        if (!offload) {
+          throw new SpLifecycleError("Supplier Partner offload not found.", "SP_LIFECYCLE_CONFLICT", 404);
+        }
 
-          const duplicate = first(await tx.execute(sql`
+        const duplicate = first(
+          await tx.execute(sql`
             SELECT id FROM sp_offload_reversals WHERE offload_id = ${offloadId} FOR UPDATE
-          `));
-          if (duplicate) {
-            throw new SpLifecycleError("This offload has already been reversed.", "SP_LIFECYCLE_ALREADY_DONE", 409);
-          }
+          `)
+        );
+        if (duplicate) {
+          throw new SpLifecycleError("This offload has already been reversed.", "SP_LIFECYCLE_ALREADY_DONE", 409);
+        }
 
-          const container = first(await tx.execute(sql`
+        const container = first(
+          await tx.execute(sql`
             SELECT * FROM sp_containers
             WHERE id = ${offload.container_id} AND company_id = ${companyId}
             FOR UPDATE
-          `));
-          if (!container || container.status !== "offloaded") {
-            throw new SpLifecycleError(
-              "Only the currently offloaded container can be reversed.",
-              "SP_LIFECYCLE_CONFLICT",
-              409
-            );
-          }
+          `)
+        );
+        if (!container || container.status !== "offloaded") {
+          throw new SpLifecycleError(
+            "Only the currently offloaded container can be reversed.",
+            "SP_LIFECYCLE_CONFLICT",
+            409
+          );
+        }
 
-          const laterOffload = first(await tx.execute(sql`
+        const laterOffload = first(
+          await tx.execute(sql`
             SELECT id FROM sp_offloads
             WHERE company_id = ${companyId}
               AND container_id = ${offload.container_id}
@@ -183,71 +183,75 @@ export function registerSpOffloadLifecycleRoutes(app: Express): void {
                 SELECT 1 FROM sp_offload_reversals r WHERE r.offload_id = sp_offloads.id
               )
             LIMIT 1
-          `));
-          if (laterOffload) {
+          `)
+        );
+        if (laterOffload) {
+          throw new SpLifecycleError(
+            "A newer active offload exists for this container; reverse the newest offload first.",
+            "SP_LIFECYCLE_CONFLICT",
+            409
+          );
+        }
+
+        const movements = await tx
+          .select()
+          .from(spStockMovements)
+          .where(and(eq(spStockMovements.companyId, companyId), eq(spStockMovements.offloadId, offloadId)));
+        if (movements.length === 0) {
+          throw new SpLifecycleError(
+            "The offload has no stock movements and cannot be reversed safely.",
+            "SP_LIFECYCLE_CONFLICT",
+            409
+          );
+        }
+
+        for (const movement of movements) {
+          const qtyIn = Number(movement.qtyIn ?? 0);
+          const qtyRemaining = Number(movement.qtyRemaining ?? 0);
+          if (Math.abs(qtyIn - qtyRemaining) > 0.0001) {
             throw new SpLifecycleError(
-              "A newer active offload exists for this container; reverse the newest offload first.",
+              `Stock lot #${movement.id} has been consumed. Reverse its Supplier Partner sales before reversing the offload.`,
               "SP_LIFECYCLE_CONFLICT",
               409
             );
           }
+        }
 
-          const movements = await tx
-            .select()
-            .from(spStockMovements)
-            .where(and(eq(spStockMovements.companyId, companyId), eq(spStockMovements.offloadId, offloadId)));
-          if (movements.length === 0) {
-            throw new SpLifecycleError(
-              "The offload has no stock movements and cannot be reversed safely.",
-              "SP_LIFECYCLE_CONFLICT",
-              409
-            );
-          }
+        const charges = await tx
+          .select()
+          .from(spOffloadCharges)
+          .where(and(eq(spOffloadCharges.companyId, companyId), eq(spOffloadCharges.offloadId, offloadId)));
 
-          for (const movement of movements) {
-            const qtyIn = Number(movement.qtyIn ?? 0);
-            const qtyRemaining = Number(movement.qtyRemaining ?? 0);
-            if (Math.abs(qtyIn - qtyRemaining) > 0.0001) {
-              throw new SpLifecycleError(
-                `Stock lot #${movement.id} has been consumed. Reverse its Supplier Partner sales before reversing the offload.`,
-                "SP_LIFECYCLE_CONFLICT",
-                409
-              );
-            }
-          }
-
-          const charges = await tx
-            .select()
-            .from(spOffloadCharges)
-            .where(and(eq(spOffloadCharges.companyId, companyId), eq(spOffloadCharges.offloadId, offloadId)));
-
-          for (const charge of charges) {
-            if (charge.chargeType !== "prepaid_used" || !charge.prepaidChargeId) continue;
-            const prepaid = first(await tx.execute(sql`
+        for (const charge of charges) {
+          if (charge.chargeType !== "prepaid_used" || !charge.prepaidChargeId) continue;
+          const prepaid = first(
+            await tx.execute(sql`
               SELECT * FROM sp_prepaid_charges
               WHERE id = ${charge.prepaidChargeId} AND company_id = ${companyId}
               FOR UPDATE
-            `));
-            if (!prepaid || Number(prepaid.amount_used_usd ?? 0) + 0.0001 < Number(charge.amountUsd ?? 0)) {
-              throw new SpLifecycleError(
-                `Prepaid charge #${charge.prepaidChargeId} cannot be restored exactly.`,
-                "SP_LIFECYCLE_CONFLICT",
-                409
-              );
-            }
-            await tx.execute(sql`
+            `)
+          );
+          if (!prepaid || Number(prepaid.amount_used_usd ?? 0) + 0.0001 < Number(charge.amountUsd ?? 0)) {
+            throw new SpLifecycleError(
+              `Prepaid charge #${charge.prepaidChargeId} cannot be restored exactly.`,
+              "SP_LIFECYCLE_CONFLICT",
+              409
+            );
+          }
+          await tx.execute(sql`
               UPDATE sp_prepaid_charges
               SET amount_used_usd = amount_used_usd - ${Number(charge.amountUsd ?? 0)}
               WHERE id = ${charge.prepaidChargeId} AND company_id = ${companyId}
             `);
-          }
+        }
 
-          const originalVoucherIds: number[] = [
-            Number(offload.voucher_id_reversal),
-            Number(offload.voucher_id_stock),
-          ].filter((id) => Number.isInteger(id) && id > 0);
+        const originalVoucherIds: number[] = [
+          Number(offload.voucher_id_reversal),
+          Number(offload.voucher_id_stock),
+        ].filter((id) => Number.isInteger(id) && id > 0);
 
-          const parentVouchers = rows(await tx.execute(sql`
+        const parentVouchers = rows(
+          await tx.execute(sql`
             SELECT id, company_id
             FROM vouchers
             WHERE source_module = 'SP'
@@ -256,65 +260,71 @@ export function registerSpOffloadLifecycleRoutes(app: Express): void {
               AND created_at >= ${offload.created_at}
             ORDER BY id
             FOR UPDATE
-          `));
+          `)
+        );
 
-          const reversalVoucherIds: number[] = [];
-          for (const originalVoucherId of originalVoucherIds) {
-            reversalVoucherIds.push(await createExactVoucherReversal(tx, {
+        const reversalVoucherIds: number[] = [];
+        for (const originalVoucherId of originalVoucherIds) {
+          reversalVoucherIds.push(
+            await createExactVoucherReversal(tx, {
               companyId,
               originalVoucherId,
               reversalDate,
               numberPrefix: "SP-OFFLOAD-REV",
               description: `Supplier Partner offload #${offloadId} reversal — ${reason}`,
-            }));
-          }
-          for (const parentVoucher of parentVouchers) {
-            originalVoucherIds.push(Number(parentVoucher.id));
-            reversalVoucherIds.push(await createExactVoucherReversal(tx, {
+            })
+          );
+        }
+        for (const parentVoucher of parentVouchers) {
+          originalVoucherIds.push(Number(parentVoucher.id));
+          reversalVoucherIds.push(
+            await createExactVoucherReversal(tx, {
               companyId: Number(parentVoucher.company_id),
               originalVoucherId: Number(parentVoucher.id),
               reversalDate,
               numberPrefix: "SP-AGENT-REV",
               description: `Supplier Partner parent-agent offload #${offloadId} reversal — ${reason}`,
-            }));
-          }
+            })
+          );
+        }
 
-          for (const movement of movements) {
-            await adjustSpInventoryAtomic(tx, {
-              companyId,
-              locationId: Number(movement.locationId),
-              stockItemId: movement.stockItemId,
-              deltaQty: -Number(movement.qtyIn),
-              incomingRate: Number(movement.finalUnitCostUsd),
-              context: `SP offload reversal #${offloadId} lot #${movement.id}`,
-              sourceVoucherType: "SP_OFFLOAD_REVERSAL",
-              sourceVoucherId: offloadId,
-            });
-            await tx
-              .update(spStockMovements)
-              .set({ qtyRemaining: "0", sourceType: "offload_reversed" })
-              .where(and(eq(spStockMovements.id, movement.id), eq(spStockMovements.companyId, companyId)));
-          }
-
-          const notes = appendSpLifecycleNote({
-            existingNotes: container.notes,
-            action: "OFFLOAD REVERSED",
-            reason,
-            username: req.user?.username ?? req.session?.username,
-            date: reversalDate,
+        for (const movement of movements) {
+          await adjustSpInventoryAtomic(tx, {
+            companyId,
+            locationId: Number(movement.locationId),
+            stockItemId: movement.stockItemId,
+            deltaQty: -Number(movement.qtyIn),
+            incomingRate: Number(movement.finalUnitCostUsd),
+            context: `SP offload reversal #${offloadId} lot #${movement.id}`,
+            sourceVoucherType: "SP_OFFLOAD_REVERSAL",
+            sourceVoucherId: offloadId,
           });
           await tx
-            .update(spContainers)
-            .set({ status: "open", notes })
-            .where(and(eq(spContainers.id, offload.container_id), eq(spContainers.companyId, companyId)));
+            .update(spStockMovements)
+            .set({ qtyRemaining: "0", sourceType: "offload_reversed" })
+            .where(and(eq(spStockMovements.id, movement.id), eq(spStockMovements.companyId, companyId)));
+        }
 
-          const snapshot = {
-            offload,
-            movements,
-            charges,
-            parentVoucherIds: parentVouchers.map((voucher) => Number(voucher.id)),
-          };
-          const reversalRow = first(await tx.execute(sql`
+        const notes = appendSpLifecycleNote({
+          existingNotes: container.notes,
+          action: "OFFLOAD REVERSED",
+          reason,
+          username: req.user?.username ?? req.session?.username,
+          date: reversalDate,
+        });
+        await tx
+          .update(spContainers)
+          .set({ status: "open", notes })
+          .where(and(eq(spContainers.id, offload.container_id), eq(spContainers.companyId, companyId)));
+
+        const snapshot = {
+          offload,
+          movements,
+          charges,
+          parentVoucherIds: parentVouchers.map((voucher) => Number(voucher.id)),
+        };
+        const reversalRow = first(
+          await tx.execute(sql`
             INSERT INTO sp_offload_reversals (
               company_id, container_id, offload_id, reversal_date, reason, reversed_by,
               voucher_ids_original, voucher_ids_reversal, snapshot
@@ -326,38 +336,35 @@ export function registerSpOffloadLifecycleRoutes(app: Express): void {
               ${JSON.stringify(snapshot)}::jsonb
             )
             RETURNING *
-          `));
+          `)
+        );
 
-          return {
-            reversal: reversalRow,
-            containerId: Number(offload.container_id),
-            restoredPrepaidChargeCount: charges.filter((charge) => charge.chargeType === "prepaid_used").length,
-            reversedMovementCount: movements.length,
-            originalVoucherIds,
-            reversalVoucherIds,
-          };
-        });
+        return {
+          reversal: reversalRow,
+          containerId: Number(offload.container_id),
+          restoredPrepaidChargeCount: charges.filter((charge) => charge.chargeType === "prepaid_used").length,
+          reversedMovementCount: movements.length,
+          originalVoucherIds,
+          reversalVoucherIds,
+        };
+      });
 
-        res.json(result);
-      } catch (error: unknown) {
-        if (respondToSpLifecycleError(res, error)) return;
-        if (respondToSpInventoryIntegrityError(res, error)) return;
-        res.status(500).json({ message: getErrorMessage(error) });
-      }
+      res.json(result);
+    } catch (error: unknown) {
+      if (respondToSpLifecycleError(res, error)) return;
+      if (respondToSpInventoryIntegrityError(res, error)) return;
+      res.status(500).json({ message: getErrorMessage(error) });
     }
-  );
+  });
 
-  app.get(
-    "/api/sp/reconciliation/offloads",
-    requireAuth,
-    requireRole("Admin"),
-    async (req: any, res: any) => {
-      try {
-        await ensureSpOffloadReversalStorage();
-        const companyId = await requireSpCompany(req, res);
-        if (!companyId) return;
+  app.get("/api/sp/reconciliation/offloads", requireAuth, requireRole("Admin"), async (req: any, res: any) => {
+    try {
+      await ensureSpOffloadReversalStorage();
+      const companyId = await requireSpCompany(req, res);
+      if (!companyId) return;
 
-        const report = first(await db.execute(sql`
+      const report = first(
+        await db.execute(sql`
           WITH voucher_balance AS (
             SELECT v.id,
                    COALESCE(SUM(ve.debit_amount::numeric), 0) AS debit,
@@ -401,29 +408,29 @@ export function registerSpOffloadLifecycleRoutes(app: Express): void {
                   SELECT 1 FROM active_offloads o WHERE o.container_id = c.id
                 )
             ) AS container_state_mismatch_count
-        `));
+        `)
+      );
 
-        const mismatches =
-          Number(report?.unbalanced_voucher_count ?? 0) +
-          Number(report?.stock_cost_mismatch_count ?? 0) +
-          Number(report?.prepaid_mismatch_count ?? 0) +
-          Number(report?.reversal_voucher_mismatch_count ?? 0) +
-          Number(report?.container_state_mismatch_count ?? 0);
+      const mismatches =
+        Number(report?.unbalanced_voucher_count ?? 0) +
+        Number(report?.stock_cost_mismatch_count ?? 0) +
+        Number(report?.prepaid_mismatch_count ?? 0) +
+        Number(report?.reversal_voucher_mismatch_count ?? 0) +
+        Number(report?.container_state_mismatch_count ?? 0);
 
-        res.json({
-          status: mismatches === 0 ? "PASS" : "FAIL",
-          mismatchCount: mismatches,
-          checks: {
-            unbalancedVouchers: Number(report?.unbalanced_voucher_count ?? 0),
-            stockCost: Number(report?.stock_cost_mismatch_count ?? 0),
-            prepaidBalances: Number(report?.prepaid_mismatch_count ?? 0),
-            reversalVoucherPairs: Number(report?.reversal_voucher_mismatch_count ?? 0),
-            containerState: Number(report?.container_state_mismatch_count ?? 0),
-          },
-        });
-      } catch (error: unknown) {
-        res.status(500).json({ message: getErrorMessage(error) });
-      }
+      res.json({
+        status: mismatches === 0 ? "PASS" : "FAIL",
+        mismatchCount: mismatches,
+        checks: {
+          unbalancedVouchers: Number(report?.unbalanced_voucher_count ?? 0),
+          stockCost: Number(report?.stock_cost_mismatch_count ?? 0),
+          prepaidBalances: Number(report?.prepaid_mismatch_count ?? 0),
+          reversalVoucherPairs: Number(report?.reversal_voucher_mismatch_count ?? 0),
+          containerState: Number(report?.container_state_mismatch_count ?? 0),
+        },
+      });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
     }
-  );
+  });
 }

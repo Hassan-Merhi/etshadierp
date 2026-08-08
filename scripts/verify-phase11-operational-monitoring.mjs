@@ -21,8 +21,8 @@ for (const [file, text] of [
   ["server/lib/operationalEvents.ts", "severityCounts"],
   ["server/lib/operationalEvents.ts", "byCode"],
   ["tests/phase11-operational-monitoring.test.ts", "Phase 11 operational monitoring contracts"],
-  ["docs/engineering/phase11-operational-monitoring.md", "Verification boundary"],
-  ["docs/engineering/phase11-operational-monitoring.md", "Merge boundary"],
+  ["docs/archive/engineering/phase11-operational-monitoring.md", "Verification boundary"],
+  ["docs/archive/engineering/phase11-operational-monitoring.md", "Merge boundary"],
 ]) {
   requireText(file, text);
 }

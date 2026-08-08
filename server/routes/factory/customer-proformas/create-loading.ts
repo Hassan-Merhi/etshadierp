@@ -23,6 +23,7 @@ import {
   customers,
 } from "@shared/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
+import { resultRows } from "../../../lib/queryResult";
 
 export function registerFactoryCustomerProformaLoadingRoutes(app: Express) {
   // Create a pending loading from a proforma — auto-adds matching bales from stock
@@ -71,7 +72,7 @@ export function registerFactoryCustomerProformaLoadingRoutes(app: Express) {
       );
       logger.info(`[create-loading] proformaId=${proformaId} companyId=${companyId}`);
       const alreadyLoadedMap = new Map<string, number>(
-        ((alreadyLoadedRaw as any).rows || (alreadyLoadedRaw as unknown as any[])).map((r: any) => [
+        (resultRows(alreadyLoadedRaw) || (alreadyLoadedRaw as unknown as any[])).map((r: any) => [
           r.articleCode,
           Number(r.loaded),
         ])

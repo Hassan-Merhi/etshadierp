@@ -87,7 +87,7 @@ for (const required of [
   if (!offloadRoutes.includes(required)) failures.push(`offloadRoutes missing ${required}`);
 }
 
-const docs = read("docs/engineering/phase7-permission-company-isolation-completion.md").toLowerCase();
+const docs = read("docs/archive/engineering/phase7-permission-company-isolation-completion.md").toLowerCase();
 for (const phrase of [
   "explicit company membership",
   "privileged cross-company access",

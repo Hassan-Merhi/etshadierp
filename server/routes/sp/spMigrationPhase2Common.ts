@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db } from "../../db";
+import { resultRows, firstRow } from "../../lib/queryResult";
 
 export const pn = (value: unknown): number => {
   const parsed = Number.parseFloat(String(value ?? "0"));
@@ -13,7 +14,8 @@ let phase2SchemaPromise: Promise<void> | null = null;
 export function ensurePhase2Schema(): Promise<void> {
   if (!phase2SchemaPromise) {
     phase2SchemaPromise = (async () => {
-      await db.execute(sql.raw(`
+      await db.execute(
+        sql.raw(`
         CREATE TABLE IF NOT EXISTS sp_migration_container_charges (
           id BIGSERIAL PRIMARY KEY,
           run_id UUID NOT NULL REFERENCES sp_migration_rehearsal_runs(id) ON DELETE CASCADE,
@@ -34,15 +36,20 @@ export function ensurePhase2Schema(): Promise<void> {
           created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           UNIQUE (target_company_id, source_container_id, source_key)
         )
-      `));
-      await db.execute(sql.raw(`
+      `)
+      );
+      await db.execute(
+        sql.raw(`
         CREATE INDEX IF NOT EXISTS sp_mig_container_charges_pair_idx
         ON sp_migration_container_charges(source_company_id, target_company_id)
-      `));
-      await db.execute(sql.raw(`
+      `)
+      );
+      await db.execute(
+        sql.raw(`
         CREATE INDEX IF NOT EXISTS sp_mig_container_charges_sp_container_idx
         ON sp_migration_container_charges(sp_container_id)
-      `));
+      `)
+      );
     })().catch((error) => {
       phase2SchemaPromise = null;
       throw error;
@@ -58,10 +65,14 @@ async function getCompany(companyId: number): Promise<any | null> {
     WHERE id = ${companyId}
     LIMIT 1
   `);
-  return (result as any).rows?.[0] ?? null;
+  return firstRow(result) ?? null;
 }
 
-export async function validateMigrationPair(req: any, res: any, requireConfirmation = true): Promise<{
+export async function validateMigrationPair(
+  req: any,
+  res: any,
+  requireConfirmation = true
+): Promise<{
   sourceId: number;
   targetId: number;
   sourceCompany: any;
@@ -117,7 +128,11 @@ const DEPENDENCIES: Record<string, string[]> = {
   gc_containers: ["gc_stock_opening"],
 };
 
-export async function requireCompletedAction(sourceId: number, targetId: number, action: string): Promise<string | null> {
+export async function requireCompletedAction(
+  sourceId: number,
+  targetId: number,
+  action: string
+): Promise<string | null> {
   for (const dependency of DEPENDENCIES[action] ?? []) {
     const result = await db.execute(sql`
       SELECT id
@@ -129,7 +144,7 @@ export async function requireCompletedAction(sourceId: number, targetId: number,
       ORDER BY created_at DESC
       LIMIT 1
     `);
-    if (!(result as any).rows?.[0]) {
+    if (!firstRow(result)) {
       return `Run ${dependency === "gc_stock_opening" ? "Step 5 — Stock Opening by Location" : dependency} successfully first.`;
     }
   }
@@ -143,7 +158,7 @@ export async function createRun(sourceId: number, targetId: number, action: stri
     VALUES (${sourceId}, ${targetId}, ${action}, 'running', 0, ${notes})
     RETURNING id
   `);
-  return String((result as any).rows[0].id);
+  return String(resultRows(result)[0].id);
 }
 
 export async function completeRun(runId: string, rowsCreated: number, notes?: string): Promise<void> {
@@ -165,11 +180,15 @@ export async function completeRun(runId: string, rowsCreated: number, notes?: st
 
 export async function failRun(runId: string, error: unknown): Promise<void> {
   const message = error instanceof Error ? error.message : String(error);
-  await db.execute(sql`
+  await db
+    .execute(
+      sql`
     UPDATE sp_migration_rehearsal_runs
     SET status = 'failed', error_message = ${message}, completed_at = now()
     WHERE id = ${runId}
-  `).catch(() => undefined);
+  `
+    )
+    .catch(() => undefined);
 }
 
 export async function trackRow(runId: string, tableName: string, rowId: number): Promise<void> {
@@ -213,7 +232,7 @@ export async function loadStockItemMap(sourceId: number, targetId: number): Prom
       AND l.target_table = 'stock_items'
     ORDER BY l.source_id, r.created_at DESC
   `);
-  return new Map(((result as any).rows ?? []).map((row: any) => [pn(row.source_id), pn(row.target_id)]));
+  return new Map(resultRows(result).map((row: any) => [pn(row.source_id), pn(row.target_id)]));
 }
 
 export async function loadTargetAccounts(targetId: number): Promise<{
@@ -227,7 +246,7 @@ export async function loadTargetAccounts(targetId: number): Promise<{
     FROM ledger_accounts
     WHERE company_id = ${targetId} AND deleted_at IS NULL
   `);
-  const rows = (result as any).rows ?? [];
+  const rows = resultRows(result);
   const bySubType = new Map<string, any>();
   const byCode = new Map<string, any>();
   const byType = new Map<string, any[]>();
@@ -248,10 +267,13 @@ export async function loadSourceAccounts(sourceId: number): Promise<Map<number, 
     FROM ledger_accounts
     WHERE company_id = ${sourceId} AND deleted_at IS NULL
   `);
-  return new Map(((result as any).rows ?? []).map((row: any) => [pn(row.id), row]));
+  return new Map(resultRows(result).map((row: any) => [pn(row.id), row]));
 }
 
-export function mapTargetAccount(sourceAccount: any | null, targetAccounts: Awaited<ReturnType<typeof loadTargetAccounts>>): {
+export function mapTargetAccount(
+  sourceAccount: any | null,
+  targetAccounts: Awaited<ReturnType<typeof loadTargetAccounts>>
+): {
   targetAccountId: number | null;
   method: string;
   reviewStatus: "mapped" | "review" | "unmapped";
@@ -283,7 +305,10 @@ export function mapTargetAccount(sourceAccount: any | null, targetAccounts: Awai
   return { targetAccountId: null, method: "unmapped", reviewStatus: "unmapped" };
 }
 
-export async function resolveSupplier(sourceSupplierId: number | null, sourceName: string | null): Promise<{
+export async function resolveSupplier(
+  sourceSupplierId: number | null,
+  sourceName: string | null
+): Promise<{
   supplierId: number | null;
   supplierName: string;
   method: string;
@@ -291,9 +316,13 @@ export async function resolveSupplier(sourceSupplierId: number | null, sourceNam
 }> {
   if (sourceSupplierId) {
     const byId = await db.execute(sql`SELECT id, legal_name FROM suppliers WHERE id = ${sourceSupplierId} LIMIT 1`);
-    const row = (byId as any).rows?.[0];
+    const row = firstRow<{ id: number; legal_name: string | null }>(byId);
     if (row) {
-      return { supplierId: pn(row.id), supplierName: row.legal_name ?? sourceName ?? `Supplier #${sourceSupplierId}`, method: "source_id" };
+      return {
+        supplierId: pn(row.id),
+        supplierName: row.legal_name ?? sourceName ?? `Supplier #${sourceSupplierId}`,
+        method: "source_id",
+      };
     }
   }
 
@@ -307,9 +336,13 @@ export async function resolveSupplier(sourceSupplierId: number | null, sourceNam
       ORDER BY id ASC
       LIMIT 2
     `);
-    const rows = (normalized as any).rows ?? [];
+    const rows = resultRows<{ id: number; legal_name: string | null }>(normalized);
     if (rows.length === 1) {
-      return { supplierId: pn(rows[0].id), supplierName: rows[0].legal_name ?? fallbackName, method: "normalized_name" };
+      return {
+        supplierId: pn(rows[0].id),
+        supplierName: rows[0].legal_name ?? fallbackName,
+        method: "normalized_name",
+      };
     }
     if (rows.length > 1) {
       return {
@@ -335,7 +368,7 @@ export async function getSuspenseReview(sourceId: number, targetId: number): Pro
     WHERE company_id = ${targetId} AND sub_type = 'gc_mig_suspense' AND deleted_at IS NULL
     LIMIT 1
   `);
-  const suspenseId = pn((suspenseResult as any).rows?.[0]?.id);
+  const suspenseId = pn(firstRow(suspenseResult)?.id);
   if (!suspenseId) return { count: 0, totalDebit: 0, totalCredit: 0, items: [] };
 
   const linked = await db.execute(sql`
@@ -407,7 +440,7 @@ export async function getSuspenseReview(sourceId: number, targetId: number): Pro
       )
   `);
 
-  const items = [...((linked as any).rows ?? []), ...((unlinked as any).rows ?? [])];
+  const items = [...resultRows(linked), ...resultRows(unlinked)];
   return {
     count: items.length,
     totalDebit: items.reduce((sum, item) => sum + pn(item.debit_amount), 0),
@@ -416,7 +449,11 @@ export async function getSuspenseReview(sourceId: number, targetId: number): Pro
   };
 }
 
-export async function findExistingContainerLink(sourceId: number, targetId: number, sourceContainerId: number): Promise<number | null> {
+export async function findExistingContainerLink(
+  sourceId: number,
+  targetId: number,
+  sourceContainerId: number
+): Promise<number | null> {
   const result = await db.execute(sql`
     SELECT l.target_id
     FROM sp_migration_source_links l
@@ -430,5 +467,5 @@ export async function findExistingContainerLink(sourceId: number, targetId: numb
     ORDER BY r.created_at DESC
     LIMIT 1
   `);
-  return (result as any).rows?.[0] ? pn((result as any).rows[0].target_id) : null;
+  return firstRow(result) ? pn(resultRows(result)[0].target_id) : null;
 }

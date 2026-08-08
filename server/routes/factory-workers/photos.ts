@@ -46,7 +46,7 @@ export function registerFactoryWorkerPhotoRoutes(app: Express, requireAuth: any,
         referenceId: updated.id,
         referenceTable: "factory_workers",
         description: `Photo uploaded for worker: ${updated.fullName}`,
-        createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+        createdBy: (req.session as any).userId ?? undefined,
       });
 
       res.json(updated);

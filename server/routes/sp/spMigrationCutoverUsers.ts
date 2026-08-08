@@ -3,13 +3,31 @@ import { db } from "../../db";
 import { ensureCutoverSchema } from "./spMigrationCutoverState";
 import { pn } from "./spMigrationPhase2Common";
 import { resolveTargetLedgerAccount, resolveTargetLocation } from "./spMigrationCutoverReadiness";
+import { resultRows, firstRow } from "../../lib/queryResult";
 
-function roleSnapshot(row: any): any {
+/**
+ * The role fields captured before a cutover and replayed on rollback. Stored as
+ * JSONB in sp_migration_cutover_role_changes.source_role_snapshot, so nothing
+ * about its shape is enforced by the database — this type is the contract.
+ */
+export type CutoverRoleSnapshot = {
+  role: string | null;
+  assignedLocationId: number | null;
+  cashAccountId: number | null;
+  posStation: string | null;
+  canSellNegativeStock: boolean;
+  posViewOnly: boolean;
+  daybookEditDays: number;
+  canAccessCustomers: boolean;
+  canDeleteRecords: boolean;
+};
+
+function roleSnapshot(row: Record<string, unknown>): CutoverRoleSnapshot {
   return {
-    role: row.role,
+    role: row.role == null ? null : String(row.role),
     assignedLocationId: row.assigned_location_id ? pn(row.assigned_location_id) : null,
     cashAccountId: row.cash_account_id ? pn(row.cash_account_id) : null,
-    posStation: row.pos_station ?? null,
+    posStation: row.pos_station == null ? null : String(row.pos_station),
     canSellNegativeStock: Boolean(row.can_sell_negative_stock),
     posViewOnly: Boolean(row.pos_view_only),
     daybookEditDays: pn(row.daybook_edit_days),
@@ -22,7 +40,7 @@ async function switchUserSessions(params: {
   userId: string;
   fromCompanyId: number;
   toCompanyId: number;
-  role: any;
+  role: CutoverRoleSnapshot;
   companyName: string;
 }): Promise<number> {
   const result = await db.execute(sql`
@@ -46,7 +64,7 @@ async function switchUserSessions(params: {
       AND NULLIF(sess->>'currentCompanyId', '')::int = ${params.fromCompanyId}
     RETURNING sid
   `);
-  return ((result as any).rows ?? []).length;
+  return resultRows(result).length;
 }
 
 async function mapSourceRole(sourceId: number, targetId: number, sourceRole: any): Promise<any> {
@@ -95,7 +113,7 @@ export async function moveUsersToTarget(
   let cashMappingsCopied = 0;
   let developerRolesSkipped = 0;
 
-  for (const sourceRole of (sourceRolesResult as any).rows ?? []) {
+  for (const sourceRole of resultRows(sourceRolesResult)) {
     if (sourceRole.role === "Developer") {
       developerRolesSkipped++;
       continue;
@@ -107,7 +125,7 @@ export async function moveUsersToTarget(
       WHERE user_id = ${sourceRole.user_id} AND company_id = ${targetId}
       LIMIT 1
     `);
-    const existingTarget = (existingTargetResult as any).rows?.[0] ?? null;
+    const existingTarget = firstRow(existingTargetResult) ?? null;
     let targetRoleId: number;
     let createdTargetRole = false;
     let effectiveTargetRole: any;
@@ -128,7 +146,7 @@ export async function moveUsersToTarget(
            ${mapped.canAccessCustomers}, ${mapped.canDeleteRecords})
         RETURNING id
       `);
-      targetRoleId = pn((inserted as any).rows[0].id);
+      targetRoleId = pn(resultRows(inserted)[0].id);
       effectiveTargetRole = mapped;
       createdTargetRole = true;
       targetRolesCreated++;
@@ -137,7 +155,7 @@ export async function moveUsersToTarget(
         SELECT location_id FROM user_locations
         WHERE user_id = ${sourceRole.user_id} AND company_id = ${sourceId}
       `);
-      for (const sourceLocation of (sourceLocationsResult as any).rows ?? []) {
+      for (const sourceLocation of resultRows(sourceLocationsResult)) {
         const targetLocation = await resolveTargetLocation(sourceId, targetId, pn(sourceLocation.location_id));
         if (!targetLocation) continue;
         await db.execute(sql`
@@ -158,7 +176,7 @@ export async function moveUsersToTarget(
         FROM user_location_cash_accounts
         WHERE user_id = ${sourceRole.user_id} AND company_id = ${sourceId}
       `);
-      for (const sourceMapping of (sourceCashMappingsResult as any).rows ?? []) {
+      for (const sourceMapping of resultRows(sourceCashMappingsResult)) {
         const targetLocation = await resolveTargetLocation(sourceId, targetId, pn(sourceMapping.location_id));
         const targetCashAccountId = await resolveTargetLedgerAccount(pn(sourceMapping.cash_account_id), targetId);
         if (!targetLocation || !targetCashAccountId) continue;
@@ -252,14 +270,29 @@ export async function restoreUsersToSource(
   let targetRolesRemoved = 0;
   let sessionsSwitched = 0;
 
-  for (const change of (changesResult as any).rows ?? []) {
-    const sourceRole = change.source_role_snapshot ?? {};
+  for (const change of resultRows<{
+    user_id: string;
+    target_role_id: number | null;
+    created_target_role: boolean | null;
+    source_role_snapshot: CutoverRoleSnapshot | null;
+  }>(changesResult)) {
+    const sourceRole: CutoverRoleSnapshot = change.source_role_snapshot ?? {
+      role: null,
+      assignedLocationId: null,
+      cashAccountId: null,
+      posStation: null,
+      canSellNegativeStock: false,
+      posViewOnly: false,
+      daybookEditDays: 0,
+      canAccessCustomers: false,
+      canDeleteRecords: false,
+    };
     const existingSourceResult = await db.execute(sql`
       SELECT id FROM user_company_roles
       WHERE user_id = ${change.user_id} AND company_id = ${sourceId}
       LIMIT 1
     `);
-    if (!(existingSourceResult as any).rows?.[0]) {
+    if (!firstRow(existingSourceResult)) {
       await db.execute(sql`
         INSERT INTO user_company_roles
           (user_id, company_id, role, assigned_location_id, cash_account_id, pos_station,

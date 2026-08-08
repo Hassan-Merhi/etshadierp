@@ -16,7 +16,7 @@ const requiredFiles = [
   "client/src/main.tsx",
   "client/src/lib/clientObservability.ts",
   "client/src/components/ObservabilityErrorBoundary.tsx",
-  "docs/program-1-observability-roadmap.md",
+  "docs/archive/program-1-observability-roadmap.md",
   "docs/program-1-incident-response-runbook.md",
 ];
 for (const file of requiredFiles) if (!fs.existsSync(file)) throw new Error(`Program 1 missing required file: ${file}`);
@@ -30,7 +30,7 @@ const alerts = read("server/lib/operationalAlerts.ts");
 const alertRuntime = read("server/lib/operationalAlertRuntime.ts");
 const requestLogger = read("server/middleware/requestLogger.ts");
 const intake = read("server/middleware/clientObservability.ts");
-const roadmap = read("docs/program-1-observability-roadmap.md");
+const roadmap = read("docs/archive/program-1-observability-roadmap.md");
 const runbook = read("docs/program-1-incident-response-runbook.md");
 const checks = [
   [logger.includes("SENSITIVE_KEY_PATTERN") && logger.includes("JSON.stringify(entry)"), "logger must remain structured and redacted"],

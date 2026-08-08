@@ -24,6 +24,7 @@ import path from "node:path";
 import request from "supertest";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 
+import { pool } from "../server/db";
 import { seedTestData, cleanupTestData, closeTestServer, type TestContext } from "./setup";
 
 /**
@@ -58,6 +59,35 @@ interface PinnedEndpoint {
   body?: Record<string, unknown>;
   /** Response is a file, not JSON: hash the bytes instead of the parsed body. */
   binary?: boolean;
+  /**
+   * This endpoint writes. It gets its own seed-and-release cycle so the rows it
+   * creates cannot reach the read pins captured from the shared fixture, and so
+   * re-running the suite starts from the same state every time. Without this an
+   * offload posted during capture would shift the net-profit figures pinned
+   * above, and the two pins would fight each other.
+   */
+  isolate?: boolean;
+  /**
+   * Rows the handler needs that seedTestData does not create, plus the path
+   * substitutions they produce. Runs inside the endpoint's own fixture.
+   */
+  setup?: (ctx: TestContext, prefix: string) => Promise<Record<string, string>>;
+  /** Removes anything `setup` created outside the company-scoped teardown. */
+  teardown?: (ctx: TestContext, prefix: string) => Promise<void>;
+}
+
+/**
+ * The `containers`, `purchase_orders` and `suppliers` tables are not company-
+ * scoped in cleanupTestData — suppliers has no company column at all — so a PO
+ * fixture has to clear up after itself. Both identifiers are UNIQUE, so the
+ * delete also has to run *before* the insert or a re-run collides with its own
+ * leftovers from a crashed one.
+ */
+async function clearPurchaseOrderFixture(prefix: string): Promise<void> {
+  // po_line_items cascades from purchase_orders, so the PO delete covers it.
+  await pool.query(`DELETE FROM purchase_orders WHERE po_number = $1`, [`${prefix}-PO-1`]);
+  await pool.query(`DELETE FROM containers WHERE container_number = $1`, [`${prefix}-CONT-1`]);
+  await pool.query(`DELETE FROM suppliers WHERE code = $1`, [`${prefix}-SUP-1`]);
 }
 
 /**
@@ -93,6 +123,92 @@ const ENDPOINTS: PinnedEndpoint[] = [
     method: "GET",
     path: "/api/factory/suppliers/:supplierId/statement",
   },
+  {
+    // The 1,156-line handler in this file, and the one the god-file program
+    // named as having no test referencing it at all. It recomputes a purchase
+    // order's charge totals, so the figures are the whole point.
+    sourceModule: "server/routes/containers/containerFreightWriteRoutes.ts",
+    fixture: "erp",
+    method: "PATCH",
+    path: "/api/purchase-orders/:poId",
+    isolate: true,
+    body: {
+      freight: "150.50",
+      surcharge: "25.00",
+      fumigation: "10.00",
+      documentCharges: "5.00",
+      discount: "2.50",
+      otherCharges: "7.25",
+    },
+    setup: async (ctx, prefix) => {
+      await clearPurchaseOrderFixture(prefix);
+
+      const supplier = await pool.query(
+        `INSERT INTO suppliers (code, legal_name, email) VALUES ($1, $2, $3) RETURNING id`,
+        [`${prefix}-SUP-1`, `${prefix} Supplier`, `${prefix}@example.test`]
+      );
+      const container = await pool.query(
+        `INSERT INTO containers (company_id, container_number, supplier_id, import_date, items_total)
+         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        [ctx.companyId, `${prefix}-CONT-1`, supplier.rows[0].id, "2030-01-15", "1000.00"]
+      );
+      const po = await pool.query(
+        `INSERT INTO purchase_orders (company_id, po_number, container_id, supplier_id, currency, items_total)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+        [ctx.companyId, `${prefix}-PO-1`, container.rows[0].id, supplier.rows[0].id, "USD", "1000.00"]
+      );
+      // One line item, so the recomputed grand total is items + charges rather
+      // than charges against an empty order.
+      await pool.query(
+        `INSERT INTO po_line_items (po_id, stock_item_id, item_name, quantity, rate, line_total)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [po.rows[0].id, ctx.stockItemIds[0], "Pinned line item", "100.000", "10.00", "1000.00"]
+      );
+      return { ":poId": String(po.rows[0].id) };
+    },
+    teardown: async (_ctx, prefix) => clearPurchaseOrderFixture(prefix),
+  },
+  {
+    // The 972-line handler: landed-cost calculation for a container receipt.
+    // It writes raw stock and posts journals, which is why it is isolated.
+    sourceModule: "server/routes/factory/raw-stock/rawStockOffloadRoutes.ts",
+    fixture: "factory",
+    method: "POST",
+    path: "/api/factory/raw-stock/offload",
+    isolate: true,
+    body: {
+      receivedKg: "1000",
+      costPerKg: "2.5",
+      currencyCode: "USD",
+      fxRateToUsd: "1",
+      offloadDate: "2030-12-31",
+    },
+    setup: async (ctx, prefix) => {
+      // factory_containers *is* company-scoped in cleanupTestData, so this
+      // needs no teardown of its own.
+      const container = await pool.query(
+        `INSERT INTO factory_containers
+           (company_id, container_number, declared_kg, rate_per_kg, currency_code, fx_rate_to_usd, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+        [ctx.companyId, `${prefix}-FC-1`, "1000.000", "2.500000", "USD", "1", "PENDING"]
+      );
+      return { ":containerId": String(container.rows[0].id) };
+    },
+  },
+];
+
+/**
+ * The route files this suite exists to protect. Asserted against the pins, so
+ * that "the six single-handler files are pinned" is a checked claim rather than
+ * a sentence in a comment — it read "six" while covering four.
+ */
+const PHASE_3_MODULES = [
+  "server/routes/stats/statsNetProfitRoutes.ts",
+  "server/routes/netProfitExcelRoute.ts",
+  "server/routes/factory/employee-pos/employeeNetPositionRoutes.ts",
+  "server/routes/factory/suppliers/supplierStatementRoutes.ts",
+  "server/routes/containers/containerFreightWriteRoutes.ts",
+  "server/routes/factory/raw-stock/rawStockOffloadRoutes.ts",
 ];
 
 interface PinFile {
@@ -120,14 +236,24 @@ const VOLATILE_KEYS = new Set([
   "generatedAt",
   "timestamp",
   "filename",
+  // Set to now() when the offload posts, so it differs on every capture. Listed
+  // rather than caught by a `/At$/` rule: the broad rule also drops stable
+  // date fields from the other pins, and these hashes are the only thing
+  // standing between an extraction and a silent change to a money figure —
+  // strictness is worth more here than a rule that pre-empts the next one.
+  "offloadedAt",
 ]);
+
+function isVolatileKey(key: string): boolean {
+  return VOLATILE_KEYS.has(key);
+}
 
 function normalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(normalize);
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
     for (const key of Object.keys(value as Record<string, unknown>).sort()) {
-      if (VOLATILE_KEYS.has(key)) continue;
+      if (isVolatileKey(key)) continue;
       out[key] = normalize((value as Record<string, unknown>)[key]);
     }
     return out;
@@ -208,7 +334,7 @@ async function captureWith(prefix: string, fixture: "erp" | "factory"): Promise<
       if (!supplierId) throw new Error(`Could not seed a factory supplier: ${created.status}`);
     }
 
-    for (const endpoint of ENDPOINTS.filter((e) => e.fixture === fixture)) {
+    for (const endpoint of ENDPOINTS.filter((e) => e.fixture === fixture && !e.isolate)) {
       const resolved = endpoint.path.replace(":supplierId", String(supplierId));
       const url = endpoint.query ? `${resolved}?${endpoint.query}` : resolved;
 
@@ -240,9 +366,65 @@ async function captureWith(prefix: string, fixture: "erp" | "factory"): Promise<
   }
 }
 
+/**
+ * One write endpoint, in a fixture of its own.
+ *
+ * A mutating handler cannot share the read fixture: the rows it writes would
+ * change what the net-position and statement pins compute, so the two would
+ * drift against each other for reasons unrelated to any code change. Seeding
+ * per endpoint costs a few seconds and makes each pin independent of the order
+ * the suite happens to run in.
+ */
+async function captureIsolated(endpoint: PinnedEndpoint, prefix: string): Promise<void> {
+  const ctx: TestContext = await seedTestData(prefix);
+  try {
+    const agent = request.agent(ctx.app);
+    const login = await agent.post("/api/auth/login").send({
+      username: `${prefix}_testuser`,
+      password: "testpassword123",
+    });
+    if (login.status !== 200) throw new Error(`Login failed for ${prefix}: ${login.status}`);
+    await agent.post("/api/auth/set-company").send({ companyId: ctx.companyId });
+
+    const substitutions = endpoint.setup ? await endpoint.setup(ctx, prefix) : {};
+    let resolved = endpoint.path;
+    for (const [token, value] of Object.entries(substitutions)) {
+      resolved = resolved.replace(token, value);
+    }
+    const url = endpoint.query ? `${resolved}?${endpoint.query}` : resolved;
+
+    const send = { get: "get", post: "post", patch: "patch" } as const;
+    const verb = send[endpoint.method.toLowerCase() as keyof typeof send];
+
+    // The body carries the ids the handler needs, which only exist once setup
+    // has run — so merge the substitutions in rather than hard-coding them.
+    const body = { ...(endpoint.body ?? {}) };
+    if (substitutions[":containerId"]) body.containerId = Number(substitutions[":containerId"]);
+
+    const response = await agent[verb](url)
+      .set("x-client-date", FIXED_CLIENT_DATE)
+      .send(body)
+      .timeout({ response: REQUEST_TIMEOUT_MS, deadline: REQUEST_TIMEOUT_MS });
+
+    observed[`${endpoint.method} ${endpoint.path}`] = {
+      status: response.status,
+      shape: shapeOf(response.body),
+      hash: hash(response.body),
+    };
+
+    if (endpoint.teardown) await endpoint.teardown(ctx, prefix);
+  } finally {
+    await cleanupTestData(prefix);
+  }
+}
+
 beforeAll(async () => {
   await captureWith(ERP_PREFIX, "erp");
   await captureWith(FACTORY_PREFIX, "factory");
+
+  for (const endpoint of ENDPOINTS.filter((e) => e.isolate)) {
+    await captureIsolated(endpoint, endpoint.fixture === "factory" ? FACTORY_PREFIX : ERP_PREFIX);
+  }
 
   if (shouldUpdate) {
     const file: PinFile = {
@@ -268,6 +450,26 @@ describe("single-handler report endpoints keep their computed output", () => {
   it("has a pin recorded for every endpoint under extraction", () => {
     const missing = ENDPOINTS.map((e) => `${e.method} ${e.path}`).filter((key) => !pinned.pins[key]);
     expect(missing, `No pin for:\n${missing.join("\n")}\nRegenerate with ${pinned.regenerate}`).toEqual([]);
+  });
+
+  it("covers every single-handler route file the split program is blocked on", () => {
+    const covered = new Set(ENDPOINTS.map((e) => e.sourceModule));
+    const uncovered = PHASE_3_MODULES.filter((module) => !covered.has(module));
+
+    // Without this, the suite can quietly protect fewer files than its own
+    // documentation claims — which is exactly what had happened.
+    expect(uncovered, `Phase 3 route files with no response pin:\n${uncovered.join("\n")}`).toEqual([]);
+  });
+
+  it("never pins a server error as if it were the expected output", () => {
+    const errored = Object.entries(observed)
+      .filter(([, result]) => result.status >= 500)
+      .map(([key, result]) => `${key} → ${result.status}`);
+
+    // A 500 hashes as stably as a real answer, so without this a broken
+    // endpoint would be frozen in as "correct" and the pin would then defend
+    // the breakage.
+    expect(errored, `Endpoints returned a server error while capturing:\n${errored.join("\n")}`).toEqual([]);
   });
 
   it.each(ENDPOINTS)("$method $path returns the pinned status and shape", (endpoint) => {

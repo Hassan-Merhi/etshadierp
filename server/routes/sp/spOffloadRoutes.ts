@@ -18,6 +18,7 @@ import {
 import { adjustSpInventoryAtomic, respondToSpInventoryIntegrityError } from "../../services/sp/spInventoryIntegrity";
 import { SP_RELEASE_CURRENCY, SP_RELEASE_EXCHANGE_RATE } from "../../services/sp/spReleasePolicy";
 import { requireSpCompany, getSpAccount, parseNum } from "./spHelpers";
+import { resultRows, firstRow } from "../../lib/queryResult";
 
 // ── Parent Company Agents + Offload ──────────────────────────────────────────
 
@@ -28,7 +29,7 @@ export function registerSpOffloadRoutes(app: Express) {
       if (!companyId) return;
 
       const parentRows = await db.execute(sql`SELECT parent_company_id FROM companies WHERE id = ${companyId} LIMIT 1`);
-      const parentRow = (parentRows as any).rows?.[0] ?? (parentRows as any)[0];
+      const parentRow = firstRow(parentRows) ?? (parentRows as any)[0];
       const parentId = parentRow?.parent_company_id ?? 1;
 
       const agents = await db.execute(sql`
@@ -41,7 +42,7 @@ export function registerSpOffloadRoutes(app: Express) {
         ORDER BY aa.account_name
       `);
 
-      res.json((agents as any).rows ?? agents);
+      res.json(resultRows(agents));
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
@@ -197,7 +198,7 @@ export function registerSpOffloadRoutes(app: Express) {
             const prepaidRows = await tx.execute(
               sql`SELECT amount_paid_usd, amount_used_usd FROM sp_prepaid_charges WHERE id = ${parseInt(charge.prepaidChargeId)} FOR UPDATE`
             );
-            const prepaidRow = (prepaidRows as any).rows?.[0] ?? (prepaidRows as any)[0];
+            const prepaidRow = firstRow(prepaidRows) ?? (prepaidRows as any)[0];
             if (!prepaidRow) throw new Error(`Prepaid charge #${charge.prepaidChargeId} not found`);
             const alreadyUsed = parseNum(prepaidRow.amount_used_usd);
             const totalPaid = parseNum(prepaidRow.amount_paid_usd);

@@ -18,6 +18,7 @@ import {
 } from "@shared/schema";
 
 import { getCompanyId, getUsername, isAdmin } from "./_helpers";
+import { firstRow, resultRows } from "../../../lib/queryResult";
 
 export function registerDispatchBaleScanRoutes(app: Express) {
   // ── POST /api/factory/dispatch-truck-rides/:id/scan-bale ──────────────────
@@ -61,7 +62,15 @@ export function registerDispatchBaleScanRoutes(app: Express) {
           WHERE reference_number = ${barcode.trim()} AND company_id = ${companyId}
           LIMIT 1
         `);
-        const bale = ((baleRows as any).rows || baleRows)[0];
+        const bale = firstRow<{
+          id: number;
+          referenceNumber: string | null;
+          articleCode: string | null;
+          productName: string | null;
+          weightKg: string | null;
+          erpLocationId: number | null;
+          status: string | null;
+        }>(baleRows);
         if (!bale) throw new Error(`Bale "${barcode}" not found`);
 
         // 4. Bale must be IN_STOCK
@@ -76,7 +85,7 @@ export function registerDispatchBaleScanRoutes(app: Express) {
           WHERE s.company_id = ${companyId} AND s.bale_id = ${bale.id} AND s.removed_at IS NULL
           LIMIT 1
         `);
-        const dupRow = ((dupCheck as any).rows || dupCheck)[0];
+        const dupRow = resultRows(dupCheck)[0];
         if (dupRow) throw new Error(`Bale ${barcode} is already scanned in dispatch batch ${dupRow.batchNumber}`);
 
         // 6. Cross-order duplicate check (legacy loading system)
@@ -86,7 +95,7 @@ export function registerDispatchBaleScanRoutes(app: Express) {
           WHERE cob.bale_id = ${bale.id} AND co.status != 'CANCELLED'
           LIMIT 1
         `);
-        const orderDupRow = ((orderDupCheck as any).rows || orderDupCheck)[0];
+        const orderDupRow = resultRows(orderDupCheck)[0];
         if (orderDupRow) throw new Error(`Bale ${barcode} is already loaded on invoice order #${orderDupRow.order_id}`);
 
         // 7. Proforma article check — hard block if batch is linked to a proforma
@@ -117,7 +126,7 @@ export function registerDispatchBaleScanRoutes(app: Express) {
             WHERE batch_id = ${batch.id} AND company_id = ${companyId}
               AND article_code = ${bale.articleCode} AND removed_at IS NULL
           `);
-          scannedQtyForArticle = parseInt(((qtyRows as any).rows || qtyRows)[0]?.cnt || "0");
+          scannedQtyForArticle = parseInt(firstRow<{ cnt: string | null }>(qtyRows)?.cnt || "0");
           if (scannedQtyForArticle >= proformaQtyForArticle) {
             overageWarning = true;
           }

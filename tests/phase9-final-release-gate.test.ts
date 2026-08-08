@@ -45,7 +45,7 @@ describe("Phase 9 final verification and release contract", () => {
   });
 
   it("keeps the complete release matrix manual and current-main scoped", () => {
-    const workflow = read(".github/workflows/phase9-final-release.yml");
+    const workflow = read(".github/workflows/release-verification.yml");
     const currentMainVerifier = read("scripts/verify-phase9-current-main-release.mjs");
 
     for (const token of [
@@ -69,8 +69,8 @@ describe("Phase 9 final verification and release contract", () => {
       "scripts/verify-multilingual-phases-4-7-current-main.mjs",
       "scripts/verify-phase8-current-main-reconciliation.mjs",
       "scripts/verify-phase9-current-main-release.mjs",
-      "ERP_SMOKE_REQUIRE_AUTHENTICATED: \"1\"",
-      "ERP_SMOKE_REQUIRE_EXACT_ROUTES: \"1\"",
+      'ERP_SMOKE_REQUIRE_AUTHENTICATED: "1"',
+      'ERP_SMOKE_REQUIRE_EXACT_ROUTES: "1"',
       "PHASE9_ERP_SMOKE_USERNAME",
       "PHASE9_ERP_SMOKE_PASSWORD",
     ]) {

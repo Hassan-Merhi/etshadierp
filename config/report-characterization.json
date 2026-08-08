@@ -21,6 +21,16 @@
       "status": 200,
       "shape": "{brokerContainers,currencyGroups,fxTransfers,ledger,linkedSupplierGroups,obCommissions,offloadCharges,payments,statement,summary,supplier,voucherPayments}",
       "hash": "c744dde780be869ca88c8c74469c2405b547aff44dded594119247f721e72b7f"
+    },
+    "PATCH /api/purchase-orders/:poId": {
+      "status": 200,
+      "shape": "{chargesEdited,companyId,containerId,createdAt,currency,discount,documentCharges,freight,freightOwnAccountId,freightPaidBy,freightParentAccountId,fumigation,id,itemsTotal,otherCharges,poNumber,status,supplierId,surcharge,voucherId}",
+      "hash": "69b8c4af5f779ba4f55c187626c307bc05387fd1e2dec54a6ad3dae1252ba918"
+    },
+    "POST /api/factory/raw-stock/offload": {
+      "status": 200,
+      "shape": "{commission,rawStock}",
+      "hash": "3d7f5a53fb683c9754a103dc5aa9dc501de5c381de4b162c4230bb15f1ed550b"
     }
   }
 }

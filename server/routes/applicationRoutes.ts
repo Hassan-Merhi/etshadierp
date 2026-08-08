@@ -72,6 +72,8 @@ import { registerWhatsAppRoutes } from "./whatsappRoutes";
 import { registerDispatchBatchRoutes } from "./factory/dispatch-batches";
 import { registerFactoryInvoiceLoadingRoutes } from "./factory/invoice-loading";
 import { registerFactoryInsuranceRoutes } from "./factory/factoryInsuranceRoutes";
+import { registerInsuranceHistoricalRepairRoutes } from "./factory/insuranceHistoricalRepairRoutes";
+import { registerAttributionHistoricalRepairRoutes } from "./factory/attributionHistoricalRepairRoutes";
 import { registerFactorySheetsAndSacksRoutes } from "./factory/factorySheetsAndSacksRoutes";
 import { registerFactorySheetsRoutes } from "./factory/factorySheetsRoutes";
 import { registerFactoryStatusBuilderRoutes } from "./factory/factoryStatusBuilderRoutes";
@@ -139,6 +141,8 @@ export async function registerApplicationRoutes(app: Express): Promise<Server> {
   registerLabelBannersRoutes(app, requireAuth);
   registerFactoryTransporterRoutes(app);
   registerFactoryInsuranceRoutes(app);
+  registerInsuranceHistoricalRepairRoutes(app);
+  registerAttributionHistoricalRepairRoutes(app);
   registerFactorySheetsAndSacksRoutes(app);
 
   registerLegacyHealthRoutes(app);

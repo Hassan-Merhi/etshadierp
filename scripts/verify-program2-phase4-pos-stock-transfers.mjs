@@ -8,8 +8,8 @@ const requiredFiles = [
   "server/routes/vouchers/centralStockTransferDeleteRoute.ts",
   "server/services/stockTransferDeletion.ts",
   "server/routes/voucherRoutes.ts",
-  "docs/program-2-phase-2c.md",
-  "docs/program-2-phase-4-pos-stock-transfers.md",
+  "docs/archive/program-2-phase-2c.md",
+  "docs/archive/program-2-phase-4-pos-stock-transfers.md",
 ];
 for (const file of requiredFiles) {
   if (!fs.existsSync(file)) throw new Error(`Program 2 Phase 4 missing required file: ${file}`);

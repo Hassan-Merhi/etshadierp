@@ -6,7 +6,7 @@ const requiredFiles = [
   "server/services/pos/edit/updateSaleService.ts",
   "server/routes/spMigrationRoutes.ts",
   "server/routes/sp/spMigrationPhase4Routes.ts",
-  "docs/program-2-phase-6-supplier-partner.md",
+  "docs/archive/program-2-phase-6-supplier-partner.md",
 ];
 for (const file of requiredFiles) if (!fs.existsSync(file)) throw new Error(`Program 2 Phase 6 missing required file: ${file}`);
 const read = (file) => fs.readFileSync(file, "utf8");

@@ -13,6 +13,7 @@ import { sql, eq, and } from "drizzle-orm";
 import { customerDispatchBatches, customerDispatchTruckRides } from "@shared/schema";
 
 import { getCompanyId, getUsername } from "./_helpers";
+import { firstRow } from "../../../lib/queryResult";
 
 export function registerDispatchTruckRideRoutes(app: Express) {
   // ── POST /api/factory/dispatch-batches/:id/truck-rides ────────────────────
@@ -37,7 +38,7 @@ export function registerDispatchTruckRideRoutes(app: Express) {
         const countRows = await tx.execute(
           sql`SELECT COALESCE(MAX(ride_number), 0) + 1 AS next_num FROM customer_dispatch_truck_rides WHERE batch_id = ${batchId}`
         );
-        const nextRideNum = (countRows as any).rows?.[0]?.next_num || 1;
+        const nextRideNum = firstRow(countRows)?.next_num || 1;
 
         const { truckPlate, driverName, destination, notes } = req.body;
 

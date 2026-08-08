@@ -177,7 +177,7 @@ export function registerAdvanceBulkRepayRoutes(app: Express) {
             amountCurrency: effectiveAmount,
             currencyCode: "USD",
             amountUsd: effectiveAmount,
-            createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+            createdBy: (req.session as any).userId ?? undefined,
           });
 
           repaymentResults.push(repayment);

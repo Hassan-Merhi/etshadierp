@@ -32,6 +32,7 @@ import {
 import { eq, and, sql, isNull } from "drizzle-orm";
 import { reverseInventoryByExactValue } from "../../../inventoryHelper";
 import { syncSalesItemCostsForStockItems } from "../../../services/syncSalesItemCosts";
+import { firstRow } from "../../../lib/queryResult";
 
 export function registerContainerOffloadCreateRoutes(app: Express) {
   app.post("/api/containers/:id/offload", requireAuth, requireNonPOS, async (req, res) => {
@@ -215,7 +216,7 @@ export function registerContainerOffloadCreateRoutes(app: Express) {
       const spCompanyRow = await db.execute(
         sql`SELECT company_type FROM companies WHERE id = ${container.companyId} LIMIT 1`
       );
-      const spCompanyType = (spCompanyRow as any).rows?.[0]?.company_type ?? (spCompanyRow as any)[0]?.company_type;
+      const spCompanyType = firstRow(spCompanyRow)?.company_type ?? (spCompanyRow as any)[0]?.company_type;
       const isSpCompany = spCompanyType === "supplier_partner";
 
       if (isSpCompany) {

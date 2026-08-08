@@ -39,10 +39,41 @@ function stableTestCompanyCode(prefix: string): string {
   return `${base}${suffix}`;
 }
 
+/**
+ * Fixtures that need a factory-typed company.
+ *
+ * The factory route tree sits behind a guard that rejects a session whose
+ * company is not of type "factory", so any suite exercising it has to seed one.
+ * Ordinary ERP/POS tests stay on "erp".
+ */
+const FACTORY_COMPANY_PREFIXES = new Set([
+  "xlsexp",
+  "charfact",
+  "supcrud",
+  "balecrud",
+  "transwr",
+  "ordchg",
+  "v3load",
+  "advwr",
+  "empadv",
+  "prodblk",
+  "shiprow",
+  "ordcrud",
+  "rsadj",
+  "dbkedit",
+  "cntdel",
+  "mixbat",
+  "facimp",
+  "wdedwr",
+  "mkpaid",
+  "prswr",
+  "wbonus",
+  "advmgt",
+  "dspbat",
+]);
+
 function testCompanyType(prefix: string): "erp" | "factory" {
-  // Factory export integration tests must exercise the same authorized factory
-  // company resolution used in production. Ordinary ERP/POS tests remain ERP.
-  return prefix === "xlsexp" || prefix === "charfact" ? "factory" : "erp";
+  return FACTORY_COMPANY_PREFIXES.has(prefix) ? "factory" : "erp";
 }
 
 export async function setupTestApp(): Promise<express.Express> {
@@ -91,10 +122,55 @@ export async function cleanupTestData(prefix: string): Promise<void> {
       .where(
         sql`${schema.stockTransferVouchers.voucherId} IN (SELECT id FROM vouchers WHERE company_id = ${company.id})`
       );
+    // The customer-order family, cleared early for three reasons:
+    // customer_order_charges references vouchers, customer_order_bales
+    // references locations, and customer_orders.proforma_id_used references
+    // customer_proformas — so all of it has to go before the voucher, location
+    // and company deletes below. Without this a suite that created a proforma
+    // or scanned a bale into an order leaves the company undeletable.
+    await pool.query(
+      "DELETE FROM customer_order_bales WHERE order_id IN (SELECT id FROM customer_orders WHERE company_id = $1)",
+      [company.id]
+    );
+    await pool.query(
+      "DELETE FROM customer_order_charges WHERE order_id IN (SELECT id FROM customer_orders WHERE company_id = $1)",
+      [company.id]
+    );
+    await pool.query(
+      "DELETE FROM customer_order_lines WHERE order_id IN (SELECT id FROM customer_orders WHERE company_id = $1)",
+      [company.id]
+    );
+    await pool.query("DELETE FROM factory_shipping_container_rows WHERE company_id = $1", [company.id]);
+    // The dispatch-batch family, cleared here for the same reason: batches
+    // reference customers and proformas with ON DELETE RESTRICT, and rides
+    // reference batches, so all of it must go before the customer delete below.
+    await pool.query("DELETE FROM customer_dispatch_bale_scans WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM customer_dispatch_truck_rides WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM customer_dispatch_batches WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM customer_dispatch_batch_sequences WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM customer_orders WHERE company_id = $1", [company.id]);
+    await pool.query(
+      "DELETE FROM customer_proforma_lines WHERE proforma_id IN (SELECT id FROM customer_proformas WHERE company_id = $1)",
+      [company.id]
+    );
+    await pool.query("DELETE FROM customer_proformas WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM customer_balances WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM customers WHERE company_id = $1", [company.id]);
+    // Transporter transactions reference vouchers with ON DELETE RESTRICT, so
+    // they must be cleared before the vouchers themselves — a suite that
+    // recorded a transporter charge otherwise leaves the company undeletable.
+    await pool.query("DELETE FROM factory_transporter_transactions WHERE company_id = $1", [company.id]);
+    // Same constraint, same reason: employee_bonuses.voucher_id is ON DELETE
+    // RESTRICT, so a suite that recorded a bonus blocks the voucher delete.
+    await pool.query("DELETE FROM employee_bonuses WHERE company_id = $1", [company.id]);
+    // worker_bonuses.cash_account_id is ON DELETE RESTRICT against
+    // ledger_accounts, so a paid worker bonus blocks the ledger delete below.
+    await pool.query("DELETE FROM worker_bonuses WHERE company_id = $1", [company.id]);
     await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, company.id));
     await db.delete(schema.stockItems).where(eq(schema.stockItems.companyId, company.id));
     await db.delete(schema.stockGroups).where(eq(schema.stockGroups.companyId, company.id));
     await db.delete(schema.locations).where(eq(schema.locations.companyId, company.id));
+    await pool.query("DELETE FROM factory_transporters WHERE company_id = $1", [company.id]);
     await db.delete(schema.ledgerAccounts).where(eq(schema.ledgerAccounts.companyId, company.id));
     await db.delete(schema.userSecurityPermissions).where(eq(schema.userSecurityPermissions.companyId, company.id));
     await db.delete(schema.userCompanyRoles).where(eq(schema.userCompanyRoles.companyId, company.id));
@@ -113,12 +189,30 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     await pool.query("DELETE FROM factory_container_other_charges WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_offload_additional_charges WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_container_commissions WHERE company_id = $1", [company.id]);
+    // Every table below carries a foreign key to factory_containers and was
+    // added after this teardown was written, so the container delete that
+    // follows started failing the moment a test actually offloaded one. Found
+    // by the raw-stock offload response pin, which is the only test that
+    // exercises that path end to end. Kept in one block so the next table with
+    // an FK to factory_containers is added here rather than discovered later.
+    await pool.query("DELETE FROM factory_container_receipts WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_container_profit_snapshots WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_duty_audit_log WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_fx_allocations WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM factory_waste_entries WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_containers WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_suppliers WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_daybook_entries WHERE company_id = $1", [company.id]);
+    // Employees, once the voucher_entries keyed by employee_id are gone.
+    await pool.query("DELETE FROM employee_advance_repayments WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM employee_advances WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM employees WHERE company_id = $1", [company.id]);
     // Barcode sequence rows are allocated lazily on read — GET
     // /api/production-bales/next-barcode writes one — so a test that only
     // exercises read endpoints can still leave an FK reference behind.
+    // POST /api/bale-label-prints/allocate-pool allocates from this table, so a
+    // suite that printed labels leaves a row here holding the company down.
+    await pool.query("DELETE FROM reference_sequences WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM bale_sequences WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM factory_bale_sequences WHERE company_id = $1", [company.id]);
 

@@ -19,6 +19,22 @@ import { registerFactoryMixBatchRoutes } from "../mix-batches";
 import { registerFactoryBaleExportRoutes } from "../bale-exports";
 import { registerFactoryFxRatesRoutes } from "../factoryFxRatesRoutes";
 
+const QUANTITY_MESSAGE = "quantity must be a whole number of at least 1";
+
+/**
+ * Bale reference numbers come from a per-company counter that each pressing
+ * advances by the quantity pressed. A negative quantity would move that counter
+ * *backwards*, and every later batch would then try to reissue reference
+ * numbers already on bales — a unique index catches the collision, so pressing
+ * simply stops working for that company until someone repairs the counter by
+ * hand. Rejecting the quantity up front is the cheaper end of that.
+ */
+function parseBaleQuantity(value: unknown): number | null {
+  const quantity = typeof value === "number" ? value : parseInt(String(value ?? ""), 10);
+  if (!Number.isInteger(quantity) || quantity < 1) return null;
+  return quantity;
+}
+
 export function registerBalesPressingRoutes(app: Express) {
   registerFactoryMixBatchRoutes(app);
   registerFactoryBaleExportRoutes(app);
@@ -28,10 +44,12 @@ export function registerBalesPressingRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { productId, quantity, weightPerBale } = req.body;
-      if (!productId || !quantity || !weightPerBale) {
+      const { productId, weightPerBale } = req.body;
+      const quantity = parseBaleQuantity(req.body.quantity);
+      if (!productId || !req.body.quantity || !weightPerBale) {
         return res.status(400).json({ message: "productId, quantity, and weightPerBale are required" });
       }
+      if (quantity === null) return res.status(400).json({ message: QUANTITY_MESSAGE });
 
       const result = await db.transaction(async (tx: any) => {
         const [product] = await tx
@@ -86,7 +104,6 @@ export function registerBalesPressingRoutes(app: Express) {
               articleCode: product.articleCode,
               productName: product.name,
               weightKg: String(weightPerBale),
-              sellingPrice: String(product.productionPrice || "0"),
               status: "PENDING_PRESSING",
             })
             .returning();
@@ -123,8 +140,14 @@ export function registerBalesPressingRoutes(app: Express) {
         return res.status(400).json({ message: "items array is required with at least one entry" });
       }
 
+      const parsedQuantities = items.map((item: any) => parseBaleQuantity(item.quantity ?? item.qty));
+      if (parsedQuantities.some((quantity: number | null) => quantity === null)) {
+        return res.status(400).json({ message: QUANTITY_MESSAGE });
+      }
+      const quantities = parsedQuantities as number[];
+
       const result = await db.transaction(async (tx: any) => {
-        const totalExpected = items.reduce((sum: number, item: any) => sum + parseInt(item.quantity || item.qty), 0);
+        const totalExpected = quantities.reduce((sum: number, quantity: number) => sum + quantity, 0);
 
         const [pressingBatch] = await tx
           .insert(factoryPressingBatches)
@@ -160,8 +183,8 @@ export function registerBalesPressingRoutes(app: Express) {
         const bales: any[] = [];
         let baleIndex = 0;
 
-        for (const item of items) {
-          const qty = parseInt(item.quantity || item.qty);
+        for (const [itemIndex, item] of items.entries()) {
+          const qty = quantities[itemIndex];
           const weight = item.weightPerBale;
 
           const [product] = await tx
@@ -184,7 +207,6 @@ export function registerBalesPressingRoutes(app: Express) {
                 articleCode: product.articleCode,
                 productName: product.name,
                 weightKg: String(weight),
-                sellingPrice: String(product.productionPrice || "0"),
                 status: "PENDING_PRESSING",
               })
               .returning();
@@ -218,10 +240,12 @@ export function registerBalesPressingRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { productId, quantity, weightPerBale } = req.body;
-      if (!productId || !quantity || !weightPerBale) {
+      const { productId, weightPerBale } = req.body;
+      const quantity = parseBaleQuantity(req.body.quantity);
+      if (!productId || !req.body.quantity || !weightPerBale) {
         return res.status(400).json({ message: "productId, quantity, and weightPerBale are required" });
       }
+      if (quantity === null) return res.status(400).json({ message: QUANTITY_MESSAGE });
 
       const result = await db.transaction(async (tx: any) => {
         const [product] = await tx
@@ -276,7 +300,6 @@ export function registerBalesPressingRoutes(app: Express) {
               articleCode: product.articleCode,
               productName: product.name,
               weightKg: String(weightPerBale),
-              sellingPrice: String(product.productionPrice || "0"),
               status: "PENDING_PRESSING",
             })
             .returning();

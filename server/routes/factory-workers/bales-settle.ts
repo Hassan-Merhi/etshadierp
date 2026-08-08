@@ -91,7 +91,7 @@ export function registerFactoryWorkerBaleSettleRoutes(app: Express, requireAuth:
           description: `Contract ended (no settlement) for ${worker.fullName}`,
           amountCurrency: 0,
           amountUsd: 0,
-          createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+          createdBy: (req.session as any).userId ?? undefined,
         });
         return res.json({ skipped: true, workerUpdated: true });
       }
@@ -310,7 +310,7 @@ export function registerFactoryWorkerBaleSettleRoutes(app: Express, requireAuth:
         description: `Settlement for ${worker.fullName}: earned $${earned.toFixed(2)}, paid $${totalPaid.toFixed(2)}, advances $${totalAdvances.toFixed(2)}, balance $${balance.toFixed(2)}`,
         amountCurrency: Math.abs(balance),
         amountUsd: Math.abs(balance),
-        createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+        createdBy: (req.session as any).userId ?? undefined,
       });
 
       res.json({

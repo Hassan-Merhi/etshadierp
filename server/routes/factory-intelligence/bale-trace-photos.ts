@@ -163,7 +163,7 @@ export function registerFactoryBaleTracePhotoRoutes(app: Express, requireAuth: a
             baleId,
             url,
             fileName: req.file.originalname,
-            uploadedBy: (req.session as any).userId ? parseInt((req.session as any).userId) : null,
+            uploadedBy: (req.session as any).userId ?? null,
           })
           .returning();
 

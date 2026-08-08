@@ -12,6 +12,7 @@ import { sql } from "drizzle-orm";
 import {} from "@shared/schema";
 
 import { getCompanyId } from "./_helpers";
+import { resultRows } from "../../../lib/queryResult";
 
 export function registerDispatchBaleSearchRoutes(app: Express) {
   // ── GET /api/factory/bale-search ──────────────────────────────────────────
@@ -31,7 +32,7 @@ export function registerDispatchBaleSearchRoutes(app: Express) {
         WHERE company_id = ${companyId} AND LOWER(reference_number) = LOWER(${q})
         LIMIT 1
       `);
-      const bale = ((baleRes as any).rows || baleRes)[0];
+      const bale = resultRows(baleRes)[0];
 
       // 2. Find active dispatch scan (removed_at IS NULL)
       const scanRes = await db.execute(sql`
@@ -70,7 +71,7 @@ export function registerDispatchBaleSearchRoutes(app: Express) {
         ORDER BY sc.scanned_at DESC
         LIMIT 1
       `);
-      const scan = ((scanRes as any).rows || scanRes)[0];
+      const scan = resultRows(scanRes)[0];
 
       if (!bale && !scan) {
         return res.status(404).json({ message: `Bale "${q}" not found` });
@@ -82,7 +83,7 @@ export function registerDispatchBaleSearchRoutes(app: Express) {
       } else if (scan) {
         status = "RESERVED_FOR_DISPATCH";
       } else {
-        status = bale?.status || "IN_STOCK";
+        status = String(bale?.status || "IN_STOCK");
       }
 
       res.json({

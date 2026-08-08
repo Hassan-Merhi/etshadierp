@@ -20,6 +20,7 @@ import {
 import { eq, sql } from "drizzle-orm";
 
 import { ApplySnapshot, findOrCreateLedgerAccount, parseNum } from "./_helpers";
+import { resultRows } from "../../lib/queryResult";
 
 export function registerBalanceRepairApplyRoutes(app: Express) {
   // ── POST /api/admin/repair-balances/apply ────────────────────────────────
@@ -49,7 +50,7 @@ export function registerBalanceRepairApplyRoutes(app: Express) {
           GROUP BY ledger_row_id
         `);
       const pmtMap = new Map<number, number>();
-      for (const row of (pmtSumsRows as any).rows ?? pmtSumsRows) {
+      for (const row of resultRows(pmtSumsRows)) {
         pmtMap.set(Number(row.ledger_row_id), parseNum(row.total_paid));
       }
       for (const row of allLedger) {
@@ -88,7 +89,21 @@ export function registerBalanceRepairApplyRoutes(app: Express) {
         `);
 
       const seenVouchers = new Set<number>();
-      for (const row of (paymentsRows as any).rows ?? paymentsRows) {
+      for (const row of resultRows<{
+        payment_id: number;
+        voucher_id: number;
+        contract_id: number;
+        unit_id: number | null;
+        amount: string | null;
+        payment_date: string;
+        entry_count: string | number | null;
+        voucher_deleted_at: string | null;
+        cash_account_id: number | null;
+        voucher_desc: string | null;
+        voucher_total: string | null;
+        module: string | null;
+        unit_type: string | null;
+      }>(paymentsRows)) {
         const vid = Number(row.voucher_id);
         if (seenVouchers.has(vid)) continue;
         const entryCount = Number(row.entry_count ?? 0);
@@ -110,7 +125,7 @@ export function registerBalanceRepairApplyRoutes(app: Express) {
 
         // Re-insert entries only if there are none (after potential un-delete)
         const countAfter = await db.execute(sql`SELECT COUNT(*) AS cnt FROM voucher_entries WHERE voucher_id = ${vid}`);
-        const cnt = Number(((countAfter as any).rows ?? countAfter)[0]?.cnt ?? 0);
+        const cnt = Number(resultRows(countAfter)[0]?.cnt ?? 0);
         if (cnt === 0 && cashAccId) {
           const amtStr = String(amount);
           let incomeOrExpenseId: number | null = null;
@@ -189,7 +204,24 @@ export function registerBalanceRepairApplyRoutes(app: Express) {
           WHERE ict.from_company_id = ${companyId} OR ict.to_company_id = ${companyId}
         `);
 
-      for (const row of (transferRows as any).rows ?? transferRows) {
+      for (const row of resultRows<{
+        id: number;
+        transfer_type: string;
+        from_company_id: number;
+        to_company_id: number;
+        transfer_date: string;
+        amount: string | null;
+        from_ledger_account_id: number;
+        to_ledger_account_id: number;
+        from_voucher_id: number | null;
+        to_voucher_id: number | null;
+        description: string | null;
+        source_payment_id: number | null;
+        from_deleted: string | null;
+        to_deleted: string | null;
+        from_entry_count: string | number | null;
+        to_entry_count: string | number | null;
+      }>(transferRows)) {
         const fromBroken = !!row.from_deleted || Number(row.from_entry_count ?? 0) === 0;
         const toBroken = !!row.to_deleted || Number(row.to_entry_count ?? 0) === 0;
         const fromExists = !!row.from_voucher_id;
@@ -249,7 +281,7 @@ export function registerBalanceRepairApplyRoutes(app: Express) {
         `);
       const guarContractIds2 = new Set<number>();
       const guarAmountMap2 = new Map<number, number>();
-      for (const row of (guarRows2 as any).rows ?? guarRows2) {
+      for (const row of resultRows(guarRows2)) {
         const parts = String(row.voucher_number ?? "").split("-");
         const cid = parseInt(parts[parts.length - 1]);
         if (!isNaN(cid)) {

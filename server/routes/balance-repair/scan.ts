@@ -20,6 +20,7 @@ import {
   VoucherEntryMissing,
   parseNum,
 } from "./_helpers";
+import { resultRows } from "../../lib/queryResult";
 
 export function registerBalanceRepairScanRoutes(app: Express) {
   // ── GET /api/admin/repair-balances/scan ──────────────────────────────────
@@ -41,7 +42,7 @@ export function registerBalanceRepairScanRoutes(app: Express) {
           GROUP BY ledger_row_id
         `);
       const pmtMap = new Map<number, number>();
-      for (const row of (pmtSumsRows as any).rows ?? pmtSumsRows) {
+      for (const row of resultRows(pmtSumsRows)) {
         pmtMap.set(Number(row.ledger_row_id), parseNum(row.total_paid));
       }
 
@@ -108,7 +109,20 @@ export function registerBalanceRepairScanRoutes(app: Express) {
 
       const voucherEntryMissing: VoucherEntryMissing[] = [];
       const seenVoucherIds = new Set<number>(); // deduplicate (split payments share one voucher)
-      for (const row of (paymentsWithVoucher as any).rows ?? paymentsWithVoucher) {
+      for (const row of resultRows<{
+        payment_id: number;
+        voucher_id: number;
+        contract_id: number;
+        unit_id: number | null;
+        module: string | null;
+        amount: string | null;
+        payment_date: string;
+        entry_count: string | number | null;
+        voucher_deleted_at: string | null;
+        cash_account_id: number | null;
+        cash_account_name: string | null;
+        unit_type: string | null;
+      }>(paymentsWithVoucher)) {
         const vid = Number(row.voucher_id);
         if (seenVoucherIds.has(vid)) continue;
         const entryCount = Number(row.entry_count ?? 0);
@@ -162,7 +176,22 @@ export function registerBalanceRepairScanRoutes(app: Express) {
         `);
 
       const orphanedTransfers: OrphanedTransfer[] = [];
-      for (const row of (transferRows as any).rows ?? transferRows) {
+      for (const row of resultRows<{
+        id: number;
+        description: string | null;
+        amount: string | null;
+        transfer_date: string;
+        from_company_id: number;
+        to_company_id: number;
+        from_voucher_id: number | null;
+        to_voucher_id: number | null;
+        from_company_name: string | null;
+        to_company_name: string | null;
+        from_deleted: string | null;
+        to_deleted: string | null;
+        from_entry_count: string | number | null;
+        to_entry_count: string | number | null;
+      }>(transferRows)) {
         const fromBroken = !!row.from_deleted || Number(row.from_entry_count ?? 0) === 0;
         const toBroken = !!row.to_deleted || Number(row.to_entry_count ?? 0) === 0;
         const fromExists = !!row.from_voucher_id;
@@ -203,7 +232,7 @@ export function registerBalanceRepairScanRoutes(app: Express) {
         `);
       const guarContractIds = new Set<number>();
       const guarAmountMap = new Map<number, number>(); // contractId → voucher total_amount
-      for (const row of (guarRows as any).rows ?? guarRows) {
+      for (const row of resultRows(guarRows)) {
         const parts = String(row.voucher_number ?? "").split("-");
         const cid = parseInt(parts[parts.length - 1]);
         if (!isNaN(cid)) {

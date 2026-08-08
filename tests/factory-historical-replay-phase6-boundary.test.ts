@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 describe("Historical Replay phase 6 boundary", () => {
   it("documents that static audit is not authorization to apply", () => {
     const audit = readFileSync(
-      resolve(process.cwd(), "docs/historical-replay-phase-6-static-audit.md"),
+      resolve(process.cwd(), "docs/archive/historical-replay-phase-6-static-audit.md"),
       "utf8"
     );
     expect(audit).toContain("This is a source-level audit only");

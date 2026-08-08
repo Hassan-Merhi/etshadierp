@@ -30,7 +30,15 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      "@typescript-eslint/no-explicit-any": "off",
+      // On as a warning so `any` is visible in the editor as it is written.
+      // The *gate* is not this rule — it is the per-file ratchet in
+      // config/type-escape-boundaries.json, which is exact, counts from the
+      // AST, and fails CI when any single file gains an escape. This rule is
+      // the feedback loop; `npm run audit:type-escapes` is the enforcement.
+      // See Phase 1 in docs/system-quality-program.md.
+      "@typescript-eslint/no-explicit-any": "warn",
+      // Stays off deliberately: unused-imports/no-unused-vars below replaces it
+      // and the plugin requires the base rule disabled to avoid double reports.
       "@typescript-eslint/no-unused-vars": "off",
       "unused-imports/no-unused-imports": "error",
       "unused-imports/no-unused-vars": [
@@ -69,28 +77,26 @@ export default tseslint.config(
     },
   },
   {
+    // Blocked, not deferred. CI format-checks every changed file, and Prettier
+    // reflow pushes each of these past a size gate:
+    //
+    //   FactoryBaleProductHistory   849 → 915  (becomes a *new* god file)
+    //   FactoryPayrollTab          1573 → 1610 (frozen at 1575)
+    //   DailyProductionReport      1328 → 1366 (frozen at 1350)
+    //   workerStatsAdvancesRoutes   921 → 928  (frozen at 922)
+    //
+    // Deleting an unused import from any of them therefore fails either the
+    // format gate or the size gate — they cannot be edited at all until they
+    // are split. Raising a frozen baseline to absorb formatting churn would
+    // leave headroom that silently refills, which working rule 4 of the
+    // god-file program exists to prevent.
+    //
+    // Remove this block when those files are split (that program's Phase 4).
     files: [
-      "client/src/lib/labelHtml.ts",
-      "client/src/main.tsx",
-      "client/src/pages/Daybook.tsx",
-      "client/src/pages/StockEntryHistory.tsx",
-      "client/src/pages/StockInSalesReport.tsx",
-      "client/src/pages/StockInSalesReportDetail.tsx",
-      "client/src/pages/accounts/AccountStatementView.tsx",
-      "client/src/pages/factory/FactoryDaybook.tsx",
-      "client/src/pages/factory/FactoryStockAllocationV5.tsx",
-    ],
-    rules: {
-      "unused-imports/no-unused-imports": "off",
-    },
-  },
-  {
-    files: [
-      "client/src/pages/factory/DailyProductionReport.tsx",
       "client/src/pages/factory/FactoryBaleProductHistory.tsx",
       "client/src/pages/factory/FactoryPayrollTab.tsx",
+      "client/src/pages/factory/DailyProductionReport.tsx",
       "server/routes/payroll/workerStatsAdvancesRoutes.ts",
-      "server/routes/sp/spOffloadLifecycleRoutes.ts",
     ],
     rules: {
       "unused-imports/no-unused-imports": "off",

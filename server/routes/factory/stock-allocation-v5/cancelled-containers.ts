@@ -12,6 +12,7 @@ import { requireAuth } from "../../../auth";
 import {} from "@shared/schema";
 import { sql } from "drizzle-orm";
 import { recalculateOrderTotals } from "../_helpers";
+import { resultRows } from "../../../lib/queryResult";
 
 export function registerV5CancelledContainerRoutes(app: Express) {
   // ── GET /api/factory/v5/recently-cancelled-containers ────────────────────
@@ -45,7 +46,7 @@ export function registerV5CancelledContainerRoutes(app: Express) {
             LIMIT 50`
       );
 
-      const orders = ((raw as any).rows ?? (raw as unknown as any[])).map((r: any) => ({
+      const orders = resultRows(raw).map((r: any) => ({
         id: Number(r.id),
         containerNumber: r.containerNumber ?? `Order #${r.id}`,
         status: r.status,
@@ -123,7 +124,7 @@ export function registerV5CancelledContainerRoutes(app: Express) {
       const historyResult = await db.execute(
         sql`SELECT COUNT(*)::int AS cnt FROM customer_order_bales_history WHERE order_id = ${orderId}`
       );
-      const historyCount = Number(((historyResult as any).rows ?? [])[0]?.cnt ?? 0);
+      const historyCount = Number(resultRows(historyResult)[0]?.cnt ?? 0);
 
       if (historyCount > 0) {
         await db.execute(

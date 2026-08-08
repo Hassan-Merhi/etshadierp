@@ -124,7 +124,7 @@ export function registerFactoryDashboardWasteRoutes(app: Express, requireAuth: a
           wasteType: wasteType || null,
           kgWaste: String(kgWaste),
           reason: reason || null,
-          createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : null,
+          createdBy: (req.session as any).userId ?? null,
         })
         .returning();
 

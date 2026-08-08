@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const root = path.resolve(__dirname, "..");
 const baselinePath = path.join(root, "scripts", "program8c-reporting-traceability-baseline.json");
-const auditPath = path.join(root, "docs", "program-8c-reporting-traceability.md");
+const auditPath = path.join(root, "docs", "archive", "program-8c-reporting-traceability.md");
 
 const fail = (message) => {
   console.error(`[program8c] ${message}`);
