@@ -97,6 +97,7 @@ export function useScreenFeed() {
     busyRef.current = false;
     let disposed = false;
     let lastObservedHref = window.location.href;
+    let mutationObserver: MutationObserver | null = null;
     const clickBuffer: ClickEvent[] = [];
     const trackedScrollElements = new Set<HTMLElement>();
 
@@ -285,11 +286,13 @@ export function useScreenFeed() {
     }
 
     const onPointerMove = (event: PointerEvent) => {
+      if (!watchedRef.current) return;
       const point = normalizeScreenFeedPoint(event.clientX, event.clientY, window.innerWidth, window.innerHeight);
       pointerRef.current = { ...point, visible: true, ts: Date.now() };
     };
 
     const onPointerLeave = () => {
+      if (!watchedRef.current) return;
       const previous = pointerRef.current ?? { x: 0, y: 0, visible: false, ts: Date.now() };
       pointerRef.current = { ...previous, visible: false, ts: Date.now() };
     };
@@ -384,9 +387,31 @@ export function useScreenFeed() {
       lastSentPointerRef.current = null;
     };
 
+    const stopMutationObserver = () => {
+      mutationObserver?.disconnect();
+      mutationObserver = null;
+    };
+
+    const startMutationObserver = () => {
+      if (mutationObserver || !watchedRef.current || document.visibilityState !== "visible") return;
+      mutationObserver = new MutationObserver((records) => {
+        if (!watchedRef.current || !mutationHasVisibleChange(records)) return;
+        const recentlyInteractive = Date.now() - lastInteractionAtRef.current <= INTERACTION_ACTIVE_WINDOW_MS;
+        markDirty({ minGapMs: recentlyInteractive ? ACTIVE_CAPTURE_MIN_GAP_MS : BACKGROUND_MUTATION_MIN_GAP_MS });
+      });
+      mutationObserver.observe(document.body, {
+        subtree: true,
+        childList: true,
+        characterData: true,
+        attributes: true,
+        attributeFilter: ["value", "checked", "selected", "aria-expanded", "aria-checked", "data-state", "hidden"],
+      });
+    };
+
     const stopCapturing = () => {
       clearCaptureTimer();
       stopPointerLoop();
+      stopMutationObserver();
       lastSignatureRef.current = null;
       lastUploadedClickTsRef.current = 0;
       lastCaptureAtRef.current = 0;
@@ -398,6 +423,7 @@ export function useScreenFeed() {
       pendingMinGapRef.current = ACTIVE_CAPTURE_MIN_GAP_MS;
       clickBuffer.length = 0;
       trackedScrollElements.clear();
+      pointerRef.current = null;
     };
 
     const applyWatchStatus = (watched: boolean, fast: boolean) => {
@@ -407,6 +433,7 @@ export function useScreenFeed() {
 
       if (watched) {
         watchedRef.current = true;
+        startMutationObserver();
         startPointerLoop();
         if (!wasWatched || modeChanged) {
           lastSignatureRef.current = null;
@@ -455,13 +482,17 @@ export function useScreenFeed() {
 
     let eventSource: EventSource | null = null;
     // A server with the live transport switched off answers this stream with
-    // 204, which EventSource treats as an error and retries forever. Give up
-    // after a couple of attempts instead of reconnecting for the whole session.
+    // 204, which EventSource treats as an error and can otherwise retry forever.
+    // Give up after a couple of attempts instead of reconnecting for the whole
+    // ERP session; polling remains the recovery transport.
     const MAX_STATUS_STREAM_ERRORS = 2;
     let statusStreamErrors = 0;
     try {
       eventSource = new EventSource("/api/screen-feed/live/status", { withCredentials: true });
-      eventSource.onopen = stopFallbackPolling;
+      eventSource.onopen = () => {
+        statusStreamErrors = 0;
+        stopFallbackPolling();
+      };
       eventSource.addEventListener("status", (event) => {
         statusStreamErrors = 0;
         try {
@@ -483,26 +514,15 @@ export function useScreenFeed() {
       startFallbackPolling();
     }
 
-    const mutationObserver = new MutationObserver((records) => {
-      if (!watchedRef.current || !mutationHasVisibleChange(records)) return;
-      const recentlyInteractive = Date.now() - lastInteractionAtRef.current <= INTERACTION_ACTIVE_WINDOW_MS;
-      markDirty({ minGapMs: recentlyInteractive ? ACTIVE_CAPTURE_MIN_GAP_MS : BACKGROUND_MUTATION_MIN_GAP_MS });
-    });
-    mutationObserver.observe(document.body, {
-      subtree: true,
-      childList: true,
-      characterData: true,
-      attributes: true,
-      attributeFilter: ["value", "checked", "selected", "aria-expanded", "aria-checked", "data-state", "hidden"],
-    });
-
     const onVisibilityChange = () => {
       if (document.visibilityState !== "visible") {
         clearCaptureTimer();
         stopPointerLoop();
+        stopMutationObserver();
         return;
       }
       if (watchedRef.current) {
+        startMutationObserver();
         startPointerLoop();
         lastSignatureRef.current = null;
         markDirty({ urgent: true });
@@ -524,7 +544,7 @@ export function useScreenFeed() {
 
     return () => {
       disposed = true;
-      mutationObserver.disconnect();
+      stopMutationObserver();
       eventSource?.close();
       stopFallbackPolling();
       watchedRef.current = false;
