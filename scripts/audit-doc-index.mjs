@@ -2,28 +2,15 @@
 /**
  * audit-doc-index.mjs
  *
- * Two jobs, both narrow on purpose.
+ * Documentation has two states in this repository:
  *
- * 1. Classification completeness. Every file under docs/ is either a
- *    **reference** (describes how the system behaves now, must stay accurate)
- *    or a **record** (describes work that finished, correct as history). A new
- *    doc with no entry fails, so the choice is made when the doc is written
- *    rather than inferred by the next person to read it.
+ * - **reference** — describes how the system behaves now and belongs under
+ *   docs/ outside docs/archive/;
+ * - **record** — describes completed work and belongs under docs/archive/.
  *
- * 2. Figure agreement. Documentation rots in one way that a script can actually
- *    catch: a doc states a number that a config file or an audit also states,
- *    and the two drift apart. `docs/god-file-split-program.md` opened with
- *    "139 files, 74,858 lines over the limit" while the config said 64 and
- *    33,432 — a doc whose entire purpose is tracking a number, wrong by more
- *    than a factor of two, in the same repository as the number.
- *
- *    So documented figures are *bound* to their live source here. A binding is
- *    explicit — nobody's prose is scanned for stray digits — and when the
- *    source moves, the doc fails until it is updated.
- *
- * What this cannot do is detect prose that is merely out of date. That is a
- * judgment call, which is why classification is data for review rather than
- * something the audit pretends to verify.
+ * This audit enforces that state model rather than relying on naming habits.
+ * It also binds selected numerical claims to live sources and requires every
+ * current reference document to be discoverable from docs/README.md.
  *
  * Usage:
  *   npm run audit:doc-index
@@ -38,9 +25,8 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 const configPath = path.join(projectRoot, "config/doc-index.json");
 
 const VALID_CLASSES = new Set(["reference", "record"]);
-
-/** Where finished work lives. Records belong here; references must not. */
 const ARCHIVE_ROOT = "docs/archive";
+const DOCS_README = "docs/README.md";
 
 function normalizeRelativePath(absolutePath) {
   return path.relative(projectRoot, absolutePath).split(path.sep).join("/");
@@ -64,12 +50,8 @@ function collectDocs(root, scanConfig, output) {
 }
 
 /**
- * Heuristic used only to seed the classification. A doc named for a phase or
- * carrying a completion word is almost always a record of finished work, and
- * anything already filed under the archive is one by definition. It is a
- * starting point for review, never an assertion — the Phase 3a pass moved 16
- * docs the filename rule had called references, including every `program-N-*`
- * write-up that opens with "Program status: complete".
+ * Heuristic used only to seed a missing classification. It is never used by the
+ * audit to decide whether a reviewed file is current or historical.
  */
 function guessClassification(relativePath) {
   if (relativePath.startsWith(`${ARCHIVE_ROOT}/`)) return "record";
@@ -87,6 +69,29 @@ function readJson(relativePath) {
 
 function resolveJsonPath(value, dottedPath) {
   return dottedPath.split(".").reduce((current, key) => (current == null ? current : current[key]), value);
+}
+
+function localMarkdownTargets(fromDoc, text) {
+  const targets = [];
+  const linkPattern = /\[[^\]]*\]\(([^)]+)\)/g;
+
+  for (const match of text.matchAll(linkPattern)) {
+    let raw = String(match[1] ?? "").trim();
+    if (!raw) continue;
+
+    // Strip the optional <...> wrapper used for paths containing spaces.
+    if (raw.startsWith("<") && raw.includes(">")) raw = raw.slice(1, raw.indexOf(">"));
+    else raw = raw.split(/\s+["']/)[0];
+
+    if (/^(?:https?:|mailto:|tel:|#)/i.test(raw)) continue;
+    const withoutFragment = raw.split("#")[0].split("?")[0];
+    if (!withoutFragment.toLowerCase().endsWith(".md")) continue;
+
+    const target = path.posix.normalize(path.posix.join(path.posix.dirname(fromDoc), withoutFragment));
+    targets.push(target);
+  }
+
+  return targets;
 }
 
 /** Resolves a figure's live value from whichever source it is bound to. */
@@ -126,6 +131,7 @@ export async function auditDocIndex() {
   docs.sort();
 
   const classification = config.classification ?? {};
+  const known = new Set(docs);
 
   const unclassified = docs.filter((doc) => classification[doc] === undefined);
   for (const doc of unclassified) {
@@ -140,18 +146,15 @@ export async function auditDocIndex() {
     }
   }
 
-  const known = new Set(docs);
+  // A stale row is not harmless metadata. It makes the index claim that a
+  // document still exists and can hide a rename/move that was never reviewed.
   const staleEntries = Object.keys(classification).filter((doc) => !known.has(doc));
   for (const doc of staleEntries) {
-    warnings.push(`${doc} is classified but no longer exists; remove the entry`);
+    failures.push(`${doc} is classified but no longer exists. Remove the stale row or classify the renamed file.`);
   }
 
-  // Classification and location have to agree, or the split stops meaning
-  // anything the moment someone adds a file. A record outside the archive puts
-  // finished work back where a reader looks for current behaviour; a reference
-  // inside it hides something that is still true. Phase 3d of
-  // docs/system-quality-program.md: phase write-ups are *born* in docs/archive/,
-  // and only material describing lasting behaviour is promoted out.
+  // Classification and location must agree. A historical record outside the
+  // archive looks current to a reader; a live reference inside it is hidden.
   const misplaced = [];
   for (const doc of docs) {
     const value = classification[doc];
@@ -167,6 +170,36 @@ export async function auditDocIndex() {
     }
   }
   failures.push(...misplaced);
+
+  // Every live reference must be discoverable from the landing page. This is
+  // intentionally exact: adding a current doc without putting it in the index
+  // is equivalent to shipping a feature without a navigation path to it.
+  const readmePath = path.join(projectRoot, DOCS_README);
+  const readmeTargets = fs.existsSync(readmePath)
+    ? localMarkdownTargets(DOCS_README, fs.readFileSync(readmePath, "utf8"))
+    : [];
+  const readmeTargetSet = new Set(readmeTargets);
+  const referenceDocs = docs.filter((doc) => classification[doc] === "reference" && doc !== DOCS_README);
+  const readmeMissingReferences = referenceDocs.filter((doc) => !readmeTargetSet.has(doc));
+  for (const doc of readmeMissingReferences) {
+    failures.push(`${doc} is a current reference but is not linked from ${DOCS_README}.`);
+  }
+
+  // The current-doc landing page must not send readers straight into a completed
+  // phase record as if it described current behaviour.
+  const readmeRecordLinks = [...new Set(readmeTargets.filter((doc) => classification[doc] === "record"))];
+  for (const doc of readmeRecordLinks) {
+    failures.push(`${DOCS_README} links directly to archived record ${doc} as documentation navigation.`);
+  }
+
+  // A local .md link in the landing page that does not resolve is a broken
+  // navigation entry. Limit this check to the landing page; prose elsewhere can
+  // legitimately link to repository files outside docs/ and is a separate lint
+  // concern.
+  const readmeBrokenLinks = [...new Set(readmeTargets.filter((doc) => doc.startsWith("docs/") && !known.has(doc)))];
+  for (const doc of readmeBrokenLinks) {
+    failures.push(`${DOCS_README} links to ${doc}, but that Markdown document does not exist.`);
+  }
 
   // --- Figure agreement ---
   const figureResults = [];
@@ -226,14 +259,21 @@ export async function auditDocIndex() {
     unclassified,
     staleEntries,
     misplaced,
+    readmeMissingReferences,
+    readmeRecordLinks,
+    readmeBrokenLinks,
     figureResults,
     summary: {
       totalDocs: docs.length,
       reference: counts.reference,
       record: counts.record,
       unclassified: unclassified.length,
+      staleEntries: staleEntries.length,
       misplaced: misplaced.length,
       archived: docs.filter((doc) => doc.startsWith(`${ARCHIVE_ROOT}/`)).length,
+      readmeMissingReferences: readmeMissingReferences.length,
+      readmeRecordLinks: readmeRecordLinks.length,
+      readmeBrokenLinks: readmeBrokenLinks.length,
       figuresChecked: figureResults.length,
       figureMismatches: figureResults.filter((result) => !result.ok).length,
     },
@@ -250,7 +290,8 @@ function seedClassification() {
   const classification = {};
   let added = 0;
   for (const doc of docs) {
-    // Never overwrite a reviewed decision; only fill in what is missing.
+    // Never overwrite a reviewed decision; only fill in what is missing. By
+    // rebuilding from the actual tree, this also removes stale rows.
     if (existing[doc] !== undefined) {
       classification[doc] = existing[doc];
       continue;
@@ -286,8 +327,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   } else {
     const { summary } = report;
     console.log(
-      `Doc index verified: ${summary.totalDocs} docs — ${summary.reference} reference in docs/, ` +
-        `${summary.archived} archived records — and ${summary.figuresChecked} documented figures agree with their source.`
+      `Doc index verified: ${summary.totalDocs} docs — ${summary.reference} current references, ` +
+        `${summary.archived} archived records, every current reference is linked from ${DOCS_README}, ` +
+        `and ${summary.figuresChecked} documented figures agree with their source.`
     );
   }
 }
