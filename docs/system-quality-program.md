@@ -162,12 +162,58 @@ for the numbers written.
 
 ## Phase 3 — documentation state
 
-Documentation-state enforcement is complete. Current references live under
-`docs/`; completed phase/program records live under `docs/archive/`.
-`config/doc-index.json` enforces that classification and binds live figures to
-sources so reference documents fail when important numbers drift.
+Phase 3 is complete and enforced by both the standalone documentation audit and
+the normal backend test suite.
 
-`docs/README.md` is the entry point for current documentation.
+### Current references versus historical records
+
+Every Markdown document below `docs/` is explicitly classified in
+`config/doc-index.json` as one of two states:
+
+- **reference** — describes current behaviour and must live outside
+  `docs/archive/`;
+- **record** — describes completed work and must live under `docs/archive/`.
+
+`npm run audit:doc-index` fails when a document is unclassified, when its class
+does not match its location, or when the index contains a stale path for a file
+that no longer exists. Renaming or deleting documentation therefore requires an
+intentional index change rather than leaving ghost metadata behind.
+
+### Discoverability contract
+
+`docs/README.md` is the canonical navigation surface for current documentation.
+Every current reference except the README itself must be linked there. A new
+reference that is correctly classified but not discoverable still fails the
+audit. The landing page also fails if it directly lists an archived record as
+current documentation or links to a missing Markdown document.
+
+This closes a gap where a document could be technically present and correctly
+classified but effectively invisible to maintainers.
+
+### Bound live figures
+
+Selected numerical claims in current documentation are explicitly bound to live
+configuration or audit outputs in `config/doc-index.json`. When the source value
+changes, the documentation must change in the same work or the audit fails.
+This is intentionally narrow: prose freshness still requires review, while
+figures with an objective source are machine-enforced.
+
+### Test-suite integration
+
+`tests/doc-index-contract.test.ts` invokes the same audit during the normal
+backend suite and asserts that there are no unclassified docs, stale entries,
+misplaced docs, missing README references, archived-record navigation leaks,
+broken README Markdown links, or bound-figure mismatches.
+
+```bash
+npm run audit:doc-index
+```
+
+**Phase 3 exit criteria:** the documentation index exactly describes the current
+Markdown tree; references and records are physically separated; every live
+reference is reachable from the docs landing page; stale paths and broken
+landing-page entries fail closed; objective figures remain bound to their live
+sources; and the contract is part of the standard backend tests.
 
 ---
 
