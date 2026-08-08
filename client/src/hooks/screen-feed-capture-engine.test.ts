@@ -108,6 +108,8 @@ describe("screen feed capture engine", () => {
 
     expect(result.uploaded).toBe(true);
     expect(result.failed).toBe(false);
+    expect(result.failureStage).toBeUndefined();
+    expect(result.failureReason).toBeUndefined();
     expect(body.capture.source).toBe("dom");
     expect(body.capture.failureReason).toBeUndefined();
   });
@@ -123,6 +125,32 @@ describe("screen feed capture engine", () => {
     expect(body.capture.source).toBe("fallback");
     expect(String(body.capture.failureReason)).toContain("Tainted");
     expect(String(body.dataUrl)).toMatch(/^data:image\//);
+  });
+
+  it("returns an encode failure when even the fallback canvas cannot be exported", async () => {
+    HTMLCanvasElement.prototype.toDataURL = function () {
+      throw securityError();
+    };
+    html2canvas.mockResolvedValue(makeCanvas(1200, 800, false));
+
+    const { result } = await captureOnce(fetchMock);
+
+    expect(result.uploaded).toBe(false);
+    expect(result.failed).toBe(true);
+    expect(result.failureStage).toBe("encode");
+    expect(result.failureReason).toContain("Tainted");
+  });
+
+  it("returns the upload status when the server rejects a frame", async () => {
+    html2canvas.mockResolvedValue(makeCanvas(1200, 800, false));
+    fetchMock.mockResolvedValue({ ok: false, status: 413 });
+
+    const { result } = await captureOnce(fetchMock);
+
+    expect(result.uploaded).toBe(false);
+    expect(result.failed).toBe(true);
+    expect(result.failureStage).toBe("upload");
+    expect(result.failureReason).toBe("Screen frame upload rejected (413).");
   });
 
   it("reports how long the capture cost so the caller can pace itself", async () => {
