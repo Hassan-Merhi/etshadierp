@@ -13,8 +13,9 @@
  *   accounts unchanged, even when the route reports a validation/security error;
  * - after every call, every live voucher in the selected company must still be
  *   balanced;
- * - sentinel vouchers in untouched ERP, Factory and Supplier Partner companies
- *   must survive the entire sweep unchanged, catching cross-company leakage.
+ * - sentinel vouchers in untouched ERP, Factory, Properties and Supplier
+ *   Partner companies must survive the entire sweep unchanged, catching
+ *   cross-company leakage.
  *
  * Deep positive-path tests remain the source of truth for exact journal legs,
  * quantities and lifecycle transitions. This file closes the broad gap that
@@ -32,7 +33,7 @@ const TEST_PREFIX = "wrsafe";
 const MISSING_ID = "2147483646";
 const MISSING_REFERENCE = `${TEST_PREFIX}-missing-reference`;
 
-type CompanyMode = "erp" | "factory" | "supplier_partner";
+type CompanyMode = "erp" | "factory" | "properties" | "supplier_partner";
 type WriteMethod = "DELETE" | "PATCH" | "POST" | "PUT";
 
 type RouteUnderTest = {
@@ -69,6 +70,7 @@ let companySequence = 0;
 function modeForPath(path: string): CompanyMode {
   if (path.startsWith("/api/sp/")) return "supplier_partner";
   if (path.startsWith("/api/factory/")) return "factory";
+  if (path.startsWith("/api/properties/")) return "properties";
   return "erp";
 }
 
@@ -253,6 +255,7 @@ beforeAll(async () => {
   stableCompanies = {
     erp: ctx.companyId,
     factory: await createCompany("factory", "stable-factory"),
+    properties: await createCompany("properties", "stable-properties"),
     supplier_partner: await createCompany("supplier_partner", "stable-sp"),
   };
   // Parameterless writes get their own isolated empty company so they cannot
@@ -262,11 +265,13 @@ beforeAll(async () => {
   parameterlessCompanies = {
     erp: await createCompany("erp", "parameterless-erp"),
     factory: await createCompany("factory", "parameterless-factory"),
+    properties: await createCompany("properties", "parameterless-properties"),
     supplier_partner: await createCompany("supplier_partner", "parameterless-sp"),
   };
   controlCompanies = {
     erp: await createCompany("erp", "control-erp"),
     factory: await createCompany("factory", "control-factory"),
+    properties: await createCompany("properties", "control-properties"),
     supplier_partner: await createCompany("supplier_partner", "control-sp"),
   };
 
@@ -276,6 +281,7 @@ beforeAll(async () => {
   controlBefore = {
     erp: await sensitiveFingerprint(controlCompanies.erp),
     factory: await sensitiveFingerprint(controlCompanies.factory),
+    properties: await sensitiveFingerprint(controlCompanies.properties),
     supplier_partner: await sensitiveFingerprint(controlCompanies.supplier_partner),
   };
 }, 120000);
@@ -316,10 +322,11 @@ describe.sequential("authenticated sensitive write safety sweep", () => {
         await expectBalancedVouchers(companyId, route);
       }
 
-      // A write in one company must never reach an unrelated tenant. The three
-      // sentinels cover all company modes used by the sweep.
+      // A write in one company must never reach an unrelated tenant. The
+      // sentinels cover every company mode exercised by the sweep.
       expect(await sensitiveFingerprint(controlCompanies.erp)).toEqual(controlBefore.erp);
       expect(await sensitiveFingerprint(controlCompanies.factory)).toEqual(controlBefore.factory);
+      expect(await sensitiveFingerprint(controlCompanies.properties)).toEqual(controlBefore.properties);
       expect(await sensitiveFingerprint(controlCompanies.supplier_partner)).toEqual(controlBefore.supplier_partner);
     },
     300000
