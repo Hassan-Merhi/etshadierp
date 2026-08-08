@@ -216,7 +216,7 @@ describe("PATCH /api/factory/shipping-container-rows/:id/sync-order", () => {
   });
 });
 
-describe("POST .../done and .../restore", () => {
+describe("POST /api/factory/shipping-container-rows/:id/done and /api/factory/shipping-container-rows/:id/restore", () => {
   it("marks the row done with a timestamp and a user", async () => {
     const rowId = await createRow(await createOrder());
 
@@ -306,5 +306,58 @@ describe("DELETE /api/factory/shipping-container-rows/:id", () => {
 
   it("returns 404 for a row in another company", async () => {
     expect((await agent.delete("/api/factory/shipping-container-rows/999999")).status).toBe(404);
+  });
+});
+
+describe("POST /api/factory/shipping-container-rows/sync", () => {
+  /** Rows the sync would have to create: active orders with no row yet. */
+  async function rowCount(): Promise<number> {
+    const result = await pool.query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM factory_shipping_container_rows WHERE company_id = $1`,
+      [ctx.companyId]
+    );
+    return Number(result.rows[0].count);
+  }
+
+  it("opens a row for every active order that has none, and is idempotent", async () => {
+    const loading = await createOrder("LOADING");
+    const verified = await createOrder("VERIFIED");
+
+    const first = await agent.post("/api/factory/shipping-container-rows/sync").send({});
+    expect(first.status).toBe(200);
+    const afterFirst = await rowCount();
+
+    // The board calls this on every page load. A second pass must find nothing
+    // left to do — otherwise each visit doubles the board.
+    const second = await agent.post("/api/factory/shipping-container-rows/sync").send({});
+    expect(second.status).toBe(200);
+    expect(second.body.created).toBe(0);
+    expect(await rowCount()).toBe(afterFirst);
+
+    for (const orderId of [loading, verified]) {
+      const rows = await pool.query(
+        `SELECT id FROM factory_shipping_container_rows WHERE company_id = $1 AND customer_order_id = $2`,
+        [ctx.companyId, orderId]
+      );
+      expect(rows.rowCount).toBe(1);
+    }
+  });
+
+  it("ignores orders that are not being shipped", async () => {
+    const draft = await createOrder("DRAFT");
+    const deleted = await createOrder("LOADING");
+    await pool.query(`UPDATE customer_orders SET deleted_at = now() WHERE id = $1`, [deleted]);
+
+    await agent.post("/api/factory/shipping-container-rows/sync").send({});
+
+    // A DRAFT order has not started loading and a soft-deleted one is gone;
+    // either on the board is a container nobody is shipping.
+    for (const orderId of [draft, deleted]) {
+      const rows = await pool.query(
+        `SELECT id FROM factory_shipping_container_rows WHERE company_id = $1 AND customer_order_id = $2`,
+        [ctx.companyId, orderId]
+      );
+      expect(rows.rowCount).toBe(0);
+    }
   });
 });
