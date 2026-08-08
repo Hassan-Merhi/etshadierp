@@ -23,6 +23,7 @@ const isDev = import.meta.env.DEV;
 
 type Html2Canvas = (typeof import("html2canvas"))["default"];
 type CaptureSource = "dom" | "retry" | "fallback";
+export type ScreenFeedFailureStage = "render" | "encode" | "upload" | "pipeline";
 let html2canvasPromise: Promise<Html2Canvas> | null = null;
 let scrollKeySequence = 0;
 let unsupportedCssCache: { styleSheetCount: number; found: boolean } | null = null;
@@ -50,6 +51,8 @@ export interface ScreenFeedCaptureResult {
   latestClickTs: number;
   /** Wall-clock cost of the render + encode on the employee's main thread. */
   durationMs: number;
+  failureStage?: ScreenFeedFailureStage;
+  failureReason?: string;
 }
 
 interface EncodedFrame {
@@ -697,7 +700,8 @@ export async function captureAndUploadScreenFrame(input: {
   const failureReason = encodeFailureReason ?? captured.failureReason;
 
   if (!encoded) {
-    trace("encode-failed", failureReason ?? "unknown");
+    const reason = failureReason ?? "Screen frame encoding failed.";
+    trace("encode-failed", reason);
     return {
       uploaded: false,
       unchanged: false,
@@ -706,6 +710,8 @@ export async function captureAndUploadScreenFrame(input: {
       signature,
       latestClickTs,
       durationMs: Math.max(0, Date.now() - startedAt),
+      failureStage: "encode",
+      failureReason: reason,
     };
   }
 
@@ -748,12 +754,16 @@ export async function captureAndUploadScreenFrame(input: {
       signature,
       latestClickTs,
       durationMs: Math.max(0, Date.now() - startedAt),
+      ...(!response.ok
+        ? { failureStage: "upload" as const, failureReason: `Screen frame upload rejected (${response.status}).` }
+        : {}),
     };
   } catch (error) {
     if (!input.shouldContinue() || document.visibilityState !== "visible") {
       return cancelledResult(input.lastUploadedClickTs, startedAt);
     }
-    trace("upload-error", errorMessage(error));
+    const reason = errorMessage(error) || "Screen frame upload failed.";
+    trace("upload-error", reason);
     return {
       uploaded: false,
       unchanged: false,
@@ -762,6 +772,8 @@ export async function captureAndUploadScreenFrame(input: {
       signature,
       latestClickTs,
       durationMs: Math.max(0, Date.now() - startedAt),
+      failureStage: "upload",
+      failureReason: reason,
     };
   } finally {
     clearTimeout(uploadTimeout);
