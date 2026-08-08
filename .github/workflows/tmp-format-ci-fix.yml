@@ -1,0 +1,37 @@
+name: Temporary CI fix formatter
+
+on:
+  push:
+    branches:
+      - fix/main-ci-green-20260808
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/main-ci-green-20260808
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit
+      - name: Format changed CI-fix sources
+        run: node node_modules/prettier/bin/prettier.cjs --write client/src/i18n/sharedUiPhase3Translations.part6.ts client/src/i18n/sharedUiPhase3Translations.ts scripts/audit-i18n-phase14.mjs
+      - name: Commit formatter output
+        run: |
+          if git diff --quiet -- client/src/i18n/sharedUiPhase3Translations.part6.ts client/src/i18n/sharedUiPhase3Translations.ts scripts/audit-i18n-phase14.mjs; then
+            echo "Already formatted"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add client/src/i18n/sharedUiPhase3Translations.part6.ts client/src/i18n/sharedUiPhase3Translations.ts scripts/audit-i18n-phase14.mjs
+          git commit -m "style: format CI repair sources"
+          git push origin HEAD:fix/main-ci-green-20260808
