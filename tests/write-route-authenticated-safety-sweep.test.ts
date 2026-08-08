@@ -8,7 +8,7 @@
  * - every current guard-only sensitive route is invoked through the real app as
  *   an authenticated Developer in the correct company mode;
  * - parameterised routes receive a guaranteed-missing resource;
- * - parameterless routes receive a poison/dry-run body on a disposable company;
+ * - parameterless routes receive a poison/dry-run body on an isolated company;
  * - every call must leave vouchers, inventory, raw stock, bales and ledger
  *   accounts unchanged, even when the route reports a validation/security error;
  * - after every call, every live voucher in the selected company must still be
@@ -61,6 +61,7 @@ let ctx: TestContext;
 let agent: request.SuperAgentTest;
 let parentCompanyId: number;
 let stableCompanies: Record<CompanyMode, number>;
+let parameterlessCompanies: Record<CompanyMode, number>;
 let controlCompanies: Record<CompanyMode, number>;
 let controlBefore: Record<CompanyMode, Fingerprint>;
 let companySequence = 0;
@@ -254,6 +255,15 @@ beforeAll(async () => {
     factory: await createCompany("factory", "stable-factory"),
     supplier_partner: await createCompany("supplier_partner", "stable-sp"),
   };
+  // Parameterless writes get their own isolated empty company so they cannot
+  // contaminate the stable missing-resource fixtures. Reuse one per mode: the
+  // sweep requires every call to leave the sensitive fingerprint unchanged, so
+  // creating one company per route would add teardown cost without extra safety.
+  parameterlessCompanies = {
+    erp: await createCompany("erp", "parameterless-erp"),
+    factory: await createCompany("factory", "parameterless-factory"),
+    supplier_partner: await createCompany("supplier_partner", "parameterless-sp"),
+  };
   controlCompanies = {
     erp: await createCompany("erp", "control-erp"),
     factory: await createCompany("factory", "control-factory"),
@@ -289,9 +299,7 @@ describe.sequential("authenticated sensitive write safety sweep", () => {
       for (const route of routes) {
         const mode = modeForPath(route.path);
         const parameterised = hasPathParams(route.path);
-        const companyId = parameterised
-          ? stableCompanies[mode]
-          : await createCompany(mode, `disposable-${companySequence + 1}`);
+        const companyId = parameterised ? stableCompanies[mode] : parameterlessCompanies[mode];
         await selectCompany(companyId);
 
         const before = await sensitiveFingerprint(companyId);
