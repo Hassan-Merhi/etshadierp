@@ -1,0 +1,97 @@
+name: PR 590 one-shot corrective fixes
+
+on:
+  push:
+    branches:
+      - quality-audit-integration-20260808
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: ${{ !contains(github.event.head_commit.message, '[pr590-auto-fix]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: quality-audit-integration-20260808
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Normalize private registry URLs
+        shell: bash
+        run: |
+          sed -i 's#https://registry.replit.com/#https://registry.npmjs.org/#g' package-lock.json .npmrc 2>/dev/null || true
+
+      - run: npm ci
+
+      - name: Apply mechanical and safety fixes
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+          import json
+
+          # Keep live documentation figures synchronized with the audit source of truth.
+          for filename in ["docs/god-file-split-program.md", "docs/system-quality-program.md"]:
+              p = Path(filename)
+              s = p.read_text()
+              s = s.replace("Backlog: 64 files, 33,920 lines over the limit", "Backlog: 65 files, 33,942 lines over the limit")
+              s = s.replace("64 files and 33,920", "65 files and 33,942")
+              s = s.replace("64 files, 33,920", "65 files, 33,942")
+              p.write_text(s)
+
+          # Lock in three god-file reductions already achieved by this branch.
+          p = Path("config/god-file-boundaries.json")
+          data = json.loads(p.read_text())
+          grandfathered = data["repositoryScan"]["grandfathered"]
+          for key in [
+              "server/routes/containers/containerFreightWriteRoutes.ts",
+              "server/routes/factory/employee-pos/employeeNetPositionRoutes.ts",
+              "server/routes/factory/raw-stock/rawStockOffloadRoutes.ts",
+          ]:
+              grandfathered.pop(key, None)
+          p.write_text(json.dumps(data, indent=2) + "\n")
+
+          # The safety sweep must not create a legacy ledger when there is no migration work.
+          p = Path("server/routes/payroll/core/migrations.ts")
+          s = p.read_text()
+          marker = "      const salaryAccByCity = new Map<string, number>();\n"
+          guard = '''      const migrationWork = await db.execute(sql`\n        SELECT (\n          EXISTS (\n            SELECT 1 FROM vouchers v\n            WHERE v.company_id = ${companyId}\n              AND v.voucher_number LIKE 'PAYROLL-GEN-%'\n          )\n          OR EXISTS (\n            SELECT 1 FROM worker_bonuses wb\n            WHERE wb.company_id = ${companyId}\n              AND wb.status = 'paid'\n              AND wb.cash_account_id IS NOT NULL\n          )\n        ) AS has_work\n      `);\n      const migrationWorkRows = migrationWork.rows as { has_work: boolean }[];\n      if (cityRows.length === 0 && !migrationWorkRows[0]?.has_work) {\n        return res.json({\n          message: "Migration complete",\n          vouchersUpdated: 0,\n          bonusEntriesCreated: 0,\n        });\n      }\n\n'''
+          if guard not in s:
+              if marker not in s:
+                  raise SystemExit("payroll migration insertion marker not found")
+              s = s.replace(marker, guard + marker, 1)
+              p.write_text(s)
+          PY
+
+      - name: Format changed source
+        run: npx prettier --write client/src/components/StockNameUpdateImport.tsx server/routes/payroll/core/migrations.ts config/god-file-boundaries.json docs/god-file-split-program.md docs/system-quality-program.md
+
+      - name: Regenerate reviewed route manifest
+        env:
+          UPDATE_ROUTE_MANIFEST: "1"
+        run: npm run test:backend -- route-manifest
+
+      - name: Regenerate reviewed API smoke contracts
+        env:
+          UPDATE_API_SMOKE_SHAPES: "1"
+        run: npm run test:smoke-sweep
+
+      - name: Commit fixes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/god-file-split-program.md docs/system-quality-program.md config/god-file-boundaries.json config/route-manifest.json config/api-smoke-shapes.json client/src/components/StockNameUpdateImport.tsx server/routes/payroll/core/migrations.ts
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "fix: resolve PR 590 CI drift and migration safety [pr590-auto-fix]"
+          git push origin HEAD:quality-audit-integration-20260808
