@@ -13,7 +13,9 @@
   "routeManifestAdditions": [
     "POST /api/stock-items/update-names-by-code [requireAuth > requireNonPOS > <anonymous>]"
   ],
-  "routeManifestMountAdditions": [],
+  "routeManifestMountAdditions": [
+    "USE /api/properties/rental [<anonymous>]"
+  ],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [
       "tests/factory-post-offload-phase5-reconciliation.test.ts",
