@@ -283,7 +283,7 @@ export function registerStockItemBulkMergeRoutes(app: Express) {
               mergedItemName: duplicateItem.name,
               snapshotBefore,
               snapshotAfter,
-              mergedByUserId: userId,
+              mergedByUserId: String(userId),
               notes: `Bulk merge via Excel`,
             });
           } catch (_auditErr) {
