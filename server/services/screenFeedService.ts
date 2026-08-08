@@ -61,9 +61,7 @@ export function sanitizeScreenFeedFailureReason(value: unknown): string | undefi
   return sanitized || undefined;
 }
 
-export function sanitizeScreenFeedFailure(
-  value: unknown
-): Omit<ScreenFeedFailureInfo, "occurredAt"> | null {
+export function sanitizeScreenFeedFailure(value: unknown): Omit<ScreenFeedFailureInfo, "occurredAt"> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const failure = value as Record<string, unknown>;
   const stage = failure.stage;
