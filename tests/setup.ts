@@ -67,6 +67,7 @@ const FACTORY_COMPANY_PREFIXES = new Set([
   "wdedwr",
   "mkpaid",
   "prswr",
+  "wbonus",
 ]);
 
 function testCompanyType(prefix: string): "erp" | "factory" {
@@ -153,6 +154,9 @@ export async function cleanupTestData(prefix: string): Promise<void> {
     // Same constraint, same reason: employee_bonuses.voucher_id is ON DELETE
     // RESTRICT, so a suite that recorded a bonus blocks the voucher delete.
     await pool.query("DELETE FROM employee_bonuses WHERE company_id = $1", [company.id]);
+    // worker_bonuses.cash_account_id is ON DELETE RESTRICT against
+    // ledger_accounts, so a paid worker bonus blocks the ledger delete below.
+    await pool.query("DELETE FROM worker_bonuses WHERE company_id = $1", [company.id]);
     await db.delete(schema.vouchers).where(eq(schema.vouchers.companyId, company.id));
     await db.delete(schema.stockItems).where(eq(schema.stockItems.companyId, company.id));
     await db.delete(schema.stockGroups).where(eq(schema.stockGroups.companyId, company.id));

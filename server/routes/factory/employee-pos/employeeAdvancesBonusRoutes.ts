@@ -4,7 +4,7 @@ import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 
-import { ledgerAccounts, voucherEntries, employees, vouchers } from "@shared/schema";
+import { ledgerAccounts, voucherEntries, employees, factoryWorkers, vouchers } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 
 export function registerEmployeeAdvancesBonusRoutes(app: Express) {
@@ -316,6 +316,14 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
         return res.status(400).json({ message: "workerId, bonusDate, amount required" });
       const amt = parseFloat(amount);
       if (isNaN(amt) || amt <= 0) return res.status(400).json({ message: "Invalid amount" });
+      // The worker is only reached through a join when the bonus is paid, and
+      // that join does not scope by company — so an unchecked worker id here
+      // ends up posting one company's bonus expense against another's employee.
+      const [worker] = await db
+        .select({ id: factoryWorkers.id })
+        .from(factoryWorkers)
+        .where(and(eq(factoryWorkers.id, parseInt(workerId)), eq(factoryWorkers.companyId, companyId)));
+      if (!worker) return res.status(404).json({ message: "Worker not found" });
       const result = await db.execute(sql`
         INSERT INTO worker_bonuses (company_id, worker_id, bonus_date, amount, notes, status)
         VALUES (${companyId}, ${parseInt(workerId)}, ${bonusDate}, ${amt.toFixed(2)}, ${notes || null}, 'pending')
@@ -335,6 +343,14 @@ export function registerEmployeeAdvancesBonusRoutes(app: Express) {
       if (!cashAccountId) return res.status(400).json({ message: "cashAccountId required" });
       const cashId = parseInt(cashAccountId);
       const payDate = paidDate || getClientDate(req);
+
+      // The credit leg lands on whatever account this names, so an account from
+      // another company would draw the payment out of their cash book.
+      const [cashAcc] = await db
+        .select({ id: ledgerAccounts.id })
+        .from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.id, cashId), eq(ledgerAccounts.companyId, companyId)));
+      if (!cashAcc) return res.status(400).json({ message: "Cash account not found for this company" });
 
       // Fetch the bonus and worker city for accounting
       const bonusRows = await db.execute(sql`
