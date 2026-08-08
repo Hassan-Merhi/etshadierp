@@ -5,9 +5,14 @@ that describes finished work — a phase write-up, a completion record, a dated
 audit — lives in [`archive/`](archive/) and is history, not reference.
 
 That split is enforced, not conventional: `npm run audit:doc-index` fails on a
-doc with no classification, on a record filed outside the archive, and on a
+doc with no classification, a stale classification row, a record filed outside
+the archive, a current reference missing from this landing page, or a bound
 figure that has drifted from the config it describes. See Phase 3 of
 [`system-quality-program.md`](system-quality-program.md).
+
+Every current reference document except this README must be linked from this
+page. Adding a reference without adding it here is a documentation-state audit
+failure, so a correct document cannot quietly become undiscoverable.
 
 ## Start here
 
@@ -84,6 +89,7 @@ Both describe work in progress and carry live figures bound to their sources.
 | [properties-navigation-registry.md](properties-navigation-registry.md) | Properties routes |
 | [supplier-partner-navigation-registry.md](supplier-partner-navigation-registry.md) | Supplier Partner routes |
 | [i18n/README.md](i18n/README.md) | Interface language support |
+| [i18n/phases-1-4-global-language-foundation.md](i18n/phases-1-4-global-language-foundation.md) | Current global language foundation and rollout contract |
 
 ## Using the system
 
@@ -104,10 +110,10 @@ Both describe work in progress and carry live figures bound to their sources.
 
 ## `archive/`
 
-131 documents recording work that finished: phase write-ups, completion
-records, dated audits, per-program verification reports. They are kept because
-they explain *why* decisions were made, and they are accurate as of the day
-they were written — but nothing in there should be read as a description of
+Historical documents recording work that finished: phase write-ups, completion
+records, dated audits, and per-program verification reports. They are kept
+because they explain *why* decisions were made, and they are accurate as of the
+day they were written — but nothing in there should be read as a description of
 current behaviour.
 
 New phase documents are written straight into `archive/`. Only material that
