@@ -219,21 +219,105 @@ sources; and the contract is part of the standard backend tests.
 
 ## Phase 4 — configuration coherence
 
-Configuration coherence is complete and enforced rather than conventional.
-Node/toolchain sources are audited for one supported version, script inventory
-is classified and ratcheted, and active workflows are named for what they check
-instead of old phase numbers.
+Phase 4 is complete at the implementation level. Runtime selection, CI wiring,
+script-gate classification, workflow drift, and committed deployment-secret
+hygiene are all expressed as enforceable contracts rather than conventions.
 
-Key checks include:
+### Canonical Node runtime
+
+`.node-version` is the canonical runtime pin. `scripts/audit-toolchain-coherence.mjs`
+requires agreement across:
+
+- `.nvmrc` — exact canonical version;
+- `package.json#engines.node` — compatibility floor in the same Node major and
+  no older major admitted;
+- `.replit` — exactly one `nodejs-N` module matching the canonical major;
+- `render.yaml#NODE_VERSION` — exact canonical version used by production;
+- every GitHub Actions job that runs `node`, `npm`, or `npx` — exactly one
+  `actions/setup-node` pin and that pin must equal the canonical version;
+- every CircleCI `cimg/node` image — exact canonical version;
+- the root README prerequisite — exact canonical version.
+
+The job-level rule is important. Merely scanning literal `node-version:` strings
+allowed a workflow to run Node without `setup-node` and inherit whatever version
+`ubuntu-latest` happened to provide. The i18n audit had exactly that gap and is
+now explicitly pinned. The production Render declaration had also been pinned
+only to major `22`; it is now pinned to the same canonical `22.14` used by the
+repository.
+
+`tests/toolchain-coherence-audit.test.ts` executes the same audit from the normal
+backend suite and pins the production Render source plus every Node-using GitHub
+job to the canonical runtime.
 
 ```bash
 npm run audit:toolchain
+```
+
+### Workflow coherence
+
+Active workflows are aligned with current branch/tooling conventions rather
+than obsolete phase branches. The RTL/accessibility workflow now targets
+`main`, uses a purpose-based concurrency key, and uses the same current checkout
+and setup-node action generations as the other maintained workflows. The mobile
+responsive workflow was aligned to those action generations as well.
+
+A workflow that uses Node without pinning it is now a toolchain-audit failure,
+so adding a new workflow cannot silently reintroduce hosted-runner drift.
+
+### Verification-script inventory
+
+`scripts/audit-script-inventory.mjs` no longer treats the existence of an npm
+alias as proof that a script is a CI gate. Every `verify-*.mjs` and
+`audit-*.mjs` is classified into one of four states:
+
+- **wired** — invoked by automatic GitHub Actions or CircleCI;
+- **manual** — exposed through `package.json` or a `workflow_dispatch`-only
+  workflow but not automatically enforced;
+- **chained** — reached only by another script or test;
+- **orphan** — neither invoked nor intentionally exposed.
+
+Automatic wired scripts are executed by the inventory audit unless they have a
+reviewed build/database/network dependency in `config/script-inventory.json`.
+A `knownFailing` entry may describe a manual release check, but it cannot be
+used to suppress a failing automatic CI gate. Stale exception rows and empty
+exception reasons fail the audit, and the orphan count remains a falling
+ceiling.
+
+The existing untranslated-text release debt remains classified as a **manual
+release finding**, not an automatically-green gate. Final verification must fix
+that debt or leave the release blocked; increasing translation caps is not a
+valid repair.
+
+`tests/script-inventory-contract.test.ts` pins the automatic/manual distinction,
+the orphan ceiling, and the rule that the known translation debt stays out of
+automatic CI while unresolved.
+
+```bash
 npm run audit:scripts
 ```
 
-A wired verification script is expected to run, not merely exist. Dead or
-source-text-coupled checks should be removed or replaced with behavioural
-assertions rather than carried indefinitely as misleading safety signals.
+### Committed configuration secret hygiene
+
+A carrier API credential was found as a literal value in committed `.replit`
+configuration during this phase. The current configuration no longer contains
+the value. Credentials belong in platform secret/environment storage, not in
+repository configuration.
+
+`tests/configuration-secret-hygiene.test.ts` now scans committed deployment-style
+environment files (`.replit`, `.env.production`, and Capacitor environment
+configuration) for literal values assigned to credential-bearing variable names,
+and rejects literal secret values in `render.yaml` as well.
+
+Removing a secret from the current tree does **not** erase it from Git history.
+Any credential discovered this way must also be rotated at the provider.
+
+**Phase 4 exit criteria:** one canonical Node runtime is selected at every real
+runtime/CI boundary; a Node-using workflow cannot rely on the hosted runner's
+default; deployment runtime pins match repository pins; automatic gates are
+distinguished from manual commands; known failures cannot suppress automatic
+CI; orphan verification scripts remain ratcheted; stale script exceptions fail;
+committed deployment configs cannot contain literal credentials; and all three
+contracts are represented in the normal backend test suite.
 
 ---
 
