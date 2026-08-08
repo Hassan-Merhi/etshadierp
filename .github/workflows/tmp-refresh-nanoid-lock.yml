@@ -1,0 +1,36 @@
+name: Temporary Nano ID lock refresh
+
+on:
+  push:
+    branches:
+      - fix/main-ci-green-20260808
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-lock:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/main-ci-green-20260808
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - name: Refresh patched Nano ID lock entry
+        run: npm install nanoid@3.3.17 --package-lock-only --ignore-scripts --no-audit --fund=false
+      - name: Commit lockfile refresh
+        run: |
+          if git diff --quiet -- package.json package-lock.json; then
+            echo "Lockfile already current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "security: update nanoid to 3.3.17"
+          git push origin HEAD:fix/main-ci-green-20260808
