@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { and, eq, sql } from "drizzle-orm";
 import { factoryBalePhotos, factoryDaybookEntries, userCompanyRoles, users } from "@shared/schema";
 import { db } from "../../db";
@@ -101,7 +101,7 @@ export function registerAttributionHistoricalRepairRoutes(app: Express): void {
     "/api/factory/admin/repair-truncated-user-attribution",
     requireAuth,
     requireRole("Admin"),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const companyId = resolveRequestCompanyId(req);
         const dryRun = req.body?.dryRun !== false;
