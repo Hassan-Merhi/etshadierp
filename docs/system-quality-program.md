@@ -119,8 +119,8 @@ only behavioural evidence for any sensitive route.
 `tests/write-route-authenticated-safety-sweep.test.ts` closes the broad gap for
 routes that would otherwise have only the anonymous guard assertion. It derives
 that exact pre-sweep set from the audit at runtime and invokes every route as an
-authenticated Developer in the appropriate ERP, Factory, or Supplier Partner
-company mode.
+authenticated Developer in the appropriate ERP, Factory, Properties, or
+Supplier Partner company mode.
 
 The sweep is intentionally **non-mutating**. It uses missing resource IDs and
 poison/dry-run validation bodies and asserts that each call:
@@ -130,8 +130,8 @@ poison/dry-run validation bodies and asserts that each call:
 - does not change the selected company's voucher totals, ledger-account count,
   inventory quantity/value, raw-stock quantity, bale count, or sales-item count;
 - leaves all non-optional vouchers balanced;
-- does not touch sentinel accounting state in unrelated ERP, Factory, or
-  Supplier Partner companies.
+- does not touch sentinel accounting state in unrelated ERP, Factory,
+  Properties, or Supplier Partner companies.
 
 This is negative-path behavioural coverage, not a replacement for deep
 positive-path tests. Exact accounting/stock behaviour continues to be pinned by
@@ -143,8 +143,10 @@ posting/replacement.
 `tests/write-route-authenticated-safety-audit.test.ts` protects the measurement
 itself: with the authenticated sweep deliberately disabled, the audit must still
 see the pre-sweep guard-only backlog; with it enabled, that same measured set
-must fall to zero. This prevents a future edit from "solving" the backlog by
-removing the measurement.
+must fall to zero. The audit also requires the sweep's dynamic inventory,
+sensitive fingerprint, voucher-balance assertion, and isolation sentinels to
+remain present before it grants that coverage. A leftover marker comment is not
+enough.
 
 ```bash
 npm run audit:write-routes
