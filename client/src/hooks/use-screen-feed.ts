@@ -23,6 +23,8 @@ const POINTER_INTERVAL_MS = 250;
 const BACKGROUND_MUTATION_MIN_GAP_MS = 4000;
 const INTERACTION_ACTIVE_WINDOW_MS = 2500;
 
+type CaptureFailureStage = "capture-or-upload" | "pipeline";
+
 export interface ClickEvent extends ScreenFeedClickEvent {}
 
 function trimLabel(el: HTMLElement): string {
@@ -51,6 +53,22 @@ function cursorsDiffer(previous: ScreenFeedCursorEvent | null, next: ScreenFeedC
     Math.abs(previous.y - next.y) > 0.002 ||
     next.ts - previous.ts > 1000
   );
+}
+
+function compactFailureReason(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message.trim().slice(0, 180);
+  return "Unexpected screen capture pipeline failure.";
+}
+
+function reportCaptureFailure(stage: CaptureFailureStage, reason: string, durationMs?: number): void {
+  void fetch("/api/screen-feed/capture-failure", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ stage, reason: reason.slice(0, 180), durationMs }),
+  }).catch(() => {
+    // Diagnostics must never add a retry loop or slow the employee's ERP tab.
+  });
 }
 
 function ignoredForCapture(node: Node | null): boolean {
@@ -267,8 +285,15 @@ export function useScreenFeed() {
           .then((result) => {
             failed = result.failed;
             completeCaptureCycle(result);
+            if (result.failed && watchedRef.current && document.visibilityState === "visible" && !disposed) {
+              reportCaptureFailure(
+                "capture-or-upload",
+                "Screen frame could not be produced or uploaded.",
+                result.durationMs
+              );
+            }
           })
-          .catch(() => {
+          .catch((error) => {
             failed = true;
             lastCaptureAtRef.current = Date.now();
             consecutiveFailuresRef.current += 1;
@@ -277,6 +302,9 @@ export function useScreenFeed() {
               pendingMinGapRef.current = ACTIVE_CAPTURE_MIN_GAP_MS;
             }
             dirtyRef.current = true;
+            if (watchedRef.current && document.visibilityState === "visible" && !disposed) {
+              reportCaptureFailure("pipeline", compactFailureReason(error));
+            }
           })
           .finally(() => {
             busyRef.current = false;
