@@ -26,9 +26,7 @@
  */
 
 /** Rows from a raw query result, or `[]` if there are none. */
-export function resultRows<TRow extends Record<string, unknown> = Record<string, unknown>>(
-  result: unknown
-): TRow[] {
+export function resultRows<TRow extends Record<string, unknown> = Record<string, unknown>>(result: unknown): TRow[] {
   if (Array.isArray(result)) return result as TRow[];
   const rows = (result as { rows?: unknown } | null | undefined)?.rows;
   return Array.isArray(rows) ? (rows as TRow[]) : [];

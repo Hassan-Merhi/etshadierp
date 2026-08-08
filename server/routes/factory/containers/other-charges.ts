@@ -180,9 +180,7 @@ export function registerFactoryContainerOtherChargesRoutes(app: Express) {
 
         const insertValues = preparedCharges.map(({ fxRate: _fxRate, ...charge }) => charge);
         const newCharges =
-          insertValues.length > 0
-            ? await tx.insert(factoryContainerOtherCharges).values(insertValues).returning()
-            : [];
+          insertValues.length > 0 ? await tx.insert(factoryContainerOtherCharges).values(insertValues).returning() : [];
 
         await tx
           .update(factoryContainers)

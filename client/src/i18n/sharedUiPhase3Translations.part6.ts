@@ -26,8 +26,8 @@ export const phase3SharedUiTranslationsPart6: readonly Phase3SharedUiEntry[] = [
     fr: "Le fichier ne contient aucune ligne de données",
   },
   {
-    en: "Expected columns \"Code\" and \"New Name\"",
-    ar: "الأعمدة المتوقعة هي \"Code\" و\"New Name\"",
+    en: 'Expected columns "Code" and "New Name"',
+    ar: 'الأعمدة المتوقعة هي "Code" و"New Name"',
     fr: "Colonnes attendues : « Code » et « New Name »",
   },
   { en: "Ready", ar: "جاهز", fr: "Prêt" },

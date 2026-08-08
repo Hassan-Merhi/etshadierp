@@ -12,10 +12,7 @@ import {
   vouchers,
 } from "@shared/schema";
 import { insertVoucherWithEntriesTx } from "../../services/accounting/voucherPostingService";
-import {
-  isCompanyIsolationError,
-  resolveRequestCompanyId,
-} from "../../services/security/requestCompanyScope";
+import { isCompanyIsolationError, resolveRequestCompanyId } from "../../services/security/requestCompanyScope";
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
@@ -29,14 +26,10 @@ function sendRouteError(res: any, error: unknown, fallback: string): void {
   res.status(500).json({ message: errorMessage(error, fallback) });
 }
 
-async function findOrCreateLedger(
-  companyId: number,
-  name: string,
-  accountType: string,
-): Promise<{ id: number }> {
+async function findOrCreateLedger(companyId: number, name: string, accountType: string): Promise<{ id: number }> {
   const existing = await pool.query(
     `SELECT id FROM ledger_accounts WHERE company_id = $1 AND name = $2 AND deleted_at IS NULL LIMIT 1`,
-    [companyId, name],
+    [companyId, name]
   );
   if (existing.rows.length > 0) return { id: existing.rows[0].id };
 
@@ -44,7 +37,7 @@ async function findOrCreateLedger(
     `SELECT MAX(CAST(code AS INTEGER)) AS max_code
      FROM ledger_accounts
      WHERE company_id = $1 AND code ~ '^[0-9]+$'`,
-    [companyId],
+    [companyId]
   );
   const nextCode = String((parseInt(maxRow.rows[0]?.max_code || "0") || 0) + 1);
 
@@ -53,7 +46,7 @@ async function findOrCreateLedger(
      VALUES ($1, $2, $3, $4, true, false)
      ON CONFLICT (company_id, code) DO UPDATE SET name = EXCLUDED.name
      RETURNING id`,
-    [companyId, nextCode, name, accountType],
+    [companyId, nextCode, name, accountType]
   );
   return { id: inserted.rows[0].id };
 }
@@ -101,12 +94,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
         })
         .from(voucherEntries)
         .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-        .where(
-          and(
-            eq(voucherEntries.ledgerAccountId, member.ledgerAccountId),
-            eq(vouchers.companyId, companyId),
-          ),
-        )
+        .where(and(eq(voucherEntries.ledgerAccountId, member.ledgerAccountId), eq(vouchers.companyId, companyId)))
         .orderBy(desc(vouchers.voucherDate), desc(vouchers.id));
       res.json(entries);
     } catch (error: unknown) {
@@ -142,7 +130,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
           data.notes ?? null,
           data.active ?? true,
           ledger.id,
-        ],
+        ]
       );
       res.status(201).json(inserted.rows[0]);
     } catch (error: unknown) {
@@ -172,12 +160,7 @@ export function registerFactoryInsuranceRoutes(app: Express) {
         await db
           .update(ledgerAccounts)
           .set({ name: `Insurance - ${data.name}` })
-          .where(
-            and(
-              eq(ledgerAccounts.id, existing.ledgerAccountId),
-              eq(ledgerAccounts.companyId, companyId),
-            ),
-          );
+          .where(and(eq(ledgerAccounts.id, existing.ledgerAccountId), eq(ledgerAccounts.companyId, companyId)));
       }
       const [updated] = await db
         .update(insuranceMembers)
@@ -229,10 +212,10 @@ export function registerFactoryInsuranceRoutes(app: Express) {
         .delete(insuranceMembers)
         .where(and(eq(insuranceMembers.id, id), eq(insuranceMembers.companyId, companyId)));
       if (existing.ledgerAccountId) {
-        await pool.query(
-          `UPDATE ledger_accounts SET deleted_at = NOW() WHERE id = $1 AND company_id = $2`,
-          [existing.ledgerAccountId, companyId],
-        );
+        await pool.query(`UPDATE ledger_accounts SET deleted_at = NOW() WHERE id = $1 AND company_id = $2`, [
+          existing.ledgerAccountId,
+          companyId,
+        ]);
       }
       res.json({ success: true });
     } catch (error: unknown) {
@@ -334,8 +317,8 @@ export function registerFactoryInsuranceRoutes(app: Express) {
               creditAmount: member.amount.toFixed(2),
               narration,
             })),
-          ],
-        ),
+          ]
+        )
       );
 
       res.json({

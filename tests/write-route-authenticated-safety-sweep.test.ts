@@ -292,43 +292,42 @@ afterAll(async () => {
 }, 120000);
 
 describe.sequential("authenticated sensitive write safety sweep", () => {
-  it(
-    "exercises every route that would otherwise be guard-only without mutating sensitive state",
-    async () => {
-      // Disable recognition of this file while deriving the inventory it has to
-      // execute; otherwise the audit would (correctly) report zero guard-only
-      // routes after seeing the V1 marker above.
-      const raw = auditWriteRouteCoverage({ includeAuthenticatedSafetySweep: false });
-      const routes = raw.guardOnlySensitive as RouteUnderTest[];
-      expect(routes.length).toBeGreaterThan(0);
+  it("exercises every route that would otherwise be guard-only without mutating sensitive state", async () => {
+    // Disable recognition of this file while deriving the inventory it has to
+    // execute; otherwise the audit would (correctly) report zero guard-only
+    // routes after seeing the V1 marker above.
+    const raw = auditWriteRouteCoverage({ includeAuthenticatedSafetySweep: false });
+    const routes = raw.guardOnlySensitive as RouteUnderTest[];
+    expect(routes.length).toBeGreaterThan(0);
 
-      for (const route of routes) {
-        const mode = modeForPath(route.path);
-        const parameterised = hasPathParams(route.path);
-        const companyId = parameterised ? stableCompanies[mode] : parameterlessCompanies[mode];
-        await selectCompany(companyId);
+    for (const route of routes) {
+      const mode = modeForPath(route.path);
+      const parameterised = hasPathParams(route.path);
+      const companyId = parameterised ? stableCompanies[mode] : parameterlessCompanies[mode];
+      await selectCompany(companyId);
 
-        const before = await sensitiveFingerprint(companyId);
-        const concretePath = materializePath(route.path);
-        const response = await requestFor(route.method, concretePath)
-          .set("x-client-date", "2026-08-08")
-          .send(poisonBody(companyId));
+      const before = await sensitiveFingerprint(companyId);
+      const concretePath = materializePath(route.path);
+      const response = await requestFor(route.method, concretePath)
+        .set("x-client-date", "2026-08-08")
+        .send(poisonBody(companyId));
 
-        expect(response.status, `${route.method} ${route.path} returned ${response.status}: ${response.text}`).toBeLessThan(500);
-        expect(response.status, `${route.method} ${route.path} lost its authenticated session`).not.toBe(401);
+      expect(
+        response.status,
+        `${route.method} ${route.path} returned ${response.status}: ${response.text}`
+      ).toBeLessThan(500);
+      expect(response.status, `${route.method} ${route.path} lost its authenticated session`).not.toBe(401);
 
-        const after = await sensitiveFingerprint(companyId);
-        expect(after, `${route.method} ${route.path} mutated sensitive state during the safety sweep`).toEqual(before);
-        await expectBalancedVouchers(companyId, route);
-      }
+      const after = await sensitiveFingerprint(companyId);
+      expect(after, `${route.method} ${route.path} mutated sensitive state during the safety sweep`).toEqual(before);
+      await expectBalancedVouchers(companyId, route);
+    }
 
-      // A write in one company must never reach an unrelated tenant. The
-      // sentinels cover every company mode exercised by the sweep.
-      expect(await sensitiveFingerprint(controlCompanies.erp)).toEqual(controlBefore.erp);
-      expect(await sensitiveFingerprint(controlCompanies.factory)).toEqual(controlBefore.factory);
-      expect(await sensitiveFingerprint(controlCompanies.properties)).toEqual(controlBefore.properties);
-      expect(await sensitiveFingerprint(controlCompanies.supplier_partner)).toEqual(controlBefore.supplier_partner);
-    },
-    300000
-  );
+    // A write in one company must never reach an unrelated tenant. The
+    // sentinels cover every company mode exercised by the sweep.
+    expect(await sensitiveFingerprint(controlCompanies.erp)).toEqual(controlBefore.erp);
+    expect(await sensitiveFingerprint(controlCompanies.factory)).toEqual(controlBefore.factory);
+    expect(await sensitiveFingerprint(controlCompanies.properties)).toEqual(controlBefore.properties);
+    expect(await sensitiveFingerprint(controlCompanies.supplier_partner)).toEqual(controlBefore.supplier_partner);
+  }, 300000);
 });

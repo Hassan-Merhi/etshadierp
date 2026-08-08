@@ -254,9 +254,7 @@ describe("POST /api/factory/advances/post-accounting", () => {
     const advanceId = await createAdvance({ amount: "80.00", advanceDate: "2026-02-14" });
     await agent.post("/api/factory/advances/post-accounting").send({ cashAccountId: ctx.cashAccountId });
 
-    const second = await agent
-      .post("/api/factory/advances/post-accounting")
-      .send({ cashAccountId: ctx.cashAccountId });
+    const second = await agent.post("/api/factory/advances/post-accounting").send({ cashAccountId: ctx.cashAccountId });
 
     // The guard is a scan of PAYMENT-ADV- voucher numbers. Without it a second
     // run doubles every advance the company has ever given.

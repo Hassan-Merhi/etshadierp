@@ -257,10 +257,9 @@ describe("DELETE /api/purchase-orders/:id", () => {
     const containerId = await createContainer({ itemsTotal: "50", chargesTotal: "4", grandTotal: "54" });
     const poId = await createPurchaseOrder({ containerId, itemsTotal: "50", freight: "4" });
     await addLineItem(poId, "50");
-    await pool.query(
-      `INSERT INTO container_charges (container_id, charge_type, amount) VALUES ($1, 'Freight', '4')`,
-      [containerId]
-    );
+    await pool.query(`INSERT INTO container_charges (container_id, charge_type, amount) VALUES ($1, 'Freight', '4')`, [
+      containerId,
+    ]);
     await pool.query(
       `INSERT INTO import_logs (file_name, file_hash, row_count, container_id, status)
        VALUES ($1, $2, 1, $3, 'completed')`,
@@ -272,7 +271,9 @@ describe("DELETE /api/purchase-orders/:id", () => {
 
     expect((await pool.query(`SELECT id FROM purchase_orders WHERE id = $1`, [poId])).rowCount).toBe(0);
     expect((await pool.query(`SELECT id FROM containers WHERE id = $1`, [containerId])).rowCount).toBe(0);
-    expect((await pool.query(`SELECT id FROM container_charges WHERE container_id = $1`, [containerId])).rowCount).toBe(0);
+    expect((await pool.query(`SELECT id FROM container_charges WHERE container_id = $1`, [containerId])).rowCount).toBe(
+      0
+    );
     expect((await pool.query(`SELECT id FROM import_logs WHERE container_id = $1`, [containerId])).rowCount).toBe(0);
   });
 

@@ -84,9 +84,7 @@ afterAll(async () => {
   ]);
   await pool.query(`DELETE FROM factory_container_other_charges WHERE container_id = $1`, [containerId]);
   await pool.query(`DELETE FROM factory_containers WHERE id = $1`, [containerId]);
-  await pool.query(`DELETE FROM ledger_accounts WHERE id = ANY($1::int[])`, [
-    [handlingAccountId, inspectionAccountId],
-  ]);
+  await pool.query(`DELETE FROM ledger_accounts WHERE id = ANY($1::int[])`, [[handlingAccountId, inspectionAccountId]]);
   await cleanupTestData(TEST_PREFIX);
   closeTestServer();
 }, 60000);

@@ -1,11 +1,6 @@
 import type { Express } from "express";
 import { and, eq, sql } from "drizzle-orm";
-import {
-  factoryBalePhotos,
-  factoryDaybookEntries,
-  userCompanyRoles,
-  users,
-} from "@shared/schema";
+import { factoryBalePhotos, factoryDaybookEntries, userCompanyRoles, users } from "@shared/schema";
 import { db } from "../../db";
 import { requireAuth, requireRole } from "../../auth";
 import { logger } from "../../lib/logger";
@@ -72,52 +67,28 @@ async function inspectCompanyAttribution(companyId: number): Promise<{
     .from(userCompanyRoles)
     .innerJoin(users, eq(users.id, userCompanyRoles.userId))
     .where(eq(userCompanyRoles.companyId, companyId));
-  const usersInCompany = [
-    ...new Map(roleRows.map((row) => [row.id, { id: row.id, username: row.username }])).values(),
-  ];
+  const usersInCompany = [...new Map(roleRows.map((row) => [row.id, { id: row.id, username: row.username }])).values()];
 
   const daybookRows = await db
     .select({ id: factoryDaybookEntries.id, value: factoryDaybookEntries.createdBy })
     .from(factoryDaybookEntries)
-    .where(
-      and(
-        eq(factoryDaybookEntries.companyId, companyId),
-        sql`${factoryDaybookEntries.createdBy} ~ '^[0-9]+$'`
-      )
-    );
+    .where(and(eq(factoryDaybookEntries.companyId, companyId), sql`${factoryDaybookEntries.createdBy} ~ '^[0-9]+$'`));
   const photoRows = await db
     .select({ id: factoryBalePhotos.id, value: factoryBalePhotos.uploadedBy })
     .from(factoryBalePhotos)
-    .where(
-      and(
-        eq(factoryBalePhotos.companyId, companyId),
-        sql`${factoryBalePhotos.uploadedBy} ~ '^[0-9]+$'`
-      )
-    );
+    .where(and(eq(factoryBalePhotos.companyId, companyId), sql`${factoryBalePhotos.uploadedBy} ~ '^[0-9]+$'`));
 
   const candidates: RepairCandidate[] = [];
   const unresolved: Unresolved[] = [];
   for (const row of daybookRows) {
     if (!isTruncatedNumericUserId(row.value)) continue;
-    const result = resolvePrefix(
-      usersInCompany,
-      "factory_daybook_entries",
-      row.id,
-      "created_by",
-      row.value
-    );
+    const result = resolvePrefix(usersInCompany, "factory_daybook_entries", row.id, "created_by", row.value);
     if ("userId" in result) candidates.push(result);
     else unresolved.push(result);
   }
   for (const row of photoRows) {
     if (!isTruncatedNumericUserId(row.value)) continue;
-    const result = resolvePrefix(
-      usersInCompany,
-      "factory_bale_photos",
-      row.id,
-      "uploaded_by",
-      row.value
-    );
+    const result = resolvePrefix(usersInCompany, "factory_bale_photos", row.id, "uploaded_by", row.value);
     if ("userId" in result) candidates.push(result);
     else unresolved.push(result);
   }

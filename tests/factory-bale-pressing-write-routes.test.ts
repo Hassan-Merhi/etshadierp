@@ -99,10 +99,9 @@ async function batchCount(): Promise<number> {
 
 /** Each test starts from a known counter so it can assert exact numbers. */
 async function resetPressing() {
-  await pool.query(
-    `DELETE FROM factory_bales WHERE company_id = $1 AND pressing_batch_id IS NOT NULL`,
-    [ctx.companyId]
-  );
+  await pool.query(`DELETE FROM factory_bales WHERE company_id = $1 AND pressing_batch_id IS NOT NULL`, [
+    ctx.companyId,
+  ]);
   await pool.query(`DELETE FROM factory_pressing_batches WHERE company_id = $1`, [ctx.companyId]);
   await pool.query(`DELETE FROM factory_bale_sequences WHERE company_id = $1`, [ctx.companyId]);
 }

@@ -207,7 +207,7 @@ export function registerBalesPressingRoutes(app: Express) {
                 articleCode: product.articleCode,
                 productName: product.name,
                 weightKg: String(weight),
-                  status: "PENDING_PRESSING",
+                status: "PENDING_PRESSING",
               })
               .returning();
             bales.push({ ...bale, _product: product });

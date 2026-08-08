@@ -59,11 +59,7 @@ async function inspectHistoricalInsuranceJournals(companyId: number): Promise<{
     .innerJoin(voucherEntries, eq(voucherEntries.voucherId, vouchers.id))
     .leftJoin(ledgerAccounts, eq(ledgerAccounts.id, voucherEntries.ledgerAccountId))
     .where(
-      and(
-        eq(vouchers.companyId, companyId),
-        eq(vouchers.sourceModule, "ERP"),
-        ilike(vouchers.voucherNumber, "INS-%")
-      )
+      and(eq(vouchers.companyId, companyId), eq(vouchers.sourceModule, "ERP"), ilike(vouchers.voucherNumber, "INS-%"))
     );
 
   const linkedMemberLedgers = new Set(
@@ -201,7 +197,9 @@ export function registerInsuranceHistoricalRepairRoutes(app: Express): void {
               updatedEntries += result.length;
             }
             if (updatedEntries !== candidate.entries.length) {
-              throw new Error(`Insurance voucher ${candidate.voucherNumber} changed during repair; transaction rolled back`);
+              throw new Error(
+                `Insurance voucher ${candidate.voucherNumber} changed during repair; transaction rolled back`
+              );
             }
             repaired.push(candidate.voucherId);
           }

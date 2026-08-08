@@ -162,10 +162,10 @@ beforeAll(async () => {
 }, 120000);
 
 afterAll(async () => {
-  await pool.query(
-    `DELETE FROM factory_bale_production_attributions WHERE company_id IN ($1, $2)`,
-    [ctx.companyId, foreignCompanyId]
-  );
+  await pool.query(`DELETE FROM factory_bale_production_attributions WHERE company_id IN ($1, $2)`, [
+    ctx.companyId,
+    foreignCompanyId,
+  ]);
   await pool.query(`DELETE FROM factory_production_positions WHERE company_id = $1`, [ctx.companyId]);
   await pool.query(`DELETE FROM factory_bales WHERE company_id = $1`, [foreignCompanyId]);
   await pool.query(`DELETE FROM factory_workers WHERE company_id IN ($1, $2)`, [ctx.companyId, foreignCompanyId]);
@@ -372,9 +372,7 @@ describe("PATCH /api/factory/bales/:id/assign-worker", () => {
     const baleId = await createBale();
     await attributeBale(baleId, otherWorkerId, `${TEST_PREFIX} Other`);
 
-    const response = await agent
-      .patch(`/api/factory/bales/${baleId}/assign-worker`)
-      .send({ workerId: activeWorkerId });
+    const response = await agent.patch(`/api/factory/bales/${baleId}/assign-worker`).send({ workerId: activeWorkerId });
     expect(response.status).toBe(200);
 
     const bale = await workerFields(baleId);

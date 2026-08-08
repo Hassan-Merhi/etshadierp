@@ -103,7 +103,9 @@ describe("POST /api/factory/containers/:id/reverse-offload", () => {
     const response = await agent.post(`/api/factory/containers/${containerId}/reverse-offload`).send({});
     expect(response.status).toBe(200);
 
-    expect((await pool.query(`SELECT id FROM factory_raw_stock WHERE container_id = $1`, [containerId])).rowCount).toBe(0);
+    expect((await pool.query(`SELECT id FROM factory_raw_stock WHERE container_id = $1`, [containerId])).rowCount).toBe(
+      0
+    );
 
     const container = await pool.query<{
       status: string;
@@ -141,7 +143,9 @@ describe("POST /api/factory/containers/:id/reverse-offload", () => {
 
     // Offload-time financials are part of the same unwind.
     expect((await pool.query(`SELECT id FROM vouchers WHERE id = $1`, [offloadVoucherId])).rowCount).toBe(0);
-    expect((await pool.query(`SELECT id FROM voucher_entries WHERE voucher_id = $1`, [offloadVoucherId])).rowCount).toBe(0);
+    expect(
+      (await pool.query(`SELECT id FROM voucher_entries WHERE voucher_id = $1`, [offloadVoucherId])).rowCount
+    ).toBe(0);
 
     // The restored status closes the destructive path immediately. Keeping this
     // assertion in the same test makes it independent of test execution order.

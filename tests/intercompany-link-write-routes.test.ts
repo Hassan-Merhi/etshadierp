@@ -167,10 +167,9 @@ beforeAll(async () => {
 }, 120000);
 
 beforeEach(async () => {
-  await pool.query(
-    `DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`,
-    [destCompanyId]
-  );
+  await pool.query(`DELETE FROM voucher_entries WHERE voucher_id IN (SELECT id FROM vouchers WHERE company_id = $1)`, [
+    destCompanyId,
+  ]);
   await pool.query(`DELETE FROM vouchers WHERE company_id = $1`, [destCompanyId]);
   await pool.query(
     `DELETE FROM intercompany_payment_requests WHERE link_id IN
@@ -224,10 +223,9 @@ describe("POST /api/intercompany-links", () => {
   });
 
   it("refuses a recipient with no role in the destination company", async () => {
-    const foreignUser = await pool.query<{ id: string }>(
-      `SELECT id FROM users WHERE id <> $1 ORDER BY id LIMIT 1`,
-      [ctx.userId]
-    );
+    const foreignUser = await pool.query<{ id: string }>(`SELECT id FROM users WHERE id <> $1 ORDER BY id LIMIT 1`, [
+      ctx.userId,
+    ]);
     if (foreignUser.rowCount === 0) return;
 
     const response = await agent.post("/api/intercompany-links").send({
@@ -279,18 +277,16 @@ describe("PUT /api/intercompany-links/:id", () => {
     const response = await agent.put(`/api/intercompany-links/${linkId}`).send({ active: false });
 
     expect(response.status).toBe(200);
-    const row = await pool.query<{ active: boolean }>(
-      `SELECT active FROM intercompany_account_links WHERE id = $1`,
-      [linkId]
-    );
+    const row = await pool.query<{ active: boolean }>(`SELECT active FROM intercompany_account_links WHERE id = $1`, [
+      linkId,
+    ]);
     expect(row.rows[0].active).toBe(false);
   });
 
   it("refuses a recipient with no role in the destination company", async () => {
-    const foreignUser = await pool.query<{ id: string }>(
-      `SELECT id FROM users WHERE id <> $1 ORDER BY id LIMIT 1`,
-      [ctx.userId]
-    );
+    const foreignUser = await pool.query<{ id: string }>(`SELECT id FROM users WHERE id <> $1 ORDER BY id LIMIT 1`, [
+      ctx.userId,
+    ]);
     if (foreignUser.rowCount === 0) return;
 
     const response = await agent
@@ -352,8 +348,11 @@ describe("POST /api/intercompany-requests/:id/approve", () => {
   it("posts only once when the same request is approved twice", async () => {
     const requestId = await createRequest(linkId);
     expect(
-      (await agent.post(`/api/intercompany-requests/${requestId}/approve`).send({ destLedgerAccountId: destCashAccountId }))
-        .status
+      (
+        await agent
+          .post(`/api/intercompany-requests/${requestId}/approve`)
+          .send({ destLedgerAccountId: destCashAccountId })
+      ).status
     ).toBe(200);
 
     const second = await agent
