@@ -1,23 +1,25 @@
 import { useLocation } from "wouter";
 import { useEscapeBack } from "./use-escape-back";
 import { getParentRoute } from "@/lib/parent-routes";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { goBackToPreviousErpLocation } from "@/lib/erp-navigation-history";
 
 /**
- * Esc-back wrapper that navigates to a known parent route via wouter
- * (instead of `window.history.back()`), so behavior is correct even
- * after a refresh, deep link, or redirect chain.
+ * Esc-back wrapper.
  *
- * - If `parent` is provided, Esc navigates there.
- * - If `parent` is omitted, the parent is looked up from the current
- *   pathname via `getParentRoute()`.
- * - If no parent can be resolved, Esc is a no-op on this page.
+ * ERP mode prefers the exact previous browser entry so tabs/query state and
+ * the originating list context survive. Direct links and refreshed detail
+ * pages fall back to the deterministic parent-route registry.
  *
- * For pages with an inline "selected item" view, keep using
- * `useEscapeBack` directly with a two-step handler (clear selection
- * first, then navigate up on the next Esc).
+ * Factory/Properties retain deterministic parent routing.
  */
 export function useEscapeToParent(parent?: string | null) {
   const [location, navigate] = useLocation();
+  const mode = useAppMode();
   const target = parent ?? getParentRoute(location);
-  useEscapeBack(target ? () => navigate(target) : null);
+
+  useEscapeBack(() => {
+    if (mode === "erp" && goBackToPreviousErpLocation()) return;
+    if (target) navigate(target);
+  });
 }
