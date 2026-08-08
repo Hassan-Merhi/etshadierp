@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { useLocation, useParams, useSearch } from "wouter";
+import { useParams, useSearch } from "wouter";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
+import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,8 +48,8 @@ function formatValue(value: number): string {
 }
 
 export default function ClosingStockDetail() {
-  const [, navigate] = useLocation();
   const params = useParams<{ groupId: string }>();
+  const handleBack = useBackToParent();
   useEscapeToParent();
   const searchString = useSearch();
   const { selectedCompany } = useCompany();
@@ -70,12 +71,7 @@ export default function ClosingStockDetail() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate("/closing-stock-summary")}
-          data-testid="button-back"
-        >
+        <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
