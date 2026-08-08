@@ -107,7 +107,9 @@ describe("remote support phase 4 hardening", () => {
   it("returns keyboard authorization in controller-active instead of a second GET", () => {
     expect(controlRoutes).toContain("getRemoteKeyboardAuthorization(session.id, controllerUserId)");
     expect(controlRoutes).toContain("keyboardAuthorization: serializeKeyboardAuthorization(keyboardAuthorization)");
-    expect(keyboardRoutes).not.toContain('app.get(\n    "/api/screen-feed/control/sessions/:sessionId/keyboard-authorization"');
+    expect(keyboardRoutes).not.toContain(
+      'app.get(\n    "/api/screen-feed/control/sessions/:sessionId/keyboard-authorization"'
+    );
     expect(controllerContext).not.toContain("KeyboardAuthorizationResponse");
     expect(controllerContext).not.toContain("keyboardPayload");
   });
