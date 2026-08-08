@@ -11,6 +11,7 @@ import { utils, writeFile, read } from "@/lib/excelHelper";
 import { Download, Package } from "lucide-react";
 import type { Location } from "@shared/schema";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { StockNameUpdateImport } from "@/components/StockNameUpdateImport";
 
 interface CombinedImportDialogProps {
   open: boolean;
@@ -276,7 +277,7 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="opening">Opening Stock</TabsTrigger>
             <TabsTrigger value="prices">Prices</TabsTrigger>
-            <TabsTrigger value="items">Items</TabsTrigger>
+            <TabsTrigger value="items">Items / Names</TabsTrigger>
           </TabsList>
 
           <TabsContent value="opening" className="space-y-4">
@@ -388,13 +389,15 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
           </TabsContent>
 
           <TabsContent value="items" className="space-y-4">
-            <div className="mt-4 p-4 bg-muted/50 rounded-md space-y-3">
+            <StockNameUpdateImport />
+            <div className="p-4 bg-muted/50 rounded-md space-y-3">
+              <p className="text-sm font-medium">Need to create brand-new stock items?</p>
               <p className="text-sm text-muted-foreground">
-                To import stock items, use the dedicated import page with full validation and preview.
+                Use the dedicated import page for new items with stock-group validation and preview.
               </p>
               <a href="/import-stock-items">
-                <Button className="w-full" data-testid="button-go-to-import-items">
-                  Go to Import Items Page
+                <Button variant="outline" className="w-full" data-testid="button-go-to-import-items">
+                  Go to New Items Import Page
                 </Button>
               </a>
             </div>
