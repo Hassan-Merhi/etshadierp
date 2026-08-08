@@ -1,13 +1,13 @@
 /**
  * sendRevisedTransferWhatsApp.ts
  * Fire-and-forget helper: build the revised transfer image (shows before/change/after)
- * and send it to the POS user's assigned source-location WhatsApp group.
+ * and send it to the WhatsApp group assigned to the transfer destination.
  */
 
 import { db } from "../db";
 import { getErrorMessage } from "../lib/httpHandlers";
 import { logger } from "../lib/logger";
-import { locations, stockItems } from "@shared/schema";
+import { companies, locations, stockItems } from "@shared/schema";
 import { eq, inArray } from "drizzle-orm";
 import { generateRevisedTransferImageBuffer } from "./generateTransferImage";
 import { sendWhatsAppFileToChatIdPos, sendWhatsAppTextToChatIdPos } from "../services/whatsappService";
@@ -24,12 +24,6 @@ export interface RevisedTransferWAItem {
 export interface SendRevisedTransferWAOptions {
   sourceLocationId: number;
   sourceLocationName: string;
-  /**
-   * Retained because the revision lifecycle already returns the destination and
-   * callers use it for the rendered transfer context. Revision delivery itself
-   * is intentionally routed by sourceLocationId so a POS user's revision can
-   * never leak into another location's transfer group.
-   */
   destinationLocationId?: number;
   destLocationName: string;
   items: RevisedTransferWAItem[];
@@ -40,19 +34,31 @@ export interface SendRevisedTransferWAOptions {
 /**
  * Generate and send the revised stock transfer image.
  *
- * POS revisions are owned by the POS user's source location. Send only to that
- * location's normal POS WhatsApp group (locations.whatsapp_group_chat_id), the
- * same assignment used by the POS stock/invoice send routes. Do not fall back
- * to the destination transfer group or a company-wide transfer group: a missing
- * POS group must skip safely rather than send the revision to the wrong chat.
+ * POS revisions follow the same routing rule as the original stock transfer:
+ *   1. destination location's transfer WhatsApp group
+ *      (locations.transferWaGroupChatId — Settings → Stock Transfers — WhatsApp)
+ *   2. destination company's configured fallback transfer group when the
+ *      destination has no location-specific assignment.
+ *
+ * This deliberately does NOT use locations.whatsappGroupChatId (the normal POS
+ * stock/invoice group), because the destination mapping shown in Settings is the
+ * authoritative route for stock-transfer and stock-transfer-revision images.
  *
  * Designed to be called fire-and-forget — never throws.
  */
 export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOptions): Promise<void> {
-  const { sourceLocationId, sourceLocationName, destLocationName, items, voucherNumber, voucherDate } = opts;
+  const {
+    sourceLocationId,
+    sourceLocationName,
+    destinationLocationId,
+    destLocationName,
+    items,
+    voucherNumber,
+    voucherDate,
+  } = opts;
 
   logger.info(
-    `[RevisedTransferWA] Starting for ${voucherNumber} → sourceLocId=${sourceLocationId}, destLocId=${opts.destinationLocationId ?? "unknown"}, items=${items.length}`
+    `[RevisedTransferWA] Starting for ${voucherNumber} → sourceLocId=${sourceLocationId}, destLocId=${destinationLocationId ?? "unknown"}, items=${items.length}`
   );
 
   if (!items || items.length === 0) {
@@ -60,33 +66,51 @@ export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOpt
     return;
   }
 
-  if (!Number.isInteger(sourceLocationId) || sourceLocationId <= 0) {
-    logger.warn(`[RevisedTransferWA] Invalid POS source location for ${voucherNumber} — skipping`);
+  if (!Number.isInteger(destinationLocationId) || Number(destinationLocationId) <= 0) {
+    logger.warn(`[RevisedTransferWA] Invalid destination location for ${voucherNumber} — skipping`);
     return;
   }
 
-  const [sourceLoc] = await db
+  const destinationId = Number(destinationLocationId);
+  const [destination] = await db
     .select({
       id: locations.id,
       name: locations.name,
-      whatsappGroupChatId: locations.whatsappGroupChatId,
+      companyId: locations.companyId,
+      transferWaGroupChatId: locations.transferWaGroupChatId,
     })
     .from(locations)
-    .where(eq(locations.id, sourceLocationId))
+    .where(eq(locations.id, destinationId))
     .limit(1);
 
-  if (!sourceLoc) {
-    logger.warn(`[RevisedTransferWA] Source location ${sourceLocationId} not found for ${voucherNumber} — skipping`);
+  if (!destination) {
+    logger.warn(`[RevisedTransferWA] Destination location ${destinationId} not found for ${voucherNumber} — skipping`);
     return;
   }
 
-  const chatId = sourceLoc.whatsappGroupChatId?.trim() || null;
+  let chatId = destination.transferWaGroupChatId?.trim() || null;
+  let routingSource = "destination location";
+
+  if (!chatId && destination.companyId) {
+    const [company] = await db
+      .select({ transferWaGroupChatId: companies.transferWaGroupChatId })
+      .from(companies)
+      .where(eq(companies.id, destination.companyId))
+      .limit(1);
+    chatId = company?.transferWaGroupChatId?.trim() || null;
+    routingSource = "company fallback";
+  }
+
   if (!chatId) {
     logger.info(
-      `[RevisedTransferWA] No POS WhatsApp group assigned to source location ${sourceLocationId} (${sourceLoc.name}) for ${voucherNumber} — skipping`
+      `[RevisedTransferWA] No transfer WhatsApp group configured for destination ${destinationId} (${destination.name}) or its company for ${voucherNumber} — skipping`
     );
     return;
   }
+
+  logger.info(
+    `[RevisedTransferWA] Routing ${voucherNumber} to ${routingSource} group ${chatId} for destination ${destinationId} (${destination.name})`
+  );
 
   const uniqueIds = [...new Set(items.map((i) => i.stockItemId).filter((id) => id > 0))];
   const itemRows =
@@ -148,7 +172,7 @@ export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOpt
     if (result.success) {
       imageSent = true;
       logger.info(
-        `[RevisedTransferWA] Sent ${voucherNumber} revised image to POS source group ${chatId} (location ${sourceLocationId})`
+        `[RevisedTransferWA] Sent ${voucherNumber} revised image to ${routingSource} group ${chatId} (destination ${destinationId})`
       );
     } else {
       logger.warn(`[RevisedTransferWA] Image send failed for ${voucherNumber} → ${chatId}: ${result.error}`);
@@ -159,7 +183,7 @@ export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOpt
     const textResult = await sendWhatsAppTextToChatIdPos(chatId, caption);
     if (textResult.success) {
       logger.info(
-        `[RevisedTransferWA] Text fallback sent for ${voucherNumber} → POS source group ${chatId} (location ${sourceLocationId})`
+        `[RevisedTransferWA] Text fallback sent for ${voucherNumber} → ${routingSource} group ${chatId} (destination ${destinationId})`
       );
     } else {
       logger.warn(`[RevisedTransferWA] Text fallback failed for ${voucherNumber} → ${chatId}: ${textResult.error}`);
