@@ -72,19 +72,22 @@ describe("ERP navigation history", () => {
     expect(consumeErpScrollRestore()).toBeNull();
   });
 
-  it("upgrades legacy ERP Back buttons to exact browser history", () => {
-    window.history.pushState({}, "", "/closing-stock/12?name=GROUP-A");
-    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
-    const button = document.createElement("button");
-    button.dataset.testid = "button-back";
-    document.body.appendChild(button);
+  it.each(["button-back", "button-back-to-stock-query", "button-sp-back"])(
+    "upgrades legacy ERP Back control %s to exact browser history",
+    (testId) => {
+      window.history.pushState({}, "", "/closing-stock/12?name=GROUP-A");
+      const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+      const button = document.createElement("button");
+      button.dataset.testid = testId;
+      document.body.appendChild(button);
 
-    const click = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
-    button.dispatchEvent(click);
+      const click = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+      button.dispatchEvent(click);
 
-    expect(click.defaultPrevented).toBe(true);
-    expect(back).toHaveBeenCalledTimes(1);
-  });
+      expect(click.defaultPrevented).toBe(true);
+      expect(back).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it("does not invent a previous ERP page for a direct entry", () => {
     expect(canGoBackToPreviousErpLocation()).toBe(false);
