@@ -1,5 +1,11 @@
 import { useEffect, useRef } from "react";
 import {
+  captureAndUploadScreenFrame,
+  type ScreenFeedClickEvent,
+  type ScreenFeedCursorEvent,
+  type ScreenFeedFailureStage,
+} from "./screen-feed-capture-engine";
+import {
   ACTIVE_CAPTURE_MIN_GAP_MS,
   DIRTY_SETTLE_MS,
   IDLE_REFRESH_MS,
@@ -7,11 +13,6 @@ import {
   adaptiveCaptureGapMs,
   failedCaptureBackoffMs,
 } from "./screen-feed-capture-policy";
-import {
-  captureAndUploadScreenFrame,
-  type ScreenFeedClickEvent,
-  type ScreenFeedCursorEvent,
-} from "./screen-feed-capture-engine";
 import { normalizeScreenFeedPoint } from "./screen-feed-viewing-quality";
 
 const POLL_INTERVAL_MS = 15000;
@@ -22,8 +23,6 @@ const UNWATCHED_POLL_INTERVAL_MS = 5000;
 const POINTER_INTERVAL_MS = 250;
 const BACKGROUND_MUTATION_MIN_GAP_MS = 4000;
 const INTERACTION_ACTIVE_WINDOW_MS = 2500;
-
-type CaptureFailureStage = "capture-or-upload" | "pipeline";
 
 export interface ClickEvent extends ScreenFeedClickEvent {}
 
@@ -60,12 +59,14 @@ function compactFailureReason(error: unknown): string {
   return "Unexpected screen capture pipeline failure.";
 }
 
-function reportCaptureFailure(stage: CaptureFailureStage, reason: string, durationMs?: number): void {
-  void fetch("/api/screen-feed/capture-failure", {
+function reportCaptureFailure(stage: ScreenFeedFailureStage, reason: string, durationMs?: number): void {
+  void fetch("/api/screen-feed/pointer", {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ stage, reason: reason.slice(0, 180), durationMs }),
+    body: JSON.stringify({
+      failure: { stage, reason: reason.slice(0, 180), durationMs },
+    }),
   }).catch(() => {
     // Diagnostics must never add a retry loop or slow the employee's ERP tab.
   });
@@ -287,8 +288,8 @@ export function useScreenFeed() {
             completeCaptureCycle(result);
             if (result.failed && watchedRef.current && document.visibilityState === "visible" && !disposed) {
               reportCaptureFailure(
-                "capture-or-upload",
-                "Screen frame could not be produced or uploaded.",
+                result.failureStage ?? "pipeline",
+                result.failureReason ?? "Screen frame could not be produced or uploaded.",
                 result.durationMs
               );
             }
