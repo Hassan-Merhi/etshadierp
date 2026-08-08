@@ -210,6 +210,93 @@ describe("PATCH /api/purchase-orders/:id", () => {
     expect(byType.get("Discount")).toBeCloseTo(-2, 2);
     expect(byType.get("Other Charges")).toBeCloseTo(5, 2);
   });
+
+  it("writes only the fields the endpoint names", async () => {
+    const containerId = await createContainer();
+    const otherContainerId = await createContainer();
+    const poId = await createPurchaseOrder({ containerId, itemsTotal: "500" });
+
+    const response = await agent
+      .patch(`/api/purchase-orders/${poId}`)
+      .send({ containerId: otherContainerId, supplierId: 99999999, freight: "10" });
+    expect(response.status).toBe(200);
+
+    // The allow-list is the line between correcting a charge and reassigning
+    // the whole order to another supplier or container.
+    const po = await pool.query<{ container_id: number; supplier_id: number; freight: string }>(
+      `SELECT container_id, supplier_id, freight FROM purchase_orders WHERE id = $1`,
+      [poId]
+    );
+    expect(po.rows[0].container_id).toBe(containerId);
+    expect(po.rows[0].supplier_id).toBe(supplierId);
+    expect(Number(po.rows[0].freight)).toBeCloseTo(10, 2);
+  });
+
+  it("refuses a stock-item swap once the container is offloaded", async () => {
+    const containerId = await createContainer();
+    await pool.query(`UPDATE containers SET status = 'OFFLOADED' WHERE id = $1`, [containerId]);
+    const poId = await createPurchaseOrder({ containerId, itemsTotal: "400" });
+    const lineItemId = await addLineItem(poId, "400");
+
+    const response = await agent.patch(`/api/purchase-orders/${poId}`).send({
+      items: [{ stockItemId: ctx.stockItemIds[1], itemName: "swapped", quantity: "1", rate: "400" }],
+    });
+
+    // Inventory has already been added under the original item. Swapping now
+    // leaves the import cycle unbalanced with nothing left to reconcile it
+    // against — the fix is to reverse the offload first.
+    expect(response.status).toBe(400);
+    expect(response.body.message).toMatch(/offloaded container/i);
+    const remaining = await pool.query<{ stock_item_id: number }>(
+      `SELECT stock_item_id FROM po_line_items WHERE id = $1`,
+      [lineItemId]
+    );
+    expect(remaining.rows[0].stock_item_id).toBe(ctx.stockItemIds[0]);
+  });
+
+  it("returns 404 for an unknown order and 400 for a bad id", async () => {
+    expect((await agent.patch("/api/purchase-orders/99999999").send({ freight: "1" })).status).toBe(404);
+    expect((await agent.patch("/api/purchase-orders/0").send({ freight: "1" })).status).toBe(400);
+  });
+});
+
+describe("POST /api/purchase-orders/:id/sync-parent-voucher", () => {
+  it("reports nothing to sync when freight is not paid by a parent company", async () => {
+    const containerId = await createContainer();
+    const voucher = await pool.query<{ id: number }>(
+      `INSERT INTO vouchers (company_id, voucher_number, voucher_type, voucher_date, total_amount, currency)
+       VALUES ($1, $2, 'Purchase', '2026-06-01', '1000.00', 'USD') RETURNING id`,
+      [ctx.companyId, nextCode("V")]
+    );
+    await pool.query(
+      `INSERT INTO voucher_entries (voucher_id, ledger_account_id, debit_amount, credit_amount)
+       VALUES ($1, $2, '1000.00', '0')`,
+      [voucher.rows[0].id, ctx.cashAccountId]
+    );
+    const poId = await createPurchaseOrder({ containerId, itemsTotal: "1000", freight: "100" });
+    await pool.query(`UPDATE purchase_orders SET voucher_id = $1 WHERE id = $2`, [voucher.rows[0].id, poId]);
+
+    const response = await agent.post(`/api/purchase-orders/${poId}/sync-parent-voucher`).send({});
+    expect(response.status).toBe(200);
+    expect(response.body.updated).toBe(false);
+
+    // Freight is the supplier's here, so the PO's own voucher legs must be left
+    // exactly as they are rather than rebuilt around a parent freight account.
+    const entries = await pool.query<{ debit_amount: string }>(
+      `SELECT debit_amount FROM voucher_entries WHERE voucher_id = $1`,
+      [voucher.rows[0].id]
+    );
+    expect(entries.rowCount).toBe(1);
+    expect(Number(entries.rows[0].debit_amount)).toBeCloseTo(1000, 2);
+
+    await pool.query(`UPDATE purchase_orders SET voucher_id = NULL WHERE id = $1`, [poId]);
+    await pool.query(`DELETE FROM voucher_entries WHERE voucher_id = $1`, [voucher.rows[0].id]);
+    await pool.query(`DELETE FROM vouchers WHERE id = $1`, [voucher.rows[0].id]);
+  });
+
+  it("returns 404 for an unknown order", async () => {
+    expect((await agent.post("/api/purchase-orders/99999999/sync-parent-voucher").send({})).status).toBe(404);
+  });
 });
 
 describe("DELETE /api/purchase-orders/:id", () => {
