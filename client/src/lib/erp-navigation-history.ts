@@ -152,8 +152,7 @@ export function installErpNavigationHistory(): () => void {
 
   popstateHandler = (event: PopStateEvent) => {
     const meta = readMeta(event.state);
-    pendingScrollRestore =
-      meta?.mode === "erp" && isCurrentErpPath() ? Math.max(0, meta.scrollTop) : null;
+    pendingScrollRestore = meta?.mode === "erp" && isCurrentErpPath() ? Math.max(0, meta.scrollTop) : null;
   };
   window.addEventListener("popstate", popstateHandler);
 
