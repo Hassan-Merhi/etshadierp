@@ -37,7 +37,6 @@ jobs:
           from pathlib import Path
           import json
 
-          # Keep live documentation figures synchronized with the audit source of truth.
           for filename in ["docs/god-file-split-program.md", "docs/system-quality-program.md"]:
               p = Path(filename)
               s = p.read_text()
@@ -46,7 +45,6 @@ jobs:
               s = s.replace("64 files, 33,920", "65 files, 33,942")
               p.write_text(s)
 
-          # Lock in three god-file reductions already achieved by this branch.
           p = Path("config/god-file-boundaries.json")
           data = json.loads(p.read_text())
           grandfathered = data["repositoryScan"]["grandfathered"]
@@ -58,7 +56,6 @@ jobs:
               grandfathered.pop(key, None)
           p.write_text(json.dumps(data, indent=2) + "\n")
 
-          # The safety sweep must not create a legacy ledger when there is no migration work.
           p = Path("server/routes/payroll/core/migrations.ts")
           s = p.read_text()
           marker = "      const salaryAccByCity = new Map<string, number>();\n"
@@ -73,25 +70,15 @@ jobs:
       - name: Format changed source
         run: npx prettier --write client/src/components/StockNameUpdateImport.tsx server/routes/payroll/core/migrations.ts config/god-file-boundaries.json docs/god-file-split-program.md docs/system-quality-program.md
 
-      - name: Regenerate reviewed route manifest
-        env:
-          UPDATE_ROUTE_MANIFEST: "1"
-        run: npm run test:backend -- route-manifest
-
-      - name: Regenerate reviewed API smoke contracts
-        env:
-          UPDATE_API_SMOKE_SHAPES: "1"
-        run: npm run test:smoke-sweep
-
       - name: Commit fixes
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/god-file-split-program.md docs/system-quality-program.md config/god-file-boundaries.json config/route-manifest.json config/api-smoke-shapes.json client/src/components/StockNameUpdateImport.tsx server/routes/payroll/core/migrations.ts
+          git add docs/god-file-split-program.md docs/system-quality-program.md config/god-file-boundaries.json client/src/components/StockNameUpdateImport.tsx server/routes/payroll/core/migrations.ts
           if git diff --cached --quiet; then
             echo "No changes to commit"
             exit 0
           fi
-          git commit -m "fix: resolve PR 590 CI drift and migration safety [pr590-auto-fix]"
+          git commit -m "fix: resolve PR 590 mechanical CI drift and migration safety [pr590-auto-fix]"
           git push origin HEAD:quality-audit-integration-20260808
