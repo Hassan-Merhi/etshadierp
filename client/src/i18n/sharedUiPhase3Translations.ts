@@ -5,6 +5,7 @@ import { phase3SharedUiTranslationsPart2 } from "./sharedUiPhase3Translations.pa
 import { phase3SharedUiTranslationsPart3 } from "./sharedUiPhase3Translations.part3";
 import { phase3SharedUiTranslationsPart4 } from "./sharedUiPhase3Translations.part4";
 import { phase3SharedUiTranslationsPart5 } from "./sharedUiPhase3Translations.part5";
+import { phase3SharedUiTranslationsPart6 } from "./sharedUiPhase3Translations.part6";
 
 export const phase3SharedUiTranslations: readonly Phase3SharedUiEntry[] = [
   ...phase3SharedUiTranslationsPart1,
@@ -12,6 +13,7 @@ export const phase3SharedUiTranslations: readonly Phase3SharedUiEntry[] = [
   ...phase3SharedUiTranslationsPart3,
   ...phase3SharedUiTranslationsPart4,
   ...phase3SharedUiTranslationsPart5,
+  ...phase3SharedUiTranslationsPart6,
 ];
 
 const exactEntryByVisibleText = new Map<string, Phase3SharedUiEntry>();
