@@ -21,6 +21,7 @@ import {
 
 import { getCompanyId, getUsername } from "./_helpers";
 import { resultRows, firstRow } from "../../../lib/queryResult";
+import { sqlArray } from "../../../lib/sqlArray";
 
 export function registerDispatchBatchCrudRoutes(app: Express) {
   // ── GET /api/factory/dispatch-batches ─────────────────────────────────────
@@ -322,11 +323,15 @@ export function registerDispatchBatchCrudRoutes(app: Express) {
           SELECT bale_id FROM customer_dispatch_bale_scans
           WHERE batch_id = ${batchId} AND company_id = ${companyId} AND removed_at IS NULL
         `);
-        const ids = resultRows(activeBaleIds).map((r: any) => r.bale_id);
+        const ids = resultRows(activeBaleIds).map((r: any) => Number(r.bale_id));
         if (ids.length > 0) {
+          // sqlArray, not a bare array: Drizzle renders a bare JS array as
+          // tuple syntax, which ANY() rejects outright — so this statement used
+          // to throw for every batch that had a bale on it, which is every
+          // batch worth cancelling.
           await tx.execute(sql`
             UPDATE factory_bales SET status = 'IN_STOCK', updated_at = now()
-            WHERE id = ANY(${ids}::int[]) AND status = 'RESERVED_FOR_DISPATCH'
+            WHERE id = ANY(${sqlArray(ids)}) AND status = 'RESERVED_FOR_DISPATCH'
           `);
         }
 

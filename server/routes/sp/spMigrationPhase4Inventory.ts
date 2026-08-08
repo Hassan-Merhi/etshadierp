@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { sqlArray } from "../../lib/sqlArray";
 import { db } from "../../db";
 import { loadStockItemMap, pn } from "./spMigrationPhase2Common";
 import { resolveTargetLocation } from "./spMigrationCutoverReadiness";
@@ -94,7 +95,7 @@ async function loadTargetInventoryRows(targetId: number, targetItemIds: number[]
     SELECT id, stock_item_id, location_id, quantity, average_rate, total_value
     FROM inventory
     WHERE company_id = ${targetId}
-      AND stock_item_id = ANY(${targetItemIds})
+      AND stock_item_id = ANY(${sqlArray(targetItemIds)})
     ORDER BY id ASC
   `);
   return resultRows(result);

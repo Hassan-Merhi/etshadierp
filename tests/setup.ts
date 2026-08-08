@@ -69,6 +69,7 @@ const FACTORY_COMPANY_PREFIXES = new Set([
   "prswr",
   "wbonus",
   "advmgt",
+  "dspbat",
 ]);
 
 function testCompanyType(prefix: string): "erp" | "factory" {
@@ -140,6 +141,13 @@ export async function cleanupTestData(prefix: string): Promise<void> {
       [company.id]
     );
     await pool.query("DELETE FROM factory_shipping_container_rows WHERE company_id = $1", [company.id]);
+    // The dispatch-batch family, cleared here for the same reason: batches
+    // reference customers and proformas with ON DELETE RESTRICT, and rides
+    // reference batches, so all of it must go before the customer delete below.
+    await pool.query("DELETE FROM customer_dispatch_bale_scans WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM customer_dispatch_truck_rides WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM customer_dispatch_batches WHERE company_id = $1", [company.id]);
+    await pool.query("DELETE FROM customer_dispatch_batch_sequences WHERE company_id = $1", [company.id]);
     await pool.query("DELETE FROM customer_orders WHERE company_id = $1", [company.id]);
     await pool.query(
       "DELETE FROM customer_proforma_lines WHERE proforma_id IN (SELECT id FROM customer_proformas WHERE company_id = $1)",

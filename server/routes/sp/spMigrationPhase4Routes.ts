@@ -1,5 +1,6 @@
 import type { Express, NextFunction, Request, Response } from "express";
 import { sql } from "drizzle-orm";
+import { sqlArray } from "../../lib/sqlArray";
 import { db } from "../../db";
 import { logger } from "../../lib/logger";
 import { requireAuth, requireRole } from "../../auth";
@@ -129,8 +130,8 @@ async function phase4WriteGuard(req: Request, res: Response, next: NextFunction)
           FROM sp_migration_cutovers
           WHERE status IN ('prepared', 'active')
             AND (
-              source_company_id = ANY(${uniqueMigrationCompanyIds}) OR
-              target_company_id = ANY(${uniqueMigrationCompanyIds})
+              source_company_id = ANY(${sqlArray(uniqueMigrationCompanyIds)}) OR
+              target_company_id = ANY(${sqlArray(uniqueMigrationCompanyIds)})
             )
           ORDER BY id DESC
           LIMIT 1

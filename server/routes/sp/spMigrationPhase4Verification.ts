@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { sqlArray } from "../../lib/sqlArray";
 import { db } from "../../db";
 import {
   buildCutoverReadiness,
@@ -252,7 +253,7 @@ async function verifyContainers(
         AND r.source_company_id = ${sourceId}
         AND r.target_company_id = ${targetId}
         AND r.status <> 'rolled_back'
-        AND rr.row_id = ANY(${targetLineIds.length ? targetLineIds : [-1]})
+        AND rr.row_id = ANY(${sqlArray(targetLineIds.length ? targetLineIds : [-1])})
     `);
     const trackedIds = new Set(resultRows(trackedResult).map((row: any) => pn(row.row_id)));
     const untracked = targetLineIds.filter((id: number) => !trackedIds.has(id));

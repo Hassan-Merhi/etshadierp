@@ -22,6 +22,7 @@
 
 import { db } from "../../db";
 import { sql } from "drizzle-orm";
+import { sqlArray } from "../../lib/sqlArray";
 import { ledgerAccounts } from "@shared/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { firstRow } from "../../lib/queryResult";
@@ -516,7 +517,7 @@ export async function buildGcMigrationPreview(sourceId: number, targetId: number
   const gcAcctRows = (
     await db.execute(sql`
     SELECT sub_type, name FROM ledger_accounts
-    WHERE company_id = ${targetId} AND deleted_at IS NULL AND sub_type = ANY(${gcAllSubTypes})
+    WHERE company_id = ${targetId} AND deleted_at IS NULL AND sub_type = ANY(${sqlArray(gcAllSubTypes)})
   `)
   ).rows as any[];
   const existingGcSubTypes = new Map(gcAcctRows.map((r: any) => [r.sub_type, r.name]));
