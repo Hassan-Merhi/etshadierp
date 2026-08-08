@@ -11,6 +11,7 @@ export * from "./raw-stock-mix";
 export * from "./customer-orders";
 export * from "./daybook-fx";
 export * from "./workers-payroll";
+export * from "./worker-bonuses";
 export * from "./production-positions";
 export * from "./bale-production-attribution";
 export * from "./production-bonuses";
