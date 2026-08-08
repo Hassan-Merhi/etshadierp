@@ -17,6 +17,7 @@ const compatibilityTranslationFiles = [
   "client/src/i18n/sharedUiPhase3Translations.part3.ts",
   "client/src/i18n/sharedUiPhase3Translations.part4.ts",
   "client/src/i18n/sharedUiPhase3Translations.part5.ts",
+  "client/src/i18n/sharedUiPhase3Translations.part6.ts",
   "client/src/i18n/supplierPartnerPhase4Translations.part1.ts",
   "client/src/i18n/supplierPartnerPhase4Translations.part2.ts",
   "client/src/i18n/supplierPartnerPhase4Translations.part3.ts",
