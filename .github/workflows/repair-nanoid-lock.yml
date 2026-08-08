@@ -1,0 +1,38 @@
+name: One-shot nanoid lockfile repair
+
+on:
+  push:
+    branches:
+      - quality-audit-integration-20260808
+    paths:
+      - ".github/workflows/repair-nanoid-lock.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  repair-lockfile:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: quality-audit-integration-20260808
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22.14"
+          cache: npm
+      - name: Remove unused direct nanoid dependency and refresh transitive resolution
+        run: |
+          npm uninstall nanoid --package-lock-only --ignore-scripts --no-audit
+          npm update nanoid --package-lock-only --ignore-scripts --no-audit
+      - name: Commit refreshed package metadata
+        run: |
+          if git diff --quiet -- package.json package-lock.json; then
+            echo "No package metadata changes were required"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "Repair nanoid dependency resolution"
+          git push origin HEAD:quality-audit-integration-20260808
