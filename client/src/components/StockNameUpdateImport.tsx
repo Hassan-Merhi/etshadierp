@@ -112,7 +112,9 @@ export function StockNameUpdateImport() {
 
       const headers = Object.keys(rawRows[0] ?? {});
       const codeHeader = headers.find((header) => ["code", "itemcode"].includes(normalizeHeader(header)));
-      const nameHeader = headers.find((header) => ["newname", "name", "itemname"].includes(normalizeHeader(header)));
+      const nameHeader = headers.find((header) =>
+        ["newname", "name", "itemname"].includes(normalizeHeader(header))
+      );
       if (!codeHeader || !nameHeader) {
         throw new Error('Expected columns "Code" and "New Name"');
       }
@@ -151,7 +153,11 @@ export function StockNameUpdateImport() {
         description: `${ready} name change${ready === 1 ? "" : "s"} ready to apply${missing > 0 ? `; ${missing} missing code${missing === 1 ? "" : "s"} will be ignored` : ""}`,
       });
     } catch (error: unknown) {
-      toast({ title: "Could not read file", description: getErrorMessage(error), variant: "destructive" });
+      toast({
+        title: "Could not read file",
+        description: getErrorMessage(error),
+        variant: "destructive",
+      });
     } finally {
       setIsReading(false);
     }
