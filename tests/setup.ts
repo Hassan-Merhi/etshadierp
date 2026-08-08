@@ -68,6 +68,7 @@ const FACTORY_COMPANY_PREFIXES = new Set([
   "mkpaid",
   "prswr",
   "wbonus",
+  "advmgt",
 ]);
 
 function testCompanyType(prefix: string): "erp" | "factory" {
