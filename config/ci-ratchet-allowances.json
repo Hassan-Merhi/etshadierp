@@ -7,9 +7,12 @@
     "client/src/pages/daybook/VoucherDetailsDialog.tsx": 984,
     "client/src/pages/factory/FactoryContainerLoadingScan.tsx": 1906,
     "client/src/pages/factory/FactoryShippingContainers.tsx": 913,
-    "client/src/pages/vouchers/StockTransferForm.tsx": 2388
+    "client/src/pages/vouchers/StockTransferForm.tsx": 2388,
+    "server/services/rental/rentalPaymentPostingService.ts": 958
   },
-  "routeManifestAdditions": [],
+  "routeManifestAdditions": [
+    "POST /api/stock-items/update-names-by-code [requireAuth > requireNonPOS > <anonymous>]"
+  ],
   "routeManifestMountAdditions": [],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [
@@ -49,8 +52,9 @@
       "tests/loading-proforma-summary-lines.test.ts",
       "tests/pos-revision-whatsapp-routing.test.ts",
       "tests/ui/remote-support-fast-viewer.test.ts",
-      "server/lib/reportPrecision.test.ts"
+      "server/lib/reportPrecision.test.ts",
+      "tests/stock-item-name-update-by-code.test.ts"
     ],
-    "maxAdditionalTextAssertions": 548
+    "maxAdditionalTextAssertions": 577
   }
 }
