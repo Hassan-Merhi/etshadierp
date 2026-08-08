@@ -25,9 +25,20 @@ describe("stock item name updates by code", () => {
     expect(source).toContain('"/api/stock-items/update-names-by-code"');
     expect(source).toContain('Required columns: "Code" and "New Name".');
     expect(source).toContain("Current Name");
-    expect(source).toContain("Code not found");
+    expect(source).toContain("Ignored — code not found");
     expect(source).toContain("Duplicate code");
     expect(source).toContain("Apply ${changeRows.length} Name Changes");
+  });
+
+  it("does not block valid name updates when some item codes are missing", () => {
+    const source = readFileSync("client/src/components/StockNameUpdateImport.tsx", "utf8");
+    expect(source).toContain('const notFoundCount = rows.filter((row) => row.status === "not_found").length');
+    expect(source).toContain(
+      'const blockingProblemCount = rows.filter((row) => ["duplicate", "invalid"].includes(row.status)).length'
+    );
+    expect(source).toContain("Codes that do not exist are ignored");
+    expect(source).toContain("blockingProblemCount > 0");
+    expect(source).not.toContain("problemCount > 0");
   });
 
   it("exposes the rename flow from the Stock Items import dialog", () => {
