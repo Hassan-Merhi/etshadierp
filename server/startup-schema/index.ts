@@ -28,6 +28,8 @@ import { productionBonusPayroll } from "./015-production-bonus-payroll";
 import { locationWhatsAppStockReports } from "./016-location-whatsapp-stock-reports";
 import { locationWhatsAppStockSchedules } from "./017-location-whatsapp-stock-schedules";
 import { locationWhatsAppDeliveryHistory } from "./018-location-whatsapp-delivery-history";
+import { stockMergeAuditUserId } from "./019-stock-merge-audit-user-id";
+import { v3LoadUserId } from "./020-v3-load-user-id";
 
 export const startupMigrations: string[] = [
   ...coreTablesAndColumns,
@@ -48,4 +50,7 @@ export const startupMigrations: string[] = [
   ...locationWhatsAppStockReports,
   ...locationWhatsAppStockSchedules,
   ...locationWhatsAppDeliveryHistory,
+  // Last: an ALTER on a table created in 007, so it must run after it.
+  ...stockMergeAuditUserId,
+  ...v3LoadUserId,
 ];

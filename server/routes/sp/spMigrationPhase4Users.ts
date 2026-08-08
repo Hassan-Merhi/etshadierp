@@ -3,12 +3,13 @@ import { db } from "../../db";
 import { pn } from "./spMigrationPhase2Common";
 import { resolveTargetLedgerAccount, resolveTargetLocation } from "./spMigrationCutoverReadiness";
 import { ensurePhase4CutoverSchema } from "./spMigrationPhase4Inventory";
+import { resultRows, firstRow } from "../../lib/queryResult";
 
 function roleSnapshot(row: any): any {
   return {
     role: row.role,
-    assignedLocationId: row.assigned_location_id ? pn(row.assigned_location_id) : row.assignedLocationId ?? null,
-    cashAccountId: row.cash_account_id ? pn(row.cash_account_id) : row.cashAccountId ?? null,
+    assignedLocationId: row.assigned_location_id ? pn(row.assigned_location_id) : (row.assignedLocationId ?? null),
+    cashAccountId: row.cash_account_id ? pn(row.cash_account_id) : (row.cashAccountId ?? null),
     posStation: row.pos_station ?? row.posStation ?? null,
     canSellNegativeStock: Boolean(row.can_sell_negative_stock ?? row.canSellNegativeStock),
     posViewOnly: Boolean(row.pos_view_only ?? row.posViewOnly),
@@ -53,7 +54,7 @@ async function switchUserSessions(
           END = ${params.fromCompanyId}
     RETURNING sid
   `);
-  return ((result as any).rows ?? []).length;
+  return resultRows(result).length;
 }
 
 async function loadUserLocations(tx: any, userId: string, companyId: number): Promise<any[]> {
@@ -63,7 +64,7 @@ async function loadUserLocations(tx: any, userId: string, companyId: number): Pr
     WHERE user_id = ${userId} AND company_id = ${companyId}
     ORDER BY location_id ASC
   `);
-  return ((result as any).rows ?? []).map((row: any) => ({ locationId: pn(row.location_id) }));
+  return resultRows(result).map((row: any) => ({ locationId: pn(row.location_id) }));
 }
 
 async function loadCashMappings(tx: any, userId: string, companyId: number): Promise<any[]> {
@@ -73,7 +74,7 @@ async function loadCashMappings(tx: any, userId: string, companyId: number): Pro
     WHERE user_id = ${userId} AND company_id = ${companyId}
     ORDER BY location_id ASC
   `);
-  return ((result as any).rows ?? []).map((row: any) => ({
+  return resultRows(result).map((row: any) => ({
     locationId: pn(row.location_id),
     cashAccountId: pn(row.cash_account_id),
     posStation: row.pos_station ?? null,
@@ -119,7 +120,9 @@ async function mapAllCashMappings(sourceId: number, targetId: number, rows: any[
     const location = await resolveTargetLocation(sourceId, targetId, pn(row.locationId));
     const cashAccountId = await resolveTargetLedgerAccount(pn(row.cashAccountId), targetId);
     if (!location || !cashAccountId) {
-      throw new Error(`Cash mapping location ${row.locationId}, account ${row.cashAccountId} has no safe target mapping.`);
+      throw new Error(
+        `Cash mapping location ${row.locationId}, account ${row.cashAccountId} has no safe target mapping.`
+      );
     }
     mapped.push({
       locationId: location.targetLocationId,
@@ -141,7 +144,9 @@ async function replaceLocations(tx: any, userId: string, companyId: number, rows
 }
 
 async function replaceCashMappings(tx: any, userId: string, companyId: number, rows: any[]): Promise<void> {
-  await tx.execute(sql`DELETE FROM user_location_cash_accounts WHERE user_id = ${userId} AND company_id = ${companyId}`);
+  await tx.execute(
+    sql`DELETE FROM user_location_cash_accounts WHERE user_id = ${userId} AND company_id = ${companyId}`
+  );
   for (const row of rows) {
     await tx.execute(sql`
       INSERT INTO user_location_cash_accounts (user_id, company_id, location_id, cash_account_id, pos_station)
@@ -150,13 +155,18 @@ async function replaceCashMappings(tx: any, userId: string, companyId: number, r
   }
 }
 
-async function upsertRole(tx: any, userId: string, companyId: number, role: any): Promise<{ id: number; created: boolean }> {
+async function upsertRole(
+  tx: any,
+  userId: string,
+  companyId: number,
+  role: any
+): Promise<{ id: number; created: boolean }> {
   const existing = await tx.execute(sql`
     SELECT id FROM user_company_roles
     WHERE user_id = ${userId} AND company_id = ${companyId}
     LIMIT 1
   `);
-  const existingId = pn((existing as any).rows?.[0]?.id);
+  const existingId = pn(firstRow(existing)?.id);
   if (existingId) {
     await tx.execute(sql`
       UPDATE user_company_roles
@@ -184,7 +194,7 @@ async function upsertRole(tx: any, userId: string, companyId: number, role: any)
        ${pn(role.daybookEditDays)}, ${Boolean(role.canAccessCustomers)}, ${Boolean(role.canDeleteRecords)})
     RETURNING id
   `);
-  return { id: pn((inserted as any).rows[0].id), created: true };
+  return { id: pn(resultRows(inserted)[0].id), created: true };
 }
 
 export async function moveUsersToTargetExact(
@@ -210,7 +220,7 @@ export async function moveUsersToTargetExact(
     developerRolesSkipped: 0,
   };
 
-  for (const sourceRole of (sourceRolesResult as any).rows ?? []) {
+  for (const sourceRole of resultRows(sourceRolesResult)) {
     if (sourceRole.role === "Developer") {
       summary.developerRolesSkipped++;
       continue;
@@ -229,7 +239,7 @@ export async function moveUsersToTargetExact(
         WHERE user_id = ${userId} AND company_id = ${targetId}
         LIMIT 1
       `);
-      const targetRoleBefore = (targetRoleResult as any).rows?.[0] ?? null;
+      const targetRoleBefore = firstRow(targetRoleResult) ?? null;
 
       const mappedLocations = await mapAllLocations(sourceId, targetId, sourceLocations);
       const mappedCashMappings = await mapAllCashMappings(sourceId, targetId, sourceCashMappings);
@@ -282,14 +292,22 @@ export async function moveUsersToTargetExact(
         WHERE cutover_id = ${cutoverId} AND user_id = ${userId}
       `);
 
-      await tx.execute(sql`DELETE FROM user_location_cash_accounts WHERE user_id = ${userId} AND company_id = ${sourceId}`);
+      await tx.execute(
+        sql`DELETE FROM user_location_cash_accounts WHERE user_id = ${userId} AND company_id = ${sourceId}`
+      );
       await tx.execute(sql`DELETE FROM user_locations WHERE user_id = ${userId} AND company_id = ${sourceId}`);
-      await tx.execute(sql`DELETE FROM user_company_roles WHERE id = ${pn(sourceRole.id)} AND company_id = ${sourceId}`);
-      await tx.execute(sql`
+      await tx.execute(
+        sql`DELETE FROM user_company_roles WHERE id = ${pn(sourceRole.id)} AND company_id = ${sourceId}`
+      );
+      await tx
+        .execute(
+          sql`
         UPDATE user_presence
         SET company_id = ${targetId}, company_name = ${targetCompanyName}, role = ${mappedRole.role}
         WHERE user_id = ${userId} AND company_id = ${sourceId}
-      `).catch(() => undefined);
+      `
+        )
+        .catch(() => undefined);
 
       summary.sessionsSwitched += switched;
       summary.sourceLocationsMoved += sourceLocations.length;
@@ -325,12 +343,19 @@ export async function restoreUsersToSourceExact(
     sourceCashMappingsRestored: 0,
   };
 
-  for (const change of (changesResult as any).rows ?? []) {
+  for (const change of resultRows(changesResult)) {
     const userId = String(change.user_id);
-    const sourceRole = change.source_role_snapshot ?? {};
+    const sourceRole = (change.source_role_snapshot ?? {}) as {
+      role?: string | null;
+      assignedLocationId?: number | null;
+      cashAccountId?: number | null;
+      posStation?: string | null;
+    };
     const targetRoleBefore = change.target_role_snapshot_before ?? null;
     const sourceLocations = Array.isArray(change.source_locations_snapshot) ? change.source_locations_snapshot : [];
-    const sourceCashMappings = Array.isArray(change.source_cash_mappings_snapshot) ? change.source_cash_mappings_snapshot : [];
+    const sourceCashMappings = Array.isArray(change.source_cash_mappings_snapshot)
+      ? change.source_cash_mappings_snapshot
+      : [];
     const targetLocationsBefore = Array.isArray(change.target_locations_snapshot_before)
       ? change.target_locations_snapshot_before
       : [];
@@ -345,9 +370,13 @@ export async function restoreUsersToSourceExact(
       await replaceCashMappings(tx, userId, sourceId, sourceCashMappings);
 
       if (change.created_target_role) {
-        await tx.execute(sql`DELETE FROM user_location_cash_accounts WHERE user_id = ${userId} AND company_id = ${targetId}`);
+        await tx.execute(
+          sql`DELETE FROM user_location_cash_accounts WHERE user_id = ${userId} AND company_id = ${targetId}`
+        );
         await tx.execute(sql`DELETE FROM user_locations WHERE user_id = ${userId} AND company_id = ${targetId}`);
-        await tx.execute(sql`DELETE FROM user_company_roles WHERE id = ${pn(change.target_role_id)} AND company_id = ${targetId}`);
+        await tx.execute(
+          sql`DELETE FROM user_company_roles WHERE id = ${pn(change.target_role_id)} AND company_id = ${targetId}`
+        );
         summary.targetRolesRemoved++;
       } else if (targetRoleBefore) {
         await upsertRole(tx, userId, targetId, targetRoleBefore);
@@ -363,11 +392,15 @@ export async function restoreUsersToSourceExact(
         role: sourceRole,
         companyName: sourceCompanyName,
       });
-      await tx.execute(sql`
+      await tx
+        .execute(
+          sql`
         UPDATE user_presence
         SET company_id = ${sourceId}, company_name = ${sourceCompanyName}, role = ${sourceRole.role}
         WHERE user_id = ${userId} AND company_id = ${targetId}
-      `).catch(() => undefined);
+      `
+        )
+        .catch(() => undefined);
 
       summary.sessionsSwitched += switched;
       summary.sourceLocationsRestored += sourceLocations.length;

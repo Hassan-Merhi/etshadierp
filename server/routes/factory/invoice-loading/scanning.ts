@@ -19,6 +19,7 @@ import {
 import { eq, and, or, inArray, not, sql, ne } from "drizzle-orm";
 
 import { buildLoadingSummary, getCompanyId } from "./_helpers";
+import { resultRows } from "../../../lib/queryResult";
 
 export function registerInvoiceLoadingScanRoutes(app: Express) {
   // POST /api/factory/invoice-loading-sessions/:sessionId/scan-bale
@@ -99,7 +100,7 @@ export function registerInvoiceLoadingScanRoutes(app: Express) {
       const _linkResult = await db.execute(
         sql`SELECT bale_id FROM customer_order_bales WHERE order_id = ${invoiceId} AND bale_id = ${bale.id} LIMIT 1`
       );
-      const _linkRows: any[] = (_linkResult as any).rows ?? (_linkResult as unknown as any[]);
+      const _linkRows: any[] = resultRows(_linkResult);
       const invoiceBaleLink = _linkRows.length > 0 ? { baleId: _linkRows[0].bale_id as number } : undefined;
 
       if (!invoiceBaleLink) {

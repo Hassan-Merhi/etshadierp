@@ -194,7 +194,7 @@ export function registerAdvanceRepaymentRoutes(app: Express) {
           amountCurrency: effectiveAmount,
           currencyCode: "USD",
           amountUsd: effectiveAmount,
-          createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+          createdBy: (req.session as any).userId ?? undefined,
         });
 
         const [updatedAdvance] = await tx

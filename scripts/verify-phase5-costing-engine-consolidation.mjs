@@ -153,7 +153,7 @@ for (const invariant of [
   if (!policy.includes(invariant)) failures.push(`${policyPath}: missing ${invariant}`);
 }
 
-const completionPath = "docs/engineering/phase5-costing-engine-consolidation.md";
+const completionPath = "docs/archive/engineering/phase5-costing-engine-consolidation.md";
 const completion = read(completionPath).toLowerCase();
 for (const phrase of [
   "one precision policy",

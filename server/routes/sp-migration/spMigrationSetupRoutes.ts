@@ -9,6 +9,7 @@ import { logger } from "../../lib/logger";
 import { db } from "../../db";
 import { requireAuth, requireRole } from "../../auth";
 import { sql } from "drizzle-orm";
+import { sqlArray } from "../../lib/sqlArray";
 import {
   pn,
   SP_ACCOUNTS,
@@ -98,7 +99,7 @@ export function registerSpMigrationSetupRoutes(app: Express) {
         await db.execute(sql`
         SELECT sub_type, code, name FROM ledger_accounts
         WHERE company_id = ${targetId} AND deleted_at IS NULL
-          AND sub_type = ANY(${ALL_ACCOUNT_DEFS.map((a) => a.subType)})
+          AND sub_type = ANY(${sqlArray(ALL_ACCOUNT_DEFS.map((a) => a.subType))})
       `)
       ).rows as any[];
       const existingBySubType = new Map(existingRows.map((r: any) => [r.sub_type, r]));

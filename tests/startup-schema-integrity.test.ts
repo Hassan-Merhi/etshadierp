@@ -24,10 +24,10 @@ import { describe, expect, it } from "vitest";
 import { startupMigrations } from "../server/startup-schema";
 
 /** Statement count of the reviewed composed array. */
-const EXPECTED_STATEMENT_COUNT = 1275;
+const EXPECTED_STATEMENT_COUNT = 1280;
 
 /** sha256 of JSON.stringify(startupMigrations) for the reviewed composed array. */
-const EXPECTED_CONTENT_HASH = "4a3054fc36274b41a48d4f857a4508429e3200c8fa6b8d0406076ed2f5cd4eec";
+const EXPECTED_CONTENT_HASH = "e5e904a2be7226e1a38e7daa4f7069d5e89b30fa16c0e9ad1acb242e1f4e9206";
 
 function contentHash(statements: string[]): string {
   return crypto.createHash("sha256").update(JSON.stringify(statements)).digest("hex");

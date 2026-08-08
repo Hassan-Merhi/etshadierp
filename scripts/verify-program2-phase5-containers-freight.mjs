@@ -10,8 +10,8 @@ const requiredFiles = [
   "server/services/factory/currencyConversion.ts",
   "server/services/factory/postOffloadChargeMutation.ts",
   "server/services/security/postOffloadLedgerOwnershipGuard.ts",
-  "docs/program-2-accounting-convergence.md",
-  "docs/program-2-phase-5-containers-freight.md",
+  "docs/archive/program-2-accounting-convergence.md",
+  "docs/archive/program-2-phase-5-containers-freight.md",
 ];
 for (const file of requiredFiles) if (!fs.existsSync(file)) throw new Error(`Program 2 Phase 5 missing required file: ${file}`);
 const read = (file) => fs.readFileSync(file, "utf8");

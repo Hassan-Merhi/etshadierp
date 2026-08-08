@@ -6,6 +6,7 @@ import { logger } from "../../lib/logger";
 import { ensurePhase2Schema, getSuspenseReview, pn } from "./spMigrationPhase2Common";
 import { buildCutoverReadiness } from "./spMigrationCutoverReadiness";
 import { ensureCutoverSchema, getLiveCutover } from "./spMigrationCutoverState";
+import { firstRow } from "../../lib/queryResult";
 
 export type VerificationStatus = "PASS" | "WARN" | "FAIL";
 export type VerificationArea = {
@@ -28,7 +29,7 @@ async function companyRow(companyId: number): Promise<any | null> {
     WHERE id = ${companyId}
     LIMIT 1
   `);
-  return (result as any).rows?.[0] ?? null;
+  return firstRow(result) ?? null;
 }
 
 export async function buildFinalSpVerification(sourceId: number, targetId: number): Promise<any> {
@@ -42,7 +43,9 @@ export async function buildFinalSpVerification(sourceId: number, targetId: numbe
       sourceCompanyId: sourceId,
       targetCompanyId: targetId,
       generatedAt: new Date().toISOString(),
-      areas: [{ area: "Company pair", status: "FAIL", detail: "Source or target company does not exist.", mismatches: [] }],
+      areas: [
+        { area: "Company pair", status: "FAIL", detail: "Source or target company does not exist.", mismatches: [] },
+      ],
     };
   }
 
@@ -68,8 +71,16 @@ export async function buildFinalSpVerification(sourceId: number, targetId: numbe
   areas.push({
     area: "Migration Suspense",
     status: suspense.count === 0 ? "PASS" : "FAIL",
-    detail: suspense.count === 0 ? "No migrated entry remains in Migration Suspense." : `${suspense.count} entry row(s) require mapping.`,
-    mismatches: suspense.items.slice(0, 50).map((item: any) => `${item.target_voucher_number ?? item.target_voucher_id}: ${item.source_account_name ?? item.review_reason}`),
+    detail:
+      suspense.count === 0
+        ? "No migrated entry remains in Migration Suspense."
+        : `${suspense.count} entry row(s) require mapping.`,
+    mismatches: suspense.items
+      .slice(0, 50)
+      .map(
+        (item: any) =>
+          `${item.target_voucher_number ?? item.target_voucher_id}: ${item.source_account_name ?? item.review_reason}`
+      ),
   });
 
   const voucherCheck = await db.execute(sql`
@@ -90,13 +101,15 @@ export async function buildFinalSpVerification(sourceId: number, targetId: numbe
       GROUP BY v.id
     ) totals
   `);
-  const voucherTotals = (voucherCheck as any).rows?.[0] ?? {};
+  const voucherTotals = firstRow(voucherCheck) ?? {};
   const voucherFailures = pn(voucherTotals.unbalanced_count) + pn(voucherTotals.incomplete_count);
   areas.push({
     area: "Voucher integrity",
     status: voucherFailures === 0 ? "PASS" : "FAIL",
     detail: `${pn(voucherTotals.voucher_count)} SP/migration voucher(s); ${pn(voucherTotals.unbalanced_count)} unbalanced; ${pn(voucherTotals.incomplete_count)} incomplete.`,
-    mismatches: voucherFailures ? ["All SP and migrated vouchers must have at least two entries and equal debit/credit totals."] : [],
+    mismatches: voucherFailures
+      ? ["All SP and migrated vouchers must have at least two entries and equal debit/credit totals."]
+      : [],
   });
 
   const supplierLinkCheck = await db.execute(sql`
@@ -107,11 +120,14 @@ export async function buildFinalSpVerification(sourceId: number, targetId: numbe
       AND c.supplier_id IS NOT NULL
       AND v.supplier_id IS DISTINCT FROM c.supplier_id
   `);
-  const supplierLinkGap = pn((supplierLinkCheck as any).rows?.[0]?.count);
+  const supplierLinkGap = pn(firstRow(supplierLinkCheck)?.count);
   areas.push({
     area: "Supplier voucher links",
     status: supplierLinkGap === 0 ? "PASS" : "FAIL",
-    detail: supplierLinkGap === 0 ? "All Goods-OTW vouchers match their SP container supplier." : `${supplierLinkGap} Goods-OTW voucher(s) have a supplier mismatch.`,
+    detail:
+      supplierLinkGap === 0
+        ? "All Goods-OTW vouchers match their SP container supplier."
+        : `${supplierLinkGap} Goods-OTW voucher(s) have a supplier mismatch.`,
     mismatches: supplierLinkGap ? ["Run SP Setup repair and re-run verification."] : [],
   });
 
@@ -125,15 +141,18 @@ export async function buildFinalSpVerification(sourceId: number, targetId: numbe
            COALESCE(SUM(total_value::numeric), 0) AS value
     FROM inventory WHERE company_id = ${targetId}
   `);
-  const srcStock = (sourceStock as any).rows?.[0] ?? {};
-  const tgtStock = (targetStock as any).rows?.[0] ?? {};
+  const srcStock = firstRow(sourceStock) ?? {};
+  const tgtStock = firstRow(targetStock) ?? {};
   const qtyDiff = Math.abs(pn(srcStock.qty) - pn(tgtStock.qty));
   const valueDiff = Math.abs(pn(srcStock.value) - pn(tgtStock.value));
   areas.push({
     area: "Stock totals",
     status: qtyDiff <= 0.0001 && valueDiff <= 0.01 ? "PASS" : "WARN",
     detail: `Source qty ${pn(srcStock.qty).toFixed(4)} / value ${pn(srcStock.value).toFixed(2)}; target qty ${pn(tgtStock.qty).toFixed(4)} / value ${pn(tgtStock.value).toFixed(2)}.`,
-    mismatches: qtyDiff <= 0.0001 && valueDiff <= 0.01 ? [] : [`Quantity difference ${qtyDiff.toFixed(4)}; value difference ${valueDiff.toFixed(2)}.`],
+    mismatches:
+      qtyDiff <= 0.0001 && valueDiff <= 0.01
+        ? []
+        : [`Quantity difference ${qtyDiff.toFixed(4)}; value difference ${valueDiff.toFixed(2)}.`],
   });
 
   const orphanCheck = await db.execute(sql`
@@ -145,7 +164,7 @@ export async function buildFinalSpVerification(sourceId: number, targetId: numbe
       (SELECT COUNT(*) FROM sp_sale_lines l LEFT JOIN sp_sales s ON s.id = l.sale_id
        WHERE l.company_id = ${targetId} AND s.id IS NULL)::int AS orphan_sale_lines
   `);
-  const orphans = (orphanCheck as any).rows?.[0] ?? {};
+  const orphans = firstRow(orphanCheck) ?? {};
   const orphanTotal = pn(orphans.orphan_lines) + pn(orphans.orphan_movements) + pn(orphans.orphan_sale_lines);
   areas.push({
     area: "Referential integrity",
@@ -161,7 +180,7 @@ export async function buildFinalSpVerification(sourceId: number, targetId: numbe
     FROM user_company_roles
     WHERE company_id = ${sourceId}
   `);
-  const access = (userAccess as any).rows?.[0] ?? {};
+  const access = firstRow(userAccess) ?? {};
   const cutover = await getLiveCutover(sourceId, targetId);
   const activated = cutover?.status === "active";
   const oldRoleCount = pn(access.old_non_developer_roles);
@@ -171,7 +190,8 @@ export async function buildFinalSpVerification(sourceId: number, targetId: numbe
     detail: activated
       ? `${oldRoleCount} non-developer role(s) remain on old ERP; ${pn(access.target_roles)} role(s) exist on target.`
       : `Cutover is not active; ${pn(access.target_roles)} target role(s) are prepared.`,
-    mismatches: activated && oldRoleCount ? ["After activation, only Developer support access may remain on the old ERP."] : [],
+    mismatches:
+      activated && oldRoleCount ? ["After activation, only Developer support access may remain on the old ERP."] : [],
   });
 
   const rollbackEvidence = cutover
@@ -181,14 +201,20 @@ export async function buildFinalSpVerification(sourceId: number, targetId: numbe
           (SELECT COUNT(*) FROM sp_migration_cutover_stock_deltas WHERE cutover_id = ${cutover.id})::int AS stock_rows
       `)
     : null;
-  const evidence = (rollbackEvidence as any)?.rows?.[0] ?? {};
+  const evidence = firstRow<{ role_rows: number | null; stock_rows: number | null }>(rollbackEvidence) ?? {
+    role_rows: 0,
+    stock_rows: 0,
+  };
   areas.push({
     area: "Rollback evidence",
     status: !cutover || pn(evidence.role_rows) + pn(evidence.stock_rows) > 0 ? "PASS" : "WARN",
     detail: cutover
       ? `${pn(evidence.role_rows)} user-role rollback row(s), ${pn(evidence.stock_rows)} stock rollback row(s).`
       : "No active cutover exists; rollback evidence will be created during finalization.",
-    mismatches: cutover && pn(evidence.role_rows) + pn(evidence.stock_rows) === 0 ? ["Active cutover has no recorded rollback evidence."] : [],
+    mismatches:
+      cutover && pn(evidence.role_rows) + pn(evidence.stock_rows) === 0
+        ? ["Active cutover has no recorded rollback evidence."]
+        : [],
   });
 
   const overall = summarizeVerification(areas);
@@ -210,26 +236,21 @@ export async function buildFinalSpVerification(sourceId: number, targetId: numbe
 }
 
 export function registerSpMigrationFinalVerificationRoutes(app: Express): void {
-  app.get(
-    "/api/sp/migration/final-verification",
-    requireAuth,
-    requireRole("Developer"),
-    async (req: any, res: any) => {
-      try {
-        const sourceId = Number.parseInt(String(req.query.sourceCompanyId ?? ""), 10);
-        const targetId = Number.parseInt(String(req.query.targetCompanyId ?? ""), 10);
-        if (!sourceId || !targetId) {
-          return res.status(400).json({ message: "sourceCompanyId and targetCompanyId are required" });
-        }
-        if (sourceId === targetId) {
-          return res.status(400).json({ message: "Source and target companies must be different" });
-        }
-        const report = await buildFinalSpVerification(sourceId, targetId);
-        return res.status(report.overall === "FAIL" ? 409 : 200).json(report);
-      } catch (error: unknown) {
-        logger.error("[SP Migration] final verification error", { error });
-        return res.status(500).json({ message: "Final Supplier Partner verification failed" });
+  app.get("/api/sp/migration/final-verification", requireAuth, requireRole("Developer"), async (req: any, res: any) => {
+    try {
+      const sourceId = Number.parseInt(String(req.query.sourceCompanyId ?? ""), 10);
+      const targetId = Number.parseInt(String(req.query.targetCompanyId ?? ""), 10);
+      if (!sourceId || !targetId) {
+        return res.status(400).json({ message: "sourceCompanyId and targetCompanyId are required" });
       }
+      if (sourceId === targetId) {
+        return res.status(400).json({ message: "Source and target companies must be different" });
+      }
+      const report = await buildFinalSpVerification(sourceId, targetId);
+      return res.status(report.overall === "FAIL" ? 409 : 200).json(report);
+    } catch (error: unknown) {
+      logger.error("[SP Migration] final verification error", { error });
+      return res.status(500).json({ message: "Final Supplier Partner verification failed" });
     }
-  );
+  });
 }

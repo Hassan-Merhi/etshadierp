@@ -13,6 +13,7 @@ import { sql, eq, and } from "drizzle-orm";
 import { customerDispatchBatches, customerDispatchTruckRides } from "@shared/schema";
 
 import { getCompanyId, isAdmin } from "./_helpers";
+import { firstRow } from "../../../lib/queryResult";
 
 export function registerDispatchTruckRideDispatchRoutes(app: Express) {
   // ── POST /api/factory/dispatch-truck-rides/:id/dispatch ───────────────────
@@ -38,7 +39,7 @@ export function registerDispatchTruckRideDispatchRoutes(app: Express) {
           SELECT COUNT(*) AS cnt FROM customer_dispatch_bale_scans
           WHERE truck_ride_id = ${rideId} AND company_id = ${companyId} AND removed_at IS NULL
         `);
-        const cnt = parseInt(((countRows as any).rows || countRows)[0]?.cnt || "0");
+        const cnt = parseInt(firstRow<{ cnt: string | null }>(countRows)?.cnt || "0");
         if (cnt === 0) throw new Error("Cannot dispatch a ride with no scanned bales");
 
         const [updated] = await tx

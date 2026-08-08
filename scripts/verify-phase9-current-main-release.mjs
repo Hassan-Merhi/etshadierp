@@ -10,13 +10,13 @@ const read = (file) => {
   return fs.readFileSync(file, "utf8");
 };
 
-const workflowPath = ".github/workflows/phase9-final-release.yml";
+const workflowPath = ".github/workflows/release-verification.yml";
 const workflow = read(workflowPath);
 const configSource = read("config/i18n-phase9-final-release.json");
 const baselineVerifier = read("scripts/verify-phase9-final-i18n-baseline.mjs");
 const browserSmoke = read("scripts/run-phase9-language-browser-smoke.mjs");
 const releaseTest = read("tests/phase9-final-release-gate.test.ts");
-const releaseDoc = read("docs/translation/phase-9-current-main-release.md");
+const releaseDoc = read("docs/archive/translation/phase-9-current-main-release.md");
 
 let config = null;
 try {

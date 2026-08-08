@@ -349,11 +349,16 @@ export function registerFactoryTransporterRoutes(app: Express) {
       if (!tx) return res.status(404).json({ message: "Transaction not found" });
 
       await db.transaction(async (trx) => {
+        // The transaction row has to go first. factory_transporter_transactions
+        // .voucher_id references vouchers.id with ON DELETE RESTRICT, so
+        // deleting the voucher while this row still points at it raises 23503
+        // and the whole request fails — which it did for every transaction that
+        // had a voucher, meaning all of them.
+        await trx.delete(factoryTransporterTransactions).where(eq(factoryTransporterTransactions.id, txId));
         if (tx.voucherId) {
           await trx.delete(voucherEntries).where(eq(voucherEntries.voucherId, tx.voucherId));
           await trx.delete(vouchers).where(eq(vouchers.id, tx.voucherId));
         }
-        await trx.delete(factoryTransporterTransactions).where(eq(factoryTransporterTransactions.id, txId));
       });
 
       res.json({ ok: true });

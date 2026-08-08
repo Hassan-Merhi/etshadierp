@@ -64,8 +64,6 @@ import {
   currencySymbol,
   formatTxType,
   getFactoryTxTypeBadge,
-  CURRENCY_SYMBOLS,
-  TX_TYPE_LABELS,
   VOUCHER_TX_TYPES,
 } from "./daybook/daybookUtils";
 import { FACTORY_DAYBOOK_STATE_KEY, loadFactoryDaybookState, saveFactoryDaybookState } from "./daybook/daybookUiState";

@@ -18,11 +18,8 @@ import {
   resolveSupplier,
   findExistingContainerLink,
 } from "./spMigrationPhase2Common";
-import {
-  getContainerChargeCandidates,
-  getSourceContainerLines,
-  upsertChargeMapping,
-} from "./spMigrationPhase2Charges";
+import { getContainerChargeCandidates, getSourceContainerLines, upsertChargeMapping } from "./spMigrationPhase2Charges";
+import { resultRows, firstRow } from "../../lib/queryResult";
 
 export async function importContainers(req: any, res: any): Promise<any> {
   const pair = await validateMigrationPair(req, res, true);
@@ -69,7 +66,15 @@ export async function importContainers(req: any, res: any): Promise<any> {
     let chargeReview = 0;
     let chargeUnmapped = 0;
 
-    for (const sourceContainer of (sourceContainersResult as any).rows ?? []) {
+    for (const sourceContainer of resultRows<{
+      id: number;
+      supplier_id: number | null;
+      source_supplier_name: string | null;
+      container_number: string | null;
+      status: string | null;
+      items_total: string | null;
+      import_date: string | null;
+    }>(sourceContainersResult)) {
       const sourceContainerId = pn(sourceContainer.id);
       const supplier = await resolveSupplier(
         sourceContainer.supplier_id ? pn(sourceContainer.supplier_id) : null,
@@ -87,7 +92,7 @@ export async function importContainers(req: any, res: any): Promise<any> {
         ORDER BY id DESC
         LIMIT 1
       `);
-      const po = (poResult as any).rows?.[0] ?? null;
+      const po = firstRow(poResult) ?? null;
       const status = ["otw", "open"].includes(String(sourceContainer.status ?? "").toLowerCase())
         ? "open"
         : "offloaded";
@@ -106,7 +111,7 @@ export async function importContainers(req: any, res: any): Promise<any> {
           ORDER BY id ASC
           LIMIT 1
         `);
-        spContainerId = pn((existingByNumber as any).rows?.[0]?.id);
+        spContainerId = pn(firstRow(existingByNumber)?.id);
         if (spContainerId) {
           await linkSourceRow(runId, "containers", sourceContainerId, "sp_containers", spContainerId);
         }
@@ -123,7 +128,7 @@ export async function importContainers(req: any, res: any): Promise<any> {
              ${migrationNote})
           RETURNING id
         `);
-        spContainerId = pn((inserted as any).rows[0].id);
+        spContainerId = pn(resultRows(inserted)[0].id);
         await trackRow(runId, "sp_containers", spContainerId);
         await linkSourceRow(runId, "containers", sourceContainerId, "sp_containers", spContainerId);
         rowsCreated++;
@@ -157,14 +162,14 @@ export async function importContainers(req: any, res: any): Promise<any> {
             SELECT goods_otw_voucher_id FROM sp_containers
             WHERE id = ${spContainerId} AND company_id = ${pair.targetId}
           `);
-          let voucherId = pn((linkedVoucherResult as any).rows?.[0]?.goods_otw_voucher_id);
+          let voucherId = pn(firstRow(linkedVoucherResult)?.goods_otw_voucher_id);
           if (!voucherId) {
             const existingVoucher = await db.execute(sql`
               SELECT id FROM vouchers
               WHERE company_id = ${pair.targetId} AND voucher_number = ${deterministicNumber}
               LIMIT 1
             `);
-            voucherId = pn((existingVoucher as any).rows?.[0]?.id);
+            voucherId = pn(firstRow(existingVoucher)?.id);
           }
 
           if (!voucherId) {
@@ -179,7 +184,7 @@ export async function importContainers(req: any, res: any): Promise<any> {
                  ${money(invoiceTotal)}, 'USD', 'SP_MIGRATION')
               RETURNING id
             `);
-            voucherId = pn((insertedVoucher as any).rows[0].id);
+            voucherId = pn(resultRows(insertedVoucher)[0].id);
             await trackRow(runId, "vouchers", voucherId);
             rowsCreated++;
             otwVouchersCreated++;
@@ -199,21 +204,21 @@ export async function importContainers(req: any, res: any): Promise<any> {
             WHERE voucher_id = ${voucherId} AND ledger_account_id = ${pn(otwAssetAccount.id)}
             LIMIT 1
           `);
-          if (!(debitEntry as any).rows?.[0]) {
+          if (!firstRow(debitEntry)) {
             const inserted = await db.execute(sql`
               INSERT INTO voucher_entries (voucher_id, ledger_account_id, debit_amount, credit_amount, narration)
               VALUES (${voucherId}, ${pn(otwAssetAccount.id)}, ${money(invoiceTotal)}, '0.0000',
                       ${`Goods OTW — container ${sourceContainer.container_number}`})
               RETURNING id
             `);
-            await trackRow(runId, "voucher_entries", pn((inserted as any).rows[0].id));
+            await trackRow(runId, "voucher_entries", pn(resultRows(inserted)[0].id));
             rowsCreated++;
           } else {
             await db.execute(sql`
               UPDATE voucher_entries
               SET debit_amount = ${money(invoiceTotal)}, credit_amount = '0.0000',
                   narration = ${`Goods OTW — container ${sourceContainer.container_number}`}
-              WHERE id = ${pn((debitEntry as any).rows[0].id)}
+              WHERE id = ${pn(resultRows(debitEntry)[0].id)}
             `);
           }
 
@@ -222,7 +227,7 @@ export async function importContainers(req: any, res: any): Promise<any> {
             WHERE voucher_id = ${voucherId} AND ledger_account_id = ${pn(otwClearingAccount.id)}
             LIMIT 1
           `);
-          if (!(creditEntry as any).rows?.[0]) {
+          if (!firstRow(creditEntry)) {
             const inserted = await db.execute(sql`
               INSERT INTO voucher_entries
                 (voucher_id, ledger_account_id, supplier_id, debit_amount, credit_amount, narration)
@@ -230,7 +235,7 @@ export async function importContainers(req: any, res: any): Promise<any> {
                       ${money(invoiceTotal)}, ${`Goods OTW clearing — container ${sourceContainer.container_number}`})
               RETURNING id
             `);
-            await trackRow(runId, "voucher_entries", pn((inserted as any).rows[0].id));
+            await trackRow(runId, "voucher_entries", pn(resultRows(inserted)[0].id));
             rowsCreated++;
           } else {
             await db.execute(sql`
@@ -238,7 +243,7 @@ export async function importContainers(req: any, res: any): Promise<any> {
               SET supplier_id = ${supplier.supplierId}, debit_amount = '0.0000',
                   credit_amount = ${money(invoiceTotal)},
                   narration = ${`Goods OTW clearing — container ${sourceContainer.container_number}`}
-              WHERE id = ${pn((creditEntry as any).rows[0].id)}
+              WHERE id = ${pn(resultRows(creditEntry)[0].id)}
             `);
           }
 
@@ -259,15 +264,13 @@ export async function importContainers(req: any, res: any): Promise<any> {
       }
       for (const sourceLine of sourceLines.rows) {
         const sourceStockItemId = sourceLine.stock_item_id ? pn(sourceLine.stock_item_id) : null;
-        const targetStockItemId = sourceStockItemId ? stockItemMap.get(sourceStockItemId) ?? null : null;
+        const targetStockItemId = sourceStockItemId ? (stockItemMap.get(sourceStockItemId) ?? null) : null;
         if (sourceStockItemId && !targetStockItemId) {
           warnings.push(
             `Container ${sourceContainer.container_number}: stock item ${sourceStockItemId} has no target mapping.`
           );
         }
-        const articleCode = String(
-          sourceLine.article_code ?? sourceLine.description ?? `MIG-${sourceContainerId}`
-        );
+        const articleCode = String(sourceLine.article_code ?? sourceLine.description ?? `MIG-${sourceContainerId}`);
         const quantity = pn(sourceLine.quantity);
         const rate = pn(sourceLine.rate);
         const existingLine = await db.execute(sql`
@@ -279,7 +282,7 @@ export async function importContainers(req: any, res: any): Promise<any> {
             AND unit_rate_usd = ${money(rate)}
           LIMIT 1
         `);
-        if ((existingLine as any).rows?.[0]) continue;
+        if (firstRow(existingLine)) continue;
 
         const insertedLine = await db.execute(sql`
           INSERT INTO sp_container_lines
@@ -289,7 +292,7 @@ export async function importContainers(req: any, res: any): Promise<any> {
              ${money(quantity)}, ${money(rate)}, ${targetStockItemId})
           RETURNING id
         `);
-        await trackRow(runId, "sp_container_lines", pn((insertedLine as any).rows[0].id));
+        await trackRow(runId, "sp_container_lines", pn(resultRows(insertedLine)[0].id));
         rowsCreated++;
         linesCreated++;
       }

@@ -11,6 +11,7 @@ import { db } from "../../../db";
 import { requireAuth, requireRole } from "../../../auth";
 import {} from "@shared/schema";
 import { sql } from "drizzle-orm";
+import { resultRows } from "../../../lib/queryResult";
 
 export function registerAdminOrphanedBaleRoutes(app: Express) {
   app.post("/api/admin/fix-orphaned-bales", requireAuth, requireRole("Admin", "Owner"), async (_req, res) => {
@@ -29,7 +30,7 @@ export function registerAdminOrphanedBaleRoutes(app: Express) {
           )
         RETURNING id
       `);
-      const fixed = (result as any).rows?.length ?? 0;
+      const fixed = resultRows(result)?.length ?? 0;
       res.json({ fixed, message: fixed > 0 ? `Restored ${fixed} bale(s) to IN_STOCK` : "No orphaned bales found" });
     } catch (error: unknown) {
       logger.error("[BaleOrphanFix] Error:", { error: error });

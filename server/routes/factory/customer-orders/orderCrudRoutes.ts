@@ -20,6 +20,7 @@ import {
 } from "@shared/schema";
 import { eq, and, or, desc, sql, inArray, isNull, gte, lte } from "drizzle-orm";
 import { parseListPagination, setListPaginationHeaders } from "../../../lib/listPagination";
+import { resultRows } from "../../../lib/queryResult";
 
 export function registerOrderCrudRoutes(app: Express) {
   app.get("/api/factory/customer-orders", requireAuth, async (req: any, res: any) => {
@@ -132,7 +133,7 @@ export function registerOrderCrudRoutes(app: Express) {
             WHERE co.id = ${id} AND co.company_id = ${companyId}
             LIMIT 1`
       );
-      const rawOrderRows: any[] = (rawOrderRes as any).rows ?? (rawOrderRes as unknown as any[]);
+      const rawOrderRows: any[] = resultRows(rawOrderRes);
       if (!rawOrderRows.length) return res.status(404).json({ message: "Order not found" });
       const r = rawOrderRows[0];
       const order = {
@@ -170,7 +171,7 @@ export function registerOrderCrudRoutes(app: Express) {
       // customer_order_bales and customer_order_charges both have newer columns
       // added via migrations that may be absent in production — use raw SQL.
       const rawBalesRes = await db.execute(sql`SELECT * FROM customer_order_bales WHERE order_id = ${id} ORDER BY id`);
-      const bales = ((rawBalesRes as any).rows ?? (rawBalesRes as unknown as any[])).map((b: any) => ({
+      const bales = resultRows(rawBalesRes).map((b: any) => ({
         id: b.id,
         orderId: b.order_id,
         baleId: b.bale_id,
@@ -185,7 +186,7 @@ export function registerOrderCrudRoutes(app: Express) {
       const rawChargesRes = await db.execute(
         sql`SELECT * FROM customer_order_charges WHERE order_id = ${id} ORDER BY id`
       );
-      const charges = ((rawChargesRes as any).rows ?? (rawChargesRes as unknown as any[])).map((c: any) => ({
+      const charges = resultRows(rawChargesRes).map((c: any) => ({
         id: c.id,
         orderId: c.order_id,
         name: c.name ?? "",

@@ -11,6 +11,7 @@ import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { sql } from "drizzle-orm";
 import { sqlArray } from "../../../lib/sqlArray";
+import { resultRows } from "../../../lib/queryResult";
 
 export function registerV5LocationSummaryRoutes(app: Express) {
   // ── GET /api/factory/v5/location-summary ──────────────────────────────────
@@ -41,7 +42,7 @@ export function registerV5LocationSummaryRoutes(app: Express) {
             GROUP BY article_code`
       );
       const inStockMap = new Map<string, number>(
-        ((inStockRaw as any).rows ?? []).map((r: any) => [r.articleCode, Number(r.count)])
+        resultRows(inStockRaw).map((r: any) => [r.articleCode, Number(r.count)])
       );
 
       // 2. reservedExpected — SUM(expected_qty) for DRAFT V5 orders on active proformas (company-wide)
@@ -59,7 +60,7 @@ export function registerV5LocationSummaryRoutes(app: Express) {
             GROUP BY cel.article_code`
       );
       const reservedMap = new Map<string, number>(
-        ((reservedRaw as any).rows ?? []).map((r: any) => [r.articleCode, Number(r.total)])
+        resultRows(reservedRaw).map((r: any) => [r.articleCode, Number(r.total)])
       );
 
       // 3. loading — bales at this location that have been scanned into LOADING V5 containers
@@ -77,7 +78,7 @@ export function registerV5LocationSummaryRoutes(app: Express) {
             GROUP BY fb.article_code`
       );
       const loadingMap = new Map<string, number>(
-        ((loadingRaw as any).rows ?? []).map((r: any) => [r.articleCode, Number(r.count)])
+        resultRows(loadingRaw).map((r: any) => [r.articleCode, Number(r.count)])
       );
 
       // 4. Resolve product names + weight_per_bale_kg (bidirectional code/articleCode lookup)
@@ -100,7 +101,7 @@ export function registerV5LocationSummaryRoutes(app: Express) {
               WHERE matched_code IS NOT NULL
               ORDER BY matched_code`
         );
-        ((nameRaw as any).rows ?? []).forEach((r: any) => {
+        resultRows(nameRaw).forEach((r: any) => {
           if (r.name) productNameMap.set(r.articleCode, r.name);
           if (r.weightPerBaleKg != null) weightMap.set(r.articleCode, parseFloat(r.weightPerBaleKg));
         });

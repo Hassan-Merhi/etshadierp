@@ -1,15 +1,17 @@
 import { sql } from "drizzle-orm";
+import { sqlArray } from "../../lib/sqlArray";
 import { db } from "../../db";
-import { buildCutoverReadiness, resolveTargetLedgerAccount, resolveTargetLocation } from "./spMigrationCutoverReadiness";
+import {
+  buildCutoverReadiness,
+  resolveTargetLedgerAccount,
+  resolveTargetLocation,
+} from "./spMigrationCutoverReadiness";
 import { getSourceContainerLines } from "./spMigrationPhase2Charges";
 import { getSpSupplierVoucherLinkGapCount } from "./spSupplierVoucherSync";
 import { pn } from "./spMigrationPhase2Common";
 import { buildExactInventoryPlan } from "./spMigrationPhase4Inventory";
-import {
-  classifyFinalVerification,
-  numbersDiffer,
-  type VerificationIssue,
-} from "./spMigrationPhase4Policy";
+import { classifyFinalVerification, numbersDiffer, type VerificationIssue } from "./spMigrationPhase4Policy";
+import { resultRows, firstRow } from "../../lib/queryResult";
 
 export type VerificationArea = {
   area: string;
@@ -22,7 +24,12 @@ function addUnique(target: VerificationIssue[], issue: VerificationIssue): void 
   if (!target.some((existing) => existing.code === issue.code)) target.push(issue);
 }
 
-async function completedPairLinks(sourceId: number, targetId: number, sourceTable: string, targetTable: string): Promise<any[]> {
+async function completedPairLinks(
+  sourceId: number,
+  targetId: number,
+  sourceTable: string,
+  targetTable: string
+): Promise<any[]> {
   const result = await db.execute(sql`
     SELECT DISTINCT ON (l.source_id) l.source_id, l.target_id
     FROM sp_migration_source_links l
@@ -34,10 +41,13 @@ async function completedPairLinks(sourceId: number, targetId: number, sourceTabl
       AND l.target_table = ${targetTable}
     ORDER BY l.source_id, r.created_at DESC
   `);
-  return (result as any).rows ?? [];
+  return resultRows(result);
 }
 
-async function verifyHistoricalSales(sourceId: number, targetId: number): Promise<{
+async function verifyHistoricalSales(
+  sourceId: number,
+  targetId: number
+): Promise<{
   blockers: VerificationIssue[];
   deltas: VerificationIssue[];
   area: VerificationArea;
@@ -69,9 +79,9 @@ async function verifyHistoricalSales(sourceId: number, targetId: number): Promis
     JOIN vouchers v ON v.id = e.voucher_id
     WHERE v.company_id = ${sourceId} AND v.voucher_type IN ('Sales', 'Sale') AND v.deleted_at IS NULL
   `);
-  const sourceVouchers = (sourceVouchersResult as any).rows ?? [];
-  const sourceItems = (sourceItemsResult as any).rows ?? [];
-  const sourceEntries = (sourceEntriesResult as any).rows ?? [];
+  const sourceVouchers = resultRows(sourceVouchersResult);
+  const sourceItems = resultRows(sourceItemsResult);
+  const sourceEntries = resultRows(sourceEntriesResult);
   const missingVouchers = sourceVouchers.filter((row: any) => !linkedVoucherIds.has(pn(row.id)));
   const missingItems = sourceItems.filter((row: any) => !linkedItemIds.has(pn(row.id)));
   const missingEntries = sourceEntries.filter((row: any) => !linkedEntryIds.has(pn(row.id)));
@@ -115,7 +125,7 @@ async function verifyHistoricalSales(sourceId: number, targetId: number): Promis
           AND l.target_id = tv.id
       )
   `);
-  const unlinkedTargets = pn((unlinkedTargetsResult as any).rows?.[0]?.count);
+  const unlinkedTargets = pn(firstRow(unlinkedTargetsResult)?.count);
   if (unlinkedTargets) {
     blockers.push({
       code: "UNPROVENANCED_TARGET_SALES",
@@ -149,7 +159,10 @@ async function verifyHistoricalSales(sourceId: number, targetId: number): Promis
   };
 }
 
-async function verifyContainers(sourceId: number, targetId: number): Promise<{
+async function verifyContainers(
+  sourceId: number,
+  targetId: number
+): Promise<{
   blockers: VerificationIssue[];
   deltas: VerificationIssue[];
   area: VerificationArea;
@@ -166,7 +179,7 @@ async function verifyContainers(sourceId: number, targetId: number): Promise<{
     WHERE c.company_id = ${sourceId}
     ORDER BY c.id ASC
   `);
-  const sourceContainers = (sourceResult as any).rows ?? [];
+  const sourceContainers = resultRows(sourceResult);
   const missing = sourceContainers.filter((row: any) => !linkMap.has(pn(row.id)));
   if (missing.length) {
     deltas.push({
@@ -190,10 +203,12 @@ async function verifyContainers(sourceId: number, targetId: number): Promise<{
     const targetResult = await db.execute(sql`
       SELECT * FROM sp_containers WHERE id = ${targetContainerId} AND company_id = ${targetId} LIMIT 1
     `);
-    const target = (targetResult as any).rows?.[0];
+    const target = firstRow(targetResult);
     if (!target) {
       headerDrift++;
-      mismatchMessages.push(`Container ${sourceContainer.container_number}: provenance points to a missing target row.`);
+      mismatchMessages.push(
+        `Container ${sourceContainer.container_number}: provenance points to a missing target row.`
+      );
       continue;
     }
     if (!target.supplier_id) unresolvedSupplier++;
@@ -203,8 +218,10 @@ async function verifyContainers(sourceId: number, targetId: number): Promise<{
       FROM purchase_orders WHERE container_id = ${sourceContainerId}
       ORDER BY id DESC LIMIT 1
     `);
-    const po = (poResult as any).rows?.[0] ?? null;
-    const expectedStatus = ["otw", "open"].includes(String(sourceContainer.status ?? "").toLowerCase()) ? "open" : "offloaded";
+    const po = firstRow(poResult) ?? null;
+    const expectedStatus = ["otw", "open"].includes(String(sourceContainer.status ?? "").toLowerCase())
+      ? "open"
+      : "offloaded";
     const expectedInvoice = String(po?.po_number ?? sourceContainer.container_number ?? `GC-${sourceContainerId}`);
     const expectedTotal = pn(po?.items_total ?? sourceContainer.items_total);
     const expectedFreight = pn(po?.freight);
@@ -216,7 +233,9 @@ async function verifyContainers(sourceId: number, targetId: number): Promise<{
       numbersDiffer(target.freight_estimate_usd, expectedFreight, 0.01);
     if (drift) {
       headerDrift++;
-      mismatchMessages.push(`Container ${sourceContainer.container_number}: target header/status differs from the source.`);
+      mismatchMessages.push(
+        `Container ${sourceContainer.container_number}: target header/status differs from the source.`
+      );
     }
 
     const sourceLines = await getSourceContainerLines(sourceContainer, po);
@@ -225,7 +244,7 @@ async function verifyContainers(sourceId: number, targetId: number): Promise<{
       WHERE company_id = ${targetId} AND container_id = ${targetContainerId}
       ORDER BY id ASC
     `);
-    const targetLineIds = ((targetLinesResult as any).rows ?? []).map((row: any) => pn(row.id));
+    const targetLineIds = resultRows(targetLinesResult).map((row: any) => pn(row.id));
     const trackedResult = await db.execute(sql`
       SELECT DISTINCT rr.row_id
       FROM sp_migration_run_rows rr
@@ -234,9 +253,9 @@ async function verifyContainers(sourceId: number, targetId: number): Promise<{
         AND r.source_company_id = ${sourceId}
         AND r.target_company_id = ${targetId}
         AND r.status <> 'rolled_back'
-        AND rr.row_id = ANY(${targetLineIds.length ? targetLineIds : [-1]})
+        AND rr.row_id = ANY(${sqlArray(targetLineIds.length ? targetLineIds : [-1])})
     `);
-    const trackedIds = new Set(((trackedResult as any).rows ?? []).map((row: any) => pn(row.row_id)));
+    const trackedIds = new Set(resultRows(trackedResult).map((row: any) => pn(row.row_id)));
     const untracked = targetLineIds.filter((id: number) => !trackedIds.has(id));
     if (untracked.length) untrackedTargetLines += untracked.length;
     if (sourceLines.rows.length !== targetLineIds.length) {
@@ -255,7 +274,7 @@ async function verifyContainers(sourceId: number, targetId: number): Promise<{
           WHERE id = ${voucherId} AND company_id = ${targetId} AND deleted_at IS NULL
           LIMIT 1
         `);
-        if (!(voucherResult as any).rows?.[0]) otwStateDrift++;
+        if (!firstRow(voucherResult)) otwStateDrift++;
       }
     } else if (voucherId) {
       const activeVoucher = await db.execute(sql`
@@ -263,7 +282,7 @@ async function verifyContainers(sourceId: number, targetId: number): Promise<{
         WHERE id = ${voucherId} AND company_id = ${targetId} AND deleted_at IS NULL
         LIMIT 1
       `);
-      if ((activeVoucher as any).rows?.[0]) otwStateDrift++;
+      if (firstRow(activeVoucher)) otwStateDrift++;
     }
   }
 
@@ -282,13 +301,25 @@ async function verifyContainers(sourceId: number, targetId: number): Promise<{
     });
   }
   if (headerDrift) {
-    deltas.push({ code: "CONTAINER_HEADER_DELTA", message: `${headerDrift} container header(s) require final synchronization.`, count: headerDrift });
+    deltas.push({
+      code: "CONTAINER_HEADER_DELTA",
+      message: `${headerDrift} container header(s) require final synchronization.`,
+      count: headerDrift,
+    });
   }
   if (lineDrift) {
-    deltas.push({ code: "CONTAINER_LINE_DELTA", message: `${lineDrift} container line set(s) require final rebuilding.`, count: lineDrift });
+    deltas.push({
+      code: "CONTAINER_LINE_DELTA",
+      message: `${lineDrift} container line set(s) require final rebuilding.`,
+      count: lineDrift,
+    });
   }
   if (otwStateDrift) {
-    deltas.push({ code: "CONTAINER_OTW_STATE_DELTA", message: `${otwStateDrift} container OTW accounting state(s) require final reconciliation.`, count: otwStateDrift });
+    deltas.push({
+      code: "CONTAINER_OTW_STATE_DELTA",
+      message: `${otwStateDrift} container OTW accounting state(s) require final reconciliation.`,
+      count: otwStateDrift,
+    });
   }
 
   const supplierVoucherGaps = await getSpSupplierVoucherLinkGapCount(targetId);
@@ -326,7 +357,10 @@ async function verifyContainers(sourceId: number, targetId: number): Promise<{
   };
 }
 
-async function verifyUserMappings(sourceId: number, targetId: number): Promise<{
+async function verifyUserMappings(
+  sourceId: number,
+  targetId: number
+): Promise<{
   blockers: VerificationIssue[];
   area: VerificationArea;
   counts: any;
@@ -341,7 +375,7 @@ async function verifyUserMappings(sourceId: number, targetId: number): Promise<{
   let cashMappingsChecked = 0;
   const mismatches: string[] = [];
 
-  for (const role of (rolesResult as any).rows ?? []) {
+  for (const role of resultRows(rolesResult)) {
     if (role.assigned_location_id) {
       locationsChecked++;
       if (!(await resolveTargetLocation(sourceId, targetId, pn(role.assigned_location_id)))) {
@@ -358,7 +392,7 @@ async function verifyUserMappings(sourceId: number, targetId: number): Promise<{
       SELECT location_id FROM user_locations
       WHERE user_id = ${role.user_id} AND company_id = ${sourceId}
     `);
-    for (const row of (locations as any).rows ?? []) {
+    for (const row of resultRows(locations)) {
       locationsChecked++;
       if (!(await resolveTargetLocation(sourceId, targetId, pn(row.location_id)))) {
         mismatches.push(`User ${role.user_id}: location ${row.location_id} is unmapped.`);
@@ -368,12 +402,14 @@ async function verifyUserMappings(sourceId: number, targetId: number): Promise<{
       SELECT location_id, cash_account_id FROM user_location_cash_accounts
       WHERE user_id = ${role.user_id} AND company_id = ${sourceId}
     `);
-    for (const row of (cashMappings as any).rows ?? []) {
+    for (const row of resultRows(cashMappings)) {
       cashMappingsChecked++;
       const location = await resolveTargetLocation(sourceId, targetId, pn(row.location_id));
       const account = await resolveTargetLedgerAccount(pn(row.cash_account_id), targetId);
       if (!location || !account) {
-        mismatches.push(`User ${role.user_id}: location/cash mapping ${row.location_id}/${row.cash_account_id} is unmapped.`);
+        mismatches.push(
+          `User ${role.user_id}: location/cash mapping ${row.location_id}/${row.cash_account_id} is unmapped.`
+        );
       }
     }
   }
@@ -388,7 +424,12 @@ async function verifyUserMappings(sourceId: number, targetId: number): Promise<{
   }
   return {
     blockers,
-    counts: { roles: ((rolesResult as any).rows ?? []).length, locationsChecked, cashMappingsChecked, mismatches: mismatches.length },
+    counts: {
+      roles: resultRows(rolesResult).length,
+      locationsChecked,
+      cashMappingsChecked,
+      mismatches: mismatches.length,
+    },
     area: {
       area: "User and POS assignments",
       status: mismatches.length ? "FAIL" : "PASS",
@@ -441,7 +482,13 @@ export async function buildFinalMigrationVerification(sourceId: number, targetId
   areas.push(users.area);
 
   const accountingBlockers = blockers.filter((issue) =>
-    ["SUSPENSE_REVIEW_REQUIRED", "CONTAINER_CHARGE_REVIEW_REQUIRED", "UNBALANCED_MIGRATION_VOUCHERS", "MISSING_TARGET_ACCOUNTS", "PROFIT_OPENING_MISSING"].includes(issue.code)
+    [
+      "SUSPENSE_REVIEW_REQUIRED",
+      "CONTAINER_CHARGE_REVIEW_REQUIRED",
+      "UNBALANCED_MIGRATION_VOUCHERS",
+      "MISSING_TARGET_ACCOUNTS",
+      "PROFIT_OPENING_MISSING",
+    ].includes(issue.code)
   );
   areas.push({
     area: "Accounting readiness",

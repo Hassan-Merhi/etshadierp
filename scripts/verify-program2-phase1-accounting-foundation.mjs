@@ -1,6 +1,6 @@
 import fs from "node:fs";
 
-const phaseDocumentPath = "docs/program-2-phase-1-accounting-foundation.md";
+const phaseDocumentPath = "docs/archive/program-2-phase-1-accounting-foundation.md";
 const inventoryPath = "docs/program-2-posting-path-inventory.json";
 const accountingBoundaryPath = "server/services/accounting/index.ts";
 const requiredFiles = [
@@ -33,10 +33,10 @@ const requiredFiles = [
   "server/routes/payrollRoutes.ts",
   "server/services/rental/rentalPaymentPostingService.ts",
   "server/routes/rental/rentalPaymentsAccrualRoutes.ts",
-  "docs/program-2-accounting-convergence.md",
-  "docs/program-2-phase-2b.md",
-  "docs/program-2-phase-2c.md",
-  "docs/program-2d-special-workflows.md",
+  "docs/archive/program-2-accounting-convergence.md",
+  "docs/archive/program-2-phase-2b.md",
+  "docs/archive/program-2-phase-2c.md",
+  "docs/archive/program-2d-special-workflows.md",
 ];
 for (const file of requiredFiles) if (!fs.existsSync(file)) throw new Error(`Program 2 Phase 1 missing required file: ${file}`);
 

@@ -52,12 +52,12 @@ requireAll("server/routes/ledgerRoutes.ts", [
 
 for (const file of [
   "tests/historical-currency-repair-center-contract.test.ts",
-  "docs/engineering/phase6-historical-accounting-fx-repair-center.md",
+  "docs/archive/engineering/phase6-historical-accounting-fx-repair-center.md",
 ]) {
   if (!fs.existsSync(path.join(root, file))) failures.push(`missing ${file}`);
 }
 
-const docs = read("docs/engineering/phase6-historical-accounting-fx-repair-center.md").toLowerCase();
+const docs = read("docs/archive/engineering/phase6-historical-accounting-fx-repair-center.md").toLowerCase();
 for (const phrase of [
   "read-only diagnosis",
   "explicit approval",

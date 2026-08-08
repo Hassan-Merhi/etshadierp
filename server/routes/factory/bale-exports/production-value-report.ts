@@ -20,6 +20,7 @@ import {
   factoryWorkers,
 } from "@shared/schema";
 import { eq, and, sql, inArray, isNull } from "drizzle-orm";
+import { resultRows } from "../../../lib/queryResult";
 
 export function registerFactoryProductionValueReportRoutes(app: Express) {
   // ───────────────────────────────────────────────
@@ -359,7 +360,7 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
           AND carry_forward_from_id IS NULL
           AND deleted_at        IS NULL
       `);
-      const mixAllTimeRow = ((mixAllTimeResult as any).rows ?? (mixAllTimeResult as any))[0] ?? {};
+      const mixAllTimeRow = resultRows(mixAllTimeResult)[0] ?? {};
       const allTimeMixKg = parseFloat(String(mixAllTimeRow.mix_kg ?? "0")) || 0;
       const allTimeMixCost = parseFloat(String(mixAllTimeRow.mix_cost ?? "0")) || 0;
 
@@ -371,7 +372,7 @@ export function registerFactoryProductionValueReportRoutes(app: Express) {
         WHERE  b.company_id = ${companyId}
           AND  b.status NOT IN ('DELETED', 'REMOVED')
       `);
-      const baleAllTimeRow = ((baleAllTimeResult as any).rows ?? (baleAllTimeResult as any))[0] ?? {};
+      const baleAllTimeRow = resultRows(baleAllTimeResult)[0] ?? {};
       const allTimeBaleKg = parseFloat(String(baleAllTimeRow.bale_kg ?? "0")) || 0;
 
       const allTimeBlendedCpk = allTimeMixKg > 0 ? allTimeMixCost / allTimeMixKg : 0;

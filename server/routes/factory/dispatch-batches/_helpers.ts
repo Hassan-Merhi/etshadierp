@@ -6,6 +6,7 @@
 import { db } from "../../../db";
 import { sql, eq, and } from "drizzle-orm";
 import { customerDispatchBatches } from "@shared/schema";
+import { firstRow } from "../../../lib/queryResult";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -24,7 +25,7 @@ export async function isAdmin(req: any, companyId: number): Promise<boolean> {
     const rows = await db.execute(
       sql`SELECT role FROM user_company_roles WHERE company_id = ${companyId} AND user_id = ${String(userId)} LIMIT 1`
     );
-    const row = (rows as any).rows?.[0];
+    const row = firstRow(rows);
     return row?.role === "Admin";
   } catch {
     return false;

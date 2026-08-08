@@ -11,6 +11,7 @@ import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { customerProformas } from "@shared/schema";
 import { eq, sql, and } from "drizzle-orm";
+import { resultRows } from "../../../lib/queryResult";
 
 export function registerV5ProformaUpdateRoutes(app: Express) {
   // ── PATCH /api/factory/v5/proforma/:proformaId/close ─────────────────────
@@ -40,7 +41,7 @@ export function registerV5ProformaUpdateRoutes(app: Express) {
       const linkedOrdersRaw = await db.execute(
         sql`SELECT id, status FROM customer_orders WHERE proforma_id_used = ${proformaId}`
       );
-      const linkedOrders = ((linkedOrdersRaw as any).rows ?? []) as { id: number; status: string }[];
+      const linkedOrders = resultRows(linkedOrdersRaw) as { id: number; status: string }[];
       if (linkedOrders.length === 0) {
         return res.status(400).json({ message: "Cannot close a proforma with no linked containers" });
       }
@@ -115,7 +116,7 @@ export function registerV5ProformaUpdateRoutes(app: Express) {
                 SELECT 1 FROM customer_order_bales cob WHERE cob.order_id = customer_orders.id
               )`
       );
-      const eligibleOrders = ((eligibleRaw as any).rows ?? []) as { id: number }[];
+      const eligibleOrders = resultRows(eligibleRaw) as { id: number }[];
       if (eligibleOrders.length === 0) {
         return res.status(400).json({ message: "No draft containers are available to edit." });
       }

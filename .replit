@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "web", "python-3.11", "postgresql-16"]
+modules = ["nodejs-22", "web", "python-3.11", "postgresql-16"]
 run = "npm run dev"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
@@ -103,5 +103,4 @@ timeoutMs = 20000
 [userenv.shared]
 PUBLIC_CARRIER_TRACKING_ENABLED = "true"
 CMA_PUBLIC_TRACKING_ENABLED = "true"
-CMA_CGM_API_KEY = "kEeKGT2FtWdeP1peQ2SGVv36d2gnKdpv"
 CAPACITOR_ENABLED = "true"

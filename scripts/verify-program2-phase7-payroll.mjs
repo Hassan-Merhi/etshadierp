@@ -4,7 +4,7 @@ const required = [
   "server/routes/payrollRoutes.ts",
   "server/services/accounting/employeeBalancePosting.ts",
   "server/routes/vouchers/centralPaymentReceiptDeleteRoute.ts",
-  "docs/program-2-phase-7-payroll.md",
+  "docs/archive/program-2-phase-7-payroll.md",
 ];
 for (const file of required) if (!fs.existsSync(file)) throw new Error(`Program 2 Phase 7 missing: ${file}`);
 const payroll = fs.readFileSync(required[0], "utf8");

@@ -16,14 +16,10 @@ import { getOrCreateLedgerAccount, checkFactoryAdmin } from "../_helpers";
 import {
   factoryContainers,
   factoryRawStock,
-  factoryMixBatchSources,
   factoryContainerCommissions,
   voucherEntries,
   factoryDaybookEntries,
-  factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges,
   vouchers,
-  factoryFxAllocations,
 } from "@shared/schema";
 import { eq, and, or, inArray, ilike, isNull } from "drizzle-orm";
 import { normFactoryEntry } from "./_helpers";
@@ -62,145 +58,14 @@ export function registerFactoryContainerDeleteRoutes(app: Express) {
         .set({ deletedAt: new Date(), updatedAt: new Date() })
         .where(and(inArray(factoryContainers.id, ownedIds), eq(factoryContainers.companyId, companyId)));
 
-      res.json({ deleted: ownedIds.length, ids: ownedIds });
-      return;
-
-      await db.transaction(async (tx: any) => {
-        // 1. Gather commission record IDs and raw stock IDs before deleting (needed for daybook cleanup)
-        const commRows = await tx
-          .select({ id: factoryContainerCommissions.id })
-          .from(factoryContainerCommissions)
-          .where(
-            and(
-              eq(factoryContainerCommissions.companyId, companyId),
-              inArray(factoryContainerCommissions.containerId, ownedIds)
-            )
-          );
-        const commIds = commRows.map((r: any) => r.id);
-
-        const rsRows = await tx
-          .select({ id: factoryRawStock.id })
-          .from(factoryRawStock)
-          .where(and(eq(factoryRawStock.companyId, companyId), inArray(factoryRawStock.containerId, ownedIds)));
-        const rsIds = rsRows.map((r: any) => r.id);
-
-        // 2. Delete daybook entries linked to these containers
-        //    a. OFFLOAD_RAW_STOCK / COMMISSION linked by referenceId = raw stock or commission ids
-        if (rsIds.length > 0) {
-          await tx
-            .delete(factoryDaybookEntries)
-            .where(
-              and(
-                eq(factoryDaybookEntries.companyId, companyId),
-                eq(factoryDaybookEntries.txType, "OFFLOAD_RAW_STOCK"),
-                inArray(factoryDaybookEntries.referenceId, rsIds)
-              )
-            );
-        }
-        if (commIds.length > 0) {
-          await tx
-            .delete(factoryDaybookEntries)
-            .where(
-              and(
-                eq(factoryDaybookEntries.companyId, companyId),
-                eq(factoryDaybookEntries.txType, "COMMISSION"),
-                inArray(factoryDaybookEntries.referenceId, commIds)
-              )
-            );
-        }
-        //    b. FREIGHT / OTHER_CHARGE / DUTY / CONTAINER_IMPORT / PURCHASE linked by referenceId = containerId
-        await tx
-          .delete(factoryDaybookEntries)
-          .where(
-            and(
-              eq(factoryDaybookEntries.companyId, companyId),
-              inArray(factoryDaybookEntries.txType, [
-                "FREIGHT",
-                "OTHER_CHARGE",
-                "DUTY",
-                "CONTAINER_IMPORT",
-                "PURCHASE",
-              ]),
-              inArray(factoryDaybookEntries.referenceId, ownedIds)
-            )
-          );
-
-        // 3. Delete accounting vouchers for these containers
-        //    Patterns: FACTORY-IMPORT-{id}-*, FACTORY-COMM-{id}-*, FACTORY-FREIGHT-{id}-*, FACTORY-OC-{id}-*
-        for (const cid of ownedIds) {
-          const containerVouchers = await tx
-            .select({ id: vouchers.id })
-            .from(vouchers)
-            .where(
-              and(
-                eq(vouchers.companyId, companyId),
-                eq(vouchers.sourceModule, "FACTORY"),
-                or(
-                  ilike(vouchers.voucherNumber, `FACTORY-IMPORT-${cid}-%`),
-                  ilike(vouchers.voucherNumber, `FACTORY-COMM-${cid}-%`),
-                  ilike(vouchers.voucherNumber, `FACTORY-FREIGHT-${cid}-%`),
-                  ilike(vouchers.voucherNumber, `FACTORY-OC-${cid}-%`)
-                )
-              )
-            );
-          if (containerVouchers.length > 0) {
-            const vIds = containerVouchers.map((v: any) => v.id);
-            await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
-            await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
-          }
-        }
-
-        // 4. Delete FX allocations and transfer records referencing these containers
-        await tx
-          .delete(factoryFxAllocations)
-          .where(
-            and(eq(factoryFxAllocations.companyId, companyId), inArray(factoryFxAllocations.containerId, ownedIds))
-          );
-
-        // 5. Delete mix batch sources
-        await tx.delete(factoryMixBatchSources).where(inArray(factoryMixBatchSources.containerId, ownedIds));
-
-        // 6. Delete offload additional charges
-        await tx
-          .delete(factoryOffloadAdditionalCharges)
-          .where(
-            and(
-              eq(factoryOffloadAdditionalCharges.companyId, companyId),
-              inArray(factoryOffloadAdditionalCharges.containerId, ownedIds)
-            )
-          );
-
-        // 7. Delete pre-registered other charges (container-level charges, not offload)
-        await tx
-          .delete(factoryContainerOtherCharges)
-          .where(
-            and(
-              eq(factoryContainerOtherCharges.companyId, companyId),
-              inArray(factoryContainerOtherCharges.containerId, ownedIds)
-            )
-          );
-
-        // 8. Delete commission records
-        await tx
-          .delete(factoryContainerCommissions)
-          .where(
-            and(
-              eq(factoryContainerCommissions.companyId, companyId),
-              inArray(factoryContainerCommissions.containerId, ownedIds)
-            )
-          );
-
-        // 9. Delete raw stock records
-        await tx
-          .delete(factoryRawStock)
-          .where(and(eq(factoryRawStock.companyId, companyId), inArray(factoryRawStock.containerId, ownedIds)));
-
-        // 10. Finally delete the containers themselves
-        await tx
-          .delete(factoryContainers)
-          .where(and(inArray(factoryContainers.id, ownedIds), eq(factoryContainers.companyId, companyId)));
-      });
-
+      // Soft delete only. The cascade that used to follow this line — daybook
+      // entries, vouchers, charges, raw stock and the container rows
+      // themselves — sat after an unconditional `return` and had been
+      // unreachable for as long as that return was there. Removed rather than
+      // left in place: the single-container DELETE below *does* cascade its
+      // vouchers, so a long dead cascade sitting in the bulk handler read as
+      // though this one did too. Permanent deletion is performed from the
+      // admin trash UI.
       res.json({ deleted: ownedIds.length, ids: ownedIds });
     } catch (error: unknown) {
       logger.error("Error bulk-deleting factory containers:", { error: error });

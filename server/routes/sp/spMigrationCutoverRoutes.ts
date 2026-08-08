@@ -12,27 +12,30 @@ import {
   installCutoverWriteGuard,
   invalidateCutoverLockCache,
 } from "./spMigrationCutoverState";
-import {
-  buildCutoverReadiness,
-  restoreCutoverStock,
-  synchronizeCutoverStock,
-} from "./spMigrationCutoverReadiness";
+import { buildCutoverReadiness, restoreCutoverStock, synchronizeCutoverStock } from "./spMigrationCutoverReadiness";
 import { moveUsersToTarget, restoreUsersToSource } from "./spMigrationCutoverUsers";
+import { resultRows, firstRow } from "../../lib/queryResult";
 
 async function ensureCutoverColumns(): Promise<void> {
   await ensureCutoverSchema();
-  await db.execute(sql.raw(`
+  await db.execute(
+    sql.raw(`
     ALTER TABLE sp_migration_cutovers
       ADD COLUMN IF NOT EXISTS rollback_window_hours INTEGER NOT NULL DEFAULT 72
-  `));
-  await db.execute(sql.raw(`
+  `)
+  );
+  await db.execute(
+    sql.raw(`
     ALTER TABLE sp_migration_cutovers
       ADD COLUMN IF NOT EXISTS finalize_started_at TIMESTAMPTZ
-  `));
-  await db.execute(sql.raw(`
+  `)
+  );
+  await db.execute(
+    sql.raw(`
     ALTER TABLE sp_migration_cutover_stock_deltas
       ADD COLUMN IF NOT EXISTS created_target_inventory BOOLEAN NOT NULL DEFAULT false
-  `));
+  `)
+  );
 }
 
 function exactConfirmation(req: any, expected: string, sourceName: string): string | null {
@@ -43,7 +46,11 @@ function exactConfirmation(req: any, expected: string, sourceName: string): stri
   return null;
 }
 
-async function invokeMigrationHandler(handler: (req: any, res: any) => Promise<any>, req: any, body: any): Promise<any> {
+async function invokeMigrationHandler(
+  handler: (req: any, res: any) => Promise<any>,
+  req: any,
+  body: any
+): Promise<any> {
   let statusCode = 200;
   let payload: any = null;
   const captureResponse: any = {
@@ -97,11 +104,11 @@ async function harmfulTargetActivity(targetId: number, activatedAt?: string | nu
       ${after}
   `);
   const counts = {
-    vouchers: pn((vouchers as any).rows?.[0]?.count),
-    sales: pn((sales as any).rows?.[0]?.count),
-    offloads: pn((offloads as any).rows?.[0]?.count),
-    prepaid: pn((prepaid as any).rows?.[0]?.count),
-    containers: pn((containers as any).rows?.[0]?.count),
+    vouchers: pn(firstRow(vouchers)?.count),
+    sales: pn(firstRow(sales)?.count),
+    offloads: pn(firstRow(offloads)?.count),
+    prepaid: pn(firstRow(prepaid)?.count),
+    containers: pn(firstRow(containers)?.count),
   };
   return { ...counts, total: Object.values(counts).reduce((sum, value) => sum + value, 0) };
 }
@@ -128,7 +135,7 @@ async function loadCutoverById(cutoverId: number): Promise<any | null> {
   const result = await db.execute(sql`
     SELECT * FROM sp_migration_cutovers WHERE id = ${cutoverId} LIMIT 1
   `);
-  return (result as any).rows?.[0] ?? null;
+  return firstRow(result) ?? null;
 }
 
 async function prepareCutover(req: any, res: any): Promise<any> {
@@ -140,7 +147,9 @@ async function prepareCutover(req: any, res: any): Promise<any> {
   await ensureCutoverColumns();
   const existing = await getLiveCutover(pair.sourceId, pair.targetId);
   if (existing) {
-    return res.status(409).json({ message: `Cutover ${existing.id} is already ${existing.status}.`, cutover: existing });
+    return res
+      .status(409)
+      .json({ message: `Cutover ${existing.id} is already ${existing.status}.`, cutover: existing });
   }
 
   const readiness = await normalizedReadiness(pair.sourceId, pair.targetId);
@@ -167,7 +176,7 @@ async function prepareCutover(req: any, res: any): Promise<any> {
   return res.json({
     success: true,
     message: "Source and target are now locked for final synchronization.",
-    cutover: (inserted as any).rows[0],
+    cutover: resultRows(inserted)[0],
     readiness,
   });
 }
@@ -192,7 +201,7 @@ async function finalizeCutover(req: any, res: any): Promise<any> {
       AND finalize_started_at IS NULL
     RETURNING id
   `);
-  if (!(claimed as any).rows?.[0]) {
+  if (!firstRow(claimed)) {
     return res.status(409).json({ message: "Cutover finalization is already running or awaiting repair." });
   }
 
@@ -219,19 +228,15 @@ async function finalizeCutover(req: any, res: any): Promise<any> {
         WHERE id = ${pn(live.id)}
       `);
       return res.status(409).json({
-        message: "Final delta synchronization completed, but review items remain. Resolve them while both companies stay locked, then finalize again.",
+        message:
+          "Final delta synchronization completed, but review items remain. Resolve them while both companies stay locked, then finalize again.",
         cutoverId: pn(live.id),
         deltaSummary: { salesDelta, containerDelta, stockDelta },
         readiness,
       });
     }
 
-    const roleSummary = await moveUsersToTarget(
-      pn(live.id),
-      pair.sourceId,
-      pair.targetId,
-      pair.targetCompany.name
-    );
+    const roleSummary = await moveUsersToTarget(pn(live.id), pair.sourceId, pair.targetId, pair.targetCompany.name);
     const rollbackWindowHours = pn(live.rollback_window_hours) || 72;
     const activated = await db.execute(sql`
       UPDATE sp_migration_cutovers
@@ -251,19 +256,24 @@ async function finalizeCutover(req: any, res: any): Promise<any> {
     invalidateCutoverLockCache();
     return res.json({
       success: true,
-      message: "Supplier Partner cutover is active. The old ERP company is now permanently read-only unless the controlled rollback is used.",
-      cutover: (activated as any).rows[0],
+      message:
+        "Supplier Partner cutover is active. The old ERP company is now permanently read-only unless the controlled rollback is used.",
+      cutover: resultRows(activated)[0],
       deltaSummary: { salesDelta, containerDelta, stockDelta },
       roleSummary,
       readiness,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await db.execute(sql`
+    await db
+      .execute(
+        sql`
       UPDATE sp_migration_cutovers
       SET finalize_started_at = NULL, failure_message = ${message}, updated_at = now()
       WHERE id = ${pn(live.id)}
-    `).catch(() => undefined);
+    `
+      )
+      .catch(() => undefined);
     logger.error("[SP Cutover] Finalization failed", { error, cutoverId: live.id });
     return res.status(500).json({ message: `Cutover finalization failed: ${message}`, cutoverId: pn(live.id) });
   }
@@ -275,7 +285,8 @@ async function rollbackCutover(req: any, res: any): Promise<any> {
   await ensureCutoverColumns();
   const cutover = await loadCutoverById(cutoverId);
   if (!cutover) return res.status(404).json({ message: "Cutover not found" });
-  if (cutover.status !== "active") return res.status(409).json({ message: "Only an active cutover can be rolled back." });
+  if (cutover.status !== "active")
+    return res.status(409).json({ message: "Only an active cutover can be rolled back." });
   const confirmationError = exactConfirmation(req, "ROLLBACK CUTOVER", cutover.source_company_name);
   if (confirmationError) return res.status(400).json({ message: confirmationError });
   if (!cutover.rollback_deadline || new Date(cutover.rollback_deadline).getTime() < Date.now()) {
@@ -308,7 +319,7 @@ async function rollbackCutover(req: any, res: any): Promise<any> {
   return res.json({
     success: true,
     message: "Operational cutover rolled back. Source users and pre-cutover target inventory were restored.",
-    cutover: (rolledBack as any).rows[0],
+    cutover: resultRows(rolledBack)[0],
     userRestore,
     stockRestore,
   });
@@ -320,7 +331,8 @@ async function cancelPreparedCutover(req: any, res: any): Promise<any> {
   await ensureCutoverColumns();
   const cutover = await loadCutoverById(cutoverId);
   if (!cutover) return res.status(404).json({ message: "Cutover not found" });
-  if (cutover.status !== "prepared") return res.status(409).json({ message: "Only a prepared cutover can be cancelled." });
+  if (cutover.status !== "prepared")
+    return res.status(409).json({ message: "Only a prepared cutover can be cancelled." });
   const confirmationError = exactConfirmation(req, "CANCEL CUTOVER", cutover.source_company_name);
   if (confirmationError) return res.status(400).json({ message: confirmationError });
 
@@ -335,7 +347,7 @@ async function cancelPreparedCutover(req: any, res: any): Promise<any> {
   return res.json({
     success: true,
     message: "Prepared cutover cancelled; company write locks were removed.",
-    cutover: (cancelled as any).rows[0],
+    cutover: resultRows(cancelled)[0],
     stockRestore,
   });
 }
@@ -352,7 +364,7 @@ async function statusCutover(req: any, res: any): Promise<any> {
   `);
   return res.json({
     liveCutover: live,
-    latestCutover: (latestResult as any).rows?.[0] ?? null,
+    latestCutover: firstRow(latestResult) ?? null,
     readiness: await normalizedReadiness(pair.sourceId, pair.targetId),
   });
 }
@@ -370,7 +382,8 @@ async function mapSuspenseEntry(req: any, res: any): Promise<any> {
     WHERE id = ${targetLedgerAccountId} AND company_id = ${pair.targetId} AND deleted_at IS NULL
     LIMIT 1
   `);
-  if (!(targetAccount as any).rows?.[0]) return res.status(400).json({ message: "Target account does not belong to the target company." });
+  if (!firstRow(targetAccount))
+    return res.status(400).json({ message: "Target account does not belong to the target company." });
 
   const updated = await db.execute(sql`
     UPDATE voucher_entries e
@@ -384,7 +397,8 @@ async function mapSuspenseEntry(req: any, res: any): Promise<any> {
       AND suspense.sub_type = 'gc_mig_suspense'
     RETURNING e.id
   `);
-  if (!(updated as any).rows?.[0]) return res.status(404).json({ message: "Suspense entry was not found or is already mapped." });
+  if (!firstRow(updated))
+    return res.status(404).json({ message: "Suspense entry was not found or is already mapped." });
   return res.json({ success: true, targetEntryId, targetLedgerAccountId });
 }
 
@@ -411,14 +425,17 @@ async function mapContainerCharge(req: any, res: any): Promise<any> {
       AND a.deleted_at IS NULL
     RETURNING m.id
   `);
-  if (!(updated as any).rows?.[0]) return res.status(404).json({ message: "Charge review row or target account was not found." });
+  if (!firstRow(updated))
+    return res.status(404).json({ message: "Charge review row or target account was not found." });
   return res.json({ success: true, chargeId, targetLedgerAccountId });
 }
 
 export function registerSpMigrationCutoverRoutes(app: Express): void {
   installCutoverWriteGuard(app);
   void ensureCutoverColumns().catch((error) => {
-    logger.warn("[SP Cutover] Schema setup deferred", { error: error instanceof Error ? error.message : String(error) });
+    logger.warn("[SP Cutover] Schema setup deferred", {
+      error: error instanceof Error ? error.message : String(error),
+    });
   });
 
   const developer = [requireAuth, requireRole("Developer")] as const;
@@ -438,14 +455,6 @@ export function registerSpMigrationCutoverRoutes(app: Express): void {
     return res.status(400).json({ message: "action must be prepare, finalize, rollback, or cancel" });
   });
 
-  app.post(
-    "/api/sp/migration/gc-suspense-review/:targetEntryId/map",
-    ...developer,
-    mapSuspenseEntry
-  );
-  app.post(
-    "/api/sp/migration/gc-container-charge-review/:chargeId/map",
-    ...developer,
-    mapContainerCharge
-  );
+  app.post("/api/sp/migration/gc-suspense-review/:targetEntryId/map", ...developer, mapSuspenseEntry);
+  app.post("/api/sp/migration/gc-container-charge-review/:chargeId/map", ...developer, mapContainerCharge);
 }

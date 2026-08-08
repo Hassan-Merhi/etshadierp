@@ -27,6 +27,7 @@ import {
   voucherEntries,
   vouchers,
 } from "@shared/schema";
+import { resultRows } from "../lib/queryResult";
 
 export function registerOffloadRoutes(app: Express) {
   // List offloads for daybook view (filtered by date range and company)
@@ -186,9 +187,9 @@ export function registerOffloadRoutes(app: Express) {
               like(vouchers.voucherNumber, `OFFICE-${cn}-%`),
               like(vouchers.voucherNumber, `TRANS-${cn}-%`),
               like(vouchers.voucherNumber, `XFER-${cn}-%`),
-              like(vouchers.voucherNumber, `CHG-${cn}-%`),
-            ),
-          ),
+              like(vouchers.voucherNumber, `CHG-${cn}-%`)
+            )
+          )
         )
         .execute();
 
@@ -308,9 +309,9 @@ export function registerOffloadRoutes(app: Express) {
                   like(vouchers.voucherNumber, `OFFICE-${cn}-%`),
                   like(vouchers.voucherNumber, `TRANS-${cn}-%`),
                   like(vouchers.voucherNumber, `XFER-${cn}-%`),
-                  like(vouchers.voucherNumber, `CHG-${cn}-%`),
-                ),
-              ),
+                  like(vouchers.voucherNumber, `CHG-${cn}-%`)
+                )
+              )
             )
             .execute();
 
@@ -586,7 +587,7 @@ export function registerOffloadRoutes(app: Express) {
         WHERE c.ledger_account_id IS NOT NULL
         ORDER BY c.id
       `);
-        const rows: any[] = (chargesRes as any).rows ?? (chargesRes as unknown as any[]);
+        const rows: any[] = resultRows(chargesRes);
 
         for (const row of rows) {
           scanned++;
@@ -633,7 +634,7 @@ export function registerOffloadRoutes(app: Express) {
               AND ve.credit_amount::numeric > 0
             LIMIT 1
           `);
-            const existingRows: any[] = (existingCheck as any).rows ?? (existingCheck as unknown as any[]);
+            const existingRows: any[] = resultRows(existingCheck);
             if (existingRows.length > 0) {
               skippedExisting++;
               continue;

@@ -19,6 +19,7 @@ import {
   customerOrderBales,
 } from "@shared/schema";
 import { eq, and, or, sql, inArray } from "drizzle-orm";
+import { resultRows, firstRow } from "../../../../lib/queryResult";
 
 export function registerOrderBaleBulkImportRoutes(app: Express) {
   app.post("/api/factory/customer-orders/:id/bales/bulk-import", requireAuth, async (req: any, res: any) => {
@@ -129,7 +130,7 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
                     AND cob.order_id != ${orderId}
                   LIMIT 1`
             );
-            const bulkCrossOrderRow = (bulkCrossOrderCheck as any).rows?.[0];
+            const bulkCrossOrderRow = firstRow(bulkCrossOrderCheck);
             if (bulkCrossOrderRow) return { kind: "notFound" as const };
 
             let priceUsed = "0";
@@ -213,7 +214,7 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
               WHERE co.status != 'CANCELLED'
                 AND cob.order_id != ${orderId}`
         );
-        for (const row of (blockedRows as any).rows ?? []) {
+        for (const row of resultRows<{ bale_id: number }>(blockedRows)) {
           v5BlockedBaleIds.add(row.bale_id);
         }
       }
@@ -294,7 +295,7 @@ export function registerOrderBaleBulkImportRoutes(app: Express) {
                       AND cob.order_id != ${orderId}
                     LIMIT 1`
               );
-              if ((v5DupCheck as any).rows?.[0]) continue;
+              if (firstRow(v5DupCheck)) continue;
             }
 
             // Determine price

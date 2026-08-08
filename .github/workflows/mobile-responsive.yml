@@ -1,0 +1,47 @@
+name: Mobile Responsiveness
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "client/**"
+      - "scripts/verify-mobile-responsive-*.mjs"
+      - "scripts/verify-phase10-dialog-form-consistency.mjs"
+      - "tests/ui/mobile-responsive-*.test.ts"
+      - "docs/archive/mobile-responsive-phase-status.md"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/mobile-responsive.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-responsive-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22.14"
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: TypeScript
+        run: npm run check
+      - name: Lint
+        run: npm run lint
+      - name: Production build
+        run: npm run build
+      - name: Full responsive contract matrix
+        run: node scripts/verify-mobile-responsive-phase11-regression.mjs
+      - name: Focused responsive tests
+        run: node node_modules/vitest/vitest.mjs run --config vitest.config.frontend.ts tests/ui/mobile-responsive-*.test.ts
+      - name: Frontend regression suite
+        run: npm run test:frontend
+      - name: Security and dependency contracts
+        run: |
+          npm run verify:lockfile
+          npm run verify:dependency-audit
+          npm run verify:production-dependencies

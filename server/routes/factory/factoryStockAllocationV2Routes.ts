@@ -7,6 +7,7 @@ import { customerProformas, customerProformaLines, customers } from "@shared/sch
 import { eq, inArray, sql } from "drizzle-orm";
 import { syncProformaReservations } from "./_stockReservationHelper";
 import { sqlArray } from "../../lib/sqlArray";
+import { resultRows } from "../../lib/queryResult";
 
 // ─── Backend stock-truth helper ───────────────────────────────────────────────
 // Phases 1–4: compute per-article inventory state entirely on the backend.
@@ -37,9 +38,7 @@ async function computeStockTruth(companyId: number) {
         WHERE company_id = ${companyId} AND status = 'IN_STOCK'
         GROUP BY article_code`
   );
-  const inStockMap = new Map<string, number>(
-    ((inStockRaw as any).rows ?? (inStockRaw as unknown as any[])).map((r: any) => [r.articleCode, Number(r.count)])
-  );
+  const inStockMap = new Map<string, number>(resultRows(inStockRaw).map((r: any) => [r.articleCode, Number(r.count)]));
 
   // RESERVED_FOR_ORDER = bales physically picked into an active loading order
   const inLoadingRaw = await db.execute(
@@ -52,7 +51,7 @@ async function computeStockTruth(companyId: number) {
         GROUP BY fb.article_code`
   );
   const inLoadingMap = new Map<string, number>(
-    ((inLoadingRaw as any).rows ?? (inLoadingRaw as unknown as any[])).map((r: any) => [r.articleCode, Number(r.count)])
+    resultRows(inLoadingRaw).map((r: any) => [r.articleCode, Number(r.count)])
   );
 
   // ── proformaStockReservations is the backend SOT for reservedNotYetLoaded ──
@@ -66,10 +65,7 @@ async function computeStockTruth(companyId: number) {
         GROUP BY article_code`
   );
   const reservedNotYetLoadedMap = new Map<string, number>(
-    ((reservedRaw as any).rows ?? (reservedRaw as unknown as any[])).map((r: any) => [
-      r.articleCode,
-      Number(r.reservedNotYetLoaded),
-    ])
+    resultRows(reservedRaw).map((r: any) => [r.articleCode, Number(r.reservedNotYetLoaded)])
   );
 
   // Union all known article codes from all three sources
@@ -108,9 +104,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
       const activeProformaIds = await db.execute(
         sql`SELECT id FROM customer_proformas WHERE company_id = ${companyId} AND is_active = true`
       );
-      const idsToSync: number[] = (activeProformaIds.rows).map((r: any) =>
-        Number(r.id)
-      );
+      const idsToSync: number[] = activeProformaIds.rows.map((r: any) => Number(r.id));
       for (const pid of idsToSync) {
         await syncProformaReservations(db, companyId, pid);
       }
@@ -123,7 +117,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
             WHERE company_id = ${companyId} AND active = false`
       );
       const inactiveArticleCodes = new Set<string>(
-        ((inactiveProductsRaw as any).rows ?? (inactiveProductsRaw as unknown as any[])).flatMap((r: any) => {
+        resultRows(inactiveProductsRaw).flatMap((r: any) => {
           const vals: string[] = [];
           if (r.code) vals.push(r.code as string);
           if (r.article_code) vals.push(r.article_code as string);
@@ -354,7 +348,7 @@ export function registerFactoryStockAllocationV2Routes(app: Express) {
             WHERE company_id = ${companyId} AND active = false`
       );
       const inactiveCodes2 = new Set<string>(
-        (inactiveRaw2.rows).flatMap((r: any) => {
+        inactiveRaw2.rows.flatMap((r: any) => {
           const vals: string[] = [];
           if (r.code) vals.push(r.code as string);
           if (r.article_code) vals.push(r.article_code as string);

@@ -11,6 +11,7 @@ import { requireAuth } from "../../../auth";
 import { parseId } from "../../../lib/parseId";
 import { sql } from "drizzle-orm";
 import { getCompanyId } from "./_helpers";
+import { firstRow, resultRows } from "../../../lib/queryResult";
 
 export function registerDispatchReportRoutes(app: Express) {
   // ── GET /api/factory/dispatch-reports/summary ──────────────────────────────
@@ -29,7 +30,12 @@ export function registerDispatchReportRoutes(app: Express) {
         FROM customer_dispatch_batches
         WHERE company_id = ${companyId}
       `);
-      const s = ((summaryRes as any).rows || summaryRes)[0] || {};
+      const s = firstRow<{
+        uninvoicedCount: string | null;
+        dispatchedCount: string | null;
+        invoicedCount: string | null;
+        loadingCount: string | null;
+      }>(summaryRes);
 
       const reservedRes = await db.execute(sql`
         SELECT COUNT(*) AS cnt
@@ -39,7 +45,7 @@ export function registerDispatchReportRoutes(app: Express) {
           AND sc.removed_at IS NULL
           AND b.status NOT IN ('INVOICED', 'CANCELLED')
       `);
-      const reservedRow = ((reservedRes as any).rows || reservedRes)[0];
+      const reservedRow = firstRow<{ cnt: string | null }>(reservedRes);
 
       const ridesRes = await db.execute(sql`
         SELECT COUNT(*) AS cnt
@@ -49,13 +55,13 @@ export function registerDispatchReportRoutes(app: Express) {
           AND tr.status = 'DISPATCHED'
           AND b.status NOT IN ('INVOICED', 'CANCELLED')
       `);
-      const ridesRow = ((ridesRes as any).rows || ridesRes)[0];
+      const ridesRow = firstRow<{ cnt: string | null }>(ridesRes);
 
       res.json({
-        uninvoicedCount: parseInt(s.uninvoicedCount || "0"),
-        dispatchedCount: parseInt(s.dispatchedCount || "0"),
-        invoicedCount: parseInt(s.invoicedCount || "0"),
-        loadingCount: parseInt(s.loadingCount || "0"),
+        uninvoicedCount: parseInt(s?.uninvoicedCount || "0"),
+        dispatchedCount: parseInt(s?.dispatchedCount || "0"),
+        invoicedCount: parseInt(s?.invoicedCount || "0"),
+        loadingCount: parseInt(s?.loadingCount || "0"),
         reservedBalesCount: parseInt(reservedRow?.cnt || "0"),
         dispatchedRidesNotInvoiced: parseInt(ridesRow?.cnt || "0"),
       });
@@ -95,7 +101,7 @@ export function registerDispatchReportRoutes(app: Express) {
         ORDER BY sc.scanned_at DESC
       `);
 
-      res.json((rows as any).rows || rows);
+      res.json(resultRows(rows));
     } catch (err: unknown) {
       res.status(500).json({ message: getErrorMessage(err) });
     }

@@ -93,7 +93,7 @@ for (const test of [
   if (!fs.existsSync(path.join(root, test))) failures.push(`missing focused test ${test}`);
 }
 
-const docs = read("docs/engineering/phase8-frontend-data-architecture.md").toLowerCase();
+const docs = read("docs/archive/engineering/phase8-frontend-data-architecture.md").toLowerCase();
 for (const phrase of [
   "canonical request urls",
   "company-scoped cache identity",

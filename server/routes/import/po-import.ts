@@ -13,6 +13,7 @@ import { storage } from "../../storage";
 import { requireAuth } from "../../auth";
 import { ledgerAccounts, purchaseOrders, type Container } from "@shared/schema";
 import { eq, and, sql, isNull, like } from "drizzle-orm";
+import { firstRow } from "../../lib/queryResult";
 
 export function registerPoImportRoutes(app: Express) {
   app.post("/api/po-import/validate", requireAuth, async (req, res) => {
@@ -419,7 +420,7 @@ export function registerPoImportRoutes(app: Express) {
         const companyRow = await db.execute(
           sql`SELECT company_type FROM companies WHERE id = ${currentCompanyId} LIMIT 1`
         );
-        const companyType = (companyRow as any).rows?.[0]?.company_type ?? (companyRow as any)[0]?.company_type;
+        const companyType = firstRow(companyRow)?.company_type ?? (companyRow as any)[0]?.company_type;
         const isSpCompany = companyType === "supplier_partner";
 
         if (isSpCompany) {

@@ -5,6 +5,7 @@ import { requireAuth } from "../../auth";
 import { sql, eq, asc, desc } from "drizzle-orm";
 import { spStockMovements, spProfitSplits } from "@shared/schema";
 import { requireSpCompany, getSpAccount, parseNum } from "./spHelpers";
+import { resultRows } from "../../lib/queryResult";
 
 // ── Reports + Profit Splits ───────────────────────────────────────────────────
 
@@ -27,7 +28,7 @@ export function registerSpReportRoutes(app: Express) {
         ORDER BY v.voucher_date ASC, v.id ASC
       `);
 
-      const entries = (rows as any).rows ?? (rows as any);
+      const entries = resultRows(rows);
       let runningBalance = 0;
       const movements = entries.map((e: any) => {
         const credit = parseNum(e.credit_amount);
@@ -68,7 +69,7 @@ export function registerSpReportRoutes(app: Express) {
         WHERE company_id = ${companyId}
         LIMIT 1
       `);
-      const settingsRow = ((settingsRows as any).rows ?? settingsRows)[0];
+      const settingsRow = resultRows(settingsRows)[0];
       const spPosProfitAccountId = settingsRow?.sp_pos_profit_account_id ?? null;
       const spPosPayableAccountId = settingsRow?.sp_pos_payable_account_id ?? null;
 
@@ -92,7 +93,7 @@ export function registerSpReportRoutes(app: Express) {
           ${startDate ? sql`AND v.voucher_date >= ${startDate}` : sql``}
           ${endDate ? sql`AND v.voucher_date <= ${endDate}` : sql``}
       `);
-      const siRow = ((siRows as any).rows ?? siRows)[0];
+      const siRow = resultRows(siRows)[0];
       totalRevenue = parseNum(siRow?.total_revenue);
       totalCogs = parseNum(siRow?.total_cogs);
       saleCount = parseInt(String(siRow?.cnt ?? "0"), 10);
@@ -113,7 +114,7 @@ export function registerSpReportRoutes(app: Express) {
             ${startDate ? sql`AND v.voucher_date >= ${startDate}` : sql``}
             ${endDate ? sql`AND v.voucher_date <= ${endDate}` : sql``}
         `);
-        const sr = ((sharedRows as any).rows ?? sharedRows)[0];
+        const sr = resultRows(sharedRows)[0];
         totalSharedCharges = parseNum(sr?.total);
       }
 
@@ -237,13 +238,13 @@ export function registerSpReportRoutes(app: Express) {
           JOIN vouchers v ON ve.voucher_id = v.id
           WHERE ve.ledger_account_id = ${payableAcct.id} AND v.company_id = ${companyId}
         `);
-        const pr = ((payRows as any).rows ?? payRows)[0];
+        const pr = resultRows(payRows)[0];
         paymentsTotal = parseNum(pr?.total_payments);
         payableBalance = parseNum(pr?.total_credits) - paymentsTotal;
       }
 
-      const salesArr = (salesRows as any).rows ?? (salesRows as any);
-      const stockArr = (stockRows as any).rows ?? (stockRows as any);
+      const salesArr = resultRows(salesRows);
+      const stockArr = resultRows<{ article_code: string }>(stockRows);
       const stockMap = new Map<string, any>();
       for (const s of stockArr) stockMap.set(s.article_code, s);
 

@@ -21,7 +21,7 @@ const assert = (condition, message) => {
 const audit = read("scripts/audit-program6d-database-query-risks.mjs");
 const validator = read("scripts/validate-program6d-query-classifications.mjs");
 const runner = read("scripts/run-program6d-query-review.mjs");
-const documentation = read("docs/program-6d-database-query-optimization.md");
+const documentation = read("docs/archive/program-6d-database-query-optimization.md");
 const netProfit = read("server/routes/stats/statsNetProfitRoutes.ts");
 
 assert(audit.includes("possible-n-plus-one"), "6D audit must continue detecting looped database awaits.");

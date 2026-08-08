@@ -72,7 +72,7 @@ export function registerWorkerRepaymentDeleteRoutes(app: Express) {
         amountCurrency: repayAmt,
         currencyCode: "USD",
         amountUsd: repayAmt,
-        createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+        createdBy: (req.session as any).userId ?? undefined,
       });
 
       res.json({ message: "Repayment deleted", restoredBalance: restoredBal.toFixed(2) });

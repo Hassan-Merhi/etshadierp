@@ -8,9 +8,12 @@ those splits verifiable rather than hopeful.
 Phases 0, 1 and 2 are complete. Phases 3 and 4 are in progress; 3b and 5 have
 not been started.
 
-**Backlog: 139 files, 74,858 lines over the limit** (from 162 and 102,337).
+**Backlog: 64 files, 33,920 lines over the limit** (from 162 and 102,337).
 `npm run audit:god-files` prints the current figure; the ceiling is asserted in
-`tests/god-file-boundaries.test.ts` and is lowered with each split.
+`tests/god-file-boundaries.test.ts` and is lowered with each split. This line is
+bound to the audit in `config/doc-index.json`, so it now fails the build instead
+of going stale — it previously read "139 files, 74,858", and a later section
+"82 files and 45,684", while the real figure was neither.
 
 ## Why a harness came first
 
@@ -153,7 +156,8 @@ npm run audit:god-files
 | — | Oversized test files | **Not started** — 4 files, 1,207 lines. Unassigned in the original plan but ratcheted like everything else, so they block reaching zero. |
 
 The backlog started at **162 files and 102,337 excess lines**. It now stands at
-**82 files and 45,684** — 55% cleared.
+64 files and 33,920 — 67% cleared. (Both figures in this paragraph were stale
+until `npm run audit:doc-index` began asserting the one in the header.)
 
 ### Where Phase 3 stops
 
