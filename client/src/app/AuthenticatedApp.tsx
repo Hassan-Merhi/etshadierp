@@ -7,6 +7,7 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useWsInvalidation } from "@/hooks/use-ws-invalidation";
 import { LanguageOnboardingDialog } from "@/components/LanguageOnboardingDialog";
 import { RemoteSupportRuntime } from "@/components/RemoteSupportRuntime";
+import { consumeErpScrollRestore } from "@/lib/erp-navigation-history";
 import type { AuthenticatedUser } from "@/contracts/sessionContracts";
 import { useAppNavigation } from "./useAppNavigation";
 import { useAuthenticatedAppData } from "./useAuthenticatedAppData";
@@ -36,9 +37,33 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
 
   useEffect(() => {
     const main = document.getElementById("main-content");
-    if (main) {
-      main.scrollTop = 0;
-      main.focus({ preventScroll: true });
+    if (!main) return;
+
+    const restoreScrollTop = consumeErpScrollRestore();
+    const targetScrollTop = restoreScrollTop ?? 0;
+    main.scrollTop = targetScrollTop;
+    main.focus({ preventScroll: true });
+
+    // Browser Back can render cached list rows a frame after the route changes.
+    // Re-apply the captured ERP scroll position a few times so the previous
+    // list/table position wins even when content height settles asynchronously.
+    if (restoreScrollTop !== null) {
+      let secondFrame = 0;
+      const firstFrame = window.requestAnimationFrame(() => {
+        main.scrollTop = targetScrollTop;
+        secondFrame = window.requestAnimationFrame(() => {
+          main.scrollTop = targetScrollTop;
+        });
+      });
+      const settleTimer = window.setTimeout(() => {
+        main.scrollTop = targetScrollTop;
+      }, 150);
+
+      return () => {
+        window.cancelAnimationFrame(firstFrame);
+        if (secondFrame) window.cancelAnimationFrame(secondFrame);
+        window.clearTimeout(settleTimer);
+      };
     }
   }, [currentLocation]);
 
