@@ -195,6 +195,10 @@ async function seedControlVoucher(companyId: number, label: string): Promise<voi
 function poisonBody(companyId: number) {
   return {
     companyId,
+    // Some global settings treat an omitted value as an instruction to clear
+    // it. Supplying a deliberately non-numeric value makes that path fail
+    // validation instead of changing the repository-wide parent-company pin.
+    parentCompanyId: "__INVALID__",
     confirm: false,
     confirmed: false,
     confirmation: "__WRITE_SAFETY_SWEEP_DO_NOT_APPLY__",
