@@ -86,6 +86,107 @@ export function registerStockItemRoutes(app: Express) {
     }
   });
 
+  // Bulk rename existing stock items by primary code. Intentionally name-only:
+  // inventory, costs, prices, barcodes, groups, grades and categories are untouched.
+  app.post("/api/stock-items/update-names-by-code", requireAuth, requireNonPOS, async (req: any, res: any) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+      const inputRows = req.body?.rows as Array<{ code?: unknown; newName?: unknown }> | undefined;
+      if (!Array.isArray(inputRows) || inputRows.length === 0) {
+        return res.status(400).json({ message: "rows must be a non-empty array" });
+      }
+      if (inputRows.length > 5000) {
+        return res.status(400).json({ message: "A maximum of 5,000 rows can be updated at once" });
+      }
+
+      const rows = inputRows.map((row, index) => ({
+        row: index + 1,
+        code: String(row?.code ?? "").trim(),
+        newName: String(row?.newName ?? "").trim(),
+      }));
+      const invalidRows = rows.filter((row) => !row.code || !row.newName || row.newName.length > 500);
+      if (invalidRows.length > 0) {
+        return res.status(400).json({
+          message: "Every row requires a code and a new name of 500 characters or fewer",
+          invalidRows: invalidRows.map((row) => row.row),
+        });
+      }
+
+      const seen = new Set<string>();
+      const duplicateCodes = new Set<string>();
+      for (const row of rows) {
+        const key = row.code.toLowerCase();
+        if (seen.has(key)) duplicateCodes.add(row.code);
+        seen.add(key);
+      }
+      if (duplicateCodes.size > 0) {
+        return res.status(400).json({
+          message: "Duplicate item codes were found in the upload",
+          duplicateCodes: Array.from(duplicateCodes),
+        });
+      }
+
+      const existingItems = await db
+        .select({ id: stockItems.id, code: stockItems.code, name: stockItems.name })
+        .from(stockItems)
+        .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)));
+      const itemByCode = new Map(existingItems.map((item) => [item.code.trim().toLowerCase(), item]));
+
+      const notFoundCodes: string[] = [];
+      const changed: Array<{ id: number; code: string; oldName: string; newName: string }> = [];
+      let unchanged = 0;
+
+      await db.transaction(async (tx) => {
+        for (const row of rows) {
+          const item = itemByCode.get(row.code.toLowerCase());
+          if (!item) {
+            notFoundCodes.push(row.code);
+            continue;
+          }
+          if (item.name === row.newName) {
+            unchanged++;
+            continue;
+          }
+
+          await tx
+            .update(stockItems)
+            .set({ name: row.newName })
+            .where(and(eq(stockItems.id, item.id), eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)));
+          changed.push({ id: item.id, code: item.code, oldName: item.name, newName: row.newName });
+        }
+      });
+
+      for (const item of changed) {
+        try {
+          await logAudit({
+            userId: req.session.userId!,
+            username: (req.session as any).username || "unknown",
+            companyId,
+            action: "update",
+            tableName: "stock_items",
+            recordId: item.id,
+            recordIdentifier: `${item.code} - ${item.newName}`,
+            changes: { name: { old: item.oldName, new: item.newName } },
+          });
+        } catch {
+          /* non-fatal */
+        }
+      }
+
+      return res.json({
+        message: `Name update complete: ${changed.length} updated, ${unchanged} unchanged, ${notFoundCodes.length} code(s) not found`,
+        updated: changed.length,
+        unchanged,
+        notFound: notFoundCodes.length,
+        notFoundCodes,
+      });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
   app.post("/api/stock-items", requireAuth, requireNonPOS, async (req, res) => {
     try {
       if (!req.session.currentCompanyId) {
