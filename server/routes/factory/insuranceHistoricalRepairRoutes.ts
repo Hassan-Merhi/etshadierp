@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { and, eq, ilike } from "drizzle-orm";
 import { insuranceMembers, ledgerAccounts, voucherEntries, vouchers } from "@shared/schema";
 import { db } from "../../db";
@@ -115,8 +115,6 @@ async function inspectHistoricalInsuranceJournals(companyId: number): Promise<{
       continue;
     }
 
-    // Correct/new journals are Dr expense / Cr liabilities. They are not a
-    // repair candidate and make repeated application naturally idempotent.
     if (expenseDebit > 0 && expenseCredit === 0 && liabilityDebits === 0 && liabilityCredits > 0) {
       continue;
     }
@@ -152,7 +150,7 @@ export function registerInsuranceHistoricalRepairRoutes(app: Express): void {
     "/api/insurance/admin/repair-reversed-journals",
     requireAuth,
     requireRole("Admin"),
-    async (req: any, res: any) => {
+    async (req: Request, res: Response) => {
       try {
         const companyId = resolveRequestCompanyId(req);
         const dryRun = req.body?.dryRun !== false;
@@ -178,8 +176,6 @@ export function registerInsuranceHistoricalRepairRoutes(app: Express): void {
         const repairedVoucherIds = await db.transaction(async (tx) => {
           const repaired: number[] = [];
           for (const candidate of inspection.candidates) {
-            // Re-read the entries through update predicates so a concurrently
-            // corrected row cannot be blindly overwritten.
             let updatedEntries = 0;
             for (const entry of candidate.entries) {
               const result = await tx
