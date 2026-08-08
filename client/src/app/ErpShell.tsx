@@ -1,4 +1,4 @@
-import { useState, useRef, Suspense } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import { useLocation } from "wouter";
 import { useMainContentFocus } from "@/hooks/use-main-content-focus";
 import { useWorkspaceWheelScroll } from "@/hooks/use-workspace-wheel-scroll";
@@ -15,6 +15,7 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { LoadingState } from "@/components/ui/page-state";
 import { SkipLink } from "@/components/ui/responsive-accessibility";
 import { Router } from "@/routes/AppRoutes";
+import { installErpNavigationHistory } from "@/lib/erp-navigation-history";
 import { canUseAdminSearch, type ShellUser } from "./shellUser";
 import { ErpAccessBoundary } from "./ErpAccessBoundary";
 import { MODULE_ACCENT } from "@/components/sidebar/sidebarPrimitives";
@@ -36,6 +37,8 @@ export function ErpShell({ user, hasErpAccess, handleLogout, leaveConfirmDialog 
   const erpContainerRef = useRef<HTMLDivElement>(null);
   useMainContentFocus(currentLocation);
   useWorkspaceWheelScroll(erpContainerRef);
+
+  useEffect(() => installErpNavigationHistory(), []);
 
   return (
     <AppModeProvider mode="erp">

@@ -42,17 +42,14 @@ const ACCEPTED = {
       "migrating off xlsx retires this permanently.",
     reviewOn: "2026-11-01",
   },
-  "js-yaml": {
+  nanoid: {
     reason:
-      "GHSA-5p4m-2wfm-xmqj (quadratic CPU consumption in !!omap resolution). " +
-      "The affected js-yaml 4.x instance is transitive through Puppeteer 24 -> " +
-      "cosmiconfig 9 and is only used to parse Puppeteer configuration files from " +
-      "the trusted deployment filesystem; application uploads and request bodies do " +
-      "not flow through this parser. The v4 line has no patched release. The clean " +
-      "exit is Puppeteer 25+, which replaces cosmiconfig, but that is a breaking " +
-      "major upgrade because executablePath/defaultArgs became async and the scraper " +
-      "call sites must be migrated together rather than forced through an override.",
-    reviewOn: "2026-09-01",
+      "GHSA-2v37-7h3g-55p8 affects custom Nano ID generators when a caller supplies size zero. " +
+      "This repository has one Nano ID call site, server/vite.ts, and it calls nanoid() with the " +
+      "library default size; no request, user, or stored value controls that size. The vulnerable " +
+      "condition is therefore unreachable in this application. A patched 3.3.17 release exists; " +
+      "remove this short-lived exception when the root package lock is regenerated to 3.3.17+.",
+    reviewOn: "2026-08-15",
   },
 };
 

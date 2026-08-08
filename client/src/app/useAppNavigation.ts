@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { getParentRoute } from "@/lib/parent-routes";
+import { goBackToPreviousErpLocation } from "@/lib/erp-navigation-history";
 import { useGlobalScrollKeys } from "./useGlobalScrollKeys";
 
 declare global {
@@ -36,6 +37,11 @@ export function useAppNavigation() {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   const navigateToParent = useCallback(() => {
+    // ERP navigation is history-first so Esc/Back returns to the exact page,
+    // tab, query and list context that opened the current page. The helper
+    // only succeeds for entries created while the ERP shell was active.
+    if (goBackToPreviousErpLocation()) return;
+
     const pathname = window.location.pathname;
     const parent = getSupplierPartnerParent(pathname) ?? getParentRoute(pathname);
     if (parent) {
