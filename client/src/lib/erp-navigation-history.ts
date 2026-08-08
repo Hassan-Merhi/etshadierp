@@ -7,12 +7,14 @@ type ErpHistoryMeta = {
 };
 
 const ERP_HISTORY_STATE_KEY = "__erpNavigation";
+const ERP_BACK_CONTROL_SELECTOR = '[data-testid="button-back"], [data-testid^="button-"][data-testid$="-back"]';
 
 let installCount = 0;
 let originalPushState: History["pushState"] | null = null;
 let originalReplaceState: History["replaceState"] | null = null;
 let pendingScrollRestore: number | null = null;
 let popstateHandler: ((event: PopStateEvent) => void) | null = null;
+let legacyBackClickHandler: ((event: MouseEvent) => void) | null = null;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -96,6 +98,11 @@ function markCurrentEntry(): void {
  * the main workspace scroll position on the current entry. This lets shared
  * Back controls use the browser history entry first, while deterministic
  * parent-route mappings remain available as a deep-link/refresh fallback.
+ *
+ * A capture listener also covers older ERP pages that render their own Back
+ * button instead of using PageHeader/useBackToParent. When a tracked previous
+ * ERP entry exists, those controls are upgraded to the same exact-history
+ * behavior without relying on every individual page to be patched forever.
  */
 export function installErpNavigationHistory(): () => void {
   if (typeof window === "undefined") return () => {};
@@ -148,6 +155,20 @@ export function installErpNavigationHistory(): () => void {
   };
   window.addEventListener("popstate", popstateHandler);
 
+  legacyBackClickHandler = (event: MouseEvent) => {
+    if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const backControl = target.closest(ERP_BACK_CONTROL_SELECTOR);
+    if (!backControl || !canGoBackToPreviousErpLocation()) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    goBackToPreviousErpLocation();
+  };
+  window.addEventListener("click", legacyBackClickHandler, true);
+
   return () => {
     installCount = Math.max(0, installCount - 1);
     if (installCount > 0) return;
@@ -155,6 +176,10 @@ export function installErpNavigationHistory(): () => void {
     if (popstateHandler) {
       window.removeEventListener("popstate", popstateHandler);
       popstateHandler = null;
+    }
+    if (legacyBackClickHandler) {
+      window.removeEventListener("click", legacyBackClickHandler, true);
+      legacyBackClickHandler = null;
     }
     if (originalPushState) window.history.pushState = originalPushState;
     if (originalReplaceState) window.history.replaceState = originalReplaceState;
