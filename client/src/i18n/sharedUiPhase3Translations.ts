@@ -5,6 +5,7 @@ import { phase3SharedUiTranslationsPart2 } from "./sharedUiPhase3Translations.pa
 import { phase3SharedUiTranslationsPart3 } from "./sharedUiPhase3Translations.part3";
 import { phase3SharedUiTranslationsPart4 } from "./sharedUiPhase3Translations.part4";
 import { phase3SharedUiTranslationsPart5 } from "./sharedUiPhase3Translations.part5";
+import { phase3SharedUiTranslationsPart6 } from "./sharedUiPhase3Translations.part6";
 
 export const phase3SharedUiTranslations: readonly Phase3SharedUiEntry[] = [
   ...phase3SharedUiTranslationsPart1,
@@ -12,6 +13,7 @@ export const phase3SharedUiTranslations: readonly Phase3SharedUiEntry[] = [
   ...phase3SharedUiTranslationsPart3,
   ...phase3SharedUiTranslationsPart4,
   ...phase3SharedUiTranslationsPart5,
+  ...phase3SharedUiTranslationsPart6,
 ];
 
 const exactEntryByVisibleText = new Map<string, Phase3SharedUiEntry>();
@@ -38,6 +40,21 @@ const dynamicRules: readonly DynamicRule[] = [
       en: ([count]) => `You have ${count} unread message${Number(count) === 1 ? "" : "s"}.`,
       ar: ([count]) => `لديك ${count} رسالة غير مقروءة.`,
       fr: ([count]) => `Vous avez ${count} message(s) non lu(s).`,
+    },
+  },
+  {
+    patterns: {
+      en: /^(\d+) name changes? ready to apply(?:; (\d+) missing codes? will be ignored)?$/,
+      ar: /^هناك (\d+) تغيير أسماء جاهز للتطبيق(?:؛ سيتم تجاهل (\d+) رمز غير موجود)?$/,
+      fr: /^(\d+) changement\(s\) de nom prêt\(s\) à appliquer(?: ; (\d+) code\(s\) introuvable\(s\) seront ignorés)?$/,
+    },
+    render: {
+      en: ([ready, missing]) =>
+        `${ready} name change${Number(ready) === 1 ? "" : "s"} ready to apply${missing ? `; ${missing} missing code${Number(missing) === 1 ? "" : "s"} will be ignored` : ""}`,
+      ar: ([ready, missing]) =>
+        `هناك ${ready} تغيير أسماء جاهز للتطبيق${missing ? `؛ سيتم تجاهل ${missing} رمز غير موجود` : ""}`,
+      fr: ([ready, missing]) =>
+        `${ready} changement(s) de nom prêt(s) à appliquer${missing ? ` ; ${missing} code(s) introuvable(s) seront ignorés` : ""}`,
     },
   },
   {
