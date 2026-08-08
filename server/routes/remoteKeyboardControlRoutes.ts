@@ -5,6 +5,7 @@ import { getSessionCompanyId, getSessionRole, getSessionUserId, getSessionUserna
 import {
   RemoteKeyboardControlError,
   authorizeRemoteKeyboardControl,
+  getRemoteKeyboardAuthorization,
   publishRemoteKeyboardCommand,
   publishRemoteKeyboardCommandResult,
   revokeRemoteKeyboardControl,
@@ -66,7 +67,8 @@ function writeHeartbeat(res: Response): void {
   (res as FlushableResponse).flush?.();
 }
 
-function serializeAuthorization(authorization: RemoteKeyboardAuthorization) {
+function serializeAuthorization(authorization: RemoteKeyboardAuthorization | null) {
+  if (!authorization) return null;
   return {
     ...authorization,
     authorizedAt: new Date(authorization.authorizedAt).toISOString(),
@@ -104,6 +106,28 @@ async function auditOrBlock(input: Parameters<typeof writeRemoteSupportAudit>[0]
 }
 
 export function registerRemoteKeyboardControlRoutes(app: Express): void {
+  app.get(
+    "/api/screen-feed/control/sessions/:sessionId/keyboard-authorization",
+    requireAuth,
+    keyboardPermission,
+    (req, res) => {
+      if (!requireController(req, res)) return;
+      const session = getRemoteControlSession(req.params.sessionId);
+      const controllerUserId = sessionUserId(req);
+      if (
+        !session ||
+        session.companyId !== getSessionCompanyId(req) ||
+        session.controllerUserId !== controllerUserId
+      ) {
+        return res.status(404).json({ message: "Support session not found." });
+      }
+      res.setHeader("Cache-Control", "no-store");
+      res.json({
+        authorization: serializeAuthorization(getRemoteKeyboardAuthorization(session.id, controllerUserId)),
+      });
+    }
+  );
+
   app.post(
     "/api/screen-feed/control/sessions/:sessionId/keyboard-authorization",
     requireAuth,
