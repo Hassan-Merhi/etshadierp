@@ -58,7 +58,15 @@ export function StockNameUpdateImport() {
   });
 
   const itemByCode = useMemo(
-    () => new Map(stockItems.map((item) => [String(item.code || "").trim().toLowerCase(), item])),
+    () =>
+      new Map(
+        stockItems.map((item) => [
+          String(item.code || "")
+            .trim()
+            .toLowerCase(),
+          item,
+        ])
+      ),
     [stockItems]
   );
 
@@ -112,9 +120,7 @@ export function StockNameUpdateImport() {
 
       const headers = Object.keys(rawRows[0] ?? {});
       const codeHeader = headers.find((header) => ["code", "itemcode"].includes(normalizeHeader(header)));
-      const nameHeader = headers.find((header) =>
-        ["newname", "name", "itemname"].includes(normalizeHeader(header))
-      );
+      const nameHeader = headers.find((header) => ["newname", "name", "itemname"].includes(normalizeHeader(header)));
       if (!codeHeader || !nameHeader) {
         throw new Error('Expected columns "Code" and "New Name"');
       }

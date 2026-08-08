@@ -30,6 +30,30 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
       `);
       const cityRows = cities.rows as { city: string }[];
 
+      const migrationWork = await db.execute(sql`
+        SELECT (
+          EXISTS (
+            SELECT 1 FROM vouchers v
+            WHERE v.company_id = ${companyId}
+              AND v.voucher_number LIKE 'PAYROLL-GEN-%'
+          )
+          OR EXISTS (
+            SELECT 1 FROM worker_bonuses wb
+            WHERE wb.company_id = ${companyId}
+              AND wb.status = 'paid'
+              AND wb.cash_account_id IS NOT NULL
+          )
+        ) AS has_work
+      `);
+      const migrationWorkRows = migrationWork.rows as { has_work: boolean }[];
+      if (cityRows.length === 0 && !migrationWorkRows[0]?.has_work) {
+        return res.json({
+          message: "Migration complete",
+          vouchersUpdated: 0,
+          bonusEntriesCreated: 0,
+        });
+      }
+
       const salaryAccByCity = new Map<string, number>();
       const bonusAccByCity = new Map<string, number>();
       for (const { city } of cityRows) {
