@@ -78,8 +78,9 @@ beforeAll(async () => {
   await pool.query(
     `INSERT INTO voucher_entries
        (voucher_id, ledger_account_id, debit_amount, credit_amount, narration)
-     VALUES ($1, $2, '10', '0', $3)`,
-    [offloadVoucherId, ctx.cashAccountId, `${TEST_PREFIX} offload freight`]
+     VALUES ($1, $2, '10', '0', $4),
+            ($1, $3, '0', '10', $4)`,
+    [offloadVoucherId, ctx.cashAccountId, ctx.salesAccountId, `${TEST_PREFIX} offload freight`]
   );
 }, 120000);
 
@@ -98,7 +99,7 @@ afterAll(async () => {
 }, 60000);
 
 describe("POST /api/factory/containers/:id/reverse-offload", () => {
-  it("unwinds raw stock and offload accounting and restores the container snapshot", async () => {
+  it("unwinds raw stock and offload accounting, restores the snapshot, and refuses a repeat", async () => {
     const response = await agent.post(`/api/factory/containers/${containerId}/reverse-offload`).send({});
     expect(response.status).toBe(200);
 
@@ -141,11 +142,11 @@ describe("POST /api/factory/containers/:id/reverse-offload", () => {
     // Offload-time financials are part of the same unwind.
     expect((await pool.query(`SELECT id FROM vouchers WHERE id = $1`, [offloadVoucherId])).rowCount).toBe(0);
     expect((await pool.query(`SELECT id FROM voucher_entries WHERE voucher_id = $1`, [offloadVoucherId])).rowCount).toBe(0);
-  });
 
-  it("cannot reverse the same container twice", async () => {
-    const response = await agent.post(`/api/factory/containers/${containerId}/reverse-offload`).send({});
-    expect(response.status).toBe(400);
-    expect(response.body.message).toContain("Only OFFLOADED or PARTIALLY_RECEIVED containers can be reversed");
+    // The restored status closes the destructive path immediately. Keeping this
+    // assertion in the same test makes it independent of test execution order.
+    const repeated = await agent.post(`/api/factory/containers/${containerId}/reverse-offload`).send({});
+    expect(repeated.status).toBe(400);
+    expect(repeated.body.message).toContain("Only OFFLOADED or PARTIALLY_RECEIVED containers can be reversed");
   });
 });
