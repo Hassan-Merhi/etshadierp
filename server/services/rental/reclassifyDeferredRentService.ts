@@ -91,6 +91,11 @@ async function runReclassification(): Promise<void> {
         continue;
       }
 
+      // Lock the account row before reading its balance. PostgreSQL does not allow
+      // FOR UPDATE on the grouped aggregate query itself, so the lock is acquired
+      // separately and held until this transaction commits.
+      await client.query("SELECT id FROM ledger_accounts WHERE id = $1 FOR UPDATE", [deferredId]);
+
       const balanceResult = await client.query<{ credit_balance: string }>(
         `
         SELECT (
@@ -111,7 +116,6 @@ async function runReclassification(): Promise<void> {
         LEFT JOIN vouchers v ON v.id = ve.voucher_id
         WHERE la.id = $1
         GROUP BY la.id, la.opening_balance, la.opening_balance_side
-        FOR UPDATE OF la
         `,
         [deferredId]
       );
