@@ -101,7 +101,7 @@ describe("remote support phase 4 hardening", () => {
     expect(screenRoutes).toContain('writeEvent(res, "capture-failure"');
     expect(screenRoutes).toContain("captureFailure: serializeFailure(failure)");
     expect(viewer).toContain('eventSource.addEventListener("capture-failure"');
-    expect(viewer).toContain("Screen capture failed:");
+    expect(viewer).toContain('t("Screen capture failed")');
   });
 
   it("returns keyboard authorization in controller-active instead of a second GET", () => {
