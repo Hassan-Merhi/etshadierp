@@ -34,19 +34,35 @@ export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDra
                 {colVis.company && <TableHead className="w-[120px] font-bold h-9 text-teal-50">Company</TableHead>}
                 {colVis.shopName && <TableHead className="w-[100px] font-bold h-9 text-teal-50">Shop Name</TableHead>}
                 {colVis.eta && <TableHead className="w-[100px] font-bold h-9 text-teal-50">ETA DAS</TableHead>}
-                {colVis.cost && <TableHead className="w-[85px] font-bold text-right h-9 text-teal-50">Cost ($)</TableHead>}
-                {colVis.freight && <TableHead className="w-[70px] font-bold text-center h-9 text-teal-50">Freight</TableHead>}
+                {colVis.cost && (
+                  <TableHead className="w-[85px] font-bold text-right h-9 text-teal-50">Cost ($)</TableHead>
+                )}
+                {colVis.freight && (
+                  <TableHead className="w-[70px] font-bold text-center h-9 text-teal-50">Freight</TableHead>
+                )}
                 {colVis.truckNo && <TableHead className="w-[100px] font-bold h-9 text-teal-50">Truck #</TableHead>}
                 {colVis.location && <TableHead className="w-[110px] font-bold h-9 text-teal-50">Location</TableHead>}
-                {colVis.borderDate && <TableHead className="w-[100px] font-bold h-9 text-teal-50">Border Date</TableHead>}
-                {colVis.maxOffload && <TableHead className="w-[100px] font-bold h-9 text-teal-50">Max Offload</TableHead>}
-                {colVis.delayed && <TableHead className="w-[70px] font-bold text-center h-9 text-teal-50">Delayed</TableHead>}
+                {colVis.borderDate && (
+                  <TableHead className="w-[100px] font-bold h-9 text-teal-50">Border Date</TableHead>
+                )}
+                {colVis.maxOffload && (
+                  <TableHead className="w-[100px] font-bold h-9 text-teal-50">Max Offload</TableHead>
+                )}
+                {colVis.delayed && (
+                  <TableHead className="w-[70px] font-bold text-center h-9 text-teal-50">Delayed</TableHead>
+                )}
                 {colVis.docs && <TableHead className="w-[50px] font-bold text-center h-9 text-teal-50">Docs</TableHead>}
                 {colVis.docsSent && <TableHead className="w-[100px] font-bold h-9 text-teal-50">Docs Sent</TableHead>}
-                {colVis.transporter && <TableHead className="w-[110px] font-bold h-9 text-teal-50">Transporter</TableHead>}
-                {colVis.transportFee && <TableHead className="w-[90px] font-bold text-right h-9 text-teal-50">Trans. Fee</TableHead>}
+                {colVis.transporter && (
+                  <TableHead className="w-[110px] font-bold h-9 text-teal-50">Transporter</TableHead>
+                )}
+                {colVis.transportFee && (
+                  <TableHead className="w-[90px] font-bold text-right h-9 text-teal-50">Trans. Fee</TableHead>
+                )}
                 {colVis.agent && <TableHead className="w-[90px] font-bold h-9 text-teal-50">Agent</TableHead>}
-                {colVis.dutyFee && <TableHead className="w-[80px] font-bold text-right h-9 text-teal-50">Duty ($)</TableHead>}
+                {colVis.dutyFee && (
+                  <TableHead className="w-[80px] font-bold text-right h-9 text-teal-50">Duty ($)</TableHead>
+                )}
                 {colVis.notes && <TableHead className="w-[120px] font-bold h-9 text-teal-50">Notes</TableHead>}
                 {colVis.blDocs && <TableHead className="w-[120px] font-bold h-9 text-teal-50">BL Docs</TableHead>}
               </TableRow>
