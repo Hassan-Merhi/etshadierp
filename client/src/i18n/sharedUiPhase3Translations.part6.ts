@@ -12,7 +12,11 @@ export const phase3SharedUiTranslationsPart6: readonly Phase3SharedUiEntry[] = [
   { en: "Names updated", ar: "تم تحديث الأسماء", fr: "Noms mis à jour" },
   { en: "Preview ready", ar: "المعاينة جاهزة", fr: "Aperçu prêt" },
   { en: "Could not read file", ar: "تعذر قراءة الملف", fr: "Impossible de lire le fichier" },
-  { en: "The file has no data rows", ar: "لا يحتوي الملف على صفوف بيانات", fr: "Le fichier ne contient aucune ligne de données" },
+  {
+    en: "The file has no data rows",
+    ar: "لا يحتوي الملف على صفوف بيانات",
+    fr: "Le fichier ne contient aucune ligne de données",
+  },
   {
     en: 'Expected columns "Code" and "New Name"',
     ar: 'الأعمدة المطلوبة هي "Code" و "New Name"',
