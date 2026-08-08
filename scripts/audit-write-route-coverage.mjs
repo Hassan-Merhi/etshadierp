@@ -22,9 +22,10 @@
  * write-safety sweep derives the current guard-only set from this audit at
  * runtime and invokes every one of those routes as a privileged user. Because
  * its route inventory is deliberately dynamic, the paths do not appear as
- * literals in the test source. The sweep only counts when its version marker is
- * present, and callers can disable that recognition to recover the raw
- * pre-sweep guard-only list that the test itself must execute.
+ * literals in the test source. The sweep only counts while its required
+ * behavioural-contract signatures are all present, and callers can disable
+ * that recognition to recover the raw pre-sweep guard-only list that the test
+ * itself must execute.
  *
  * Usage:
  *   npm run audit:write-routes
@@ -48,11 +49,20 @@ const GUARD_SWEEP_TEST = "tests/write-route-guard-sweep.test.ts";
  * Authenticated behavioural sweep. Unlike GUARD_SWEEP_TEST this enters the
  * authenticated route chain, uses deliberately invalid resources / validation
  * bodies, and asserts that sensitive state is not partially mutated and that
- * vouchers remain balanced. The marker prevents a renamed or gutted file from
- * silently receiving credit.
+ * vouchers remain balanced. Requiring the behavioural signatures below means a
+ * leftover marker comment cannot keep 168 routes credited after the real test
+ * loop or its invariants have been deleted.
  */
 const AUTHENTICATED_SAFETY_SWEEP_TEST = "tests/write-route-authenticated-safety-sweep.test.ts";
-const AUTHENTICATED_SAFETY_SWEEP_MARKER = "WRITE_ROUTE_AUTHENTICATED_SAFETY_SWEEP_V1";
+const AUTHENTICATED_SAFETY_SWEEP_SIGNATURES = [
+  "WRITE_ROUTE_AUTHENTICATED_SAFETY_SWEEP_V1",
+  "auditWriteRouteCoverage({ includeAuthenticatedSafetySweep: false })",
+  "raw.guardOnlySensitive",
+  "sensitiveFingerprint",
+  "expectBalancedVouchers",
+  "controlBefore",
+  "mutated sensitive state during the safety sweep",
+];
 
 /** Tables whose corruption is expensive and hard to notice. */
 const SENSITIVE_TABLES = [
@@ -112,7 +122,9 @@ export function auditWriteRouteCoverage(options = {}) {
   const authenticatedSweepText = testFiles.includes(AUTHENTICATED_SAFETY_SWEEP_TEST)
     ? readTest(AUTHENTICATED_SAFETY_SWEEP_TEST)
     : "";
-  const authenticatedSafetySweepPresent = authenticatedSweepText.includes(AUTHENTICATED_SAFETY_SWEEP_MARKER);
+  const authenticatedSafetySweepPresent = AUTHENTICATED_SAFETY_SWEEP_SIGNATURES.every((signature) =>
+    authenticatedSweepText.includes(signature)
+  );
   const otherTestText = testFiles
     .filter((file) => file !== GUARD_SWEEP_TEST && file !== AUTHENTICATED_SAFETY_SWEEP_TEST)
     .map(readTest)
@@ -250,7 +262,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       `${summary.authenticatedSafetyCovered} covered by the authenticated safety sweep.`
   );
 
-  const list = process.argv.includes("--list") ? report.uncoveredSensitive : process.argv.includes("--list-guard-only") ? report.guardOnlySensitive : null;
+  const list = process.argv.includes("--list")
+    ? report.uncoveredSensitive
+    : process.argv.includes("--list-guard-only")
+      ? report.guardOnlySensitive
+      : null;
   if (list) {
     const byOwner = new Map();
     for (const route of list) {
