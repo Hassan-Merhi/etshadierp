@@ -29,6 +29,10 @@ import {
   subscribeRemoteControlTarget,
   type RemoteControlSession,
 } from "../services/remoteControlSessionService";
+import {
+  getRemoteKeyboardAuthorization,
+  type RemoteKeyboardAuthorization,
+} from "../services/remoteKeyboardCommandService";
 import { remoteSupportCommandAuditDetails, writeRemoteSupportAudit } from "../services/remoteSupportAuditService";
 import { isRemoteMouseCommandAllowedOnRoute } from "../services/remoteSupportSensitiveActionPolicy";
 import { isRemoteSupportEnabled } from "../services/remoteSupportRuntime";
@@ -79,6 +83,15 @@ function serializeSession(session: RemoteControlSession | null) {
 }
 
 function serializeMouseAuthorization(authorization: RemoteMouseAuthorization | null) {
+  if (!authorization) return null;
+  return {
+    ...authorization,
+    authorizedAt: new Date(authorization.authorizedAt).toISOString(),
+    expiresAt: new Date(authorization.expiresAt).toISOString(),
+  };
+}
+
+function serializeKeyboardAuthorization(authorization: RemoteKeyboardAuthorization | null) {
   if (!authorization) return null;
   return {
     ...authorization,
@@ -211,10 +224,15 @@ export function registerRemoteControlSessionRoutes(app: Express): void {
     const controllerUserId = sessionUserId(req);
     const sessions = listActiveRemoteControlSessionsForController(controllerUserId)
       .filter((session) => session.companyId === getSessionCompanyId(req))
-      .map((session) => ({
-        ...serializeSession(session)!,
-        mouseAuthorization: serializeMouseAuthorization(getRemoteMouseAuthorization(session.id, controllerUserId)),
-      }));
+      .map((session) => {
+        const keyboardAuthorization = getRemoteKeyboardAuthorization(session.id, controllerUserId);
+        const refreshedSession = getRemoteControlSession(session.id) ?? session;
+        return {
+          ...serializeSession(refreshedSession)!,
+          mouseAuthorization: serializeMouseAuthorization(getRemoteMouseAuthorization(session.id, controllerUserId)),
+          keyboardAuthorization: serializeKeyboardAuthorization(keyboardAuthorization),
+        };
+      });
     res.setHeader("Cache-Control", "no-store");
     res.json({ sessions });
   });

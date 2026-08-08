@@ -23,6 +23,7 @@ const isDev = import.meta.env.DEV;
 
 type Html2Canvas = (typeof import("html2canvas"))["default"];
 type CaptureSource = "dom" | "retry" | "fallback";
+export type ScreenFeedFailureStage = "render" | "encode" | "upload" | "pipeline";
 let html2canvasPromise: Promise<Html2Canvas> | null = null;
 let scrollKeySequence = 0;
 let unsupportedCssCache: { styleSheetCount: number; found: boolean } | null = null;
@@ -48,6 +49,10 @@ export interface ScreenFeedCaptureResult {
   cancelled: boolean;
   signature: string | null;
   latestClickTs: number;
+  /** Wall-clock cost of the render + encode on the employee's main thread. */
+  durationMs: number;
+  failureStage?: ScreenFeedFailureStage;
+  failureReason?: string;
 }
 
 interface EncodedFrame {
@@ -361,7 +366,12 @@ function buildHtml2CanvasOptions(snapshot: Map<string, { top: number; left: numb
     useCORS: true,
     allowTaint: false,
     logging: false,
-    foreignObjectRendering: true,
+    // ForeignObject rendering draws the page through an SVG <foreignObject>
+    // image. Chromium marks any canvas that consumed such an image as tainted,
+    // so the later toDataURL() throws SecurityError and the frame is dropped —
+    // silently, forever, while the employee keeps paying for full page renders.
+    // The regular renderer is the only one whose output can actually be encoded.
+    foreignObjectRendering: false,
     imageTimeout: 1800,
     removeContainer: true,
     onclone: (doc: Document) => sanitizeClone(doc, snapshot, sanitizeColors),
@@ -449,14 +459,24 @@ async function withSafeCreatePattern<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-function buildFrameSignature(canvas: HTMLCanvasElement): string {
-  const sample = document.createElement("canvas");
-  sample.width = SIGNATURE_WIDTH;
-  sample.height = SIGNATURE_HEIGHT;
-  const ctx = sample.getContext("2d", { willReadFrequently: true });
-  if (!ctx) return `${canvas.width}x${canvas.height}`;
-  ctx.drawImage(canvas, 0, 0, SIGNATURE_WIDTH, SIGNATURE_HEIGHT);
-  return hashScreenFeedPixels(ctx.getImageData(0, 0, SIGNATURE_WIDTH, SIGNATURE_HEIGHT).data);
+/**
+ * Returns null when the pixels cannot be read at all (a tainted canvas throws
+ * SecurityError from getImageData). A null signature means "unknown", which
+ * makes the caller upload the frame rather than silently dropping it.
+ */
+function buildFrameSignature(canvas: HTMLCanvasElement): string | null {
+  try {
+    const sample = document.createElement("canvas");
+    sample.width = SIGNATURE_WIDTH;
+    sample.height = SIGNATURE_HEIGHT;
+    const ctx = sample.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return `${canvas.width}x${canvas.height}`;
+    ctx.drawImage(canvas, 0, 0, SIGNATURE_WIDTH, SIGNATURE_HEIGHT);
+    return hashScreenFeedPixels(ctx.getImageData(0, 0, SIGNATURE_WIDTH, SIGNATURE_HEIGHT).data);
+  } catch (error) {
+    trace("signature-failed", errorMessage(error));
+    return null;
+  }
 }
 
 function resizeCanvas(source: HTMLCanvasElement, maxWidth: number): HTMLCanvasElement {
@@ -500,6 +520,45 @@ function encodeFrame(canvas: HTMLCanvasElement, fast: boolean): EncodedFrame | n
   }
 
   return lastFrame && lastFrame.dataUrl.length <= MAX_DATA_URL_LEN ? lastFrame : null;
+}
+
+interface EncodeOutcome {
+  encoded: EncodedFrame | null;
+  source: CaptureSource;
+  failureReason?: string;
+}
+
+/**
+ * Encoding is the last place a capture can die, and it dies for reasons the
+ * render itself cannot see: a tainted canvas throws SecurityError, an oversized
+ * page encodes past the transport limit. Dropping the frame there leaves the
+ * watcher on "waiting for the first frame" with no explanation while the
+ * employee's browser keeps re-rendering the page. Falling back to the cheap
+ * text canvas keeps the viewer populated and carries the reason across.
+ */
+function encodeWithFallback(canvas: HTMLCanvasElement, fast: boolean, source: CaptureSource): EncodeOutcome {
+  let reason: string;
+  try {
+    const encoded = encodeFrame(canvas, fast);
+    if (encoded?.dataUrl.startsWith("data:image/") && encoded.dataUrl.length <= MAX_DATA_URL_LEN) {
+      return { encoded, source };
+    }
+    reason = `encode-invalid-${encoded?.dataUrl.length ?? 0}`;
+  } catch (error) {
+    reason = errorMessage(error);
+  }
+
+  trace("encode-fallback", reason);
+  try {
+    const encoded = encodeFrame(buildFallbackCanvas(reason), fast);
+    if (encoded?.dataUrl.startsWith("data:image/") && encoded.dataUrl.length <= MAX_DATA_URL_LEN) {
+      return { encoded, source: "fallback", failureReason: reason };
+    }
+  } catch (error) {
+    reason = `${reason}; fallback: ${errorMessage(error)}`;
+  }
+
+  return { encoded: null, source: "fallback", failureReason: reason };
 }
 
 async function runCaptureAttempt(scrollElements: Iterable<HTMLElement>, retry: boolean): Promise<HTMLCanvasElement> {
@@ -569,7 +628,7 @@ function buildViewportMetadata() {
   };
 }
 
-function cancelledResult(lastUploadedClickTs: number): ScreenFeedCaptureResult {
+function cancelledResult(lastUploadedClickTs: number, startedAt = Date.now()): ScreenFeedCaptureResult {
   return {
     uploaded: false,
     unchanged: false,
@@ -577,6 +636,7 @@ function cancelledResult(lastUploadedClickTs: number): ScreenFeedCaptureResult {
     cancelled: true,
     signature: null,
     latestClickTs: lastUploadedClickTs,
+    durationMs: Math.max(0, Date.now() - startedAt),
   };
 }
 
@@ -595,27 +655,30 @@ export async function captureAndUploadScreenFrame(input: {
   }
 
   const startedAt = Date.now();
-  const { canvas, source, failureReason } = await captureCanvas(input.scrollElements);
+  const captured = await captureCanvas(input.scrollElements);
   if (
     !input.shouldContinue() ||
     document.visibilityState !== "visible" ||
     window.location.href !== input.expectedPath
   ) {
     trace("capture-discarded");
-    return cancelledResult(input.lastUploadedClickTs);
+    return cancelledResult(input.lastUploadedClickTs, startedAt);
   }
 
-  const signature = buildFrameSignature(canvas);
+  const signature = buildFrameSignature(captured.canvas);
   const cutoff = Date.now() - CLICK_RETAIN_MS;
   const clicks = input.clicks.filter((click) => click.ts >= cutoff);
   const latestClickTs = clicks.reduce((latest, click) => Math.max(latest, click.ts), 0);
 
   if (
     !shouldUploadScreenFrame({
-      signature,
+      signature: signature ?? "",
       lastSignature: input.lastSignature,
       latestClickTs,
       lastUploadedClickTs: input.lastUploadedClickTs,
+      // An unreadable canvas has no comparable signature; always ship it so the
+      // watcher sees the page instead of an unexplained empty viewer.
+      force: signature === null,
     })
   ) {
     return {
@@ -625,14 +688,20 @@ export async function captureAndUploadScreenFrame(input: {
       cancelled: false,
       signature,
       latestClickTs,
+      durationMs: Math.max(0, Date.now() - startedAt),
     };
   }
 
-  let encoded: EncodedFrame | null;
-  try {
-    encoded = encodeFrame(canvas, input.fast);
-  } catch (error) {
-    trace("to-data-url-failed", errorMessage(error));
+  const {
+    encoded,
+    source,
+    failureReason: encodeFailureReason,
+  } = encodeWithFallback(captured.canvas, input.fast, captured.source);
+  const failureReason = encodeFailureReason ?? captured.failureReason;
+
+  if (!encoded) {
+    const reason = failureReason ?? "Screen frame encoding failed.";
+    trace("encode-failed", reason);
     return {
       uploaded: false,
       unchanged: false,
@@ -640,23 +709,14 @@ export async function captureAndUploadScreenFrame(input: {
       cancelled: false,
       signature,
       latestClickTs,
-    };
-  }
-
-  if (!encoded?.dataUrl.startsWith("data:image/") || encoded.dataUrl.length > MAX_DATA_URL_LEN) {
-    trace("encode-invalid", String(encoded?.dataUrl.length ?? 0));
-    return {
-      uploaded: false,
-      unchanged: false,
-      failed: true,
-      cancelled: false,
-      signature,
-      latestClickTs,
+      durationMs: Math.max(0, Date.now() - startedAt),
+      failureStage: "encode",
+      failureReason: reason,
     };
   }
 
   if (!input.shouldContinue() || document.visibilityState !== "visible") {
-    return cancelledResult(input.lastUploadedClickTs);
+    return cancelledResult(input.lastUploadedClickTs, startedAt);
   }
 
   const completedAt = Date.now();
@@ -685,6 +745,7 @@ export async function captureAndUploadScreenFrame(input: {
         },
       }),
     });
+    if (!response.ok) trace("upload-rejected", String(response.status));
     return {
       uploaded: response.ok,
       unchanged: false,
@@ -692,12 +753,17 @@ export async function captureAndUploadScreenFrame(input: {
       cancelled: false,
       signature,
       latestClickTs,
+      durationMs: Math.max(0, Date.now() - startedAt),
+      ...(!response.ok
+        ? { failureStage: "upload" as const, failureReason: `Screen frame upload rejected (${response.status}).` }
+        : {}),
     };
   } catch (error) {
     if (!input.shouldContinue() || document.visibilityState !== "visible") {
-      return cancelledResult(input.lastUploadedClickTs);
+      return cancelledResult(input.lastUploadedClickTs, startedAt);
     }
-    trace("upload-error", errorMessage(error));
+    const reason = errorMessage(error) || "Screen frame upload failed.";
+    trace("upload-error", reason);
     return {
       uploaded: false,
       unchanged: false,
@@ -705,6 +771,9 @@ export async function captureAndUploadScreenFrame(input: {
       cancelled: false,
       signature,
       latestClickTs,
+      durationMs: Math.max(0, Date.now() - startedAt),
+      failureStage: "upload",
+      failureReason: reason,
     };
   } finally {
     clearTimeout(uploadTimeout);
