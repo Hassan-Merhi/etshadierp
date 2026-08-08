@@ -1,4 +1,4 @@
-import { createContext, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { markRemoteSupportAuthLost } from "@/components/remote-support-auth-lifecycle";
 import {
   acquireRemoteControlPanelHost,
