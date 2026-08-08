@@ -6,6 +6,7 @@ import { registerCentralRentalPaymentDeletionRoute } from "./rental/centralRenta
 import { registerRentalPaymentsAccrualRoutes } from "./rental/rentalPaymentsAccrualRoutes";
 import { registerRentalAccrualConfigRoutes } from "./rental/rentalAccrualConfigRoutes";
 import { runRentalReconciliation } from "../services/rental/rentalReconciliationService";
+import { reclassifyLegacyDeferredRentForProperties } from "../services/rental/reclassifyDeferredRentService";
 import { requireAuth } from "../auth";
 import { getClientDate } from "../lib/dateUtils";
 import { getCompanyId } from "./rental/shared";
@@ -20,6 +21,25 @@ export function registerRentalRoutes(
   incomeAccountName: string,
   shopExpenseAccountName: string = "Rent Expense - Shops"
 ) {
+  // Properties-mode landlord accounting now recognises rent immediately on receipt.
+  // Run the legacy Deferred Rent Revenue cleanup automatically at route startup.
+  // If startup happens before a fresh database is fully ready, the middleware below
+  // retries on the first Properties request. A successful run becomes a process no-op.
+  if (module === "PROPERTIES") {
+    const ensurePropertiesIncomeCleanup = () =>
+      reclassifyLegacyDeferredRentForProperties().catch((error: unknown) => {
+        logger.error("[PROPERTIES/rental] deferred-rent reclassification failed", {
+          error: getErrorMessage(error),
+        });
+      });
+
+    void ensurePropertiesIncomeCleanup();
+    app.use(urlPrefix, (_req, _res, next) => {
+      void ensurePropertiesIncomeCleanup();
+      next();
+    });
+  }
+
   registerRentalUnitsContractsRoutes(app, module, urlPrefix, incomeAccountName, shopExpenseAccountName);
   // The central route owns DELETE /payments/:id. Registration order keeps the
   // legacy creation, bulk, detail, and accrual handlers unchanged.
