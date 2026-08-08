@@ -469,7 +469,6 @@ async function postGroupCore(
 
     return v.id;
   } else {
-    // Landlord receipt: Dr Cash / Cr Rental Income [/ Cr Deferred Rent Revenue]
     const incomeAccountId = await findOrCreateLedgerAccount(
       tx,
       companyId,
@@ -478,6 +477,56 @@ async function postGroupCore(
       "RENT-INC",
       "Indirect Income"
     );
+
+    // Properties-mode landlord receipts are cash-basis by product decision:
+    // every dollar received is Rental Income immediately, even when the rental
+    // ledger allocates part of the payment to future months. We keep those month
+    // allocations for operational tracking only; they no longer drive a deferred
+    // revenue liability or a later recognition journal.
+    if (mod === "PROPERTIES") {
+      const voucherNum = `RENT-${paymentDate.replace(/-/g, "")}-${groupId.slice(-6)}`;
+      const [v] = await tx
+        .insert(vouchers)
+        .values({
+          companyId,
+          voucherNumber: voucherNum,
+          voucherType: "Receipt",
+          voucherDate: paymentDate as any,
+          description: narration,
+          totalAmount: totalAmountStr,
+          currency,
+          sourceModule: "ERP",
+        })
+        .returning();
+
+      await tx.insert(voucherEntries).values([
+        {
+          voucherId: v.id,
+          ledgerAccountId: cashAccountId,
+          ...normEntry(totalAmountStr, "0"),
+          narration,
+        },
+        {
+          voucherId: v.id,
+          ledgerAccountId: incomeAccountId,
+          ...normEntry("0", totalAmountStr),
+          narration,
+        },
+      ]);
+
+      const landlordLedgerIds = allocs.map((a) => a.ledgerRowId).filter(Boolean) as number[];
+      if (landlordLedgerIds.length > 0) {
+        await tx
+          .update(propertyMonthlyLedger)
+          .set({ usedPrepaidAccount: false, usedAdvanceAccount: false })
+          .where(inArray(propertyMonthlyLedger.id, landlordLedgerIds));
+      }
+
+      return v.id;
+    }
+
+    // Legacy ERP/Factory landlord accounting remains accrual-based:
+    // Dr Cash / Cr Rental Income [/ Cr Deferred Rent Revenue].
     const pd = new Date(paymentDate + "T00:00:00Z");
     const payYear = pd.getUTCFullYear();
     const payMonth = pd.getUTCMonth() + 1;

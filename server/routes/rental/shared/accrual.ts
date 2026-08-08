@@ -121,7 +121,7 @@ export async function postRentAccrualForCompany(
 
   // If there are no SHOP/shared contracts, pass 1 and pass 2 will no-op via
   // their own guards (contractIds.length === 0), but pass 3 (landlord deferred)
-  // must still run for landlord-only companies.
+  // must still run for landlord-only companies outside PROPERTIES mode.
 
   // Determine the dominant currency for this batch of contracts (fallback USD).
   const currencyCount = new Map<string, number>();
@@ -635,6 +635,13 @@ export async function postRentAccrualForCompany(
       const detail = (getErrorMessage(e) ?? String(e)).replace(/\n/g, " | ");
       logger.error(`[ERP/rental] prepaid recognition failed company ${companyId}: ${detail}`);
     }
+  }
+
+  // Properties landlord receipts are recognised entirely when cash is received.
+  // There is no Deferred Rent Revenue account or later landlord recognition pass.
+  // SHOP/shared tenant expense accruals above still run normally in PROPERTIES mode.
+  if (moduleParam === "PROPERTIES") {
+    return { accrued, skipped: alreadyDone };
   }
 
   // ── Pass 3: Landlord deferred revenue recognition ─────────────────────────
