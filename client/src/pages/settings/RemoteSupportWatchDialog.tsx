@@ -40,6 +40,7 @@ interface GroupedActivityEvent extends ActivityEvent {
 type DisplayMode = "fit" | "actual";
 
 const FALLBACK_POLL_MS = 3000;
+const MAX_LIVE_STREAM_ERRORS = 2;
 
 function groupConsecutiveActivity(activity: ActivityEvent[]): GroupedActivityEvent[] {
   const grouped: GroupedActivityEvent[] = [];
@@ -149,6 +150,8 @@ function ScreenFeedDialog({
 
     let closed = false;
     let eventSource: EventSource | null = null;
+    let liveStreamErrors = 0;
+    let liveStreamAbandoned = false;
 
     if (liveTransportEnabled) {
       eventSource = new EventSource(`/api/screen-feed/live/${encodeURIComponent(userId)}`, {
@@ -156,15 +159,17 @@ function ScreenFeedDialog({
       });
 
       eventSource.addEventListener("ready", () => {
-        if (closed) return;
+        if (closed || liveStreamAbandoned) return;
+        liveStreamErrors = 0;
         setConnectionState(true);
         setError(null);
       });
       eventSource.addEventListener("frame", (event) => {
-        if (closed) return;
+        if (closed || liveStreamAbandoned) return;
         try {
           const nextFrame = JSON.parse((event as MessageEvent<string>).data) as ScreenFrame;
           if (!nextFrame?.dataUrl) return;
+          liveStreamErrors = 0;
           stateRef.current = { etag: null, frame: nextFrame };
           setFrame(nextFrame);
           setConnectionState(true);
@@ -174,13 +179,21 @@ function ScreenFeedDialog({
         }
       });
       eventSource.onerror = () => {
-        if (closed) return;
+        if (closed || liveStreamAbandoned) return;
+        liveStreamErrors += 1;
         setConnectionState(false);
         setError(t("Live connection interrupted. Polling recovery is active."));
+        if (liveStreamErrors >= MAX_LIVE_STREAM_ERRORS) {
+          liveStreamAbandoned = true;
+          eventSource?.close();
+          eventSource = null;
+        }
         void pollOnce();
       };
     }
 
+    // Prime the viewer from the conditional endpoint. Once SSE is connected,
+    // the interval below goes idle and polling becomes recovery-only.
     void pollOnce();
     const intervalId = window.setInterval(() => {
       if (!liveTransportEnabled || !connectedRef.current) void pollOnce();
@@ -188,6 +201,7 @@ function ScreenFeedDialog({
 
     return () => {
       closed = true;
+      liveStreamAbandoned = true;
       window.clearInterval(intervalId);
       eventSource?.close();
       pollAbortRef.current?.abort();
