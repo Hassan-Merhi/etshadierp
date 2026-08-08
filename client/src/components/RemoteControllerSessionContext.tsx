@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { markRemoteSupportAuthLost } from "@/components/remote-support-auth-lifecycle";
 import {
   acquireRemoteControlPanelHost,
@@ -37,10 +37,6 @@ export class RemoteControllerRequestError extends Error {
 
 interface ControllerActiveResponse {
   sessions?: RemoteControllerSessionView[];
-}
-
-interface KeyboardAuthorizationResponse {
-  authorization?: RemoteAuthorizationView | null;
 }
 
 interface RemoteControllerSessionContextValue {
@@ -160,49 +156,17 @@ export function RemoteControllerSessionProvider({ children }: { children: ReactN
     request = remoteControllerRequestJson<ControllerActiveResponse>(
       "/api/screen-feed/control/sessions/controller-active"
     )
-      .then(async (payload) => {
+      .then((payload) => {
         if (targetRef.current?.userId !== activeTarget.userId) return null;
         const candidate = Array.isArray(payload.sessions)
           ? payload.sessions.find((item) => item?.targetUserId === activeTarget.userId)
           : undefined;
-        let next = normalizeSession(candidate, activeTarget.userId);
+        const next = normalizeSession(candidate, activeTarget.userId);
         if (!next) {
           setSession(null);
           return null;
         }
 
-        if (next.capabilities.keyboard) {
-          try {
-            const keyboardPayload = await remoteControllerRequestJson<KeyboardAuthorizationResponse>(
-              `/api/screen-feed/control/sessions/${encodeURIComponent(next.id)}/keyboard-authorization`
-            );
-            const keyboardAuthorization = keyboardPayload.authorization ?? null;
-            next = {
-              ...next,
-              capabilities: {
-                ...next.capabilities,
-                keyboard: !!keyboardAuthorization,
-              },
-              keyboardAuthorization,
-            };
-          } catch (error) {
-            if (
-              !(error instanceof RemoteControllerRequestError) ||
-              (error.status !== 403 && error.status !== 404)
-            ) {
-              throw error;
-            }
-            next = {
-              ...next,
-              capabilities: { ...next.capabilities, keyboard: false },
-              keyboardAuthorization: null,
-            };
-          }
-        } else {
-          next = { ...next, keyboardAuthorization: null };
-        }
-
-        if (targetRef.current?.userId !== activeTarget.userId) return null;
         const current = sessionRef.current;
         const merged =
           current?.id === next.id
