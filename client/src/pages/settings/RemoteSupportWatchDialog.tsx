@@ -15,16 +15,41 @@ interface RemoteSupportRuntime {
   };
 }
 
+interface CaptureFailure {
+  stage: string;
+  reason: string;
+  occurredAt: string;
+  durationMs?: number | null;
+}
+
+interface ScreenCaptureInfo {
+  source?: "dom" | "retry" | "fallback";
+  durationMs?: number;
+  failureReason?: string;
+}
+
 interface ScreenFrame {
   dataUrl: string;
   capturedAt: string;
   receivedAt?: string;
   username?: string;
+  capture?: ScreenCaptureInfo | null;
+  captureFailure?: CaptureFailure | null;
+}
+
+interface ScreenFeedPayload {
+  dataUrl?: string;
+  capturedAt?: string;
+  receivedAt?: string;
+  username?: string;
+  capture?: ScreenCaptureInfo | null;
+  captureFailure?: CaptureFailure | null;
 }
 
 interface FastPollState {
   etag: string | null;
   frame: ScreenFrame | null;
+  failure: CaptureFailure | null;
 }
 
 interface ActivityEvent {
@@ -55,6 +80,18 @@ function groupConsecutiveActivity(activity: ActivityEvent[]): GroupedActivityEve
   return grouped;
 }
 
+function captureFailureFromFrame(frame: ScreenFrame | null): CaptureFailure | null {
+  if (!frame) return null;
+  if (frame.captureFailure?.reason) return frame.captureFailure;
+  if (!frame.capture?.failureReason) return null;
+  return {
+    stage: frame.capture.source === "fallback" ? "capture" : "encode",
+    reason: frame.capture.failureReason,
+    occurredAt: frame.capturedAt,
+    durationMs: frame.capture.durationMs ?? null,
+  };
+}
+
 async function fetchConditionalFrame(
   userId: string,
   state: FastPollState,
@@ -71,10 +108,13 @@ async function fetchConditionalFrame(
   if (response.status === 304) return state;
   if (!response.ok) throw new Error("Screen feed request failed.");
 
-  const frame = (await response.json()) as ScreenFrame | null;
+  const payload = (await response.json()) as ScreenFeedPayload | null;
+  const nextFrame = payload?.dataUrl && payload.capturedAt ? (payload as ScreenFrame) : state.frame;
+  const failure = payload?.captureFailure ?? (payload?.dataUrl ? captureFailureFromFrame(nextFrame) : null);
   return {
     etag: response.headers.get("ETag"),
-    frame: frame?.dataUrl ? frame : state.frame,
+    frame: nextFrame,
+    failure,
   };
 }
 
@@ -91,11 +131,12 @@ function ScreenFeedDialog({
 }) {
   const { language } = useApplicationLanguage();
   const [frame, setFrame] = useState<ScreenFrame | null>(null);
+  const [captureFailure, setCaptureFailure] = useState<CaptureFailure | null>(null);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [displayMode, setDisplayMode] = useState<DisplayMode>("fit");
-  const stateRef = useRef<FastPollState>({ etag: null, frame: null });
+  const stateRef = useRef<FastPollState>({ etag: null, frame: null, failure: null });
   const connectedRef = useRef(false);
   const pollAbortRef = useRef<AbortController | null>(null);
   const viewerSurfaceRef = useRef<HTMLDivElement>(null);
@@ -130,6 +171,7 @@ function ScreenFeedDialog({
       const next = await fetchConditionalFrame(userId, stateRef.current, controller.signal);
       stateRef.current = next;
       if (next.frame) setFrame(next.frame);
+      setCaptureFailure(next.failure);
       setError(null);
     } catch (pollError) {
       if (controller.signal.aborted) return;
@@ -143,8 +185,9 @@ function ScreenFeedDialog({
   }, [t, userId]);
 
   useEffect(() => {
-    stateRef.current = { etag: null, frame: null };
+    stateRef.current = { etag: null, frame: null, failure: null };
     setFrame(null);
+    setCaptureFailure(null);
     setConnectionState(false);
     setError(null);
 
@@ -170,12 +213,25 @@ function ScreenFeedDialog({
           const nextFrame = JSON.parse((event as MessageEvent<string>).data) as ScreenFrame;
           if (!nextFrame?.dataUrl) return;
           liveStreamErrors = 0;
-          stateRef.current = { etag: null, frame: nextFrame };
+          const nextFailure = captureFailureFromFrame(nextFrame);
+          stateRef.current = { etag: null, frame: nextFrame, failure: nextFailure };
           setFrame(nextFrame);
+          setCaptureFailure(nextFailure);
           setConnectionState(true);
           setError(null);
         } catch {
           setError(t("A live frame arrived in an invalid format."));
+        }
+      });
+      eventSource.addEventListener("capture-failure", (event) => {
+        if (closed || liveStreamAbandoned) return;
+        try {
+          const failure = JSON.parse((event as MessageEvent<string>).data) as CaptureFailure;
+          if (!failure?.reason) return;
+          stateRef.current = { ...stateRef.current, failure };
+          setCaptureFailure(failure);
+        } catch {
+          // Polling recovery can still retrieve the sanitized diagnostic.
         }
       });
       eventSource.onerror = () => {
@@ -207,7 +263,7 @@ function ScreenFeedDialog({
       pollAbortRef.current?.abort();
       pollAbortRef.current = null;
       connectedRef.current = false;
-      stateRef.current = { etag: null, frame: null };
+      stateRef.current = { etag: null, frame: null, failure: null };
     };
   }, [liveTransportEnabled, pollOnce, setConnectionState, t, userId]);
 
@@ -290,6 +346,19 @@ function ScreenFeedDialog({
           </div>
         ) : null}
 
+        {captureFailure ? (
+          <div
+            className="flex items-start gap-2 border-b bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
+            data-testid="screen-feed-capture-failure"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              {t("Screen capture issue")}: {captureFailure.reason}
+              {captureFailure.stage ? ` · ${captureFailure.stage}` : ""}
+            </span>
+          </div>
+        ) : null}
+
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div
             ref={viewerSurfaceRef}
@@ -311,9 +380,13 @@ function ScreenFeedDialog({
                 data-testid="img-screen-feed"
               />
             ) : (
-              <div className="m-auto flex flex-col items-center gap-2 text-sm text-white/70">
+              <div className="m-auto flex max-w-xl flex-col items-center gap-2 px-6 text-center text-sm text-white/70">
                 <Clock className="h-9 w-9 opacity-40" />
-                <span>{t("Waiting for the first screen frame…")}</span>
+                <span>
+                  {captureFailure
+                    ? `${t("Screen capture failed")}: ${captureFailure.reason}`
+                    : t("Waiting for the first screen frame…")}
+                </span>
               </div>
             )}
           </div>
