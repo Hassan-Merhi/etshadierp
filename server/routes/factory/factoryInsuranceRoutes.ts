@@ -308,17 +308,30 @@ export function registerFactoryInsuranceRoutes(app: Express) {
             totalAmount: totalAmount.toFixed(2),
             sourceModule: "ERP",
           },
+          // Dr Insurance Expense / Cr each member's liability.
+          //
+          // This ran the other way round until now — the expense account
+          // credited and the member liabilities debited — which is the reverse
+          // of standard double entry and of the convention every other posting
+          // here uses (see the transporter charge route: Dr expense / Cr the
+          // party owed). The effect was that running the monthly journal
+          // reduced recorded expense and made each member's liability account
+          // read as an asset.
+          //
+          // Only new journals are affected. Ones already posted keep the old
+          // direction; correcting those is a data question, not a code one, and
+          // is left to whoever owns the chart of accounts.
           [
             {
               ledgerAccountId: expenseAccount.id,
-              debitAmount: "0",
-              creditAmount: totalAmount.toFixed(2),
+              debitAmount: totalAmount.toFixed(2),
+              creditAmount: "0",
               narration,
             },
             ...memberLedgers.map((member) => ({
               ledgerAccountId: member.ledgerId,
-              debitAmount: member.amount.toFixed(2),
-              creditAmount: "0",
+              debitAmount: "0",
+              creditAmount: member.amount.toFixed(2),
               narration,
             })),
           ],

@@ -93,7 +93,7 @@ export async function writeDaybookEntry(
     amountCurrency?: number;
     fxRateToUsd?: number;
     amountUsd?: number;
-    createdBy?: number;
+    createdBy?: string | null;
   }
 ) {
   const currency = opts.currencyCode || "USD";

@@ -247,7 +247,7 @@ export function registerFactoryPayrollGenerateRoutes(app: Express, requireAuth: 
           description: `Payroll generated — Worker #${worker.id} (${worker.fullName || worker.employeeCode || ""}). Period: ${startDate} to ${endDate}. Net: $${netSalary.toFixed(2)}`,
           amountCurrency: netSalary,
           amountUsd: netSalary,
-          createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+          createdBy: (req.session as any).userId ?? undefined,
         });
 
         payrollRecords.push(record);

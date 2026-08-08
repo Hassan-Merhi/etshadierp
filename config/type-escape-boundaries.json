@@ -3706,7 +3706,7 @@
       ],
       "server/routes/factory-intelligence/bale-trace-photos.ts": [
         20,
-        10,
+        9,
         0
       ],
       "server/routes/factory-intelligence/cashflow.ts": [
@@ -3716,7 +3716,7 @@
       ],
       "server/routes/factory-intelligence/dashboard-waste.ts": [
         11,
-        13,
+        12,
         0
       ],
       "server/routes/factory-intelligence/index.ts": [
@@ -3756,7 +3756,7 @@
       ],
       "server/routes/factory-payroll/delete.ts": [
         5,
-        5,
+        4,
         0
       ],
       "server/routes/factory-payroll/exports.ts": [
@@ -3766,7 +3766,7 @@
       ],
       "server/routes/factory-payroll/generate.ts": [
         10,
-        3,
+        2,
         0
       ],
       "server/routes/factory-payroll/index.ts": [
@@ -3821,12 +3821,12 @@
       ],
       "server/routes/factory-workers/bales-settle.ts": [
         11,
-        5,
+        3,
         0
       ],
       "server/routes/factory-workers/crud.ts": [
         15,
-        8,
+        4,
         0
       ],
       "server/routes/factory-workers/documents.ts": [
@@ -3836,7 +3836,7 @@
       ],
       "server/routes/factory-workers/import-export.ts": [
         24,
-        2,
+        1,
         0
       ],
       "server/routes/factory-workers/index.ts": [
@@ -3856,7 +3856,7 @@
       ],
       "server/routes/factory-workers/photos.ts": [
         6,
-        2,
+        1,
         0
       ],
       "server/routes/factory/_helpers.ts": [
@@ -5166,7 +5166,7 @@
       ],
       "server/routes/payroll/advance-accounting/bulk-repay.ts": [
         3,
-        2,
+        1,
         0
       ],
       "server/routes/payroll/advance-accounting/cash.ts": [
@@ -5176,7 +5176,7 @@
       ],
       "server/routes/payroll/advance-accounting/repay-by-month.ts": [
         5,
-        2,
+        1,
         0
       ],
       "server/routes/payroll/advance-accounting/repayment-audit.ts": [
@@ -5186,12 +5186,12 @@
       ],
       "server/routes/payroll/advance-accounting/repayments.ts": [
         5,
-        2,
+        1,
         0
       ],
       "server/routes/payroll/advanceManagementRoutes.ts": [
         33,
-        13,
+        10,
         0
       ],
       "server/routes/payroll/centralFactoryPayrollGenerationRoute.ts": [
@@ -5251,7 +5251,7 @@
       ],
       "server/routes/payroll/worker-statement/repayments.ts": [
         3,
-        3,
+        2,
         0
       ],
       "server/routes/payroll/worker-statement/statement.ts": [
@@ -5266,7 +5266,7 @@
       ],
       "server/routes/payroll/workerStatsAdvancesRoutes.ts": [
         48,
-        12,
+        10,
         0
       ],
       "server/routes/performance/readMicrocache.edge-cases.test.ts": [
@@ -6722,6 +6722,6 @@
     }
   },
   "totals": {
-    "typeEscapeCeiling": 11419
+    "typeEscapeCeiling": 11398
   }
 }

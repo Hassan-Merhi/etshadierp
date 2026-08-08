@@ -23,11 +23,12 @@
  *     `voucher_entries` row without its voucher.
  *   - **Both are Admin-only**, and the role check must come before any write.
  *
- * Note on an unrelated wart found while reading: the daybook writes here pass
- * `parseInt(req.session.userId)` into an integer `created_by`, and `users.id`
- * is a UUID — `parseInt` stops at the first non-digit and stores a truncated
- * number rather than failing. It records a meaningless attribution rather than
- * corrupting money, so it is left alone and noted here rather than changed.
+ * The daybook attribution is asserted too. These writes used to pass
+ * `parseInt(req.session.userId)` into `created_by` while `users.id` is a UUID,
+ * so `parseInt` stopped at the first non-digit and stored a truncated number —
+ * a plausible-looking id belonging to nobody. The column was varchar all along;
+ * only the code was wrong. The test below pins the full id, because a truncated
+ * one is indistinguishable from a real one by inspection.
  */
 import request from "supertest";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -124,6 +125,22 @@ describe("POST /api/factory/workers/:id/advances", () => {
     expect(Number(cashLeg?.credit_amount)).toBeCloseTo(250, 2);
     const advancesLeg = legs.find((leg) => leg.ledger_account_id !== ctx.cashAccountId);
     expect(Number(advancesLeg?.debit_amount)).toBeCloseTo(250, 2);
+  });
+
+  it("attributes the daybook entry to the full session user id", async () => {
+    const advance = await giveAdvance("60.00");
+
+    const entry = await pool.query<{ created_by: string | null }>(
+      `SELECT created_by FROM factory_daybook_entries
+       WHERE company_id = $1 AND reference_table = 'factory_worker_advances' AND reference_id = $2`,
+      [ctx.companyId, advance.id]
+    );
+
+    expect(entry.rowCount).toBe(1);
+    // users.id is a UUID. This used to be written through parseInt, which stops
+    // at the first non-digit and stored a truncated number — an id that looks
+    // real and belongs to nobody.
+    expect(entry.rows[0].created_by).toBe(ctx.userId);
   });
 
   it("starts the remaining balance at the full amount", async () => {

@@ -16,13 +16,14 @@
  *     tombstones it. A rename that left the account behind puts the next
  *     month's journal under the old name.
  *
- * NOTE ON DIRECTION: `generate` credits Insurance Expense and debits each
- * member's liability account. That is the reverse of the convention the
- * transporter charge routes use (Dr expense / Cr liability), and it is pinned
- * here as the behaviour that exists rather than endorsed as correct — flipping
- * it would move real balances and is a decision for whoever owns the chart of
- * accounts, not a refactor. The assertion below is written so that the *pairing*
- * and the totals are locked either way.
+ * DIRECTION: `generate` debits Insurance Expense and credits each member's
+ * liability account. It ran the other way round until the direction was
+ * corrected — the expense credited, the liabilities debited — which made the
+ * monthly journal reduce recorded expense and made each member's account read
+ * as an asset. The specific direction is asserted below rather than merely that
+ * the legs land on opposite sides, so the correction cannot be quietly undone.
+ * Journals posted before the fix keep the old direction; repairing those is a
+ * data question and is left to whoever owns the chart of accounts.
  */
 import request from "supertest";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -238,7 +239,7 @@ describe("POST /api/insurance/generate", () => {
     expect(debits).toBeCloseTo(60, 2);
   });
 
-  it("keeps the expense leg and the member legs on opposite sides", async () => {
+  it("debits the expense account and credits the member's liability", async () => {
     await deactivateAllMembers();
     const member = await createMember({
       name: `${TEST_PREFIX} Sides`,
@@ -254,15 +255,15 @@ describe("POST /api/insurance/generate", () => {
       [response.body.voucherId]
     );
     const memberLeg = legs.rows.find((leg) => leg.ledger_account_id === member.ledger_account_id);
-    const otherLeg = legs.rows.find((leg) => leg.ledger_account_id !== member.ledger_account_id);
+    const expenseLeg = legs.rows.find((leg) => leg.ledger_account_id !== member.ledger_account_id);
 
-    expect(memberLeg).toBeDefined();
-    expect(otherLeg).toBeDefined();
-    // Whichever way round the convention is, the two must never land on the
-    // same side — that is the failure that silently doubles a balance.
-    const memberOnDebit = Number(memberLeg?.debit_amount) > 0;
-    const otherOnDebit = Number(otherLeg?.debit_amount) > 0;
-    expect(memberOnDebit).not.toBe(otherOnDebit);
-    expect(Number(memberLeg?.debit_amount) + Number(memberLeg?.credit_amount)).toBeCloseTo(45, 2);
+    // Incurring the month's insurance is an expense, and what the company now
+    // owes the member is a liability. Run the other way — as this did until the
+    // direction was corrected — it reduces recorded expense and makes the
+    // member's account read as an asset.
+    expect(Number(expenseLeg?.debit_amount)).toBeCloseTo(45, 2);
+    expect(Number(expenseLeg?.credit_amount)).toBeCloseTo(0, 2);
+    expect(Number(memberLeg?.credit_amount)).toBeCloseTo(45, 2);
+    expect(Number(memberLeg?.debit_amount)).toBeCloseTo(0, 2);
   });
 });

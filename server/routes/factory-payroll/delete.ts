@@ -94,7 +94,7 @@ export function registerFactoryPayrollDeleteRoutes(app: Express, requireAuth: an
         referenceId: id,
         referenceTable: "factory_payrolls",
         description: `Draft payroll #${id} deleted (Worker #${existing.workerId}, period ${existing.periodStart}–${existing.periodEnd}, net $${parseFloat(existing.netSalary || "0").toFixed(2)})`,
-        createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+        createdBy: (req.session as any).userId ?? undefined,
       });
 
       try {

@@ -50,7 +50,7 @@ async function writeDaybookEntry(
     amountCurrency?: number;
     fxRateToUsd?: number;
     amountUsd?: number;
-    createdBy?: number;
+    createdBy?: string | null;
   }
 ) {
   const currency = opts.currencyCode || "USD";
@@ -454,7 +454,7 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
           description: `Advance given to ${worker.fullName}: $${amount.toFixed(2)}`,
           amountCurrency: amount,
           amountUsd: amount,
-          createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+          createdBy: (req.session as any).userId ?? undefined,
         });
 
         return { ...advance, voucherId, workerName: worker.fullName };
@@ -763,7 +763,7 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
             description: `Advance given to ${worker.fullName}: $${amount.toFixed(2)}`,
             amountCurrency: amount,
             amountUsd: amount,
-            createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+            createdBy: (req.session as any).userId ?? undefined,
           });
 
           created.push({ ...advance, workerName: worker.fullName });
