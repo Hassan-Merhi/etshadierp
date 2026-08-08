@@ -343,7 +343,7 @@ export function registerStockItemMergeRoutes(app: Express) {
           mergedItemName: duplicateItem.name,
           snapshotBefore,
           snapshotAfter: (req as any)._mergeSnapshotAfter ?? {},
-          mergedByUserId: userId,
+          mergedByUserId: String(userId),
           notes: notes ?? null,
         });
       } catch (auditErr: unknown) {
