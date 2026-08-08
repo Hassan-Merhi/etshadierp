@@ -64,6 +64,7 @@ const FACTORY_COMPANY_PREFIXES = new Set([
   "cntdel",
   "mixbat",
   "facimp",
+  "wdedwr",
 ]);
 
 function testCompanyType(prefix: string): "erp" | "factory" {
