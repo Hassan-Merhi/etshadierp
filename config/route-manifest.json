@@ -1,7 +1,7 @@
 {
   "formatVersion": 1,
   "description": "Ordered snapshot of every registered Express route (method, path, guard chain) and middleware mount. Regenerate with UPDATE_ROUTE_MANIFEST=1 only when a route change is intended; during a file split the manifest must not change at all.",
-  "routeCount": 1891,
+  "routeCount": 1892,
   "middlewareMountCount": 87,
   "routes": [
     "GET /api/admin/operational-monitoring [requireAuth > <anonymous> > <anonymous>]",
@@ -926,6 +926,7 @@
     "POST /api/screen-feed/admin/runtime/emergency-stop [requireAuth > <anonymous>]",
     "POST /api/screen-feed/admin/runtime/restore-defaults [requireAuth > <anonymous>]",
     "POST /api/screen-feed/admin/runtime/reset-metrics [requireAuth > <anonymous>]",
+    "GET /api/screen-feed/capabilities [requireAuth > <anonymous> > <anonymous>]",
     "GET /api/screen-feed/live/status [requireLogin > <anonymous>]",
     "GET /api/screen-feed/live/:userId [requireAuth > <anonymous> > <anonymous>]",
     "GET /api/screen-feed/being-watched [requireLogin > <anonymous>]",

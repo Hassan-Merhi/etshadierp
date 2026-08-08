@@ -155,6 +155,23 @@ export function registerScreenFeedRoutes(app: Express) {
     res.json(resetRemoteSupportMetrics());
   });
 
+  // The admin runtime snapshot is Developer-only, but every authorized watcher
+  // (Admin/Owner/Manager) needs to know whether the live transport is available
+  // before opening a viewer. Without this they all fall back to polling.
+  app.get("/api/screen-feed/capabilities", requireAuth, viewPermission, (req, res) => {
+    if (!requireSupportController(req, res)) return;
+    res.setHeader("Cache-Control", "no-store");
+    const screenFeedEnabled = isRemoteSupportEnabled("screenFeedEnabled");
+    res.json({
+      flags: {
+        screenFeedEnabled,
+        fastScreenFeed: screenFeedEnabled && isRemoteSupportEnabled("fastScreenFeed"),
+        remoteControl: screenFeedEnabled && isRemoteSupportEnabled("remoteControl"),
+        keyboardControl: screenFeedEnabled && isRemoteSupportEnabled("keyboardControl"),
+      },
+    });
+  });
+
   app.get("/api/screen-feed/live/status", requireLogin, (req, res) => {
     if (!isRemoteSupportEnabled("screenFeedEnabled") || !isRemoteSupportEnabled("fastScreenFeed")) {
       res.setHeader("Cache-Control", "no-store");

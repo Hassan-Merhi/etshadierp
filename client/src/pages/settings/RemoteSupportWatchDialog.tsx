@@ -389,8 +389,11 @@ export function RemoteSupportWatchDialog(props: { userId: string; username: stri
     isLoading,
     isError,
   } = useQuery<RemoteSupportRuntime>({
-    queryKey: ["/api/screen-feed/admin/runtime"],
-    queryFn: () => apiRequest("GET", "/api/screen-feed/admin/runtime").then((response) => response.json()),
+    // Every authorized watcher can read this; the Developer-only admin runtime
+    // snapshot (queryKey: ["/api/screen-feed/admin/runtime"]) answers 403 for
+    // Admin/Owner/Manager, which silently pinned them to polling mode.
+    queryKey: ["/api/screen-feed/capabilities"],
+    queryFn: () => apiRequest("GET", "/api/screen-feed/capabilities").then((response) => response.json()),
     staleTime: 15000,
     retry: 1,
   });
