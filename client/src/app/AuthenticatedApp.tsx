@@ -1,4 +1,4 @@
-import { Suspense, useEffect } from "react";
+import { Suspense } from "react";
 import { lazyRetry as lazy } from "@/lib/lazyRetry";
 import { useDialogScrollFix } from "@/hooks/use-dialog-scroll-fix";
 import { useMobilePerformanceLifecycle } from "@/hooks/use-mobile-performance-lifecycle";
@@ -7,13 +7,13 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useWsInvalidation } from "@/hooks/use-ws-invalidation";
 import { LanguageOnboardingDialog } from "@/components/LanguageOnboardingDialog";
 import { RemoteSupportRuntime } from "@/components/RemoteSupportRuntime";
-import { consumeErpScrollRestore } from "@/lib/erp-navigation-history";
 import type { AuthenticatedUser } from "@/contracts/sessionContracts";
 import { useAppNavigation } from "./useAppNavigation";
 import { useAuthenticatedAppData } from "./useAuthenticatedAppData";
 import { resolveAuthenticatedAppRoute } from "./authenticatedAppRouteGuard";
 import { AppLeaveConfirmDialog } from "./AppLeaveConfirmDialog";
 import { AppLoadingState } from "./AppLoadingState";
+import { useErpScrollRestoration } from "./useErpScrollRestoration";
 
 const PosShell = lazy(() => import("./PosShell").then((module) => ({ default: module.PosShell })));
 const PropertiesShell = lazy(() => import("./PropertiesShell").then((module) => ({ default: module.PropertiesShell })));
@@ -32,40 +32,9 @@ export function AuthenticatedApp({ user, handleLogout }: AuthenticatedAppProps) 
   useDialogScrollFix();
 
   const [currentLocation] = useLocation();
+  useErpScrollRestoration(currentLocation);
   const { showLeaveConfirm, setShowLeaveConfirm, handleGoBack, handleConfirmLeave } = useAppNavigation();
   const isPOS = user.role === "POS";
-
-  useEffect(() => {
-    const main = document.getElementById("main-content");
-    if (!main) return;
-
-    const restoreScrollTop = consumeErpScrollRestore();
-    const targetScrollTop = restoreScrollTop ?? 0;
-    main.scrollTop = targetScrollTop;
-    main.focus({ preventScroll: true });
-
-    // Browser Back can render cached list rows a frame after the route changes.
-    // Re-apply the captured ERP scroll position a few times so the previous
-    // list/table position wins even when content height settles asynchronously.
-    if (restoreScrollTop !== null) {
-      let secondFrame = 0;
-      const firstFrame = window.requestAnimationFrame(() => {
-        main.scrollTop = targetScrollTop;
-        secondFrame = window.requestAnimationFrame(() => {
-          main.scrollTop = targetScrollTop;
-        });
-      });
-      const settleTimer = window.setTimeout(() => {
-        main.scrollTop = targetScrollTop;
-      }, 150);
-
-      return () => {
-        window.cancelAnimationFrame(firstFrame);
-        if (secondFrame) window.cancelAnimationFrame(secondFrame);
-        window.clearTimeout(settleTimer);
-      };
-    }
-  }, [currentLocation]);
 
   const { chatUnread, posImportEnabled, myAccess, myAccessLoading, myAccessError, factorySettings } =
     useAuthenticatedAppData({ selectedCompanyId: selectedCompany?.id, userPresent: true, isPOS });
