@@ -4,6 +4,8 @@ import { ArrowLeft, ChevronUp, ChevronDown } from "lucide-react";
 import { useCursorNav } from "@/contexts/CursorNavContext";
 import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { getParentRoute } from "@/lib/parent-routes";
+import { canGoBackToPreviousErpLocation } from "@/lib/erp-navigation-history";
+import { useAppMode } from "@/contexts/AppModeContext";
 import { useLocation } from "wouter";
 
 export interface PageHeaderProps {
@@ -31,9 +33,11 @@ export function PageHeader({
 }: PageHeaderProps) {
   const { config } = useCursorNav();
   const [location] = useLocation();
+  const mode = useAppMode();
   const resolvedBackTarget = backTarget === undefined ? getParentRoute(location) : backTarget;
+  const hasTrackedErpBack = mode === "erp" && canGoBackToPreviousErpLocation();
   const handleBack = useBackToParent(resolvedBackTarget);
-  const hasBack = showBackButton && !!resolvedBackTarget;
+  const hasBack = showBackButton && (!!resolvedBackTarget || hasTrackedErpBack);
   const hasNav = hasBack || (showCursorNavButtons && !!config);
 
   return (
