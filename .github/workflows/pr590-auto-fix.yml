@@ -141,11 +141,26 @@ jobs:
         shell: bash
         run: UPDATE_TYPE_ESCAPE_BASELINE=1 npm run audit:type-escapes
 
-      - name: Refresh reviewed route and smoke snapshots
+      - name: Refresh and verify route manifest
         shell: bash
         run: |
-          UPDATE_ROUTE_MANIFEST=1 npm run test:backend -- tests/route-manifest.test.ts
+          UPDATE_ROUTE_MANIFEST=1 npm run test:backend -- tests/route-manifest.test.ts || true
+          python <<'PY'
+          from pathlib import Path
+          import json
+          p = Path("config/ci-ratchet-allowances.json")
+          data = json.loads(p.read_text())
+          data["routeManifestAdditions"] = []
+          data["routeManifestMountAdditions"] = []
+          p.write_text(json.dumps(data, indent=2) + "\n")
+          PY
+          npm run test:backend -- tests/route-manifest.test.ts
+
+      - name: Refresh and verify smoke snapshot
+        shell: bash
+        run: |
           UPDATE_API_SMOKE_SHAPES=1 npm run test:smoke-sweep
+          npm run test:smoke-sweep
 
       - name: Format changed source
         run: npx prettier --write client/src/components/StockNameUpdateImport.tsx client/src/pages/AccountsLegacy.tsx server/routes/payroll/core/migrations.ts shared/schema/factoryBilingualTables.ts config/god-file-boundaries.json config/ci-ratchet-allowances.json config/type-escape-boundaries.json config/route-manifest.json config/api-smoke-shapes.json docs/god-file-split-program.md docs/system-quality-program.md
