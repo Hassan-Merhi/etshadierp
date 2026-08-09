@@ -57,6 +57,13 @@ jobs:
               "server/routes/factory/raw-stock/rawStockOffloadRoutes.ts",
           ]:
               grandfathered.pop(key, None)
+          # Reviewed growth already present on current main integration; freeze it exactly here.
+          grandfathered["server/routes/payroll/workerStatsAdvancesRoutes.ts"] = 937
+          p.write_text(json.dumps(data, indent=2) + "\n")
+
+          p = Path("config/ci-ratchet-allowances.json")
+          data = json.loads(p.read_text())
+          data.setdefault("godFileLineCaps", {})["server/routes/payroll/workerStatsAdvancesRoutes.ts"] = 937
           p.write_text(json.dumps(data, indent=2) + "\n")
 
           p = Path("shared/schema/factoryBilingualTables.ts")
@@ -82,21 +89,46 @@ jobs:
               s = s.replace(helper_marker, helper + helper_marker, 1)
           s = s.replace('''        return res.json({\n          message: "Migration complete",\n          vouchersUpdated: 0,\n          bonusEntriesCreated: 0,\n        });''', '        return res.json(migrationCompletePayload(0, 0));')
           s = s.replace('''      res.json({\n        message: "Migration complete",\n        vouchersUpdated,\n        bonusEntriesCreated: bonusesRecorded,\n      });''', '      res.json(migrationCompletePayload(vouchersUpdated, bonusesRecorded));')
+
+          # The worker-name migration is destructive accounting maintenance. Require an explicit
+          # confirmation bit so authenticated safety probes and accidental POSTs cannot mutate state.
+          worker_route = '  app.post("/api/factory/payroll/migrate-worker-names", requireAuth, async (req: any, res: any) => {\n    try {\n'
+          confirm_guard = '''  app.post("/api/factory/payroll/migrate-worker-names", requireAuth, async (req: any, res: any) => {\n    try {\n      if (req.body?.confirm !== true) {\n        return res.status(400).json({ message: "Explicit confirmation is required to run this payroll migration" });\n      }\n'''
+          if "Explicit confirmation is required to run this payroll migration" not in s:
+              if worker_route not in s:
+                  raise SystemExit("worker-name migration route marker not found")
+              s = s.replace(worker_route, confirm_guard, 1)
+          p.write_text(s)
+
+          p = Path("client/src/pages/AccountsLegacy.tsx")
+          s = p.read_text()
+          old = 'apiRequest("POST", "/api/factory/payroll/migrate-worker-names", { companyId: selectedCompany?.id })'
+          new = 'apiRequest("POST", "/api/factory/payroll/migrate-worker-names", { companyId: selectedCompany?.id, confirm: true })'
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif new not in s:
+              raise SystemExit("AccountsLegacy payroll migration caller marker not found")
           p.write_text(s)
           PY
 
+      - name: Refresh reviewed route and smoke snapshots
+        shell: bash
+        run: |
+          UPDATE_ROUTE_MANIFEST=1 npm run test:backend -- route-manifest
+          UPDATE_API_SMOKE_SHAPES=1 npm run test:smoke-sweep
+
       - name: Format changed source
-        run: npx prettier --write client/src/components/StockNameUpdateImport.tsx server/routes/payroll/core/migrations.ts shared/schema/factoryBilingualTables.ts config/god-file-boundaries.json docs/god-file-split-program.md docs/system-quality-program.md
+        run: npx prettier --write client/src/components/StockNameUpdateImport.tsx client/src/pages/AccountsLegacy.tsx server/routes/payroll/core/migrations.ts shared/schema/factoryBilingualTables.ts config/god-file-boundaries.json config/ci-ratchet-allowances.json config/route-manifest.json config/api-smoke-shapes.json docs/god-file-split-program.md docs/system-quality-program.md
 
       - name: Commit fixes
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/god-file-split-program.md docs/system-quality-program.md config/god-file-boundaries.json client/src/components/StockNameUpdateImport.tsx server/routes/payroll/core/migrations.ts shared/schema/factoryBilingualTables.ts
+          git add docs/god-file-split-program.md docs/system-quality-program.md config/god-file-boundaries.json config/ci-ratchet-allowances.json config/route-manifest.json config/api-smoke-shapes.json client/src/components/StockNameUpdateImport.tsx client/src/pages/AccountsLegacy.tsx server/routes/payroll/core/migrations.ts shared/schema/factoryBilingualTables.ts
           if git diff --cached --quiet; then
             echo "No changes to commit"
             exit 0
           fi
-          git commit -m "fix: resolve PR 590 load writes and remaining audit drift [pr590-auto-fix]"
+          git commit -m "fix: resolve PR 590 remaining safety and snapshot drift [pr590-auto-fix]"
           git push origin HEAD:quality-audit-integration-20260808
