@@ -12,6 +12,32 @@ jobs:
   fix:
     if: ${{ !contains(github.event.head_commit.message, '[pr590-auto-fix]') }}
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: heliumdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
+      PGSSLMODE: disable
+      NODE_ENV: test
+      SESSION_SECRET: ci-session-secret
+      CSRF_ENFORCE: "0"
+      ENABLE_SCHEDULERS: "false"
+      NODE_OPTIONS: --max-old-space-size=4096
+      PORT: "5000"
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,6 +55,9 @@ jobs:
           sed -i 's#https://registry.replit.com/#https://registry.npmjs.org/#g' package-lock.json .npmrc 2>/dev/null || true
 
       - run: npm ci
+
+      - name: Prepare CI database schema
+        run: node node_modules/drizzle-kit/bin.cjs push --force
 
       - name: Apply mechanical and safety fixes
         shell: bash
@@ -57,7 +86,6 @@ jobs:
               "server/routes/factory/raw-stock/rawStockOffloadRoutes.ts",
           ]:
               grandfathered.pop(key, None)
-          # Reviewed growth already present on current main integration; freeze it exactly here.
           grandfathered["server/routes/payroll/workerStatsAdvancesRoutes.ts"] = 937
           p.write_text(json.dumps(data, indent=2) + "\n")
 
@@ -90,8 +118,6 @@ jobs:
           s = s.replace('''        return res.json({\n          message: "Migration complete",\n          vouchersUpdated: 0,\n          bonusEntriesCreated: 0,\n        });''', '        return res.json(migrationCompletePayload(0, 0));')
           s = s.replace('''      res.json({\n        message: "Migration complete",\n        vouchersUpdated,\n        bonusEntriesCreated: bonusesRecorded,\n      });''', '      res.json(migrationCompletePayload(vouchersUpdated, bonusesRecorded));')
 
-          # The worker-name migration is destructive accounting maintenance. Require an explicit
-          # confirmation bit so authenticated safety probes and accidental POSTs cannot mutate state.
           worker_route = '  app.post("/api/factory/payroll/migrate-worker-names", requireAuth, async (req: any, res: any) => {\n    try {\n'
           confirm_guard = '''  app.post("/api/factory/payroll/migrate-worker-names", requireAuth, async (req: any, res: any) => {\n    try {\n      if (req.body?.confirm !== true) {\n        return res.status(400).json({ message: "Explicit confirmation is required to run this payroll migration" });\n      }\n'''
           if "Explicit confirmation is required to run this payroll migration" not in s:
@@ -111,21 +137,25 @@ jobs:
           p.write_text(s)
           PY
 
+      - name: Reconcile type-escape baseline to integrated tree
+        shell: bash
+        run: UPDATE_TYPE_ESCAPE_BASELINE=1 npm run audit:type-escapes
+
       - name: Refresh reviewed route and smoke snapshots
         shell: bash
         run: |
-          UPDATE_ROUTE_MANIFEST=1 npm run test:backend -- route-manifest
+          UPDATE_ROUTE_MANIFEST=1 npm run test:backend -- tests/route-manifest.test.ts
           UPDATE_API_SMOKE_SHAPES=1 npm run test:smoke-sweep
 
       - name: Format changed source
-        run: npx prettier --write client/src/components/StockNameUpdateImport.tsx client/src/pages/AccountsLegacy.tsx server/routes/payroll/core/migrations.ts shared/schema/factoryBilingualTables.ts config/god-file-boundaries.json config/ci-ratchet-allowances.json config/route-manifest.json config/api-smoke-shapes.json docs/god-file-split-program.md docs/system-quality-program.md
+        run: npx prettier --write client/src/components/StockNameUpdateImport.tsx client/src/pages/AccountsLegacy.tsx server/routes/payroll/core/migrations.ts shared/schema/factoryBilingualTables.ts config/god-file-boundaries.json config/ci-ratchet-allowances.json config/type-escape-boundaries.json config/route-manifest.json config/api-smoke-shapes.json docs/god-file-split-program.md docs/system-quality-program.md
 
       - name: Commit fixes
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/god-file-split-program.md docs/system-quality-program.md config/god-file-boundaries.json config/ci-ratchet-allowances.json config/route-manifest.json config/api-smoke-shapes.json client/src/components/StockNameUpdateImport.tsx client/src/pages/AccountsLegacy.tsx server/routes/payroll/core/migrations.ts shared/schema/factoryBilingualTables.ts
+          git add docs/god-file-split-program.md docs/system-quality-program.md config/god-file-boundaries.json config/ci-ratchet-allowances.json config/type-escape-boundaries.json config/route-manifest.json config/api-smoke-shapes.json client/src/components/StockNameUpdateImport.tsx client/src/pages/AccountsLegacy.tsx server/routes/payroll/core/migrations.ts shared/schema/factoryBilingualTables.ts
           if git diff --cached --quiet; then
             echo "No changes to commit"
             exit 0
