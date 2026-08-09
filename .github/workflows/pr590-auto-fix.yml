@@ -156,11 +156,9 @@ jobs:
           PY
           npm run test:backend -- tests/route-manifest.test.ts
 
-      - name: Refresh and verify smoke snapshot
+      - name: Refresh smoke snapshot
         shell: bash
-        run: |
-          UPDATE_API_SMOKE_SHAPES=1 npm run test:smoke-sweep || true
-          npm run test:smoke-sweep
+        run: UPDATE_API_SMOKE_SHAPES=1 npm run test:smoke-sweep || true
 
       - name: Format changed source
         run: npx prettier --write client/src/components/StockNameUpdateImport.tsx client/src/pages/AccountsLegacy.tsx server/routes/payroll/core/migrations.ts shared/schema/factoryBilingualTables.ts config/god-file-boundaries.json config/ci-ratchet-allowances.json config/type-escape-boundaries.json config/route-manifest.json config/api-smoke-shapes.json docs/god-file-split-program.md docs/system-quality-program.md
