@@ -267,3 +267,12 @@ describe("POST /api/insurance/generate", () => {
     expect(Number(memberLeg?.debit_amount)).toBeCloseTo(0, 2);
   });
 });
+
+describe("POST /api/insurance/admin/repair-reversed-journals", () => {
+  it("defaults to a dry run", async () => {
+    const response = await agent.post("/api/insurance/admin/repair-reversed-journals").send({});
+    expect(response.status).toBe(200);
+    expect(response.body.dryRun).toBe(true);
+    expect(response.body.confirmationRequired).toBe("REPAIR_REVERSED_INSURANCE_JOURNALS");
+  });
+});

@@ -288,6 +288,7 @@ const SENSITIVE_WRITE_ROUTES = [
   "POST /api/factory/workers/:id/deductions",
   "POST /api/fix-old-po-credits",
   "POST /api/fix-parent-po-supplier-entries",
+  "POST /api/insurance/admin/repair-reversed-journals",
   "POST /api/insurance/generate",
   "POST /api/insurance/members",
   "POST /api/intercompany-links",

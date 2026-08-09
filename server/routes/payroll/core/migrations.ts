@@ -402,6 +402,9 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
   // shows an expandable group row instead of a flat list.  Safe to run multiple times.
   app.post("/api/factory/payroll/migrate-salary-groups", requireAuth, async (req: any, res: any) => {
     try {
+      if (req.body?.confirm !== true) {
+        return res.status(400).json({ message: "Explicit confirmation is required to run this payroll migration" });
+      }
       const currentRole = (req.session as any).currentRole;
       if (!["Admin", "Owner", "Developer"].includes(currentRole)) {
         return res.status(403).json({ message: "Only Admin, Owner, or Developer can run this migration" });
