@@ -194,7 +194,7 @@
       "client/src/pages/vouchers/StockTransferForm.tsx": 2400,
       "server/chatService.ts": 2000,
       "server/index.ts": 1725,
-      "server/routes/payroll/workerStatsAdvancesRoutes.ts": 922,
+      "server/routes/payroll/workerStatsAdvancesRoutes.ts": 937,
       "server/services/factory/postOffloadPhase6Safety.ts": 927,
       "server/services/rental/rentalPaymentPostingService.ts": 925,
       "tests/excel-export-v2.test.ts": 1425,

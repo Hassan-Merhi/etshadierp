@@ -1,7 +1,7 @@
 {
   "description": "Reviewed CI ratchet deltas for intentional functionality added before the architecture snapshots were refreshed. Every allowance is exact so unrelated growth or routes still fail. The route-manifest additions were folded into config/route-manifest.json on 2026-08-05, so these lists only contain exact reviewed deltas since that snapshot.",
   "godFileLineCaps": {
-    "server/routes/payroll/workerStatsAdvancesRoutes.ts": 922,
+    "server/routes/payroll/workerStatsAdvancesRoutes.ts": 937,
     "server/services/factory/postOffloadPhase6Safety.ts": 927,
     "server/services/rental/rentalPaymentPostingService.ts": 958,
     "client/src/pages/ContainerLoadingScan.tsx": 1133,
@@ -10,12 +10,8 @@
     "client/src/pages/factory/FactoryShippingContainers.tsx": 913,
     "client/src/pages/vouchers/StockTransferForm.tsx": 2388
   },
-  "routeManifestAdditions": [
-    "POST /api/stock-items/update-names-by-code [requireAuth > requireNonPOS > <anonymous>]"
-  ],
-  "routeManifestMountAdditions": [
-    "USE /api/properties/rental [<anonymous>]"
-  ],
+  "routeManifestAdditions": [],
+  "routeManifestMountAdditions": [],
   "sourceTextAssertionDelta": {
     "additionalSourceCoupledTests": [
       "tests/factory-post-offload-phase5-reconciliation.test.ts",

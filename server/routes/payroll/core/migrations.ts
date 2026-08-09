@@ -229,6 +229,9 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
   // Safe to run multiple times (idempotent per voucher).
   app.post("/api/factory/payroll/migrate-worker-names", requireAuth, async (req: any, res: any) => {
     try {
+      if (req.body?.confirm !== true) {
+        return res.status(400).json({ message: "Explicit confirmation is required to run this payroll migration" });
+      }
       const currentRole = (req.session as any).currentRole;
       if (!["Admin", "Owner", "Developer"].includes(currentRole)) {
         return res.status(403).json({ message: "Only Admin, Owner, or Developer can run this migration" });

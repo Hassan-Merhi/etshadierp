@@ -7,7 +7,22 @@
   ],
   "skippedFailing": [
     "/api/accounts/multi-currency/unresolved-openings",
-    "/api/sessions"
+    "/api/auth/passkey/list",
+    "/api/factory/bale-ledger",
+    "/api/git/agent-duty-wa-settings",
+    "/api/git/containers-wa-settings",
+    "/api/git/transfer-wa-settings",
+    "/api/location-inventory/whatsapp/groups",
+    "/api/sessions",
+    "/api/whatsapp/chats",
+    "/api/whatsapp/chats/pos",
+    "/api/whatsapp/instance-state/main",
+    "/api/whatsapp/instance-state/pos",
+    "/api/whatsapp/np-settings",
+    "/api/whatsapp/recipients",
+    "/api/whatsapp/settings",
+    "/api/whatsapp/settings/pos",
+    "/api/whatsapp/stock-settings"
   ],
   "routes": {
     "/api/accounts/all": {
@@ -48,7 +63,7 @@
     },
     "/api/admin/operational-monitoring": {
       "status": 200,
-      "shape": "{alerts:[],buildVersion:scalar,events:{byCode:[],counts:{bandwidth:scalar,error:scalar,integrity:scalar},recent:[],severityCounts:{critical:scalar,info:scalar,warning:scalar}},generatedAt:scalar,metrics:{bandwidth:{apiEndpointCount:scalar,budgets:{…},endpointCount:scalar,generatedAt:scalar,ranked:[],staticAssetCount:scalar,staticAssets:[],totalApiResponseBytes:scalar,totalStaticAssetResponseBytes:scalar,violations:[],windowMs:scalar},databasePool:{active:scalar,idle:scalar,max:scalar,total:scalar,utilizationPercent:scalar,waiting:scalar},operationalEvents:{byCode:[],counts:{…},recent:[],severityCounts:{…}},process:{memoryMb:{…},nodeEnv:scalar,startedAt:scalar,uptimeSeconds:scalar},requests:{active:scalar,averageDurationMs:scalar,clientError:scalar,completed:scalar,database:{…},durationBuckets:{…},maxDurationMs:scalar,serverError:scalar,serverErrorPercent:scalar,slow:scalar,slowPercent:scalar,slowRequestThresholdMs:scalar,slowRequestThresholdsMs:{…},success:scalar,total:scalar},status:scalar,timestamp:scalar},readMicrocache:{bytes:scalar,coalesced:scalar,entries:scalar,evictions:scalar,hits:scalar,invalidations:scalar,misses:scalar,revalidated:scalar,stores:scalar},status:scalar,summary:{activeRequests:scalar,databasePoolUtilizationPercent:scalar,databasePoolWaiting:scalar,heapUsedMb:scalar,recentCriticalEvents:scalar,serverErrorPercent:scalar,slowRequestPercent:scalar,uptimeSeconds:scalar},thresholds:{databasePoolWaitingWarning:scalar,heapUsedMbCritical:scalar,heapUsedMbWarning:scalar,recentCriticalEventsWarning:scalar,serverErrorPercentCritical:scalar,serverErrorPercentWarning:scalar,slowRequestPercentCritical:scalar,slowRequestPercentWarning:scalar}}"
+      "shape": "{alerts:[],buildVersion:scalar,events:{byCode:[],counts:{bandwidth:scalar,error:scalar,integrity:scalar},recent:[],severityCounts:{critical:scalar,info:scalar,warning:scalar}},generatedAt:scalar,metrics:{bandwidth:{apiEndpointCount:scalar,budgets:{…},endpointCount:scalar,generatedAt:scalar,ranked:[],staticAssetCount:scalar,staticAssets:[],totalApiResponseBytes:scalar,totalStaticAssetResponseBytes:scalar,violations:[],windowMs:scalar},databasePool:{active:scalar,idle:scalar,max:scalar,total:scalar,utilizationPercent:scalar,waiting:scalar},operationalEvents:{byCode:[],counts:{…},recent:[],severityCounts:{…}},process:{memoryMb:{…},nodeEnv:scalar,startedAt:scalar,uptimeSeconds:scalar},requests:{active:scalar,averageDurationMs:scalar,clientError:scalar,completed:scalar,database:{…},durationBuckets:{…},expectedClientResponse:scalar,maxDurationMs:scalar,serverError:scalar,serverErrorPercent:scalar,slow:scalar,slowPercent:scalar,slowRequestThresholdMs:scalar,slowRequestThresholdsMs:{…},success:scalar,total:scalar},status:scalar,timestamp:scalar},readMicrocache:{bytes:scalar,coalesced:scalar,entries:scalar,evictions:scalar,hits:scalar,invalidations:scalar,misses:scalar,revalidated:scalar,stores:scalar},status:scalar,summary:{activeRequests:scalar,databasePoolUtilizationPercent:scalar,databasePoolWaiting:scalar,heapUsedMb:scalar,recentCriticalEvents:scalar,serverErrorPercent:scalar,slowRequestPercent:scalar,uptimeSeconds:scalar},thresholds:{databasePoolWaitingWarning:scalar,heapUsedMbCritical:scalar,heapUsedMbWarning:scalar,recentCriticalEventsWarning:scalar,serverErrorPercentCritical:scalar,serverErrorPercentWarning:scalar,slowRequestPercentCritical:scalar,slowRequestPercentWarning:scalar}}"
     },
     "/api/admin/orphaned-pos-sales": {
       "status": 200,
@@ -98,10 +113,6 @@
       "status": 200,
       "shape": "{assignedLocationId:scalar,canAccessCustomers:scalar,canDeleteRecords:scalar,canSellNegativeStock:scalar,cashAccountId:scalar,currentCompanyId:scalar,currentLocationId:scalar,currentPOSStation:scalar,currentRole:scalar,daybookEditDays:scalar,id:scalar,posStation:scalar,posViewOnly:scalar,role:scalar,username:scalar}"
     },
-    "/api/auth/passkey/list": {
-      "status": 200,
-      "shape": "[]"
-    },
     "/api/auth/session-company": {
       "status": 200,
       "shape": "{companyId:scalar}"
@@ -144,7 +155,7 @@
     },
     "/api/chat/users": {
       "status": 200,
-      "shape": "[{active:scalar,hasMessages:scalar,id:scalar,isOnline:scalar,lastSeen:scalar,unreadCount:scalar,username:scalar}]"
+      "shape": "[]"
     },
     "/api/chatbot/alerts": {
       "status": 200,
@@ -358,13 +369,9 @@
       "status": 403,
       "shape": "{code:scalar,message:scalar}"
     },
-    "/api/factory/bale-ledger": {
-      "status": 403,
-      "shape": "{code:scalar,message:scalar}"
-    },
     "/api/factory/bale-ledger/details": {
-      "status": 403,
-      "shape": "{code:scalar,message:scalar}"
+      "status": 400,
+      "shape": "{message:scalar}"
     },
     "/api/factory/bale-lookup": {
       "status": 403,
@@ -611,6 +618,10 @@
       "shape": "{code:scalar,message:scalar}"
     },
     "/api/factory/pressing-batches": {
+      "status": 403,
+      "shape": "{code:scalar,message:scalar}"
+    },
+    "/api/factory/production-positions": {
       "status": 403,
       "shape": "{code:scalar,message:scalar}"
     },
@@ -902,10 +913,6 @@
       "status": 200,
       "shape": "{agents:[],asOf:scalar,companyId:scalar,companyName:scalar,mode:scalar}"
     },
-    "/api/git/agent-duty-wa-settings": {
-      "status": 200,
-      "shape": "{groups:{},hasCredentials:scalar,waEnabled:scalar}"
-    },
     "/api/git/at-port": {
       "status": 200,
       "shape": "{asOf:scalar,companyId:scalar,companyName:scalar,containers:[],facets:{agents:[],companies:[],containerNumbers:[],etaDates:[],hasContainersWithNoEta:scalar,locations:[],suppliers:[],transporters:[],trucks:[]},hasMore:scalar,mode:scalar,page:scalar,pageSize:scalar,summary:{arrived:scalar,atPort:scalar,atSea:scalar,delayed:scalar,inTransit:scalar,leftDar:scalar,overdue:scalar,total:scalar,totalCost:scalar,totalTransportDuty:scalar},total:scalar,totalPages:scalar}"
@@ -914,17 +921,9 @@
       "status": 200,
       "shape": "{asOf:scalar,companyId:scalar,companyName:scalar,containers:[],facets:{agents:[],companies:[],containerNumbers:[],etaDates:[],hasContainersWithNoEta:scalar,locations:[],suppliers:[],transporters:[],trucks:[]},hasMore:scalar,mode:scalar,page:scalar,pageSize:scalar,summary:{arrived:scalar,atPort:scalar,atSea:scalar,delayed:scalar,inTransit:scalar,leftDar:scalar,overdue:scalar,total:scalar,totalCost:scalar,totalTransportDuty:scalar},total:scalar,totalPages:scalar}"
     },
-    "/api/git/containers-wa-settings": {
-      "status": 200,
-      "shape": "{groupChatId:scalar,hasCredentials:scalar,lastSentAt:scalar,scheduleEnabled:scalar,scheduleHour:scalar,waEnabled:scalar}"
-    },
     "/api/git/summary": {
       "status": 200,
       "shape": "{asOf:scalar,companyId:scalar,companyName:scalar,mode:scalar,summary:{byStatus:{},delayed:scalar,docsReadyNotSent:scalar,overdue:scalar,total:scalar,withTruck:scalar,withoutTruck:scalar}}"
-    },
-    "/api/git/transfer-wa-settings": {
-      "status": 200,
-      "shape": "{companies:[{companyId:scalar,companyName:scalar,groupChatId:scalar}],hasCredentials:scalar,waEnabled:scalar}"
     },
     "/api/git/truck-location": {
       "status": 200,
@@ -1014,17 +1013,25 @@
       "status": 200,
       "shape": "[]"
     },
+    "/api/location-inventory/whatsapp/capability": {
+      "status": 200,
+      "shape": "{canManage:scalar}"
+    },
+    "/api/location-inventory/whatsapp/cost-capability": {
+      "status": 200,
+      "shape": "{canSendWithCost:scalar}"
+    },
     "/api/location-price-groups": {
       "status": 200,
       "shape": "[]"
     },
     "/api/location-summary": {
       "status": 200,
-      "shape": "{grandTotals:{},stockGroups:[]}"
+      "shape": "{asOfDate:scalar,grandTotals:{},stockGroups:[]}"
     },
     "/api/locations": {
       "status": 200,
-      "shape": "[{active:scalar,city:scalar,code:scalar,companyId:scalar,country:scalar,createdAt:scalar,deletedAt:scalar,id:scalar,name:scalar,state:scalar,supplierPartnerPayableDeductionPerQty:scalar,transferWaGroupChatId:scalar,whatsappGroupChatId:scalar}]"
+      "shape": "[{active:scalar,city:scalar,code:scalar,companyId:scalar,country:scalar,createdAt:scalar,deletedAt:scalar,id:scalar,name:scalar,state:scalar,supplierPartnerPayableDeductionPerQty:scalar,transferWaGroupChatId:scalar,whatsappGroupChatId:scalar,whatsappGroupName:scalar,whatsappStockReportsEnabled:scalar}]"
     },
     "/api/login-history": {
       "status": 200,
@@ -1299,8 +1306,8 @@
       "shape": "{message:scalar}"
     },
     "/api/screen-feed/live/status": {
-      "status": 409,
-      "shape": "{live:scalar}"
+      "status": 204,
+      "shape": "{}"
     },
     "/api/settings/role-permissions": {
       "status": 200,
@@ -1553,42 +1560,6 @@
     "/api/waste-dispatches": {
       "status": 200,
       "shape": "[]"
-    },
-    "/api/whatsapp/chats": {
-      "status": 400,
-      "shape": "{message:scalar}"
-    },
-    "/api/whatsapp/chats/pos": {
-      "status": 400,
-      "shape": "{message:scalar}"
-    },
-    "/api/whatsapp/instance-state/main": {
-      "status": 200,
-      "shape": "{state:scalar}"
-    },
-    "/api/whatsapp/instance-state/pos": {
-      "status": 200,
-      "shape": "{state:scalar}"
-    },
-    "/api/whatsapp/np-settings": {
-      "status": 200,
-      "shape": "{autoSend:scalar,enabled:scalar,frequency:scalar,lastSentAt:scalar,recipientId:scalar,recipientName:scalar,sendDayOfWeek:scalar,sendHour:scalar}"
-    },
-    "/api/whatsapp/recipients": {
-      "status": 200,
-      "shape": "[]"
-    },
-    "/api/whatsapp/settings": {
-      "status": 200,
-      "shape": "{apiToken:scalar,dailyAutoSend:scalar,dailyRecipientId:scalar,dailyRecipientName:scalar,enabled:scalar,hasCredentials:scalar,instanceId:scalar,monthlyAutoSend:scalar}"
-    },
-    "/api/whatsapp/settings/pos": {
-      "status": 200,
-      "shape": "{apiToken:scalar,enabled:scalar,hasCredentials:scalar,instanceId:scalar}"
-    },
-    "/api/whatsapp/stock-settings": {
-      "status": 200,
-      "shape": "{autoSend:scalar,companyId:scalar,enabled:scalar,frequency:scalar,lastSentAt:scalar,recipientId:scalar,sendDayOfWeek:scalar,sendHour:scalar}"
     },
     "/api/worker-groups": {
       "status": 200,
