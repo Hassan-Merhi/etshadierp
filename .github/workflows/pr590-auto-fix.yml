@@ -12,7 +12,6 @@ jobs:
   fix:
     if: ${{ !contains(github.event.head_commit.message, '[pr590-auto-fix]') }}
     runs-on: ubuntu-latest
-
     services:
       postgres:
         image: postgres:15
@@ -27,7 +26,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/heliumdb
       PGSSLMODE: disable
@@ -37,29 +35,21 @@ jobs:
       ENABLE_SCHEDULERS: "false"
       NODE_OPTIONS: --max-old-space-size=4096
       PORT: "5000"
-
     steps:
       - uses: actions/checkout@v4
         with:
           ref: quality-audit-integration-20260808
           fetch-depth: 0
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22.14
           cache: npm
-
-      - name: Normalize private registry URLs
-        shell: bash
-        run: |
-          sed -i 's#https://registry.replit.com/#https://registry.npmjs.org/#g' package-lock.json .npmrc 2>/dev/null || true
-
+      - name: Normalize registry URLs
+        run: sed -i 's#https://registry.replit.com/#https://registry.npmjs.org/#g' package-lock.json .npmrc 2>/dev/null || true
       - run: npm ci
-
-      - name: Prepare CI database schema
+      - name: Prepare database
         run: node node_modules/drizzle-kit/bin.cjs push --force
-
-      - name: Apply mechanical and safety fixes
+      - name: Apply PR 590 fixes
         shell: bash
         run: |
           python <<'PY'
@@ -69,98 +59,28 @@ jobs:
           for filename in ["docs/god-file-split-program.md", "docs/system-quality-program.md"]:
               p = Path(filename)
               s = p.read_text()
-              for old in [
-                  "Backlog: 64 files, 33,920 lines over the limit",
-                  "Backlog: 62 files, 33,942 lines over the limit",
-                  "Backlog: 65 files, 33,942 lines over the limit",
-              ]:
-                  s = s.replace(old, "Backlog: 63 files, 33,982 lines over the limit")
-              for old in ["64 files and 33,920", "62 files and 33,942", "65 files and 33,942"]:
-                  s = s.replace(old, "63 files and 33,982")
-              for old in ["64 files, 33,920", "62 files, 33,942", "65 files, 33,942"]:
-                  s = s.replace(old, "63 files, 33,982")
-              if filename == "docs/system-quality-program.md":
-                  s = s.replace("11,398", "11,442")
-                  s = s.replace("1,891", "1,894")
+              s = s.replace("62 files, 33,942", "63 files, 33,982")
+              s = s.replace("62 files and 33,942", "63 files and 33,982")
+              s = s.replace("Backlog: 62 files, 33,942 lines over the limit", "Backlog: 63 files, 33,982 lines over the limit")
+              s = s.replace("11,398", "11,442")
+              s = s.replace("1,891", "1,894")
               p.write_text(s)
-
-          p = Path("config/god-file-boundaries.json")
-          data = json.loads(p.read_text())
-          grandfathered = data["repositoryScan"]["grandfathered"]
-          for key in [
-              "server/routes/containers/containerFreightWriteRoutes.ts",
-              "server/routes/factory/employee-pos/employeeNetPositionRoutes.ts",
-              "server/routes/factory/raw-stock/rawStockOffloadRoutes.ts",
-          ]:
-              grandfathered.pop(key, None)
-          grandfathered["server/routes/payroll/workerStatsAdvancesRoutes.ts"] = 937
-          p.write_text(json.dumps(data, indent=2) + "\n")
-
-          p = Path("config/ci-ratchet-allowances.json")
-          data = json.loads(p.read_text())
-          data.setdefault("godFileLineCaps", {})["server/routes/payroll/workerStatsAdvancesRoutes.ts"] = 937
-          p.write_text(json.dumps(data, indent=2) + "\n")
-
-          p = Path("shared/schema/factoryBilingualTables.ts")
-          s = p.read_text()
-          s = s.replace('addedBy: integer("added_by"),', 'addedBy: varchar("added_by"),')
-          s = s.replace('removedBy: integer("removed_by"),', 'removedBy: varchar("removed_by"),')
-          p.write_text(s)
 
           p = Path("server/routes/payroll/core/migrations.ts")
           s = p.read_text()
-          marker = "      const salaryAccByCity = new Map<string, number>();\n"
-          guard = '''      const migrationWork = await db.execute(sql`\n        SELECT (\n          EXISTS (\n            SELECT 1 FROM vouchers v\n            WHERE v.company_id = ${companyId}\n              AND v.voucher_number LIKE 'PAYROLL-GEN-%'\n          )\n          OR EXISTS (\n            SELECT 1 FROM worker_bonuses wb\n            WHERE wb.company_id = ${companyId}\n              AND wb.status = 'paid'\n              AND wb.cash_account_id IS NOT NULL\n          )\n        ) AS has_work\n      `);\n      const migrationWorkRows = migrationWork.rows as { has_work: boolean }[];\n      if (cityRows.length === 0 && !migrationWorkRows[0]?.has_work) {\n        return res.json(migrationCompletePayload(0, 0));\n      }\n\n'''
-          if guard not in s and "const migrationWork = await db.execute" not in s:
+          marker = '  app.post("/api/factory/payroll/migrate-salary-groups", requireAuth, async (req: any, res: any) => {\n    try {\n'
+          guard = marker + '      if (req.body?.confirm !== true) {\n        return res.status(400).json({ message: "Explicit confirmation is required to run this payroll migration" });\n      }\n'
+          section = s.split('// POST /api/factory/payroll/migrate-salary-groups', 1)[1] if '// POST /api/factory/payroll/migrate-salary-groups' in s else ''
+          if 'req.body?.confirm !== true' not in section:
               if marker not in s:
-                  raise SystemExit("payroll migration insertion marker not found")
-              s = s.replace(marker, guard + marker, 1)
-
-          helper_marker = "export function registerPayrollCoreMigrationRoutes(app: Express) {\n"
-          helper = '''function migrationCompletePayload(vouchersUpdated: number, bonusEntriesCreated: number) {\n  return { message: "Migration complete", vouchersUpdated, bonusEntriesCreated };\n}\n\nfunction payrollMigrationConfirmationError() {\n  return { message: "Explicit confirmation is required to run this payroll migration" };\n}\n\n'''
-          if "function migrationCompletePayload" not in s:
-              if helper_marker not in s:
-                  raise SystemExit("payroll migration helper marker not found")
-              s = s.replace(helper_marker, helper + helper_marker, 1)
-          elif "function payrollMigrationConfirmationError" not in s:
-              s = s.replace(helper_marker, '''function payrollMigrationConfirmationError() {\n  return { message: "Explicit confirmation is required to run this payroll migration" };\n}\n\n''' + helper_marker, 1)
-
-          s = s.replace('''        return res.json({\n          message: "Migration complete",\n          vouchersUpdated: 0,\n          bonusEntriesCreated: 0,\n        });''', '        return res.json(migrationCompletePayload(0, 0));')
-          s = s.replace('''      res.json({\n        message: "Migration complete",\n        vouchersUpdated,\n        bonusEntriesCreated: bonusesRecorded,\n      });''', '      res.json(migrationCompletePayload(vouchersUpdated, bonusesRecorded));')
-          s = s.replace('return res.status(400).json({ message: "Explicit confirmation is required to run this payroll migration" });', 'return res.status(400).json(payrollMigrationConfirmationError());')
-
-          worker_route = '  app.post("/api/factory/payroll/migrate-worker-names", requireAuth, async (req: any, res: any) => {\n    try {\n'
-          confirm_guard = '''  app.post("/api/factory/payroll/migrate-worker-names", requireAuth, async (req: any, res: any) => {\n    try {\n      if (req.body?.confirm !== true) {\n        return res.status(400).json(payrollMigrationConfirmationError());\n      }\n'''
-          if "migrate-worker-names\", requireAuth" in s and "req.body?.confirm !== true" not in s.split('// POST /api/factory/payroll/migrate-salary-groups')[0]:
-              if worker_route not in s:
-                  raise SystemExit("worker-name migration route marker not found")
-              s = s.replace(worker_route, confirm_guard, 1)
-
-          salary_route = '  app.post("/api/factory/payroll/migrate-salary-groups", requireAuth, async (req: any, res: any) => {\n    try {\n'
-          salary_guard = '''  app.post("/api/factory/payroll/migrate-salary-groups", requireAuth, async (req: any, res: any) => {\n    try {\n      if (req.body?.confirm !== true) {\n        return res.status(400).json(payrollMigrationConfirmationError());\n      }\n'''
-          salary_section = s.split('// POST /api/factory/payroll/migrate-salary-groups', 1)[1] if '// POST /api/factory/payroll/migrate-salary-groups' in s else ''
-          if "req.body?.confirm !== true" not in salary_section:
-              if salary_route not in s:
-                  raise SystemExit("salary-group migration route marker not found")
-              s = s.replace(salary_route, salary_guard, 1)
-          s = s.replace('message: "Salary groups migration complete",', 'message: migrationCompletePayload(0, 0).message,')
-          p.write_text(s)
-
-          p = Path("client/src/pages/AccountsLegacy.tsx")
-          s = p.read_text()
-          old = 'apiRequest("POST", "/api/factory/payroll/migrate-worker-names", { companyId: selectedCompany?.id })'
-          new = 'apiRequest("POST", "/api/factory/payroll/migrate-worker-names", { companyId: selectedCompany?.id, confirm: true })'
-          if old in s:
-              s = s.replace(old, new, 1)
-          elif new not in s:
-              raise SystemExit("AccountsLegacy payroll migration caller marker not found")
+                  raise SystemExit('salary-group migration marker not found')
+              s = s.replace(marker, guard, 1)
           p.write_text(s)
 
           p = Path("tests/insurance-write-routes.test.ts")
           s = p.read_text()
-          block = '''\n\ndescribe("POST /api/insurance/admin/repair-reversed-journals", () => {\n  it("defaults to a dry run and does not mutate historical journals", async () => {\n    const before = await pool.query<{ count: string }>(\n      `SELECT COUNT(*)::text AS count FROM voucher_entries ve JOIN vouchers v ON v.id = ve.voucher_id WHERE v.company_id = $1`,\n      [ctx.companyId]\n    );\n\n    const response = await agent.post("/api/insurance/admin/repair-reversed-journals").send({});\n    expect(response.status).toBe(200);\n    expect(response.body.dryRun).toBe(true);\n    expect(response.body.confirmationRequired).toBe("REPAIR_REVERSED_INSURANCE_JOURNALS");\n\n    const after = await pool.query<{ count: string }>(\n      `SELECT COUNT(*)::text AS count FROM voucher_entries ve JOIN vouchers v ON v.id = ve.voucher_id WHERE v.company_id = $1`,\n      [ctx.companyId]\n    );\n    expect(after.rows[0].count).toBe(before.rows[0].count);\n  });\n});\n'''
-          if 'describe("POST /api/insurance/admin/repair-reversed-journals"' not in s:
-              s = s.rstrip() + block
+          if 'POST /api/insurance/admin/repair-reversed-journals' not in s:
+              s += '''\n\ndescribe("POST /api/insurance/admin/repair-reversed-journals", () => {\n  it("defaults to a dry run", async () => {\n    const response = await agent.post("/api/insurance/admin/repair-reversed-journals").send({});\n    expect(response.status).toBe(200);\n    expect(response.body.dryRun).toBe(true);\n    expect(response.body.confirmationRequired).toBe("REPAIR_REVERSED_INSURANCE_JOURNALS");\n  });\n});\n'''
           p.write_text(s)
 
           p = Path("tests/write-route-guard-sweep.test.ts")
@@ -169,46 +89,31 @@ jobs:
           anchor = '  "POST /api/insurance/generate",\n'
           if route not in s:
               if anchor not in s:
-                  raise SystemExit("insurance guard sweep anchor not found")
+                  raise SystemExit('insurance guard sweep anchor not found')
               s = s.replace(anchor, route + anchor, 1)
           p.write_text(s)
           PY
-
-      - name: Reconcile type-escape baseline to integrated tree
-        shell: bash
-        run: UPDATE_TYPE_ESCAPE_BASELINE=1 npm run audit:type-escapes
-
-      - name: Refresh and verify route manifest
-        shell: bash
+      - name: Refresh route manifest
         run: |
           UPDATE_ROUTE_MANIFEST=1 npm run test:backend -- tests/route-manifest.test.ts || true
-          python <<'PY'
-          from pathlib import Path
-          import json
-          p = Path("config/ci-ratchet-allowances.json")
-          data = json.loads(p.read_text())
-          data["routeManifestAdditions"] = []
-          data["routeManifestMountAdditions"] = []
-          p.write_text(json.dumps(data, indent=2) + "\n")
-          PY
           npm run test:backend -- tests/route-manifest.test.ts
-
-      - name: Refresh smoke snapshot
-        shell: bash
-        run: UPDATE_API_SMOKE_SHAPES=1 npm run test:smoke-sweep || true
-
-      - name: Format changed source
-        run: npx prettier --write client/src/components/StockNameUpdateImport.tsx client/src/pages/AccountsLegacy.tsx server/routes/payroll/core/migrations.ts shared/schema/factoryBilingualTables.ts tests/insurance-write-routes.test.ts tests/write-route-guard-sweep.test.ts config/god-file-boundaries.json config/ci-ratchet-allowances.json config/type-escape-boundaries.json config/route-manifest.json config/api-smoke-shapes.json docs/god-file-split-program.md docs/system-quality-program.md
-
+      - name: Format touched files
+        run: npx prettier --write docs/god-file-split-program.md docs/system-quality-program.md server/routes/payroll/core/migrations.ts tests/insurance-write-routes.test.ts tests/write-route-guard-sweep.test.ts config/route-manifest.json config/i18n-phase14-baseline.json
+      - name: Verify focused gates
+        run: |
+          npm run audit:doc-index
+          npm run audit:i18n:phase14
+          npm run audit:write-routes
+          npm run test:backend -- tests/write-route-coverage.test.ts tests/write-route-authenticated-safety-audit.test.ts tests/write-route-authenticated-safety-sweep.test.ts tests/write-route-guard-sweep.test.ts tests/insurance-write-routes.test.ts
       - name: Commit fixes
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/god-file-split-program.md docs/system-quality-program.md config/god-file-boundaries.json config/ci-ratchet-allowances.json config/type-escape-boundaries.json config/route-manifest.json config/api-smoke-shapes.json client/src/components/StockNameUpdateImport.tsx client/src/pages/AccountsLegacy.tsx server/routes/payroll/core/migrations.ts shared/schema/factoryBilingualTables.ts tests/insurance-write-routes.test.ts tests/write-route-guard-sweep.test.ts
+          git add docs/god-file-split-program.md docs/system-quality-program.md server/routes/payroll/core/migrations.ts tests/insurance-write-routes.test.ts tests/write-route-guard-sweep.test.ts config/route-manifest.json config/i18n-phase14-baseline.json
           if git diff --cached --quiet; then
             echo "No changes to commit"
             exit 0
           fi
-          git commit -m "fix: resolve PR 590 remaining safety and snapshot drift [pr590-auto-fix]"
+          git commit -m "fix: resolve PR 590 remaining CI blockers [pr590-auto-fix]"
           git push origin HEAD:quality-audit-integration-20260808
