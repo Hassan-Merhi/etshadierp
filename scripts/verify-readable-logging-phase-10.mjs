@@ -7,8 +7,8 @@ const requiredFiles = [
   "server/lib/operationalEvents.ts",
   "server/routes/auth/activityOverviewRoutes.ts",
   "docs/render-production-logging.md",
-  "docs/logging-phases-8-9.md",
-  "docs/logging-phase-10-release.md",
+  "docs/archive/logging-phases-8-9.md",
+  "docs/archive/logging-phase-10-release.md",
   "scripts/verify-readable-logging-phases-1-7.mjs",
   "scripts/verify-readable-logging-phases-8-9.mjs",
 ];
@@ -56,7 +56,7 @@ requireText("docs/render-production-logging.md", [
   "X-Request-Id",
   "LOG_FORMAT=pretty",
 ]);
-requireText("docs/logging-phase-10-release.md", [
+requireText("docs/archive/logging-phase-10-release.md", [
   "Stage 1",
   "Stage 2",
   "Stage 3",

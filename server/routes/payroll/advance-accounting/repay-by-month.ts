@@ -166,7 +166,7 @@ export function registerAdvanceRepayByMonthRoutes(app: Express) {
             amountCurrency: bal,
             currencyCode: "USD",
             amountUsd: bal,
-            createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+            createdBy: (req.session as any).userId ?? undefined,
           });
 
           repaidCount++;

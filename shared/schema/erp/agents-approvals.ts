@@ -26,7 +26,7 @@ export const stockItemMergeLogs = pgTable(
     mergedItemName: text("merged_item_name").notNull(),
     snapshotBefore: jsonb("snapshot_before").notNull().$type<Record<string, unknown>>(),
     snapshotAfter: jsonb("snapshot_after").notNull().$type<Record<string, unknown>>(),
-    mergedByUserId: integer("merged_by_user_id").notNull(),
+    mergedByUserId: varchar("merged_by_user_id").notNull(),
     mergedAt: timestamp("merged_at").notNull().defaultNow(),
     notes: text("notes"),
   },

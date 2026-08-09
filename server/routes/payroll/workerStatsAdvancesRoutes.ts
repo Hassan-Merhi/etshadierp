@@ -50,7 +50,7 @@ async function writeDaybookEntry(
     amountCurrency?: number;
     fxRateToUsd?: number;
     amountUsd?: number;
-    createdBy?: number;
+    createdBy?: string | null;
   }
 ) {
   const currency = opts.currencyCode || "USD";
@@ -80,7 +80,9 @@ async function findOrCreateLedger(companyId: number, name: string, accountType: 
   const [existing] = await db
     .select({ id: ledgerAccounts.id })
     .from(ledgerAccounts)
-    .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, name), isNull(ledgerAccounts.deletedAt)));
+    .where(
+      and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, name), isNull(ledgerAccounts.deletedAt))
+    );
   if (existing) return existing;
 
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -100,7 +102,13 @@ async function findOrCreateLedger(companyId: number, name: string, accountType: 
         const [nowFound] = await db
           .select({ id: ledgerAccounts.id })
           .from(ledgerAccounts)
-          .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, name), isNull(ledgerAccounts.deletedAt)));
+          .where(
+            and(
+              eq(ledgerAccounts.companyId, companyId),
+              eq(ledgerAccounts.name, name),
+              isNull(ledgerAccounts.deletedAt)
+            )
+          );
         if (nowFound) return nowFound;
         continue;
       }
@@ -454,7 +462,7 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
           description: `Advance given to ${worker.fullName}: $${amount.toFixed(2)}`,
           amountCurrency: amount,
           amountUsd: amount,
-          createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+          createdBy: (req.session as any).userId ?? undefined,
         });
 
         return { ...advance, voucherId, workerName: worker.fullName };
@@ -518,7 +526,14 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
       if (!deductionDate) return res.status(400).json({ message: "Deduction date is required" });
       const [deduction] = await db
         .insert(factoryWorkerDeductions)
-        .values({ companyId, workerId, amount: parseFloat(amount).toFixed(2), reason: reason || null, deductionDate, applied: false } as any)
+        .values({
+          companyId,
+          workerId,
+          amount: parseFloat(amount).toFixed(2),
+          reason: reason || null,
+          deductionDate,
+          applied: false,
+        } as any)
         .returning();
       res.json(deduction);
     } catch (error: unknown) {
@@ -763,7 +778,7 @@ export function registerWorkerStatsAdvancesRoutes(app: Express) {
             description: `Advance given to ${worker.fullName}: $${amount.toFixed(2)}`,
             amountCurrency: amount,
             amountUsd: amount,
-            createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+            createdBy: (req.session as any).userId ?? undefined,
           });
 
           created.push({ ...advance, workerName: worker.fullName });

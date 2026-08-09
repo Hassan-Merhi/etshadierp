@@ -5,6 +5,7 @@ import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { logger } from "../../lib/logger";
 import { requireSpCompany } from "./spHelpers";
+import { resultRows } from "../../lib/queryResult";
 
 export const SP_PERMISSIONS = [
   "sp_view",
@@ -79,7 +80,9 @@ export function ensureSpAccessControlStorage(): Promise<void> {
           UNIQUE (company_id, user_id, permission, idempotency_key)
         )
       `);
-      await db.execute(sql`CREATE INDEX IF NOT EXISTS sp_audit_events_company_created_idx ON sp_audit_events(company_id, created_at DESC)`);
+      await db.execute(
+        sql`CREATE INDEX IF NOT EXISTS sp_audit_events_company_created_idx ON sp_audit_events(company_id, created_at DESC)`
+      );
     })().catch((error) => {
       storageReady = null;
       throw error;
@@ -91,10 +94,22 @@ export function ensureSpAccessControlStorage(): Promise<void> {
 function classifyPermission(req: Request): SpPermission {
   const path = req.path;
   const method = req.method.toUpperCase();
-  if (path.includes("migration") || path.includes("cutover") || path.includes("final-verification") || path.startsWith("/production/")) return "sp_migration";
+  if (
+    path.includes("migration") ||
+    path.includes("cutover") ||
+    path.includes("final-verification") ||
+    path.startsWith("/production/")
+  )
+    return "sp_migration";
   if (path.includes("setup")) return "sp_setup";
   if (path.includes("opening-stock")) return "sp_opening_stock";
-  if (path.includes("/report/") || path.includes("/export") || path.includes("reconciliation") || path.includes("profit-splits")) return "sp_reports";
+  if (
+    path.includes("/report/") ||
+    path.includes("/export") ||
+    path.includes("reconciliation") ||
+    path.includes("profit-splits")
+  )
+    return "sp_reports";
   if (path.includes("/sales/") && path.endsWith("/reverse")) return "sp_sales_reverse";
   if (path.includes("offload") && path.endsWith("/reverse")) return "sp_offload_reverse";
   if (path === "/offload" && method === "POST") return "sp_offload";
@@ -105,14 +120,22 @@ function classifyPermission(req: Request): SpPermission {
 
 function sensitiveRequirement(req: Request): { confirmation: string; requireReason: boolean } | null {
   const path = req.path;
-  if (path === "/production/evidence" && req.method === "POST") return { confirmation: "RECORD SP PRODUCTION EVIDENCE", requireReason: true };
-  if (path === "/production/close-rollback-window" && req.method === "POST") return { confirmation: "CLOSE SP ROLLBACK WINDOW", requireReason: true };
-  if (path.includes("/sales/") && path.endsWith("/reverse")) return { confirmation: "REVERSE SP SALE", requireReason: true };
-  if (path.includes("/containers/") && path.endsWith("/cancel")) return { confirmation: "CANCEL SP CONTAINER", requireReason: true };
-  if (path.includes("offload") && path.endsWith("/reverse")) return { confirmation: "REVERSE SP OFFLOAD", requireReason: true };
-  if (path.includes("opening-stock") && req.method !== "GET") return { confirmation: "POST SP OPENING STOCK", requireReason: true };
-  if (path.includes("profit-splits") && req.method === "POST") return { confirmation: "FINALIZE SP PROFIT SPLIT", requireReason: true };
-  if ((path.includes("migration") || path.includes("cutover")) && req.method !== "GET") return { confirmation: "RUN SP MIGRATION", requireReason: true };
+  if (path === "/production/evidence" && req.method === "POST")
+    return { confirmation: "RECORD SP PRODUCTION EVIDENCE", requireReason: true };
+  if (path === "/production/close-rollback-window" && req.method === "POST")
+    return { confirmation: "CLOSE SP ROLLBACK WINDOW", requireReason: true };
+  if (path.includes("/sales/") && path.endsWith("/reverse"))
+    return { confirmation: "REVERSE SP SALE", requireReason: true };
+  if (path.includes("/containers/") && path.endsWith("/cancel"))
+    return { confirmation: "CANCEL SP CONTAINER", requireReason: true };
+  if (path.includes("offload") && path.endsWith("/reverse"))
+    return { confirmation: "REVERSE SP OFFLOAD", requireReason: true };
+  if (path.includes("opening-stock") && req.method !== "GET")
+    return { confirmation: "POST SP OPENING STOCK", requireReason: true };
+  if (path.includes("profit-splits") && req.method === "POST")
+    return { confirmation: "FINALIZE SP PROFIT SPLIT", requireReason: true };
+  if ((path.includes("migration") || path.includes("cutover")) && req.method !== "GET")
+    return { confirmation: "RUN SP MIGRATION", requireReason: true };
   if (path.includes("setup") && req.method !== "GET") return { confirmation: "CHANGE SP SETUP", requireReason: true };
   return null;
 }
@@ -126,14 +149,19 @@ function sanitizedBody(body: unknown): unknown {
   return copy;
 }
 
-async function hasPermission(companyId: number, userId: string, role: string, permission: SpPermission): Promise<boolean> {
+async function hasPermission(
+  companyId: number,
+  userId: string,
+  role: string,
+  permission: SpPermission
+): Promise<boolean> {
   const result = await db.execute(sql`
     SELECT enabled
     FROM sp_permission_grants
     WHERE company_id = ${companyId} AND user_id = ${userId} AND permission = ${permission}
     LIMIT 1
   `);
-  const row = ((result as any).rows ?? result ?? [])[0];
+  const row = (resultRows(result) ?? [])[0];
   if (row) return row.enabled === true;
   return (ROLE_DEFAULTS[role] ?? []).includes(permission);
 }
@@ -152,7 +180,9 @@ async function enforceSpAccess(req: Request, res: Response, next: NextFunction):
         INSERT INTO sp_audit_events(company_id, user_id, username, role, permission, action, method, path, status_code, request_body)
         VALUES (${companyId}, ${userId || null}, ${req.session.username ?? null}, ${role || null}, ${permission}, 'ACCESS_DENIED', ${req.method}, ${req.originalUrl}, 403, ${JSON.stringify(sanitizedBody(req.body))}::jsonb)
       `);
-      res.status(403).json({ code: "SP_PERMISSION_DENIED", message: `Missing Supplier Partner permission: ${permission}` });
+      res
+        .status(403)
+        .json({ code: "SP_PERMISSION_DENIED", message: `Missing Supplier Partner permission: ${permission}` });
       return;
     }
 
@@ -162,16 +192,23 @@ async function enforceSpAccess(req: Request, res: Response, next: NextFunction):
     let idempotencyKey: string | null = null;
     if (sensitive) {
       if (confirmation !== sensitive.confirmation) {
-        res.status(400).json({ code: "SP_EXACT_CONFIRMATION_REQUIRED", message: `Type exactly: ${sensitive.confirmation}` });
+        res
+          .status(400)
+          .json({ code: "SP_EXACT_CONFIRMATION_REQUIRED", message: `Type exactly: ${sensitive.confirmation}` });
         return;
       }
       if (sensitive.requireReason && reason.length < 5) {
-        res.status(400).json({ code: "SP_REASON_REQUIRED", message: "A meaningful reason of at least 5 characters is required." });
+        res
+          .status(400)
+          .json({ code: "SP_REASON_REQUIRED", message: "A meaningful reason of at least 5 characters is required." });
         return;
       }
       idempotencyKey = String(req.header("Idempotency-Key") ?? (req.body as any)?.idempotencyKey ?? "").trim();
       if (!idempotencyKey) {
-        res.status(400).json({ code: "SP_IDEMPOTENCY_KEY_REQUIRED", message: "Idempotency-Key is required for this sensitive action." });
+        res.status(400).json({
+          code: "SP_IDEMPOTENCY_KEY_REQUIRED",
+          message: "Idempotency-Key is required for this sensitive action.",
+        });
         return;
       }
       try {
@@ -181,7 +218,9 @@ async function enforceSpAccess(req: Request, res: Response, next: NextFunction):
         `);
       } catch (error: any) {
         if (error?.code === "23505") {
-          res.status(409).json({ code: "SP_DUPLICATE_REQUEST", message: "This sensitive request has already been submitted." });
+          res
+            .status(409)
+            .json({ code: "SP_DUPLICATE_REQUEST", message: "This sensitive request has already been submitted." });
           return;
         }
         throw error;
@@ -189,7 +228,9 @@ async function enforceSpAccess(req: Request, res: Response, next: NextFunction):
     }
 
     res.once("finish", () => {
-      void db.execute(sql`
+      void db
+        .execute(
+          sql`
         INSERT INTO sp_audit_events(
           company_id, user_id, username, role, permission, action, method, path, entity_id,
           reason, confirmation, idempotency_key, status_code, request_body
@@ -199,13 +240,19 @@ async function enforceSpAccess(req: Request, res: Response, next: NextFunction):
           ${req.params?.id ?? req.body?.id ?? req.body?.containerId ?? req.body?.cutoverId ?? null}, ${reason || null},
           ${confirmation || null}, ${idempotencyKey}, ${res.statusCode}, ${JSON.stringify(sanitizedBody(req.body))}::jsonb
         )
-      `).catch((error) => logger.error("SP audit event write failed", { error }));
+      `
+        )
+        .catch((error) => logger.error("SP audit event write failed", { error }));
       if (sensitive && res.statusCode >= 400 && idempotencyKey) {
-        void db.execute(sql`
+        void db
+          .execute(
+            sql`
           DELETE FROM sp_idempotency_keys
           WHERE company_id = ${companyId} AND user_id = ${userId}
             AND permission = ${permission} AND idempotency_key = ${idempotencyKey}
-        `).catch((error) => logger.error("SP idempotency rollback failed", { error }));
+        `
+          )
+          .catch((error) => logger.error("SP idempotency rollback failed", { error }));
       }
     });
 

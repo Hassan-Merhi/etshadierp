@@ -10,8 +10,8 @@ const requiredFiles = [
   "server/routes/voucherRoutes.ts",
   "tests/payment-receipt-posting.test.ts",
   "tests/payment-receipt-deletion-policy.test.ts",
-  "docs/program-2-phase-2b.md",
-  "docs/program-2-phase-3-payments-receipts.md",
+  "docs/archive/program-2-phase-2b.md",
+  "docs/archive/program-2-phase-3-payments-receipts.md",
 ];
 
 for (const file of requiredFiles) {
@@ -26,7 +26,7 @@ const create = read("server/routes/vouchers/centralPaymentReceiptCreateRoute.ts"
 const lifecycle = read("server/routes/vouchers/centralPaymentReceiptLifecycleRoute.ts");
 const deletion = read("server/routes/vouchers/centralPaymentReceiptDeleteRoute.ts");
 const registry = read("server/routes/voucherRoutes.ts");
-const doc = read("docs/program-2-phase-3-payments-receipts.md");
+const doc = read("docs/archive/program-2-phase-3-payments-receipts.md");
 
 const registrationIndex = (name) => registry.indexOf(`${name}(app`);
 const before = (a, b) => registrationIndex(a) >= 0 && registrationIndex(a) < registrationIndex(b);

@@ -14,8 +14,8 @@ const requiredFiles = [
   "tests/manual-journal-posting.test.ts",
   "tests/generic-voucher-posting.test.ts",
   "tests/employee-balance-posting.test.ts",
-  "docs/program-2-accounting-convergence.md",
-  "docs/program-2-phase-2-manual-journals-vouchers.md",
+  "docs/archive/program-2-accounting-convergence.md",
+  "docs/archive/program-2-phase-2-manual-journals-vouchers.md",
 ];
 for (const file of requiredFiles) if (!fs.existsSync(file)) throw new Error(`Program 2 Phase 2 missing required file: ${file}`);
 const read = (file) => fs.readFileSync(file, "utf8");

@@ -7,6 +7,7 @@ import { vouchers, voucherEntries, locations, spStockMovements } from "@shared/s
 import { adjustSpInventoryAtomic, respondToSpInventoryIntegrityError } from "../../services/sp/spInventoryIntegrity";
 import { SP_RELEASE_CURRENCY, SP_RELEASE_EXCHANGE_RATE } from "../../services/sp/spReleasePolicy";
 import { requireSpCompany, getSpAccount, parseNum } from "./spHelpers";
+import { resultRows } from "../../lib/queryResult";
 
 // ── Opening Stock ─────────────────────────────────────────────────────────
 
@@ -18,7 +19,7 @@ export function registerSpOpeningStockRoutes(app: Express) {
       const rows = await db.execute(
         sql`SELECT * FROM sp_stock_movements WHERE company_id = ${companyId} AND source_type = 'opening' ORDER BY created_at DESC`
       );
-      res.json((rows as any).rows ?? (rows as any));
+      res.json(resultRows(rows));
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }

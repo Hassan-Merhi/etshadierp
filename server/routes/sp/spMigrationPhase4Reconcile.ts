@@ -10,12 +10,16 @@ import {
   trackRow,
 } from "./spMigrationPhase2Common";
 import { getSourceContainerLines } from "./spMigrationPhase2Charges";
+import { resultRows, firstRow } from "../../lib/queryResult";
 
 function numericEqual(left: unknown, right: unknown, tolerance = 0.0001): boolean {
   return Math.abs(pn(left) - pn(right)) <= tolerance;
 }
 
-function buildSalesAccountMap(sourceAccounts: Map<number, any>, targetAccounts: Awaited<ReturnType<typeof loadTargetAccounts>>) {
+function buildSalesAccountMap(
+  sourceAccounts: Map<number, any>,
+  targetAccounts: Awaited<ReturnType<typeof loadTargetAccounts>>
+) {
   const suspense = targetAccounts.bySubType.get("gc_mig_suspense");
   if (!suspense) throw new Error("Migration Suspense account is missing.");
   const fallback: Record<string, string> = {
@@ -55,7 +59,7 @@ async function existingSourceLinks(
       AND l.target_table = ${targetTable}
     ORDER BY l.source_id, r.created_at DESC
   `);
-  return new Map(((result as any).rows ?? []).map((row: any) => [pn(row.source_id), pn(row.target_id)]));
+  return new Map(resultRows(result).map((row: any) => [pn(row.source_id), pn(row.target_id)]));
 }
 
 export async function reconcileHistoricalSalesCopy(params: {
@@ -90,16 +94,16 @@ export async function reconcileHistoricalSalesCopy(params: {
   let entryLinksAdded = 0;
   const blockers: string[] = [];
 
-  for (const sourceVoucher of (sourceVouchersResult as any).rows ?? []) {
+  for (const sourceVoucher of resultRows(sourceVouchersResult)) {
     let targetVoucherId = voucherLinks.get(pn(sourceVoucher.id)) ?? null;
     if (!targetVoucherId) {
-      const deterministic = (`MIG-GC-${sourceVoucher.voucher_number}`).slice(0, 100);
+      const deterministic = `MIG-GC-${sourceVoucher.voucher_number}`.slice(0, 100);
       const targetResult = await db.execute(sql`
         SELECT id FROM vouchers
         WHERE company_id = ${targetId} AND voucher_number = ${deterministic}
         LIMIT 1
       `);
-      targetVoucherId = pn((targetResult as any).rows?.[0]?.id) || null;
+      targetVoucherId = pn(firstRow(targetResult)?.id) || null;
       if (targetVoucherId) {
         await linkSourceRow(runId, "vouchers", pn(sourceVoucher.id), "vouchers", targetVoucherId);
         voucherLinks.set(pn(sourceVoucher.id), targetVoucherId);
@@ -131,10 +135,10 @@ export async function reconcileHistoricalSalesCopy(params: {
       SELECT id, stock_item_id, quantity, selling_price, cost_price, total_sales, total_cost, profit, configured_price
       FROM sales_items WHERE voucher_id = ${targetVoucherId} ORDER BY id ASC
     `);
-    const targetItems = (targetItemsResult as any).rows ?? [];
+    const targetItems = resultRows(targetItemsResult);
     const linkedTargetItemIds = new Set(Array.from(itemLinks.values()));
 
-    for (const sourceItem of (sourceItemsResult as any).rows ?? []) {
+    for (const sourceItem of resultRows(sourceItemsResult)) {
       const targetStockItemId = stockMap.get(pn(sourceItem.stock_item_id));
       if (!targetStockItemId) {
         blockers.push(`Sale item ${sourceItem.id} has no target stock-item mapping.`);
@@ -177,7 +181,7 @@ export async function reconcileHistoricalSalesCopy(params: {
              ${sourceItem.profit ?? "0"}, ${sourceItem.configured_price ?? null})
           RETURNING id
         `);
-        targetItemId = pn((inserted as any).rows[0].id);
+        targetItemId = pn(resultRows(inserted)[0].id);
         await trackRow(runId, "sales_items", targetItemId);
         itemsInserted++;
       } else {
@@ -197,8 +201,8 @@ export async function reconcileHistoricalSalesCopy(params: {
       SELECT id, ledger_account_id, debit_amount, credit_amount, narration
       FROM voucher_entries WHERE voucher_id = ${targetVoucherId} ORDER BY id ASC
     `);
-    const sourceEntries = (sourceEntriesResult as any).rows ?? [];
-    const targetEntries = (targetEntriesResult as any).rows ?? [];
+    const sourceEntries = resultRows(sourceEntriesResult);
+    const targetEntries = resultRows(targetEntriesResult);
     for (const sourceEntry of sourceEntries) {
       const linkedTargetEntryId = entryLinks.get(pn(sourceEntry.id));
       if (!linkedTargetEntryId) continue;
@@ -215,7 +219,11 @@ export async function reconcileHistoricalSalesCopy(params: {
     const linkedTargetEntryIds = new Set(Array.from(entryLinks.values()));
     const unlinkedTargets = targetEntries.filter((entry: any) => !linkedTargetEntryIds.has(pn(entry.id)));
 
-    if (unlinkedSources.length > 0 && sourceEntries.length === targetEntries.length && unlinkedSources.length === unlinkedTargets.length) {
+    if (
+      unlinkedSources.length > 0 &&
+      sourceEntries.length === targetEntries.length &&
+      unlinkedSources.length === unlinkedTargets.length
+    ) {
       for (let index = 0; index < unlinkedSources.length; index++) {
         const sourceEntryId = pn(unlinkedSources[index].id);
         const targetEntryId = pn(unlinkedTargets[index].id);
@@ -230,7 +238,7 @@ export async function reconcileHistoricalSalesCopy(params: {
       } else {
         for (const sourceEntry of unlinkedSources) {
           const targetLedgerAccountId = sourceEntry.ledger_account_id
-            ? accountMap.map.get(pn(sourceEntry.ledger_account_id)) ?? accountMap.suspenseId
+            ? (accountMap.map.get(pn(sourceEntry.ledger_account_id)) ?? accountMap.suspenseId)
             : accountMap.suspenseId;
           const inserted = await db.execute(sql`
             INSERT INTO voucher_entries (voucher_id, ledger_account_id, debit_amount, credit_amount, narration)
@@ -238,7 +246,7 @@ export async function reconcileHistoricalSalesCopy(params: {
                     ${sourceEntry.credit_amount ?? "0"}, ${sourceEntry.narration ?? null})
             RETURNING id
           `);
-          const targetEntryId = pn((inserted as any).rows[0].id);
+          const targetEntryId = pn(resultRows(inserted)[0].id);
           await trackRow(runId, "voucher_entries", targetEntryId);
           await linkSourceRow(runId, "voucher_entries", pn(sourceEntry.id), "voucher_entries", targetEntryId);
           entryLinks.set(pn(sourceEntry.id), targetEntryId);
@@ -301,7 +309,7 @@ export async function reconcileMigrationOwnedContainers(params: {
   let otwVouchersReactivated = 0;
   const blockers: string[] = [];
 
-  for (const sourceContainer of (linkedResult as any).rows ?? []) {
+  for (const sourceContainer of resultRows(linkedResult)) {
     const sourceContainerId = pn(sourceContainer.id);
     const spContainerId = pn(sourceContainer.sp_container_id);
     const poResult = await db.execute(sql`
@@ -310,10 +318,10 @@ export async function reconcileMigrationOwnedContainers(params: {
       WHERE container_id = ${sourceContainerId}
       ORDER BY id DESC LIMIT 1
     `);
-    const po = (poResult as any).rows?.[0] ?? null;
+    const po = firstRow(poResult) ?? null;
     const supplier = await resolveSupplier(
       sourceContainer.supplier_id ? pn(sourceContainer.supplier_id) : null,
-      sourceContainer.source_supplier_name ?? null
+      sourceContainer.source_supplier_name == null ? null : String(sourceContainer.source_supplier_name)
     );
     if (!supplier.supplierId) {
       blockers.push(`Container ${sourceContainer.container_number}: supplier remains unresolved.`);
@@ -364,8 +372,8 @@ export async function reconcileMigrationOwnedContainers(params: {
       WHERE company_id = ${targetId} AND container_id = ${spContainerId}
       ORDER BY id ASC
     `);
-    const trackedLineIds = new Set(((trackedLinesResult as any).rows ?? []).map((row: any) => pn(row.row_id)));
-    const allLineIds = ((allLinesResult as any).rows ?? []).map((row: any) => pn(row.id));
+    const trackedLineIds = new Set(resultRows(trackedLinesResult).map((row: any) => pn(row.row_id)));
+    const allLineIds = resultRows(allLinesResult).map((row: any) => pn(row.id));
     const untrackedLineIds = allLineIds.filter((id: number) => !trackedLineIds.has(id));
 
     if (untrackedLineIds.length > 0) {
@@ -378,9 +386,11 @@ export async function reconcileMigrationOwnedContainers(params: {
       }
       for (const sourceLine of sourceLines.rows) {
         const sourceStockItemId = sourceLine.stock_item_id ? pn(sourceLine.stock_item_id) : null;
-        const targetStockItemId = sourceStockItemId ? stockMap.get(sourceStockItemId) ?? null : null;
+        const targetStockItemId = sourceStockItemId ? (stockMap.get(sourceStockItemId) ?? null) : null;
         if (sourceStockItemId && !targetStockItemId) {
-          blockers.push(`Container ${sourceContainer.container_number}: line item ${sourceStockItemId} has no target mapping.`);
+          blockers.push(
+            `Container ${sourceContainer.container_number}: line item ${sourceStockItemId} has no target mapping.`
+          );
           continue;
         }
         const articleCode = String(sourceLine.article_code ?? sourceLine.description ?? `MIG-${sourceContainerId}`);
@@ -392,7 +402,7 @@ export async function reconcileMigrationOwnedContainers(params: {
              ${pn(sourceLine.quantity).toFixed(4)}, ${pn(sourceLine.rate).toFixed(4)}, ${targetStockItemId})
           RETURNING id
         `);
-        await trackRow(runId, "sp_container_lines", pn((inserted as any).rows[0].id));
+        await trackRow(runId, "sp_container_lines", pn(resultRows(inserted)[0].id));
         linesRebuilt++;
       }
     }
@@ -407,7 +417,7 @@ export async function reconcileMigrationOwnedContainers(params: {
           AND source_module = 'SP_MIGRATION'
         RETURNING id
       `);
-      const voucherId = pn((reactivated as any).rows?.[0]?.id);
+      const voucherId = pn(firstRow(reactivated)?.id);
       if (voucherId) {
         await db.execute(sql`
           UPDATE sp_containers SET goods_otw_voucher_id = ${voucherId}
@@ -420,7 +430,7 @@ export async function reconcileMigrationOwnedContainers(params: {
         SELECT goods_otw_voucher_id FROM sp_containers
         WHERE id = ${spContainerId} AND company_id = ${targetId}
       `);
-      const voucherId = pn((linkedVoucherResult as any).rows?.[0]?.goods_otw_voucher_id);
+      const voucherId = pn(firstRow(linkedVoucherResult)?.goods_otw_voucher_id);
       if (voucherId) {
         const retired = await db.execute(sql`
           UPDATE vouchers
@@ -431,14 +441,16 @@ export async function reconcileMigrationOwnedContainers(params: {
             AND voucher_number = ${`GC-OTW-${targetId}-${sourceContainerId}`}
           RETURNING id
         `);
-        if ((retired as any).rows?.[0]) {
+        if (firstRow(retired)) {
           await db.execute(sql`
             UPDATE sp_containers SET goods_otw_voucher_id = NULL
             WHERE id = ${spContainerId} AND company_id = ${targetId}
           `);
           otwVouchersRetired++;
         } else {
-          blockers.push(`Container ${sourceContainer.container_number}: linked OTW voucher is not safely migration-owned.`);
+          blockers.push(
+            `Container ${sourceContainer.container_number}: linked OTW voucher is not safely migration-owned.`
+          );
         }
       }
     }

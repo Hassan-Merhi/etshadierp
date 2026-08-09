@@ -15,6 +15,7 @@ import {
   factoryBaleWasteDispatches,
 } from "@shared/schema";
 import { eq, and, desc, sql, inArray } from "drizzle-orm";
+import { resultRows } from "../../../lib/queryResult";
 
 export function registerEmployeeLedgerWasteRoutes(app: Express) {
   app.get("/api/factory/bale-ledger", requireAuth, async (req: any, res: any) => {
@@ -81,17 +82,16 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
         ]
       );
 
-      const allBales: any[] = Array.isArray(allBalesRaw) ? allBalesRaw : (allBalesRaw as any).rows || [];
+      const allBales: any[] = Array.isArray(allBalesRaw) ? allBalesRaw : resultRows(allBalesRaw);
       const pendingOrderBaleIds = new Set<number>(
-        (Array.isArray(pendingOrderBaleIdsRaw)
-          ? pendingOrderBaleIdsRaw
-          : (pendingOrderBaleIdsRaw as any).rows || []
-        ).map((r: any) => Number(r.baleId))
+        (Array.isArray(pendingOrderBaleIdsRaw) ? pendingOrderBaleIdsRaw : resultRows(pendingOrderBaleIdsRaw)).map(
+          (r: any) => Number(r.baleId)
+        )
       );
       // Bales physically gone but DB status not yet updated to SOLD/DISPATCHED
       const staleOrderBaleIds = new Set<number>(
-        (Array.isArray(staleOrderBaleIdsRaw) ? staleOrderBaleIdsRaw : (staleOrderBaleIdsRaw as any).rows || []).map(
-          (r: any) => Number(r.baleId)
+        (Array.isArray(staleOrderBaleIdsRaw) ? staleOrderBaleIdsRaw : resultRows(staleOrderBaleIdsRaw)).map((r: any) =>
+          Number(r.baleId)
         )
       );
 
@@ -337,16 +337,15 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
         ]
       );
 
-      const allBales: any[] = Array.isArray(allBalesRaw) ? allBalesRaw : (allBalesRaw as any).rows || [];
+      const allBales: any[] = Array.isArray(allBalesRaw) ? allBalesRaw : resultRows(allBalesRaw);
       const pendingOrderBaleIds = new Set<number>(
-        (Array.isArray(pendingOrderBaleIdsRaw)
-          ? pendingOrderBaleIdsRaw
-          : (pendingOrderBaleIdsRaw as any).rows || []
-        ).map((r: any) => Number(r.baleId))
+        (Array.isArray(pendingOrderBaleIdsRaw) ? pendingOrderBaleIdsRaw : resultRows(pendingOrderBaleIdsRaw)).map(
+          (r: any) => Number(r.baleId)
+        )
       );
       const staleOrderBaleIds = new Set<number>(
-        (Array.isArray(staleOrderBaleIdsRaw) ? staleOrderBaleIdsRaw : (staleOrderBaleIdsRaw as any).rows || []).map(
-          (r: any) => Number(r.baleId)
+        (Array.isArray(staleOrderBaleIdsRaw) ? staleOrderBaleIdsRaw : resultRows(staleOrderBaleIdsRaw)).map((r: any) =>
+          Number(r.baleId)
         )
       );
 
@@ -539,7 +538,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
           AND waste_dispatch_id IS NOT NULL
         ORDER BY waste_dispatch_id, id
       `);
-      const linkedBales: any[] = Array.isArray(linkedBalesRaw) ? linkedBalesRaw : (linkedBalesRaw as any).rows || [];
+      const linkedBales: any[] = Array.isArray(linkedBalesRaw) ? linkedBalesRaw : resultRows(linkedBalesRaw);
 
       const balesByDispatch = new Map<number, any[]>();
       for (const bale of linkedBales) {
@@ -583,7 +582,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
         FROM factory_bales
         WHERE company_id = ${companyId} AND waste_dispatch_id = ${dispatchId}
       `);
-      const bales: any[] = Array.isArray(linkedBales) ? linkedBales : (linkedBales as any).rows || [];
+      const bales: any[] = Array.isArray(linkedBales) ? linkedBales : resultRows(linkedBales);
 
       await db.transaction(async (tx: any) => {
         const now = new Date();

@@ -301,7 +301,10 @@ export default function Accounts() {
 
   const fixPayrollAccountsMutation = useMutation({
     mutationFn: () =>
-      apiRequest("POST", "/api/factory/payroll/migrate-worker-names", { companyId: selectedCompany?.id }),
+      apiRequest("POST", "/api/factory/payroll/migrate-worker-names", {
+        companyId: selectedCompany?.id,
+        confirm: true,
+      }),
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
       toast({

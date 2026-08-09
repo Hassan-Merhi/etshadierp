@@ -1,11 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "../../db";
-import {
-  pn,
-  money,
-  loadTargetAccounts,
-  mapTargetAccount,
-} from "./spMigrationPhase2Common";
+import { pn, money, loadTargetAccounts, mapTargetAccount } from "./spMigrationPhase2Common";
+import { resultRows, firstRow } from "../../lib/queryResult";
 
 export type ChargeCandidate = {
   sourceKey: string;
@@ -29,7 +25,7 @@ export async function upsertChargeMapping(params: {
 }): Promise<{ reviewStatus: string; amountUsd: number; inserted: boolean }> {
   const { candidate } = params;
   const sourceAccount = candidate.sourceLedgerAccountId
-    ? params.sourceAccounts.get(candidate.sourceLedgerAccountId) ?? null
+    ? (params.sourceAccounts.get(candidate.sourceLedgerAccountId) ?? null)
     : null;
   const mapped = mapTargetAccount(sourceAccount, params.targetAccounts);
 
@@ -72,9 +68,9 @@ export async function upsertChargeMapping(params: {
   `);
 
   return {
-    reviewStatus: String((upsertResult as any).rows?.[0]?.review_status ?? mapped.reviewStatus),
+    reviewStatus: String(firstRow(upsertResult)?.review_status ?? mapped.reviewStatus),
     amountUsd: candidate.amountUsd,
-    inserted: Boolean((upsertResult as any).rows?.[0]?.inserted),
+    inserted: Boolean(firstRow(upsertResult)?.inserted),
   };
 }
 
@@ -130,7 +126,12 @@ export async function getContainerChargeCandidates(container: any, po: any | nul
     WHERE container_id = ${pn(container.id)}
     ORDER BY id ASC
   `);
-  for (const row of (customResult as any).rows ?? []) {
+  for (const row of resultRows<{
+    id: number;
+    charge_type: string | null;
+    amount: string | null;
+    ledger_account_id: number | null;
+  }>(customResult)) {
     addPositiveCharge(candidates, {
       sourceKey: `container_charge:${row.id}`,
       sourceKind: "container_charge",
@@ -148,7 +149,7 @@ export async function getContainerChargeCandidates(container: any, po: any | nul
     ORDER BY id DESC
     LIMIT 1
   `);
-  const offload = (offloadResult as any).rows?.[0] ?? null;
+  const offload = firstRow(offloadResult) ?? null;
   if (offload) {
     addPositiveCharge(candidates, {
       sourceKey: "offload:duties",
@@ -234,8 +235,8 @@ export async function getSourceContainerLines(
       WHERE li.po_id = ${pn(po.id)}
       ORDER BY li.id ASC
     `);
-    if (((poLines as any).rows ?? []).length > 0) {
-      return { source: "purchase_order", rows: (poLines as any).rows };
+    if (resultRows(poLines).length > 0) {
+      return { source: "purchase_order", rows: resultRows(poLines) };
     }
   }
 
@@ -251,8 +252,8 @@ export async function getSourceContainerLines(
     GROUP BY oi.stock_item_id, si.code, si.name
     ORDER BY si.code ASC
   `);
-  if (((offloadLines as any).rows ?? []).length > 0) {
-    return { source: "offload_items", rows: (offloadLines as any).rows };
+  if (resultRows(offloadLines).length > 0) {
+    return { source: "offload_items", rows: resultRows(offloadLines) };
   }
 
   const qty = pn(container.total_kg);
@@ -267,7 +268,7 @@ export async function getSourceContainerLines(
       ORDER BY CASE WHEN lower(code) = lower(${itemName}) THEN 0 ELSE 1 END, id ASC
       LIMIT 1
     `);
-    const sourceItem = (sourceItemResult as any).rows?.[0] ?? null;
+    const sourceItem = firstRow(sourceItemResult) ?? null;
     const rate = pn(container.rate_per_kg) || (qty > 0 ? pn(container.items_total) / qty : 0);
     return {
       source: "container_summary",

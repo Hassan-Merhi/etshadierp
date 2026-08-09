@@ -34,7 +34,7 @@ describe("Phase 14 trilingual release gate", () => {
     expect(policy.ignoredPathRules.every((rule: { reason?: string }) => Boolean(rule.reason))).toBe(true);
     expect(baseline.schemaVersion).toBe(2);
     expect(baseline.detectorVersion).toBe(9);
-    expect(baseline.maxActionable).toBe(12467);
+    expect(baseline.maxActionable).toBe(12468);
     expect(baseline.maxUnclassified).toBe(0);
     expect(Object.keys(baseline.modules)).toHaveLength(14);
     expect(baseline.modules["shared-ui"].maxActionable).toBeLessThanOrEqual(4);

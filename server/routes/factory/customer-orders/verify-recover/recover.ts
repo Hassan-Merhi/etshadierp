@@ -13,6 +13,7 @@ import { requireAuth } from "../../../../auth";
 import { recalculateOrderTotals } from "../../_helpers";
 import { factoryBales, customerProformaLines, customerOrders, customerOrderBales } from "@shared/schema";
 import { eq, and, or, sql } from "drizzle-orm";
+import { resultRows } from "../../../../lib/queryResult";
 
 export function registerOrderRecoverBalesRoutes(app: Express) {
   // ── Admin: recover missing customer_order_bales rows from factory_bales ──────
@@ -62,7 +63,7 @@ export function registerOrderRecoverBalesRoutes(app: Express) {
       const existingBaleCount = await db.execute(
         sql`SELECT COUNT(*)::int AS count FROM customer_order_bales WHERE order_id = ${orderId}`
       );
-      const existingCount = Number(((existingBaleCount as any).rows ?? [{ count: 0 }])[0]?.count ?? 0);
+      const existingCount = Number((resultRows(existingBaleCount) ?? [{ count: 0 }])[0]?.count ?? 0);
       if (existingCount > 0) {
         return res.status(400).json({
           message: `Order already has ${existingCount} bale(s) linked. Recovery is only for orders with 0 linked bales.`,
@@ -199,7 +200,7 @@ export function registerOrderRecoverBalesRoutes(app: Express) {
       const existingResult = await db.execute(
         sql`SELECT COUNT(*)::int AS count FROM customer_order_bales WHERE order_id = ${orderId}`
       );
-      const existingCount = Number(((existingResult as any).rows ?? [{ count: 0 }])[0]?.count ?? 0);
+      const existingCount = Number((resultRows(existingResult) ?? [{ count: 0 }])[0]?.count ?? 0);
       if (existingCount > 0) {
         return res.status(400).json({
           message: `Order already has ${existingCount} bale(s) linked. Use manual Recover Bales for partial recovery.`,
@@ -222,7 +223,7 @@ export function registerOrderRecoverBalesRoutes(app: Express) {
               AND co.status != 'CANCELLED'
               AND cob.order_id != ${orderId}`
       );
-      const claimedIds = new Set<number>(((claimedResult as any).rows ?? []).map((r: any) => Number(r.bale_id)));
+      const claimedIds = new Set<number>(resultRows(claimedResult).map((r: any) => Number(r.bale_id)));
 
       const scannerName: string | null = session.username || session.name || session.email || null;
       let totalLinked = 0;
@@ -243,7 +244,7 @@ export function registerOrderRecoverBalesRoutes(app: Express) {
               ORDER BY id
               LIMIT ${needed * 3}`
         );
-        const candidates: any[] = (candidatesResult as any).rows ?? (candidatesResult as unknown as any[]);
+        const candidates: any[] = resultRows(candidatesResult);
         const available = candidates.filter((b: any) => !claimedIds.has(Number(b.id))).slice(0, needed);
 
         for (const bale of available) {

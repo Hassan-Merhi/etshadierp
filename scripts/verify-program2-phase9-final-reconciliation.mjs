@@ -13,15 +13,15 @@ const phaseVerifiers = [
 ];
 
 const required = [
-  "docs/program-2-phase-1-accounting-foundation.md",
-  "docs/program-2-phase-2-manual-journals-vouchers.md",
-  "docs/program-2-phase-3-payments-receipts.md",
-  "docs/program-2-phase-4-pos-stock-transfers.md",
-  "docs/program-2-phase-5-containers-freight.md",
-  "docs/program-2-phase-6-supplier-partner.md",
-  "docs/program-2-phase-7-payroll.md",
-  "docs/program-2-phase-8-rentals.md",
-  "docs/program-2-phase-9-final-reconciliation.md",
+  "docs/archive/program-2-phase-1-accounting-foundation.md",
+  "docs/archive/program-2-phase-2-manual-journals-vouchers.md",
+  "docs/archive/program-2-phase-3-payments-receipts.md",
+  "docs/archive/program-2-phase-4-pos-stock-transfers.md",
+  "docs/archive/program-2-phase-5-containers-freight.md",
+  "docs/archive/program-2-phase-6-supplier-partner.md",
+  "docs/archive/program-2-phase-7-payroll.md",
+  "docs/archive/program-2-phase-8-rentals.md",
+  "docs/archive/program-2-phase-9-final-reconciliation.md",
   ...phaseVerifiers,
 ];
 
@@ -49,7 +49,7 @@ for (const verifier of phaseVerifiers) {
   }
 }
 
-const completion = fs.readFileSync("docs/program-2-phase-9-final-reconciliation.md", "utf8");
+const completion = fs.readFileSync("docs/archive/program-2-phase-9-final-reconciliation.md", "utf8");
 for (const phrase of [
   "company ownership",
   "historical currency",

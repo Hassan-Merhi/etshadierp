@@ -12,6 +12,7 @@ import {
   factoryInvoiceLoadingBales,
 } from "@shared/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
+import { resultRows } from "../../../lib/queryResult";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -58,7 +59,7 @@ export async function buildLoadingSummary(invoiceId: number, companyId: number, 
   const _invoiceBalesRawResult = await db.execute(
     sql`SELECT * FROM customer_order_bales WHERE order_id = ${invoiceId}`
   );
-  const _invoiceBalesRows: any[] = (_invoiceBalesRawResult as any).rows ?? (_invoiceBalesRawResult as unknown as any[]);
+  const _invoiceBalesRows: any[] = resultRows(_invoiceBalesRawResult);
   const invoiceBalesRaw = _invoiceBalesRows.map((r: any) => ({
     id: r.id as number,
     baleId: r.bale_id as number,

@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 
 import { db } from "../../../db";
+import { resultRows } from "../../../lib/queryResult";
 
 /**
  * The four inventory valuations in the factory net-position report: finished
@@ -69,7 +70,7 @@ export async function computeNetPositionInventory(ctx: NetPositionInventoryConte
         AND co.company_id = ${ctx.companyId}
     )
 `);
-  const invRow = ((invResult as any).rows ?? (invResult as any))[0] ?? {};
+  const invRow = resultRows(invResult)[0] ?? {};
   const inventorySellValue = ctx.round2(parseFloat(String(invRow?.total ?? "0")));
 
   // ── 3b. Raw material stock value — direct SQL, mirrors /api/factory/raw-stock
@@ -110,7 +111,7 @@ export async function computeNetPositionInventory(ctx: NetPositionInventoryConte
     AND  fc.deleted_at IS NULL
   GROUP  BY fc.supplier_id
 `);
-  const rawRows: any[] = (rawResult as any).rows ?? (rawResult as any);
+  const rawRows: any[] = resultRows(rawResult);
 
   const adjResult = await db.execute(sql`
   SELECT supplier_id, type, kg::numeric AS kg, cost_per_kg::numeric AS cpk, material_label
@@ -118,7 +119,7 @@ export async function computeNetPositionInventory(ctx: NetPositionInventoryConte
   WHERE  company_id = ${ctx.companyId}
     AND  deleted_at IS NULL
 `);
-  const adjRows: any[] = (adjResult as any).rows ?? (adjResult as any);
+  const adjRows: any[] = resultRows(adjResult);
 
   // Build per-supplier totals (same weighted-average logic as rawStockReceiptRoutes.ts)
   // cpkLocal = weighted avg of local-currency cost_per_kg (AUD/EUR/USD etc.)
@@ -211,7 +212,7 @@ export async function computeNetPositionInventory(ctx: NetPositionInventoryConte
     AND  fmb.status IN ('CLOSED', 'COMPLETED')
   GROUP  BY fms.supplier_id
 `);
-  const completedBatchRows: any[] = (completedBatchResult as any).rows ?? (completedBatchResult as any);
+  const completedBatchRows: any[] = resultRows(completedBatchResult);
   for (const r of completedBatchRows) {
     if (!r.supplier_id) continue;
     const key = `s${r.supplier_id}`;
@@ -242,7 +243,7 @@ export async function computeNetPositionInventory(ctx: NetPositionInventoryConte
     AND  fmb.status NOT IN ('CLOSED', 'COMPLETED')
   GROUP  BY fms.supplier_id
 `);
-  const openReservedRows: any[] = (openReservedResult as any).rows ?? (openReservedResult as any);
+  const openReservedRows: any[] = resultRows(openReservedResult);
   const reservedBySupKey = new Map<string, number>();
   for (const r of openReservedRows) {
     if (r.supplier_id) reservedBySupKey.set(`s${r.supplier_id}`, parseFloat(String(r.reserved_kg ?? "0")) || 0);
@@ -318,7 +319,7 @@ export async function computeNetPositionInventory(ctx: NetPositionInventoryConte
     AND carry_forward_from_id IS NULL
     AND deleted_at IS NULL
 `);
-  const mixSumRow = ((mixSumResult as any).rows ?? (mixSumResult as any))[0] ?? {};
+  const mixSumRow = resultRows(mixSumResult)[0] ?? {};
   const totalMixKg = parseFloat(String(mixSumRow.total_mix_kg ?? "0")) || 0;
   const totalMixCost = parseFloat(String(mixSumRow.total_mix_cost ?? "0")) || 0;
   const blendedCpk = totalMixKg > 0 ? totalMixCost / totalMixKg : 0;
@@ -335,7 +336,7 @@ export async function computeNetPositionInventory(ctx: NetPositionInventoryConte
   WHERE  b.company_id = ${ctx.companyId}
     AND  b.status NOT IN ('DELETED', 'REMOVED')
 `);
-  const baleSumRow = ((baleSumResult as any).rows ?? (baleSumResult as any))[0] ?? {};
+  const baleSumRow = resultRows(baleSumResult)[0] ?? {};
   const totalBaleKg = parseFloat(String(baleSumRow.total_kg ?? "0")) || 0;
   const totalWgKg = parseFloat(String(baleSumRow.wg_kg ?? "0")) || 0;
 

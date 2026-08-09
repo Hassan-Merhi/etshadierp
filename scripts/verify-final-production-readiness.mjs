@@ -27,7 +27,7 @@ function requireMarkers(relativePath, markers) {
   return source;
 }
 
-requireMarkers("docs/final-production-readiness.md", [
+requireMarkers("docs/archive/final-production-readiness.md", [
   "Never test a restore by overwriting production",
   "HISTORICAL_REPLAY_APPLY_MODE",
   "Supplier Partner Phase 4 rehearsal",
@@ -41,7 +41,7 @@ requireMarkers("docs/operations/database-backup-rollback-recovery.md", [
   "/api/health/ready",
 ]);
 
-requireMarkers("docs/program-3c-database-tenant-guards.md", [
+requireMarkers("docs/archive/program-3c-database-tenant-guards.md", [
   "tenant-control-integrity-audit.mjs",
   "0013_tenant_control_integrity_guards",
   "NOT VALID",
@@ -67,7 +67,7 @@ requireMarkers("scripts/run-versioned-migrations.mjs", [
   "Another versioned migration process already holds the migration lock",
 ]);
 
-requireMarkers("docs/sp-migration-phase-4-runbook.md", [
+requireMarkers("docs/archive/sp-migration-phase-4-runbook.md", [
   "/api/sp/migration/final-verification",
   "PREPARE CUTOVER",
   "FINALIZE CUTOVER",
@@ -75,7 +75,7 @@ requireMarkers("docs/sp-migration-phase-4-runbook.md", [
   "SP_SOURCE_READ_ONLY",
 ]);
 
-requireMarkers("docs/historical-replay-phase-8-production-readiness.md", [
+requireMarkers("docs/archive/historical-replay-phase-8-production-readiness.md", [
   "HISTORICAL_REPLAY_APPLY_MODE=APPROVED_V8_CONTROLLED_APPLY",
   "/historical-replay/readiness",
   "/historical-replay/verification",

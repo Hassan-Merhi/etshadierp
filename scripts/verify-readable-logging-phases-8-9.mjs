@@ -16,7 +16,7 @@ const required = {
     "getOperationalEventSnapshot",
   ],
   "server/routes/authRoutes.ts": ["registerActivityOverviewRoutes"],
-  "docs/logging-phases-8-9.md": ["Phase 8", "Phase 9", "No schema migration"],
+  "docs/archive/logging-phases-8-9.md": ["Phase 8", "Phase 9", "No schema migration"],
 };
 
 const failures = [];

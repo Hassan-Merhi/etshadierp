@@ -93,7 +93,7 @@ for (const requiredPath of [
   if (!fs.existsSync(path.join(root, requiredPath))) failures.push(`missing ${requiredPath}`);
 }
 
-const docs = read("docs/engineering/phase10-scheduled-export-memory.md");
+const docs = read("docs/archive/engineering/phase10-scheduled-export-memory.md");
 for (const phrase of [
   "Explicit daily export lifecycle",
   "Manual email export lifecycle",

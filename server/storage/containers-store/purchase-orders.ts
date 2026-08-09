@@ -305,8 +305,12 @@ export async function deletePurchaseOrder(id: number): Promise<void> {
   const containerId = po.containerId;
   const poItemsTotal = parseFloat(po.itemsTotal || "0");
   const poFreight = parseFloat(po.freight || "0");
+  const poSurcharge = parseFloat(po.surcharge || "0");
+  const poFumigation = parseFloat(po.fumigation || "0");
+  const poDocumentCharges = parseFloat(po.documentCharges || "0");
+  const poDiscount = parseFloat(po.discount || "0");
   const poOtherCharges = parseFloat(po.otherCharges || "0");
-  const poCharges = poFreight + poOtherCharges;
+  const poCharges = poFreight + poSurcharge + poFumigation + poDocumentCharges - poDiscount + poOtherCharges;
 
   const [container] = await db.select().from(schema.containers).where(eq(schema.containers.id, containerId)).limit(1);
 

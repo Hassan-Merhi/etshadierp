@@ -40,7 +40,7 @@ async function writeDaybookEntry(
     amountCurrency?: number;
     fxRateToUsd?: number;
     amountUsd?: number;
-    createdBy?: number;
+    createdBy?: string | null;
   }
 ) {
   const currency = opts.currencyCode || "USD";
@@ -357,7 +357,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
           referenceId: id,
           referenceTable: "factory_worker_advances",
           description: `Advance deleted for ${worker?.fullName || "Unknown"}: $${parseFloat(advance.amount).toFixed(2)}${repayNote}${voucherNote}`,
-          createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+          createdBy: (req.session as any).userId ?? undefined,
         });
       });
 
@@ -417,7 +417,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
           referenceId: id,
           referenceTable: "factory_worker_advances",
           description: `Advance reversed for ${worker?.fullName || "Unknown"}: $${parseFloat(advance.amount).toFixed(2)} restored to outstanding (${repayments.length} repayment(s) removed)`,
-          createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+          createdBy: (req.session as any).userId ?? undefined,
         });
       });
 
@@ -781,7 +781,7 @@ export function registerAdvanceManagementRoutes(app: Express) {
             description: `Cash account assigned for advance to ${workerName}: $${amount.toFixed(2)} → ${acct.name}`,
             amountCurrency: amount,
             amountUsd: amount,
-            createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+            createdBy: (req.session as any).userId ?? undefined,
           });
         }
 

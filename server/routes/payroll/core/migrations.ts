@@ -13,6 +13,12 @@ import { sql, inArray } from "drizzle-orm";
 import { ledgerAccounts, vouchers, voucherEntries } from "@shared/schema";
 import { findOrCreateLedger, getFactoryCompanyId, normUsd } from "./_helpers";
 
+const PAYROLL_MIGRATION_CONFIRMATION_REQUIRED = "Explicit confirmation is required to run this payroll migration";
+
+function migrationCompletePayload(vouchersUpdated: number, bonusEntriesCreated: number) {
+  return { message: "Migration complete", vouchersUpdated, bonusEntriesCreated };
+}
+
 export function registerPayrollCoreMigrationRoutes(app: Express) {
   // POST /api/factory/payroll/migrate-city-split
   // One-time migration: splits historical "Factory Worker Payroll" expense entries by city,
@@ -29,6 +35,26 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
         WHERE company_id = ${companyId} AND city IS NOT NULL AND TRIM(city) <> ''
       `);
       const cityRows = cities.rows as { city: string }[];
+
+      const migrationWork = await db.execute(sql`
+        SELECT (
+          EXISTS (
+            SELECT 1 FROM vouchers v
+            WHERE v.company_id = ${companyId}
+              AND v.voucher_number LIKE 'PAYROLL-GEN-%'
+          )
+          OR EXISTS (
+            SELECT 1 FROM worker_bonuses wb
+            WHERE wb.company_id = ${companyId}
+              AND wb.status = 'paid'
+              AND wb.cash_account_id IS NOT NULL
+          )
+        ) AS has_work
+      `);
+      const migrationWorkRows = migrationWork.rows as { has_work: boolean }[];
+      if (cityRows.length === 0 && !migrationWorkRows[0]?.has_work) {
+        return res.json(migrationCompletePayload(0, 0));
+      }
 
       const salaryAccByCity = new Map<string, number>();
       const bonusAccByCity = new Map<string, number>();
@@ -193,11 +219,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
         bonusesRecorded++;
       }
 
-      res.json({
-        message: "Migration complete",
-        vouchersUpdated,
-        bonusEntriesCreated: bonusesRecorded,
-      });
+      res.json(migrationCompletePayload(vouchersUpdated, bonusesRecorded));
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
@@ -209,6 +231,9 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
   // Safe to run multiple times (idempotent per voucher).
   app.post("/api/factory/payroll/migrate-worker-names", requireAuth, async (req: any, res: any) => {
     try {
+      if (req.body?.confirm !== true) {
+        return res.status(400).json({ message: PAYROLL_MIGRATION_CONFIRMATION_REQUIRED });
+      }
       const currentRole = (req.session as any).currentRole;
       if (!["Admin", "Owner", "Developer"].includes(currentRole)) {
         return res.status(403).json({ message: "Only Admin, Owner, or Developer can run this migration" });
@@ -379,6 +404,9 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
   // shows an expandable group row instead of a flat list.  Safe to run multiple times.
   app.post("/api/factory/payroll/migrate-salary-groups", requireAuth, async (req: any, res: any) => {
     try {
+      if (req.body?.confirm !== true) {
+        return res.status(400).json({ message: PAYROLL_MIGRATION_CONFIRMATION_REQUIRED });
+      }
       const currentRole = (req.session as any).currentRole;
       if (!["Admin", "Owner", "Developer"].includes(currentRole)) {
         return res.status(403).json({ message: "Only Admin, Owner, or Developer can run this migration" });

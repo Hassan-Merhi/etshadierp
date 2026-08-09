@@ -11,6 +11,7 @@ import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { factoryBales, customerOrders, customerOrderBales } from "@shared/schema";
 import { eq, and, asc, desc, sql, inArray, isNull } from "drizzle-orm";
+import { resultRows } from "../../../lib/queryResult";
 
 export function registerFactoryStockQueryRoutes(app: Express) {
   app.get("/api/factory/stock-entry/in-stock", requireAuth, async (req: any, res: any) => {
@@ -69,7 +70,7 @@ export function registerFactoryStockQueryRoutes(app: Express) {
             GROUP BY l.id, l.name
             ORDER BY count DESC`
       );
-      const result = ((rows as any).rows ?? (rows as unknown as any[])).map((r: any) => ({
+      const result = resultRows(rows).map((r: any) => ({
         id: Number(r.id),
         name: r.name as string,
         count: Number(r.count),

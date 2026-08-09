@@ -13,6 +13,7 @@ import { resolveParentCompanyId, getSupplierBalanceForContext } from "../helpers
 import { vouchers, voucherEntries, customerBalances, customerOrders } from "@shared/schema";
 import { eq, and, inArray, sql, isNull, isNotNull } from "drizzle-orm";
 import { getClientDate } from "../../lib/dateUtils";
+import { resultRows } from "../../lib/queryResult";
 
 export function registerAccountListRoutes(app: Express) {
   app.get("/api/accounts/all", requireAuth, async (req, res) => {
@@ -178,7 +179,7 @@ export function registerAccountListRoutes(app: Express) {
             WHERE  company_id = ${companyId}
               AND  remaining_balance > 0
           `);
-          const workerAdvRow = ((workerAdvRes as any).rows ?? (workerAdvRes as any))[0] ?? {};
+          const workerAdvRow = resultRows(workerAdvRes)[0] ?? {};
           const workerAdvancesValue = parseFloat(String(workerAdvRow.total ?? "0")) || 0;
           customerLedgerOverrides.set(workerAdvLedger.id, {
             balance: workerAdvancesValue.toFixed(2),

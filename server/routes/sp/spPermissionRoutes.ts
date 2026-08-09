@@ -5,6 +5,7 @@ import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { ensureSpAccessControlStorage, SP_PERMISSIONS } from "./spAccessControl";
 import { requireSpCompany } from "./spHelpers";
+import { resultRows } from "../../lib/queryResult";
 
 export function registerSpPermissionRoutes(app: Express): void {
   app.get("/api/sp/permissions", requireAuth, requireRole("Admin"), async (req: any, res: any) => {
@@ -19,7 +20,7 @@ export function registerSpPermissionRoutes(app: Express): void {
         WHERE company_id = ${companyId}
         ORDER BY user_id, permission
       `);
-      res.json({ permissions: SP_PERMISSIONS, grants: (result as any).rows ?? result ?? [] });
+      res.json({ permissions: SP_PERMISSIONS, grants: resultRows(result) ?? [] });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
@@ -36,10 +37,13 @@ export function registerSpPermissionRoutes(app: Express): void {
       }
       const confirmation = String(req.body?.confirmation ?? "");
       if (confirmation !== "CHANGE SP PERMISSION") {
-        return res.status(400).json({ code: "SP_EXACT_CONFIRMATION_REQUIRED", message: "Type exactly: CHANGE SP PERMISSION" });
+        return res
+          .status(400)
+          .json({ code: "SP_EXACT_CONFIRMATION_REQUIRED", message: "Type exactly: CHANGE SP PERMISSION" });
       }
       const reason = String(req.body?.reason ?? "").trim();
-      if (reason.length < 5) return res.status(400).json({ code: "SP_REASON_REQUIRED", message: "A meaningful reason is required." });
+      if (reason.length < 5)
+        return res.status(400).json({ code: "SP_REASON_REQUIRED", message: "A meaningful reason is required." });
       const userId = String(req.params.userId).trim();
       const enabled = req.body?.enabled === true;
       await db.execute(sql`
@@ -66,7 +70,7 @@ export function registerSpPermissionRoutes(app: Express): void {
         ORDER BY created_at DESC
         LIMIT ${limit}
       `);
-      res.json((result as any).rows ?? result ?? []);
+      res.json(resultRows(result) ?? []);
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }

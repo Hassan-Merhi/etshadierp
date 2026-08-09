@@ -70,7 +70,7 @@ for (const invariant of [
 
 requireText("tests/ui/phase10-ui-consistency.test.ts", "Phase 10 UI consistency contracts");
 
-const docs = read("docs/engineering/phase10-ui-consistency.md").toLowerCase();
+const docs = read("docs/archive/engineering/phase10-ui-consistency.md").toLowerCase();
 for (const phrase of [
   "workspace layout primitives",
   "page header consistency",

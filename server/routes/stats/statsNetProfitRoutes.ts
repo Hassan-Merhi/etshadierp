@@ -11,6 +11,7 @@ import { _getCached, _setCached } from "../../services/shared/ttlCache";
 import { computeRentalOutstanding } from "./netProfitRentalSection";
 import { computeStockInHand } from "./netProfitStockSection";
 import { loadNetProfitData } from "./netProfitDataLoad";
+import { firstRow } from "../../lib/queryResult";
 
 export function registerStatsNetProfitRoutes(app: Express) {
   app.get("/api/stats/net-profit", requireAuth, requireNonPOS, async (req, res) => {
@@ -600,7 +601,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
             AND v.deleted_at  IS NULL
             ${toDate ? sql`AND v.voucher_date <= ${toDate}` : sql``}
         `);
-        const spRow = ((spProfitResult as any).rows ?? spProfitResult)[0];
+        const spRow = firstRow<{ total: string | null }>(spProfitResult);
         spPosProfit = round2(parseFloat(spRow?.total || "0"));
       }
 

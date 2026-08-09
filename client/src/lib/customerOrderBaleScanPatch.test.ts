@@ -92,14 +92,17 @@ describe("customer order compact bale scan patch", () => {
     const merged = mergeCustomerOrderBaleScanPatch(current, patch);
 
     expect(merged.bales).toHaveLength(3);
-    expect((merged.bales as any[]).map((b) => b.baleReference)).toEqual(["REF-001", "REF-002", "REF-003"]);
+    const mergedBales = merged.bales as Array<{ baleReference?: string }>;
+    const mergedLines = merged.lines as Array<{ articleCode?: string }>;
+
+    expect(mergedBales.map((b) => b.baleReference)).toEqual(["REF-001", "REF-002", "REF-003"]);
     expect(merged.lines).toHaveLength(2);
-    expect((merged.lines as any[]).find((line) => line.articleCode === "ART-1")).toMatchObject({
+    expect(mergedLines.find((line) => line.articleCode === "ART-1")).toMatchObject({
       id: 501,
       qty: 2,
       totalPrice: "25.00",
     });
-    expect((merged.lines as any[]).find((line) => line.articleCode === "ART-2")).toMatchObject({
+    expect(mergedLines.find((line) => line.articleCode === "ART-2")).toMatchObject({
       id: 402,
       qty: 1,
       totalPrice: "20.00",

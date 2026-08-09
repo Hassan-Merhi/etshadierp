@@ -130,7 +130,7 @@ jobs:
       - run:
           name: Repository safety contracts
           command: |
-            npm run verify:program1-observability
+            npm run verify:observability
             npm run verify:final-production-readiness
             npm run verify:bandwidth
       - store_artifacts:
@@ -174,7 +174,7 @@ jobs:
           command: npm run verify:production-dependencies
       - run:
           name: Program 6 security checks
-          command: PROGRAM6_SKIP_TYPESCRIPT=1 npm run check:program-6-security
+          command: PROGRAM6_SKIP_TYPESCRIPT=1 npm run check:security
       - run:
           name: Final production readiness contract
           command: npm run verify:final-production-readiness

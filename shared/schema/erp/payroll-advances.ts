@@ -70,3 +70,72 @@ export const insertSalaryAdvanceDeductionSchema = createInsertSchema(salaryAdvan
 
 export type InsertSalaryAdvanceDeduction = z.infer<typeof insertSalaryAdvanceDeductionSchema>;
 export type SalaryAdvanceDeduction = typeof salaryAdvanceDeductions.$inferSelect;
+
+// These legacy ERP employee cash-movement tables are still used by the
+// factory employee advances/bonus routes. They must live in the Drizzle schema
+// as well as the boot-time catch-up migrations so a clean database created by
+// `drizzle-kit push` has the same runtime-authoritative tables as production.
+export const employeeAdvances = pgTable(
+  "employee_advances",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull(),
+    employeeId: integer("employee_id")
+      .notNull()
+      .references(() => employees.id, { onDelete: "restrict" }),
+    advanceDate: date("advance_date").notNull(),
+    amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
+    remainingBalance: decimal("remaining_balance", { precision: 20, scale: 2 }).notNull().default("0"),
+    cashAccountId: integer("cash_account_id"),
+    notes: text("notes"),
+    fullyPaid: boolean("fully_paid").notNull().default(false),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    companyIdx: index("employee_advances_company_idx").on(t.companyId),
+    employeeIdx: index("employee_advances_employee_idx").on(t.employeeId),
+  })
+);
+
+export const employeeAdvanceRepayments = pgTable(
+  "employee_advance_repayments",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull(),
+    advanceId: integer("advance_id")
+      .notNull()
+      .references(() => employeeAdvances.id, { onDelete: "cascade" }),
+    employeeId: integer("employee_id")
+      .notNull()
+      .references(() => employees.id, { onDelete: "restrict" }),
+    repaymentDate: date("repayment_date").notNull(),
+    amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
+    cashAccountId: integer("cash_account_id"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    companyIdx: index("employee_advance_repayments_company_idx").on(t.companyId),
+    advanceIdx: index("employee_advance_repayments_advance_idx").on(t.advanceId),
+  })
+);
+
+export const employeeBonuses = pgTable(
+  "employee_bonuses",
+  {
+    id: serial("id").primaryKey(),
+    companyId: integer("company_id").notNull(),
+    employeeId: integer("employee_id")
+      .notNull()
+      .references(() => employees.id, { onDelete: "restrict" }),
+    bonusDate: date("bonus_date").notNull(),
+    amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
+    notes: text("notes"),
+    voucherId: integer("voucher_id").references(() => vouchers.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    companyIdx: index("employee_bonuses_company_idx").on(t.companyId),
+    employeeIdx: index("employee_bonuses_employee_idx").on(t.employeeId),
+  })
+);

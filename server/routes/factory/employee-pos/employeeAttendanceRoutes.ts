@@ -7,6 +7,7 @@ import { requireAuth } from "../../../auth";
 import { factoryWorkers, employees } from "@shared/schema";
 import { eq, and, sql, isNull } from "drizzle-orm";
 import { sqlArray } from "../../../lib/sqlArray";
+import { resultRows } from "../../../lib/queryResult";
 
 export function registerEmployeeAttendanceRoutes(app: Express) {
   app.get("/api/factory/net-position/payroll-breakdown", requireAuth, async (req: any, res: any) => {
@@ -141,9 +142,7 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
               AND worker_id = ANY(${sqlArray(workerIds)})
             ORDER BY attendance_date`
       );
-      const attRecords: { workerId: number; date: string; status: string }[] = (
-        (attRows as any).rows ?? (attRows as unknown as any[])
-      ).map((r: any) => ({
+      const attRecords: { workerId: number; date: string; status: string }[] = resultRows(attRows).map((r: any) => ({
         workerId: Number(r.workerId),
         date: typeof r.date === "string" ? r.date.substring(0, 10) : new Date(r.date).toISOString().substring(0, 10),
         status: r.status,
@@ -175,9 +174,7 @@ export function registerEmployeeAttendanceRoutes(app: Express) {
               AND period_end   >= ${startDate}::date
               AND worker_id = ANY(${sqlArray(workerIds)})`
       );
-      const paidPayrollList: { workerId: number; netSalary: string }[] = (
-        (paidPayrollRows as any).rows ?? (paidPayrollRows as unknown as any[])
-      ).map((r: any) => ({
+      const paidPayrollList: { workerId: number; netSalary: string }[] = resultRows(paidPayrollRows).map((r: any) => ({
         workerId: Number(r.workerId),
         netSalary: r.netSalary ?? "0",
       }));

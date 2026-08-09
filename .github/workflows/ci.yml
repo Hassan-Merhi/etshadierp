@@ -50,7 +50,7 @@ jobs:
       - name: Set up Node.js 22
         uses: actions/setup-node@v6
         with:
-          node-version: "22"
+          node-version: "22.14"
           cache: npm
 
       - name: Normalize Replit registry URLs for CI
@@ -79,6 +79,49 @@ jobs:
       - name: Verify environment documentation
         if: always() && steps.install.outcome == 'success'
         run: npm run verify:env-docs
+
+      # Both are static ratchets, so they run before the database is touched and
+      # fail fast. The type-escape baseline may only fall; the doc index fails on
+      # an unclassified doc or on a documented figure that has drifted from the
+      # config it describes. Each is also asserted in the backend suite, but a
+      # dedicated step keeps "a baseline moved the wrong way" a distinct signal
+      # rather than one red line inside a two-thousand-test run.
+      - name: Type-escape ratchet
+        if: always() && steps.install.outcome == 'success'
+        run: npm run audit:type-escapes
+
+      - name: Documentation state index
+        if: always() && steps.install.outcome == 'success'
+        run: npm run audit:doc-index
+
+      # Mutating endpoints are excluded from the smoke sweep by design, so this
+      # is the only measure of how much of the ledger and stock write surface
+      # has a test naming it. The ceiling may only fall.
+      - name: Write-route coverage ratchet
+        if: always() && steps.install.outcome == 'success'
+        run: npm run audit:write-routes
+
+      # One Node version across .node-version, .nvmrc, .replit, package.json
+      # engines, every workflow, CircleCI's image tag, and the README. Seven
+      # sources used to disagree, and a fresh clone that followed the README
+      # produced an environment violating the engines constraint.
+      - name: Toolchain coherence
+        if: always() && steps.install.outcome == 'success'
+        run: npm run audit:toolchain
+
+      # A verification script nobody runs, or one wired in that cannot pass,
+      # looks like coverage and provides none. This asserts that every wired
+      # gate passes and that the orphan count only falls.
+      - name: Script inventory
+        if: always() && steps.install.outcome == 'success'
+        run: npm run audit:scripts
+
+      # Re-homed here when the phase-named workflow that used to run it was
+      # deleted: its trigger branch no longer exists, so the check had stopped
+      # firing entirely. It is static and fast, so it belongs in the main run.
+      - name: Readable logging contracts
+        if: always() && steps.install.outcome == 'success'
+        run: node scripts/verify-readable-logging-phase-10.mjs
 
       - name: Type-check
         id: typecheck

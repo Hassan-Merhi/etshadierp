@@ -4,6 +4,7 @@ import { requireAuth } from "../../auth";
 import { db } from "../../db";
 import { getErrorMessage } from "../../lib/httpHandlers";
 import { requireSpCompany } from "./spHelpers";
+import { resultRows, firstRow } from "../../lib/queryResult";
 
 const REQUIRED_STABILIZATION_CHECKS = [
   "daily_sales_stock",
@@ -37,7 +38,7 @@ async function latestActiveCutover(companyId: number): Promise<any | null> {
     WHERE target_company_id = ${companyId} AND status = 'active'
     ORDER BY id DESC LIMIT 1
   `);
-  return (result as any).rows?.[0] ?? null;
+  return firstRow(result) ?? null;
 }
 
 export async function buildSpProductionClosureStatus(companyId: number): Promise<any> {
@@ -58,7 +59,7 @@ export async function buildSpProductionClosureStatus(companyId: number): Promise
     WHERE company_id = ${companyId} AND cutover_id = ${cutoverId}
     ORDER BY evidence_type
   `);
-  const evidence = (evidenceResult as any).rows ?? [];
+  const evidence = resultRows(evidenceResult);
   const evidenceMap = new Map<string, any>(evidence.map((row: any) => [row.evidence_type, row]));
   const checks = REQUIRED_STABILIZATION_CHECKS.map((type) => ({
     type,
@@ -77,7 +78,7 @@ export async function buildSpProductionClosureStatus(companyId: number): Promise
       AND deleted_at IS NULL
       AND created_at > ${cutover.activated_at}
   `);
-  const sourceWriteCount = Number((sourceWrites as any).rows?.[0]?.count ?? 0);
+  const sourceWriteCount = Number(firstRow(sourceWrites)?.count ?? 0);
 
   const suspense = await db.execute(sql`
     SELECT COUNT(*)::int AS count
@@ -92,7 +93,7 @@ export async function buildSpProductionClosureStatus(companyId: number): Promise
         COALESCE(ve.debit_amount, '0')::numeric - COALESCE(ve.credit_amount, '0')::numeric
       ) > 0.0001
   `);
-  const migrationSuspenseEntryCount = Number((suspense as any).rows?.[0]?.count ?? 0);
+  const migrationSuspenseEntryCount = Number(firstRow(suspense)?.count ?? 0);
 
   const failures: any[] = checks.filter((check: any) => check.status !== "PASS");
   if (sourceWriteCount > 0) {
@@ -120,7 +121,7 @@ export async function buildSpProductionClosureStatus(companyId: number): Promise
     migrationSuspenseEntryCount,
     failureCount: failures.length,
     failures,
-    completionRecord: (completion as any).rows?.[0] ?? null,
+    completionRecord: firstRow(completion) ?? null,
   };
 }
 
@@ -169,7 +170,7 @@ export function registerSpProductionClosureRoutes(app: Express): void {
           updated_at = now()
         RETURNING *
       `);
-      res.json({ success: true, evidence: (result as any).rows?.[0] });
+      res.json({ success: true, evidence: firstRow(result) });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
     }
@@ -195,7 +196,7 @@ export function registerSpProductionClosureRoutes(app: Express): void {
             AND status = 'active'
           RETURNING id
         `);
-        if (((updated as any).rows ?? []).length !== 1) {
+        if (resultRows(updated).length !== 1) {
           throw new Error("Cutover is no longer active.");
         }
 
@@ -209,7 +210,7 @@ export function registerSpProductionClosureRoutes(app: Express): void {
           ON CONFLICT (company_id, cutover_id) DO NOTHING
           RETURNING *
         `);
-        const row = (inserted as any).rows?.[0];
+        const row = firstRow(inserted);
         if (!row) {
           throw new Error("Supplier Partner cutover completion was already recorded.");
         }

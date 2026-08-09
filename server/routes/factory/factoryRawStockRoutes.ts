@@ -14,6 +14,7 @@ import { requirePostOffloadImpactPreview } from "./raw-stock/postOffloadImpactPr
 import { registerPostOffloadImpactPreviewRoutes } from "./raw-stock/postOffloadImpactPreviewRoutes";
 import { postOffloadReconciliationMiddleware } from "./raw-stock/postOffloadReconciliationMiddleware";
 import { registerPostOffloadPhase6SafetyRoutes } from "./raw-stock/postOffloadPhase6SafetyRoutes";
+import { requireValidBatchSourceDeleteInput } from "./raw-stock/batchSourceDeleteInputGuard";
 
 const RAW_STOCK_REPAIR_PERMISSION = "factory.raw-stock.repair";
 
@@ -29,6 +30,10 @@ export function registerFactoryRawStockRoutes(app: Express) {
   // Validate and freeze high-impact repair payloads before permission,
   // confirmation, audit, or business logic can consume them.
   app.use("/api/factory/raw-stock", requireRawStockSensitiveInput);
+
+  // Reject malformed batch-source delete requests before the legacy route can
+  // turn missing identifiers into sentinel IDs and raise a server error.
+  app.use("/api/factory/raw-stock/batch-source", requireValidBatchSourceDeleteInput);
 
   // Post-offload charge routes live under /api/factory/containers even though
   // they are registered by the raw-stock module. Reject foreign, inactive, or

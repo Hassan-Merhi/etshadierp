@@ -32,7 +32,9 @@ import type { SerializedRouteManifest } from "./helpers/routeManifest";
 const TEST_PREFIX = "sweeptest";
 const MANIFEST_PATH = path.join(process.cwd(), "config/route-manifest.json");
 const BASELINE_PATH = path.join(process.cwd(), "config/api-smoke-baseline.json");
+const SHAPES_PATH = path.join(process.cwd(), "config/api-smoke-shapes.json");
 const shouldUpdateBaseline = process.env.UPDATE_API_SMOKE_BASELINE === "1";
+const shouldUpdateShapes = process.env.UPDATE_API_SMOKE_SHAPES === "1";
 
 /**
  * Per-request deadline. Generous enough for the slowest legitimate read on a
@@ -65,6 +67,79 @@ interface SweepFailure {
   detail: string;
 }
 
+/** What a route answered, reduced to the parts that form its contract. */
+interface SweptResponse {
+  status: number;
+  shape: string;
+}
+
+interface ShapeBaseline {
+  description: string;
+  regenerate: string;
+  /**
+   * Routes whose shape varies between identical runs; reported, never asserted.
+   *
+   * Both entries today are workbook endpoints. Their bodies parse into an
+   * object keyed by byte offset, so the "shape" is thousands of indices that
+   * shift whenever the zip container's timestamps change the file's length.
+   * They stay in the sweep — liveness is still checked, and net-profit-excel
+   * additionally has a real content pin in
+   * tests/report-endpoint-characterization.test.ts, which hashes the workbook's
+   * cell values rather than its bytes.
+   */
+  unstable: string[];
+  /**
+   * Routes that answered 5xx when the baseline was generated, so no contract
+   * could be recorded for them.
+   *
+   * This list is *not* a ratchet and must not be treated as one — whether a
+   * route 5xxes here is environment-dependent in exactly the way
+   * `config/api-smoke-baseline.json` already documents. Recording a 500's shape
+   * would freeze one machine's missing table into a contract every other
+   * machine then fails against, so those routes are simply left unpinned. The
+   * 5xx assertion above is what covers them.
+   */
+  skippedFailing: string[];
+  routes: Record<string, SweptResponse>;
+}
+
+/**
+ * A response's structure with its values removed.
+ *
+ * Scalar leaves collapse to `scalar` rather than their `typeof`, deliberately.
+ * A nullable column that is null in one run and a string in the next would
+ * otherwise fail the comparison for no reason, and a shape check that cries
+ * wolf gets regenerated without being read — the same failure mode the pin
+ * harness had to avoid. Key sets, nesting, and object-versus-array are what
+ * this is here to protect, and those stay exact.
+ */
+export function responseShape(value: unknown, depth = 0): string {
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "[]";
+    return depth >= 3 ? "[…]" : `[${responseShape(value[0], depth + 1)}]`;
+  }
+  if (value && typeof value === "object") {
+    if (depth >= 3) return "{…}";
+    const entries = Object.keys(value as Record<string, unknown>)
+      .sort()
+      .map((key) => `${key}:${responseShape((value as Record<string, unknown>)[key], depth + 1)}`);
+    return `{${entries.join(",")}}`;
+  }
+  return "scalar";
+}
+
+/**
+ * An empty collection is a legitimate state of the same contract, so `[]` is
+ * accepted wherever a populated array was recorded and vice versa. Anything
+ * else — a lost key, a renamed field, an object where a list used to be — is a
+ * real difference and fails.
+ */
+export function shapesCompatible(expected: string, actual: string): boolean {
+  if (expected === actual) return true;
+  const emptied = (shape: string) => shape.replace(/\[[^[\]]*\]/g, "[]");
+  return emptied(expected) === emptied(actual);
+}
+
 function loadManifest(): SerializedRouteManifest {
   return JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8")) as SerializedRouteManifest;
 }
@@ -95,6 +170,7 @@ let ctx: TestContext;
 let agent: request.SuperAgentTest;
 let failures: SweepFailure[] = [];
 let sweptPaths: string[] = [];
+const observed: Record<string, SweptResponse> = {};
 
 beforeAll(async () => {
   ctx = await seedTestData(TEST_PREFIX);
@@ -129,7 +205,41 @@ beforeAll(async () => {
     };
     fs.writeFileSync(BASELINE_PATH, `${JSON.stringify(baseline, null, 2)}\n`, "utf8");
   }
+
+  if (shouldUpdateShapes) {
+    const existing = loadShapes();
+    const routes: Record<string, SweptResponse> = {};
+    const skippedFailing: string[] = [];
+    for (const routePath of Object.keys(observed).sort()) {
+      if (existing.unstable.includes(routePath)) continue;
+      if (observed[routePath].status >= 500) {
+        skippedFailing.push(routePath);
+        continue;
+      }
+      routes[routePath] = observed[routePath];
+    }
+    const shapes: ShapeBaseline = {
+      description:
+        "Status and response structure for every swept GET endpoint, with values removed. " +
+        "The sweep proves a handler still answers; this proves it still answers with the same " +
+        "contract - a dropped field or a route that starts refusing permission is invisible to " +
+        "a non-5xx check. Scalar leaves are collapsed and empty arrays match populated ones, so " +
+        "only structural change fails.",
+      regenerate: "UPDATE_API_SMOKE_SHAPES=1 npm run test:smoke-sweep",
+      unstable: existing.unstable,
+      skippedFailing,
+      routes,
+    };
+    fs.writeFileSync(SHAPES_PATH, `${JSON.stringify(shapes, null, 2)}\n`, "utf8");
+  }
 }, 300000);
+
+function loadShapes(): ShapeBaseline {
+  if (!fs.existsSync(SHAPES_PATH)) {
+    return { description: "", regenerate: "", unstable: [], skippedFailing: [], routes: {} };
+  }
+  return JSON.parse(fs.readFileSync(SHAPES_PATH, "utf8")) as ShapeBaseline;
+}
 
 async function sweepAll(): Promise<void> {
   for (const routePath of sweptPaths) {
@@ -145,6 +255,7 @@ async function sweepAll(): Promise<void> {
         .get(routePath)
         .timeout({ response: REQUEST_TIMEOUT_MS, deadline: REQUEST_TIMEOUT_MS });
       status = response.status;
+      observed[routePath] = { status, shape: responseShape(response.body) };
       if (status >= 500) {
         const body = response.body as { message?: string; error?: string } | undefined;
         detail = body?.message || body?.error || response.text?.slice(0, 200) || "";
@@ -195,6 +306,43 @@ describe("API smoke sweep", () => {
         "A split that moved a handler without its dependencies looks exactly like this.\n" +
         `${report}\n`
     ).toEqual([]);
+  });
+
+  it("keeps every swept endpoint's status and response structure", () => {
+    const shapes = loadShapes();
+    const unstable = new Set(shapes.unstable);
+
+    const drifted = Object.entries(shapes.routes)
+      .filter(([routePath]) => !unstable.has(routePath) && observed[routePath])
+      .map(([routePath, expected]) => ({ routePath, expected, actual: observed[routePath] }))
+      .filter(
+        ({ expected, actual }) => expected.status !== actual.status || !shapesCompatible(expected.shape, actual.shape)
+      )
+      .map(
+        ({ routePath, expected, actual }) =>
+          `  ${routePath}\n      status ${expected.status} -> ${actual.status}\n` +
+          `      shape  ${expected.shape}\n          ->  ${actual.shape}`
+      );
+
+    // The non-5xx check above cannot see a handler that quietly drops a field,
+    // renames one, or starts answering 403 - all of which break a client just
+    // as thoroughly as a crash. This is the sweep's contract half.
+    expect(
+      drifted,
+      `${drifted.length} swept endpoint(s) changed their response contract.\n` +
+        `If the change was deliberate, regenerate with: ${shapes.regenerate}\n${drifted.join("\n")}\n`
+    ).toEqual([]);
+  });
+
+  it("has a recorded contract for most of the swept surface", () => {
+    const shapes = loadShapes();
+    const recorded = Object.keys(shapes.routes).filter((routePath) => sweptPaths.includes(routePath));
+
+    // Guards the check above from going vacuous: if the baseline emptied out,
+    // or selection drifted away from it, every comparison would silently pass.
+    // The margin allows for the handful of routes left unpinned because they
+    // 5xx on the machine that generated the baseline.
+    expect(recorded.length).toBeGreaterThan(sweptPaths.length * 0.85);
   });
 
   it("reports baseline entries that now pass", () => {

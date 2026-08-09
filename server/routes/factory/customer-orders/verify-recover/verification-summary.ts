@@ -13,6 +13,7 @@ import { requireAuth } from "../../../../auth";
 import {} from "../../_helpers";
 import { factoryBaleProducts } from "@shared/schema";
 import { eq, and, sql, inArray } from "drizzle-orm";
+import { resultRows } from "../../../../lib/queryResult";
 
 export function registerOrderVerificationSummaryRoutes(app: Express) {
   app.get("/api/factory/customer-orders/:id/verification-summary", requireAuth, async (req: any, res: any) => {
@@ -35,7 +36,7 @@ export function registerOrderVerificationSummaryRoutes(app: Express) {
       const rawOrderResult = await db.execute(
         sql`SELECT * FROM customer_orders WHERE id = ${orderId} AND company_id = ${companyId} LIMIT 1`
       );
-      const rawOrderRows: any[] = (rawOrderResult as any).rows ?? (rawOrderResult as unknown as any[]);
+      const rawOrderRows: any[] = resultRows(rawOrderResult);
       if (!rawOrderRows.length) return res.status(404).json({ message: "Order not found" });
       const orderRow = rawOrderRows[0];
       // Normalise the raw row into a typed object with JS-side defaults.
@@ -67,7 +68,7 @@ export function registerOrderVerificationSummaryRoutes(app: Express) {
       };
 
       const rawBalesResult = await db.execute(sql`SELECT * FROM customer_order_bales WHERE order_id = ${orderId}`);
-      const rawBaleRows: any[] = (rawBalesResult as any).rows ?? (rawBalesResult as unknown as any[]);
+      const rawBaleRows: any[] = resultRows(rawBalesResult);
       const orderBales = rawBaleRows.map((r: any) => ({
         id: r.id,
         order_id: r.order_id,
@@ -100,7 +101,7 @@ export function registerOrderVerificationSummaryRoutes(app: Express) {
 
       if (orderBales.length === 0 && order.totalQtyBales > 0) {
         const rawLinesResult = await db.execute(sql`SELECT * FROM customer_order_lines WHERE order_id = ${orderId}`);
-        const linesRows: any[] = (rawLinesResult as any).rows ?? (rawLinesResult as unknown as any[]);
+        const linesRows: any[] = resultRows(rawLinesResult);
         const hasLines = linesRows.some((r: any) => (r.qty ?? 0) > 0);
 
         if (hasLines) {
@@ -195,7 +196,7 @@ export function registerOrderVerificationSummaryRoutes(app: Express) {
         const rawProformaResult = await db.execute(
           sql`SELECT * FROM customer_proforma_lines WHERE proforma_id = ${order.proformaIdUsed}`
         );
-        proformaLines = (rawProformaResult as any).rows ?? (rawProformaResult as unknown as any[]);
+        proformaLines = resultRows(rawProformaResult);
 
         for (const pl of proformaLines) {
           const articleCode = pl.article_code ?? pl.articleCode ?? "";
@@ -270,7 +271,11 @@ export function registerOrderVerificationSummaryRoutes(app: Express) {
                 ${locationFilter}
               GROUP BY fb.article_code`
         );
-        const inStockRows = (inStockRaw as any).rows ?? (inStockRaw as unknown as any[]);
+        const inStockRows = resultRows<{
+          articleCode: string | null;
+          count: number | null;
+          total_weight: string | null;
+        }>(inStockRaw);
         for (const r of inStockRows) {
           if (r.articleCode) {
             stockQtyMap[r.articleCode] = Number(r.count);
@@ -295,7 +300,11 @@ export function registerOrderVerificationSummaryRoutes(app: Express) {
                 ${locationFilter}
               GROUP BY fb.article_code`
         );
-        const loadingRows = (loadingRaw as any).rows ?? (loadingRaw as unknown as any[]);
+        const loadingRows = resultRows<{
+          articleCode: string | null;
+          count: number | null;
+          total_weight: string | null;
+        }>(loadingRaw);
         for (const r of loadingRows) {
           if (r.articleCode && stockQtyMap[r.articleCode] !== undefined) {
             stockQtyMap[r.articleCode] = Math.max(0, stockQtyMap[r.articleCode] - Number(r.count));

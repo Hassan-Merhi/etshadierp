@@ -2,6 +2,7 @@ import type { Express, NextFunction, Request, Response } from "express";
 import { sql } from "drizzle-orm";
 import { db } from "../../db";
 import { logger } from "../../lib/logger";
+import { resultRows, firstRow } from "../../lib/queryResult";
 
 export type CutoverStatus = "prepared" | "active" | "rolled_back" | "cancelled" | "failed";
 
@@ -22,7 +23,8 @@ let lockCache: { expiresAt: number; locks: ActiveCutoverLock[] } | null = null;
 export function ensureCutoverSchema(): Promise<void> {
   if (!schemaPromise) {
     schemaPromise = (async () => {
-      await db.execute(sql.raw(`
+      await db.execute(
+        sql.raw(`
         CREATE TABLE IF NOT EXISTS sp_migration_cutovers (
           id BIGSERIAL PRIMARY KEY,
           source_company_id INTEGER NOT NULL,
@@ -47,22 +49,30 @@ export function ensureCutoverSchema(): Promise<void> {
           created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
-      `));
-      await db.execute(sql.raw(`
+      `)
+      );
+      await db.execute(
+        sql.raw(`
         CREATE UNIQUE INDEX IF NOT EXISTS sp_migration_cutovers_one_live_pair
         ON sp_migration_cutovers(source_company_id, target_company_id)
         WHERE status IN ('prepared', 'active')
-      `));
-      await db.execute(sql.raw(`
+      `)
+      );
+      await db.execute(
+        sql.raw(`
         CREATE INDEX IF NOT EXISTS sp_migration_cutovers_source_status_idx
         ON sp_migration_cutovers(source_company_id, status)
-      `));
-      await db.execute(sql.raw(`
+      `)
+      );
+      await db.execute(
+        sql.raw(`
         CREATE INDEX IF NOT EXISTS sp_migration_cutovers_target_status_idx
         ON sp_migration_cutovers(target_company_id, status)
-      `));
+      `)
+      );
 
-      await db.execute(sql.raw(`
+      await db.execute(
+        sql.raw(`
         CREATE TABLE IF NOT EXISTS sp_migration_cutover_role_changes (
           id BIGSERIAL PRIMARY KEY,
           cutover_id BIGINT NOT NULL REFERENCES sp_migration_cutovers(id) ON DELETE CASCADE,
@@ -78,9 +88,11 @@ export function ensureCutoverSchema(): Promise<void> {
           created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           UNIQUE (cutover_id, user_id)
         )
-      `));
+      `)
+      );
 
-      await db.execute(sql.raw(`
+      await db.execute(
+        sql.raw(`
         CREATE TABLE IF NOT EXISTS sp_migration_cutover_stock_deltas (
           id BIGSERIAL PRIMARY KEY,
           cutover_id BIGINT NOT NULL REFERENCES sp_migration_cutovers(id) ON DELETE CASCADE,
@@ -99,7 +111,8 @@ export function ensureCutoverSchema(): Promise<void> {
           created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           UNIQUE (cutover_id, source_inventory_id)
         )
-      `));
+      `)
+      );
     })().catch((error) => {
       schemaPromise = null;
       throw error;
@@ -122,7 +135,7 @@ async function loadActiveLocks(): Promise<ActiveCutoverLock[]> {
     WHERE status IN ('prepared', 'active')
     ORDER BY id DESC
   `);
-  const locks = ((result as any).rows ?? []).map((row: any) => ({
+  const locks = resultRows(result).map((row: any) => ({
     id: Number(row.id),
     sourceCompanyId: Number(row.source_company_id),
     targetCompanyId: Number(row.target_company_id),
@@ -139,9 +152,7 @@ export async function getCompanyCutoverLock(companyId: number): Promise<ActiveCu
   const locks = await loadActiveLocks();
   return (
     locks.find(
-      (lock) =>
-        lock.sourceCompanyId === companyId ||
-        (lock.status === "prepared" && lock.targetCompanyId === companyId)
+      (lock) => lock.sourceCompanyId === companyId || (lock.status === "prepared" && lock.targetCompanyId === companyId)
     ) ?? null
   );
 }
@@ -231,5 +242,5 @@ export async function getLiveCutover(sourceId: number, targetId: number): Promis
     ORDER BY id DESC
     LIMIT 1
   `);
-  return (result as any).rows?.[0] ?? null;
+  return firstRow(result) ?? null;
 }

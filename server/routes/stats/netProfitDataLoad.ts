@@ -3,6 +3,7 @@ import { eq, isNull, lte } from "drizzle-orm";
 import { vouchers } from "@shared/schema";
 import { pool } from "../../db";
 import { storage } from "../../storage";
+import { resultRows } from "../../lib/queryResult";
 
 export interface NetProfitData {
   companyRecord: any;
@@ -275,7 +276,7 @@ export async function loadNetProfitData(companyId: number, toDate: string | null
   ]);
   // true  → some entries have base_debit_amount → COALESCE returns USD base → skip legacy revaluation
   // false → all entries are pre-migration legacy OR base column absent → legacy CFA revaluation block applies
-  const hasMigratedEntries = (hasMigratedResult as any).rows[0]?.has_migrated === true;
+  const hasMigratedEntries = resultRows(hasMigratedResult)[0]?.has_migrated === true;
   const companyBaseCurrency = companyRecord?.baseCurrency || "USD";
 
   // Build accountBalances from grouped SQL result.

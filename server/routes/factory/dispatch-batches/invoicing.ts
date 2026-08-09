@@ -20,6 +20,7 @@ import {
 } from "@shared/schema";
 
 import { getCompanyId } from "./_helpers";
+import { firstRow, resultRows } from "../../../lib/queryResult";
 
 export function registerDispatchInvoiceRoutes(app: Express) {
   // ── GET /api/factory/dispatch-batches/:id/invoice-preview ─────────────────
@@ -78,7 +79,11 @@ export function registerDispatchInvoiceRoutes(app: Express) {
         GROUP BY sc.article_code, sc.product_name, sc.price_used
         ORDER BY sc.article_code
       `);
-      const articleRows = (articleSummary as any).rows || articleSummary;
+      const articleRows = resultRows<{
+        articleCode: string;
+        qty: string | null;
+        totalAmount: string | null;
+      }>(articleSummary);
 
       // Total scans
       const totalRows = await db.execute(sql`
@@ -89,7 +94,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
         FROM customer_dispatch_bale_scans
         WHERE batch_id = ${batchId} AND company_id = ${companyId} AND removed_at IS NULL
       `);
-      const totals = ((totalRows as any).rows || totalRows)[0];
+      const totals = firstRow<{ totalBales: string | null }>(totalRows);
 
       // Mismatch warnings (bales with article codes not in the proforma)
       const mismatchRows = await db.execute(sql`
@@ -105,7 +110,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
               : sql`AND 1=0`
           }
       `);
-      const mismatches = ((mismatchRows as any).rows || mismatchRows).map((r: any) => r.articleCode);
+      const mismatches = resultRows(mismatchRows).map((r: any) => r.articleCode);
 
       // Proforma progress per article
       const proformaProgress = proformaLines.map((pl: any) => {
@@ -144,7 +149,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
         customer: { id: customer?.id, legalName: customer?.legalName },
         proforma,
         proformaProgress,
-        rides: (rideSummary as any).rows || rideSummary,
+        rides: resultRows(rideSummary),
         articleLines: articleRows,
         totals,
         loadingRides: loadingRides.length,
@@ -181,7 +186,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
           SELECT * FROM customer_dispatch_batches
           WHERE id = ${batchId} AND company_id = ${companyId} FOR UPDATE
         `);
-        const batch = ((batchRows as any).rows || batchRows)[0];
+        const batch = resultRows(batchRows)[0];
         if (!batch) throw new Error("Dispatch batch not found");
         if (batch.status === "INVOICED") throw new Error("Batch already invoiced");
         if (batch.status === "CANCELLED") throw new Error("Batch is cancelled");
@@ -193,7 +198,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
           const pfRows = await tx.execute(
             sql`SELECT * FROM customer_proformas WHERE id = ${batch.proforma_id} FOR UPDATE`
           );
-          proforma = ((pfRows as any).rows || pfRows)[0];
+          proforma = resultRows(pfRows)[0];
           if (!proforma) throw new Error("Linked proforma not found");
           if (proforma.status === "CANCELLED")
             throw new Error("Linked proforma is CANCELLED — cannot generate invoice");
@@ -202,7 +207,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
           const plRows = await tx.execute(
             sql`SELECT * FROM customer_proforma_lines WHERE proforma_id = ${batch.proforma_id}`
           );
-          proformaLines = (plRows as any).rows || plRows;
+          proformaLines = resultRows(plRows);
         }
 
         // 3. Check all rides are DISPATCHED
@@ -210,7 +215,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
           SELECT id, status FROM customer_dispatch_truck_rides
           WHERE batch_id = ${batchId} AND company_id = ${companyId}
         `);
-        const rides = (rideRows as any).rows || rideRows;
+        const rides = resultRows(rideRows);
         const loadingRides = rides.filter((r: any) => r.status === "LOADING" || r.status === "DRAFT");
         if (loadingRides.length > 0)
           throw new Error(
@@ -222,14 +227,23 @@ export function registerDispatchInvoiceRoutes(app: Express) {
           SELECT * FROM customer_dispatch_bale_scans
           WHERE batch_id = ${batchId} AND company_id = ${companyId} AND removed_at IS NULL
         `);
-        const scans = (scanRows as any).rows || scanRows;
+        const scans = resultRows<{
+          bale_id: number;
+          bale_reference: string | null;
+          scanned_by: string | null;
+          article_code: string | null;
+          product_name: string | null;
+          weight_kg: string | null;
+          price_used: string | null;
+          amount: string | null;
+        }>(scanRows);
         if (scans.length === 0) throw new Error("No scanned bales found in this batch");
 
         // 5. Assign invoice number
         let seqRows = await tx.execute(sql`
           SELECT * FROM customer_invoice_sequences WHERE company_id = ${companyId} FOR UPDATE
         `);
-        let seqRow = ((seqRows as any).rows || seqRows)[0];
+        let seqRow = firstRow<{ next_number?: number; nextNumber?: number }>(seqRows);
         if (!seqRow) {
           await tx.execute(
             sql`INSERT INTO customer_invoice_sequences (company_id, next_number) VALUES (${companyId}, 1) ON CONFLICT DO NOTHING`
@@ -237,9 +251,9 @@ export function registerDispatchInvoiceRoutes(app: Express) {
           seqRows = await tx.execute(
             sql`SELECT * FROM customer_invoice_sequences WHERE company_id = ${companyId} FOR UPDATE`
           );
-          seqRow = ((seqRows as any).rows || seqRows)[0];
+          seqRow = firstRow<{ next_number?: number; nextNumber?: number }>(seqRows);
         }
-        const invoiceNum = seqRow.next_number || seqRow.nextNumber;
+        const invoiceNum = Number(seqRow?.next_number ?? seqRow?.nextNumber ?? 0);
         await tx.execute(
           sql`UPDATE customer_invoice_sequences SET next_number = ${invoiceNum + 1} WHERE company_id = ${companyId}`
         );
@@ -299,7 +313,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
             now(), now()
           ) RETURNING *
         `);
-        const order = ((orderRows as any).rows || orderRows)[0];
+        const order = resultRows(orderRows)[0];
         const orderId = order.id;
 
         // 8. Insert customerOrderLines (grouped by article)
@@ -317,7 +331,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
           const baleRow = await tx.execute(
             sql`SELECT erp_location_id FROM factory_bales WHERE id = ${scan.bale_id} LIMIT 1`
           );
-          const baleData = ((baleRow as any).rows || baleRow)[0];
+          const baleData = firstRow<{ erp_location_id: number | null }>(baleRow);
           const locationId = baleData?.erp_location_id;
           if (!locationId)
             throw new Error(`Bale ${scan.bale_reference} has no ERP location set — cannot create invoice line`);
@@ -368,7 +382,7 @@ export function registerDispatchInvoiceRoutes(app: Express) {
             GROUP BY cob.article_code
           `);
           const invoicedCounts: Record<string, number> = {};
-          for (const r of (invoicedCountsRows as any).rows || invoicedCountsRows) {
+          for (const r of resultRows<{ article_code: string; cnt: string | null }>(invoicedCountsRows)) {
             invoicedCounts[r.article_code] = parseInt(r.cnt || "0");
           }
 
