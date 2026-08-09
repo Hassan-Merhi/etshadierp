@@ -159,7 +159,7 @@ jobs:
       - name: Refresh and verify smoke snapshot
         shell: bash
         run: |
-          UPDATE_API_SMOKE_SHAPES=1 npm run test:smoke-sweep
+          UPDATE_API_SMOKE_SHAPES=1 npm run test:smoke-sweep || true
           npm run test:smoke-sweep
 
       - name: Format changed source
