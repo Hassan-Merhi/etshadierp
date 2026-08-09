@@ -13,6 +13,9 @@ import { sql, inArray } from "drizzle-orm";
 import { ledgerAccounts, vouchers, voucherEntries } from "@shared/schema";
 import { findOrCreateLedger, getFactoryCompanyId, normUsd } from "./_helpers";
 
+const PAYROLL_MIGRATION_CONFIRMATION_REQUIRED =
+  "Explicit confirmation is required to run this payroll migration";
+
 function migrationCompletePayload(vouchersUpdated: number, bonusEntriesCreated: number) {
   return { message: "Migration complete", vouchersUpdated, bonusEntriesCreated };
 }
@@ -230,7 +233,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
   app.post("/api/factory/payroll/migrate-worker-names", requireAuth, async (req: any, res: any) => {
     try {
       if (req.body?.confirm !== true) {
-        return res.status(400).json({ message: "Explicit confirmation is required to run this payroll migration" });
+        return res.status(400).json({ message: PAYROLL_MIGRATION_CONFIRMATION_REQUIRED });
       }
       const currentRole = (req.session as any).currentRole;
       if (!["Admin", "Owner", "Developer"].includes(currentRole)) {
@@ -403,7 +406,7 @@ export function registerPayrollCoreMigrationRoutes(app: Express) {
   app.post("/api/factory/payroll/migrate-salary-groups", requireAuth, async (req: any, res: any) => {
     try {
       if (req.body?.confirm !== true) {
-        return res.status(400).json({ message: "Explicit confirmation is required to run this payroll migration" });
+        return res.status(400).json({ message: PAYROLL_MIGRATION_CONFIRMATION_REQUIRED });
       }
       const currentRole = (req.session as any).currentRole;
       if (!["Admin", "Owner", "Developer"].includes(currentRole)) {
