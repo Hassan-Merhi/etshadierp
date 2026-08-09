@@ -13,8 +13,7 @@ import { sql, inArray } from "drizzle-orm";
 import { ledgerAccounts, vouchers, voucherEntries } from "@shared/schema";
 import { findOrCreateLedger, getFactoryCompanyId, normUsd } from "./_helpers";
 
-const PAYROLL_MIGRATION_CONFIRMATION_REQUIRED =
-  "Explicit confirmation is required to run this payroll migration";
+const PAYROLL_MIGRATION_CONFIRMATION_REQUIRED = "Explicit confirmation is required to run this payroll migration";
 
 function migrationCompletePayload(vouchersUpdated: number, bonusEntriesCreated: number) {
   return { message: "Migration complete", vouchersUpdated, bonusEntriesCreated };
