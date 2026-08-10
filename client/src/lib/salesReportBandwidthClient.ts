@@ -1,4 +1,5 @@
 import type { DailySummary, SalesReportItem } from "@/pages/salesreportlegacy/types";
+import { queryClient } from "./queryClient";
 
 export interface SalesReportSummaryTotals {
   itemCount: number;
@@ -47,4 +48,21 @@ export async function fetchSalesReportRows(url: string): Promise<SalesReportItem
   const data = await response.json();
   if (!Array.isArray(data)) throw new Error("Invalid sales report export response");
   return data as SalesReportItem[];
+}
+
+/**
+ * Clears every current-company, all-company, summary, comparison, and raw
+ * Sales Report query after a write that can change sales totals or grouping.
+ * URL-based report keys carry filters in their first key element, so exact-key
+ * invalidation of only `/api/sales-report` would leave compact summaries stale.
+ */
+export function invalidateSalesReportQueries(): void {
+  queryClient.invalidateQueries({
+    predicate: (query) => {
+      const key = query.queryKey[0];
+      if (typeof key !== "string") return false;
+      return key.startsWith("/api/sales-report") || key.startsWith("/api/dashboard/sales-report");
+    },
+    refetchType: "active",
+  });
 }
