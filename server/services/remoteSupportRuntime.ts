@@ -55,13 +55,21 @@ function productionFeatureEnabled(environmentKey: string): boolean {
   return process.env[environmentKey]?.trim().toLowerCase() !== "false";
 }
 
+function fastScreenFeedBootEnabled(): boolean {
+  if (HARD_DISABLED) return false;
+  return process.env.REMOTE_SUPPORT_FAST_SCREEN_FEED?.trim().toLowerCase() !== "false";
+}
+
 const productionRemoteControlEnabled = productionFeatureEnabled("REMOTE_SUPPORT_REMOTE_CONTROL");
 const productionKeyboardControlEnabled =
   productionRemoteControlEnabled && productionFeatureEnabled("REMOTE_SUPPORT_KEYBOARD_CONTROL");
 
 const bootFlags: RemoteSupportFlags = {
   screenFeedEnabled: !HARD_DISABLED,
-  fastScreenFeed: false,
+  // The live SSE transport is now the normal screen-view path. Deployments can
+  // explicitly opt out with REMOTE_SUPPORT_FAST_SCREEN_FEED=false, and the
+  // Developer runtime switch still provides an immediate rollback to polling.
+  fastScreenFeed: fastScreenFeedBootEnabled(),
   remoteControl: productionRemoteControlEnabled,
   keyboardControl: productionKeyboardControlEnabled,
   sensitiveActionProtection: true,

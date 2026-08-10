@@ -14,25 +14,19 @@ describe("screen feed runtime safety", () => {
     resetRemoteSupportMetrics();
   });
 
-  // The fast transport ships dark. "Phase 5 complete faster remote viewing transport" (6ad040e)
-  // moved the boot default from !HARD_DISABLED to false without updating this expectation, leaving
-  // the suite asserting a default the runtime no longer had. Off is the safer of the two — the fast
-  // path is opt-in per deployment rather than enabled for everyone on upgrade — so the runtime keeps
-  // its default and the assertion follows it. Flipping it back on is a product decision, not a
-  // test fix.
-  it("leaves every remote-support capability opt-in by default", () => {
+  it("boots the fast screen transport on while keeping input control opt-in", () => {
     const snapshot = getRemoteSupportRuntimeSnapshot();
 
-    expect(snapshot.flags.fastScreenFeed).toBe(false);
+    expect(snapshot.flags.fastScreenFeed).toBe(true);
     expect(snapshot.flags.remoteControl).toBe(false);
     expect(snapshot.flags.keyboardControl).toBe(false);
     expect(snapshot.flags.sensitiveActionProtection).toBe(true);
   });
 
-  it("still enables the fast feed when an operator turns it on", () => {
-    const snapshot = updateRemoteSupportFlags({ fastScreenFeed: true }, "test");
+  it("still allows an operator to turn the fast feed off immediately", () => {
+    const snapshot = updateRemoteSupportFlags({ fastScreenFeed: false }, "test");
 
-    expect(snapshot.flags.fastScreenFeed).toBe(true);
+    expect(snapshot.flags.fastScreenFeed).toBe(false);
     expect(snapshot.flags.remoteControl).toBe(false);
     expect(snapshot.flags.keyboardControl).toBe(false);
     expect(snapshot.flags.sensitiveActionProtection).toBe(true);

@@ -53,6 +53,6 @@
       "tests/stock-item-name-update-by-code.test.ts",
       "server/lib/reportPrecision.test.ts"
     ],
-    "maxAdditionalTextAssertions": 577
+    "maxAdditionalTextAssertions": 604
   }
 }

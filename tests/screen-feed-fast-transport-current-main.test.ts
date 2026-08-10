@@ -17,8 +17,9 @@ const viewerSource = read("client/src/pages/settings/WatchUserDialog.tsx");
 const captureSource = read("client/src/hooks/use-screen-feed.ts");
 
 describe("Phase 5 faster remote viewing contracts", () => {
-  it("keeps fast mode disabled by default", () => {
-    expect(runtimeSource).toMatch(/fastScreenFeed:\s*false/);
+  it("keeps fast mode enabled by default with an explicit deployment opt-out", () => {
+    expect(runtimeSource).toContain("fastScreenFeed: fastScreenFeedBootEnabled()");
+    expect(runtimeSource).toContain("REMOTE_SUPPORT_FAST_SCREEN_FEED");
   });
 
   it("supports conditional polling without retransmitting unchanged frames", () => {
@@ -57,6 +58,8 @@ describe("Phase 5 faster remote viewing contracts", () => {
     expect(captureSource).toContain("new MutationObserver");
     expect(captureSource).toContain('document.visibilityState !== "visible"');
     expect(captureSource).toContain("markDirty(");
+    expect(captureSource).toContain("startMutationObserver");
+    expect(captureSource).toContain("stopMutationObserver");
   });
 
   it("uses a low-impact capture cadence instead of the old 150ms loop", () => {

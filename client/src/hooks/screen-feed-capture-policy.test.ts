@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   ACTIVE_CAPTURE_DELAY_MS,
+  CAPTURE_DUTY_CYCLE,
   FAILED_CAPTURE_DELAY_MS,
   IDLE_CAPTURE_DELAY_MS,
+  MAX_ADAPTIVE_CAPTURE_GAP_MS,
+  MAX_FAILED_CAPTURE_BACKOFF_MS,
   MAX_IDLE_CAPTURE_DELAY_MS,
+  adaptiveCaptureGapMs,
+  failedCaptureBackoffMs,
   hashScreenFeedPixels,
   nextScreenFeedCaptureDelay,
   shouldUploadScreenFrame,
@@ -42,6 +47,36 @@ describe("screen feed capture policy", () => {
     expect(nextScreenFeedCaptureDelay(2)).toBe(IDLE_CAPTURE_DELAY_MS);
     expect(nextScreenFeedCaptureDelay(4)).toBe(MAX_IDLE_CAPTURE_DELAY_MS);
     expect(nextScreenFeedCaptureDelay(0, true)).toBe(FAILED_CAPTURE_DELAY_MS);
+  });
+
+  it("uploads a frame whose pixels could not be read rather than dropping it", () => {
+    // An unreadable canvas (tainted, so getImageData throws) yields no
+    // signature. Without the force flag the frame compares equal to the empty
+    // baseline and is silently discarded, leaving the watcher with no picture.
+    expect(
+      shouldUploadScreenFrame({
+        signature: "",
+        lastSignature: "",
+        latestClickTs: 0,
+        lastUploadedClickTs: 0,
+        force: true,
+      })
+    ).toBe(true);
+  });
+
+  it("spaces captures by what the previous render actually cost", () => {
+    expect(adaptiveCaptureGapMs(ACTIVE_CAPTURE_DELAY_MS, 0)).toBe(ACTIVE_CAPTURE_DELAY_MS);
+    expect(adaptiveCaptureGapMs(ACTIVE_CAPTURE_DELAY_MS, 50)).toBe(ACTIVE_CAPTURE_DELAY_MS);
+    expect(adaptiveCaptureGapMs(ACTIVE_CAPTURE_DELAY_MS, 900)).toBe(900 * CAPTURE_DUTY_CYCLE);
+    expect(adaptiveCaptureGapMs(ACTIVE_CAPTURE_DELAY_MS, 60_000)).toBe(MAX_ADAPTIVE_CAPTURE_GAP_MS);
+  });
+
+  it("widens the retry gap while captures keep failing", () => {
+    expect(failedCaptureBackoffMs(1)).toBe(FAILED_CAPTURE_DELAY_MS);
+    expect(failedCaptureBackoffMs(3)).toBeGreaterThan(failedCaptureBackoffMs(1));
+    expect(failedCaptureBackoffMs(50)).toBeLessThanOrEqual(MAX_FAILED_CAPTURE_BACKOFF_MS);
+    // The gap plateaus instead of growing without bound.
+    expect(failedCaptureBackoffMs(50)).toBe(failedCaptureBackoffMs(5));
   });
 
   it("produces stable signatures from sampled pixels", () => {
