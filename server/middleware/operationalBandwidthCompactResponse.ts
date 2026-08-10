@@ -197,12 +197,21 @@ function encodeValue(value: unknown, indexes: Map<string, number>): unknown {
   return value;
 }
 
+function normalizeLikeResJson(payload: unknown): unknown {
+  const serialized = JSON.stringify(payload);
+  return serialized === undefined ? null : JSON.parse(serialized);
+}
+
 function compactPayload(payload: unknown): CompactEnvelope {
-  const { dictionary, indexes } = buildDictionary(payload);
+  // Normalize first so Dates, toJSON hooks, omitted undefined object properties,
+  // and null array slots match Express/JSON.stringify semantics exactly before
+  // we change only the wire representation.
+  const normalized = normalizeLikeResJson(payload);
+  const { dictionary, indexes } = buildDictionary(normalized);
   return {
     __erpWire: 1,
     d: dictionary,
-    v: encodeValue(payload, indexes),
+    v: encodeValue(normalized, indexes),
   };
 }
 
@@ -244,4 +253,5 @@ export const operationalBandwidthWireInternals = {
   DICT_TOKEN,
   shouldCompactPath,
   preparePayload,
+  normalizeLikeResJson,
 };
