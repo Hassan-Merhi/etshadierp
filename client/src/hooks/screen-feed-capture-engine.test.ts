@@ -55,9 +55,9 @@ function makeCanvas(width: number, height: number, tainted: boolean): HTMLCanvas
   return canvas;
 }
 
-function captureOnce(fetchMock: ReturnType<typeof vi.fn>) {
+function captureOnce(fetchMock: ReturnType<typeof vi.fn>, fast = false) {
   return captureAndUploadScreenFrame({
-    fast: false,
+    fast,
     lastSignature: null,
     lastUploadedClickTs: 0,
     cursor: null,
@@ -139,6 +139,24 @@ describe("screen feed capture engine", () => {
     expect(result.failed).toBe(true);
     expect(result.failureStage).toBe("encode");
     expect(result.failureReason).toContain("Tainted");
+  });
+
+  it("never uploads a fast frame above the fast transport encoding cap", async () => {
+    HTMLCanvasElement.prototype.toDataURL = function () {
+      return `data:image/jpeg;base64,${"A".repeat(600_000)}`;
+    };
+    html2canvas.mockResolvedValue(makeCanvas(1200, 800, false));
+
+    const { result } = await captureOnce(fetchMock, true);
+
+    expect(result.uploaded).toBe(false);
+    expect(result.failed).toBe(true);
+    expect(result.failureStage).toBe("encode");
+    expect(
+      fetchMock.mock.calls.some(
+        (call) => call[0] === "/api/screen-feed" && (call[1] as { method?: string } | undefined)?.method === "POST"
+      )
+    ).toBe(false);
   });
 
   it("returns the upload status when the server rejects a frame", async () => {

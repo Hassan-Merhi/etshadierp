@@ -206,6 +206,13 @@ export function registerScreenFeedRoutes(app: Express) {
       return res.status(204).end();
     }
     const userId = String(getSessionUserId(req));
+    const wantsEventStream = String(req.headers.accept ?? "")
+      .toLowerCase()
+      .includes("text/event-stream");
+    if (!wantsEventStream) {
+      res.setHeader("Cache-Control", "no-store");
+      return res.json({ watched: isUserBeingWatched(userId), fast: true });
+    }
     openEventStream(res);
     recordRemoteSupportMetric("liveStatusConnected");
     const sendStatus = () => {

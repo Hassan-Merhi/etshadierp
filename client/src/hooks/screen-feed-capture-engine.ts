@@ -519,7 +519,7 @@ function encodeFrame(canvas: HTMLCanvasElement, fast: boolean): EncodedFrame | n
     if (dataUrl.length <= limit) return lastFrame;
   }
 
-  return lastFrame && lastFrame.dataUrl.length <= MAX_DATA_URL_LEN ? lastFrame : null;
+  return lastFrame && lastFrame.dataUrl.length <= limit ? lastFrame : null;
 }
 
 interface EncodeOutcome {
@@ -537,10 +537,11 @@ interface EncodeOutcome {
  * text canvas keeps the viewer populated and carries the reason across.
  */
 function encodeWithFallback(canvas: HTMLCanvasElement, fast: boolean, source: CaptureSource): EncodeOutcome {
+  const limit = fast ? FAST_MAX_DATA_URL_LEN : MAX_DATA_URL_LEN;
   let reason: string;
   try {
     const encoded = encodeFrame(canvas, fast);
-    if (encoded?.dataUrl.startsWith("data:image/") && encoded.dataUrl.length <= MAX_DATA_URL_LEN) {
+    if (encoded?.dataUrl.startsWith("data:image/") && encoded.dataUrl.length <= limit) {
       return { encoded, source };
     }
     reason = `encode-invalid-${encoded?.dataUrl.length ?? 0}`;
@@ -551,7 +552,7 @@ function encodeWithFallback(canvas: HTMLCanvasElement, fast: boolean, source: Ca
   trace("encode-fallback", reason);
   try {
     const encoded = encodeFrame(buildFallbackCanvas(reason), fast);
-    if (encoded?.dataUrl.startsWith("data:image/") && encoded.dataUrl.length <= MAX_DATA_URL_LEN) {
+    if (encoded?.dataUrl.startsWith("data:image/") && encoded.dataUrl.length <= limit) {
       return { encoded, source: "fallback", failureReason: reason };
     }
   } catch (error) {
