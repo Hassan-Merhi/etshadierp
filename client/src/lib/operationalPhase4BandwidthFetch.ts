@@ -56,6 +56,12 @@ function responseProfileFor(path: string): string | null {
   if (pagePath === "/factory/sales/loading/new" && /^\/api\/factory\/customer-orders\/\d+$/.test(path)) {
     return "loading-order-state-v1";
   }
+  if (
+    pagePath === "/factory/waste-dispatch" &&
+    (path === "/api/factory/waste-dispatch/bales" || path === "/api/factory/waste-dispatch/history")
+  ) {
+    return "waste-dispatch-page-v1";
+  }
   return null;
 }
 
